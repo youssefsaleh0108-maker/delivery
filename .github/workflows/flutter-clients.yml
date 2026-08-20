@@ -1,0 +1,87 @@
+﻿# One pipeline building the mobile app and both web targets from the shared monorepo (Section 10).
+#
+# Everything here has been run locally against Flutter 3.44.9 / Dart 3.12.2: all three apps and both
+# shared packages analyze clean and their tests pass. The workflow itself has not run on a GitHub
+# runner yet (there is no remote), so treat the Android job in particular as unproven CI-side.
+
+name: flutter-clients
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'clients/**'
+      - '.github/workflows/flutter-clients.yml'
+  pull_request:
+    paths:
+      - 'clients/**'
+
+jobs:
+  analyze-and-build:
+    runs-on: ubuntu-latest
+    strategy:
+      # Don't let one target's failure hide the others': with three apps sharing two packages, a
+      # break is usually in the shared half and shows up everywhere at once.
+      fail-fast: false
+      matrix:
+        include:
+          - app: mobile_app
+            target: apk
+          - app: backoffice_web
+            target: web
+          - app: merchant_portal
+            target: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        working-directory: clients/apps/${{ matrix.app }}
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: clients/apps/${{ matrix.app }}
+        run: flutter analyze
+
+      - name: Test
+        working-directory: clients/apps/${{ matrix.app }}
+        # No widget tests exist yet; don't fail the build for that, but do run any that appear.
+        run: flutter test --no-pub || [ ! -d test ]
+
+      - name: Build
+        working-directory: clients/apps/${{ matrix.app }}
+        run: flutter build ${{ matrix.target }} --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}
+          path: |
+            clients/apps/${{ matrix.app }}/build/web
+            clients/apps/${{ matrix.app }}/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: ignore
+
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.9'
+          channel: stable
+          cache: true
+
+      # The shared packages are the blast radius for all three apps, so they are analysed on their
+      # own rather than only via whichever app happens to import the broken symbol.
+      - name: Analyze shared packages
+        run: |
+          for pkg in clients/packages/*/; do
+            echo "==> $pkg"
+            (cd "$pkg" && flutter pub get && flutter analyze)
+          done

@@ -1,0 +1,106 @@
+server:
+  port: ${SERVER_PORT:8102}
+
+spring:
+  application:
+    name: order-tracking
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=tracking}
+    username: ${DB_USER:order_tracking}
+    password: ${DB_PASSWORD:order_tracking_dev_pw}
+    hikari:
+      # Larger than the other services: this one takes a write per active rider every few seconds.
+      maximum-pool-size: 15
+      minimum-idle: 3
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/tracking
+    schemas: tracking
+    default-schema: tracking
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: tracking
+        jdbc:
+          time_zone: UTC
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:delivery}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+    listener:
+      simple:
+        # The projection is idempotent, so redelivery is safe; retry a few times before the DLQ.
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+delivery:
+  outbox:
+    exchange: delivery.events
+
+  tracking:
+    order-events-queue: tracking.order-events
+    # How long a cached position stays valid. Slightly longer than the rider ping interval so a
+    # single dropped ping does not push every watcher through to Postgres.
+    location-cache-ttl: 60s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      # Deliberately lower than the other services: this endpoint is called several times a second
+      # per active delivery, and tracing all of it would swamp the collector for little insight.
+      probability: ${OTEL_SAMPLE_RATE:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

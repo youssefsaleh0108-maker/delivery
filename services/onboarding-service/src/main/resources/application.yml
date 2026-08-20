@@ -1,0 +1,151 @@
+server:
+  port: ${SERVER_PORT:8117}
+
+spring:
+  application:
+    name: onboarding-service
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=onboarding}
+    username: ${DB_USER:onboarding_service}
+    password: ${DB_PASSWORD:onboarding_service_dev_pw}
+    hikari:
+      # The engine holds a connection per running job as well as per request, so this needs a
+      # little more headroom than a plain CRUD service.
+      maximum-pool-size: 12
+      minimum-idle: 3
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/onboarding
+    schemas: onboarding
+    default-schema: onboarding
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: onboarding
+        jdbc:
+          time_zone: UTC
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+camunda:
+  bpm:
+    # The engine creates and upgrades its own ACT_* tables. Flyway owns everything else in this
+    # schema; the two do not overlap, and letting Camunda manage its own is what makes an engine
+    # version bump a dependency change rather than fifty hand-written migrations.
+    database:
+      schema-update: true
+      table-prefix: onboarding.
+    # Deployed from the classpath on boot. A changed BPMN file becomes a new version and running
+    # instances finish on the version they started with — which is the property that lets a process
+    # be edited while applications are mid-review.
+    auto-deployment-enabled: true
+    deployment-resource-pattern: classpath*:processes/*.bpmn
+    # No engine-level authorisation. The only way into this engine is this service's own API, which
+    # is BACKOFFICE-gated at the controller; a second permission model on top would be two places to
+    # get the same answer from.
+    authorization:
+      enabled: false
+    # No admin-user. It exists to seed a login for Camunda's own web apps, which are not on the
+    # classpath — and the engine rejects an id containing a hyphen as "not a valid resource
+    # identifier", which is a confusing way to be told about an account nothing can use.
+    generic-properties:
+      properties:
+        # Job retries are what make a failed provisioning step recoverable rather than terminal.
+        historyTimeToLive: P180D
+
+delivery:
+  security:
+    permit-all:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+      # Applying to join, and checking on your own application.
+      #
+      # The only write endpoint in the platform reachable with no token, and it has to be: a
+      # prospective merchant has no account, because getting one is what they are asking for.
+      # Nothing here reads or returns anybody else's data — the status lookup is keyed on a
+      # 160-bit reference precisely because there is no caller identity to check it against.
+      - /api/onboarding/applications
+      - /api/onboarding/applications/by-reference/**
+      # Proving an address or a number belongs to you, which by definition happens before there is
+      # an account to authenticate with. These two send real messages to addresses strangers type,
+      # so the limits in VerificationService are what stand in for authentication here.
+      - /api/onboarding/verifications
+      - /api/onboarding/verifications/confirm
+
+  onboarding:
+    verification:
+      # How long before the same address can be sent another code. Short enough not to punish
+      # somebody whose first message went to spam, long enough that this is not a way to send
+      # somebody a message every second.
+      resend-cooldown: ${VERIFICATION_RESEND_COOLDOWN:60s}
+      # And the ceiling for a whole day. Past this, an address is being used as a target rather
+      # than being verified.
+      daily-cap: ${VERIFICATION_DAILY_CAP:8}
+
+  keycloak:
+    base-url: ${KEYCLOAK_INTERNAL_URL:http://localhost:8180}
+    realm: delivery-platform
+    client-id: ${KEYCLOAK_CLIENT_ID:onboarding-service}
+    # From Vault in a deployment. This service account can create users and register delivery
+    # companies, which makes it the most powerful credential in the platform.
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+
+  services:
+    order-manager: ${ORDER_MANAGER_URL:http://localhost:8101}
+    # Where one-time codes and decision messages are handed off. This service holds no SMTP or SMS
+    # credentials of its own — one sending path for the platform, one delivery log to answer
+    # "did it arrive" from.
+    notifications-manager: ${NOTIFICATIONS_MANAGER_URL:http://localhost:8104}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

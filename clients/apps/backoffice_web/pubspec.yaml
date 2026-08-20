@@ -1,0 +1,33 @@
+name: backoffice_web
+description: Delivery Backoffice - Flutter Web, BACKOFFICE role only. Monitoring, reconciliation and Connector Settings.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  delivery_core:
+    path: ../../packages/delivery_core
+  delivery_design_system:
+    path: ../../packages/delivery_design_system
+  # Used directly for the Dio instance and for catching DioException on 409s, so it is a first-order
+  # dependency here rather than something inherited from delivery_core.
+  dio: ^5.7.0
+  # Banner and category artwork. file_selector, not image_picker: it is the one that works on
+  # Flutter Web, which is the only place this app runs.
+  file_selector: ^1.0.3
+  # Read directly in main.dart for window.location.origin, so the OIDC redirect URI matches
+  # whichever host the portal was actually opened on.
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

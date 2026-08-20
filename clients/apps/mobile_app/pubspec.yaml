@@ -1,0 +1,41 @@
+name: mobile_app
+description: Delivery mobile app - Customer and Delivery Rider, branched on the Keycloak role claim.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  delivery_core:
+    path: ../../packages/delivery_core
+  delivery_design_system:
+    path: ../../packages/delivery_design_system
+  delivery_l10n:
+    path: ../../packages/delivery_l10n
+  # Used directly to build the shared Dio instance in main.dart.
+  dio: ^5.7.0
+  # Both are imported directly here — the localisation delegates in main.dart and the saved
+  # language and address. They arrive transitively too, but depending on that would mean this app
+  # stops compiling the day another package drops them.
+  flutter_localizations:
+    sdk: flutter
+  flutter_secure_storage: ^9.2.2
+  # Dates on the order page. `any` so it stays pinned to whatever the Flutter SDK resolves for
+  # flutter_localizations — a version constraint here would fight it on every SDK bump.
+  intl: any
+  # Push notifications arrive through the Push Worker -> Push Connector -> Firebase chain in
+  # Phase 3; the package is listed now so token registration is wired from the first build.
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

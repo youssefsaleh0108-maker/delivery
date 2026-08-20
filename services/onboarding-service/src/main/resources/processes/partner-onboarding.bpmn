@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Joining the platform as a merchant or a delivery company.
+
+  The shape of this process is the argument for having a process at all. Provisioning is not one
+  step, it is several that can each fail independently — a Keycloak account, a domain record, a
+  notification — and the expensive failure is a half-finished partner: an account that can sign in
+  to a shop that does not exist, or a company row with nobody able to log into it. An engine that
+  remembers where it got to, and retries the step that failed rather than the whole thing, is worth
+  more here than the code it replaces.
+
+  The human step is genuinely human. Somebody at the platform reads the application and decides.
+  Everything either side of that decision is automatic.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="partner-onboarding-definitions"
+                  targetNamespace="http://delivery.com/onboarding">
+
+  <bpmn:process id="partner-onboarding" name="Partner onboarding" isExecutable="true">
+
+    <bpmn:startEvent id="submitted" name="Application submitted">
+      <bpmn:outgoing>to-screen</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:sequenceFlow id="to-screen" sourceRef="submitted" targetRef="screen" />
+
+    <!--
+      The cheap checks, before a person spends time on it: is this name already taken, does the
+      contact information look like it belongs to somebody reachable. Nothing here rejects an
+      application on its own — it annotates it, so the reviewer sees the problem rather than
+      discovering it after approving.
+    -->
+    <bpmn:serviceTask id="screen" name="Automatic checks"
+                      camunda:delegateExpression="${screenApplication}">
+      <bpmn:incoming>to-screen</bpmn:incoming>
+      <bpmn:outgoing>to-review</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:sequenceFlow id="to-review" sourceRef="screen" targetRef="review" />
+
+    <!--
+      The decision. A user task rather than a timer or a rule: whether to let a business onto the
+      platform is a commercial judgement, and the one thing that must not happen is it being made
+      by default because nobody looked.
+    -->
+    <bpmn:userTask id="review" name="Platform review" camunda:candidateGroups="BACKOFFICE">
+      <bpmn:incoming>to-review</bpmn:incoming>
+      <bpmn:outgoing>to-decision</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:sequenceFlow id="to-decision" sourceRef="review" targetRef="decision" />
+
+    <!--
+      Declining is the default branch, stated rather than left to be inferred. Camunda will assume
+      an unconditioned flow is the default and warns that it is doing so — and the assumption is
+      worth removing here specifically, because the branch it guesses at is the one that grants
+      somebody a merchant account. Not approving by accident is the safe direction.
+    -->
+    <bpmn:exclusiveGateway id="decision" name="Approved?" default="rejected">
+      <bpmn:incoming>to-decision</bpmn:incoming>
+      <bpmn:outgoing>approved</bpmn:outgoing>
+      <bpmn:outgoing>rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:sequenceFlow id="approved" name="yes" sourceRef="decision" targetRef="provision">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"
+                                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <!--
+      Two service tasks rather than one, because they fail for different reasons and only one of
+      them is safe to retry blindly. Creating the account talks to Keycloak; creating the shop or
+      the fleet talks to our own services. Splitting them means a Keycloak outage does not roll back
+      a perfectly good domain record, and the engine resumes at the step that actually failed.
+    -->
+    <bpmn:serviceTask id="provision" name="Create the account"
+                      camunda:delegateExpression="${provisionAccount}">
+      <bpmn:incoming>approved</bpmn:incoming>
+      <bpmn:outgoing>to-create-entity</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:sequenceFlow id="to-create-entity" sourceRef="provision" targetRef="create-entity" />
+
+    <bpmn:serviceTask id="create-entity" name="Create the shop or the fleet"
+                      camunda:delegateExpression="${createPartnerRecord}">
+      <bpmn:incoming>to-create-entity</bpmn:incoming>
+      <bpmn:outgoing>to-welcome</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:sequenceFlow id="to-welcome" sourceRef="create-entity" targetRef="welcome" />
+
+    <bpmn:serviceTask id="welcome" name="Tell them they are in"
+                      camunda:delegateExpression="${notifyApplicant}">
+      <bpmn:incoming>to-welcome</bpmn:incoming>
+      <bpmn:outgoing>to-live</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:sequenceFlow id="to-live" sourceRef="welcome" targetRef="live" />
+
+    <bpmn:endEvent id="live" name="Partner is live">
+      <bpmn:incoming>to-live</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="rejected" name="no" sourceRef="decision" targetRef="decline" />
+
+    <!--
+      A rejection is still told to the applicant, with the reason. Silence is the worst answer: it
+      produces the phone call, and the reapplication, and the same review done twice.
+    -->
+    <bpmn:serviceTask id="decline" name="Tell them why not"
+                      camunda:delegateExpression="${notifyApplicant}">
+      <bpmn:incoming>rejected</bpmn:incoming>
+      <bpmn:outgoing>to-declined</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:sequenceFlow id="to-declined" sourceRef="decline" targetRef="declined" />
+
+    <bpmn:endEvent id="declined" name="Application declined">
+      <bpmn:incoming>to-declined</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+
+  <!-- Diagram interchange, so the process is readable in Camunda Modeler rather than only as XML. -->
+  <bpmndi:BPMNDiagram id="diagram">
+    <bpmndi:BPMNPlane id="plane" bpmnElement="partner-onboarding">
+      <bpmndi:BPMNShape id="s-submitted" bpmnElement="submitted">
+        <dc:Bounds x="160" y="180" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-screen" bpmnElement="screen">
+        <dc:Bounds x="250" y="158" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-review" bpmnElement="review">
+        <dc:Bounds x="400" y="158" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-decision" bpmnElement="decision" isMarkerVisible="true">
+        <dc:Bounds x="550" y="173" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-provision" bpmnElement="provision">
+        <dc:Bounds x="650" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-create-entity" bpmnElement="create-entity">
+        <dc:Bounds x="790" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-welcome" bpmnElement="welcome">
+        <dc:Bounds x="930" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-live" bpmnElement="live">
+        <dc:Bounds x="1080" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-decline" bpmnElement="decline">
+        <dc:Bounds x="650" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-declined" bpmnElement="declined">
+        <dc:Bounds x="800" y="272" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="e-to-screen" bpmnElement="to-screen">
+        <di:waypoint x="196" y="198" /><di:waypoint x="250" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-review" bpmnElement="to-review">
+        <di:waypoint x="350" y="198" /><di:waypoint x="400" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-decision" bpmnElement="to-decision">
+        <di:waypoint x="500" y="198" /><di:waypoint x="550" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-approved" bpmnElement="approved">
+        <di:waypoint x="575" y="173" /><di:waypoint x="575" y="120" /><di:waypoint x="650" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-create-entity" bpmnElement="to-create-entity">
+        <di:waypoint x="750" y="120" /><di:waypoint x="790" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-welcome" bpmnElement="to-welcome">
+        <di:waypoint x="890" y="120" /><di:waypoint x="930" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-live" bpmnElement="to-live">
+        <di:waypoint x="1030" y="120" /><di:waypoint x="1080" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-rejected" bpmnElement="rejected">
+        <di:waypoint x="575" y="223" /><di:waypoint x="575" y="290" /><di:waypoint x="650" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-to-declined" bpmnElement="to-declined">
+        <di:waypoint x="750" y="290" /><di:waypoint x="800" y="290" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

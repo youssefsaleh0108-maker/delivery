@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delivery — your city, delivered</title>
+  <meta name="description" content="Restaurants, pharmacies and anything else, brought to the door. Partner with us as a shop or a delivery company.">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<!--
+  The public front door.
+
+  Four audiences arrive here and only two of them belong on this page. A shop or a delivery company
+  signs a commercial agreement and needs a review before they can trade, so they get a form. A
+  customer or a rider signs themselves up in the app in under a minute, so sending them to a web
+  form would be a longer road to the same place — they get a link to the app instead.
+
+  The Backoffice is deliberately absent from this page, and its address is deliberately absent from
+  this comment too — a note in the page source naming the door is the same as a link to it. Staff
+  know where it is. Not a security control on its own: that portal enforces the BACKOFFICE role on
+  every request. It is simply not a public entrance, so it is not on the public map.
+-->
+
+<!--
+  The moving backdrop.
+
+  Decorative and nothing else, so it is aria-hidden and takes no pointer events — a screen reader
+  should not announce three empty spans, and nothing here should ever swallow a click meant for the
+  page. It is also the first thing in the body rather than a background on an element, so it can sit
+  behind the whole document without any section having to know it exists.
+-->
+<div class="backdrop" aria-hidden="true">
+  <span class="orb orb-a"></span>
+  <span class="orb orb-b"></span>
+  <span class="orb orb-c"></span>
+  <span class="grain"></span>
+  <span class="dawn"></span>
+</div>
+
+<header class="masthead">
+  <a class="wordmark" href="/">
+    <span class="mark" aria-hidden="true"></span>
+    Delivery
+  </a>
+  <nav>
+    <a href="#about">About us</a>
+    <a href="#contact">Contact us</a>
+    <!--
+      The one way in for a business, and it goes straight to the form.
+
+      There used to be two cards further down the page saying the same thing in more words, each
+      with its own button. They were a second entry point to a page that already asks, as its first
+      question, which of the two you are — so the cards restated a choice the form was going to
+      make anyway, and split the traffic between two places to keep in step.
+    -->
+    <a href="/register">Partner with us</a>
+    <a href="#app">Get the app</a>
+    <button class="ghost" data-open="signin">Sign in</button>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <h1>Your city, delivered.</h1>
+      <p class="lede">
+        Restaurants, pharmacies, groceries — and anything else you need fetched.
+        Ordered in the app, or straight from a WhatsApp message to the shop.
+      </p>
+      <div class="hero-actions">
+        <!-- Straight to the form. On a narrow screen the masthead links are hidden, so this is the
+             only way a business reaches it — a link to a section that no longer exists would have
+             left mobile visitors with no route in at all. -->
+        <a class="primary" href="/register">Partner with us</a>
+        <a class="secondary" href="#app">Order something</a>
+      </div>
+    </div>
+    <!--
+      Placeholder for the Canva hero. Drawn in CSS rather than left blank so the page is complete
+      on its own — a broken image frame reads as a broken site, and an empty box reads as an
+      unfinished one.
+    -->
+    <div class="hero-art" role="img" aria-label="A courier bag and a scooter, stylised">
+      <div class="art-bag"></div>
+      <div class="art-wheel art-wheel-a"></div>
+      <div class="art-wheel art-wheel-b"></div>
+      <div class="art-road"></div>
+    </div>
+  </section>
+
+  <section class="strip">
+    <div><strong>Same-day</strong><span>Most orders inside the hour</span></div>
+    <div><strong>Any shop</strong><span>Food, pharmacy, groceries, errands</span></div>
+    <div><strong>Cash or card</strong><span>Pay however suits you</span></div>
+    <div><strong>Arabic &amp; English</strong><span>The whole app, both ways round</span></div>
+  </section>
+
+  <section id="about" class="prose">
+    <h2>About us</h2>
+    <p class="section-lede">
+      We connect the shops in your city with the people who deliver for them, and take the awkward
+      parts off both of their hands.
+    </p>
+    <p>
+      A shop gets its menu in front of the whole city and keeps taking orders the way it already
+      does — including straight from the WhatsApp messages it already receives. A delivery company
+      brings its own fleet and is sent work on merit: the more it completes and the faster it
+      claims, the more it is offered. Nobody has to choose between the two, and nobody has to run
+      their own riders to be on the platform.
+    </p>
+    <p>
+      The whole thing works in Arabic and English, both ways round, and takes cash as seriously as
+      it takes cards — because most of this city still pays at the door.
+    </p>
+  </section>
+
+  <section id="contact" class="prose">
+    <h2>Contact us</h2>
+    <p class="section-lede">
+      Something gone wrong with an order, or a question before you apply? Talk to a person.
+    </p>
+    <!--
+      PLACEHOLDERS. These are not real routes yet and need replacing before this site is public —
+      an address on a contact page that nobody reads is worse than no contact page, because a
+      customer who writes to it believes they have been in touch.
+    -->
+    <dl class="contact-list">
+      <dt>Email</dt>
+      <dd><a href="mailto:hello@delivery.example">hello@delivery.example</a></dd>
+      <dt>WhatsApp</dt>
+      <dd>The number on your order confirmation reaches the shop directly.</dd>
+      <dt>Already a partner?</dt>
+      <dd>Sign in to your portal — support is on every screen.</dd>
+    </dl>
+  </section>
+
+  <section id="app" class="app">
+    <h2>Ordering, or riding?</h2>
+    <p class="section-lede">
+      Both live in the app — the same one, and it knows which you are when you sign in.
+      No application, no waiting: you are set up in a minute.
+    </p>
+    <div class="app-actions">
+      <a class="primary" href="http://127.0.0.1:5012" target="_blank" rel="noopener">Open the app</a>
+      <span class="hint">Customers order. Riders pick up work. Same sign-in.</span>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>© Delivery</span>
+  <nav>
+    <a href="#about">About us</a>
+    <a href="#contact">Contact us</a>
+    <a href="/register">Partner with us</a>
+    <a href="#app">Get the app</a>
+  </nav>
+</footer>
+
+<!-- ------------------------------------------------------------------ sign in -->
+<dialog id="signin" class="sheet">
+  <form method="dialog" class="sheet-head">
+    <h2>Sign in</h2>
+    <button class="icon" aria-label="Close">&times;</button>
+  </form>
+  <p class="sheet-lede">Which portal are you here for?</p>
+  <div class="choices">
+    <a class="choice" href="http://127.0.0.1:5010">
+      <strong>Shop</strong>
+      <span>Menu, orders, your WhatsApp inbox</span>
+    </a>
+    <a class="choice" href="http://127.0.0.1:5013">
+      <strong>Delivery company</strong>
+      <span>Your jobs, your earnings, your fleet</span>
+    </a>
+  </div>
+  <p class="sheet-foot">
+    Ordering or riding? <a href="http://127.0.0.1:5012">Open the app instead</a>.
+  </p>
+</dialog>
+
+<!--
+  The apply sheet used to live here. It moved to /register, and became a page with steps, when
+  verification entered the flow: a dialog that can be dismissed with the Escape key or a stray click
+  on the backdrop is a poor place to keep somebody's half-finished application while they go and
+  find a code in their inbox.
+-->
+
+<script src="site.js"></script>
+</body>
+</html>

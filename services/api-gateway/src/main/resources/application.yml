@@ -1,0 +1,227 @@
+server:
+  port: ${SERVER_PORT:8100}
+
+spring:
+  application:
+    name: api-gateway
+
+  # Config client bootstrap (Section 6). 'optional:' so the Gateway still starts for a health check
+  # if the Config Server is briefly down; real property values still come from there when it is up.
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+    gateway:
+      default-filters:
+        # Every downstream call is rate-limited on the resolved user/IP key.
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: ${RATE_LIMIT_RPS:20}
+            redis-rate-limiter.burstCapacity: ${RATE_LIMIT_BURST:40}
+            redis-rate-limiter.requestedTokens: 1
+        # Strip hop-by-hop identity headers a client might try to inject. Downstream services read
+        # identity from the validated JWT only, but defence in depth costs nothing here.
+        - RemoveRequestHeader=X-User-Id
+        - RemoveRequestHeader=X-User-Roles
+
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            # Flutter Web (Backoffice + Merchant Portal) are separate origins from the API.
+            # Comma-separated; localhost and 127.0.0.1 are different origins to a browser, so both
+            # must be listed or one of them silently fails every request.
+            allowedOriginPatterns: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: '*'
+            exposedHeaders: [X-Correlation-Id]
+            allowCredentials: true
+            maxAge: 3600
+
+      # Phase 0 ships the Gateway with routes already declared for services that arrive in later
+      # phases. Until each is built these return 503 — that is the intended state, not a bug, and
+      # it means adding a service is a deployment rather than a Gateway code change.
+      routes:
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URI:http://localhost:8103}
+          predicates:
+            - Path=/api/products/**,/api/categories/**
+
+        - id: order-manager
+          uri: ${ORDER_MANAGER_URI:http://localhost:8101}
+          predicates:
+            - Path=/api/orders/**
+
+        # Fee waivers. BACKOFFICE-only, and the role check is in the service rather than only here:
+        # this endpoint gives away the platform's own revenue, which is not an authorisation that
+        # should depend on a routing table being right.
+        - id: fee-waiver-offers
+          uri: ${ORDER_MANAGER_URI:http://localhost:8101}
+          predicates:
+            - Path=/api/offers,/api/offers/**
+
+        - id: order-tracking
+          uri: ${ORDER_TRACKING_URI:http://localhost:8102}
+          predicates:
+            - Path=/api/tracking/**
+
+        - id: order-tracking-ws
+          uri: ${ORDER_TRACKING_WS_URI:ws://localhost:8102}
+          predicates:
+            - Path=/ws/tracking/**
+
+        - id: app-notification
+          uri: ${APP_NOTIFICATION_URI:http://localhost:8108}
+          predicates:
+            - Path=/api/notifications/**
+
+        - id: app-notification-ws
+          uri: ${APP_NOTIFICATION_WS_URI:ws://localhost:8108}
+          predicates:
+            - Path=/ws/notifications/**
+
+        # A separate path from /api/notifications/** on purpose. That one is the user's in-app
+        # inbox; this is the delivery record across every channel - a different service, a
+        # different audience, and mostly BACKOFFICE-only.
+        - id: notifications-manager
+          uri: ${NOTIFICATIONS_MANAGER_URI:http://localhost:8104}
+          predicates:
+            - Path=/api/notification-log/**
+
+        # Phase 6: per-provider delivery rates, the gate on a vendor cutover. BACKOFFICE-only,
+        # enforced in the service.
+        - id: notification-rates
+          uri: ${NOTIFICATIONS_MANAGER_URI:http://localhost:8104}
+          predicates:
+            - Path=/api/notification-rates/**
+
+        # BACKOFFICE-only reconciliation (Phase 4). Enforced in the service, not just here.
+        - id: accounting-service
+          uri: ${ACCOUNTING_SERVICE_URI:http://localhost:8115}
+          predicates:
+            - Path=/api/accounting/**
+
+        # NOTE: the connectors (8110-8113) are deliberately NOT routed here. Their endpoints accept
+        # "send this message" or "move this money" with no user token, and exist only on the
+        # internal network. A route would expose them to anyone holding any valid token.
+        #
+        # Nor is the Core Banking Simulator (8114): it stands in for a system outside the platform
+        # and carries a fault-injection endpoint. Routing it would put "break the bank connection"
+        # behind the same gateway as the customer app.
+
+        # BACKOFFICE-only. The Connector Settings API can redirect real SMS and money traffic
+        # (Section 8), so the role check is enforced in that service, not just here.
+        - id: connector-settings
+          uri: ${CONNECTOR_SETTINGS_URI:http://localhost:8109}
+          predicates:
+            - Path=/api/settings/connectors/**
+
+        # WhatsApp ordering. The merchant inbox is an ordinary JWT route; the inbound webhook is
+        # not, for the same forced reason as the DLR callback — see the permit-all note below.
+        - id: whatsapp-service
+          uri: ${WHATSAPP_SERVICE_URI:http://localhost:8116}
+          predicates:
+            - Path=/api/whatsapp/**
+
+        - id: whatsapp-webhook
+          uri: ${WHATSAPP_SERVICE_URI:http://localhost:8116}
+          predicates:
+            - Path=/webhooks/whatsapp/**
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+
+delivery:
+  security:
+    # Realm roles are always mapped; listing the clients here also maps their client-level roles,
+    # which is what a future BACKOFFICE_ADMIN sub-role would use (Section 3).
+    client-ids:
+      - mobile-app
+      - backoffice-web
+      - merchant-portal
+    permit-all:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      # Carrier delivery-receipt callbacks. The ONE public path the Gateway forwards to a connector,
+      # and the exception is forced rather than chosen: an SMS vendor's webhook originates outside
+      # our estate and can never hold a Keycloak token, so demanding one would mean never learning
+      # whether a message arrived. The request is still authenticated - by the vendor's own
+      # signature, checked in the connector, failing closed with no secret configured.
+      #
+      # Scoped to this exact prefix. It is NOT /webhooks/**, and it does not widen
+      # /api/connector/**, which stays unrouted (Phase 5 asserts this).
+      - /webhooks/dlr/**
+      # Inbound WhatsApp messages, for the identical reason: Meta's servers hold no Keycloak token,
+      # so a JWT requirement here means never receiving a customer's order. Authenticated by Meta's
+      # HMAC signature over the raw body, checked in whatsapp-service before any field is read and
+      # failing closed with no secret configured.
+      #
+      # Scoped to this exact prefix. /api/whatsapp/** — the merchant's own inbox — is NOT here and
+      # stays behind a token.
+      - /webhooks/whatsapp/**
+      # Applying to join, and checking on your own application.
+      #
+      # The only WRITE endpoint in the platform reachable with no token, and unlike the two webhooks
+      # above it is not authenticated by a signature either — it cannot be, because the caller is a
+      # member of the public filling in a form. What makes that acceptable is that it creates
+      # nothing but a request for review: no account, no shop, no money. A person decides the rest.
+      #
+      # Both paths listed exactly. `/api/onboarding/**` would open the reviewer queue and the
+      # approve endpoint to the world, which is the difference between a form and a way in.
+      - /api/onboarding/applications
+      - /api/onboarding/applications/by-reference/**
+      # Proving an address or a number is yours, which necessarily happens before there is an
+      # account. Listed exactly, like the two above: these send real messages to addresses a
+      # stranger supplies, and the cooldown and daily cap per destination in the service are what
+      # stand in for authentication.
+      - /api/onboarding/verifications
+      - /api/onboarding/verifications/confirm
+      # The list of delivery companies a rider can apply to. Open for the same reason as the two
+      # above: applying is what gets them an account, so they cannot have one yet. Exact, not a
+      # wildcard — /api/delivery-providers/** would expose registering and suspending companies.
+      - /api/delivery-providers/hiring
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,prometheus,refresh,busrefresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

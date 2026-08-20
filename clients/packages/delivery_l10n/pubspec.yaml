@@ -1,0 +1,23 @@
+name: delivery_l10n
+description: Shared translations and locale handling for the three Delivery clients.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Provides the Material/Cupertino/Widgets delegates. Without these, Arabic renders but every
+  # built-in string (date pickers, "Cancel", tooltips) stays English.
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  generate: true

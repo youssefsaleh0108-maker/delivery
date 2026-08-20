@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Standalone: this library builds, versions and releases on its own, with no parent pom,
+       so it can move to its own repository without any further change. -->
+  <groupId>com.delivery</groupId>
+  <artifactId>platform-security</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Platform :: Security</name>
+  <description>Keycloak JWT -&gt; Spring Security authorities, for both servlet and reactive services (Section 3)</description>
+
+  <properties>
+    <java.version>17</java.version>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <spring-boot.version>3.4.5</spring-boot.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Brings spring-security-config/core/web + oauth2-resource-server + jose,
+         but deliberately NOT servlet-api or a web server: this jar has to work
+         in both the servlet services and the reactive gateway. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Compile-only: needed to reference SecurityFilterChain (servlet) and ServerHttpSecurity
+         (reactive) in the same jar. Provided scope keeps them out of the runtime classpath, so a
+         reactive service never picks up the servlet API and vice versa. The matching
+         @ConditionalOnWebApplication guards mean only one of the two configs ever activates. -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Was inherited from the root pom, which applied it to every module without exception. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${maven.compiler.release}</release>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Published here by the platform repo's own workflow; consumed by the services from the same
+       URL. -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages — delivery platform</name>
+      <url>https://maven.pkg.github.com/youssefsaleh0108-maker/delivery.platform</url>
+    </repository>
+  </distributionManagement>
+</project>

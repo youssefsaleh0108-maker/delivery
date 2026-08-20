@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apply to join — Delivery</title>
+  <meta name="description" content="Apply to put your shop on the platform, or to bring your delivery fleet onto it.">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<!--
+  Applying, on its own page.
+
+  This was a dialog, and a dialog was the wrong container the moment verification entered it. A
+  sheet over a darkened page reads as "one quick thing" — you can dismiss it with the Escape key or
+  a stray click on the backdrop, and losing it loses everything typed. That is a fair bargain for a
+  short form and a bad one for a flow that asks somebody to leave, open their inbox, and come back
+  with a code. A page has an address, survives a reload, and can be sent to a colleague to finish.
+-->
+
+<div class="backdrop" aria-hidden="true">
+  <span class="orb orb-a"></span>
+  <span class="orb orb-b"></span>
+  <span class="orb orb-c"></span>
+  <span class="grain"></span>
+  <span class="dawn"></span>
+</div>
+
+<header class="masthead">
+  <a class="wordmark" href="/">
+    <span class="mark" aria-hidden="true"></span>
+    Delivery
+  </a>
+  <nav>
+    <a href="/">Back to the site</a>
+  </nav>
+</header>
+
+<main class="apply-page">
+  <h1 id="apply-heading">Apply to join</h1>
+  <p class="section-lede" id="apply-sub">A few short steps. We read every application.</p>
+
+  <!--
+    The progress rail.
+
+    Steps are numbered and named, and the ones already done stay visible. A bare "3 of 4" tells
+    somebody how much is left but not what is coming, and what is coming is the part that decides
+    whether they start at all: nobody minds a code if they can see it is one step of four.
+  -->
+  <ol class="steps" id="steps" aria-label="Progress">
+    <li data-step="1"><span class="dot">1</span><span class="step-name">Your business</span></li>
+    <li data-step="2"><span class="dot">2</span><span class="step-name">Email</span></li>
+    <li data-step="3"><span class="dot">3</span><span class="step-name">Phone</span></li>
+    <li data-step="4"><span class="dot">4</span><span class="step-name">Send it</span></li>
+  </ol>
+
+  <p class="form-error" id="page-error" hidden></p>
+
+  <!-- ---------------------------------------------------------------- 1. business -->
+  <section class="panel step" data-step="1">
+    <h2>Your business</h2>
+    <p class="panel-lede">Tell us who is applying. Nothing here is published anywhere.</p>
+
+    <fieldset class="kind-choice">
+      <legend>What are you applying as?</legend>
+      <label class="kind">
+        <input type="radio" name="kind" value="MERCHANT" checked>
+        <span>
+          <strong>A shop</strong>
+          <small>Put your menu in front of the city and let us find the rider</small>
+        </span>
+      </label>
+      <label class="kind">
+        <input type="radio" name="kind" value="CARRIER">
+        <span>
+          <strong>A delivery company</strong>
+          <small>Bring your fleet onto the platform and get work routed to you</small>
+        </span>
+      </label>
+    </fieldset>
+
+    <label>
+      <span id="business-label">Shop name</span>
+      <input id="businessName" required maxlength="200" autocomplete="organization">
+    </label>
+    <label>
+      <span>Your name</span>
+      <input id="contactName" required maxlength="160" autocomplete="name">
+    </label>
+    <label>
+      <span id="notes-label">Anything else we should know</span>
+      <textarea id="notes" rows="3" maxlength="2000"></textarea>
+    </label>
+
+    <div class="step-actions">
+      <span></span>
+      <button class="primary" data-next="2">Continue</button>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- 2. email -->
+  <section class="panel step" data-step="2" hidden>
+    <h2>Your email address</h2>
+    <p class="panel-lede">
+      We send a six-digit code to check it reaches you. Everything after this — including the
+      decision and how to sign in — goes to this address, so it has to be one you can open.
+    </p>
+
+    <div class="verify-row">
+      <label class="grow">
+        <span>Email</span>
+        <input id="contactEmail" type="email" required maxlength="200" autocomplete="email">
+      </label>
+      <button class="secondary" id="email-send">Send code</button>
+    </div>
+
+    <div class="code-box" id="email-code-box" hidden>
+      <label>
+        <span>The code we sent</span>
+        <!-- inputmode numeric so a phone offers a number pad; one-time-code lets both iOS and
+             Android offer to fill it from the message itself. -->
+        <input id="email-code" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="6" placeholder="000000">
+      </label>
+      <button class="primary" id="email-confirm">Verify</button>
+      <p class="hint">
+        <span id="email-expiry"></span>
+        <button class="linkish" id="email-resend" disabled>Send another</button>
+      </p>
+    </div>
+
+    <p class="verified" id="email-verified" hidden>✓ Verified</p>
+    <p class="form-error" id="email-error" hidden></p>
+
+    <div class="step-actions">
+      <button class="secondary" data-back="1">Back</button>
+      <button class="primary" data-next="3" id="email-continue" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- 3. phone -->
+  <section class="panel step" data-step="3" hidden>
+    <h2>A phone number <span class="optional">optional</span></h2>
+    <p class="panel-lede">
+      Useful when something about an order needs sorting out quickly. If you would rather not,
+      skip this — it changes nothing about your application.
+    </p>
+
+    <div class="verify-row">
+      <label class="grow">
+        <span>Phone</span>
+        <input id="contactPhone" type="tel" maxlength="32" autocomplete="tel" placeholder="+961 …">
+      </label>
+      <button class="secondary" id="phone-send">Send code</button>
+    </div>
+
+    <div class="code-box" id="phone-code-box" hidden>
+      <label>
+        <span>The code we sent</span>
+        <input id="phone-code" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="6" placeholder="000000">
+      </label>
+      <button class="primary" id="phone-confirm">Verify</button>
+      <p class="hint">
+        <span id="phone-expiry"></span>
+        <button class="linkish" id="phone-resend" disabled>Send another</button>
+      </p>
+    </div>
+
+    <p class="verified" id="phone-verified" hidden>✓ Verified</p>
+    <p class="form-error" id="phone-error" hidden></p>
+
+    <div class="step-actions">
+      <button class="secondary" data-back="2">Back</button>
+      <span class="spacer"></span>
+      <!-- Skip is a plain button beside Continue, not a small link underneath it. An optional step
+           whose way out is hidden is not optional in practice. -->
+      <button class="ghost" id="phone-skip">Skip this</button>
+      <button class="primary" data-next="4" id="phone-continue" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- 4. send -->
+  <section class="panel step" data-step="4" hidden>
+    <h2>Check and send</h2>
+    <p class="panel-lede">This is what we will read. Go back and change anything that is not right.</p>
+
+    <dl class="summary" id="summary"></dl>
+
+    <p class="form-error" id="submit-error" hidden></p>
+
+    <div class="step-actions">
+      <button class="secondary" data-back="3">Back</button>
+      <button class="primary" id="submit">Send application</button>
+    </div>
+    <p class="sheet-foot">We read every application. You will hear from us either way.</p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- receipt -->
+  <section class="panel step" data-step="done" hidden>
+    <p class="done-mark" aria-hidden="true">✓</p>
+    <h2>Thank you — we have it.</h2>
+    <p class="panel-lede">
+      Keep this reference. It is the only way to check on your application before we reply, and we
+      have also sent it to your email address.
+    </p>
+    <p class="reference" id="reference"></p>
+    <div class="step-actions">
+      <button class="secondary" id="check">Check its status</button>
+      <a class="primary" href="/">Back to the site</a>
+    </div>
+    <p class="status-line" id="status" hidden></p>
+  </section>
+</main>
+
+<script src="register.js"></script>
+</body>
+</html>

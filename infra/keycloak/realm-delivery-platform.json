@@ -1,0 +1,368 @@
+{
+  "realm": "delivery-platform",
+  "displayName": "Delivery Platform",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "failureFactor": 10,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "roles": {
+    "realm": [
+      {
+        "name": "CUSTOMER",
+        "description": "Places and tracks orders in the Mobile App."
+      },
+      {
+        "name": "DELIVERY",
+        "description": "Delivery rider: delivery queue, route, proof-of-delivery capture."
+      },
+      {
+        "name": "MERCHANT",
+        "description": "Manages own catalog and orders through the Merchant Web Portal."
+      },
+      {
+        "name": "BACKOFFICE",
+        "description": "Platform administration, monitoring and reconciliation."
+      },
+      {
+        "name": "CARRIER",
+        "description": "Staff of a delivery company: administers their own carrier, not the platform."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "mobile-app",
+      "name": "Flutter Mobile App (Customer + Rider)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "com.delivery.app://oauth2redirect",
+        "com.delivery.app://oauth2redirect/*",
+        "http://localhost:5012/*",
+        "http://127.0.0.1:5012/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "com.delivery.app://logout##http://localhost:5012/*##http://127.0.0.1:5012/*"
+      }
+    },
+    {
+      "clientId": "backoffice-web",
+      "name": "Flutter Web Backoffice",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:5011/*",
+        "http://127.0.0.1:5011/*",
+        "http://10.182.9.119:5011/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5011/*"
+      }
+    },
+    {
+      "clientId": "merchant-portal",
+      "name": "Flutter Web Merchant Portal",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:5010/*",
+        "http://127.0.0.1:5010/*",
+        "http://10.182.9.119:5010/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5010/*"
+      }
+    },
+    {
+      "clientId": "backend-services",
+      "name": "Spring Boot resource servers",
+      "description": "Bearer-only. Validates tokens issued to the three client applications above; never initiates a login of its own.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "notifications-manager",
+      "name": "Notifications Manager service account",
+      "description": "Reads user email and phone attributes so an order event carrying only a Keycloak sub can be turned into an addressed notification. Scoped to view-users and nothing else - a service that needs to read an email address must not be able to write one.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "notifications-manager-dev-secret",
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "accounting-service",
+      "name": "Accounting Service service account",
+      "description": "Resolves a Keycloak sub into the bank account that user settles through. Scoped to view-users only: a service that reads a payout account must not be able to write one.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "accounting-service-dev-secret",
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "carrier-portal",
+      "name": "Carrier Portal",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://127.0.0.1:5013/*",
+        "http://localhost:5013/*"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:5013",
+        "http://localhost:5013"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5010/*"
+      }
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "name": "declarative-user-profile",
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"phoneNumber\",\"displayName\":\"Mobile number\",\"validations\":{\"pattern\":{\"pattern\":\"^\\\\+[1-9]\\\\d{7,14}$\",\"error-message\":\"Must be an E.164 number, e.g. +15550100001\"}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"fcmToken\",\"displayName\":\"Push device token\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"bankAccountRef\",\"displayName\":\"Settlement account\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes the platform keeps about a person\"}]}"
+          ]
+        }
+      }
+    ]
+  },
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "notifications-manager",
+        "roles": [
+          "view-users"
+        ]
+      },
+      {
+        "client": "accounting-service",
+        "roles": [
+          "view-users"
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-accounting-service",
+      "enabled": true,
+      "serviceAccountClientId": "accounting-service",
+      "clientRoles": {
+        "realm-management": [
+          "view-users"
+        ]
+      }
+    },
+    {
+      "username": "service-account-notifications-manager",
+      "enabled": true,
+      "serviceAccountClientId": "notifications-manager",
+      "clientRoles": {
+        "realm-management": [
+          "view-users"
+        ]
+      }
+    },
+    {
+      "username": "customer",
+      "email": "customer@dev.local",
+      "firstName": "Casey",
+      "lastName": "Customer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "CUSTOMER"
+      ],
+      "attributes": {
+        "phoneNumber": [
+          "+15550100001"
+        ],
+        "fcmToken": [
+          "dev-fcm-token-customer-0000000000000000000000000000"
+        ],
+        "bankAccountRef": [
+          "ACC-CUSTOMER"
+        ]
+      }
+    },
+    {
+      "username": "rider",
+      "email": "rider@dev.local",
+      "firstName": "Riley",
+      "lastName": "Rider",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "rider",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "DELIVERY"
+      ],
+      "attributes": {
+        "phoneNumber": [
+          "+15550100002"
+        ],
+        "fcmToken": [
+          "dev-fcm-token-rider-0000000000000000000000000000000"
+        ],
+        "bankAccountRef": [
+          "ACC-RIDER"
+        ]
+      }
+    },
+    {
+      "username": "merchant",
+      "email": "merchant@dev.local",
+      "firstName": "Morgan",
+      "lastName": "Merchant",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "merchant",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "MERCHANT"
+      ],
+      "attributes": {
+        "phoneNumber": [
+          "+15550100003"
+        ],
+        "fcmToken": [
+          "dev-fcm-token-merchant-0000000000000000000000000000"
+        ],
+        "bankAccountRef": [
+          "ACC-MERCHANT"
+        ]
+      }
+    },
+    {
+      "username": "backoffice",
+      "email": "backoffice@dev.local",
+      "firstName": "Bailey",
+      "lastName": "Backoffice",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "backoffice",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "BACKOFFICE"
+      ]
+    },
+    {
+      "username": "carrier",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "carrier@delivery.test",
+      "firstName": "Cara",
+      "lastName": "Carrier",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "carrier",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "CARRIER"
+      ],
+      "attributes": {
+        "phoneNumber": [
+          "+15550100003"
+        ],
+        "fcmToken": [
+          "dev-fcm-token-merchant-0000000000000000000000000000"
+        ],
+        "bankAccountRef": [
+          "ACC-MERCHANT"
+        ]
+      }
+    }
+  ],
+  "loginTheme": "delivery",
+  "accountTheme": "keycloak.v3",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "en",
+    "ar"
+  ],
+  "defaultLocale": "en"
+}

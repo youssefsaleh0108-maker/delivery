@@ -1,0 +1,202 @@
+# The route table, and the middlewares every request passes through.
+#
+# Watched and hot-reloaded: adding a service is an edit to this file, not a rebuild of the one
+# component every request goes through.
+#
+# --------------------------------------------------------------------------------------------
+# WHAT MOVED, AND WHAT DID NOT
+#
+# The Spring gateway validated the JWT before proxying. Traefik does not, and that is not a hole:
+# every service behind it validates the token itself through platform-security, checks the issuer,
+# and enforces its own role rules and its own permit-all list. The gateway's check was the second
+# of two, never the only one — which is why the services each keep a permitAll list rather than
+# trusting whatever arrives.
+#
+# The practical difference is that an unauthenticated request now reaches the service before it is
+# refused, instead of being refused a hop earlier. What that costs is a little more traffic on the
+# internal network. What it buys is one place where routing lives, no JVM in the request path, and
+# no service that cannot be reached because the gateway has not been redeployed.
+#
+# What did move here, because it belongs at the edge: CORS, rate limiting, stripping injected
+# identity headers, and the security headers.
+# --------------------------------------------------------------------------------------------
+
+http:
+  middlewares:
+    platform-cors:
+      headers:
+        # localhost and 127.0.0.1 are different origins to a browser. Both, or one of the portals
+        # silently fails every request — which is exactly the bug that is impossible to see from
+        # the server side.
+        accessControlAllowOriginListRegex:
+          - "^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$"
+        accessControlAllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+        accessControlAllowHeaders: ["*"]
+        accessControlExposeHeaders: [X-Correlation-Id]
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 3600
+        addVaryHeader: true
+
+    platform-rate-limit:
+      rateLimit:
+        # Matches what the Spring gateway allowed: 20/s sustained, 40 burst. Per client IP, which
+        # is what Traefik can key on without Redis — the old one keyed on the resolved user where
+        # it could. Coarser, and the honest trade for taking Redis out of the request path.
+        average: 20
+        burst: 40
+        # No sourceCriterion: the default is the request's remote address, which is what is wanted.
+        # An explicit `ipStrategy.depth: 0` looks like the same thing and is not — depth counts back
+        # through X-Forwarded-For, so with no such header the client IP resolves to empty and the
+        # limiter silently lets everything through. It did: 120 parallel requests, none refused.
+
+    strip-identity-headers:
+      headers:
+        customRequestHeaders:
+          # Services read identity from the validated token and nothing else, so these are already
+          # ignored. Emptied anyway: defence in depth costs nothing, and the day somebody adds a
+          # convenience read of X-User-Id this is what stops it being a way in.
+          X-User-Id: ""
+          X-User-Roles: ""
+
+    security-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: no-referrer
+
+  routers:
+    # ------------------------------------------------------------------ product-service (8103)
+    product-service:
+      rule: >-
+        PathPrefix(`/api/products`) || PathPrefix(`/api/categories`)
+        || PathPrefix(`/api/stores`) || PathPrefix(`/api/banners`)
+        || PathPrefix(`/api/delivery-zones`)
+      service: product-service
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ order-manager (8101)
+    order-manager:
+      rule: >-
+        PathPrefix(`/api/orders`) || PathPrefix(`/api/butler`)
+        || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`)
+      service: order-manager
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ order-tracking (8102)
+    order-tracking:
+      rule: PathPrefix(`/api/tracking`)
+      service: order-tracking
+      entryPoints: [web]
+
+    # Websockets need no special handling in Traefik — it upgrades in place, where the Spring
+    # gateway needed a separate ws:// route for the same path family.
+    order-tracking-ws:
+      rule: PathPrefix(`/ws/tracking`)
+      service: order-tracking
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ app-notification (8108)
+    app-notification:
+      rule: PathPrefix(`/api/notifications`)
+      service: app-notification
+      entryPoints: [web]
+
+    app-notification-ws:
+      rule: PathPrefix(`/ws/notifications`)
+      service: app-notification
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ notifications-manager (8104)
+    notification-log:
+      rule: PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`)
+      service: notifications-manager
+      entryPoints: [web]
+
+    # The DLR callback. A carrier's delivery receipt arrives with no token — it cannot have one —
+    # and is authenticated by a signature instead. Routed, but nothing else about it is public.
+    sms-dlr-webhook:
+      rule: PathPrefix(`/webhooks/dlr`)
+      service: notifications-manager
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ accounting-service (8115)
+    accounting-service:
+      rule: PathPrefix(`/api/accounting`)
+      service: accounting-service
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ connector-settings (8109)
+    connector-settings:
+      rule: PathPrefix(`/api/settings/connectors`)
+      service: connector-settings
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ whatsapp-service (8116)
+    whatsapp-service:
+      rule: PathPrefix(`/api/whatsapp`)
+      service: whatsapp-service
+      entryPoints: [web]
+
+    whatsapp-webhook:
+      rule: PathPrefix(`/webhooks/whatsapp`)
+      service: whatsapp-service
+      entryPoints: [web]
+
+    # ------------------------------------------------------------------ onboarding-service (8117)
+    onboarding-service:
+      rule: PathPrefix(`/api/onboarding`)
+      service: onboarding-service
+      entryPoints: [web]
+
+  # NOTE ON WHAT IS ABSENT.
+  #
+  # The connectors (8110-8113) and the Core Banking Simulator (8114) are deliberately not routed.
+  # Their endpoints accept "send this message" and "move this money" with no user token and exist
+  # only on the internal network; a route would put them behind the same door as the customer app.
+  # The simulator additionally carries a fault-injection endpoint — "break the bank connection"
+  # does not belong on the public edge at any price.
+  services:
+    product-service:
+      loadBalancer:
+        servers:
+          - url: http://product-service:8103
+
+    order-manager:
+      loadBalancer:
+        servers:
+          - url: http://order-manager:8101
+
+    order-tracking:
+      loadBalancer:
+        servers:
+          - url: http://order-tracking:8102
+
+    app-notification:
+      loadBalancer:
+        servers:
+          - url: http://app-notification:8108
+
+    notifications-manager:
+      loadBalancer:
+        servers:
+          - url: http://notifications-manager:8104
+
+    accounting-service:
+      loadBalancer:
+        servers:
+          - url: http://accounting-service:8115
+
+    connector-settings:
+      loadBalancer:
+        servers:
+          - url: http://connector-settings:8109
+
+    whatsapp-service:
+      loadBalancer:
+        servers:
+          - url: http://whatsapp-service:8116
+
+    onboarding-service:
+      loadBalancer:
+        servers:
+          - url: http://onboarding-service:8117

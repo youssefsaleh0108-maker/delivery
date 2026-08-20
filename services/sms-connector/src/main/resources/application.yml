@@ -1,0 +1,125 @@
+server:
+  port: ${SERVER_PORT:8112}
+
+spring:
+  application:
+    name: sms-connector
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+
+  # Used only by the dev-passthrough provider. Real vendors are reached over HTTPS, not SMTP.
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+delivery:
+  security:
+    # The send endpoint is called by the SMS worker, a service with no user token to present. It is
+    # NOT routed by the API Gateway, so it is unreachable from outside the cluster network - see
+    # ConnectorSendController for why adding a Gateway route for it would be a mistake. Staging and
+    # production replace this with mTLS between services (Section 10).
+    permit-all:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      # Narrowed from /api/connector/** in the Phase 5 review: a wildcard would make any
+      # endpoint later added under that prefix public by default. These are the only two the
+      # worker needs, and neither is routed by the Gateway.
+      - /api/connector/send
+      - /api/connector/status
+      # Phase 6: read-only "which provider would this id go to", for confirming a canary ramp
+      # before it carries real traffic. Sends nothing and reveals no secret.
+      - /api/connector/route/**
+      # Carrier delivery receipts. Unlike everything above this IS routed by the Gateway and IS
+      # reachable from the internet, because a vendor's callback comes from a machine holding no
+      # token of ours. "permit-all" here means "no JWT", not "no authentication": each provider's
+      # DeliveryReceiptTranslator verifies the vendor's signature before a field is read, and fails
+      # closed when no secret is configured. Scoped to this one path - it must never become
+      # /webhooks/** for the same reason /api/connector/** was narrowed above.
+      - /webhooks/dlr/**
+
+  outbox:
+    exchange: delivery.events
+
+  connector:
+    type: SMS
+    # What this connector uses until Connector Settings tells it otherwise. The safe choice: a
+    # wrong default that sends nothing real beats one that sends through a paid vendor.
+    default-provider: DEV_PASSTHROUGH
+    settings-queue: connector.sms.settings
+    settings-url: ${CONNECTOR_SETTINGS_URL:http://localhost:8109}
+    cache-ttl: 5m
+    max-attempts: 3
+    initial-backoff: 500ms
+    failure-rate-threshold: 50
+    open-state-duration: 30s
+    dead-letter-queue: notification.dlq
+
+  sms:
+    dev-passthrough:
+      test-inbox: ${SMS_TEST_INBOX:sms-test-inbox@dev.local}
+      from: sms-connector@dev.local
+      # Signs dev-passthrough delivery receipts, so the DLR path can be exercised without a vendor
+      # account. A DEV-ONLY default value on purpose: it authenticates callbacks for a provider that
+      # sends nothing real, and the dev-passthrough provider must never be active in production.
+      # The real vendors' secrets have no default and come from Vault - see below.
+      dlr-secret: ${SMS_DEV_DLR_SECRET:dev-dlr-secret}
+    montymobile:
+      base-url: https://api.montymobile.com
+      send-path: /api/v1/SMS/Send
+      sender-id: DELIVERY
+      # api-key comes from Vault at secret/sms-connector, never from here.
+    twilio:
+      base-url: https://api.twilio.com
+      # account-sid, auth-token and from come from Vault at secret/sms-connector.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

@@ -1,0 +1,71 @@
+# What the platform is doing, collected rather than guessed at.
+#
+# Every service has published /actuator/prometheus since Phase 0 and nothing has ever scraped it —
+# so the load numbers in Section 10 came from a one-off run and there was no way to see a
+# regression between them. This closes that.
+#
+# Scrape targets are listed explicitly rather than discovered. Docker service discovery would find
+# containers automatically, but it also finds the ones that must never be scraped as though they
+# were ours — Keycloak, the bank simulator — and an accidental target is harder to notice than a
+# missing one.
+
+global:
+  # Fast enough to see a deploy take effect while somebody is watching, slow enough that fifteen
+  # services scraping in a loop is not itself the load being measured.
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stack: delivery-local
+
+# The rules that decide when somebody is told. Collecting metrics and watching none of them is most
+# of the way to no monitoring at all — the data answers a question, but only once somebody already
+# knows to ask it. See alerts.yml for why the list is deliberately short.
+#
+# Note there is no Alertmanager in this compose stack, so alerts fire and are visible on
+# Prometheus's own /alerts page but are not routed anywhere. Wiring that up is a deployment
+# decision (who is on call, on which channel) rather than an application one.
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # The domain services. All Spring Boot, all exposing the same actuator path, so one job with a
+  # target list rather than fifteen near-identical jobs.
+  #
+  # `application` is already stamped on every metric by management.metrics.tags in the shared
+  # config, so the instance label here is only about which container answered.
+  - job_name: delivery-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - 'api-gateway:8100'
+          - 'product-service:8103'
+          - 'order-manager:8101'
+          - 'order-tracking:8102'
+          - 'notifications-manager:8104'
+          - 'mail-worker:8105'
+          - 'push-worker:8106'
+          - 'sms-worker:8107'
+          - 'app-notification:8108'
+          - 'connector-settings:8109'
+          - 'email-connector:8110'
+          - 'push-connector:8111'
+          - 'sms-connector:8112'
+          - 'corebanking-connector:8113'
+          - 'accounting-service:8115'
+          - 'whatsapp-service:8116'
+          - 'onboarding-service:8117'
+    relabel_configs:
+      # The container name alone, so a graph legend reads "order-manager" rather than a host:port.
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: service
+        replacement: '$1'
+
+  # Deliberately absent: keycloak, rabbitmq, postgres, minio, vault, jaeger, and the Core Banking
+  # simulator. The first group are infrastructure with their own exporters if they are ever wanted;
+  # the simulator stands in for a system outside the platform and scraping it would put a
+  # third party's internals on our dashboards.

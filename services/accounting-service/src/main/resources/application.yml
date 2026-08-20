@@ -1,0 +1,116 @@
+server:
+  port: ${SERVER_PORT:8115}
+
+spring:
+  application:
+    name: accounting-service
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=accounting}
+    username: ${DB_USER:accounting_service}
+    password: ${DB_PASSWORD:accounting_service_dev_pw}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/accounting
+    schemas: accounting
+    default-schema: accounting
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: accounting
+        jdbc:
+          time_zone: UTC
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+    listener:
+      simple:
+        retry:
+          # Both listeners are idempotent, so a few redeliveries are safe before the DLQ.
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+        # Deliberately 1. Settlement legs for one order must not be processed concurrently: two
+        # threads applying results for the same order could both decide to compensate it.
+        concurrency: 1
+        max-concurrency: 1
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+delivery:
+  outbox:
+    exchange: delivery.events
+
+  ordering:
+    # The platform's take. Served from the config repo in a real environment - it is a business
+    # parameter an engineer changes through a commit, not a Backoffice screen (Section 6).
+    commission-percentage: 12.5
+
+  accounting:
+    order-events-queue: accounting.order-events
+    results-queue: accounting.posting-results
+    platform-account: ACC-PLATFORM
+    currency: USD
+    # Where a settlement goes when a user has no bankAccountRef. Deliberately a real-looking but
+    # obviously wrong account, so the mistake shows up in the reconciliation view rather than as a
+    # silently dropped settlement.
+    unmapped-account: ACC-UNMAPPED
+    account-cache-ttl: 15m
+    keycloak:
+      base-url: ${KEYCLOAK_INTERNAL_URL:http://localhost:8180}
+      realm: delivery-platform
+      client-id: accounting-service
+      client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

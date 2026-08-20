@@ -1,0 +1,40 @@
+# Build output
+target/
+build/
+*.jar
+*.war
+
+# The config-repo is its own Git repository, not a directory of this one (Section 6).
+# infra/bootstrap.ps1 initialises it; in staging/prod it is a real remote the Config Server clones.
+/config-repo/
+
+# Local environment credentials
+infra/.env
+.env
+!.env.example
+!infra/.env.example
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Flutter / Dart
+clients/**/.dart_tool/
+clients/**/build/
+clients/**/.flutter-plugins
+clients/**/.flutter-plugins-dependencies
+clients/**/ios/Pods/
+clients/**/android/.gradle/
+*.g.dart
+*.freezed.dart
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,59 @@
+# Traefik: the front door.
+#
+# Static configuration — what Traefik itself is. The routes live in dynamic/routes.yml, which
+# Traefik watches and reloads without a restart. That split is most of the reason for the change:
+# adding a service used to mean editing a Spring application, rebuilding a jar and redeploying the
+# one component every request passes through.
+
+entryPoints:
+  # 8100, the same port the Spring gateway held. Deliberate: every client, every smoke suite and
+  # every dart-define in the repo names this port, so keeping it makes the cutover a swap rather
+  # than a rename across four apps and a website.
+  web:
+    address: ":8100"
+    http:
+      middlewares:
+        - platform-cors@file
+        - platform-rate-limit@file
+        - strip-identity-headers@file
+        - security-headers@file
+
+  # Traefik's own metrics and dashboard, on a port that is not the public one. The dashboard is
+  # useful and is emphatically not something to serve beside the customer API.
+  #
+  # 8099, not 8080 and not 8180: 8080 is Keycloak's port inside the network and 8180 is Keycloak's
+  # on the host, and a monitoring port that collides with the identity provider is a confusing
+  # half-hour waiting to happen.
+  traefik:
+    address: ":8099"
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+api:
+  # Read-only: no configuration can be changed through it. On its own entryPoint, which is not
+  # published to the host in production — see the compose file.
+  dashboard: true
+  insecure: false
+
+metrics:
+  prometheus:
+    entryPoint: traefik
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+log:
+  level: INFO
+
+accessLog:
+  # One line per request, and deliberately not the default set: Authorization would put bearer
+  # tokens in a log file, and a token in a log is a token that outlives the session it belonged to.
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        X-Correlation-Id: keep
+        User-Agent: keep
+        Content-Type: keep

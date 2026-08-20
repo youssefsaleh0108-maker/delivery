@@ -1,0 +1,34 @@
+name: delivery_core
+description: Keycloak OIDC login, token storage and the authenticated API client shared by all Delivery clients.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Authorization Code + PKCE (Section 3).
+  #
+  # flutter_appauth is MOBILE/DESKTOP ONLY — it has no web implementation. The two Flutter Web
+  # portals use the hand-rolled browser redirect flow in oidc_client_web.dart instead, which is why
+  # crypto/http/web are here alongside it. Conditional imports in oidc_client.dart pick one.
+  flutter_appauth: ^8.0.0
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.6
+  http: ^1.2.2
+  web: ^1.1.0
+
+  dio: ^5.7.0
+  # The translated labels for the display enums. delivery_l10n depends on nothing local, so
+  # this cannot cycle.
+  delivery_l10n:
+    path: ../delivery_l10n
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

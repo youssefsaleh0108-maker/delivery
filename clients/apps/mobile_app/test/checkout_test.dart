@@ -1,0 +1,222 @@
+import 'package:delivery_core/delivery_core.dart';
+import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_app/src/cart.dart';
+import 'package:mobile_app/src/checkout_screen.dart';
+import 'package:mobile_app/src/delivery_address.dart';
+
+import 'widget_test.dart' show product, storeCard;
+
+/// What the checkout screen sends, and what it refuses to send.
+///
+/// These are the two changes that can silently ship wrong: an address picked in the dropdown that
+/// travels without the area it belongs to, and a payment method the customer never saw. Both are
+/// invisible on screen and only visible in the request body, so that is what is asserted.
+void main() {
+  /// Secure storage, answered in-process.
+  ///
+  /// Not optional. A `testWidgets` body runs inside fake async, and a real platform channel is
+  /// replied to on the real event loop — so `select()`, which writes the address book, awaits a
+  /// reply that never arrives and the test hangs rather than fails. Answering the channel here
+  /// keeps the whole await chain inside the same fake clock.
+  const MethodChannel storageChannel =
+      MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(storageChannel, (MethodCall call) async => null);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(storageChannel, null);
+  });
+
+  /// Captures the placement request instead of making one.
+  ///
+  /// An interceptor rather than a fake adapter: it resolves before any socket is opened, so the
+  /// test neither waits on a connection nor depends on how Dio encodes the body on the wire.
+  ({Dio dio, List<RequestOptions> sent}) recordingDio() {
+    final List<RequestOptions> sent = <RequestOptions>[];
+    final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+        sent.add(options);
+        handler.resolve(Response<dynamic>(
+          requestOptions: options,
+          statusCode: 201,
+          data: <String, dynamic>{
+            'id': 'order-1',
+            'customerId': 'user-1',
+            'merchantId': 'm1',
+            'riderId': null,
+            'status': 'PLACED',
+            'totalAmount': 9.75,
+            'deliveryAddress': '12 Rose Street',
+            'paymentMethod': 'CASH',
+            'paymentStatus': 'DUE',
+            'items': <dynamic>[],
+            'availableActions': <dynamic>[],
+          },
+        ));
+      },
+    ));
+    return (dio: dio, sent: sent);
+  }
+
+  /// A store with two saved addresses, the second of which is selected.
+  ///
+  /// [load] is never called, so nothing reads the platform channel. Writing through [select] does
+  /// touch it, and the store swallows that failure by design — persistence is a convenience, and a
+  /// test that could not select an address would be testing the storage plugin rather than this
+  /// screen.
+  Future<DeliveryAddressStore> storeWithAddresses() async {
+    final DeliveryAddressStore store = DeliveryAddressStore();
+    await store.select(const DeliveryAddress(
+      line: '4 Mill Lane',
+      label: 'Work',
+      notes: 'Reception desk, ask for me',
+      zoneId: 'zone-work',
+      zoneName: 'Downtown',
+    ));
+    await store.select(const DeliveryAddress(
+      line: '12 Rose Street',
+      label: 'Home',
+      zoneId: 'zone-home',
+      zoneName: 'Riverside',
+    ));
+    return store;
+  }
+
+  Cart cartWithOneItem() {
+    final Cart cart = Cart();
+    cart.add(product('a', 's1', 9.75), from: storeCard('s1'));
+    return cart;
+  }
+
+  Future<void> pumpCheckout(
+    WidgetTester tester, {
+    required Dio dio,
+    required DeliveryAddressStore addresses,
+    required Cart cart,
+  }) async {
+    // Tall enough for the whole form: at the default 800x600 the place-order button falls outside
+    // the viewport, where a lazy ListView never builds it and no finder can reach it.
+    tester.view.physicalSize = const Size(1000, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: DeliveryTheme.light(),
+      localizationsDelegates: const <LocalizationsDelegate<Object>>[
+        DeliveryStrings.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: LocaleController.supported,
+      home: CheckoutScreen(api: OrderApi(dio), cart: cart, addresses: addresses),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('the address is picked from a list, not typed', (WidgetTester tester) async {
+    final DeliveryAddressStore addresses = await storeWithAddresses();
+    await pumpCheckout(
+        tester, dio: recordingDio().dio, addresses: addresses, cart: cartWithOneItem());
+
+    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    // The most recently selected one, already chosen — the customer picked it on the home screen
+    // and should not have to pick it again.
+    expect(find.text('Home · 12 Rose Street'), findsOneWidget);
+    // And the area behind it, which is what the fee is priced from.
+    expect(find.textContaining('Riverside'), findsOneWidget);
+  });
+
+  testWidgets('cash on delivery is offered and already chosen', (WidgetTester tester) async {
+    final DeliveryAddressStore addresses = await storeWithAddresses();
+    await pumpCheckout(
+        tester, dio: recordingDio().dio, addresses: addresses, cart: cartWithOneItem());
+
+    expect(find.text('Payment method'), findsOneWidget);
+    expect(find.text('Cash on delivery'), findsOneWidget);
+    // Chosen, not merely listed. An unselected sole option is a decision the customer has to make
+    // for no reason.
+    expect(find.byIcon(Icons.radio_button_checked_rounded), findsOneWidget);
+    // The one method that has no provider behind it must not be offered.
+    expect(find.text('Card'), findsNothing);
+  });
+
+  testWidgets('placing sends the picked address, its area, and CASH',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
+    final DeliveryAddressStore addresses = await storeWithAddresses();
+    await pumpCheckout(
+        tester, dio: recorder.dio, addresses: addresses, cart: cartWithOneItem());
+
+    // Switch to the other saved address: the zone has to follow the choice, which is the whole
+    // reason the free-text box went.
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Work · 4 Mill Lane').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+
+    expect(recorder.sent, hasLength(1));
+    final Map<String, dynamic> body = recorder.sent.single.data as Map<String, dynamic>;
+    expect(body['deliveryAddress'], '4 Mill Lane');
+    expect(body['deliveryZoneId'], 'zone-work');
+    expect(body['paymentMethod'], 'CASH');
+  });
+
+  testWidgets('the door notes follow the address, and what is typed still wins',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
+    final DeliveryAddressStore addresses = await storeWithAddresses();
+    await pumpCheckout(
+        tester, dio: recorder.dio, addresses: addresses, cart: cartWithOneItem());
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Work · 4 Mill Lane').last);
+    await tester.pumpAndSettle();
+
+    // Switching door brings that door's instructions with it, rather than carrying the previous
+    // address's over.
+    expect(find.text('Reception desk, ask for me'), findsWidgets);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Notes for the merchant (optional)'), 'No onions');
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+
+    // Placing re-selects the address to promote it in the recents, which notifies the store — and
+    // that notification must not overwrite what the customer just typed.
+    final Map<String, dynamic> body = recorder.sent.single.data as Map<String, dynamic>;
+    expect(body['notes'], 'No onions');
+    // And the saved address keeps its own note rather than inheriting the order's.
+    expect(addresses.selected?.notes, 'Reception desk, ask for me');
+  });
+
+  testWidgets('with nothing saved there is nothing to place against',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
+    await pumpCheckout(
+        tester, dio: recorder.dio, addresses: DeliveryAddressStore(), cart: cartWithOneItem());
+
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pumpAndSettle();
+
+    // No request, and a reason on screen rather than a silent no-op.
+    expect(recorder.sent, isEmpty);
+    expect(find.text('We need somewhere to deliver to'), findsOneWidget);
+  });
+}

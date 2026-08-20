@@ -1,0 +1,98 @@
+server:
+  port: ${SERVER_PORT:8888}
+
+spring:
+  application:
+    name: config-server
+
+  profiles:
+    # REQUIRED for the composite backend below. Without the 'composite' profile active, Spring
+    # Cloud Config ignores spring.cloud.config.server.composite entirely and falls back to the
+    # single-repository DefaultRepositoryConfiguration, which then fails at startup with
+    # "You need to configure a uri for the git repository". Run locally with 'composite,local'.
+    # Not named SPRING_PROFILES: that env var binds to the property 'spring.profiles', which Boot 3
+    # rejects outright as an invalid config property.
+    active: ${CONFIG_PROFILES:composite}
+
+  security:
+    user:
+      name: ${CONFIG_SERVER_USER:config}
+      # No default. A Config Server that boots with a well-known password is a Config Server that
+      # hands out every service's Vault-resolved secrets to anything on the network.
+      password: ${CONFIG_SERVER_PASSWORD}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD}
+
+  cloud:
+    config:
+      server:
+        # Applies to every composite entry. Without it the server resolves an unlabelled request
+        # against 'master' and 404s, since config-repo's default branch is 'main'.
+        default-label: ${CONFIG_GIT_BRANCH:main}
+
+        # How the server AUTHENTICATES to Vault.
+        #
+        # This block must live here, at spring.cloud.config.server.vault, and NOT only inside the
+        # composite entry below. SpringVaultEnvironmentRepositoryFactory is constructed with a
+        # SpringVaultClientConfiguration bean built from these global properties, and that bean is
+        # what chooses the ClientAuthentication. Put `authentication: APPROLE` only in the composite
+        # entry and it is silently ignored: the server falls back to TOKEN auth and every config
+        # request fails with "Missing required header in HttpServletRequest: X-Config-Token".
+        #
+        # AppRole, not a root token: this server holds a role scoped read-only to exactly the secret
+        # paths it serves, and never broader Vault access (Section 6).
+        vault:
+          host: ${VAULT_HOST:localhost}
+          port: ${VAULT_PORT:8200}
+          scheme: ${VAULT_SCHEME:http}
+          backend: ${VAULT_BACKEND:secret}
+          kv-version: 2
+          default-key: application
+          profile-separator: '/'
+          authentication: APPROLE
+          app-role:
+            role-id: ${VAULT_ROLE_ID}
+            secret-id: ${VAULT_SECRET_ID}
+            app-role-path: approle
+
+        # Composite backend (Section 6): Git for plain business/environment properties, Vault for
+        # secrets. Order matters — later entries win, so a Vault key overrides a Git placeholder of
+        # the same name rather than the other way round.
+        composite:
+          - type: git
+            uri: ${CONFIG_GIT_URI:file://${user.dir}/../../config-repo}
+            default-label: ${CONFIG_GIT_BRANCH:main}
+            search-paths: '{application}'
+            clone-on-start: true
+            # A stale config on a Git outage is far better than a service that cannot boot.
+            force-pull: true
+          - type: vault
+            host: ${VAULT_HOST:localhost}
+            port: ${VAULT_PORT:8200}
+            scheme: ${VAULT_SCHEME:http}
+            backend: ${VAULT_BACKEND:secret}
+            kv-version: 2
+            default-key: application
+            profile-separator: '/'
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,busrefresh,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

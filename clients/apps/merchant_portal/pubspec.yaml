@@ -1,0 +1,38 @@
+name: merchant_portal
+description: Delivery Merchant Portal - Flutter Web, MERCHANT role only. Catalog and order management.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  delivery_core:
+    path: ../../packages/delivery_core
+  delivery_design_system:
+    path: ../../packages/delivery_design_system
+  # Arabic is not optional for this market; a merchant reads their own dashboard.
+  delivery_l10n:
+    path: ../../packages/delivery_l10n
+  flutter_localizations:
+    sdk: flutter
+  # Holds the chosen language across reloads; there is nowhere else on web that survives one.
+  flutter_secure_storage: ^9.2.2
+  dio: ^5.7.0
+  # Image picking for the product form. file_selector works on Flutter Web, which image_picker
+  # historically did not do cleanly.
+  file_selector: ^1.0.3
+  # Read directly in main.dart for window.location.origin, so the OIDC redirect URI matches
+  # whichever host the portal was actually opened on.
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

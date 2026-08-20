@@ -1,0 +1,22 @@
+name: delivery_design_system
+description: Shared red/white brand system for the Delivery mobile app and two web portals.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  # Inter is not bundled here yet - Appendix A allows a system-font fallback, which is what the
+  # clients get until the font files are added to this package under assets/fonts/.
+  uses-material-design: true

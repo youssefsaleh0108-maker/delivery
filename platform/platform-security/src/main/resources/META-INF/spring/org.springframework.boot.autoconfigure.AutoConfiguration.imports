@@ -1,0 +1,2 @@
+com.delivery.platform.security.ServletSecurityAutoConfiguration
+com.delivery.platform.security.ReactiveSecurityAutoConfiguration

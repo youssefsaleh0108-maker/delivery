@@ -1,0 +1,25 @@
+# Build output. This matters more here than it did in the monorepo: the root .gitignore does not
+# travel with a directory that becomes its own repository, and the first commit of a split service
+# will otherwise carry a ~100 MB fat jar and every class file under target/.
+target/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Local environment credentials
+.env
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,496 @@
+# The notification layer and the accounting services.
+#
+# Nine deployables, and the split is load-bearing rather than ceremony: the workers render (CPU,
+# fast) while the connectors block on third parties whose latency nobody here controls, and the
+# connectors are the only pods holding provider credentials. See the README's deviations.
+#
+# Every Service here is ClusterIP. The connectors' /api/connector/send takes no user token, so a
+# LoadBalancer or NodePort on any of them would publish "send an arbitrary SMS" to the world.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: notifications-manager, namespace: delivery, labels: { app: notifications-manager } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: notifications-manager } }
+  template:
+    metadata: { labels: { app: notifications-manager } }
+    spec:
+      containers:
+        - name: notifications-manager
+          image: ghcr.io/delivery/notifications-manager:0.1.0
+          ports: [ { containerPort: 8104 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8104" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1000m", memory: "1Gi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8104 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8104 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8104 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: notifications-manager, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: notifications-manager }
+  ports: [ { port: 8104, targetPort: 8104 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: mail-worker, namespace: delivery, labels: { app: mail-worker } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: mail-worker } }
+  template:
+    metadata: { labels: { app: mail-worker } }
+    spec:
+      containers:
+        - name: mail-worker
+          image: ghcr.io/delivery/mail-worker:0.1.0
+          ports: [ { containerPort: 8105 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8105" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8105 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8105 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8105 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: mail-worker, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: mail-worker }
+  ports: [ { port: 8105, targetPort: 8105 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: push-worker, namespace: delivery, labels: { app: push-worker } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: push-worker } }
+  template:
+    metadata: { labels: { app: push-worker } }
+    spec:
+      containers:
+        - name: push-worker
+          image: ghcr.io/delivery/push-worker:0.1.0
+          ports: [ { containerPort: 8106 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8106" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8106 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8106 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8106 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: push-worker, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: push-worker }
+  ports: [ { port: 8106, targetPort: 8106 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: sms-worker, namespace: delivery, labels: { app: sms-worker } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: sms-worker } }
+  template:
+    metadata: { labels: { app: sms-worker } }
+    spec:
+      containers:
+        - name: sms-worker
+          image: ghcr.io/delivery/sms-worker:0.1.0
+          ports: [ { containerPort: 8107 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8107" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8107 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8107 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8107 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: sms-worker, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: sms-worker }
+  ports: [ { port: 8107, targetPort: 8107 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: connector-settings, namespace: delivery, labels: { app: connector-settings } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: connector-settings } }
+  template:
+    metadata: { labels: { app: connector-settings } }
+    spec:
+      containers:
+        - name: connector-settings
+          image: ghcr.io/delivery/connector-settings:0.1.0
+          ports: [ { containerPort: 8109 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8109" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8109 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8109 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8109 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: connector-settings, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: connector-settings }
+  ports: [ { port: 8109, targetPort: 8109 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: email-connector, namespace: delivery, labels: { app: email-connector } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: email-connector } }
+  template:
+    metadata: { labels: { app: email-connector } }
+    spec:
+      containers:
+        - name: email-connector
+          image: ghcr.io/delivery/email-connector:0.1.0
+          ports: [ { containerPort: 8110 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8110" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8110 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8110 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8110 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: email-connector, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: email-connector }
+  ports: [ { port: 8110, targetPort: 8110 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: push-connector, namespace: delivery, labels: { app: push-connector } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: push-connector } }
+  template:
+    metadata: { labels: { app: push-connector } }
+    spec:
+      containers:
+        - name: push-connector
+          image: ghcr.io/delivery/push-connector:0.1.0
+          ports: [ { containerPort: 8111 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8111" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8111 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8111 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8111 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: push-connector, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: push-connector }
+  ports: [ { port: 8111, targetPort: 8111 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: sms-connector, namespace: delivery, labels: { app: sms-connector } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: sms-connector } }
+  template:
+    metadata: { labels: { app: sms-connector } }
+    spec:
+      containers:
+        - name: sms-connector
+          image: ghcr.io/delivery/sms-connector:0.1.0
+          ports: [ { containerPort: 8112 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8112" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8112 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8112 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8112 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: sms-connector, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: sms-connector }
+  ports: [ { port: 8112, targetPort: 8112 } ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: accounting-service, namespace: delivery, labels: { app: accounting-service } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: accounting-service } }
+  template:
+    metadata: { labels: { app: accounting-service } }
+    spec:
+      containers:
+        - name: accounting-service
+          image: ghcr.io/delivery/accounting-service:0.1.0
+          ports: [ { containerPort: 8115 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8115" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1000m", memory: "1Gi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8115 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8115 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8115 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: accounting-service, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: accounting-service }
+  ports: [ { port: 8115, targetPort: 8115 } ]
+---
+# App Notification. ONE replica, and no HPA, deliberately.
+#
+# It holds STOMP connections in an in-memory broker (see WebSocketConfiguration). A second instance
+# would serve some users their notifications and others silence, depending on which pod their socket
+# landed on — and the failure would look like "notifications are flaky" rather than like a scaling
+# mistake. Scaling this needs a shared relay (Redis or RabbitMQ STOMP) first; the replica count
+# enforces that rather than leaving it to be discovered in production.
+#
+# The durable record is the row in Postgres either way, so the blast radius of this pod restarting
+# is a missed live update, not a lost notification — clients fall back to polling.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: app-notification, namespace: delivery, labels: { app: app-notification } }
+spec:
+  replicas: 1
+  strategy:
+    # Recreate, not RollingUpdate: two instances must never be live at once, and a rolling update
+    # would briefly run both.
+    type: Recreate
+  selector: { matchLabels: { app: app-notification } }
+  template:
+    metadata: { labels: { app: app-notification } }
+    spec:
+      containers:
+        - name: app-notification
+          image: ghcr.io/delivery/app-notification:0.1.0
+          ports: [ { containerPort: 8108 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8108" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+            - name: CORS_ALLOWED_ORIGINS
+              value: "https://app.delivery.example,https://backoffice.delivery.example,https://merchant.delivery.example"
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits:   { cpu: "1000m", memory: "1Gi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8108 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8108 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8108 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: app-notification, namespace: delivery }
+spec:
+  type: ClusterIP
+  # Sticky, so a client that reconnects lands on the same pod while there is only one. Harmless
+  # now, and required the moment a shared relay makes a second replica possible.
+  sessionAffinity: ClientIP
+  selector: { app: app-notification }
+  ports: [ { port: 8108, targetPort: 8108 } ]
+---
+# Core Banking Connector. The only pod holding bank credentials (Section 10 calls it the most
+# sensitive integration in the system), and the one whose Vault path has a policy of its own.
+#
+# Two replicas, no HPA: it consumes a queue, so throughput is bounded by the bank rather than by
+# pod count, and postings against one account serialise at the bank anyway. Scaling it would just
+# queue threads inside a slow bank instead of inside the broker, where the backlog is visible.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: corebanking-connector, namespace: delivery, labels: { app: corebanking-connector } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: corebanking-connector } }
+  template:
+    metadata: { labels: { app: corebanking-connector } }
+    spec:
+      containers:
+        - name: corebanking-connector
+          image: ghcr.io/delivery/corebanking-connector:0.1.0
+          ports: [ { containerPort: 8113 } ]
+          envFrom: [ { configMapRef: { name: delivery-common } } ]
+          env:
+            - { name: SERVER_PORT, value: "8113" }
+            - name: CONFIG_SERVER_USER
+              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
+            - name: CONFIG_SERVER_PASSWORD
+              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
+            # NOTE: no COREBANKING_SIMULATOR_URL. The simulator is dev-only and is not deployed
+            # here; the provider is switched to REAL through the Backoffice once the bank contract
+            # exists. Until then RealBankClient refuses every posting, loudly and on purpose.
+          resources:
+            requests: { cpu: "100m", memory: "384Mi" }
+            limits:   { cpu: "500m", memory: "768Mi" }
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8113 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8113 }, periodSeconds: 10 }
+          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8113 }, periodSeconds: 20 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: corebanking-connector, namespace: delivery }
+spec:
+  type: ClusterIP
+  selector: { app: corebanking-connector }
+  ports: [ { port: 8113, targetPort: 8113 } ]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: mail-worker, namespace: delivery }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: mail-worker }
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    # CPU is a placeholder. Queue depth on this worker's own channel queue is the signal that
+    # actually matters - a worker blocked on a slow connector is idle, not busy, so CPU will not
+    # scale it out when it most needs to be. Moving to KEDA on RabbitMQ queue length is the fix.
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: push-worker, namespace: delivery }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: push-worker }
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    # CPU is a placeholder. Queue depth on this worker's own channel queue is the signal that
+    # actually matters - a worker blocked on a slow connector is idle, not busy, so CPU will not
+    # scale it out when it most needs to be. Moving to KEDA on RabbitMQ queue length is the fix.
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: sms-worker, namespace: delivery }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: sms-worker }
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    # CPU is a placeholder. Queue depth on this worker's own channel queue is the signal that
+    # actually matters - a worker blocked on a slow connector is idle, not busy, so CPU will not
+    # scale it out when it most needs to be. Moving to KEDA on RabbitMQ queue length is the fix.
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }

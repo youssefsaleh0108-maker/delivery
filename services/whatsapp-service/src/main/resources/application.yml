@@ -1,0 +1,143 @@
+server:
+  port: ${SERVER_PORT:8116}
+
+spring:
+  application:
+    name: whatsapp-service
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=whatsapp}
+    username: ${DB_USER:whatsapp_service}
+    password: ${DB_PASSWORD:whatsapp_service_dev_pw}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/whatsapp
+    schemas: whatsapp
+    default-schema: whatsapp
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: whatsapp
+        jdbc:
+          time_zone: UTC
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+    listener:
+      simple:
+        # Sending an update is idempotent by primary key, so redelivery is harmless; retry a few
+        # times before the DLQ rather than dropping a customer's "on the way" message.
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+delivery:
+  outbox:
+    exchange: delivery.events
+
+  security:
+    permit-all:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+      # The inbound webhook. WhatsApp's servers hold no Keycloak token and never will, so demanding
+      # one would mean never receiving a message. "permit-all" means no JWT, not no authentication:
+      # every request is verified against the provider's HMAC signature before a field is read, and
+      # the check fails closed when no secret is configured. Scoped to this exact path — it must
+      # never become /webhooks/**, for the same reason the DLR route was scoped to /webhooks/dlr/**.
+      - /webhooks/whatsapp/**
+      # The dev simulator. "permit-all" here means "not routed" rather than "public": the Gateway
+      # deliberately does not forward /simulator/**, so this is reachable only from inside the
+      # cluster network — the same arrangement as the connectors' internal endpoints and the Core
+      # Banking simulator. It is also switched off entirely by delivery.whatsapp.simulator.enabled.
+      #
+      # It is not a way past the signature check: /simulator/inbound signs its envelope with the
+      # real app secret and goes through the real webhook.
+      - /simulator/**
+
+  whatsapp:
+    # The shared secret the provider signs its webhooks with. Empty means the webhook rejects
+    # everything — see InboundWebhookController for why that is the right way to be unconfigured.
+    app-secret: ${WHATSAPP_APP_SECRET:}
+
+    # Meta's Cloud API asks the endpoint to echo a challenge before it will send anything, and the
+    # value is chosen by us. Local default is fine; it authenticates nothing on its own.
+    verify-token: ${WHATSAPP_VERIFY_TOKEN:delivery-local-verify}
+
+    # Which number belongs to which merchant is NOT here. A merchant connects their own number
+    # through POST /api/whatsapp/numbers and it lives in the database — a shop signing up should be
+    # a form, not a pull request against the config repository.
+
+    # Where to send outbound replies. The dev simulator by default; Meta's Cloud API in a deployment
+    # that has a number.
+    outbound-url: ${WHATSAPP_OUTBOUND_URL:http://localhost:8116/simulator/outbound}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+
+    simulator:
+      # Stands in for WhatsApp so the feature can be exercised without an account, which takes weeks
+      # of business verification to obtain. MUST be false in production — see SimulatorController.
+      enabled: ${WHATSAPP_SIMULATOR_ENABLED:true}
+
+  services:
+    order-manager: ${ORDER_MANAGER_URL:http://localhost:8101}
+    product-service: ${PRODUCT_SERVICE_URL:http://localhost:8103}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

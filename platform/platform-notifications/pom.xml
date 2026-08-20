@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Standalone: this library builds, versions and releases on its own, with no parent pom,
+       so it can move to its own repository without any further change. -->
+  <groupId>com.delivery</groupId>
+  <artifactId>platform-notifications</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Platform :: Notifications</name>
+  <description>Shared plumbing for the notification workers and connectors: the command contract, the
+    resilience wrapper, and the active-provider registry.
+
+    This is a LIBRARY, not a service. Section 7 keeps each worker and each connector as its own
+    deployable so a slow provider cannot consume the thread budget of another channel, and so
+    credential-holding connectors stay separate from content-rendering workers. Sharing code here
+    keeps six services DRY without collapsing that isolation.
+
+    NAMING NOTE: half of what is here is not notification-specific. ResilientDispatcher,
+    DeadLetterPublisher, ActiveProviderRegistry, ProviderSettingsRefresher and
+    ConnectorSettingsListener are generic outbound-integration plumbing, and the Phase 4 Core
+    Banking connector uses them too - a bank posting needs exactly the same breaker, retry-on-
+    retryable-outcome and dead-letter treatment as an SMS. Splitting those into a
+    platform-integration module is the natural next refactor; it was not done during Phase 4
+    because it would re-touch nine verified services for a rename. IdempotentCommand is the seam
+    that made the sharing possible without contorting either side.</description>
+
+  <properties>
+    <java.version>17</java.version>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <spring-boot.version>3.4.5</spring-boot.version>
+
+    <resilience4j.version>2.2.0</resilience4j.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-circuitbreaker</artifactId>
+      <version>${resilience4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-retry</artifactId>
+      <version>${resilience4j.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-amqp</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- RestClient, for the connector's TTL refresh against Connector Settings. spring-web only,
+         not the web starter: a library must not decide that its host service runs a servlet
+         container. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+    </dependency>
+    <!-- The DLR webhook needs the raw request: vendors sign the URL and the exact bytes, neither of
+         which survives Spring's argument binding. Scope is `provided` precisely so the rule above
+         still holds - this compiles against the API without dragging a servlet container into
+         services that do not have one, and DlrWebhookController is already gated on
+         @ConditionalOnWebApplication(SERVLET), so a non-web host never loads it. -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <!-- Was inherited from the root pom, which applied it to every module without exception. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${maven.compiler.release}</release>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Published here by the platform repo's own workflow; consumed by the services from the same
+       URL. -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages — delivery platform</name>
+      <url>https://maven.pkg.github.com/youssefsaleh0108-maker/delivery.platform</url>
+    </repository>
+  </distributionManagement>
+</project>

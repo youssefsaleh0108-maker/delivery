@@ -1,0 +1,849 @@
+{
+  "@@locale": "ar",
+  "appTitle": "توصيل",
+  "navShops": "المتاجر",
+  "navBasket": "السلة",
+  "navOrders": "الطلبات",
+  "navButler": "بتلر",
+  "alerts": "التنبيهات",
+  "settings": "الإعدادات",
+  "signOut": "تسجيل الخروج",
+  "deliverTo": "التوصيل إلى",
+  "setDeliveryAddress": "حدّد عنوان التوصيل",
+  "address": "العنوان",
+  "addressHint": "شارع الاختبار ١٢، شقة ٤",
+  "labelOptional": "التسمية (اختياري)",
+  "labelHint": "المنزل، العمل",
+  "riderNotesOptional": "ملاحظات للسائق (اختياري)",
+  "riderNotesHint": "جرس ٤، الطابق الثاني",
+  "deliverHere": "التوصيل هنا",
+  "recent": "الأخيرة",
+  "whereShouldWeBring": "إلى أين نوصل طلبك؟",
+  "forgetThisAddress": "حذف هذا العنوان",
+  "addressTooShort": "أضف تفاصيل أكثر ليتمكن السائق من الوصول إليك",
+  "searchShops": "ابحث عن متاجر ومأكولات",
+  "all": "الكل",
+  "allStores": "كل المتاجر",
+  "yourFavourites": "مفضلتك",
+  "starredShops": "المتاجر المحفوظة",
+  "offersForYou": "عروض لك",
+  "shopsDelivering": "{count, plural, zero{لا توجد متاجر توصل إليك} one{متجر واحد يوصل إليك} two{متجران يوصلان إليك} few{{count} متاجر توصل إليك} many{{count} متجرًا توصل إليك} other{{count} متجر توصل إليك}}",
+  "@shopsDelivering": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noShopsMatch": "لا توجد متاجر مطابقة",
+  "tryClearingAFilter": "جرّب إزالة أحد عوامل التصفية.",
+  "nothingDeliveringHere": "لا يوجد توصيل إلى هنا حتى الآن.",
+  "couldNotLoadStorefront": "تعذّر تحميل المتاجر",
+  "tryAgain": "أعد المحاولة",
+  "filterOffers": "العروض",
+  "filterUnder30": "أقل من ٣٠ دقيقة",
+  "filterFreeDelivery": "توصيل مجاني",
+  "filterHighlyRated": "٤٫٥ فأكثر",
+  "clear": "مسح",
+  "statusOpen": "مفتوح",
+  "statusBusy": "مزدحم",
+  "statusClosingSoon": "يغلق قريبًا",
+  "statusClosed": "مغلق",
+  "ratingNew": "جديد",
+  "freeDelivery": "توصيل مجاني",
+  "deliveryFeeLabel": "توصيل {amount}",
+  "@deliveryFeeLabel": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "etaRange": "{from}-{to} دقيقة",
+  "@etaRange": {
+    "placeholders": {
+      "from": {
+        "type": "int"
+      },
+      "to": {
+        "type": "int"
+      }
+    }
+  },
+  "tabShop": "التسوق",
+  "tabAisles": "الأقسام",
+  "tabOffers": "العروض",
+  "tabBuyAgain": "اطلب مجددًا",
+  "everything": "الكل",
+  "itemCount": "{count} منتج",
+  "@itemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "add": "أضف",
+  "nothingOnShelves": "لا توجد منتجات بعد",
+  "nothingInAisle": "لا يوجد شيء في هذا القسم",
+  "noOffersHere": "لا توجد عروض حاليًا",
+  "noHistoryHere": "لا يوجد شيء من هذا المتجر في سجلك",
+  "appliesEverywhere": "ينطبق على كل المتاجر",
+  "required": "مطلوب",
+  "optional": "اختياري",
+  "soldOut": "نفدت الكمية",
+  "addWithTotal": "أضف · {total}",
+  "@addWithTotal": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "basket": "السلة",
+  "basketEmpty": "سلتك فارغة",
+  "subtotal": "المجموع الفرعي",
+  "delivery": "التوصيل",
+  "total": "الإجمالي",
+  "free": "مجاني",
+  "checkout": "إتمام الطلب",
+  "checkoutWithTotal": "إتمام الطلب · {total}",
+  "@checkoutWithTotal": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "minimumNotReached": "لم يتم بلوغ الحد الأدنى",
+  "minimumExplanation": "الحد الأدنى لهذا المتجر {minimum} — أضف {shortfall} أخرى.",
+  "@minimumExplanation": {
+    "placeholders": {
+      "minimum": {
+        "type": "String"
+      },
+      "shortfall": {
+        "type": "String"
+      }
+    }
+  },
+  "viewBasket": "عرض السلة",
+  "startNewBasket": "بدء سلة جديدة؟",
+  "basketFromAnotherShop": "سلتك تحتوي على منتجات من {shop}. يمكننا التوصيل من متجر واحد فقط في كل مرة.",
+  "@basketFromAnotherShop": {
+    "placeholders": {
+      "shop": {
+        "type": "String"
+      }
+    }
+  },
+  "keepIt": "الاحتفاظ بها",
+  "startHere": "ابدأ من هنا",
+  "payment": "الدفع",
+  "payWithCash": "نقدًا عند الاستلام",
+  "payWithCard": "بطاقة",
+  "paidWith": "الدفع بواسطة",
+  "orderDetails": "تفاصيل الطلب",
+  "yourOrder": "طلبك",
+  "reorder": "اطلب مجددًا",
+  "deliveredOn": "تم التوصيل في: {when}",
+  "@deliveredOn": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "placedOn": "تم الطلب في: {when}",
+  "@placedOn": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "deliveryCharge": "رسوم التوصيل",
+  "back": "رجوع",
+  "couldNotLoadOrder": "تعذّر تحميل هذا الطلب",
+  "noOrdersYet": "لا توجد طلبات بعد",
+  "tracking": "التتبع",
+  "live": "منشور",
+  "stepPlaced": "تم الطلب",
+  "stepAccepted": "تم القبول",
+  "stepPreparing": "قيد التحضير",
+  "stepReady": "جاهز",
+  "stepOnTheWay": "في الطريق",
+  "stepDelivered": "تم التوصيل",
+  "waitingForRider": "بانتظار أول موقع للسائق.",
+  "locationAfterPickup": "يظهر موقع السائق بعد استلام طلبك.",
+  "fixes": "التحديثات",
+  "travelled": "المسافة",
+  "lastSeen": "آخر ظهور",
+  "rateYourOrder": "قيّم طلبك",
+  "yourRating": "تقييمك",
+  "leaveAComment": "اكتب تعليقًا (اختياري)",
+  "submitReview": "إرسال",
+  "reviews": "التقييمات",
+  "noReviewsYet": "لا توجد تقييمات بعد",
+  "butler": "الخدمة الشخصية",
+  "butlerTagline": "أي شيء يمكن حمله على دراجة",
+  "butlerBlurb": "أخبرنا بما تحتاجه ومن أين. سيشتريه المتسوق ويوصله إليك.",
+  "butlerPrompt": "تحتاج شيئًا غير موجود هنا؟ سنشتريه لك.",
+  "whatDoYouNeed": "ما الذي تحتاجه؟",
+  "whereFromOptional": "من أين؟ (اختياري)",
+  "budgetCapOptional": "الحد الأقصى للميزانية (اختياري)",
+  "requestAButler": "اطلب خدمة شخصية",
+  "notifications": "الإشعارات",
+  "nothingYet": "لا يوجد شيء بعد",
+  "orderUpdatesHere": "ستظهر تحديثات الطلب هنا.",
+  "language": "اللغة",
+  "english": "English",
+  "arabic": "العربية",
+  "splashTagline": "بقالة ومأكولات وأكثر — توصيل إلى بابك.",
+  "signInFailed": "تعذّر تسجيل دخولك.",
+  "account": "الحساب",
+  "navAccount": "الحساب",
+  "signOutConfirm": "ستحتاج إلى تسجيل الدخول مجددًا للطلب.",
+  "profile": "الملف",
+  "roles": "الأدوار",
+  "selectRequiredOptions": "اختر الخيارات المطلوبة",
+  "orderPlacedToast": "تم تقديم الطلب رقم {id} · {total}",
+  "deliveryAddress": "عنوان التوصيل",
+  "addressRequired": "نحتاج إلى عنوان لتوصيل طلبك",
+  "contactPhoneOptional": "رقم هاتف للتواصل (اختياري)",
+  "merchantNotesOptional": "ملاحظات للمتجر (اختياري)",
+  "couldNotLoadShop": "تعذّر تحميل هذا المتجر",
+  "couldNotLoadMore": "تعذّر تحميل المزيد — حاول مرة أخرى",
+  "chooseUpTo": "اختر حتى {count} من {group}",
+  "cancelThisOrder": "إلغاء هذا الطلب؟",
+  "cancelOrder": "إلغاء الطلب",
+  "cancel": "إلغاء",
+  "couldNotLoadOrders": "تعذّر تحميل طلباتك.",
+  "browseAndPlaceFirst": "تصفّح المتاجر وقدّم طلبك الأول.",
+  "replaceYourBasket": "استبدال سلتك؟",
+  "basketFromShopReplace": "سلتك تحتوي على أصناف من {shop}. إعادة الطلب ستستبدلها.",
+  "replace": "استبدال",
+  "openStore": "افتح {store}",
+  "markAllRead": "تعليم الكل كمقروء",
+  "couldNotLoadNotifications": "تعذّر تحميل التنبيهات",
+  "pullDownToTryAgain": "اسحب للأسفل للمحاولة مرة أخرى.",
+  "setAddressFirst": "حدّد عنوان التوصيل أولاً",
+  "whatAreWeMoving": "ما الذي ننقله؟",
+  "pickUpFrom": "الاستلام من",
+  "whoReceivesItOptional": "من سيستلمه؟ (اختياري)",
+  "buyMeSomething": "اشترِ لي شيئًا",
+  "aShopperBuysIt": "يشتريه المتسوّق لك",
+  "deliverYourStuff": "وصّل أغراضك",
+  "youAlreadyHaveIt": "الغرض لديك بالفعل",
+  "yourErrands": "مهامك",
+  "couldNotLoadErrands": "تعذّر تحميل مهامك",
+  "noThanks": "لا شكرًا",
+  "payAmount": "ادفع {amount}",
+  "trackIt": "تتبّعه",
+  "whatDidItCost": "كم كانت التكلفة؟",
+  "cappedAt": "الحد الأقصى المحدّد {amount}",
+  "goodsTotal": "إجمالي المشتريات",
+  "receiptNumberOptional": "رقم الإيصال (اختياري)",
+  "sendForApproval": "أرسل للموافقة",
+  "noErrandsWaiting": "لا توجد مهام في الانتظار.",
+  "nothingToClaim": "لا يوجد شيء بانتظار الاستلام.",
+  "claim": "استلام",
+  "reportWhatItCost": "أبلغ عن التكلفة",
+  "deliveries": "التوصيلات",
+  "contactLabel": "للتواصل: {phone}",
+  "couldNotUpdateFavourites": "تعذّر تحديث مفضلتك.",
+  "itemNoLongerAvailable": "أحد هذه الأصناف لم يعد متوفرًا.",
+  "checkDeliveryDetails": "يرجى التحقق من تفاصيل التوصيل.",
+  "couldNotPlaceOrder": "تعذّر تقديم الطلب. حاول مرة أخرى.",
+  "placing": "جارٍ التقديم…",
+  "placeOrderWithTotal": "قدّم الطلب · {total}",
+  "nothingStillAvailable": "لا يوجد شيء من هذا الطلب ما زال متوفرًا.",
+  "addedToBasket": "{count, plural, zero{لم يُضف شيء إلى سلتك} one{تمت إضافة صنف واحد إلى سلتك} two{تمت إضافة صنفين إلى سلتك} few{تمت إضافة {count} أصناف إلى سلتك} many{تمت إضافة {count} صنفًا إلى سلتك} other{تمت إضافة {count} صنف إلى سلتك}}",
+  "addedSomeMissing": "تمت إضافة {added}؛ {missing} لم يعد متوفرًا",
+  "couldNotReorder": "تعذّرت إعادة الطلب الآن.",
+  "reorderWillReplace": "إعادة الطلب ستبدأ سلة جديدة.",
+  "setByStoreCharged": "يحدّدها {store} وتُحصّل عند التوصيل.",
+  "cancelBeforeAccepted": "يمكنك الإلغاء قبل قبول المتجر للطلب فقط. لا يمكن التراجع عن هذا.",
+  "cancelledByCustomer": "أُلغي من قبل العميل",
+  "tooLateToCancel": "فات الأوان — بدأ المتجر بتحضير هذا الطلب.",
+  "couldNotCancelOrder": "تعذّر إلغاء الطلب.",
+  "riderAt": "السائق عند {lat}، {lng}",
+  "couldNotPriceCombination": "تعذّر تسعير هذا الاختيار.",
+  "optionSoldOut": "{name} — نفدت الكمية",
+  "addToReachMinimum": "أضف {amount} للوصول إلى الحد الأدنى",
+  "removeFromFavourites": "إزالة من المفضلة",
+  "addToFavourites": "إضافة إلى المفضلة",
+  "minOrderLabel": "الحد الأدنى {amount}",
+  "closesAtLabel": "يغلق {when}",
+  "noAislesYet": "لا توجد أقسام في هذا المتجر بعد",
+  "signInToSeeHistory": "سجّل الدخول لترى ما طلبته سابقًا",
+  "tabAislesCount": "الأقسام ({count})",
+  "tabOffersCount": "العروض ({count})",
+  "basketFromAnotherShopSingle": "يمكننا التوصيل من متجر واحد فقط في كل مرة.",
+  "basketHasOtherShopItems": "تحتوي هذه السلة على أصناف من متجر آخر.",
+  "distanceKm": "{km} كم",
+  "distanceM": "{m} م",
+  "justNow": "الآن",
+  "secondsAgo": "منذ {count} ثانية",
+  "minutesAgo": "منذ {count} دقيقة",
+  "hoursAgo": "منذ {count} ساعة",
+  "daysAgo": "منذ {count} يوم",
+  "lineQuantity": "{qty} × {name}",
+  "lineQtyPrice": "{qty} × {price}",
+  "orderRefWithAddress": "#{ref} · {address}",
+  "sentBuyConfirmation": "تم الإرسال. سيستلمها المتسوّق ويخبرك بالتكلفة قبل الدفع.",
+  "sentMoveConfirmation": "تم الإرسال. سيأتي السائق لاستلامها.",
+  "cannotRequestErrands": "هذا الحساب لا يمكنه طلب المهام",
+  "couldNotSendRequest": "تعذّر إرسال الطلب",
+  "butlerMoveTagline": "أرسل شيئًا عبر المدينة",
+  "butlerMoveBlurb": "الغرض لديك بالفعل؟ يستلمه السائق من عنوان ويسلّمه في عنوان آخر. لا يُشترى شيء.",
+  "buyHint": "شاحن هاتف من نوع USB-C وزجاجة مياه",
+  "buyValidator": "أضف تفاصيل أكثر ليعرف المتسوّق ما يشتريه",
+  "whereFromHint": "أي صيدلية قرب الحمرا",
+  "budgetValidator": "أدخل رقمًا أو اتركه فارغًا",
+  "moveHint": "ظرف A4 يحتوي مستندات، لا شيء قابل للكسر",
+  "moveValidator": "أضف تفاصيل أكثر ليعرف السائق ما يتوقعه",
+  "pickUpHint": "شارع كليمنصو ٨، مكتب الاستقبال",
+  "pickUpValidator": "من أين يستلمها السائق؟",
+  "receiverHint": "الاسم ورقم الهاتف",
+  "requestAPickup": "اطلب استلامًا",
+  "errandFeeBuy": "رسوم المهمة {fee}. يخبرك المتسوّق بتكلفة المشتريات قبل أن تدفع أي شيء.",
+  "errandFeeMove": "رسوم المهمة {fee}. لا يُشترى شيء، لذا هذا هو السعر كاملًا.",
+  "dropOffAt": "التسليم في",
+  "thatDidNotWork": "لم ينجح ذلك",
+  "aboveYourCap": "هذا أعلى من الحد الذي حدّدته وهو {cap}.",
+  "declined": "مرفوض",
+  "approvedOnItsWay": "تمت الموافقة — في الطريق إليك",
+  "cancelled": "ملغى",
+  "waitingForShopper": "بانتظار من يستلمها · الرسوم {fee}",
+  "shopperIsOnIt": "المتسوّق يعمل عليها. سيخبرك بالتكلفة.",
+  "riderOnTheWayToCollect": "السائق في طريقه لاستلامها · {total}",
+  "goodsPlusFee": "المشتريات {goods} + الرسوم {fee} = {total}",
+  "agreedAt": "تم الاتفاق على {total}",
+  "youDeclinedThisPrice": "لقد رفضت هذا السعر",
+  "nobodyPickedThisUp": "لم يستلمها أحد",
+  "butlerStatusOpen": "متاحة",
+  "butlerStatusClaimed": "مستلمة",
+  "butlerStatusYourCall": "بانتظار قرارك",
+  "butlerStatusAgreed": "متفق عليها",
+  "butlerStatusExpired": "منتهية",
+  "somebodyElseClaimed": "استلمها شخص آخر",
+  "whatYouPaidBeforeFee": "ما دفعته، قبل رسوم المهمة",
+  "sentForApproval": "تم الإرسال. سيوافقون على السعر قبل التسليم.",
+  "cappedAtBudget": "حدّدوا الحد الأقصى بـ {amount}",
+  "yours": "لك",
+  "buyAndBring": "اشترِ وأحضر",
+  "collectAndDrop": "استلم وسلّم",
+  "from": "من",
+  "collectAndDropInstruction": "استلمها وسلّمها. ستجدها في تبويب التوصيلات.",
+  "waitingOnApproval": "بانتظار موافقتهم. لا تسلّمها قبل ذلك.",
+  "approvedDeliverIt": "تمت الموافقة. سلّمها من تبويب التوصيلات.",
+  "headingWithCount": "{label} ({count})",
+  "availableWithCount": "المتاحة ({count})",
+  "mineWithCount": "الخاصة بي ({count})",
+  "errands": "المهام",
+  "nothingWaitingForPickup": "لا يوجد شيء بانتظار الاستلام الآن.",
+  "noActiveDeliveries": "ليس لديك توصيلات نشطة.",
+  "anotherRiderClaimedIt": "استلمها سائق آخر قبلك.",
+  "orderAlreadyMovedOn": "هذا الطلب تجاوز هذه المرحلة.",
+  "contactPhone": "للتواصل: {phone}",
+  "statusReadyForPickup": "جاهز للاستلام",
+  "statusCancelled": "ملغى",
+  "actionAccept": "قبول",
+  "actionPrepare": "ابدأ التحضير",
+  "actionMarkReady": "حدّده كجاهز",
+  "actionClaim": "استلام",
+  "actionPickedUp": "تم الاستلام",
+  "actionDelivered": "تم التسليم",
+  "actionCancel": "إلغاء",
+  "verticalRestaurants": "مطاعم",
+  "verticalCoffee": "قهوة",
+  "verticalGroceries": "بقالة",
+  "verticalConvenience": "متاجر صغيرة",
+  "verticalPharmacy": "صيدلية",
+  "verticalElectronics": "إلكترونيات",
+  "verticalFlowersGifts": "زهور وهدايا",
+  "orderPlacedToastShort": "تم تقديم الطلب رقم {ref} · {total}",
+  "minimumExplanationFull": "الحد الأدنى لهذا المتجر {minimum} — أضف {shortfall} أخرى.",
+  "addToReachMinimumShort": "أضف {amount} للوصول إلى الحد الأدنى",
+  "actionFailed": "تعذّر {action}.",
+  "actionOnOrder": "{action} · #{ref}",
+  "itemCountWithDot": "{count, plural, zero{لا أصناف} one{صنف واحد} two{صنفان} few{{count} أصناف} many{{count} صنفًا} other{{count} صنف}}",
+  "riderAtShort": "السائق عند {lat}، {lng}",
+  "waitingOnApprovalOf": "بانتظار موافقتهم على {total}. لا تسلّمها قبل ذلك.",
+  "aislesCount": "الأقسام",
+  "signInPrompt": "سجّل الدخول لترى ما طلبته سابقًا",
+  "merchantPortal": "بوابة التاجر",
+  "navProducts": "المنتجات",
+  "navDelivery": "التوصيل",
+  "navMyShop": "متجري",
+  "manageYourCatalog": "أدر قائمة منتجاتك",
+  "signingIn": "جارٍ تسجيل الدخول…",
+  "signIn": "تسجيل الدخول",
+  "notAMerchant": "هذا الحساب غير مسجّل كتاجر.",
+  "signInAsSomeoneElse": "سجّل الدخول بحساب آخر",
+  "carrierNotAvailableToYou": "شركة التوصيل هذه غير متاحة لك",
+  "couldNotLoadCarriers": "تعذّر تحميل شركات التوصيل: {error}",
+  "whoCarriesYourOrders": "من يوصّل طلباتك",
+  "whoCarriesBlurb": "من يوصّل طلباتك. يسري هذا من لحظة جهوز الطلب للاستلام — أما الطلبات التي في طريقها فتبقى مع شركة التوصيل التي خرجت معها.",
+  "yourOwnDrivers": "سائقوك",
+  "fleetRidersBlurb": "تضيف المنصّة السائقين إلى أسطولك. الأسطول الذي لا سائق فيه لا يستطيع استلام شيء.",
+  "whenCarrierCannotTake": "عندما لا تستطيع شركتك أخذ الطلب",
+  "letThePlatformChoose": "دع المنصّة تختار",
+  "whoeverIsAvailable": "أي شركة متاحة تستطيع أخذ المهمة. هذا هو الخيار الافتراضي.",
+  "thePlatformWillChoose": "ستختار المنصّة",
+  "notTakingWorkNow": "{kind}  ·  لا تقبل العمل حاليًا",
+  "carrierWillCarry": "{name} ستوصّل طلباتك",
+  "ownDriversBlurb": "إن كان لديك سائقون، يمكنهم توصيل طلباتك وتتدخّل المنصّة فقط عندما ينشغلون.",
+  "yourFleetIsSetUp": "تم إعداد أسطولك",
+  "setUpMyOwnDrivers": "أعدّ سائقيّ الخاصين",
+  "anotherCarrierMayStepIn": "يمكن لشركة أخرى أن تتدخّل",
+  "onlyYourChosenCarrier": "ستُستخدم شركتك المختارة فقط",
+  "letSomeoneElseStepIn": "اسمح لغيرها بالتدخّل",
+  "onlyAppliesOnceChosen": "يسري هذا فقط بعد اختيارك لشركة توصيل.",
+  "fallbackOnBlurb": "إن لم تستطع شركتك أخذ الطلب، ستأخذه أخرى. تخرج الطلبات متأخرة بدل ألا تخرج أبدًا.",
+  "fallbackOffBlurb": "تنتظر الطلبات شركتك. لا شيء يخرج مع غيرها — والطلب الذي لا تستطيع أخذه يبقى عندك.",
+  "cancelledByMerchant": "أُلغي من قبل التاجر",
+  "orderAlreadyMovedRefreshing": "هذا الطلب تجاوز هذه المرحلة. جارٍ التحديث.",
+  "columnToAccept": "بانتظار القبول",
+  "columnPreparing": "قيد التحضير",
+  "columnAwaitingRider": "بانتظار سائق",
+  "columnDelivered": "تم التسليم",
+  "showCompleted": "أظهر المكتملة",
+  "refresh": "تحديث",
+  "updatesEvery": "يتحدّث كل {seconds} ثانية",
+  "liveOrders": "الطلبات الجارية",
+  "couldNotLoadOrdersShort": "تعذّر تحميل الطلبات.",
+  "noOrdersYetMerchant": "لا توجد طلبات بعد.",
+  "noOrdersNeedingAttention": "لا توجد طلبات تحتاج انتباهك.",
+  "riderAssigned": "تم تعيين سائق",
+  "noteWithText": "ملاحظة: {note}",
+  "saved": "تم الحفظ",
+  "couldNotSaveProduct": "تعذّر حفظ هذا المنتج",
+  "images": "الصور",
+  "uploadFailed": "فشل الرفع",
+  "newProduct": "منتج جديد",
+  "editProduct": "تعديل المنتج",
+  "nameLabel": "الاسم",
+  "nameRequired": "الاسم مطلوب",
+  "descriptionLabel": "الوصف",
+  "priceLabel": "السعر",
+  "enterANumber": "أدخل رقمًا",
+  "priceMustBePositive": "يجب أن يكون السعر أكبر من صفر",
+  "categoryLabel": "الفئة",
+  "uncategorised": "بدون فئة",
+  "saving": "جارٍ الحفظ…",
+  "save": "حفظ",
+  "saveProductFirst": "احفظ المنتج أولًا ثم أضف الصور.",
+  "needsAPhotoToPublish": "يحتاج المنتج إلى صورة واحدة على الأقل قبل نشره.",
+  "addPhoto": "أضف صورة",
+  "remove": "إزالة",
+  "couldNotPublishProduct": "تعذّر نشر هذا المنتج",
+  "archiveThisProduct": "أرشفة هذا المنتج؟",
+  "archiveConfirm": "سيُسحب \"{name}\" من قائمة المنتجات. الطلبات القائمة التي تشير إليه لن تتأثر.",
+  "archive": "أرشفة",
+  "myProducts": "منتجاتي",
+  "onSale": "معروضة",
+  "productsTotal": "{count, plural, zero{لا منتجات} one{منتج واحد} two{منتجان} few{{count} منتجات} many{{count} منتجًا} other{{count} منتج}}",
+  "drafts": "المسوّدات",
+  "noPhoto": "لا صورة",
+  "archived": "مؤرشفة",
+  "yourProducts": "منتجاتك",
+  "publish": "نشر",
+  "edit": "تعديل",
+  "draft": "مسوّدة",
+  "moreActions": "خيارات أخرى",
+  "noProductsYet": "لا منتجات بعد",
+  "createYourFirstProduct": "أنشئ منتجك الأول، أضف صورة، ثم انشره.",
+  "somethingWentWrong": "حدث خطأ ما",
+  "detailWithRef": "{detail} (المرجع: {ref})",
+  "thatDidNotWorkWith": "لم ينجح ذلك: {error}",
+  "shopSaved": "تم حفظ المتجر",
+  "couldNotLoadYourShop": "تعذّر تحميل متجرك",
+  "noShopYet": "لا يوجد متجر بعد",
+  "shopCreatedAutomatically": "أضف منتجك الأول ويُنشأ لك متجر تلقائيًا.",
+  "howYourShopAppears": "كيف يظهر متجرك للعملاء",
+  "shopName": "اسم المتجر",
+  "tagline": "العبارة التعريفية",
+  "taglineHint": "مشاوي على الفحم ومازة طوال اليوم",
+  "tags": "الوسوم",
+  "tagsHint": "لبناني، مشاوي، مازة (مفصولة بفواصل)",
+  "addressLabel": "العنوان",
+  "pictures": "الصور",
+  "logoRecognisedBy": "شعارك هو ما يعرفك به العملاء في نتائج البحث",
+  "logo": "الشعار",
+  "logoHint": "الشكل المربّع هو الأفضل. يظهر على كل بطاقة متجر.",
+  "cover": "صورة الغلاف",
+  "coverHint": "عريضة. تظهر خلف ترويسة متجرك.",
+  "generatedTileBlurb": "إلى أن ترفع صورة، يرى العملاء بطاقة مولّدة تحمل أحرف اسمك — متناسقة ولائقة، لكنها ليست صورتك.",
+  "whatCustomersAreCharged": "ما يُحتسب على العملاء وما يُقال لهم أن يتوقعوه",
+  "deliveryFeeLabelMerchant": "رسوم التوصيل",
+  "minimumOrder": "الحد الأدنى للطلب",
+  "etaFromMin": "المدة من (دقيقة)",
+  "etaToMin": "المدة إلى (دقيقة)",
+  "serverAppliesTerms": "يطبّق الخادم الاثنين عند تقديم الطلب — تُرفض السلة التي تقلّ عن الحد الأدنى، وتُضاف الرسوم إلى إجمالي العميل.",
+  "openingHours": "ساعات العمل",
+  "openingHoursBlurb": "يظهر متجرك كمفتوح أو يوشك على الإغلاق أو مغلق بناءً على هذه الساعات",
+  "addASecondWindow": "أضف فترة ثانية",
+  "secondWindowBlurb": "أضف فترة ثانية لليوم لتقسيم ساعاتك — مثلًا فترة صباحية وأخرى مسائية، مع إغلاق بينهما.",
+  "saveChanges": "حفظ التغييرات",
+  "listedOnStorefront": "مدرج في واجهة المتاجر",
+  "notListedYet": "غير مدرج بعد",
+  "markedBusy30": "تم تحديده كمشغول لمدة ٣٠ دقيقة",
+  "busy30m": "مشغول ٣٠ د",
+  "noLongerBusy": "لم يعد محدّدًا كمشغول",
+  "notBusy": "غير مشغول",
+  "yourShopIsLive": "متجرك يعمل الآن",
+  "opens": "يفتح",
+  "closes": "يغلق",
+  "removeThisWindow": "احذف هذه الفترة",
+  "upload": "رفع",
+  "labelRemoved": "تمت إزالة {label}",
+  "pictureUpdated": "تم تحديث الصورة",
+  "requiredField": "مطلوب",
+  "aNumber": "رقم",
+  "cannotBeNegative": "لا يمكن أن يكون سالبًا",
+  "signInFailedShort": "فشل تسجيل الدخول",
+  "providerKindInHouse": "أسطول المنصّة",
+  "providerKindCompany": "شركة توصيل",
+  "providerKindOwnDrivers": "سائقونك",
+  "carrierPortal": "بوابة شركة التوصيل",
+  "carrierPortalTagline": "شركتك وأسطولك وحجم العمل الذي يُعرض عليك.",
+  "notACarrier": "هذا الحساب غير مسجّل لدى شركة توصيل.",
+  "noCompanyYet": "لا توجد شركة مرتبطة بهذا الحساب بعد",
+  "askThePlatformToAttachYou": "اطلب من المنصّة ربط حسابك بشركة التوصيل الخاصة بك.",
+  "howYouAreDoing": "أداؤك",
+  "deliveryScore": "تقييم التوصيل",
+  "tooEarlyToTell": "من المبكر الحكم",
+  "ordersDelivered": "الطلبات المسلّمة",
+  "timeToClaim": "وقت الاستلام",
+  "timeOnTheRoad": "الوقت على الطريق",
+  "scoreBlurb": "يحدّد هذا التقييم حجم العمل الذي يُعرض عليك عندما يترك التاجر الاختيار للمنصّة. تسليم ما تستلمه هو الأهم، ثم سرعة الاستلام.",
+  "scoreProvisionalBlurb": "ما زلنا نمنحك العمل بحسن النية. سيصبح التقييم تقييمك أنت بدل أن يكون افتراضًا بعد بضعة طلبات أخرى.",
+  "takingOrders": "استقبال الطلبات",
+  "takingWork": "يستقبل العمل",
+  "youAreTakingOrders": "أنت تستقبل الطلبات",
+  "youAreNotTakingOrders": "أنت لا تستقبل الطلبات",
+  "pauseExplanation": "الإيقاف المؤقت يمنع إرسال طلبات جديدة إليك. أما ما هو مُسنَد إلى سائقيك فلا يتأثر.",
+  "suspendedByPlatform": "أوقفت المنصّة شركتك. لا يمكنك استئناف العمل بنفسك — تواصل مع المنصّة.",
+  "pauseNewOrders": "أوقف الطلبات الجديدة",
+  "startTakingOrders": "ابدأ استقبال الطلبات",
+  "pausedNoNewOrders": "تم الإيقاف. لن تُرسل إليك طلبات جديدة.",
+  "resumedTakingOrders": "عدت إلى استقبال الطلبات.",
+  "yourFleet": "أسطولك",
+  "noRidersBlurb": "لا يوجد لديك سائقون. تبدو شركتك متاحة ولا تستطيع استلام شيء، وهي أكثر الحالات إرباكًا لعدم وصول العمل — اطلب من المنصّة إضافة سائقيك.",
+  "ridersAddedByPlatform": "تضيف المنصّة السائقين إلى أسطولك.",
+  "gettingPaid": "استلام المستحقات",
+  "noPayoutAccount": "لا يوجد حساب لاستلام المستحقات",
+  "payoutNeedsAttentionBlurb": "لم يؤكّد المصرف هذا الحساب. قد تفشل التحويلات إليك — يمكن للمنصّة إعادة التحقق منه.",
+  "area": "المنطقة",
+  "pickYourArea": "اختر منطقتك لنعرف من يستطيع الوصول إليك",
+  "feeToArea": "التوصيل إلى {area}: {fee}",
+  "doesNotDeliverToArea": "هذا المتجر لا يوصّل إلى {area}",
+  "deliveryAreas": "مناطق التوصيل",
+  "whereYouDeliver": "إلى أين توصّل، وكم تتقاضى للوصول إلى هناك",
+  "flatFeeEverywhere": "أنت تتقاضى رسومًا واحدة لكل المناطق",
+  "flatFeeExplanation": "أضف منطقة أدناه لتسعّر حسب المسافة. قبل ذلك، كل طلب يكلّف رسوم التوصيل المعتادة وأنت توصّل إلى أي مكان.",
+  "addAnArea": "أضف منطقة",
+  "feeToHere": "الرسوم",
+  "minimumHere": "الحد الأدنى",
+  "extraMinutes": "دقائق إضافية",
+  "usesShopMinimum": "يستخدم الحد الأدنى لمتجرك",
+  "stopDelivering": "أوقف التوصيل هنا",
+  "areasYouServe": "المناطق التي توصّل إليها",
+  "onlyTheseAreas": "أنت توصّل فقط إلى المناطق المدرجة هنا. الطلبات من غيرها تُرفض.",
+  "manageAreas": "مناطق التوصيل",
+  "manageAreasBlurb": "القائمة التي يختار منها العملاء عند إدخال العنوان. تسعّر المتاجر توصيلها لكل منطقة.",
+  "newArea": "منطقة جديدة",
+  "areaName": "اسم المنطقة",
+  "regionOptional": "المحافظة (اختياري)",
+  "sortOrder": "الترتيب في القائمة",
+  "retire": "إخفاء",
+  "reinstate": "إعادة",
+  "retired": "مخفية",
+  "retiredExplanation": "المناطق المخفية تختفي من القائمة لكنها تبقى صالحة للعناوين التي تشير إليها.",
+  "noAreasYet": "لا توجد مناطق بعد",
+  "noAreasBlurb": "قبل إضافة المناطق، يتقاضى كل متجر رسوم توصيل واحدة ويوصّل إلى أي مكان.",
+  "navWhatsApp": "واتساب",
+  "whatsappInbox": "صندوق واتساب",
+  "whatsappInboxBlurb": "الزبائن الذين يراسلون متجرك. حوّل ما طلبوه إلى طلبية من هنا مباشرة.",
+  "noConversations": "لا رسائل بعد",
+  "noConversationsBlurb": "عندما يراسل زبون رقمك المربوط، تظهر المحادثة هنا.",
+  "connectedNumbers": "الأرقام المربوطة",
+  "connectNumber": "اربط رقماً",
+  "numberId": "معرّف رقم واتساب",
+  "numberLabel": "التسمية",
+  "displayNumber": "رقم الهاتف",
+  "connect": "اربط",
+  "disconnect": "افصل",
+  "disconnectNumberWarning": "تتوقف الرسائل الجديدة إلى هذا الرقم. تبقى محادثاتك الحالية محفوظة.",
+  "noNumbersYet": "لا رقم مربوط",
+  "noNumbersBlurb": "اربط رقم واتساب الذي يراسلك عليه زبائنك أصلاً.",
+  "selectAConversation": "اختر محادثة",
+  "selectAConversationBlurb": "اختر شخصاً من القائمة لقراءة ما طلبه.",
+  "showArchived": "إظهار المؤرشفة",
+  "showActive": "إظهار النشطة",
+  "typeAReply": "اكتب رداً",
+  "sendReply": "إرسال",
+  "replyNotSent": "حُفظ، لكن تعذّر الإرسال",
+  "voiceNote": "رسالة صوتية",
+  "photo": "صورة",
+  "document": "مستند",
+  "locationPin": "موقع",
+  "unsupportedMessage": "رسالة غير مدعومة",
+  "startAnOrder": "ابدأ طلبية",
+  "theRequest": "ما طلبوه",
+  "addItem": "أضف صنفاً",
+  "estimate": "تقدير",
+  "estimateNote": "تقدير بأسعار اليوم. يُحتسب المجموع النهائي عند التأكيد.",
+  "deliveryDetails": "تفاصيل التوصيل",
+  "orderNotes": "ملاحظات",
+  "confirmOrder": "أكّد الطلبية",
+  "confirmOrderWarning": "هذا ينشئ طلبية حقيقية ويحجز سائقاً.",
+  "discardRequest": "إلغاء",
+  "orderPlaced": "تم إنشاء الطلبية",
+  "draftDiscarded": "أُلغيت",
+  "nothingToOrderYet": "لم تُضف أصناف بعد",
+  "nothingToOrderYetBlurb": "أضف ما طلبه الزبون من قائمتك.",
+  "chooseOptions": "اختر الخيارات",
+  "quantity": "الكمية",
+  "addToOrder": "أضف إلى الطلبية",
+  "phoneLabel": "رقم الهاتف",
+  "budgetExhausted": "نفدت الميزانية. لن تُمنح إعفاءات جديدة حتى يلحق الإيراد.",
+  "deliveryWasFree": "عادةً {amount} — تكفّلنا بها",
+  "@deliveryWasFree": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "noCommissionOnThisOrder": "بلا عمولة على هذه الطلبية",
+  "deliveryPaidByPlatform": "المنصة تكفّلت برسوم التوصيل",
+  "navCompany": "الشركة",
+  "navJobs": "المهام",
+  "navEarnings": "الأرباح",
+  "jobsTitle": "مهامك",
+  "jobsBlurb": "كل ما يحمله سائقوك، وكل ما سلّموه.",
+  "noJobsYet": "لا مهام بعد",
+  "noJobsBlurb": "ستظهر هنا الطلبيات المسندة إلى شركتك.",
+  "earningsTitle": "الأرباح",
+  "earned": "المحقق",
+  "expected": "المتوقع",
+  "jobsDelivered": "مُسلّمة",
+  "jobsInFlight": "قيد التنفيذ",
+  "savedByOffers": "وُفّر بالعروض",
+  "earningsWindowNote": "خلال آخر {days} يوماً، بعد حصة المنصة البالغة {cut}% من كل رسم توصيل.",
+  "savedByOffersNote": "تنازلت المنصة عن حصتها في بعض توصيلاتك، فاحتفظت بكامل الرسم.",
+  "expectedNote": "قيمة العمل الجاري إن اكتمل كله. غير مستحق بعد.",
+  "yourFeeOnThis": "رسمك",
+  "navDashboard": "لوحة المتابعة",
+  "howTradeIsGoing": "كيف تسير الأعمال",
+  "howWorkIsGoing": "كيف يسير العمل",
+  "ordersToday": "طلبات اليوم",
+  "salesToday": "مبيعات اليوم",
+  "jobsToday": "مهام اليوم",
+  "earnedToday": "أرباح اليوم",
+  "upOnYesterday": "أعلى بنسبة {percent}% عن أمس",
+  "downOnYesterday": "أقل بنسبة {percent}% عن أمس",
+  "sameAsYesterday": "مثل أمس",
+  "noneYesterday": "لا شيء أمس",
+  "nothingYetToday": "لا شيء اليوم حتى الآن",
+  "needsYouNow": "بانتظارك الآن",
+  "toAccept": "بانتظار القبول",
+  "preparingNow": "قيد التحضير",
+  "readyForPickup": "جاهز للاستلام",
+  "outForDelivery": "في الطريق",
+  "allCaughtUp": "لا شيء بانتظارك.",
+  "lastDaysHeading": "آخر {days} يوماً",
+  "quietSoFar": "لا حركة في هذه الفترة بعد.",
+  "noJobsSoFar": "لا مهام في هذه الفترة بعد.",
+  "barChartLegend": "الغامق يعني ما تم تسليمه، والفاتح ما طُلب ولم يُسلَّم.",
+  "ordersInWindow": "الطلبات",
+  "deliveredInWindow": "المُسلَّمة",
+  "salesInWindow": "المبيعات",
+  "feesInWindow": "رسوم المنصة",
+  "feesInWindowNote": "{cut}% من المبيعات المُسلَّمة.",
+  "bestSellers": "الأكثر مبيعاً",
+  "nothingSoldYet": "لم يُبَع شيء في هذه الفترة بعد.",
+  "soldQty": "{qty} مبيعاً",
+  "savedForYou": "وفّرته العروض",
+  "savedForYouNote": "تنازلت المنصة عن حصتها في بعض طلباتك.",
+  "@upOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@downOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@lastDaysHeading": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@feesInWindowNote": {
+    "placeholders": {
+      "cut": {
+        "type": "String"
+      }
+    }
+  },
+  "@soldQty": {
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      }
+    }
+  },
+  "@earningsWindowNote": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "cut": {
+        "type": "String"
+      }
+    }
+  },
+  "navApplicants": "المتقدمون",
+  "waitingOnYou": "{count} بانتظار ردك",
+  "everyoneWhoApplied": "كل من تقدّم للعمل معك.",
+  "waitingOnly": "بانتظار الرد فقط",
+  "everyone": "الجميع",
+  "nobodyWaiting": "لا أحد بانتظار ردك.",
+  "nobodyHasApplied": "لم يتقدّم أحد بعد.",
+  "hiringAlsoCreatesTheirAccount": "قبوله يُنشئ حسابه ويضيفه إلى أسطولك، ليتمكن من استلام المهام فوراً.",
+  "addToMyFleet": "أضِفه إلى أسطولي",
+  "turnDown": "اعتذر",
+  "turnDownName": "الاعتذار لـ {name}",
+  "theyAreSentThisWordForWord": "سيصله هذا النص حرفياً. اذكر ما الذي يجب أن يتغيّر.",
+  "riderAdded": "{name} أصبح ضمن أسطولك. أرسلنا له طريقة تسجيل الدخول.",
+  "applicantTurnedDown": "تم إبلاغ {name}.",
+  "turnedDownBecause": "تم الاعتذار: {reason}",
+  "onYourFleetNow": "ضمن أسطولك. يمكن إرسال المهام إليه.",
+  "thatDidNotGoThrough": "لم تتم العملية. حاول مرة أخرى.",
+  "@waitingOnYou": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@turnDownName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@riderAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@applicantTurnedDown": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@turnedDownBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "wantToRideForACompany": "تريد العمل مع شركة توصيل؟",
+  "rideWithUs": "اعمل معنا",
+  "whoWouldYouRideFor": "مع أي شركة تريد العمل؟",
+  "theCompanyDecidesNotUs": "أنت تتقدّم إلى الشركة وليس إلينا. هي من تقرأ الطلب وتقرّر، وسنبلغك بالنتيجة في الحالتين.",
+  "couldNotLoadCompanies": "تعذّر تحميل الشركات.",
+  "nobodyIsHiringRightNow": "لا توجد شركات توصيل تستقبل طلبات حالياً.",
+  "aboutYou": "عنك",
+  "yourName": "اسمك",
+  "anythingWeShouldKnowRider": "شيء يجب أن يعرفوه؟ (اختياري)",
+  "yourEmail": "بريدك الإلكتروني",
+  "weSendACodeToCheckItReachesYou": "نرسل رمزاً من ستة أرقام للتأكد من وصوله إليك. كل ما يلي ذلك يُرسل إليه، بما في ذلك طريقة تسجيل الدخول.",
+  "yourPhoneOptional": "رقم هاتفك (اختياري)",
+  "aNumberHelpsWhenAnOrderNeedsSorting": "مفيد عندما يحتاج أمر يخص التوصيل إلى حل سريع. تخطَّه إن لم ترغب.",
+  "sendCode": "أرسل الرمز",
+  "sendAnother": "أرسل رمزاً آخر",
+  "theCodeWeSent": "الرمز الذي أرسلناه",
+  "verify": "تحقّق",
+  "skipThis": "تخطَّ هذا",
+  "continueLabel": "متابعة",
+  "sendApplication": "أرسل الطلب",
+  "applicationSent": "تم إرسال الطلب",
+  "companyWillBeInTouch": "ستقرأ {company} طلبك وتتواصل معك عبر البريد الإلكتروني.",
+  "keepThisReference": "احتفظ بهذا الرقم المرجعي",
+  "done": "تم",
+  "@companyWillBeInTouch": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentMethod": "طريقة الدفع",
+  "cashOnDelivery": "الدفع عند الاستلام",
+  "card": "بطاقة",
+  "payTheRiderWhenItArrives": "ادفع للمندوب عند وصول طلبك",
+  "cardNotAvailableYet": "غير متاح حالياً",
+  "paymentDue": "مستحق عند التسليم",
+  "paymentAwaitingAuthorisation": "بانتظار التفويض",
+  "paymentAuthorised": "تم التفويض",
+  "paymentPaid": "مدفوع",
+  "paymentRefunded": "تم الاسترداد",
+  "paymentFailed": "فشل الدفع",
+  "chooseAnAddress": "اختر عنواناً",
+  "addANewAddress": "أضف عنواناً جديداً",
+  "riderGreeting": "أهلاً، {name}",
+  "@riderGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "riderHeaderLine": "هذا ما هو متاح على اللوحة الآن.",
+  "riderWaitingCount": "{count} بالانتظار",
+  "@riderWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "riderOnTheWayCount": "{count} في الطريق",
+  "@riderOnTheWayCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "newJobsAppearHere": "تظهر المهام الجديدة هنا فور تجهيز المتجر لأي طلب.",
+  "claimOneToSeeItHere": "اقبل مهمة من قائمة المتاح وستظهر هنا.",
+  "collectCash": "حصّل {amount} نقداً",
+  "@collectCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "alreadyPaid": "مدفوع مسبقاً"
+}

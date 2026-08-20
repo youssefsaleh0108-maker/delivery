@@ -1,0 +1,830 @@
+/*
+  The public site.
+
+  Colours, spacing and radii are lifted from delivery_design_system/tokens.dart rather than picked
+  fresh. A visitor who applies here lands in a portal thirty seconds later, and a site that looks
+  like a different company from the product it sells is a small, constant tax on trust.
+*/
+
+:root {
+  --brand: #C41D4E;
+  --brand-dark: #8E1235;
+  --brand-soft: #FDEDF1;
+  --brand-line: #F1C6D3;
+  --ink: #241319;
+  --muted: #7E6A73;
+
+  /*
+    For secondary text that sits on the warm top rather than on the plain background.
+
+    --muted was chosen against #FCF6F8, where it manages 4.69:1 — over the 4.5:1 minimum, but not by
+    much. Warming the top of the page darkens what that text sits on and takes it to 3.91:1, which
+    is under. This is the same grey walked far enough down to clear it with room to spare (5.8:1),
+    rather than a global change: the rest of the page still sits on the pale background --muted was
+    picked for, and darkening it everywhere would flatten a distinction that is doing real work.
+  */
+  --ink-soft: #63505A;
+  --border: #EAD9DF;
+  --bg: #FCF6F8;
+  --white: #FFFFFF;
+
+  /*
+    The warm side of the palette, used only at the top of the page.
+
+    The brand is a crimson, and a whole page washed in tints of one cool red is tidy in a way that
+    reads clinical — correct for a dashboard, wrong for the first thing a stranger sees. Apricot and
+    cream are what crimson's neighbours are on the warm side: close enough to look deliberate,
+    different enough to feel like daylight rather than more of the same pink.
+  */
+  --warm: #FFB88C;
+  --warm-soft: #FFD6A8;
+  --warm-cream: #FFF0E4;
+
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 22px;
+
+  --shadow: 0 1px 2px rgba(36, 19, 25, .06), 0 8px 24px rgba(36, 19, 25, .06);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+/* ------------------------------------------------------------------ backdrop */
+
+/*
+  A slow drift behind the whole page.
+
+  Three blurred shapes on long, mismatched cycles, so the pattern never repeats visibly and nothing
+  ever crosses the reader's eye fast enough to pull it off a sentence. This is the page somebody
+  loads before they trust us, and motion that competes with the copy costs more than it earns.
+
+  Only transform and opacity are animated. Both are handled by the compositor, so this stays off the
+  main thread and does not force layout or repaint on every frame — which is the difference between
+  a background that idles at nearly no cost and one that makes a mid-range phone warm.
+*/
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  /* The blur is the expensive part, and it is applied once and never animated: a filter that
+     changes has to be re-rasterised on every frame. */
+  filter: blur(70px);
+  will-change: transform;
+}
+
+.orb-a {
+  width: 46vmax; height: 46vmax;
+  top: -14vmax; left: -10vmax;
+  background: radial-gradient(circle at 30% 30%, rgba(196, 29, 78, .30), rgba(196, 29, 78, 0) 70%);
+  animation: drift-a 34s ease-in-out infinite alternate;
+}
+
+/* The warm one, and it is the one nearest the top on purpose. */
+.orb-b {
+  width: 40vmax; height: 40vmax;
+  top: 6vmax; right: -12vmax;
+  background: radial-gradient(circle at 60% 40%, rgba(255, 184, 140, .42), rgba(255, 184, 140, 0) 70%);
+  animation: drift-b 44s ease-in-out infinite alternate;
+}
+
+.orb-c {
+  width: 52vmax; height: 52vmax;
+  bottom: -22vmax; left: 24vmax;
+  background: radial-gradient(circle at 40% 60%, rgba(142, 18, 53, .16), rgba(142, 18, 53, 0) 70%);
+  animation: drift-c 52s ease-in-out infinite alternate;
+}
+
+/* A faint tint over the orbs so they read as one surface rather than three shapes. Static: the
+   texture is there to soften the gradient banding, and moving it would be visible as noise.
+
+   Weakest at the very top and strongest at the bottom. The veil is what keeps the middle of the
+   page calm enough to read a paragraph on; at the top there is nothing to protect but a headline,
+   so the colour is allowed through. */
+.grain {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+      rgba(252, 246, 248, .22) 0%,
+      rgba(252, 246, 248, .62) 40%,
+      rgba(252, 246, 248, .86) 100%);
+}
+
+/*
+  The warm top.
+
+  Sits above the veil rather than under it, so it tints what is already there instead of being
+  muted by it — the layer order here is the whole trick. Anchored to the top of the viewport and
+  faded out well before the first section of real content, so it reads as light coming into the
+  page rather than as a coloured band with an edge.
+
+  It breathes on a long, slow cycle. Opacity only, which the compositor handles for free.
+*/
+.dawn {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 92vh;
+  background:
+      radial-gradient(120% 74% at 14% -8%, rgba(255, 184, 140, .46), rgba(255, 184, 140, 0) 62%),
+      radial-gradient(96% 62% at 86% 2%, rgba(255, 214, 168, .40), rgba(255, 214, 168, 0) 64%),
+      linear-gradient(180deg, rgba(255, 240, 228, .62) 0%, rgba(255, 240, 228, 0) 82%);
+  animation: warmth 22s ease-in-out infinite alternate;
+}
+
+@keyframes warmth {
+  from { opacity: .84; }
+  to   { opacity: 1; }
+}
+
+/* Different distances, different rhythms. Equal ones would sync up and the whole thing would
+   visibly pulse. */
+@keyframes drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(9vmax, 6vmax, 0) scale(1.12); }
+}
+
+@keyframes drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.06); }
+  to   { transform: translate3d(-11vmax, 9vmax, 0) scale(0.94); }
+}
+
+@keyframes drift-c {
+  from { transform: translate3d(0, 0, 0) scale(0.96); }
+  to   { transform: translate3d(7vmax, -8vmax, 0) scale(1.1); }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { line-height: 1.15; letter-spacing: -.02em; margin: 0; }
+
+/* ------------------------------------------------------------------ masthead */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px clamp(16px, 5vw, 64px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  /* Warmer and more transparent than it was. An opaque bar the colour of the old background sat on
+     the warm top like a strip of something else; letting the light through makes it part of the
+     page. The blur is what keeps the wordmark legible once content scrolls underneath. */
+  background: rgba(255, 249, 244, .72);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(234, 217, 223, .7);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* The mark: a courier bag reduced to a rounded square with a handle. */
+.mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--brand);
+  position: relative;
+  flex: none;
+}
+.mark::before {
+  content: "";
+  position: absolute;
+  inset: -5px 7px auto 7px;
+  height: 9px;
+  border: 2.5px solid var(--brand);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+}
+
+.masthead nav { display: flex; align-items: center; gap: 6px; }
+
+.masthead nav a {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14.5px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+}
+.masthead nav a:hover { background: var(--brand-soft); }
+
+/* ------------------------------------------------------------------ buttons */
+
+button, .primary, .secondary, .ghost {
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  text-decoration: none;
+  display: inline-block;
+  transition: transform .06s ease, background .15s ease;
+}
+button:active, .primary:active, .secondary:active { transform: translateY(1px); }
+
+.primary { background: var(--brand); color: var(--white); }
+.primary:hover { background: var(--brand-dark); }
+
+.secondary {
+  background: var(--white);
+  color: var(--ink);
+  border-color: var(--border);
+}
+.secondary:hover { border-color: var(--brand-line); background: var(--brand-soft); }
+
+.ghost {
+  background: transparent;
+  color: var(--brand);
+  border-color: var(--brand-line);
+  padding: 9px 16px;
+  font-size: 14.5px;
+}
+.ghost:hover { background: var(--brand-soft); }
+
+.wide { width: 100%; }
+
+/* ------------------------------------------------------------------ hero */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.05fr .95fr;
+  gap: clamp(24px, 5vw, 64px);
+  align-items: center;
+  padding: clamp(40px, 7vw, 96px) clamp(16px, 5vw, 64px);
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.hero h1 {
+  font-size: clamp(38px, 6.2vw, 68px);
+  font-weight: 800;
+}
+
+.lede {
+  font-size: clamp(16px, 1.6vw, 19px);
+  /* Darker than the rest of the secondary text, because it is the only paragraph that sits on the
+     warm wash. See --ink-soft. */
+  color: var(--ink-soft);
+  max-width: 46ch;
+  margin: 18px 0 0;
+}
+
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+/*
+  The hero artwork, drawn in CSS.
+
+  A placeholder until a Canva export replaces it — but a finished-looking one. An empty frame or a
+  broken image icon says "unfinished site" far louder than plain shapes say "simple illustration".
+*/
+.hero-art {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-lg);
+  /* Warm cream into white, picking up the light behind it. The crimson scooter has more to push
+     against on a warm panel than it did on a pink one. */
+  background: linear-gradient(160deg, var(--warm-cream), var(--white) 72%);
+  border: 1px solid rgba(255, 214, 168, .8);
+  overflow: hidden;
+}
+.art-bag {
+  position: absolute;
+  left: 26%; top: 22%;
+  width: 46%; aspect-ratio: 1;
+  background: var(--brand);
+  border-radius: 18px;
+  /* The rotation lives in the keyframes as well as here, because a transform on the element and a
+     transform in an animation are the same property — declaring the tilt only here would mean the
+     animation silently discards it and the bag snaps upright on the first frame. */
+  transform: rotate(-8deg);
+  animation: bob 3.4s ease-in-out infinite alternate;
+}
+.art-bag::before {
+  content: "";
+  position: absolute;
+  left: 26%; right: 26%; top: -14%;
+  height: 18%;
+  border: 6px solid var(--brand);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+}
+.art-wheel {
+  position: absolute;
+  bottom: 15%;
+  width: 15%; aspect-ratio: 1;
+  border: 6px solid var(--brand-dark);
+  border-radius: 50%;
+  background: var(--white);
+  animation: roll 1.9s linear infinite;
+}
+/* A spoke. Without it the wheels are circles, and a rotating circle is a still circle — the
+   animation would run and nobody would see anything move. */
+.art-wheel::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 12%;
+  width: 2px; height: 76%;
+  margin-left: -1px;
+  background: var(--brand-line);
+  border-radius: 2px;
+}
+.art-wheel-a { left: 18%; }
+/* Offset so the two wheels are never at the same angle. Identical phase reads as one object. */
+.art-wheel-b { right: 18%; animation-delay: -.6s; }
+
+/* The road is what actually says "moving". The wheels turning on a static line looks like a scooter
+   spinning its wheels; the line travelling underneath turns the same wheels into travel. */
+.art-road {
+  position: absolute;
+  left: 8%; right: 8%; bottom: 14%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.art-road::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Twice the width, translated by exactly half: the dashes leave on the left as their copies
+     arrive on the right, so the loop has no seam. */
+  width: 200%;
+  background: repeating-linear-gradient(
+      90deg,
+      var(--brand-line) 0 22px,
+      transparent 22px 44px);
+  animation: road 1.9s linear infinite;
+}
+
+@keyframes bob {
+  from { transform: rotate(-8deg) translateY(0); }
+  to   { transform: rotate(-6deg) translateY(-9px); }
+}
+
+@keyframes roll {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes road {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-44px, 0, 0); }
+}
+
+/* ------------------------------------------------------------------ strip */
+
+/*
+  Four cards rather than one banded strip.
+
+  As a full-bleed band with hairline dividers these read as a table of specifications — true, and
+  about as inviting as a spec sheet. Separated onto their own cards they read as four small promises,
+  which is what they actually are. It also gives the warm wash behind them somewhere to show through,
+  so the section belongs to the top of the page instead of capping it off.
+
+  Same white, same radius, same shadow as the partner cards below. One card language on one page:
+  a second one would make a reader work out whether the difference means anything.
+*/
+.strip {
+  display: grid;
+  /*
+    An explicit column count, not auto-fit.
+
+    auto-fit is the tidier-looking rule and it is wrong for this row. It packs in as many columns as
+    fit, which at tablet widths is three — leaving the fourth card stranded alone on a second row.
+    With a set of exactly four, the counts that read well are 4, 2 and 1, and nothing else; the
+    breakpoints below say so directly rather than hoping the arithmetic lands there.
+  */
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(12px, 1.6vw, 20px);
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 5vw, 64px);
+}
+.strip div {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: clamp(18px, 2.2vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.strip strong { font-size: 16px; letter-spacing: -.01em; }
+.strip span { color: var(--muted); font-size: 13.5px; }
+
+/* ------------------------------------------------------------------ sections */
+
+.prose, .app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: clamp(48px, 7vw, 96px) clamp(16px, 5vw, 64px);
+}
+
+/* Reading width, not page width. A paragraph stretched across 1240px is measurably harder to read:
+   the eye loses the line it was on when it travels back to the left. */
+.prose p { max-width: 62ch; color: var(--muted); }
+.prose p + p { margin-top: 14px; }
+/* Anchored from the nav, so they need the same clearance from the sticky masthead the steps have. */
+.prose { scroll-margin-top: 88px; }
+
+.contact-list {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) 1fr;
+  gap: 10px 24px;
+  margin: 28px 0 0;
+  max-width: 62ch;
+}
+.contact-list dt { font-weight: 700; font-size: 14.5px; }
+.contact-list dd { margin: 0; color: var(--muted); font-size: 14.5px; }
+.contact-list a { color: var(--brand); }
+
+@media (max-width: 560px) {
+  .contact-list { grid-template-columns: 1fr; gap: 2px 0; }
+  .contact-list dd { margin-bottom: 14px; }
+}
+
+h2 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 800; }
+
+.section-lede { color: var(--muted); max-width: 58ch; margin: 14px 0 0; }
+
+/* The .cards / .card rules that stood here styled the two partner cards, and went when they did.
+   Left in place they would read as a component something still depends on — the next person to
+   want a card on this page would extend rules nothing renders. The four .strip cards have their
+   own, above. */
+
+.app { text-align: center; }
+.app .section-lede { margin-inline: auto; }
+.app-actions {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.hint { color: var(--muted); font-size: 13.5px; }
+
+/* ------------------------------------------------------------------ footer */
+
+footer {
+  border-top: 1px solid var(--border);
+  padding: 26px clamp(16px, 5vw, 64px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 14px;
+}
+footer nav { display: flex; gap: 18px; }
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--brand); }
+
+/* ------------------------------------------------------------------ applying */
+
+.apply-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 56px) clamp(16px, 5vw, 48px) clamp(48px, 8vw, 96px);
+}
+.apply-page h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; }
+.apply-page .section-lede { margin-bottom: clamp(24px, 4vw, 36px); }
+
+/* The progress rail. Names, not just numbers: "3 of 4" says how much is left but not what is
+   coming, and what is coming is what decides whether somebody starts at all. */
+.steps {
+  display: flex;
+  gap: clamp(6px, 1.4vw, 16px);
+  list-style: none;
+  margin: 0 0 clamp(20px, 3vw, 28px);
+  padding: 0;
+}
+.steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding-top: 10px;
+  border-top: 3px solid var(--border);
+}
+.steps li.current, .steps li.done { color: var(--ink); border-top-color: var(--brand); }
+.dot {
+  width: 22px; height: 22px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--border);
+  color: var(--ink);
+}
+.steps li.current .dot, .steps li.done .dot { background: var(--brand); color: var(--white); }
+.steps li.done .dot { font-size: 0; }
+.steps li.done .dot::after { content: "✓"; font-size: 12px; }
+
+.panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: clamp(22px, 3.5vw, 36px);
+  display: grid;
+  gap: 16px;
+  /* The masthead is sticky, so a panel scrolled flush to the top of the viewport has its heading
+     underneath it. This is the gap that keeps the first line of the new step readable. */
+  scroll-margin-top: 88px;
+}
+.panel h2 { font-size: 23px; }
+.panel-lede { color: var(--muted); margin: -6px 0 4px; font-size: 14.5px; }
+
+.optional {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 999px;
+  padding: 3px 9px;
+  vertical-align: middle;
+}
+
+.kind-choice { border: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.kind-choice legend { font-size: 14px; font-weight: 600; padding: 0 0 8px; }
+.kind {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 400;
+}
+.kind:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.kind input { width: auto; margin-top: 3px; accent-color: var(--brand); }
+.kind strong { display: block; font-size: 15px; }
+.kind small { color: var(--muted); font-size: 13px; }
+
+/* The address and its Send button on one line, so the two read as one action. */
+.verify-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.verify-row .grow { flex: 1 1 240px; }
+.verify-row button { flex: none; }
+
+.code-box {
+  display: grid;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px dashed var(--brand-line);
+  border-radius: var(--r-md);
+  padding: 16px;
+}
+.code-box input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: .35em;
+  text-align: center;
+}
+.code-box .hint { display: flex; gap: 6px; align-items: center; justify-content: center; }
+
+/* A button that reads as a link: resending is a minor action next to Verify, and giving it the
+   same weight would make two primary things compete on one small panel. */
+.linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--brand);
+  text-decoration: underline;
+}
+.linkish:disabled { color: var(--muted); text-decoration: none; cursor: default; }
+
+.verified {
+  margin: 0;
+  font-weight: 700;
+  color: #25834B;
+}
+
+.step-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.step-actions .spacer { flex: 1; }
+.step-actions .primary, .step-actions .secondary, .step-actions .ghost { flex: none; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.summary { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 8px 20px; margin: 0; }
+.summary dt { color: var(--muted); font-size: 13.5px; }
+.summary dd { margin: 0; font-weight: 600; word-break: break-word; }
+
+@media (max-width: 560px) {
+  /* The names go, the numbers stay. Four names at this width wrap into a block that takes more
+     room than the step it is describing. */
+  .step-name { display: none; }
+  .steps li { justify-content: center; }
+}
+
+/* ------------------------------------------------------------------ dialogs */
+
+.sheet {
+  border: none;
+  border-radius: var(--r-lg);
+  padding: clamp(22px, 3vw, 32px);
+  width: min(460px, calc(100vw - 32px));
+  box-shadow: 0 24px 70px rgba(36, 19, 25, .22);
+  color: var(--ink);
+  background: var(--white);
+}
+.sheet::backdrop { background: rgba(36, 19, 25, .45); backdrop-filter: blur(3px); }
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 6px;
+}
+.sheet-head h2 { font-size: 25px; }
+
+.icon {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: var(--r-sm);
+}
+.icon:hover { color: var(--ink); background: var(--brand-soft); }
+
+.sheet-lede { color: var(--muted); margin: 0 0 20px; }
+
+.choices { display: grid; gap: 12px; }
+.choice {
+  display: grid;
+  gap: 3px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: var(--ink);
+}
+.choice:hover { border-color: var(--brand); background: var(--brand-soft); }
+.choice strong { font-size: 16px; }
+.choice span { color: var(--muted); font-size: 13.5px; }
+
+.sheet-foot { color: var(--muted); font-size: 13.5px; margin: 18px 0 0; text-align: center; }
+.sheet-foot a { color: var(--brand); }
+
+/* ------------------------------------------------------------------ form */
+
+#apply-form { display: grid; gap: 14px; }
+
+label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+
+input, textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+  resize: vertical;
+}
+input:focus, textarea:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  background: var(--white);
+}
+
+.form-error {
+  margin: 0;
+  color: var(--brand-dark);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--r-md);
+  padding: 10px 13px;
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------------ receipt */
+
+#apply-done { text-align: center; }
+.done-mark {
+  font-size: 34px;
+  color: var(--brand);
+  margin: 6px 0 10px;
+}
+#apply-done h3 { font-size: 21px; }
+#apply-done p { color: var(--muted); }
+
+/* The reference is the applicant's only key to their own application, so it is made easy to copy
+   and hard to mistranscribe: monospace, spaced out, and selectable in one click. */
+.reference {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: .04em;
+  color: var(--ink) !important;
+  background: var(--brand-soft);
+  border: 1px dashed var(--brand-line);
+  border-radius: var(--r-md);
+  padding: 13px;
+  margin: 16px 0 18px;
+  user-select: all;
+  word-break: break-all;
+}
+
+.status-line {
+  margin: 14px 0 0;
+  font-weight: 600;
+  color: var(--ink) !important;
+}
+
+/* ------------------------------------------------------------------ narrow */
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-art { order: -1; max-height: 260px; }
+  /* Two and two. Three across would leave the fourth card on a row by itself. */
+  .strip { grid-template-columns: repeat(2, 1fr); }
+  .masthead nav a { display: none; }
+}
+
+@media (max-width: 480px) {
+  .strip { grid-template-columns: 1fr; }
+}
+
+/* ------------------------------------------------------------------ stillness */
+
+/*
+  Somebody who has asked their operating system for less motion has asked for it here too.
+  For a few people this is not a preference: vestibular disorders make drifting, parallax and
+  looping motion genuinely unpleasant, and this is a public page nobody chose to open.
+
+  Everything stops rather than slows. The page was designed to be complete without any of it — the
+  orbs settle into a static wash, the scooter becomes the still illustration it already was.
+  scroll-behavior goes with it: a smooth-scrolled jump is motion the same as any other.
+*/
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  .orb,
+  .dawn,
+  .art-bag,
+  .art-wheel,
+  .art-road::before {
+    animation: none;
+  }
+
+  /* The warm top stays — it is colour, not movement, and stilling it would take the friendliness
+     away from the people who asked only for the motion to stop. Pinned at full strength so it does
+     not sit at whatever opacity the cancelled animation left behind. */
+  .dawn { opacity: 1; }
+
+  /* The tilt was in the keyframes as well as on the element; with the animation gone the
+     declaration on the element still holds it, so the bag stays as drawn. */
+  .orb-b { transform: scale(1.06); }
+
+  /* Belt and braces for anything added later: a new decorative animation should inherit the
+     preference rather than wait for somebody to remember this block. */
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android blocks cleartext HTTP by default from API 28 onward, and the local stack is plain HTTP.
+  Without this, every call fails with "Cleartext HTTP traffic to ... not permitted".
+
+  Cleartext is permitted ONLY for local development addresses and stays denied everywhere else.
+  Section 10 requires TLS everywhere in real environments; this file must never grow a public
+  hostname.
+
+  127.0.0.1 is the address the app actually uses. It reaches the host because `adb reverse`
+  forwards the device's loopback to the host's - see infra/adb-reverse.ps1. That keeps one address
+  working for the emulator, a USB-attached phone and the desktop browser at once, which is what lets
+  Keycloak stamp a single issuer that all of them accept.
+
+  10.0.2.2 is kept as a fallback for an emulator running without adb reverse.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- This machine's LAN IP - the address a physical phone on the same Wi-Fi uses.
+             UPDATE THIS when DHCP moves the IP, alongside infra/.env. Android's network-security
+             config does not accept CIDR ranges, so the specific host has to be listed. -->
+        <domain includeSubdomains="false">192.168.21.248</domain>
+        <!-- The host via `adb reverse`, which works over USB on a physical device too. -->
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- The host as seen from inside an emulator. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+
+    <base-config cleartextTrafficPermitted="false"/>
+</network-security-config>

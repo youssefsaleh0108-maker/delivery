@@ -1,0 +1,87 @@
+# Publishes the five shared libraries to GitHub Packages.
+#
+# One job per library, each gated on its own path, because none of them has a parent any more:
+# a change to platform-security releases platform-security and nothing else. That is the whole
+# point of the split, and it is also the new hazard — see the note on migrations at the bottom.
+#
+# Consumers resolve these from
+#   https://maven.pkg.github.com/youssefsaleh0108-maker/delivery.platform
+# which is this repository. GitHub Packages requires a token even for public packages, so every
+# consuming repo needs a GH_PACKAGES_TOKEN secret — docs/POLYREPO.md explains why the built-in
+# GITHUB_TOKEN is not enough across repositories.
+
+name: publish platform libraries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform-*/**'
+      - '.github/workflows/publish.yml'
+  # Manual run for a real release: set the version in the pom, then dispatch. Kept separate from
+  # the push trigger because GitHub applies one `paths` filter to branches and tags alike, so
+  # combining them makes tag publishes fire unpredictably.
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      # Independent on purpose: one library failing to publish must not silently withhold the
+      # other four, which would leave services resolving a mix of old and new.
+      fail-fast: false
+      matrix:
+        library:
+          - platform-security
+          - platform-observability
+          - platform-outbox
+          - platform-notifications
+          - platform-storage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+          # Writes a settings.xml whose <server id="github"> matches the <distributionManagement>
+          # and <repositories> id in every pom. Without the ids matching, Maven sends no
+          # credentials and the deploy fails with 401.
+          server-id: github
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_TOKEN
+
+      - name: Build and test
+        working-directory: ${{ matrix.library }}
+        run: mvn -B verify
+
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: '${{ matrix.library }}/target/surefire-reports/*.xml'
+          fail_on_failure: true
+
+      # platform-storage depends on platform-security, so it must resolve a *published* version,
+      # not a sibling directory. Deploying each library independently is what proves that.
+      - name: Deploy to GitHub Packages
+        working-directory: ${{ matrix.library }}
+        run: mvn -B deploy -DskipTests
+        env:
+          MAVEN_USERNAME: ${{ github.actor }}
+          MAVEN_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# ---------------------------------------------------------------------------------------------
+# WATCH THIS: platform-outbox and platform-storage each ship Flyway migrations under
+# src/main/resources/db/migration, and those run inside the database of whichever service pulls
+# them in. Two services on two different versions of the same library now means two different
+# migration sets against schemas that are supposed to agree. That is the 08-17 V3-vs-V21/V18
+# collision with a version number attached to it. Before changing a migration in a library, check
+# every consumer's pinned delivery.platform.version.

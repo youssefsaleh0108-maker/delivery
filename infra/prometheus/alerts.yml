@@ -1,0 +1,112 @@
+# What is worth waking somebody for.
+#
+# Metrics were being collected and nothing was watching them, which is most of the way to no
+# monitoring at all: the data existed, so a dashboard could answer a question somebody already knew
+# to ask, and nothing volunteered that anything was wrong.
+#
+# The rules below are deliberately few. An alert that fires often enough to be ignored is worse than
+# no alert, because it teaches people to ignore the channel the real one will arrive on. Everything
+# here is either "money is in the wrong place" or "an event is permanently lost" — states that do
+# not resolve on their own and that no other part of the system announces.
+#
+# Severity is a routing decision, not a description of how annoyed anyone is:
+#   page — a human should look now, out of hours if necessary
+#   warn — should be looked at during the working day
+
+groups:
+  - name: settlement
+    rules:
+      # The one this whole file exists for.
+      #
+      # A customer's money has left their account and reached nobody: the merchant has not been
+      # paid, the rider has not been paid, and no refund has posted. It is silent by construction —
+      # the debit succeeded so nothing failed, and the saga is waiting so nothing errored — which
+      # means without this rule the first report comes from the customer.
+      - alert: SettlementDebitedWithoutCounterpart
+        expr: delivery_settlement_debited_without_counterpart > 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $value }} order(s) debited with nothing credited"
+          description: >-
+            A customer has been debited and no merchant, rider, provider or refund leg has posted.
+            Money is being held that should not be. Check the unsettled view in Backoffice Finance
+            and the core_banking_sync_log for the orders concerned. Do not unwind anything
+            automatically — confirm against the bank first.
+
+      # Broader and less acute: the saga is waiting on something. Often a bank outage, in which case
+      # no money has moved yet and the legs will drain when it returns. Worth seeing in daylight.
+      - alert: SettlementLegsStuck
+        expr: delivery_settlement_stuck_legs > 0
+        for: 15m
+        labels:
+          severity: warn
+        annotations:
+          summary: "{{ $value }} settlement leg(s) pending far longer than they should be"
+          description: >-
+            Legs have sat PENDING past the configured threshold. If the bank is up, suspect a
+            posting result that was never delivered — check the corebanking-connector dead-letter
+            queue.
+
+  - name: outbox
+    rules:
+      # An event that will never be published. Whatever was waiting for it — a notification, a
+      # settlement, a projection — will wait forever. The relay logs this once, in one container,
+      # at whatever hour it happened.
+      - alert: OutboxEventsDeadLettered
+        expr: delivery_outbox_dead_lettered > 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service }} has {{ $value }} dead-lettered outbox event(s)"
+          description: >-
+            Events exhausted their retries and will never publish. This survives restarts and does
+            not clear itself. Inspect outbox_event WHERE status = 'DEAD_LETTERED' in that service's
+            schema; republishing is a manual decision because consumers may have partially acted.
+
+      # Damage in progress rather than damage done. The relay is not draining — the broker is
+      # unreachable, or the relay is not running. Caught here, nothing has been lost yet.
+      #
+      # The threshold is a backlog that persists, not a spike: a burst of orders legitimately puts
+      # hundreds of rows in the table for a few seconds.
+      - alert: OutboxBacklogNotDraining
+        expr: delivery_outbox_pending > 200
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "{{ $labels.service }} outbox backlog is not draining ({{ $value }} pending)"
+          description: >-
+            Events are being written faster than they publish, or not publishing at all. Check the
+            broker is reachable from this service and that the relay is enabled
+            (delivery.outbox.relay-enabled).
+
+      # The backlog growing without bound is the same failure caught earlier, and it fires even
+      # when the absolute number is still small — which is what a new or low-traffic service looks
+      # like when its relay is broken.
+      - alert: OutboxBacklogGrowing
+        expr: delta(delivery_outbox_pending[30m]) > 100
+        for: 10m
+        labels:
+          severity: warn
+        annotations:
+          summary: "{{ $labels.service }} outbox backlog is growing steadily"
+          description: >-
+            Pending events have risen sharply over the last half hour without draining.
+
+  - name: availability
+    rules:
+      # Deliberately last and deliberately plain. A service being down is the failure everybody
+      # already expects to be alerted on, and it is the one most likely to be noticed another way.
+      - alert: ServiceDown
+        expr: up{job="delivery-services"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service }} is not answering"
+          description: >-
+            Prometheus cannot scrape {{ $labels.instance }}. If several fire together, suspect the
+            Config Server or the database rather than the services themselves.

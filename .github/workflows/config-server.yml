@@ -1,0 +1,24 @@
+name: config-server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/config-server/**'
+      - 'platform/**'
+      - 'pom.xml'
+      - '.github/workflows/reusable-service-ci.yml'
+      - '.github/workflows/config-server.yml'
+  pull_request:
+    paths:
+      - 'services/config-server/**'
+      - 'platform/**'
+      - 'pom.xml'
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service-name: config-server
+      service-path: services/config-server
+    secrets: inherit

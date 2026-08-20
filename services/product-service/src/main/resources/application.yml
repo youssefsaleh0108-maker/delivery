@@ -1,0 +1,104 @@
+server:
+  port: ${SERVER_PORT:8103}
+
+spring:
+  application:
+    name: product-service
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  # Datasource URL/username and the Flyway settings come from config-repo; the password comes from
+  # Vault, composited into the same response (Section 6). The defaults below only exist so the
+  # service can be run straight from an IDE against the compose Postgres.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=product}
+    username: ${DB_USER:product_service}
+    password: ${DB_PASSWORD:product_service_dev_pw}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  flyway:
+    enabled: true
+    # Order matters: the shared migrations (V1 outbox, V2 file_metadata) come from the platform
+    # libraries' jars, this service's own start at V10.
+    locations: classpath:db/migration/shared,classpath:db/migration/product
+    schemas: product
+    default-schema: product
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema. Hibernate refuses to boot if the entities have drifted from it,
+      # which catches a forgotten migration at deploy time rather than at first query.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: product
+        jdbc:
+          time_zone: UTC
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+delivery:
+  outbox:
+    exchange: delivery.events
+    relay-enabled: true
+
+  storage:
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9010}
+      public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9010}
+      access-key: ${MINIO_ACCESS_KEY:delivery}
+      secret-key: ${MINIO_SECRET_KEY:delivery123}
+      presign-ttl: 10m
+      max-upload-size-bytes: 10485760
+
+  catalog:
+    max-images-per-product: 8
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh,busrefresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

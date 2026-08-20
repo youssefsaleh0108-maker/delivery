@@ -1,0 +1,39 @@
+# The non-secret environment every service shares.
+#
+# Deliberately thin. Section 6 puts business parameters and per-service configuration in the Config
+# Server's Git-backed repo, not in Kubernetes objects — the only things here are what a service
+# needs BEFORE it can reach the Config Server, plus the addresses that differ per cluster.
+#
+# If you find yourself adding a business parameter here, it belongs in config-repo instead.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: delivery-common
+  namespace: delivery
+data:
+  SPRING_PROFILES_ACTIVE: "k8s"
+  CONFIG_IMPORT: "configserver:http://config-server:8888"
+
+  # A token carries exactly one issuer, and it must be the address clients see. Services fetch
+  # signing keys on the in-cluster address instead. Change one without the other and every token
+  # validated inside the cluster is rejected on an issuer mismatch.
+  KEYCLOAK_ISSUER_URI: "https://auth.delivery.example/realms/delivery-platform"
+  KEYCLOAK_JWKS_URI: "http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs"
+  KEYCLOAK_INTERNAL_URL: "http://keycloak:8080"
+
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318/v1/traces"
+  # Lower than dev's 1.0. At the tracking write path's measured throughput, tracing every span
+  # would swamp the collector for very little insight (Section 10).
+  OTEL_SAMPLE_RATE: "0.1"
+
+  # Connector and simulator addresses. Note there is no simulator entry: it is dev-only, and the
+  # Core Banking connector points at the real bank here via Connector Settings.
+  EMAIL_CONNECTOR_URL: "http://email-connector:8110"
+  PUSH_CONNECTOR_URL: "http://push-connector:8111"
+  SMS_CONNECTOR_URL: "http://sms-connector:8112"
+  CONNECTOR_SETTINGS_URL: "http://connector-settings:8109"

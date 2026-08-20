@@ -1,0 +1,1310 @@
+{
+  "@@locale": "en",
+  "appTitle": "Delivery",
+  "navShops": "Shops",
+  "navBasket": "Basket",
+  "navOrders": "Orders",
+  "navButler": "Butler",
+  "alerts": "Alerts",
+  "settings": "Settings",
+  "signOut": "Sign out",
+  "deliverTo": "Deliver to",
+  "setDeliveryAddress": "Set delivery address",
+  "address": "Address",
+  "addressHint": "12 Test Street, Flat 4",
+  "labelOptional": "Label (optional)",
+  "labelHint": "Home, Work",
+  "riderNotesOptional": "Notes for the rider (optional)",
+  "riderNotesHint": "Buzzer 4, second floor",
+  "deliverHere": "Deliver here",
+  "recent": "Recent",
+  "whereShouldWeBring": "Where should we bring your order?",
+  "forgetThisAddress": "Forget this address",
+  "addressTooShort": "A bit more detail so the rider can find you",
+  "searchShops": "Search shops and cuisines",
+  "all": "All",
+  "allStores": "All stores",
+  "yourFavourites": "Your favourites",
+  "starredShops": "Starred shops",
+  "offersForYou": "Offers for you",
+  "shopsDelivering": "{count, plural, =1{1 shop delivering to you} other{{count} shops delivering to you}}",
+  "@shopsDelivering": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noShopsMatch": "No shops match",
+  "tryClearingAFilter": "Try clearing a filter or two.",
+  "nothingDeliveringHere": "Nothing is delivering here just yet.",
+  "couldNotLoadStorefront": "Could not load the storefront",
+  "tryAgain": "Try again",
+  "filterOffers": "Offers",
+  "filterUnder30": "Under 30 min",
+  "filterFreeDelivery": "Free delivery",
+  "filterHighlyRated": "4.5+",
+  "clear": "Clear",
+  "statusOpen": "Open",
+  "statusBusy": "Busy",
+  "statusClosingSoon": "Closing soon",
+  "statusClosed": "Closed",
+  "ratingNew": "New",
+  "freeDelivery": "Free delivery",
+  "deliveryFeeLabel": "{amount} delivery",
+  "@deliveryFeeLabel": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "etaRange": "{from}-{to} min",
+  "@etaRange": {
+    "placeholders": {
+      "from": {
+        "type": "int"
+      },
+      "to": {
+        "type": "int"
+      }
+    }
+  },
+  "tabShop": "Shop",
+  "tabAisles": "Aisles",
+  "tabOffers": "Offers",
+  "tabBuyAgain": "Buy Again",
+  "everything": "Everything",
+  "itemCount": "{count} items",
+  "@itemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "add": "Add",
+  "nothingOnShelves": "Nothing on the shelves yet",
+  "nothingInAisle": "Nothing in this aisle",
+  "noOffersHere": "No offers running here right now",
+  "noHistoryHere": "Nothing from this shop in your history yet",
+  "appliesEverywhere": "Applies everywhere",
+  "required": "Required",
+  "optional": "Optional",
+  "soldOut": "sold out",
+  "addWithTotal": "Add · {total}",
+  "@addWithTotal": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "basket": "Basket",
+  "basketEmpty": "Your basket is empty",
+  "subtotal": "Subtotal",
+  "delivery": "Delivery",
+  "total": "Total",
+  "free": "Free",
+  "checkout": "Checkout",
+  "checkoutWithTotal": "Checkout · {total}",
+  "@checkoutWithTotal": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "minimumNotReached": "Minimum not reached",
+  "minimumExplanation": "This shop has a minimum of {minimum} — add {shortfall} more.",
+  "@minimumExplanation": {
+    "placeholders": {
+      "minimum": {
+        "type": "String"
+      },
+      "shortfall": {
+        "type": "String"
+      }
+    }
+  },
+  "viewBasket": "View basket",
+  "startNewBasket": "Start a new basket?",
+  "basketFromAnotherShop": "Your basket has items from {shop}. We can only deliver from one shop at a time.",
+  "@basketFromAnotherShop": {
+    "placeholders": {
+      "shop": {
+        "type": "String"
+      }
+    }
+  },
+  "keepIt": "Keep it",
+  "startHere": "Start here",
+  "payment": "Payment",
+  "payWithCash": "Cash on delivery",
+  "payWithCard": "Card",
+  "paidWith": "Paid with",
+  "orderDetails": "Order Details",
+  "yourOrder": "Your order",
+  "reorder": "Reorder",
+  "deliveredOn": "Delivered on: {when}",
+  "@deliveredOn": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "placedOn": "Placed on: {when}",
+  "@placedOn": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "deliveryCharge": "Delivery Charge",
+  "back": "Back",
+  "couldNotLoadOrder": "Could not load this order",
+  "noOrdersYet": "No orders yet",
+  "tracking": "Tracking",
+  "live": "Live",
+  "stepPlaced": "Placed",
+  "stepAccepted": "Accepted",
+  "stepPreparing": "Preparing",
+  "stepReady": "Ready",
+  "stepOnTheWay": "On the way",
+  "stepDelivered": "Delivered",
+  "waitingForRider": "Waiting for the rider's first location.",
+  "locationAfterPickup": "The rider's location appears once your order is picked up.",
+  "fixes": "Fixes",
+  "travelled": "Travelled",
+  "lastSeen": "Last seen",
+  "rateYourOrder": "Rate your order",
+  "yourRating": "Your rating",
+  "leaveAComment": "Leave a comment (optional)",
+  "submitReview": "Submit",
+  "reviews": "Reviews",
+  "noReviewsYet": "No reviews yet",
+  "butler": "Butler",
+  "butlerTagline": "Anything that fits on a bike",
+  "butlerBlurb": "Tell us what you need and where from. A shopper buys it and brings it to you.",
+  "butlerPrompt": "Need something that is not on here? We will buy it for you.",
+  "whatDoYouNeed": "What do you need?",
+  "whereFromOptional": "Where from? (optional)",
+  "budgetCapOptional": "Budget cap (optional)",
+  "requestAButler": "Request a Butler",
+  "notifications": "Notifications",
+  "nothingYet": "Nothing yet",
+  "orderUpdatesHere": "Order updates will show up here.",
+  "language": "Language",
+  "english": "English",
+  "arabic": "العربية",
+  "splashTagline": "Groceries, food and more — delivered.",
+  "signInFailed": "We could not sign you in.",
+  "account": "Account",
+  "navAccount": "Account",
+  "signOutConfirm": "You will need to sign in again to order.",
+  "profile": "Profile",
+  "roles": "Roles",
+  "selectRequiredOptions": "Select required options",
+  "orderPlacedToast": "Order #{id} placed · {total}",
+  "@orderPlacedToast": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "deliveryAddress": "Delivery address",
+  "addressRequired": "We need somewhere to deliver to",
+  "contactPhoneOptional": "Contact phone (optional)",
+  "merchantNotesOptional": "Notes for the merchant (optional)",
+  "couldNotLoadShop": "Could not load this shop",
+  "couldNotLoadMore": "Could not load more — try again",
+  "chooseUpTo": "Choose up to {count} under {group}",
+  "@chooseUpTo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelThisOrder": "Cancel this order?",
+  "cancelOrder": "Cancel order",
+  "cancel": "Cancel",
+  "couldNotLoadOrders": "Could not load your orders.",
+  "browseAndPlaceFirst": "Browse the catalog and place your first one.",
+  "replaceYourBasket": "Replace your basket?",
+  "basketFromShopReplace": "Your basket has items from {shop}. Reordering will replace it.",
+  "@basketFromShopReplace": {
+    "placeholders": {
+      "shop": {
+        "type": "String"
+      }
+    }
+  },
+  "replace": "Replace",
+  "openStore": "Open {store}",
+  "@openStore": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "markAllRead": "Mark all read",
+  "couldNotLoadNotifications": "Could not load notifications",
+  "pullDownToTryAgain": "Pull down to try again.",
+  "setAddressFirst": "Set a delivery address first",
+  "whatAreWeMoving": "What are we moving?",
+  "pickUpFrom": "Pick up from",
+  "whoReceivesItOptional": "Who receives it? (optional)",
+  "buyMeSomething": "Buy me something",
+  "aShopperBuysIt": "A shopper buys it",
+  "deliverYourStuff": "Deliver your stuff",
+  "youAlreadyHaveIt": "You already have it",
+  "yourErrands": "Your errands",
+  "couldNotLoadErrands": "Could not load your errands",
+  "noThanks": "No thanks",
+  "payAmount": "Pay {amount}",
+  "@payAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "trackIt": "Track it",
+  "whatDidItCost": "What did it cost?",
+  "cappedAt": "They capped it at {amount}",
+  "@cappedAt": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "goodsTotal": "Goods total",
+  "receiptNumberOptional": "Receipt number (optional)",
+  "sendForApproval": "Send for approval",
+  "noErrandsWaiting": "No errands waiting.",
+  "nothingToClaim": "Nothing waiting to be claimed.",
+  "claim": "Claim",
+  "reportWhatItCost": "Report what it cost",
+  "deliveries": "Deliveries",
+  "contactLabel": "Contact: {phone}",
+  "@contactLabel": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "couldNotUpdateFavourites": "Could not update your favourites.",
+  "itemNoLongerAvailable": "One of these items is no longer available.",
+  "checkDeliveryDetails": "Please check the delivery details.",
+  "couldNotPlaceOrder": "Could not place the order. Please try again.",
+  "placing": "Placing…",
+  "placeOrderWithTotal": "Place order · {total}",
+  "@placeOrderWithTotal": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "nothingStillAvailable": "Nothing from this order is still available.",
+  "addedToBasket": "{count, plural, =1{Added 1 item to your basket} other{Added {count} items to your basket}}",
+  "@addedToBasket": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addedSomeMissing": "Added {added}; {missing} no longer available",
+  "@addedSomeMissing": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      }
+    }
+  },
+  "couldNotReorder": "Could not reorder just now.",
+  "reorderWillReplace": "Reordering will start a new one.",
+  "setByStoreCharged": "Set by {store} and charged on delivery.",
+  "@setByStoreCharged": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "cancelBeforeAccepted": "You can only cancel before the merchant accepts it. This cannot be undone.",
+  "cancelledByCustomer": "Cancelled by customer",
+  "tooLateToCancel": "Too late — the merchant has already started this order.",
+  "couldNotCancelOrder": "Could not cancel the order.",
+  "riderAt": "Rider at {lat}, {lng}",
+  "@riderAt": {
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lng": {
+        "type": "String"
+      }
+    }
+  },
+  "couldNotPriceCombination": "Could not price that combination.",
+  "optionSoldOut": "{name} — sold out",
+  "@optionSoldOut": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "addToReachMinimum": "Add {amount} to reach the minimum",
+  "@addToReachMinimum": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "removeFromFavourites": "Remove from favourites",
+  "addToFavourites": "Add to favourites",
+  "minOrderLabel": "Min {amount}",
+  "@minOrderLabel": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "closesAtLabel": "Closes {when}",
+  "@closesAtLabel": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "noAislesYet": "This shop has no aisles yet",
+  "signInToSeeHistory": "Sign in to see what you ordered before",
+  "tabAislesCount": "Aisles ({count})",
+  "@tabAislesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tabOffersCount": "Offers ({count})",
+  "@tabOffersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "basketFromAnotherShopSingle": "We can only deliver from one shop at a time.",
+  "basketHasOtherShopItems": "This basket already has items from another shop.",
+  "distanceKm": "{km} km",
+  "@distanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "distanceM": "{m} m",
+  "@distanceM": {
+    "placeholders": {
+      "m": {
+        "type": "String"
+      }
+    }
+  },
+  "justNow": "just now",
+  "secondsAgo": "{count}s ago",
+  "@secondsAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "minutesAgo": "{count}m ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{count}h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysAgo": "{count}d ago",
+  "@daysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "lineQuantity": "{qty} × {name}",
+  "@lineQuantity": {
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lineQtyPrice": "{qty} × {price}",
+  "@lineQtyPrice": {
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefWithAddress": "#{ref} · {address}",
+  "@orderRefWithAddress": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      },
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+  "sentBuyConfirmation": "Sent. A shopper will pick it up and tell you what it costs before you pay.",
+  "sentMoveConfirmation": "Sent. A rider will collect it.",
+  "cannotRequestErrands": "This account cannot request errands",
+  "couldNotSendRequest": "Could not send that request",
+  "butlerMoveTagline": "Send something across town",
+  "butlerMoveBlurb": "Already have it? A rider collects it from one address and drops it at another. Nothing is bought.",
+  "buyHint": "A phone charger, USB-C, and a bottle of still water",
+  "buyValidator": "A bit more detail so the shopper knows what to buy",
+  "whereFromHint": "Any pharmacy near Hamra",
+  "budgetValidator": "A number, or leave it blank",
+  "moveHint": "A4 envelope with documents, nothing fragile",
+  "moveValidator": "A bit more detail so the rider knows what to expect",
+  "pickUpHint": "8 Clemenceau Street, reception desk",
+  "pickUpValidator": "Where should the rider collect it?",
+  "receiverHint": "Name and phone number",
+  "requestAPickup": "Request a pickup",
+  "errandFeeBuy": "Errand fee {fee}. The shopper tells you what the goods cost before you pay anything.",
+  "@errandFeeBuy": {
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "errandFeeMove": "Errand fee {fee}. Nothing is bought, so that is the whole price.",
+  "@errandFeeMove": {
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "dropOffAt": "Drop off at",
+  "thatDidNotWork": "That did not work",
+  "aboveYourCap": "That is above the {cap} cap you set.",
+  "@aboveYourCap": {
+    "placeholders": {
+      "cap": {
+        "type": "String"
+      }
+    }
+  },
+  "declined": "Declined",
+  "approvedOnItsWay": "Approved — it is on its way",
+  "cancelled": "Cancelled",
+  "waitingForShopper": "Waiting for someone to take it · fee {fee}",
+  "@waitingForShopper": {
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "shopperIsOnIt": "A shopper is on it. They will tell you what it costs.",
+  "riderOnTheWayToCollect": "A rider is on the way to collect it · {total}",
+  "@riderOnTheWayToCollect": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "goodsPlusFee": "Goods {goods} + fee {fee} = {total}",
+  "@goodsPlusFee": {
+    "placeholders": {
+      "goods": {
+        "type": "String"
+      },
+      "fee": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "agreedAt": "Agreed at {total}",
+  "@agreedAt": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "youDeclinedThisPrice": "You declined this price",
+  "nobodyPickedThisUp": "Nobody picked this up",
+  "butlerStatusOpen": "Open",
+  "butlerStatusClaimed": "Claimed",
+  "butlerStatusYourCall": "Your call",
+  "butlerStatusAgreed": "Agreed",
+  "butlerStatusExpired": "Expired",
+  "somebodyElseClaimed": "Somebody else claimed that one",
+  "whatYouPaidBeforeFee": "What you paid, before the errand fee",
+  "sentForApproval": "Sent. They will approve the price before you deliver.",
+  "cappedAtBudget": "They capped it at {amount}",
+  "@cappedAtBudget": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "yours": "Yours",
+  "buyAndBring": "Buy and bring",
+  "collectAndDrop": "Collect and drop",
+  "from": "From",
+  "collectAndDropInstruction": "Collect it and drop it off. It is in your Deliveries tab.",
+  "waitingOnApproval": "Waiting on them to approve. Do not deliver until they do.",
+  "approvedDeliverIt": "Approved. Deliver it from your Deliveries tab.",
+  "headingWithCount": "{label} ({count})",
+  "@headingWithCount": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availableWithCount": "Available ({count})",
+  "@availableWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mineWithCount": "Mine ({count})",
+  "@mineWithCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "errands": "Errands",
+  "nothingWaitingForPickup": "Nothing waiting for pickup right now.",
+  "noActiveDeliveries": "You have no active deliveries.",
+  "anotherRiderClaimedIt": "Another rider claimed that one first.",
+  "orderAlreadyMovedOn": "That order has already moved on.",
+  "contactPhone": "Contact: {phone}",
+  "@contactPhone": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "statusReadyForPickup": "Ready for pickup",
+  "statusCancelled": "Cancelled",
+  "actionAccept": "Accept",
+  "actionPrepare": "Start preparing",
+  "actionMarkReady": "Mark ready",
+  "actionClaim": "Claim",
+  "actionPickedUp": "Picked up",
+  "actionDelivered": "Delivered",
+  "actionCancel": "Cancel",
+  "verticalRestaurants": "Restaurants",
+  "verticalCoffee": "Coffee",
+  "verticalGroceries": "Groceries",
+  "verticalConvenience": "Convenience",
+  "verticalPharmacy": "Pharmacy",
+  "verticalElectronics": "Electronics",
+  "verticalFlowersGifts": "Flowers & Gifts",
+  "orderPlacedToastShort": "Order #{ref} placed · {total}",
+  "@orderPlacedToastShort": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "minimumExplanationFull": "This shop has a minimum of {minimum} — add {shortfall} more.",
+  "@minimumExplanationFull": {
+    "placeholders": {
+      "minimum": {
+        "type": "String"
+      },
+      "shortfall": {
+        "type": "String"
+      }
+    }
+  },
+  "addToReachMinimumShort": "Add {amount} to reach the minimum",
+  "@addToReachMinimumShort": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "actionFailed": "Could not {action}.",
+  "@actionFailed": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "actionOnOrder": "{action} · #{ref}",
+  "@actionOnOrder": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "itemCountWithDot": "{count, plural, =1{1 item} other{{count} items}}",
+  "@itemCountWithDot": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "riderAtShort": "Rider at {lat}, {lng}",
+  "@riderAtShort": {
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lng": {
+        "type": "String"
+      }
+    }
+  },
+  "waitingOnApprovalOf": "Waiting on them to approve {total}. Do not deliver until they do.",
+  "@waitingOnApprovalOf": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "aislesCount": "Aisles",
+  "signInPrompt": "Sign in to see what you ordered before",
+  "merchantPortal": "Merchant Portal",
+  "navProducts": "Products",
+  "navDelivery": "Delivery",
+  "navMyShop": "My Shop",
+  "manageYourCatalog": "Manage your catalog",
+  "signingIn": "Signing in…",
+  "signIn": "Sign in",
+  "notAMerchant": "This account is not registered as a merchant.",
+  "signInAsSomeoneElse": "Sign in as someone else",
+  "carrierNotAvailableToYou": "That carrier is not available to you",
+  "couldNotLoadCarriers": "Could not load carriers: {error}",
+  "@couldNotLoadCarriers": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "whoCarriesYourOrders": "Who carries your orders",
+  "whoCarriesBlurb": "Who carries your orders. This applies from the moment an order is ready to collect — orders already on their way keep the carrier they went out with.",
+  "yourOwnDrivers": "Your own drivers",
+  "fleetRidersBlurb": "Riders are added to your fleet by the platform. A fleet with nobody in it cannot collect anything.",
+  "whenCarrierCannotTake": "When your carrier cannot take an order",
+  "letThePlatformChoose": "Let the platform choose",
+  "whoeverIsAvailable": "Whoever is available and can take the job. This is the default.",
+  "thePlatformWillChoose": "The platform will choose",
+  "notTakingWorkNow": "{kind}  ·  not taking work at the moment",
+  "@notTakingWorkNow": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "carrierWillCarry": "{name} will carry your orders",
+  "@carrierWillCarry": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "ownDriversBlurb": "If you already have drivers, they can carry your orders and the platform will only step in when they are busy.",
+  "yourFleetIsSetUp": "Your fleet is set up",
+  "setUpMyOwnDrivers": "Set up my own drivers",
+  "anotherCarrierMayStepIn": "Another carrier may step in",
+  "onlyYourChosenCarrier": "Only your chosen carrier will be used",
+  "letSomeoneElseStepIn": "Let someone else step in",
+  "onlyAppliesOnceChosen": "Only applies once you have chosen a carrier.",
+  "fallbackOnBlurb": "If your carrier cannot take an order, another one will. Orders go out late rather than not at all.",
+  "fallbackOffBlurb": "Orders wait for your carrier. Nothing goes out with anybody else — and an order they cannot take stays on your counter.",
+  "cancelledByMerchant": "Cancelled by merchant",
+  "orderAlreadyMovedRefreshing": "That order has already moved on. Refreshing.",
+  "columnToAccept": "To accept",
+  "columnPreparing": "Preparing",
+  "columnAwaitingRider": "Awaiting a rider",
+  "columnDelivered": "Delivered",
+  "showCompleted": "Show completed",
+  "refresh": "Refresh",
+  "updatesEvery": "Updates every {seconds}s",
+  "@updatesEvery": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "liveOrders": "Live orders",
+  "couldNotLoadOrdersShort": "Could not load orders.",
+  "noOrdersYetMerchant": "No orders yet.",
+  "noOrdersNeedingAttention": "No orders needing attention.",
+  "riderAssigned": "rider assigned",
+  "noteWithText": "Note: {note}",
+  "@noteWithText": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "saved": "Saved",
+  "couldNotSaveProduct": "Could not save this product",
+  "images": "Images",
+  "uploadFailed": "Upload failed",
+  "newProduct": "New product",
+  "editProduct": "Edit product",
+  "nameLabel": "Name",
+  "nameRequired": "Name is required",
+  "descriptionLabel": "Description",
+  "priceLabel": "Price",
+  "enterANumber": "Enter a number",
+  "priceMustBePositive": "Price must be greater than zero",
+  "categoryLabel": "Category",
+  "uncategorised": "Uncategorised",
+  "saving": "Saving…",
+  "save": "Save",
+  "saveProductFirst": "Save the product first, then add photos.",
+  "needsAPhotoToPublish": "A product needs at least one photo before it can be published.",
+  "addPhoto": "Add photo",
+  "remove": "Remove",
+  "couldNotPublishProduct": "Could not publish this product",
+  "archiveThisProduct": "Archive this product?",
+  "archiveConfirm": "\"{name}\" will be withdrawn from the catalog. Existing orders that reference it are unaffected.",
+  "@archiveConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "archive": "Archive",
+  "myProducts": "My products",
+  "onSale": "On sale",
+  "productsTotal": "{count, plural, =1{1 total} other{{count} total}}",
+  "@productsTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "drafts": "Drafts",
+  "noPhoto": "No photo",
+  "archived": "Archived",
+  "yourProducts": "Your products",
+  "publish": "Publish",
+  "edit": "Edit",
+  "draft": "Draft",
+  "moreActions": "More actions",
+  "noProductsYet": "No products yet",
+  "createYourFirstProduct": "Create your first product, add a photo, then publish it.",
+  "somethingWentWrong": "Something went wrong",
+  "detailWithRef": "{detail} (ref: {ref})",
+  "@detailWithRef": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      },
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "thatDidNotWorkWith": "That did not work: {error}",
+  "@thatDidNotWorkWith": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "shopSaved": "Shop saved",
+  "couldNotLoadYourShop": "Could not load your shop",
+  "noShopYet": "No shop yet",
+  "shopCreatedAutomatically": "Add your first product and a shop is created for you automatically.",
+  "howYourShopAppears": "How your shop appears on the storefront",
+  "shopName": "Shop name",
+  "tagline": "Tagline",
+  "taglineHint": "Charcoal grills and mezze, all day",
+  "tags": "Tags",
+  "tagsHint": "Lebanese, Grills, Mezze  (comma separated)",
+  "addressLabel": "Address",
+  "pictures": "Pictures",
+  "logoRecognisedBy": "Your logo is what customers recognise you by in search results",
+  "logo": "Logo",
+  "logoHint": "Square works best. Shown on every store card.",
+  "cover": "Cover",
+  "coverHint": "Wide. Sits behind your shop header.",
+  "generatedTileBlurb": "Until you upload one, customers see a generated tile with your initials — consistent and on-brand, but not yours.",
+  "whatCustomersAreCharged": "What customers are charged and told to expect",
+  "deliveryFeeLabelMerchant": "Delivery fee",
+  "minimumOrder": "Minimum order",
+  "etaFromMin": "ETA from (min)",
+  "etaToMin": "ETA to (min)",
+  "serverAppliesTerms": "Both are applied by the server when an order is placed — a basket under the minimum is refused, and the fee is added to the customer's total.",
+  "openingHours": "Opening hours",
+  "openingHoursBlurb": "Your shop shows as Open, Closing soon or Closed based on these",
+  "addASecondWindow": "Add a second window",
+  "secondWindowBlurb": "Add a second window for a day to split your hours — for example a morning service and an evening one, closed in between.",
+  "saveChanges": "Save changes",
+  "listedOnStorefront": "Listed on the storefront",
+  "notListedYet": "Not listed yet",
+  "markedBusy30": "Marked busy for 30 minutes",
+  "busy30m": "Busy 30m",
+  "noLongerBusy": "No longer marked busy",
+  "notBusy": "Not busy",
+  "yourShopIsLive": "Your shop is live",
+  "opens": "Opens",
+  "closes": "Closes",
+  "removeThisWindow": "Remove this window",
+  "upload": "Upload",
+  "labelRemoved": "{label} removed",
+  "@labelRemoved": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "pictureUpdated": "Picture updated",
+  "requiredField": "Required",
+  "aNumber": "A number",
+  "cannotBeNegative": "Cannot be negative",
+  "signInFailedShort": "Sign-in failed",
+  "providerKindInHouse": "In-house",
+  "providerKindCompany": "Delivery company",
+  "providerKindOwnDrivers": "Own drivers",
+  "carrierPortal": "Carrier Portal",
+  "carrierPortalTagline": "Your company, your fleet and how much work you are offered.",
+  "notACarrier": "This account is not registered to a delivery company.",
+  "noCompanyYet": "No company attached to this account yet",
+  "askThePlatformToAttachYou": "Ask the platform to attach you to your delivery company.",
+  "howYouAreDoing": "How you are doing",
+  "deliveryScore": "Delivery score",
+  "tooEarlyToTell": "too early to tell",
+  "ordersDelivered": "Orders delivered",
+  "timeToClaim": "Time to claim",
+  "timeOnTheRoad": "Time on the road",
+  "scoreBlurb": "This score decides how much work you are offered when a merchant lets the platform choose. Delivering what you take matters most; claiming promptly comes next.",
+  "scoreProvisionalBlurb": "You are still being given work on the benefit of the doubt. The score becomes yours rather than an assumption once you have a few more orders behind you.",
+  "takingOrders": "Taking orders",
+  "takingWork": "Taking work",
+  "youAreTakingOrders": "You are taking orders",
+  "youAreNotTakingOrders": "You are not taking orders",
+  "pauseExplanation": "Pausing stops new orders being sent to you. Anything already assigned to your riders is unaffected.",
+  "suspendedByPlatform": "The platform has suspended your company. You cannot resume yourself — talk to the platform.",
+  "pauseNewOrders": "Pause new orders",
+  "startTakingOrders": "Start taking orders",
+  "pausedNoNewOrders": "Paused. No new orders will be sent to you.",
+  "resumedTakingOrders": "You are taking orders again.",
+  "yourFleet": "Your fleet",
+  "noRidersBlurb": "You have no riders. Your company looks available and can collect nothing, which is the most confusing way to be sent no work — ask the platform to add your riders.",
+  "ridersAddedByPlatform": "Riders are added to your fleet by the platform.",
+  "gettingPaid": "Getting paid",
+  "noPayoutAccount": "No payout account on file",
+  "payoutNeedsAttentionBlurb": "The bank has not confirmed this account. Payments to you may fail — the platform can re-check it.",
+  "area": "Area",
+  "pickYourArea": "Pick your area so we know who can reach you",
+  "feeToArea": "Delivery to {area}: {fee}",
+  "@feeToArea": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      },
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "doesNotDeliverToArea": "This shop does not deliver to {area}",
+  "@doesNotDeliverToArea": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "deliveryAreas": "Delivery areas",
+  "whereYouDeliver": "Where you deliver, and what you charge to get there",
+  "flatFeeEverywhere": "You charge one fee everywhere",
+  "flatFeeExplanation": "Add an area below to charge by distance instead. Until you add one, every order costs your standard delivery fee and you deliver anywhere.",
+  "addAnArea": "Add an area",
+  "feeToHere": "Fee",
+  "minimumHere": "Minimum",
+  "extraMinutes": "Extra minutes",
+  "usesShopMinimum": "uses your shop minimum",
+  "stopDelivering": "Stop delivering here",
+  "areasYouServe": "Areas you deliver to",
+  "onlyTheseAreas": "You deliver only to the areas listed here. Orders from anywhere else are refused.",
+  "manageAreas": "Delivery areas",
+  "manageAreasBlurb": "The list customers pick from when they enter an address. Shops price their delivery per area.",
+  "newArea": "New area",
+  "areaName": "Area name",
+  "regionOptional": "Region (optional)",
+  "sortOrder": "Order in the list",
+  "retire": "Retire",
+  "reinstate": "Reinstate",
+  "retired": "Retired",
+  "retiredExplanation": "Retired areas leave the picker but keep working for addresses that already name them.",
+  "noAreasYet": "No areas yet",
+  "noAreasBlurb": "Until you add areas, every shop charges one delivery fee and delivers anywhere.",
+  "navWhatsApp": "WhatsApp",
+  "whatsappInbox": "WhatsApp inbox",
+  "whatsappInboxBlurb": "Customers who message your shop. Turn what they asked for into an order without leaving this screen.",
+  "noConversations": "No messages yet",
+  "noConversationsBlurb": "When a customer messages your connected number, the conversation appears here.",
+  "connectedNumbers": "Connected numbers",
+  "connectNumber": "Connect a number",
+  "numberId": "WhatsApp number ID",
+  "numberLabel": "Label",
+  "displayNumber": "Phone number",
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "disconnectNumberWarning": "New messages to this number stop arriving. Your existing conversations are kept.",
+  "noNumbersYet": "No number connected",
+  "noNumbersBlurb": "Connect the WhatsApp number your customers already write to.",
+  "selectAConversation": "Pick a conversation",
+  "selectAConversationBlurb": "Choose someone on the left to read what they asked for.",
+  "showArchived": "Show archived",
+  "showActive": "Show active",
+  "typeAReply": "Write a reply",
+  "sendReply": "Send",
+  "replyNotSent": "Saved, but it could not be sent",
+  "voiceNote": "Voice note",
+  "photo": "Photo",
+  "document": "Document",
+  "locationPin": "Location",
+  "unsupportedMessage": "Unsupported message",
+  "startAnOrder": "Start an order",
+  "theRequest": "What they asked for",
+  "addItem": "Add item",
+  "estimate": "Estimate",
+  "estimateNote": "An estimate at today’s prices. The final total is calculated when you confirm.",
+  "deliveryDetails": "Delivery details",
+  "orderNotes": "Notes",
+  "confirmOrder": "Confirm order",
+  "confirmOrderWarning": "This places a real order and books a rider.",
+  "discardRequest": "Discard",
+  "orderPlaced": "Order placed",
+  "draftDiscarded": "Discarded",
+  "nothingToOrderYet": "Nothing added yet",
+  "nothingToOrderYetBlurb": "Add what the customer asked for from your own menu.",
+  "chooseOptions": "Choose options",
+  "quantity": "Quantity",
+  "addToOrder": "Add to order",
+  "phoneLabel": "Phone number",
+  "budgetExhausted": "The budget is spent. No further waivers will be granted until revenue catches up.",
+  "deliveryWasFree": "Normally {amount} — we covered it",
+  "@deliveryWasFree": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "noCommissionOnThisOrder": "No commission on this order",
+  "deliveryPaidByPlatform": "Delivery paid by the platform",
+  "navCompany": "Company",
+  "navJobs": "Jobs",
+  "navEarnings": "Earnings",
+  "jobsTitle": "Your jobs",
+  "jobsBlurb": "Everything your riders are carrying, and everything they have delivered.",
+  "noJobsYet": "No jobs yet",
+  "noJobsBlurb": "Orders assigned to your company will appear here.",
+  "earningsTitle": "Earnings",
+  "earned": "Earned",
+  "expected": "Expected",
+  "jobsDelivered": "Delivered",
+  "jobsInFlight": "In flight",
+  "savedByOffers": "Saved by offers",
+  "earningsWindowNote": "Over the last {days} days, after the platform's {cut}% share of each delivery fee.",
+  "savedByOffersNote": "The platform waived its share on some of your deliveries, so you kept the whole fee.",
+  "expectedNote": "What the work in flight is worth if it all completes. Not yet owed.",
+  "yourFeeOnThis": "Your fee",
+  "navDashboard": "Dashboard",
+  "howTradeIsGoing": "How trade is going",
+  "howWorkIsGoing": "How the work is going",
+  "ordersToday": "Orders today",
+  "salesToday": "Sales today",
+  "jobsToday": "Jobs today",
+  "earnedToday": "Earned today",
+  "upOnYesterday": "{percent}% up on yesterday",
+  "downOnYesterday": "{percent}% down on yesterday",
+  "sameAsYesterday": "Same as yesterday",
+  "noneYesterday": "Nothing yesterday",
+  "nothingYetToday": "Nothing yet today",
+  "needsYouNow": "Needs you now",
+  "toAccept": "To accept",
+  "preparingNow": "Preparing",
+  "readyForPickup": "Ready for pickup",
+  "outForDelivery": "Out for delivery",
+  "allCaughtUp": "Nothing waiting on you.",
+  "lastDaysHeading": "Last {days} days",
+  "quietSoFar": "No trade in this period yet.",
+  "noJobsSoFar": "No jobs in this period yet.",
+  "barChartLegend": "Solid is delivered; pale is placed but not delivered.",
+  "ordersInWindow": "Orders",
+  "deliveredInWindow": "Delivered",
+  "salesInWindow": "Sales",
+  "feesInWindow": "Platform fees",
+  "feesInWindowNote": "{cut}% of delivered sales.",
+  "bestSellers": "Best sellers",
+  "nothingSoldYet": "Nothing has sold in this period yet.",
+  "soldQty": "{qty} sold",
+  "savedForYou": "Saved by offers",
+  "savedForYouNote": "The platform waived its share on some of your orders.",
+  "@upOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@downOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@lastDaysHeading": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@feesInWindowNote": {
+    "placeholders": {
+      "cut": {
+        "type": "String"
+      }
+    }
+  },
+  "@soldQty": {
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      }
+    }
+  },
+  "@earningsWindowNote": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "cut": {
+        "type": "String"
+      }
+    }
+  },
+  "navApplicants": "Applicants",
+  "waitingOnYou": "{count} waiting on you",
+  "everyoneWhoApplied": "Everyone who has applied to ride for you.",
+  "waitingOnly": "Waiting only",
+  "everyone": "Everyone",
+  "nobodyWaiting": "Nobody is waiting on you.",
+  "nobodyHasApplied": "Nobody has applied yet.",
+  "hiringAlsoCreatesTheirAccount": "Adding them creates their account and puts them on your fleet, so they can be sent work straight away.",
+  "addToMyFleet": "Add to my fleet",
+  "turnDown": "Turn down",
+  "turnDownName": "Turn down {name}",
+  "theyAreSentThisWordForWord": "They are sent this word for word. Say what would have to change.",
+  "riderAdded": "{name} is on your fleet. We have emailed them how to sign in.",
+  "applicantTurnedDown": "{name} has been told.",
+  "turnedDownBecause": "Turned down: {reason}",
+  "onYourFleetNow": "On your fleet. They can be sent work.",
+  "thatDidNotGoThrough": "That did not go through. Try again.",
+  "@waitingOnYou": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@turnDownName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@riderAdded": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@applicantTurnedDown": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@turnedDownBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "wantToRideForACompany": "Want to ride for a delivery company?",
+  "rideWithUs": "Ride with us",
+  "whoWouldYouRideFor": "Who would you ride for?",
+  "theCompanyDecidesNotUs": "You are applying to the company, not to us. They read it and decide, and we let you know either way.",
+  "couldNotLoadCompanies": "We could not load the companies.",
+  "nobodyIsHiringRightNow": "No delivery companies are taking applications right now.",
+  "aboutYou": "About you",
+  "yourName": "Your name",
+  "anythingWeShouldKnowRider": "Anything they should know? (optional)",
+  "yourEmail": "Your email",
+  "weSendACodeToCheckItReachesYou": "We send a six-digit code to check it reaches you. Everything after this goes there, including how to sign in.",
+  "yourPhoneOptional": "Your phone (optional)",
+  "aNumberHelpsWhenAnOrderNeedsSorting": "Useful when something about a delivery needs sorting out quickly. Skip it if you would rather not.",
+  "sendCode": "Send code",
+  "sendAnother": "Send another",
+  "theCodeWeSent": "The code we sent",
+  "verify": "Verify",
+  "skipThis": "Skip this",
+  "continueLabel": "Continue",
+  "sendApplication": "Send application",
+  "applicationSent": "Application sent",
+  "companyWillBeInTouch": "{company} will read it and be in touch by email.",
+  "keepThisReference": "Keep this reference",
+  "done": "Done",
+  "@companyWillBeInTouch": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentMethod": "Payment method",
+  "cashOnDelivery": "Cash on delivery",
+  "card": "Card",
+  "payTheRiderWhenItArrives": "Pay the rider when your order arrives",
+  "cardNotAvailableYet": "Not available yet",
+  "paymentDue": "Due on delivery",
+  "paymentAwaitingAuthorisation": "Awaiting authorisation",
+  "paymentAuthorised": "Authorised",
+  "paymentPaid": "Paid",
+  "paymentRefunded": "Refunded",
+  "paymentFailed": "Payment failed",
+  "chooseAnAddress": "Choose an address",
+  "addANewAddress": "Add a new address",
+  "riderGreeting": "Hi, {name}",
+  "@riderGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "riderHeaderLine": "Here is what is on the board right now.",
+  "riderWaitingCount": "{count} waiting",
+  "@riderWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "riderOnTheWayCount": "{count} on the way",
+  "@riderOnTheWayCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "newJobsAppearHere": "New jobs land here as soon as a shop marks an order ready.",
+  "claimOneToSeeItHere": "Claim one from Available and it will show up here.",
+  "collectCash": "Collect {amount} cash",
+  "@collectCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "alreadyPaid": "Already paid"
+}

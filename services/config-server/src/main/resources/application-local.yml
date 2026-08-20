@@ -1,0 +1,35 @@
+# Profile for running the Config Server straight from an IDE against the docker-compose infra.
+# Everything here is local-only and safe to commit; real environments get these from the
+# environment, and their secrets from Vault.
+
+spring:
+  security:
+    user:
+      password: local-config-secret
+
+  rabbitmq:
+    password: delivery
+
+  cloud:
+    config:
+      server:
+        composite:
+          - type: git
+            uri: file://${user.dir}/config-repo
+            default-label: main
+            search-paths: '{application}'
+            clone-on-start: true
+            force-pull: true
+          - type: vault
+            host: localhost
+            port: 8200
+            scheme: http
+            backend: secret
+            kv-version: 2
+            default-key: application
+            profile-separator: '/'
+            authentication: APPROLE
+            app-role:
+              role-id: ${VAULT_ROLE_ID}
+              secret-id: ${VAULT_SECRET_ID}
+              app-role-path: approle

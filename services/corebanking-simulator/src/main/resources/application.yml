@@ -1,0 +1,79 @@
+server:
+  port: ${SERVER_PORT:8114}
+
+spring:
+  application:
+    name: corebanking-simulator
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  datasource:
+    # Its own schema, NOT `accounting`. This service stands in for a system outside the platform;
+    # giving it a schema the platform's services can read would let a test assert against the
+    # bank's internals instead of through its API, and the whole value here is the API boundary.
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=corebanking}
+    username: ${DB_USER:corebanking_simulator}
+    password: ${DB_PASSWORD:corebanking_simulator_dev_pw}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/corebanking
+    schemas: corebanking
+    default-schema: corebanking
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: corebanking
+        jdbc:
+          time_zone: UTC
+
+delivery:
+  corebanking:
+    # The credential the bank hands its clients. A dev constant here; the connector reads its copy
+    # from Vault. Protects nothing real - it exists so the shape of the integration is right.
+    api-key: ${BANK_API_KEY:simulator-dev-key}
+    # Off in any environment that is not a laptop or a dev cluster. There is no scenario where
+    # deliberately breaking a bank connection is wanted somewhere real.
+    fault-injection-enabled: ${FAULT_INJECTION_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

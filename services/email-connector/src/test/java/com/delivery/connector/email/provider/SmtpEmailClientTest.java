@@ -1,0 +1,263 @@
+package com.delivery.connector.email.provider;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Properties;
+
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
+
+import org.eclipse.angus.mail.smtp.SMTPSendFailedException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.mail.MailAuthenticationException;
+import org.springframework.mail.MailParseException;
+import org.springframework.mail.MailSendException;
+import org.springframework.mail.javamail.JavaMailSender;
+
+import com.delivery.platform.notifications.DeliveryOutcome;
+import com.delivery.platform.notifications.NotificationCommand;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Sending mail, and the classification that decides whether a failed message is ever retried.
+ *
+ * <p>The classification is the substance. A 5xx is the relay refusing the message and no number of
+ * retries changes it; a 4xx or an unreachable relay is "not now". Getting it backwards either burns
+ * the retry budget on a mailbox that does not exist, or throws away recoverable mail — and the mail
+ * in question is order confirmations and one-time verification codes.
+ *
+ * <p>Two of these tests are regression guards for a bug that only fired in production: the reply
+ * code used to be matched out of the exception text, which read the relay's port number as a reply
+ * code. Port 587 is the standard SMTP submission port, so an unreachable relay looked like a
+ * permanent refusal. Dev never saw it, because the dev relay listens on 1025.
+ */
+class SmtpEmailClientTest {
+
+    private JavaMailSender mailSender;
+    private SmtpEmailClient client;
+
+    @BeforeEach
+    void setUp() {
+        mailSender = mock(JavaMailSender.class);
+        client = new SmtpEmailClient(mailSender, "no-reply@delivery.test");
+
+        when(mailSender.createMimeMessage()).thenAnswer(call ->
+                new MimeMessage(Session.getInstance(new Properties())));
+    }
+
+    private static NotificationCommand command() {
+        return new NotificationCommand("notif-1", "EMAIL", "sam@example.test",
+                "Your order is on its way", "It left the shop a moment ago",
+                Map.of("eventType", "order.status_changed"), "corr-1", Instant.now());
+    }
+
+    private MimeMessage captureSent() {
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender).send(captor.capture());
+        return captor.getValue();
+    }
+
+    /** A relay that answered with a reply code, the way Angus reports it. */
+    private void relayAnswers(int replyCode, String text) {
+        MailSendException failure = new MailSendException(
+                Map.of("sam@example.test", new SMTPSendFailedException(
+                        "DATA", replyCode, text, null, new jakarta.mail.Address[0],
+                        new jakarta.mail.Address[0], new jakarta.mail.Address[0])));
+        doThrow(failure).when(mailSender).send(any(MimeMessage.class));
+    }
+
+    @Nested
+    @DisplayName("a message that goes out")
+    class Sending {
+
+        @Test
+        void reports_success_naming_the_provider() {
+            DeliveryOutcome outcome = client.send(command());
+
+            assertThat(outcome.success()).isTrue();
+            assertThat(outcome.provider()).isEqualTo("SMTP");
+        }
+
+        @Test
+        void is_addressed_from_the_configured_sender_to_the_recipient() throws Exception {
+            client.send(command());
+
+            MimeMessage sent = captureSent();
+            assertThat(sent.getAllRecipients()[0].toString()).isEqualTo("sam@example.test");
+            assertThat(sent.getFrom()[0].toString()).isEqualTo("no-reply@delivery.test");
+            assertThat(sent.getSubject()).isEqualTo("Your order is on its way");
+        }
+
+        /**
+         * Bodies interpolate customer-controlled values — product names, delivery notes. Rendering
+         * them as HTML would turn a product name into an injection point in every inbox.
+         */
+        @Test
+        void is_sent_as_plain_text_rather_than_html() throws Exception {
+            client.send(command());
+
+            assertThat(captureSent().getContentType()).startsWith("text/plain");
+        }
+
+        /** Lets a message sitting in somebody's inbox be traced back to its notification_log row. */
+        @Test
+        void carries_the_notification_and_correlation_ids_as_headers() throws Exception {
+            client.send(command());
+
+            MimeMessage sent = captureSent();
+            assertThat(sent.getHeader("X-Notification-Id")[0]).isEqualTo("notif-1");
+            assertThat(sent.getHeader("X-Correlation-Id")[0]).isEqualTo("corr-1");
+        }
+
+        /** A message raised outside any request has no correlation id, and must still send. */
+        @Test
+        void tolerates_a_command_with_no_correlation_id() {
+            NotificationCommand uncorrelated = new NotificationCommand("notif-1", "EMAIL",
+                    "sam@example.test", "s", "b", Map.of(), null, Instant.now());
+
+            assertThat(client.send(uncorrelated).success()).isTrue();
+        }
+
+        /** SMS-shaped templates have no subject; an email still has to go out. */
+        @Test
+        void tolerates_a_command_with_no_subject() throws Exception {
+            NotificationCommand subjectless = new NotificationCommand("notif-1", "EMAIL",
+                    "sam@example.test", null, "b", Map.of(), "corr-1", Instant.now());
+
+            assertThat(client.send(subjectless).success()).isTrue();
+            assertThat(captureSent().getSubject()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("failures that will never succeed")
+    class Permanent {
+
+        /** No such mailbox. Retrying delivers it to the same nowhere. */
+        @Test
+        void a_550_reply_is_permanent() {
+            relayAnswers(550, "5.1.1 <sam@example.test>: Recipient address rejected");
+
+            DeliveryOutcome outcome = client.send(command());
+
+            assertThat(outcome.success()).isFalse();
+            assertThat(outcome.retryable()).isFalse();
+        }
+
+        @Test
+        void a_552_over_quota_reply_is_permanent() {
+            relayAnswers(552, "5.2.2 Mailbox full");
+
+            assertThat(client.send(command()).retryable()).isFalse();
+        }
+
+        /** A malformed address re-parses to the same failure every time. */
+        @Test
+        void a_malformed_message_is_permanent() {
+            doThrow(new MailParseException("Invalid address"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            DeliveryOutcome outcome = client.send(command());
+
+            assertThat(outcome.retryable()).isFalse();
+            assertThat(outcome.failureReason()).contains("malformed");
+        }
+    }
+
+    @Nested
+    @DisplayName("failures worth another attempt")
+    class Transient {
+
+        @Test
+        void a_451_reply_is_retryable() {
+            relayAnswers(451, "4.7.1 Try again later");
+
+            DeliveryOutcome outcome = client.send(command());
+
+            assertThat(outcome.success()).isFalse();
+            assertThat(outcome.retryable()).isTrue();
+        }
+
+        @Test
+        void a_421_service_unavailable_reply_is_retryable() {
+            relayAnswers(421, "4.3.2 Service not available");
+
+            assertThat(client.send(command()).retryable()).isTrue();
+        }
+
+        /**
+         * The regression guard. JavaMail renders an unreachable relay as
+         * {@code "Could not connect to SMTP host: ..., port: 587"}, and 587 — the standard
+         * submission port — used to be read as a 5xx reply code. Every email during a relay outage
+         * was permanently failed and dead-lettered instead of retried.
+         */
+        @Test
+        void an_unreachable_relay_on_port_587_is_retryable_not_permanent() {
+            doThrow(new MailSendException(
+                    "Mail server connection failed; nested exception is "
+                            + "jakarta.mail.MessagingException: Could not connect to SMTP host: "
+                            + "smtp.example.test, port: 587; nested exception is "
+                            + "java.net.ConnectException: Connection refused",
+                    new java.net.ConnectException("Connection refused")))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            DeliveryOutcome outcome = client.send(command());
+
+            assertThat(outcome.success()).isFalse();
+            assertThat(outcome.retryable())
+                    .as("an unreachable relay must be retried, not dead-lettered")
+                    .isTrue();
+        }
+
+        /** The same holds for any port that happens to look like a reply code. */
+        @Test
+        void an_unreachable_relay_is_retryable_whatever_port_it_listens_on() {
+            for (int port : new int[]{25, 465, 587, 1025, 2525}) {
+                JavaMailSender sender = mock(JavaMailSender.class);
+                when(sender.createMimeMessage()).thenAnswer(call ->
+                        new MimeMessage(Session.getInstance(new Properties())));
+                doThrow(new MailSendException("Could not connect to SMTP host: relay, port: " + port))
+                        .when(sender).send(any(MimeMessage.class));
+
+                assertThat(new SmtpEmailClient(sender, "no-reply@delivery.test")
+                        .send(command()).retryable())
+                        .as("port %d", port)
+                        .isTrue();
+            }
+        }
+
+        /**
+         * A rejected credential stops all email, so it is loud — but it is fixable without changing
+         * the message, which makes it worth keeping rather than dead-lettering.
+         */
+        @Test
+        void rejected_relay_credentials_are_retryable() {
+            doThrow(new MailAuthenticationException("535 authentication failed"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            DeliveryOutcome outcome = client.send(command());
+
+            assertThat(outcome.retryable()).isTrue();
+            assertThat(outcome.failureReason()).contains("authentication");
+        }
+
+        /** An unexpected failure is treated as transient — the safe direction for a lost message. */
+        @Test
+        void an_unexpected_failure_is_retryable() {
+            doThrow(new IllegalStateException("something odd"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            assertThat(client.send(command()).retryable()).isTrue();
+        }
+    }
+}

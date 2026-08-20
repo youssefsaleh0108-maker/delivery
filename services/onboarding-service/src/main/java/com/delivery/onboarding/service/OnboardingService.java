@@ -1,0 +1,238 @@
+package com.delivery.onboarding.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.camunda.bpm.engine.RuntimeService;
+import org.camunda.bpm.engine.TaskService;
+import org.camunda.bpm.engine.task.Task;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.delivery.onboarding.domain.OnboardingApplication;
+import com.delivery.onboarding.domain.OnboardingApplicationRepository;
+
+/**
+ * Applications to join, and the decisions made on them.
+ *
+ * <p>The engine owns the sequence; this owns the record. Keeping them apart matters because the
+ * record is what a reviewer, an auditor and the applicant all read, and none of them should have to
+ * query a workflow engine to find out what happened.
+ */
+@Service
+public class OnboardingService {
+
+    private static final String PROCESS_KEY = "partner-onboarding";
+
+    private static final Logger log = LoggerFactory.getLogger(OnboardingService.class);
+
+    private final OnboardingApplicationRepository applications;
+    private final ApplicationIntake intake;
+    private final RuntimeService runtime;
+    private final TaskService tasks;
+
+    public OnboardingService(OnboardingApplicationRepository applications,
+                             ApplicationIntake intake,
+                             RuntimeService runtime, TaskService tasks) {
+        this.applications = applications;
+        this.intake = intake;
+        this.runtime = runtime;
+        this.tasks = tasks;
+    }
+
+    /** Thrown when an application cannot be accepted or decided as asked. */
+    public static class ApplicationRuleException extends RuntimeException {
+        public ApplicationRuleException(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Thrown when a carrier reaches for a company that is not theirs.
+     *
+     * <p>Separate from the rule exception because it answers 403 rather than 422: this is not an
+     * application in the wrong state, it is somebody asking about a business they do not run.
+     */
+    public static class NotYourCompanyException extends RuntimeException {
+        public NotYourCompanyException(String message) {
+            super(message);
+        }
+    }
+
+    // ---------------------------------------------------------------- applying
+
+    /**
+     * Records an application and starts its review.
+     *
+     * <p>Deliberately NOT transactional. The write commits first, in {@link ApplicationIntake}, and
+     * only then is the engine asked to start a review — so a process that fails to start leaves a
+     * recorded application a reviewer can decide by hand, which is what the applicant's reference
+     * has to keep meaning. Holding both in one transaction looked like it did that and did the
+     * opposite: the engine's failure marks the transaction rollback-only, and catching it merely
+     * moves the error to commit time, where it takes the application with it.
+     */
+    public OnboardingApplication submit(OnboardingApplication.Kind kind, String businessName,
+                                        String contactName, String contactEmail,
+                                        String emailVerificationToken, String contactPhone,
+                                        String phoneVerificationToken, String notes,
+                                        UUID targetProviderId) {
+
+        OnboardingApplication application;
+        try {
+            application = intake.record(
+                    kind, businessName, contactName, contactEmail, emailVerificationToken,
+                    contactPhone, phoneVerificationToken, notes, targetProviderId);
+        } catch (IllegalArgumentException e) {
+            // "Choose the delivery company you want to ride for" is something the applicant can act
+            // on; an unhandled 500 is not.
+            throw new ApplicationRuleException(e.getMessage());
+        }
+
+        try {
+            String instanceId = runtime.startProcessInstanceByKey(
+                    PROCESS_KEY,
+                    application.getId().toString(),
+                    Map.of("applicationId", application.getId().toString(),
+                            "kind", kind.name(),
+                            "businessName", application.getBusinessName())).getId();
+            intake.attachProcess(application.getId(), instanceId);
+            application.startedAs(instanceId);
+        } catch (Exception e) {
+            // Left SUBMITTED with no process — and now genuinely left, because the row is already
+            // committed. It still shows in the reviewer's queue and can be decided by hand: a lost
+            // applicant is a worse outcome than a process nobody started.
+            log.error("Application {} was recorded but its review process did not start",
+                    application.getId(), e);
+        }
+
+        log.info("Application {} submitted: {} as {}",
+                application.getReference(), application.getBusinessName(), kind);
+        return application;
+    }
+
+    // ---------------------------------------------------------------- reviewing
+
+    private static final List<OnboardingApplication.Status> OPEN = List.of(
+            OnboardingApplication.Status.SUBMITTED, OnboardingApplication.Status.IN_REVIEW);
+
+    /**
+     * The platform's queue.
+     *
+     * <p>Rider applications are excluded: they are addressed to a delivery company, and showing
+     * them here too would mean two reviewers on one decision, with the platform picking somebody
+     * else's staff whenever it got there first.
+     */
+    @Transactional(readOnly = true)
+    public List<OnboardingApplication> queue() {
+        return applications.findByTargetProviderIdIsNullAndStatusInOrderByCreatedAtAsc(OPEN);
+    }
+
+    /** One company's own rider applications, open ones only. */
+    @Transactional(readOnly = true)
+    public List<OnboardingApplication> queueFor(UUID providerId) {
+        return applications.findByTargetProviderIdAndStatusInOrderByCreatedAtAsc(providerId, OPEN);
+    }
+
+    /** The same company's full history, so a decision made last month is still answerable. */
+    @Transactional(readOnly = true)
+    public List<OnboardingApplication> allFor(UUID providerId) {
+        return applications.findByTargetProviderIdOrderByCreatedAtAsc(providerId);
+    }
+
+    /**
+     * Checks an application is this company's to decide, before they decide it.
+     *
+     * <p>The id in the path is supplied by the caller, so without this a carrier could approve a
+     * rider who applied to a competitor — and, worse, attach them to their own fleet.
+     */
+    @Transactional(readOnly = true)
+    public OnboardingApplication requireBelongsTo(UUID applicationId, UUID providerId) {
+        OnboardingApplication application = applications.findById(applicationId)
+                .orElseThrow(() -> new ApplicationRuleException("No such application"));
+        if (application.getTargetProviderId() == null
+                || !application.getTargetProviderId().equals(providerId)) {
+            // Deliberately the same wording as a missing application: which riders applied to a
+            // competitor is that competitor's business, not something to confirm by guessing ids.
+            throw new ApplicationRuleException("No such application");
+        }
+        return application;
+    }
+
+    @Transactional(readOnly = true)
+    public List<OnboardingApplication> all() {
+        return applications.findAllByOrderByCreatedAtDesc();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OnboardingApplication> byReference(String reference) {
+        return applications.findByReference(reference);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OnboardingApplication> byId(UUID id) {
+        return applications.findById(id);
+    }
+
+    @Transactional
+    public OnboardingApplication approve(UUID id, String reviewer) {
+        OnboardingApplication application = require(id);
+        application.approve(reviewer);
+        applications.save(application);
+        completeReview(application, true);
+        log.info("{} approved application {}", reviewer, application.getReference());
+        return application;
+    }
+
+    @Transactional
+    public OnboardingApplication reject(UUID id, String reviewer, String reason) {
+        OnboardingApplication application = require(id);
+        try {
+            application.reject(reviewer, reason);
+        } catch (IllegalArgumentException e) {
+            throw new ApplicationRuleException(e.getMessage());
+        }
+        applications.save(application);
+        completeReview(application, false);
+        log.info("{} declined application {}: {}", reviewer, application.getReference(), reason);
+        return application;
+    }
+
+    /**
+     * Hands the decision to the engine, which does the rest.
+     *
+     * <p>Tolerates a missing task rather than failing the decision. An application whose process
+     * never started still has to be decidable — the decision is the thing that matters, and the
+     * provisioning it would have triggered is recoverable by hand in a way a stuck reviewer is not.
+     */
+    private void completeReview(OnboardingApplication application, boolean approved) {
+        if (application.getProcessInstanceId() == null) {
+            log.warn("Application {} has no process; the decision is recorded but nothing will be "
+                    + "provisioned automatically", application.getReference());
+            return;
+        }
+        Task task = tasks.createTaskQuery()
+                .processInstanceId(application.getProcessInstanceId())
+                .taskDefinitionKey("review")
+                .singleResult();
+        if (task == null) {
+            log.warn("Application {} has no review task waiting; it may already have been decided",
+                    application.getReference());
+            return;
+        }
+        tasks.complete(task.getId(), Map.of("approved", approved));
+    }
+
+    private OnboardingApplication require(UUID id) {
+        OnboardingApplication application = applications.findById(id)
+                .orElseThrow(() -> new ApplicationRuleException("No such application"));
+        if (application.isDecided()) {
+            throw new ApplicationRuleException(
+                    "This application was already " + application.getStatus().name().toLowerCase());
+        }
+        return application;
+    }
+}

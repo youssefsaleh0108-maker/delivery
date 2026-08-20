@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Standalone: this service builds, versions and releases on its own, with no parent pom.
+       Everything the old aggregator supplied is declared below. -->
+  <groupId>com.delivery</groupId>
+  <artifactId>mail-worker</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Service :: Mail Worker</name>
+  <description>Email channel orchestration (Section 7): address validation, subject and body assembly, then
+    the connector. No SMTP credentials live here - those stay in the email connector.</description>
+
+  <properties>
+    <java.version>17</java.version>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <spring-boot.version>3.4.5</spring-boot.version>
+    <spring-cloud.version>2024.0.1</spring-cloud.version>
+
+    <!-- The shared libraries, resolved from GitHub Packages. Bump deliberately:
+         nothing rebuilds this service when the platform changes any more. -->
+    <delivery.platform.version>0.1.0-SNAPSHOT</delivery.platform.version>
+
+    <!-- Container image coordinates; override per environment in CI. -->
+    <image.registry>docker.io</image.registry>
+    <image.namespace>youssefsaleh0108</image.namespace>
+    <image.name>delivery-${project.artifactId}</image.name>
+  </properties>
+
+  <!-- GitHub Packages serves the com.delivery:platform-* jars. It requires authentication even for
+       public packages, so every developer and every CI job needs a matching <server id="github">
+       in settings.xml — see docs/POLYREPO.md. -->
+  <repositories>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages — delivery platform</name>
+      <url>https://maven.pkg.github.com/youssefsaleh0108-maker/delivery.platform</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>true</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.delivery</groupId>
+        <artifactId>platform-security</artifactId>
+        <version>${delivery.platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.delivery</groupId>
+        <artifactId>platform-observability</artifactId>
+        <version>${delivery.platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.delivery</groupId>
+        <artifactId>platform-notifications</artifactId>
+        <version>${delivery.platform.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-amqp</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-config</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.retry</groupId>
+      <artifactId>spring-retry</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.delivery</groupId>
+      <artifactId>platform-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.delivery</groupId>
+      <artifactId>platform-observability</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.delivery</groupId>
+      <artifactId>platform-notifications</artifactId>
+    </dependency>
+
+    <!-- Was inherited from the root pom, which applied it to every module without exception. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${maven.compiler.release}</release>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring-boot.version}</version>
+        <configuration>
+          <image>
+            <name>${image.registry}/${image.namespace}/${image.name}:${project.version}</name>
+          </image>
+          <excludes>
+            <exclude>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+            </exclude>
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

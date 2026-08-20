@@ -1,0 +1,960 @@
+# Local development stack for the Delivery platform (Phase 0).
+#
+# Port choices avoid the lending stack already running on this machine, which holds 4200, 5432,
+# 8080-8095 and 9000-9001. Nothing here collides with those.
+#
+#   Postgres     5433        RabbitMQ    5673 / 15673 (mgmt)
+#   Redis        6380        MinIO       9010 / 9011 (console)
+#   Keycloak     8180        Vault       8200
+#   Config Srv   8888        Gateway     8100
+#   Mailpit      1025 / 8025 (web UI - the SMTP relay and the SMS dev test inbox)
+#
+# Application services:
+#   8101 order-manager     8105 mail-worker    8110 email-connector
+#   8102 order-tracking    8106 push-worker    8111 push-connector
+#   8103 product-service   8107 sms-worker     8112 sms-connector
+#   8104 notifications-mgr 8108 app-notif      8109 connector-settings
+#   8113 corebanking-connector   8114 corebanking-simulator (DEV ONLY)
+#   8115 accounting-service
+
+name: delivery
+
+services:
+  # ---------------------------------------------------------------- data layer
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: delivery-postgres
+    environment:
+      POSTGRES_DB: delivery
+      POSTGRES_USER: ${POSTGRES_USER:-delivery}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs only on an empty data dir. `docker compose down -v` to re-run after editing.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-delivery} -d delivery"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  redis:
+    image: redis:7-alpine
+    container_name: delivery-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-delivery}
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-delivery}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: delivery-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-delivery}
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks: [delivery]
+
+  minio:
+    image: minio/minio:latest
+    container_name: delivery-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-delivery}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-delivery123}
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  # Creates the five buckets from Section 5 with their access policies, then exits.
+  minio-init:
+    image: minio/mc:latest
+    container_name: delivery-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-delivery}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-delivery123}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    volumes:
+      - ./minio/bootstrap.sh:/bootstrap.sh:ro
+    restart: "no"
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- identity
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: delivery-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-delivery}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+      # Pins ONE issuer value. Clients reach Keycloak on this address while backend services reach
+      # it as keycloak:8080; without this they would disagree about `iss` and every token validated
+      # inside the network would be rejected. Services fetch JWKS on the internal address via
+      # jwk-set-uri (see config-repo/application-docker.yml).
+      #
+      # Set KEYCLOAK_PUBLIC_URL to the host's LAN IP when testing from a PHYSICAL PHONE — a device
+      # resolves `localhost` to itself, so a localhost issuer makes login fail there while still
+      # working in a desktop browser. Everything that consumes the issuer reads the same variable.
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8180:8080"
+    volumes:
+      # Mount the single realm file, not the directory: Keycloak scans everything in the import
+      # path, and the README beside it is not a realm.
+      - ./keycloak/realm-delivery-platform.json:/opt/keycloak/data/import/realm-delivery-platform.json:ro
+      # The login theme. start-dev disables theme caching, so edits to the CSS show on refresh
+      # without restarting the container.
+      - ./keycloak/themes:/opt/keycloak/themes:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image has no curl/wget; Keycloak 26 exposes health on the management port 9000.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\nHost: localhost\\nConnection: close\\n\\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- secrets
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: delivery-vault
+    # Dev mode: in-memory, auto-unsealed, root token fixed. LOCAL ONLY. Staging and production run
+    # a real sealed Vault - who hosts and administers it is Section 12 open decision #8.
+    command: ["server", "-dev", "-dev-listen-address=0.0.0.0:8200"]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_ROOT_TOKEN:-delivery-root-token}
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  # Enables AppRole, writes the read-only policy the Config Server gets, and seeds dev secrets.
+  vault-init:
+    image: hashicorp/vault:1.18
+    container_name: delivery-vault-init
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_ROOT_TOKEN:-delivery-root-token}
+      CONFIG_SERVER_ROLE_ID: ${VAULT_ROLE_ID:-config-server-dev-role-id}
+      CONFIG_SERVER_SECRET_ID: ${VAULT_SECRET_ID:-config-server-dev-secret-id}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    volumes:
+      - ./vault/bootstrap.sh:/bootstrap.sh:ro
+      - ./vault/policies:/policies:ro
+    restart: "no"
+    networks: [delivery]
+
+  # A real SMTP relay that accepts everything and delivers nothing outward, with a web UI to read
+  # what was sent. Two Phase 3 paths depend on it: the email connector's relay, and the SMS
+  # connector's dev-passthrough mode, which redirects "what the SMS would have said" here so QA can
+  # read it without a paid SMS account or a real handset (Section 7).
+  #
+  # Deliberately a real relay rather than a stub in the connector. A no-op provider would leave the
+  # SMTP hop, the failure classification and the receipt path untested until the first day a real
+  # vendor is switched on, which is the worst possible day to discover they were wrong.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: delivery-mailpit
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "1025:1025"    # SMTP
+      - "8025:8025"    # web UI - read the test inbox at http://127.0.0.1:8025
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- observability
+  # Section 10 treats distributed tracing as a Phase 0 requirement, not a later add-on: once a
+  # customer action fans out across a dozen services, "why didn't this SMS arrive" is only
+  # answerable if the trace was there from the first commit. all-in-one gives an OTLP collector and
+  # a UI in one container, which is all a laptop needs; staging/prod run a real collector pipeline.
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: delivery-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI
+      - "4318:4318"     # OTLP/HTTP - where every service exports spans
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- platform services
+  config-server:
+    build:
+      context: ../services/config-server
+    image: delivery/config-server:0.1.0
+    container_name: delivery-config-server
+    environment:
+      SERVER_PORT: 8888
+      # 'composite' is what activates the Git + Vault composite backend (Section 6).
+      CONFIG_PROFILES: composite
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      CONFIG_GIT_URI: file:///config-repo
+      CONFIG_GIT_BRANCH: main
+      VAULT_HOST: vault
+      VAULT_PORT: 8200
+      VAULT_SCHEME: http
+      VAULT_BACKEND: secret
+      VAULT_ROLE_ID: ${VAULT_ROLE_ID:-config-server-dev-role-id}
+      VAULT_SECRET_ID: ${VAULT_SECRET_ID:-config-server-dev-secret-id}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+    ports:
+      # Exposed to the host for debugging only. In staging/prod this service is internal-only,
+      # never routed through the Gateway, and fronted by mTLS (Section 6).
+      - "8888:8888"
+    volumes:
+      # The config-repo is its own Git repository; the Config Server clones it from this path.
+      # NOT mounted read-only: cloning from a local file:// URI makes JGit take a lock inside the
+      # source repo's .git directory, which fails outright on a read-only mount. In staging and
+      # production the URI is a real remote and this mount does not exist at all.
+      - ../config-repo:/config-repo
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  api-gateway:
+    build:
+      context: ../services/api-gateway
+    image: delivery/api-gateway:0.1.0
+    container_name: delivery-api-gateway
+    environment:
+      SERVER_PORT: 8100
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-delivery}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Every origin the Flutter Web portals may be opened from. These are DISTINCT origins to a
+      # browser: http://localhost:5010 and http://127.0.0.1:5010 do not match each other, and a
+      # missing one blocks every API call with what Dio reports as a connection error rather than
+      # anything mentioning CORS. Extended with the LAN origin by infra/set-host-address.ps1.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+    # No published port any more — Traefik holds 8100. Left running and reachable on the internal
+    # network so the two can be compared, and so falling back is `docker compose up` on one
+    # service rather than a rebuild. Delete it once Traefik has been in front for a while.
+    expose:
+      - "8100"
+    depends_on:
+      # service_healthy, not service_started: the container is up well before Spring is listening
+      # on 8888, and a config client that starts into a connection-refused dies on boot.
+      config-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # The front door.
+  #
+  # Replaces the Spring gateway on 8100 — the same port on purpose, because every client, every
+  # dart-define and every smoke suite in this repo names it. Swapping what answers there, rather
+  # than moving the door, is what makes the existing suites the acceptance test for this change.
+  #
+  # Routing now lives in a watched file (infra/traefik/dynamic/routes.yml) instead of a Spring
+  # application: adding a service is an edit, not a rebuild and redeploy of the one component every
+  # request passes through. See that file for what moved to the edge and what deliberately did not.
+  traefik:
+    image: traefik:v3.3
+    container_name: delivery-traefik
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "8100:8100"
+      # The dashboard and Traefik's own Prometheus metrics. Bound to the loopback interface only —
+      # a routing dashboard is useful to whoever runs the platform and to nobody else, and this one
+      # would otherwise be reachable from any machine on the network.
+      - "127.0.0.1:8099:8099"
+    volumes:
+      # Read-only. Traefik never needs to write its own configuration, and a container that can
+      # rewrite its own routing table is one compromise away from rerouting the platform.
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # Deliberately NOT depends_on every service. Traefik answers 502 for a service that is not up
+    # yet and starts routing the moment it is — waiting for all of them would mean the front door
+    # is down whenever any one service is.
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- domain services
+  product-service:
+    build:
+      context: ../services/product-service
+    image: delivery/product-service:0.1.0
+    container_name: delivery-product-service
+    environment:
+      SERVER_PORT: 8103
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      # Issuer must match what Keycloak stamps into the token; JWKS is fetched internally.
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Presigned image URLs are signed for this host, so it must be reachable by the CLIENT.
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9010}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8103:8103"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks: [delivery]
+
+  order-manager:
+    build:
+      context: ../services/order-manager
+    image: delivery/order-manager:0.1.0
+    container_name: delivery-order-manager
+    environment:
+      SERVER_PORT: 8101
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      PRODUCT_SERVICE_URL: http://product-service:8103
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8101:8101"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    networks: [delivery]
+
+  order-tracking:
+    build:
+      context: ../services/order-tracking
+    image: delivery/order-tracking:0.1.0
+    container_name: delivery-order-tracking
+    environment:
+      SERVER_PORT: 8102
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-delivery}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8102:8102"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- notification layer (Phase 3)
+  #
+  # Nine deployables. The split is not ceremony: the workers do fast CPU-bound rendering while the
+  # connectors block on third parties whose latency nobody here controls, and the connectors are
+  # the only processes holding provider credentials. Merged, a degraded vendor would consume the
+  # thread budget of every channel and a bad release would take all three down at once.
+
+  connector-settings:
+    build:
+      context: ../services/connector-settings
+    image: delivery/connector-settings:0.1.0
+    container_name: delivery-connector-settings
+    environment:
+      SERVER_PORT: 8109
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8109:8109"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  notifications-manager:
+    build:
+      context: ../services/notifications-manager
+    image: delivery/notifications-manager:0.1.0
+    container_name: delivery-notifications-manager
+    environment:
+      SERVER_PORT: 8104
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Service-to-service admin API call, so the internal address is correct here - it never has
+      # to match the issuer a browser sees.
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8104:8104"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  app-notification:
+    build:
+      context: ../services/app-notification
+    image: delivery/app-notification:0.1.0
+    container_name: delivery-app-notification
+    environment:
+      SERVER_PORT: 8108
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # A browser WebSocket is subject to origin checks like any fetch. Getting this wrong shows up
+      # as a silent connection failure, not a CORS error.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8108:8108"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      # Owns in_app_messages in the same schema, so it must not race the manager's migrations.
+      notifications-manager:
+        condition: service_healthy
+    networks: [delivery]
+
+  mail-worker:
+    build:
+      context: ../services/mail-worker
+    image: delivery/mail-worker:0.1.0
+    container_name: delivery-mail-worker
+    environment:
+      SERVER_PORT: 8105
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      EMAIL_CONNECTOR_URL: http://email-connector:8110
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8105:8105"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  push-worker:
+    build:
+      context: ../services/push-worker
+    image: delivery/push-worker:0.1.0
+    container_name: delivery-push-worker
+    environment:
+      SERVER_PORT: 8106
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      PUSH_CONNECTOR_URL: http://push-connector:8111
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8106:8106"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  sms-worker:
+    build:
+      context: ../services/sms-worker
+    image: delivery/sms-worker:0.1.0
+    container_name: delivery-sms-worker
+    environment:
+      SERVER_PORT: 8107
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      SMS_CONNECTOR_URL: http://sms-connector:8112
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8107:8107"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  email-connector:
+    build:
+      context: ../services/email-connector
+    image: delivery/email-connector:0.1.0
+    container_name: delivery-email-connector
+    environment:
+      SERVER_PORT: 8110
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8110:8110"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks: [delivery]
+
+  push-connector:
+    build:
+      context: ../services/push-connector
+    image: delivery/push-connector:0.1.0
+    container_name: delivery-push-connector
+    environment:
+      SERVER_PORT: 8111
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8111:8111"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  sms-connector:
+    build:
+      context: ../services/sms-connector
+    image: delivery/sms-connector:0.1.0
+    container_name: delivery-sms-connector
+    environment:
+      SERVER_PORT: 8112
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      # The dev-passthrough provider delivers to the same test inbox the email connector uses.
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMS_TEST_INBOX: ${SMS_TEST_INBOX:-sms-test-inbox@dev.local}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8112:8112"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- accounting (Phase 4)
+  #
+  # Three services, and the split is the point. accounting-service holds the business rules and a
+  # database but no credentials; corebanking-connector holds the bank credentials and nothing else;
+  # corebanking-simulator stands in for a system outside the platform entirely. Section 10 singles
+  # the bank out as the most sensitive integration in the system, and this is what "isolate it"
+  # looks like in practice.
+
+  accounting-service:
+    build:
+      context: ../services/accounting-service
+    image: delivery/accounting-service:0.1.0
+    container_name: delivery-accounting-service
+    environment:
+      SERVER_PORT: 8115
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8115:8115"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  corebanking-connector:
+    build:
+      context: ../services/corebanking-connector
+    image: delivery/corebanking-connector:0.1.0
+    container_name: delivery-corebanking-connector
+    environment:
+      SERVER_PORT: 8113
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      COREBANKING_SIMULATOR_URL: http://corebanking-simulator:8114
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8113:8113"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  # DEV ONLY. Section 7 is explicit that this is never deployed to staging or production - there,
+  # the same connector points at the real bank through the Backoffice toggle.
+  corebanking-simulator:
+    build:
+      context: ../services/corebanking-simulator
+    image: delivery/corebanking-simulator:0.1.0
+    container_name: delivery-corebanking-simulator
+    environment:
+      SERVER_PORT: 8114
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      BANK_API_KEY: ${BANK_API_KEY:-simulator-dev-key}
+      FAULT_INJECTION_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8114:8114"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ------------------------------------------------------------------------ WhatsApp ordering
+  #
+  # Its own deployable for the same two reasons the notification connectors are: it is the only
+  # process holding a messaging vendor's credentials, and it is the only one exposed to a public
+  # webhook. Both are reasons to be able to restart, scale and roll it back on its own.
+  whatsapp-service:
+    build:
+      context: ../services/whatsapp-service
+    image: delivery/whatsapp-service:0.1.0
+    container_name: delivery-whatsapp-service
+    environment:
+      SERVER_PORT: 8116
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Local dev only. In a deployment this is Meta's app secret and comes from Vault through the
+      # Config Server — never from an env var in a compose file that lives in the repo.
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-local-webhook-secret}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-delivery-local-verify}
+      # Stands in for WhatsApp until a real number exists. MUST be false in production.
+      WHATSAPP_SIMULATOR_ENABLED: "true"
+      WHATSAPP_OUTBOUND_URL: http://whatsapp-service:8116/simulator/outbound
+      # Merchants connect their own numbers through the API; nothing about the number-to-merchant
+      # mapping is configured here.
+      ORDER_MANAGER_URL: http://order-manager:8101
+      PRODUCT_SERVICE_URL: http://product-service:8103
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8116:8116"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ---------------------------------------------------------------------------- joining
+  #
+  # Its own deployable for two reasons no other service has: the only write endpoint reachable
+  # with no token at all, and the only workflow engine. Both are things worth being able to
+  # restart, scale and rate-limit on their own.
+  onboarding-service:
+    build:
+      context: ../services/onboarding-service
+    image: delivery/onboarding-service:0.1.0
+    container_name: delivery-onboarding-service
+    environment:
+      SERVER_PORT: 8117
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      # This account can create users and register delivery companies, which makes it the most
+      # powerful credential in the stack. From Vault in a deployment, never from a compose file.
+      KEYCLOAK_CLIENT_ID: onboarding-service
+      KEYCLOAK_CLIENT_SECRET: ${ONBOARDING_CLIENT_SECRET:-onboarding-service-dev-secret}
+      ORDER_MANAGER_URL: http://order-manager:8101
+      # Where one-time codes and decision emails are handed off. Without it the default is
+      # localhost, which inside a container is this service talking to itself.
+      NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+    ports:
+      - "8117:8117"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ------------------------------------------------------------------------------- observability
+  #
+  # Jaeger has had the traces since Phase 0; this is the other half. Every service has published
+  # /actuator/prometheus all along and nothing collected it, so "is it slower than last week" was a
+  # question nobody could answer.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: delivery-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      # Local stack: enough history to compare a deploy against yesterday, not enough to fill a
+      # laptop disk while nobody is looking.
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Mounted separately rather than folded into prometheus.yml so the rules can be edited and
+      # reloaded without touching the scrape configuration.
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9095:9090"
+    networks: [delivery]
+
+volumes:
+  prometheus-data:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:
+
+networks:
+  delivery:
+    name: delivery
+    driver: bridge

@@ -1,0 +1,24 @@
+name: product-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/product-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+      - '.github/workflows/reusable-service-ci.yml'
+      - '.github/workflows/product-service.yml'
+  pull_request:
+    paths:
+      - 'services/product-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service-name: product-service
+      service-path: services/product-service
+    secrets: inherit

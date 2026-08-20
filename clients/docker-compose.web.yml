@@ -1,0 +1,104 @@
+# Serves the built Flutter Web apps on fixed ports for local testing.
+#
+# Fixed ports matter: a Keycloak client's redirect URIs are an allow-list, and `flutter run` picks a
+# random port every time, which would fail the redirect_uri check on every run. Ports 5010-5012 are
+# used because the lending stack on this machine already holds 8080-8095.
+#
+#   cd clients/apps/merchant_portal && flutter build web --release
+#   cd clients/apps/backoffice_web  && flutter build web --release
+#   cd clients && docker compose -f docker-compose.web.yml up -d
+#
+# Then: Merchant Portal http://127.0.0.1:5010   Backoffice http://127.0.0.1:5011
+#       Mobile app      http://127.0.0.1:5012
+#
+# USE 127.0.0.1, NOT localhost. Docker Desktop on WSL2 binds ::1 ahead of the loopback proxy and
+# Chrome resolves localhost to ::1 first, so `localhost` gives ERR_CONNECTION_RESET.
+#
+# CANVASKIT IS SERVED LOCALLY, and must stay that way. Each app has a web/flutter_bootstrap.js that
+# sets canvasKitBaseUrl to "canvaskit/". Without it Flutter fetches its renderer from
+# https://www.gstatic.com/flutter-canvaskit/, which stalls on this machine (15s timeout, versus
+# 0.17s locally) — and because CanvasKit *is* the renderer, the page is blank until it resolves.
+# The symptom looks like a broken app or a slow login, especially after the Keycloak redirect,
+# which forces a fresh page load.
+#
+# After redeploying a bundle, hard-reload once (Ctrl+F5). These builds register a service worker,
+# so a normal refresh can serve the previous version.
+#
+# For day-to-day development prefer hot reload instead, pinning the same port:
+#   flutter run -d chrome --web-port 5010
+
+name: delivery-web
+
+services:
+  merchant-portal:
+    image: nginx:alpine
+    container_name: delivery-merchant-portal
+    ports:
+      - "5010:80"
+    volumes:
+      - ./apps/merchant_portal/build/web:/usr/share/nginx/html:ro
+      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
+
+  backoffice-web:
+    image: nginx:alpine
+    container_name: delivery-backoffice-web
+    ports:
+      - "5011:80"
+    volumes:
+      - ./apps/backoffice_web/build/web:/usr/share/nginx/html:ro
+      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
+
+  # The mobile app, served as a web build so the design and the flows can be walked through in a
+  # browser without an emulator or a handset.
+  #
+  # Unlike the two portals, this app's redirect URI is a COMPILE-TIME constant (its default is the
+  # custom scheme com.delivery.app://oauth2redirect, for the real mobile targets). So the web build
+  # has to be told, and rebuilt if the host ever changes:
+  #
+  #   cd apps/mobile_app && flutter build web --release \
+  #     --dart-define=KEYCLOAK_ISSUER=http://127.0.0.1:8180/realms/delivery-platform \
+  #     --dart-define=API_BASE_URL=http://127.0.0.1:8100 \
+  #     --dart-define=OIDC_REDIRECT_URL=http://127.0.0.1:5012/
+  #
+  # The issuer must match KEYCLOAK_PUBLIC_URL in infra/.env exactly — a token carries one issuer,
+  # and a mismatch fails validation on every call rather than at login.
+  #
+  # No sensors are involved: the rider's GPS is a simulated random walk in rider_home_screen.dart,
+  # not a geolocation plugin, so nothing prompts for location and nothing needs stubbing.
+  # The public site: what somebody sees before they are anybody.
+  #
+  # Sign in points at the two portals, Register starts an onboarding application, and /admin is
+  # served but linked from nowhere — an administrator types it. Plain nginx over four static files:
+  # this is the one page a stranger loads before they have any reason to trust us, and it should be
+  # quick and it should not break.
+  website:
+    image: nginx:alpine
+    container_name: delivery-website
+    ports:
+      - "5014:80"
+    volumes:
+      - ./website:/usr/share/nginx/html:ro
+      - ./website/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  # The delivery company's app: their jobs, their earnings, their company.
+  #
+  # Was built but never served — it had no entry here, so the only way to look at it was
+  # `flutter run`. Its Keycloak client must have http://127.0.0.1:5013/ among its redirect URIs, on
+  # the same allow-list rules as the other two portals.
+  carrier-portal:
+    image: nginx:alpine
+    container_name: delivery-carrier-portal
+    ports:
+      - "5013:80"
+    volumes:
+      - ./apps/carrier_portal/build/web:/usr/share/nginx/html:ro
+      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
+
+  mobile-app:
+    image: nginx:alpine
+    container_name: delivery-mobile-app
+    ports:
+      - "5012:80"
+    volumes:
+      - ./apps/mobile_app/build/web:/usr/share/nginx/html:ro
+      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro

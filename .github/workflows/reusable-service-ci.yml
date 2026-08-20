@@ -1,0 +1,139 @@
+# The standard per-service pipeline. Section 10 asks for this template to exist in Phase 0 so that
+# adding the next service is a 12-line caller file rather than a new pipeline invented from scratch
+# — with 16 services eventually in this repo, that difference compounds.
+#
+# To onboard a new service, add .github/workflows/<service>.yml containing:
+#
+#   name: <service>
+#   on:
+#     push:
+#       paths: ['services/<service>/**', 'platform/**', 'pom.xml']
+#     pull_request:
+#       paths: ['services/<service>/**', 'platform/**', 'pom.xml']
+#   jobs:
+#     ci:
+#       uses: ./.github/workflows/reusable-service-ci.yml
+#       with:
+#         service-name: <service>
+#         service-path: services/<service>
+#       secrets: inherit
+
+name: Reusable service CI
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Maven artifactId and container image name.
+        required: true
+        type: string
+      service-path:
+        description: Path to the service module from the repo root.
+        required: true
+        type: string
+      java-version:
+        required: false
+        type: string
+        default: '17'
+      push-image:
+        description: Push the image to the registry. Off for pull requests.
+        required: false
+        type: boolean
+        default: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # Needed to upload SARIF from the dependency scan below.
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ inputs.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: temurin
+          cache: maven
+
+      # The service depends on the platform-* libraries, so the reactor has to include them.
+      # -am builds exactly this module and its dependencies, not all 16 services.
+      - name: Build and test
+        run: mvn -B -pl ${{ inputs.service-path }} -am verify
+
+      - name: Publish test report
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: '${{ inputs.service-path }}/target/surefire-reports/*.xml'
+          fail_on_failure: true
+
+      # Fails the build on a known-vulnerable dependency before an image is ever produced.
+      - name: Dependency vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ inputs.service-path }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: ${{ inputs.service-name }}
+
+      - name: Log in to registry
+        if: inputs.push-image && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.service-name }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.service-path }}
+          push: ${{ inputs.push-image && github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ inputs.service-name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
+
+  deploy-staging:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Gates the deploy on whatever reviewers/secrets the 'staging' environment requires.
+    environment: staging
+    steps:
+      - name: Deploy
+        run: |
+          echo "::notice::Deploy of ${{ inputs.service-name }} to staging is not wired up yet."
+          echo "Phase 0 open item: the Kubernetes target and its credentials do not exist."
+          echo "Section 12 open decision #2 - nobody owns the platform work yet."
+          exit 0

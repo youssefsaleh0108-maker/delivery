@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    A PURE AGGREGATOR, and a local convenience only. It is NOT a parent.
+
+    Nothing below inherits from this file: every module under platform/ and services/ is a
+    standalone pom that declares its own Spring Boot BOM, its own plugin versions and its own
+    dependency versions, and each builds on its own from its own directory:
+
+        mvn -f services/order-manager/pom.xml verify
+
+    That is what the CI for each separate repository does, and it is the build that has to keep
+    working. This file exists so that one command can still build the whole tree on a developer
+    machine — most usefully to install the platform jars into ~/.m2 so the services resolve them
+    without reaching GitHub Packages:
+
+        mvn -f pom.xml install -DskipTests
+
+    Deleting this file breaks nothing except that convenience.
+
+    Because it is only an aggregator, module order does not imply inheritance — but it does decide
+    build order, so the five libraries are listed before the services that consume them.
+  -->
+  <groupId>com.delivery</groupId>
+  <artifactId>delivery-aggregator</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>Delivery :: Local Build Aggregator</name>
+  <description>Builds every standalone module in one command. Not a parent, not published.</description>
+
+  <modules>
+    <!-- Shared libraries first: the services resolve these by version. -->
+    <module>platform/platform-security</module>
+    <module>platform/platform-observability</module>
+    <module>platform/platform-outbox</module>
+    <module>platform/platform-notifications</module>
+    <!-- Depends on platform-security, so it follows it. -->
+    <module>platform/platform-storage</module>
+
+    <module>services/config-server</module>
+    <module>services/api-gateway</module>
+    <module>services/product-service</module>
+    <module>services/order-manager</module>
+    <module>services/order-tracking</module>
+    <module>services/connector-settings</module>
+
+    <!-- Phase 3, notification layer. Nine deployables rather than one: the workers render (CPU,
+         fast) while the connectors block on third parties whose latency we do not control, and the
+         connectors are the only processes holding provider credentials. -->
+    <module>services/notifications-manager</module>
+    <module>services/mail-worker</module>
+    <module>services/push-worker</module>
+    <module>services/sms-worker</module>
+    <module>services/app-notification</module>
+    <module>services/email-connector</module>
+    <module>services/push-connector</module>
+    <module>services/sms-connector</module>
+
+    <!-- Phase 4, accounting. The simulator is dev-only; the connector and the saga ship
+         everywhere, with the simulator/real toggle exposed through the Backoffice. -->
+    <module>services/accounting-service</module>
+    <module>services/corebanking-connector</module>
+    <module>services/corebanking-simulator</module>
+
+    <!-- WhatsApp ordering. Its own deployable because it is the only service holding a messaging
+         vendor's credentials and the only one exposed to a public webhook — the same reasoning that
+         separated the notification connectors from their workers. -->
+    <module>services/whatsapp-service</module>
+
+    <!-- Joining the platform. Its own deployable because it is the only one with a publicly
+         reachable write endpoint and the only one holding a workflow engine. -->
+    <module>services/onboarding-service</module>
+  </modules>
+</project>
