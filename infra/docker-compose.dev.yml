@@ -437,10 +437,16 @@ services:
 
   # ---------------------------------------------------------------- notification layer (Phase 3)
   #
-  # Nine deployables. The split is not ceremony: the workers do fast CPU-bound rendering while the
-  # connectors block on third parties whose latency nobody here controls, and the connectors are
-  # the only processes holding provider credentials. Merged, a degraded vendor would consume the
-  # thread budget of every channel and a bad release would take all three down at once.
+  # Six deployables. Each channel is now ONE process that both renders and sends: the former
+  # mail-worker, push-worker and sms-worker were merged into their connectors, which halved the
+  # JVM count on this box.
+  #
+  # What that gave up is real and was the original reason for the split. Rendering is fast and
+  # CPU-bound; a connector blocks on a third party whose latency nobody here controls. In one
+  # process a degraded vendor consumes the thread budget that rendering needed, and provider
+  # credentials now share a heap with template rendering. Per-channel isolation survives — a wedged
+  # SMS vendor still cannot stall email or push — but within a channel the two failure modes are
+  # now one.
 
   connector-settings:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-connector-settings:${IMAGE_TAG:-main}
@@ -552,104 +558,10 @@ services:
       notifications-manager:
         condition: service_healthy
     networks: [delivery]
-
-  mail-worker:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-mail-worker:${IMAGE_TAG:-main}
-    container_name: delivery-mail-worker
-    mem_limit: 256m
-    restart: unless-stopped
-    environment:
-      SERVER_PORT: 8105
-      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
-      # shared box: the throughput collectors cost more in threads and metaspace than they return.
-      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      EMAIL_CONNECTOR_URL: http://email-connector:8110
-      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
-      # does not resolve on every span and floods the log with export failures.
-      OTEL_SDK_DISABLED: "true"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
-  push-worker:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-push-worker:${IMAGE_TAG:-main}
-    container_name: delivery-push-worker
-    mem_limit: 256m
-    restart: unless-stopped
-    environment:
-      SERVER_PORT: 8106
-      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
-      # shared box: the throughput collectors cost more in threads and metaspace than they return.
-      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      PUSH_CONNECTOR_URL: http://push-connector:8111
-      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
-      # does not resolve on every span and floods the log with export failures.
-      OTEL_SDK_DISABLED: "true"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
-  sms-worker:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-sms-worker:${IMAGE_TAG:-main}
-    container_name: delivery-sms-worker
-    mem_limit: 256m
-    restart: unless-stopped
-    environment:
-      SERVER_PORT: 8107
-      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
-      # shared box: the throughput collectors cost more in threads and metaspace than they return.
-      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      SMS_CONNECTOR_URL: http://sms-connector:8112
-      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
-      # does not resolve on every span and floods the log with export failures.
-      OTEL_SDK_DISABLED: "true"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
   email-connector:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-email-connector:${IMAGE_TAG:-main}
     container_name: delivery-email-connector
-    mem_limit: 256m
+    mem_limit: 384m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8110
@@ -684,7 +596,7 @@ services:
   push-connector:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-push-connector:${IMAGE_TAG:-main}
     container_name: delivery-push-connector
-    mem_limit: 256m
+    mem_limit: 384m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8111
@@ -715,7 +627,7 @@ services:
   sms-connector:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-sms-connector:${IMAGE_TAG:-main}
     container_name: delivery-sms-connector
-    mem_limit: 288m
+    mem_limit: 384m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8112

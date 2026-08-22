@@ -23,6 +23,17 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:delivery}
     password: ${RABBITMQ_PASSWORD:delivery}
+    listener:
+      simple:
+        # No broker-level retry. WorkerDispatchService handles every failure itself and always
+        # acks; letting the broker redeliver as well would double-send anything that succeeded
+        # slowly.
+        retry:
+          enabled: false
+        # Higher than the other two: push is the highest-volume channel and FCM is the fastest
+        # provider, so throughput here is bounded by concurrency rather than by the vendor.
+        concurrency: 4
+        max-concurrency: 16
 
   security:
     oauth2:
@@ -50,6 +61,24 @@ delivery:
   outbox:
     exchange: delivery.events
 
+  # The channel worker, merged in from the former push-worker deployable. Setting both
+  # delivery.worker.channel and delivery.connector.type makes this one process consume
+  # notification.dispatch.push AND hold the Firebase credentials. See the email connector for the
+  # full reasoning; the trade is the same one.
+  #
+  # connector-url points at THIS process on purpose — the worker's timeout, retry budget and
+  # circuit breaker are all defined in terms of an HTTP call, and calling the controller directly
+  # would keep the code while silently discarding every one of them.
+  worker:
+    channel: PUSH
+    connector-url: http://localhost:${SERVER_PORT:8111}
+    max-attempts: 3
+    initial-backoff: 500ms
+    failure-rate-threshold: 50
+    open-state-duration: 30s
+    connector-timeout: 10s
+    dead-letter-queue: notification.dlq
+
   connector:
     type: PUSH
     # DEV_LOG until a Firebase project exists. Switching to FIREBASE is a Backoffice change, and
@@ -65,6 +94,8 @@ delivery:
     dead-letter-queue: notification.dlq
 
   push:
+    # Used by PushPreparer. Must match the scheme the mobile app registers for deep links.
+    deep-link-prefix: delivery://orders/
     firebase:
       # Comes from Vault at secret/push-connector. Empty here on purpose: a service-account JSON in
       # the config repo would be a credential in Git.

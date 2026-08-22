@@ -1,8 +1,18 @@
 # The notification layer and the accounting services.
 #
-# Nine deployables, and the split is load-bearing rather than ceremony: the workers render (CPU,
-# fast) while the connectors block on third parties whose latency nobody here controls, and the
-# connectors are the only pods holding provider credentials. See the README's deviations.
+# Six deployables. Each channel is ONE pod that both renders and sends — mail-worker, push-worker
+# and sms-worker were merged into their connectors.
+#
+# The split they used to have was load-bearing, not ceremony, and it is worth recording what was
+# traded away: rendering is fast and CPU-bound while a connector blocks on a third party whose
+# latency nobody here controls, so in one process a degraded vendor now consumes the thread budget
+# rendering needed. Provider credentials also share a heap with template rendering. Per-channel
+# isolation survives — a wedged SMS vendor cannot stall email or push — but within a channel the
+# two failure modes became one.
+#
+# The two worker HorizontalPodAutoscalers went with the workers. Nothing here autoscales now;
+# scaling a merged channel means scaling the pod that holds the provider credentials, which is a
+# decision to take deliberately rather than inherit from a manifest.
 #
 # Every Service here is ClusterIP. The connectors' /api/connector/send takes no user token, so a
 # LoadBalancer or NodePort on any of them would publish "send an arbitrary SMS" to the world.
@@ -44,120 +54,6 @@ spec:
   type: ClusterIP
   selector: { app: notifications-manager }
   ports: [ { port: 8104, targetPort: 8104 } ]
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: mail-worker, namespace: delivery, labels: { app: mail-worker } }
-spec:
-  replicas: 2
-  selector: { matchLabels: { app: mail-worker } }
-  template:
-    metadata: { labels: { app: mail-worker } }
-    spec:
-      containers:
-        - name: mail-worker
-          image: ghcr.io/delivery/mail-worker:0.1.0
-          ports: [ { containerPort: 8105 } ]
-          envFrom: [ { configMapRef: { name: delivery-common } } ]
-          env:
-            - { name: SERVER_PORT, value: "8105" }
-            - name: CONFIG_SERVER_USER
-              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
-            - name: CONFIG_SERVER_PASSWORD
-              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
-          resources:
-            requests: { cpu: "100m", memory: "384Mi" }
-            limits:   { cpu: "500m", memory: "768Mi" }
-          startupProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8105 }
-            periodSeconds: 5
-            failureThreshold: 30
-          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8105 }, periodSeconds: 10 }
-          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8105 }, periodSeconds: 20 }
----
-apiVersion: v1
-kind: Service
-metadata: { name: mail-worker, namespace: delivery }
-spec:
-  type: ClusterIP
-  selector: { app: mail-worker }
-  ports: [ { port: 8105, targetPort: 8105 } ]
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: push-worker, namespace: delivery, labels: { app: push-worker } }
-spec:
-  replicas: 2
-  selector: { matchLabels: { app: push-worker } }
-  template:
-    metadata: { labels: { app: push-worker } }
-    spec:
-      containers:
-        - name: push-worker
-          image: ghcr.io/delivery/push-worker:0.1.0
-          ports: [ { containerPort: 8106 } ]
-          envFrom: [ { configMapRef: { name: delivery-common } } ]
-          env:
-            - { name: SERVER_PORT, value: "8106" }
-            - name: CONFIG_SERVER_USER
-              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
-            - name: CONFIG_SERVER_PASSWORD
-              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
-          resources:
-            requests: { cpu: "100m", memory: "384Mi" }
-            limits:   { cpu: "500m", memory: "768Mi" }
-          startupProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8106 }
-            periodSeconds: 5
-            failureThreshold: 30
-          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8106 }, periodSeconds: 10 }
-          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8106 }, periodSeconds: 20 }
----
-apiVersion: v1
-kind: Service
-metadata: { name: push-worker, namespace: delivery }
-spec:
-  type: ClusterIP
-  selector: { app: push-worker }
-  ports: [ { port: 8106, targetPort: 8106 } ]
----
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: sms-worker, namespace: delivery, labels: { app: sms-worker } }
-spec:
-  replicas: 2
-  selector: { matchLabels: { app: sms-worker } }
-  template:
-    metadata: { labels: { app: sms-worker } }
-    spec:
-      containers:
-        - name: sms-worker
-          image: ghcr.io/delivery/sms-worker:0.1.0
-          ports: [ { containerPort: 8107 } ]
-          envFrom: [ { configMapRef: { name: delivery-common } } ]
-          env:
-            - { name: SERVER_PORT, value: "8107" }
-            - name: CONFIG_SERVER_USER
-              valueFrom: { secretKeyRef: { name: config-server-client, key: username } }
-            - name: CONFIG_SERVER_PASSWORD
-              valueFrom: { secretKeyRef: { name: config-server-client, key: password } }
-          resources:
-            requests: { cpu: "100m", memory: "384Mi" }
-            limits:   { cpu: "500m", memory: "768Mi" }
-          startupProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8107 }
-            periodSeconds: 5
-            failureThreshold: 30
-          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8107 }, periodSeconds: 10 }
-          livenessProbe:  { httpGet: { path: /actuator/health/liveness,  port: 8107 }, periodSeconds: 20 }
----
-apiVersion: v1
-kind: Service
-metadata: { name: sms-worker, namespace: delivery }
-spec:
-  type: ClusterIP
-  selector: { app: sms-worker }
-  ports: [ { port: 8107, targetPort: 8107 } ]
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -452,45 +348,3 @@ spec:
   type: ClusterIP
   selector: { app: corebanking-connector }
   ports: [ { port: 8113, targetPort: 8113 } ]
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata: { name: mail-worker, namespace: delivery }
-spec:
-  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: mail-worker }
-  minReplicas: 2
-  maxReplicas: 8
-  metrics:
-    # CPU is a placeholder. Queue depth on this worker's own channel queue is the signal that
-    # actually matters - a worker blocked on a slow connector is idle, not busy, so CPU will not
-    # scale it out when it most needs to be. Moving to KEDA on RabbitMQ queue length is the fix.
-    - type: Resource
-      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata: { name: push-worker, namespace: delivery }
-spec:
-  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: push-worker }
-  minReplicas: 2
-  maxReplicas: 8
-  metrics:
-    # CPU is a placeholder. Queue depth on this worker's own channel queue is the signal that
-    # actually matters - a worker blocked on a slow connector is idle, not busy, so CPU will not
-    # scale it out when it most needs to be. Moving to KEDA on RabbitMQ queue length is the fix.
-    - type: Resource
-      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata: { name: sms-worker, namespace: delivery }
-spec:
-  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: sms-worker }
-  minReplicas: 2
-  maxReplicas: 8
-  metrics:
-    # CPU is a placeholder. Queue depth on this worker's own channel queue is the signal that
-    # actually matters - a worker blocked on a slow connector is idle, not busy, so CPU will not
-    # scale it out when it most needs to be. Moving to KEDA on RabbitMQ queue length is the fix.
-    - type: Resource
-      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }

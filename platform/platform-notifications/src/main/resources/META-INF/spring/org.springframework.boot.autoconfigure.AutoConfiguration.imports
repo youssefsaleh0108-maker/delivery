@@ -1,2 +1,3 @@
+com.delivery.platform.notifications.NotificationCommonAutoConfiguration
 com.delivery.platform.notifications.ConnectorAutoConfiguration
 com.delivery.platform.notifications.WorkerAutoConfiguration

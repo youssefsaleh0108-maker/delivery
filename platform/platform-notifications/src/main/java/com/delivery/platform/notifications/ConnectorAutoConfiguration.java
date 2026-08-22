@@ -44,11 +44,9 @@ public class ConnectorAutoConfiguration {
                 properties.getType(), properties.getDefaultProvider(), properties.getCacheTtl());
     }
 
-    @Bean
-    public TopicExchange deliveryEventsExchange(
-            @Value("${delivery.outbox.exchange:delivery.events}") String exchange) {
-        return new TopicExchange(exchange, true, false);
-    }
+    // deliveryEventsExchange, notificationDeadLetterQueue and deadLetterPublisher moved to
+    // NotificationCommonAutoConfiguration — a worker declares the same three, and one process being
+    // both a worker and a connector could not start while they were defined in both.
 
     @Bean
     public Queue connectorSettingsQueue(ConnectorProperties properties) {
@@ -63,23 +61,11 @@ public class ConnectorAutoConfiguration {
                 .with(SettingsChangedEvent.ROUTING_KEY);
     }
 
-    /** Durable and unconsumed on purpose — this is the operator's inbox, not a retry path. */
-    @Bean
-    public Queue notificationDeadLetterQueue(ConnectorProperties properties) {
-        return QueueBuilder.durable(properties.getDeadLetterQueue()).build();
-    }
-
     @Bean
     public ConnectorSettingsListener connectorSettingsListener(ConnectorProperties properties,
                                                                ActiveProviderRegistry registry,
                                                                ObjectMapper objectMapper) {
         return new ConnectorSettingsListener(properties.getType(), registry, objectMapper);
-    }
-
-    @Bean
-    public DeadLetterPublisher deadLetterPublisher(RabbitTemplate rabbit, ObjectMapper objectMapper,
-                                                   ConnectorProperties properties) {
-        return new DeadLetterPublisher(rabbit, objectMapper, properties.getDeadLetterQueue());
     }
 
     @Bean

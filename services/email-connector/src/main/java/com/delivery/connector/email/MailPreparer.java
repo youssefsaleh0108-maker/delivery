@@ -1,4 +1,4 @@
-package com.delivery.worker.mail;
+package com.delivery.connector.email;
 
 import java.util.regex.Pattern;
 

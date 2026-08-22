@@ -58,9 +58,6 @@
          fast) while the connectors block on third parties whose latency we do not control, and the
          connectors are the only processes holding provider credentials. -->
     <module>services/notifications-manager</module>
-    <module>services/mail-worker</module>
-    <module>services/push-worker</module>
-    <module>services/sms-worker</module>
     <module>services/app-notification</module>
     <module>services/email-connector</module>
     <module>services/push-connector</module>

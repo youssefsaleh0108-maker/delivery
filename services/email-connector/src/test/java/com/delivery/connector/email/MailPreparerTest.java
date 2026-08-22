@@ -1,4 +1,4 @@
-package com.delivery.worker.mail;
+package com.delivery.connector.email;
 
 import java.time.Instant;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package com.delivery.worker.sms;
+package com.delivery.connector.sms;
 
 import java.time.Instant;
 import java.util.Map;

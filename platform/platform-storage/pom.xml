@@ -25,6 +25,9 @@
     <delivery.platform.version>0.1.0-SNAPSHOT</delivery.platform.version>
 
     <minio.version>8.6.0</minio.version>
+    <!-- Must match the OkHttp that ${minio.version} resolves — see the okhttp-jvm dependency for
+         why it has to be declared at all. Check with `mvn dependency:tree` after bumping MinIO. -->
+    <okhttp.version>5.1.0</okhttp.version>
   </properties>
 
   <!-- GitHub Packages serves the com.delivery:platform-* jars. It requires authentication even for
@@ -62,6 +65,25 @@
       <groupId>io.minio</groupId>
       <artifactId>minio</artifactId>
       <version>${minio.version}</version>
+    </dependency>
+
+    <!-- REQUIRED since MinIO 8.6.0, which pulls OkHttp 5.
+         OkHttp 5 is a Kotlin Multiplatform build: `com.squareup.okhttp3:okhttp` is the root module
+         and its jar is 767 bytes containing NO class files, because the JVM classes ship in
+         okhttp-jvm. Gradle follows the module metadata that says so; Maven does not, and resolves
+         the empty root jar instead.
+
+         The failure that produces is "cannot access okhttp3.HttpUrl / class file not found" while
+         compiling this module, with okhttp visible at compile scope in `dependency:tree` — the
+         artifact is on the classpath, it just has nothing in it. Declaring okhttp-jvm explicitly
+         is the supported fix for Maven consumers.
+
+         Version comes from MinIO's own dependency, so this stays in step with it rather than
+         pinning a second, independent OkHttp version. -->
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>okhttp-jvm</artifactId>
+      <version>${okhttp.version}</version>
     </dependency>
 
     <dependency>

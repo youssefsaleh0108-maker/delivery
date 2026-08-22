@@ -19,9 +19,9 @@ throughout this repo point at it.
 UAT in a real browser, and the choice of SMS vendor.**
 
 Platform foundation, catalog, the full order lifecycle with live tracking, and the whole
-notification and integration layer — nine services from Notifications Manager through the three
-channel workers to the three provider connectors, plus Connector Settings and its Backoffice
-screen. Phase 4 adds the accounting settlement saga, the Core Banking connector
+notification and integration layer — Notifications Manager, one deployable per channel that both
+renders and sends, plus App Notification, Connector Settings and its Backoffice screen. (The three
+channel workers were separate services until they were merged into their connectors.) Phase 4 adds the accounting settlement saga, the Core Banking connector
 and simulator, and financial reconciliation. Phase 5 is the hardening pass: a security review with
 fixes, load testing, correlation-ID tracing proven end to end, tracking-table partitioning, and
 Kubernetes manifests. Phase 6 adds per-provider delivery-rate monitoring and a canary ramp, so an
@@ -35,7 +35,7 @@ Verified running on this machine, from a cold `docker compose up -d` with empty 
 
 | | |
 | --- | --- |
-| Maven monorepo | 23 modules, `mvn clean install` green, 164 unit tests |
+| Maven monorepo | 20 modules, `mvn clean install` green, 793 unit tests |
 | `platform-security` | Keycloak realm roles → Spring authorities, servlet **and** reactive |
 | `platform-outbox` | Outbox entity, `FOR UPDATE SKIP LOCKED` relay, DLQ status, Flyway migration |
 | `platform-observability` | Correlation-ID filter (both stacks) + OTLP tracing |
@@ -47,8 +47,7 @@ Verified running on this machine, from a cold `docker compose up -d` with empty 
 | **Order Manager** | Order lifecycle state machine, price snapshotting, pessimistic rider claim |
 | **Order Tracking** | PostGIS positions, Redis hot-read cache, participants projection off the bus |
 | **Notifications Manager** | Templates, rendering, the notification log, audience fan-out |
-| **Mail / Push / SMS workers** | One queue and one deployable per channel; segmentation, MIME, payload shaping |
-| **Email / Push / SMS connectors** | The only processes holding provider credentials; breaker, retry, idempotency, DLQ |
+| **Email / Push / SMS connectors** | One deployable per channel that both renders and sends: its own queue, segmentation, MIME, payload shaping, and the provider credentials; breaker, retry, idempotency, DLQ |
 | **App Notification** | `in_app_messages`, STOMP over WebSocket, REST polling fallback |
 | **Connector Settings** | Business-user-managed provider choice with an audit log |
 | **Accounting Service** | Settlement saga, commission split, compensation, `accounting` schema |
@@ -192,11 +191,10 @@ delivery/
 │   ├── platform-observability/
 │   ├── platform-storage/
 │   └── platform-notifications/   # command + receipt contracts, worker/connector auto-config
-├── services/                  # 18 independently deployable Spring Boot services
+├── services/                  # 15 independently deployable Spring Boot services
 │   ├── config-server/
 │   ├── product-service/  order-manager/  order-tracking/
 │   ├── notifications-manager/  app-notification/  connector-settings/
-│   ├── mail-worker/  push-worker/  sms-worker/
 │   ├── email-connector/  push-connector/  sms-connector/
 │   ├── accounting-service/  corebanking-connector/  corebanking-simulator/
 │   └── whatsapp-service/  onboarding-service/
@@ -241,9 +239,12 @@ delivery/
   never leaving the platform, which is true of the provider hop but not of the service boundary:
   App Notification owns `in_app_messages` and is a separate deployable, so the alternative is
   Notifications Manager writing into another service's tables.
-- **The IN_APP channel has no separate worker and connector.** The other three split them to keep
-  credentials away from content rendering; in-app has no external provider and no credential, so
-  the split would add a process whose only job is to forward a message.
+- **No channel has a separate worker and connector any more.** The other three split them to keep
+  credentials away from content rendering, and IN_APP never did because it has no external provider
+  and no credential. The split has since been undone everywhere: each channel is one process, which
+  removed three JVMs at the cost of putting provider credentials back in the same heap as template
+  rendering, and letting a slow vendor consume the thread budget rendering needed. Per-channel
+  isolation is unaffected — a wedged SMS vendor still cannot stall email or push.
 - **Both notification services share the `notification` schema**, per Section 4's data model, with
   disjoint tables and separate Flyway history tables. That forces `baseline-on-migrate` on both —
   whichever starts second finds a non-empty schema with no history of its own. The trade-off is

@@ -23,6 +23,15 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:delivery}
     password: ${RABBITMQ_PASSWORD:delivery}
+    listener:
+      simple:
+        # No broker-level retry. WorkerDispatchService handles every failure itself and always
+        # acks; letting the broker redeliver as well would double-send anything that succeeded
+        # slowly, and for SMS that is a second billed message.
+        retry:
+          enabled: false
+        concurrency: 2
+        max-concurrency: 8
 
   # Used only by the dev-passthrough provider. Real vendors are reached over HTTPS, not SMTP.
   mail:
@@ -72,6 +81,24 @@ delivery:
   outbox:
     exchange: delivery.events
 
+  # The channel worker, merged in from the former sms-worker deployable. Setting both
+  # delivery.worker.channel and delivery.connector.type makes this one process consume
+  # notification.dispatch.sms AND hold the vendor credentials.
+  #
+  # connector-url points at THIS process on purpose — the worker's timeout, retry budget and
+  # circuit breaker are all defined in terms of an HTTP call, and calling the controller directly
+  # would keep the code while silently discarding every one of them. That matters more here than on
+  # the other two channels: SMS is the one where a double-send is a second billed message.
+  worker:
+    channel: SMS
+    connector-url: http://localhost:${SERVER_PORT:8112}
+    max-attempts: 3
+    initial-backoff: 500ms
+    failure-rate-threshold: 50
+    open-state-duration: 30s
+    connector-timeout: 10s
+    dead-letter-queue: notification.dlq
+
   connector:
     type: SMS
     # What this connector uses until Connector Settings tells it otherwise. The safe choice: a
@@ -87,6 +114,9 @@ delivery:
     dead-letter-queue: notification.dlq
 
   sms:
+    # Used by SmsPreparer. Above this the message is rejected rather than truncated — vendors bill
+    # per segment, and a template that needs four of them is a template bug, not a delivery problem.
+    max-segments: 3
     dev-passthrough:
       test-inbox: ${SMS_TEST_INBOX:sms-test-inbox@dev.local}
       from: sms-connector@dev.local

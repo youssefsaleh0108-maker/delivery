@@ -1,4 +1,4 @@
-package com.delivery.worker.push;
+package com.delivery.connector.push;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;

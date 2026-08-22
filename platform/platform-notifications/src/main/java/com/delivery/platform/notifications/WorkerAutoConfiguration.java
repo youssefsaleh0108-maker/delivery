@@ -34,12 +34,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @EnableConfigurationProperties(WorkerProperties.class)
 public class WorkerAutoConfiguration {
 
-    @Bean
-    public TopicExchange deliveryEventsExchange(
-            @Value("${delivery.outbox.exchange:delivery.events}") String exchange) {
-        return new TopicExchange(exchange, true, false);
-    }
-
     /**
      * This worker's own channel queue.
      *
@@ -59,16 +53,9 @@ public class WorkerAutoConfiguration {
                 .with(properties.queueName());
     }
 
-    @Bean
-    public Queue notificationDeadLetterQueue(WorkerProperties properties) {
-        return QueueBuilder.durable(properties.getDeadLetterQueue()).build();
-    }
-
-    @Bean
-    public DeadLetterPublisher deadLetterPublisher(RabbitTemplate rabbit, ObjectMapper objectMapper,
-                                                   WorkerProperties properties) {
-        return new DeadLetterPublisher(rabbit, objectMapper, properties.getDeadLetterQueue());
-    }
+    // deliveryEventsExchange, notificationDeadLetterQueue and deadLetterPublisher moved to
+    // NotificationCommonAutoConfiguration — a connector declares the same three, and one process
+    // being both a worker and a connector could not start while they were defined in both.
 
     @Bean
     public ConnectorClient connectorClient(WorkerProperties properties, RestClient.Builder builder) {

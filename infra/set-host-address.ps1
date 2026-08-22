@@ -91,7 +91,6 @@ foreach ($c in $clients) {
 $services = @(
     'product-service', 'order-manager', 'order-tracking',
     'notifications-manager', 'connector-settings', 'app-notification', 'accounting-service',
-    'mail-worker', 'push-worker', 'sms-worker',
     'email-connector', 'sms-connector', 'push-connector',
     'corebanking-connector', 'corebanking-simulator',
     'whatsapp-service', 'onboarding-service'

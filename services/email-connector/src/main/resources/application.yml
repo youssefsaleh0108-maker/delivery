@@ -23,6 +23,15 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:delivery}
     password: ${RABBITMQ_PASSWORD:delivery}
+    listener:
+      simple:
+        # No broker-level retry. WorkerDispatchService handles every failure itself and always
+        # acks; letting the broker redeliver as well would double-send anything that succeeded
+        # slowly.
+        retry:
+          enabled: false
+        concurrency: 2
+        max-concurrency: 8
 
   mail:
     host: ${SMTP_HOST:localhost}
@@ -66,6 +75,32 @@ delivery:
   outbox:
     exchange: delivery.events
 
+  # The channel worker, merged in from the former mail-worker deployable.
+  #
+  # Setting both delivery.worker.channel and delivery.connector.type makes this one process consume
+  # notification.dispatch.email AND own the SMTP credentials. Two JVMs became one; the code did not
+  # change, only where it runs.
+  #
+  # connector-url points at THIS process. The worker still reaches the connector over HTTP rather
+  # than calling the controller in-process, and that is deliberate: the timeout, the retry budget
+  # and the circuit breaker in WorkerDispatchService are all defined in terms of an HTTP call. A
+  # direct call would keep the code and quietly discard every one of those properties.
+  #
+  # WHAT THIS COSTS: the two used to fail independently. A wedged SMTP relay took out the connector
+  # and left the worker consuming and dead-lettering; now one OOM stops both, and the SMTP
+  # credentials sit in the same heap as template rendering.
+  worker:
+    channel: EMAIL
+    connector-url: http://localhost:${SERVER_PORT:8110}
+    max-attempts: 3
+    initial-backoff: 500ms
+    failure-rate-threshold: 50
+    open-state-duration: 30s
+    # Longer than SMS: an SMTP handshake plus DATA is slower than an HTTP API call, and cutting it
+    # short would classify successful sends as timeouts.
+    connector-timeout: 20s
+    dead-letter-queue: notification.dlq
+
   connector:
     type: EMAIL
     default-provider: SMTP
@@ -80,6 +115,9 @@ delivery:
 
   email:
     from: ${EMAIL_FROM:no-reply@delivery.local}
+    # Used by MailPreparer when a rendered template leaves the subject blank. A generic subject
+    # reaches the customer; a rejected notification does not.
+    default-subject: Delivery
 
 management:
   endpoints:

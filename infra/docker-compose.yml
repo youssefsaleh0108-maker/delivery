@@ -10,12 +10,18 @@
 #   Mailpit      1025 / 8025 (web UI - the SMTP relay and the SMS dev test inbox)
 #
 # Application services:
-#   8101 order-manager     8105 mail-worker    8110 email-connector
-#   8102 order-tracking    8106 push-worker    8111 push-connector
-#   8103 product-service   8107 sms-worker     8112 sms-connector
-#   8104 notifications-mgr 8108 app-notif      8109 connector-settings
+#   8101 order-manager     8108 app-notif      8110 email-connector
+#   8102 order-tracking    8109 connector-settings   8111 push-connector
+#   8103 product-service                             8112 sms-connector
+#   8104 notifications-mgr
 #   8113 corebanking-connector   8114 corebanking-simulator (DEV ONLY)
-#   8115 accounting-service
+#   8115 accounting-service      8116 whatsapp-service   8117 onboarding-service
+#
+# 8105-8107 are retired. They held mail-worker, push-worker and sms-worker, each of which is now
+# part of its connector — one process per channel that both renders and sends. Leave the ports
+# unused rather than reassigning them: every smoke suite, dashboard and note in this repo that
+# mentions 8105 means "the email worker", and pointing that number at something else is worse than
+# leaving a gap.
 
 name: delivery
 
@@ -421,10 +427,16 @@ services:
 
   # ---------------------------------------------------------------- notification layer (Phase 3)
   #
-  # Nine deployables. The split is not ceremony: the workers do fast CPU-bound rendering while the
-  # connectors block on third parties whose latency nobody here controls, and the connectors are
-  # the only processes holding provider credentials. Merged, a degraded vendor would consume the
-  # thread budget of every channel and a bad release would take all three down at once.
+  # Six deployables. Each channel is now ONE process that both renders and sends: the former
+  # mail-worker, push-worker and sms-worker were merged into their connectors, which halved the
+  # JVM count on this box.
+  #
+  # What that gave up is real and was the original reason for the split. Rendering is fast and
+  # CPU-bound; a connector blocks on a third party whose latency nobody here controls. In one
+  # process a degraded vendor consumes the thread budget that rendering needed, and provider
+  # credentials now share a heap with template rendering. Per-channel isolation survives — a wedged
+  # SMS vendor still cannot stall email or push — but within a channel the two failure modes are
+  # now one.
 
   connector-settings:
     build:
@@ -527,91 +539,6 @@ services:
       notifications-manager:
         condition: service_healthy
     networks: [delivery]
-
-  mail-worker:
-    build:
-      context: ../services/mail-worker
-    image: delivery/mail-worker:0.1.0
-    container_name: delivery-mail-worker
-    environment:
-      SERVER_PORT: 8105
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      EMAIL_CONNECTOR_URL: http://email-connector:8110
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
-    ports:
-      - "8105:8105"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
-  push-worker:
-    build:
-      context: ../services/push-worker
-    image: delivery/push-worker:0.1.0
-    container_name: delivery-push-worker
-    environment:
-      SERVER_PORT: 8106
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      PUSH_CONNECTOR_URL: http://push-connector:8111
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
-    ports:
-      - "8106:8106"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
-  sms-worker:
-    build:
-      context: ../services/sms-worker
-    image: delivery/sms-worker:0.1.0
-    container_name: delivery-sms-worker
-    environment:
-      SERVER_PORT: 8107
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      SMS_CONNECTOR_URL: http://sms-connector:8112
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
-    ports:
-      - "8107:8107"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
   email-connector:
     build:
       context: ../services/email-connector
