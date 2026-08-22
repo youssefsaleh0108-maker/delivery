@@ -1,0 +1,962 @@
+# The dev environment, as deployed on the Contabo box. Generated from docker-compose.yml and kept
+# beside it — that file stays the laptop stack, this one is what runs on the server.
+#
+# Four differences, and they are the whole point of a separate file:
+#
+#   1. No `build:`. Images come from Docker Hub at ${IMAGE_TAG}, because the box has no source
+#      checkout and compiling seventeen JVMs on 5.8 GB is not something to attempt.
+#   2. `mem_limit` on everything. Without ceilings the first service to warm up takes the memory
+#      the last one needs, and what dies is decided by whichever the kernel reaches first.
+#   3. Three ports face the internet, not thirty-three. See below.
+#   4. No Jaeger. Tracing is off; the box does not have the memory to spare for it.
+#
+# PUBLIC PORTS — 8100 Traefik (the API), 8180 Keycloak, 9010 MinIO.
+#
+# Keycloak and MinIO are public because clients reach them DIRECTLY, not through Traefik: the apps
+# authenticate against Keycloak over OIDC, and presigned image URLs are signed for the MinIO host
+# and fetched by the browser. Routing either through 8100 would break the signature or the issuer.
+#
+# Everything else is on the internal network or bound to loopback. The connectors are the reason
+# that matters: /api/connector/send takes no user token, so a published port on 8110-8113 is
+# "send an arbitrary SMS" for anyone who finds the IP. The Core Banking Simulator on 8114 carries
+# a fault-injection endpoint. Reach any of them with an SSH tunnel:
+#
+#   ssh -L 15673:localhost:15673 -L 8025:localhost:8025 -L 5433:localhost:5433 user@<box>
+#
+# THIS IS A TEST ENVIRONMENT ON A PUBLIC IP. Vault runs in dev mode, the Core Banking Simulator is
+# deployed, and Mailpit accepts any credentials. None of that is safe for real data — do not point
+# this at a live bank or put real customer records in it.
+
+name: delivery-dev
+
+services:
+  # ---------------------------------------------------------------- data layer
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: delivery-postgres
+    mem_limit: 512m
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: delivery
+      POSTGRES_USER: ${POSTGRES_USER:-delivery}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs only on an empty data dir. `docker compose down -v` to re-run after editing.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-delivery} -d delivery"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  redis:
+    image: redis:7-alpine
+    container_name: delivery-redis
+    mem_limit: 96m
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-delivery}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-delivery}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: delivery-rabbitmq
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-delivery}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks: [delivery]
+
+  minio:
+    image: minio/minio:latest
+    container_name: delivery-minio
+    mem_limit: 256m
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-delivery}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-delivery123}
+    ports:
+      - "9010:9000"
+      - "127.0.0.1:9011:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  # Creates the five buckets from Section 5 with their access policies, then exits.
+  minio-init:
+    image: minio/mc:latest
+    container_name: delivery-minio-init
+    mem_limit: 64m
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-delivery}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-delivery123}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    volumes:
+      - ./minio/bootstrap.sh:/bootstrap.sh:ro
+    restart: "no"
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- identity
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: delivery-keycloak
+    mem_limit: 640m
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-delivery}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+      # Pins ONE issuer value. Clients reach Keycloak on this address while backend services reach
+      # it as keycloak:8080; without this they would disagree about `iss` and every token validated
+      # inside the network would be rejected. Services fetch JWKS on the internal address via
+      # jwk-set-uri, which each service carries in its own application.yml.
+      #
+      # Set KEYCLOAK_PUBLIC_URL to the host's LAN IP when testing from a PHYSICAL PHONE — a device
+      # resolves `localhost` to itself, so a localhost issuer makes login fail there while still
+      # working in a desktop browser. Everything that consumes the issuer reads the same variable.
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8180:8080"
+    volumes:
+      # Mount the single realm file, not the directory: Keycloak scans everything in the import
+      # path, and the README beside it is not a realm.
+      - ./keycloak/realm-delivery-platform.json:/opt/keycloak/data/import/realm-delivery-platform.json:ro
+      # The login theme. start-dev disables theme caching, so edits to the CSS show on refresh
+      # without restarting the container.
+      - ./keycloak/themes:/opt/keycloak/themes:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image has no curl/wget; Keycloak 26 exposes health on the management port 9000.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\nHost: localhost\\nConnection: close\\n\\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- secrets
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: delivery-vault
+    mem_limit: 96m
+    restart: unless-stopped
+    # Dev mode: in-memory, auto-unsealed, root token fixed. LOCAL ONLY. Staging and production run
+    # a real sealed Vault - who hosts and administers it is Section 12 open decision #8.
+    command: ["server", "-dev", "-dev-listen-address=0.0.0.0:8200"]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_ROOT_TOKEN:-delivery-root-token}
+      VAULT_ADDR: http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
+  # Enables AppRole, writes the read-only policy the Config Server gets, and seeds dev secrets.
+  vault-init:
+    image: hashicorp/vault:1.18
+    container_name: delivery-vault-init
+    mem_limit: 64m
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_ROOT_TOKEN:-delivery-root-token}
+      CONFIG_SERVER_ROLE_ID: ${VAULT_ROLE_ID:-config-server-dev-role-id}
+      CONFIG_SERVER_SECRET_ID: ${VAULT_SECRET_ID:-config-server-dev-secret-id}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    volumes:
+      - ./vault/bootstrap.sh:/bootstrap.sh:ro
+      - ./vault/policies:/policies:ro
+    restart: "no"
+    networks: [delivery]
+
+  # A real SMTP relay that accepts everything and delivers nothing outward, with a web UI to read
+  # what was sent. Two Phase 3 paths depend on it: the email connector's relay, and the SMS
+  # connector's dev-passthrough mode, which redirects "what the SMS would have said" here so QA can
+  # read it without a paid SMS account or a real handset (Section 7).
+  #
+  # Deliberately a real relay rather than a stub in the connector. A no-op provider would leave the
+  # SMTP hop, the failure classification and the receipt path untested until the first day a real
+  # vendor is switched on, which is the worst possible day to discover they were wrong.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: delivery-mailpit
+    mem_limit: 64m
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:1025:1025"    # SMTP
+      - "127.0.0.1:8025:8025"    # web UI — SSH-tunnel to read the test inbox
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- observability
+  # Section 10 treats distributed tracing as a Phase 0 requirement, not a later add-on: once a
+  # customer action fans out across a dozen services, "why didn't this SMS arrive" is only
+  # answerable if the trace was there from the first commit. all-in-one gives an OTLP collector and
+  # a UI in one container, which is all a laptop needs; staging/prod run a real collector pipeline.
+  config-server:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-config-server:${IMAGE_TAG:-main}
+    container_name: delivery-config-server
+    mem_limit: 400m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8888
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      # 'composite' is what activates the JDBC + Vault composite backend (Section 6).
+      CONFIG_PROFILES: composite
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      # The properties live in Postgres, in the config schema, seeded by
+      # postgres/init/03-config-properties.sql. That script runs only on an empty data directory —
+      # after `docker compose down -v`, not after a restart.
+      CONFIG_DB_URL: jdbc:postgresql://postgres:5432/delivery?currentSchema=config
+      CONFIG_DB_USER: ${CONFIG_DB_USER:-config_server}
+      CONFIG_DB_PASSWORD: ${CONFIG_DB_PASSWORD:-config_server_dev_pw}
+      CONFIG_DEFAULT_LABEL: main
+      VAULT_HOST: vault
+      VAULT_PORT: 8200
+      VAULT_SCHEME: http
+      VAULT_BACKEND: secret
+      VAULT_ROLE_ID: ${VAULT_ROLE_ID:-config-server-dev-role-id}
+      VAULT_SECRET_ID: ${VAULT_SECRET_ID:-config-server-dev-secret-id}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+    depends_on:
+      # service_healthy, not service_started: the properties are read from Postgres now, and a
+      # Config Server that starts against a database still running its init scripts fails on the
+      # connection and takes every other service down with it.
+      postgres:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  # The front door.
+  #
+  # Replaces the Spring gateway on 8100 — the same port on purpose, because every client, every
+  # dart-define and every smoke suite in this repo names it. Swapping what answers there, rather
+  # than moving the door, is what makes the existing suites the acceptance test for this change.
+  #
+  # Routing now lives in a watched file (infra/traefik/dynamic/routes.yml) instead of a Spring
+  # application: adding a service is an edit, not a rebuild and redeploy of the one component every
+  # request passes through. See that file for what moved to the edge and what deliberately did not.
+  traefik:
+    image: traefik:v3.3
+    container_name: delivery-traefik
+    mem_limit: 64m
+    restart: unless-stopped
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "8100:8100"
+      # The dashboard and Traefik's own Prometheus metrics. Bound to the loopback interface only —
+      # a routing dashboard is useful to whoever runs the platform and to nobody else, and this one
+      # would otherwise be reachable from any machine on the network.
+      - "127.0.0.1:8099:8099"
+    volumes:
+      # Read-only. Traefik never needs to write its own configuration, and a container that can
+      # rewrite its own routing table is one compromise away from rerouting the platform.
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # Deliberately NOT depends_on every service. Traefik answers 502 for a service that is not up
+    # yet and starts routing the moment it is — waiting for all of them would mean the front door
+    # is down whenever any one service is.
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- domain services
+  product-service:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-product-service:${IMAGE_TAG:-main}
+    container_name: delivery-product-service
+    mem_limit: 448m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8103
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      # Issuer must match what Keycloak stamps into the token; JWKS is fetched internally.
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Presigned image URLs are signed for this host, so it must be reachable by the CLIENT.
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9010}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks: [delivery]
+
+  order-manager:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-order-manager:${IMAGE_TAG:-main}
+    container_name: delivery-order-manager
+    mem_limit: 384m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8101
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      PRODUCT_SERVICE_URL: http://product-service:8103
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    networks: [delivery]
+
+  order-tracking:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-order-tracking:${IMAGE_TAG:-main}
+    container_name: delivery-order-tracking
+    mem_limit: 400m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8102
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-delivery}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- notification layer (Phase 3)
+  #
+  # Nine deployables. The split is not ceremony: the workers do fast CPU-bound rendering while the
+  # connectors block on third parties whose latency nobody here controls, and the connectors are
+  # the only processes holding provider credentials. Merged, a degraded vendor would consume the
+  # thread budget of every channel and a bad release would take all three down at once.
+
+  connector-settings:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-connector-settings:${IMAGE_TAG:-main}
+    container_name: delivery-connector-settings
+    mem_limit: 288m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8109
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  notifications-manager:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-notifications-manager:${IMAGE_TAG:-main}
+    container_name: delivery-notifications-manager
+    mem_limit: 384m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8104
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Service-to-service admin API call, so the internal address is correct here - it never has
+      # to match the issuer a browser sees.
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  app-notification:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-app-notification:${IMAGE_TAG:-main}
+    container_name: delivery-app-notification
+    mem_limit: 288m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8108
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # A browser WebSocket is subject to origin checks like any fetch. Getting this wrong shows up
+      # as a silent connection failure, not a CORS error.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      # Owns in_app_messages in the same schema, so it must not race the manager's migrations.
+      notifications-manager:
+        condition: service_healthy
+    networks: [delivery]
+
+  mail-worker:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-mail-worker:${IMAGE_TAG:-main}
+    container_name: delivery-mail-worker
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8105
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      EMAIL_CONNECTOR_URL: http://email-connector:8110
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  push-worker:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-push-worker:${IMAGE_TAG:-main}
+    container_name: delivery-push-worker
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8106
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      PUSH_CONNECTOR_URL: http://push-connector:8111
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  sms-worker:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-sms-worker:${IMAGE_TAG:-main}
+    container_name: delivery-sms-worker
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8107
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      SMS_CONNECTOR_URL: http://sms-connector:8112
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  email-connector:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-email-connector:${IMAGE_TAG:-main}
+    container_name: delivery-email-connector
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8110
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks: [delivery]
+
+  push-connector:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-push-connector:${IMAGE_TAG:-main}
+    container_name: delivery-push-connector
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8111
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  sms-connector:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-sms-connector:${IMAGE_TAG:-main}
+    container_name: delivery-sms-connector
+    mem_limit: 288m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8112
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      # The dev-passthrough provider delivers to the same test inbox the email connector uses.
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMS_TEST_INBOX: ${SMS_TEST_INBOX:-sms-test-inbox@dev.local}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks: [delivery]
+
+  # ---------------------------------------------------------------- accounting (Phase 4)
+  #
+  # Three services, and the split is the point. accounting-service holds the business rules and a
+  # database but no credentials; corebanking-connector holds the bank credentials and nothing else;
+  # corebanking-simulator stands in for a system outside the platform entirely. Section 10 singles
+  # the bank out as the most sensitive integration in the system, and this is what "isolate it"
+  # looks like in practice.
+
+  accounting-service:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-accounting-service:${IMAGE_TAG:-main}
+    container_name: delivery-accounting-service
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8115
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  corebanking-connector:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-corebanking-connector:${IMAGE_TAG:-main}
+    container_name: delivery-corebanking-connector
+    mem_limit: 288m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8113
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
+      COREBANKING_SIMULATOR_URL: http://corebanking-simulator:8114
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [delivery]
+
+  # DEV ONLY. Section 7 is explicit that this is never deployed to staging or production - there,
+  # the same connector points at the real bank through the Backoffice toggle.
+  corebanking-simulator:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-corebanking-simulator:${IMAGE_TAG:-main}
+    container_name: delivery-corebanking-simulator
+    mem_limit: 288m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8114
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      BANK_API_KEY: ${BANK_API_KEY:-simulator-dev-key}
+      FAULT_INJECTION_ENABLED: "true"
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ------------------------------------------------------------------------ WhatsApp ordering
+  #
+  # Its own deployable for the same two reasons the notification connectors are: it is the only
+  # process holding a messaging vendor's credentials, and it is the only one exposed to a public
+  # webhook. Both are reasons to be able to restart, scale and roll it back on its own.
+  whatsapp-service:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-whatsapp-service:${IMAGE_TAG:-main}
+    container_name: delivery-whatsapp-service
+    mem_limit: 320m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8116
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Local dev only. In a deployment this is Meta's app secret and comes from Vault through the
+      # Config Server — never from an env var in a compose file that lives in the repo.
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-local-webhook-secret}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-delivery-local-verify}
+      # Stands in for WhatsApp until a real number exists. MUST be false in production.
+      WHATSAPP_SIMULATOR_ENABLED: "true"
+      WHATSAPP_OUTBOUND_URL: http://whatsapp-service:8116/simulator/outbound
+      # Merchants connect their own numbers through the API; nothing about the number-to-merchant
+      # mapping is configured here.
+      ORDER_MANAGER_URL: http://order-manager:8101
+      PRODUCT_SERVICE_URL: http://product-service:8103
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ---------------------------------------------------------------------------- joining
+  #
+  # Its own deployable for two reasons no other service has: the only write endpoint reachable
+  # with no token at all, and the only workflow engine. Both are things worth being able to
+  # restart, scale and rate-limit on their own.
+  onboarding-service:
+    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-onboarding-service:${IMAGE_TAG:-main}
+    container_name: delivery-onboarding-service
+    mem_limit: 448m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8117
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      # This account can create users and register delivery companies, which makes it the most
+      # powerful credential in the stack. From Vault in a deployment, never from a compose file.
+      KEYCLOAK_CLIENT_ID: onboarding-service
+      KEYCLOAK_CLIENT_SECRET: ${ONBOARDING_CLIENT_SECRET:-onboarding-service-dev-secret}
+      ORDER_MANAGER_URL: http://order-manager:8101
+      # Where one-time codes and decision emails are handed off. Without it the default is
+      # localhost, which inside a container is this service talking to itself.
+      NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
+      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
+      # does not resolve on every span and floods the log with export failures.
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
+  # ------------------------------------------------------------------------------- observability
+  #
+  # Jaeger has had the traces since Phase 0; this is the other half. Every service has published
+  # /actuator/prometheus all along and nothing collected it, so "is it slower than last week" was a
+  # question nobody could answer.
+volumes:
+  prometheus-data:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:
+
+networks:
+  delivery:
+    name: delivery
+    driver: bridge
