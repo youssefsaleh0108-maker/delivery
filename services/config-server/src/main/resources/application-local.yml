@@ -10,16 +10,18 @@ spring:
   rabbitmq:
     password: delivery
 
+  # 5433, not 5432: compose publishes Postgres there to avoid the lending stack already on 5432.
+  datasource:
+    url: jdbc:postgresql://localhost:5433/delivery?currentSchema=config
+    username: config_server
+    password: config_server_dev_pw
+
   cloud:
     config:
       server:
         composite:
-          - type: git
-            uri: file://${user.dir}/config-repo
-            default-label: main
-            search-paths: '{application}'
-            clone-on-start: true
-            force-pull: true
+          - type: jdbc
+            sql: "SELECT prop_key, prop_value FROM config_properties WHERE application=? AND profile=? AND label=? ORDER BY prop_key"
           - type: vault
             host: localhost
             port: 8200

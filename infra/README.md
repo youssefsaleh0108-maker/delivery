@@ -44,12 +44,18 @@ rejection on, so even a `_comment` key fails the import and the container exits.
 override `jwk-set-uri` to fetch signing keys internally. Change one without the other and every
 token is rejected inside the network.
 
-**`config-repo` is mounted read-write.** Cloning from a `file://` URI makes JGit take a lock inside
-the source repo's `.git`, which fails on a read-only mount. Real environments clone from a remote
-and this mount does not exist.
+**`config-repo` is no longer mounted or read.** The Config Server serves properties from the
+`config.config_properties` table instead, seeded by `postgres/init/03-config-properties.sql`. The
+directory is kept in the monorepo as the record of the original values — see its README.
 
 **The Config Server needs `spring.profiles.active=composite`.** Without it the composite backend is
-ignored entirely and startup fails with "You need to configure a uri for the git repository".
+ignored entirely and startup fails on the single-repository fallback, which wants a Git URI it does
+not have.
+
+**The Config Server now waits for Postgres.** Its compose entry depends on `postgres` being
+`service_healthy`, not merely started: the properties come from the database, so a Config Server
+that boots against one still running its init scripts dies on the connection and takes every other
+service down with it.
 
 **Vault auth config goes at `spring.cloud.config.server.vault.*`, not in the composite entry.** The
 `SpringVaultClientConfiguration` bean that chooses the auth method is built from the global
@@ -57,8 +63,17 @@ properties. Put `authentication: APPROLE` only in the composite entry and it is 
 the server falls back to TOKEN auth and every request fails with
 `Missing required header in HttpServletRequest: X-Config-Token`.
 
-**Config changes need a commit.** The Git backend serves committed content, not the working tree.
-Editing `config-repo/*.yml` without committing changes nothing.
+**Config changes are an `UPDATE`, and the seed script will not re-run.**
+`postgres/init/03-config-properties.sql` fires only on an empty data directory. To change a
+property on a running stack, edit the row and refresh the clients:
+
+```sql
+UPDATE config.config_properties SET prop_value = '<new>'
+ WHERE application = '<service>' AND profile = 'docker' AND label = 'main' AND prop_key = '<key>';
+```
+
+There is no diff, no review and no revert on that — the trade the database backend makes for not
+needing a Git remote.
 
 **Postgres init scripts only run on an empty data directory.** After editing anything in
 `postgres/init/`, `docker compose down -v` — otherwise the changes are silently not applied.

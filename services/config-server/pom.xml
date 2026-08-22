@@ -85,8 +85,23 @@
       <artifactId>spring-vault-core</artifactId>
     </dependency>
 
-    <!-- Spring Cloud Bus over RabbitMQ: a Git push triggers a refresh event that every config
-         client picks up, so business parameters change without a restart (Section 6). -->
+    <!-- REQUIRED for the jdbc composite entry. spring-cloud-config-server autoconfigures
+         JdbcEnvironmentRepository only when a JdbcTemplate bean exists, and that bean comes from
+         this starter. Without it the 'jdbc' composite type is accepted and then serves nothing:
+         every service starts, gets an empty property source, and fails on its first query with a
+         driver error rather than anything naming the Config Server. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- Spring Cloud Bus over RabbitMQ: a refresh event that every config client picks up, so
+         business parameters change without a restart (Section 6). -->
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-bus-amqp</artifactId>

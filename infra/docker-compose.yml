@@ -127,7 +127,7 @@ services:
       # Pins ONE issuer value. Clients reach Keycloak on this address while backend services reach
       # it as keycloak:8080; without this they would disagree about `iss` and every token validated
       # inside the network would be rejected. Services fetch JWKS on the internal address via
-      # jwk-set-uri (see config-repo/application-docker.yml).
+      # jwk-set-uri, which each service carries in its own application.yml.
       #
       # Set KEYCLOAK_PUBLIC_URL to the host's LAN IP when testing from a PHYSICAL PHONE — a device
       # resolves `localhost` to itself, so a localhost issuer makes login fail there while still
@@ -240,12 +240,17 @@ services:
     container_name: delivery-config-server
     environment:
       SERVER_PORT: 8888
-      # 'composite' is what activates the Git + Vault composite backend (Section 6).
+      # 'composite' is what activates the JDBC + Vault composite backend (Section 6).
       CONFIG_PROFILES: composite
       CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
       CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      CONFIG_GIT_URI: file:///config-repo
-      CONFIG_GIT_BRANCH: main
+      # The properties live in Postgres, in the config schema, seeded by
+      # postgres/init/03-config-properties.sql. That script runs only on an empty data directory —
+      # after `docker compose down -v`, not after a restart.
+      CONFIG_DB_URL: jdbc:postgresql://postgres:5432/delivery?currentSchema=config
+      CONFIG_DB_USER: ${CONFIG_DB_USER:-config_server}
+      CONFIG_DB_PASSWORD: ${CONFIG_DB_PASSWORD:-config_server_dev_pw}
+      CONFIG_DEFAULT_LABEL: main
       VAULT_HOST: vault
       VAULT_PORT: 8200
       VAULT_SCHEME: http
@@ -260,13 +265,12 @@ services:
       # Exposed to the host for debugging only. In staging/prod this service is internal-only,
       # never routed through the Gateway, and fronted by mTLS (Section 6).
       - "8888:8888"
-    volumes:
-      # The config-repo is its own Git repository; the Config Server clones it from this path.
-      # NOT mounted read-only: cloning from a local file:// URI makes JGit take a lock inside the
-      # source repo's .git directory, which fails outright on a read-only mount. In staging and
-      # production the URI is a real remote and this mount does not exist at all.
-      - ../config-repo:/config-repo
     depends_on:
+      # service_healthy, not service_started: the properties are read from Postgres now, and a
+      # Config Server that starts against a database still running its init scripts fails on the
+      # connection and takes every other service down with it.
+      postgres:
+        condition: service_healthy
       vault-init:
         condition: service_completed_successfully
       rabbitmq:

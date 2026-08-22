@@ -27,12 +27,31 @@ spring:
     username: ${RABBITMQ_USER:delivery}
     password: ${RABBITMQ_PASSWORD}
 
+  # The backing store for the jdbc composite entry below. This is the Config Server's OWN
+  # connection, not any service's: it reads the config schema and nothing else, under a role with
+  # SELECT on one table.
+  #
+  # This makes Postgres a hard startup dependency of the config layer, which the Git backend was
+  # not — a database that is not yet accepting connections takes the Config Server down, and every
+  # other service with it. That is the trade the database backend makes; the deployment waits for
+  # Postgres before starting this service rather than pretending otherwise.
+  datasource:
+    url: ${CONFIG_DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=config}
+    username: ${CONFIG_DB_USER:config_server}
+    password: ${CONFIG_DB_PASSWORD}
+    hikari:
+      # This pool serves config reads only, and they are short. Two is enough and leaves
+      # connections for the services, which share the same instance.
+      maximum-pool-size: 2
+
   cloud:
     config:
       server:
-        # Applies to every composite entry. Without it the server resolves an unlabelled request
-        # against 'master' and 404s, since config-repo's default branch is 'main'.
-        default-label: ${CONFIG_GIT_BRANCH:main}
+        # Applies to every composite entry. The jdbc backend matches this against the LABEL column,
+        # so every seeded row carries label 'main' — see infra/postgres/init/03-config-properties.sql.
+        # Change one without the other and every lookup returns an empty property source rather than
+        # an error, which surfaces as a service that starts and then fails on its first query.
+        default-label: ${CONFIG_DEFAULT_LABEL:main}
 
         # How the server AUTHENTICATES to Vault.
         #
@@ -59,17 +78,26 @@ spring:
             secret-id: ${VAULT_SECRET_ID}
             app-role-path: approle
 
-        # Composite backend (Section 6): Git for plain business/environment properties, Vault for
-        # secrets. Order matters — later entries win, so a Vault key overrides a Git placeholder of
-        # the same name rather than the other way round.
+        # Column names are the reason for the explicit query. The default JDBC statement selects
+        # KEY and VALUE; both are keywords, and while PostgreSQL accepts them unquoted today that
+        # is a property of its keyword classification rather than a guarantee. prop_key/prop_value
+        # cannot be misread by anything.
+        jdbc:
+          sql: "SELECT prop_key, prop_value FROM config_properties WHERE application=? AND profile=? AND label=? ORDER BY prop_key"
+          order: 1
+
+        # Composite backend (Section 6): the database for plain business/environment properties,
+        # Vault for secrets. Order matters — later entries win, so a Vault key overrides a database
+        # placeholder of the same name rather than the other way round.
+        #
+        # This was a Git repository until the database replaced it. What that costs is worth being
+        # explicit about: a config change is now an UPDATE with no diff, no review and no history,
+        # where it used to be a commit. If a bad value takes the platform down there is nothing to
+        # revert to. `config-repo/` is kept in the monorepo as the record of what the values were
+        # and is no longer read at runtime.
         composite:
-          - type: git
-            uri: ${CONFIG_GIT_URI:file://${user.dir}/../../config-repo}
-            default-label: ${CONFIG_GIT_BRANCH:main}
-            search-paths: '{application}'
-            clone-on-start: true
-            # A stale config on a Git outage is far better than a service that cannot boot.
-            force-pull: true
+          - type: jdbc
+            sql: "SELECT prop_key, prop_value FROM config_properties WHERE application=? AND profile=? AND label=? ORDER BY prop_key"
           - type: vault
             host: ${VAULT_HOST:localhost}
             port: ${VAULT_PORT:8200}

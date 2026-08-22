@@ -40,7 +40,7 @@ Verified running on this machine, from a cold `docker compose up -d` with empty 
 | `platform-outbox` | Outbox entity, `FOR UPDATE SKIP LOCKED` relay, DLQ status, Flyway migration |
 | `platform-observability` | Correlation-ID filter (both stacks) + OTLP tracing |
 | `platform-storage` | Presigned MinIO PUT/GET, `file_metadata`, confirm-and-size-check |
-| Config Server | Git + Vault composite, AppRole auth, Spring Cloud Bus refresh |
+| Config Server | Database + Vault composite, AppRole auth, Spring Cloud Bus refresh |
 | Traefik | The front door on 8100. File-watched routing, CORS, rate limiting, security headers |
 | `platform-notifications` | Command/receipt contracts, resilience wrapper, worker and connector auto-configuration |
 | **Product Service** | Catalog CRUD, per-row ownership, image upload, catalog events on the bus |
@@ -200,7 +200,7 @@ delivery/
 │   ├── email-connector/  push-connector/  sms-connector/
 │   ├── accounting-service/  corebanking-connector/  corebanking-simulator/
 │   └── whatsapp-service/  onboarding-service/
-├── config-repo/               # SEPARATE Git repo - Config Server's Git backend
+├── config-repo/               # the ORIGINAL config, superseded by the database backend
 ├── infra/                     # docker-compose, Postgres init, Keycloak realm, MinIO, Vault
 ├── clients/                   # Flutter monorepo - 3 apps, 2 shared packages
 └── .github/workflows/         # reusable per-service pipeline + callers
@@ -210,7 +210,8 @@ delivery/
 
 1. `services/<name>/` with a pom inheriting `com.delivery:services`, depending on the
    `platform-*` libraries it needs.
-2. `config-repo/<name>/<name>.yml` (+ `-docker.yml`). Secrets go to Vault, never here.
+2. Rows in `config.config_properties` (see `infra/postgres/init/03-config-properties.sql`).
+   Secrets go to Vault, never here.
 3. Its Postgres schema owner already exists — see `infra/postgres/init/02-service-roles.sql`.
 4. A compose entry on its reserved port (the map is at the top of `infra/docker-compose.yml`).
 5. `.github/workflows/<name>.yml` — 12 lines calling `reusable-service-ci.yml`.
@@ -304,8 +305,9 @@ Section 12 lists eight. The two that gate work rather than opinion:
 
 - **#2 — who owns the Phase 0 platform work.** The `deploy-staging` job in the CI template is a
   deliberate no-op: there is no Kubernetes target and no credentials.
-- **#3 — who reviews `config-repo` PRs.** The Config Server is live and serving; nobody is named as
-  the approver for a production business-parameter change.
+- **#3 — who approves a config change.** Sharper since the properties moved from Git to a database:
+  there are no PRs to review any more, so a production business-parameter change is an `UPDATE`
+  that nobody approves and nothing records.
 
 Phase 3 has made three more of them concrete rather than theoretical:
 
