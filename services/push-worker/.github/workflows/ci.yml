@@ -96,6 +96,12 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # Without this, build-push-action uses the built-in "docker" driver, which cannot
+      # export a GHA cache — the build dies on "Cache export is not supported for the
+      # docker driver". The docker-container driver this sets up can.
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
       # The Dockerfile copies target/*.jar, so the Maven build above has to have run first. The
       # context is this directory because that is all the repository contains.
       - name: Build and push image
