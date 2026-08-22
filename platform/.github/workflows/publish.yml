@@ -28,12 +28,21 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # The JUnit reporter below creates a check run. Without this every build logs
+      # "Resource not accessible by integration", which reads like a bad token and is not.
+      checks: write
       packages: write
 
     strategy:
       # Independent on purpose: one library failing to publish must not silently withhold the
       # other four, which would leave services resolving a mix of old and new.
       fail-fast: false
+      # One at a time, in the order listed below, because platform-storage DEPENDS ON
+      # platform-security and resolves it from GitHub Packages rather than from the sibling
+      # directory. Run in parallel and, on a first publish into an empty registry, storage races
+      # security and fails with a 401/404 on an artifact that simply does not exist yet — which
+      # reads like a credentials problem and is not one.
+      max-parallel: 1
       matrix:
         library:
           - platform-security

@@ -45,16 +45,13 @@
     <module>services/api-gateway</module>
     <module>services/product-service</module>
     <!--
-      DISABLED: services/order-manager/ is an empty directory in this checkout — no pom, no
-      Dockerfile, no source. Maven fails at model-building time on a missing child module, which
-      takes down every build that reads this file, including the per-service CI jobs (they run
-      `mvn -pl <service> -am`, which loads this reactor even to build one unrelated service).
-
-      Re-enable this line the moment the module's source is restored; nothing else needs to change.
-      Compose still declares the service, and the Gateway still routes /api/orders to it, so the
-      order endpoints return 504 until then.
+      Restored from https://github.com/youssefsaleh0108-maker/delivery.order-manager, which is
+      where this module already lived — the directory was empty in the monorepo checkout, not the
+      source lost. Until it was cloned back, every /api/orders call 504'd and this line had to stay
+      commented out, because Maven fails at model-building on a missing child module and that broke
+      even per-service CI (it runs `mvn -pl <service> -am`, loading this reactor regardless).
     -->
-    <!-- <module>services/order-manager</module> -->
+    <module>services/order-manager</module>
     <module>services/order-tracking</module>
     <module>services/connector-settings</module>
 
