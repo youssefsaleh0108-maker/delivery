@@ -297,6 +297,22 @@ services:
       # missing one blocks every API call with what Dio reports as a connection error rather than
       # anything mentioning CORS. Extended with the LAN origin by infra/set-host-address.ps1.
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+      # Where each route actually points. The Gateway's application.yml defaults every one of
+      # these to localhost:<port> so it can be run from an IDE against the compose stack; inside
+      # the network that loopback is the Gateway's OWN container, so without these every /api/**
+      # call proxies to nothing and comes back 500. Same wiring pattern as the peer URLs the
+      # domain services already get here.
+      PRODUCT_SERVICE_URI: http://product-service:8103
+      ORDER_MANAGER_URI: http://order-manager:8101
+      ORDER_TRACKING_URI: http://order-tracking:8102
+      ORDER_TRACKING_WS_URI: ws://order-tracking:8102
+      APP_NOTIFICATION_URI: http://app-notification:8108
+      APP_NOTIFICATION_WS_URI: ws://app-notification:8108
+      NOTIFICATIONS_MANAGER_URI: http://notifications-manager:8104
+      ACCOUNTING_SERVICE_URI: http://accounting-service:8115
+      CONNECTOR_SETTINGS_URI: http://connector-settings:8109
+      WHATSAPP_SERVICE_URI: http://whatsapp-service:8116
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     # No published port any more — Traefik holds 8100. Left running and reachable on the internal
     # network so the two can be compared, and so falling back is `docker compose up` on one
     # service rather than a rebuild. Delete it once Traefik has been in front for a while.

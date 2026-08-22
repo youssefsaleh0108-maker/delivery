@@ -1,19 +1,32 @@
-name: order-manager
+# order-manager CI — DISABLED, and deliberately kept rather than deleted.
+#
+# services/order-manager/ is an empty directory in this checkout: no pom, no Dockerfile, no source.
+# The automatic triggers below also fired on 'platform/**' and 'pom.xml', so this job ran — and
+# failed — on changes that had nothing to do with Order Manager, turning every unrelated push red.
+#
+# Left as workflow_dispatch so the file, and the fact that the service is missing, stay visible.
+# TO RE-ENABLE once the module's source is restored: delete the workflow_dispatch block and restore
+# the push/pull_request triggers below, and uncomment the module in the root pom.xml.
+#
+#   on:
+#     push:
+#       branches: [main]
+#       paths:
+#         - 'services/order-manager/**'
+#         - 'platform/**'
+#         - 'pom.xml'
+#         - '.github/workflows/reusable-service-ci.yml'
+#         - '.github/workflows/order-manager.yml'
+#     pull_request:
+#       paths:
+#         - 'services/order-manager/**'
+#         - 'platform/**'
+#         - 'pom.xml'
+
+name: order-manager (disabled - source missing)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'services/order-manager/**'
-      - 'platform/**'
-      - 'pom.xml'
-      - '.github/workflows/reusable-service-ci.yml'
-      - '.github/workflows/order-manager.yml'
-  pull_request:
-    paths:
-      - 'services/order-manager/**'
-      - 'platform/**'
-      - 'pom.xml'
+  workflow_dispatch:
 
 jobs:
   ci:

@@ -117,8 +117,18 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       // next load. Null means the user backed out of the flow on a platform where it can return.
       final AuthSession? session = await _authService.signIn();
       if (!mounted || session == null) return;
-      setState(() => _bootstrap = Future<AuthSession?>.value(session));
-    } catch (e) {
+      setState(() {
+        // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
+        // asserts its callback returns nothing. The assignment still lands, so the symptom is a
+        // thrown error immediately after a SUCCESSFUL sign-in - which any enclosing catch then
+        // reports as the sign-in having failed.
+        _bootstrap = Future<AuthSession?>.value(session);
+      });
+    } catch (e, stack) {
+      // The screen only ever says "We could not sign you in", which is right for a customer and
+      // useless for whoever has to fix it. Without this the cause never leaves the device.
+      debugPrint('SIGN-IN FAILED: $e');
+      debugPrintStack(stackTrace: stack, label: 'sign-in');
       if (!mounted) return;
       setState(() => _signInError = e);
     }
@@ -126,7 +136,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
   Future<void> _signOut() async {
     await _authService.signOut();
-    setState(() => _bootstrap = Future<AuthSession?>.value(null));
+    setState(() {
+      // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
+      // asserts its callback returns nothing.
+      _bootstrap = Future<AuthSession?>.value(null);
+    });
   }
 
   @override

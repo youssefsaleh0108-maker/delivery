@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Reaching the Gateway and Keycloak. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
@@ -7,11 +8,29 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config">
+        <!--
+          taskAffinity is EXPLICIT here, and must not be "".
+
+          The Flutter template ships android:taskAffinity="" on MainActivity to blunt
+          StrandHogg-style task-affinity hijacking. It is incompatible with AppAuth: an empty
+          affinity does not mean "a shared private affinity", it means NO affinity, so two
+          activities that both declare "" still do not group into one task.
+
+          AppAuth's AuthorizationManagementActivity is launchMode="singleTask" and depends on
+          affinity matching to be found and resumed when the browser redirect returns. With no
+          affinity to match, every redirect starts a fresh task, the instance waiting for the
+          response is never reached, and AppAuth reports AuthorizationException code 1
+          "User cancelled flow" — for a cancellation that never happened.
+
+          Naming the package affinity explicitly puts MainActivity and both AppAuth activities in
+          one task, which is what AppAuth is built for, and documents that the blank value was
+          removed on purpose rather than lost in a template merge.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:taskAffinity="com.delivery.mobile_app"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -29,6 +48,23 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!--
+          Pinned to the SAME affinity as MainActivity above, so the browser's redirect to
+          com.delivery.app://oauth2redirect comes back into the task that is waiting for it.
+          Declared here only to set that attribute — the intent-filter carrying the redirect
+          scheme still comes from the library's own manifest via the appAuthRedirectScheme
+          manifestPlaceholder in build.gradle.kts, which is why this uses tools:replace on the one
+          attribute rather than tools:node="replace" on the whole element.
+        -->
+        <activity
+            android:name="net.openid.appauth.RedirectUriReceiverActivity"
+            android:taskAffinity="com.delivery.mobile_app"
+            tools:replace="android:taskAffinity" />
+        <activity
+            android:name="net.openid.appauth.AuthorizationManagementActivity"
+            android:taskAffinity="com.delivery.mobile_app"
+            tools:replace="android:taskAffinity" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

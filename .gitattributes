@@ -1,0 +1,42 @@
+# Line endings.
+#
+# WHY THIS FILE EXISTS: several shell scripts in infra/ are mounted straight into Linux containers
+# (infra/vault/bootstrap.sh, infra/minio/bootstrap.sh, the smoke suites). Checked out with CRLF on
+# Windows, `set -eu` becomes `set -eu\r`, and the container dies on line 4 with
+#
+#     /bootstrap.sh: line 4: set: -: invalid option
+#
+# The Vault and MinIO bootstraps then never run: no AppRole, no buckets, and every service that
+# depends on them fails later for reasons that look nothing like a line ending. Fixing the working
+# copy is not enough — with core.autocrlf=true git normalises it straight back on the next commit,
+# so the fix has to live here.
+
+# Let git decide for ordinary text, so Windows editors still see CRLF where it does not matter.
+* text=auto
+
+# Anything executed by a Linux shell or copied into an image MUST be LF, on every platform.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+
+# Read inside containers or by tools that are strict about it.
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Windows-only helpers stay CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.keystore binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

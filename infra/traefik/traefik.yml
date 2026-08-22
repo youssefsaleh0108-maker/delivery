@@ -38,6 +38,12 @@ api:
   dashboard: true
   insecure: false
 
+# Enables the /ping endpoint that `traefik healthcheck --ping` calls. Without it the container's
+# compose healthcheck reports unhealthy even while Traefik is routing normally. Bound to the
+# non-public traefik entryPoint so it is not reachable beside the customer API.
+ping:
+  entryPoint: traefik
+
 metrics:
   prometheus:
     entryPoint: traefik

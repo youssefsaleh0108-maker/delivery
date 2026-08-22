@@ -19,7 +19,7 @@
         <!-- This machine's LAN IP - the address a physical phone on the same Wi-Fi uses.
              UPDATE THIS when DHCP moves the IP, alongside infra/.env. Android's network-security
              config does not accept CIDR ranges, so the specific host has to be listed. -->
-        <domain includeSubdomains="false">192.168.21.248</domain>
+        <domain includeSubdomains="false">192.168.10.26</domain>
         <!-- The host via `adb reverse`, which works over USB on a physical device too. -->
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">localhost</domain>

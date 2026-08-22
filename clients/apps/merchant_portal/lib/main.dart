@@ -130,7 +130,11 @@ class _MerchantPortalAppState extends State<MerchantPortalApp> {
 
   Future<void> _signOut() async {
     await _authService.signOut();
-    setState(() => _bootstrap = Future<AuthSession?>.value(null));
+    setState(() {
+      // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
+      // asserts its callback returns nothing.
+      _bootstrap = Future<AuthSession?>.value(null);
+    });
   }
 
   @override

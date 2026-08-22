@@ -44,6 +44,15 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  # Docker Hub is what the cluster pulls from. ghcr.io still gets every image too — it costs one
+  # extra tag on a build that has already happened, and it means a Docker Hub rate limit or outage
+  # never blocks a deploy.
+  #
+  # DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must exist as repository secrets (Settings > Secrets and
+  # variables > Actions). Use an access token from hub.docker.com > Account Settings > Personal
+  # access tokens, scoped Read/Write — never the account password. When they are absent the Docker
+  # Hub steps below skip themselves rather than failing the build, so a fork still gets green CI.
+  DOCKERHUB_NAMESPACE: youssefsaleh0108
 
 jobs:
   build:
@@ -103,11 +112,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Skipped, not failed, when the secret is absent — see the note on DOCKERHUB_NAMESPACE above.
+      - name: Check for Docker Hub credentials
+        id: dockerhub
+        if: inputs.push-image && github.event_name != 'pull_request'
+        run: echo "enabled=${{ secrets.DOCKERHUB_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        if: steps.dockerhub.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.service-name }}
+          # Both registries in one metadata block, so every tag rule below applies identically to
+          # each and the two can never drift to different versions of the same build.
+          #
+          # The Docker Hub repository is delivery-<service>, matching image.name in each service
+          # pom, because a Hub namespace is flat — there is no youssefsaleh0108/delivery/product
+          # the way ghcr.io allows a path.
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ inputs.service-name }}
+            ${{ steps.dockerhub.outputs.enabled == 'true' && format('docker.io/{0}/delivery-{1}', env.DOCKERHUB_NAMESPACE, inputs.service-name) || '' }}
           tags: |
             type=sha,format=long
             type=ref,event=branch
