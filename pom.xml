@@ -42,7 +42,6 @@
     <module>platform/platform-storage</module>
 
     <module>services/config-server</module>
-    <module>services/api-gateway</module>
     <module>services/product-service</module>
     <!--
       Restored from https://github.com/youssefsaleh0108-maker/delivery.order-manager, which is

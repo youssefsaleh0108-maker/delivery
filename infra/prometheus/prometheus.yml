@@ -41,7 +41,6 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - 'api-gateway:8100'
           - 'product-service:8103'
           - 'order-manager:8101'
           - 'order-tracking:8102'

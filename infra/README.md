@@ -27,7 +27,7 @@ whole reactor per image is minutes of waste per service.
 | Keycloak | 8180 | 8090 taken by lending |
 | Vault | 8200 | free |
 | Config Server | 8888 | free |
-| API Gateway | 8100 | 8080–8095 taken by lending |
+| Traefik (API front door) | 8100 | 8080–8095 taken by lending |
 | Jaeger | 16686 / 4318 | free |
 
 Ports 8101–8115 are reserved for services arriving in later phases; the full allocation is in the

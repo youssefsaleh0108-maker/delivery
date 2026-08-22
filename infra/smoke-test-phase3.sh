@@ -19,7 +19,7 @@
 
 set -eu
 
-GW="http://api-gateway:8100"
+GW="http://traefik:8100"
 KC="http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/token"
 SETTINGS="http://connector-settings:8109"
 SMS_CONNECTOR="http://sms-connector:8112"

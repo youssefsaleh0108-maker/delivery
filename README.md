@@ -41,7 +41,7 @@ Verified running on this machine, from a cold `docker compose up -d` with empty 
 | `platform-observability` | Correlation-ID filter (both stacks) + OTLP tracing |
 | `platform-storage` | Presigned MinIO PUT/GET, `file_metadata`, confirm-and-size-check |
 | Config Server | Git + Vault composite, AppRole auth, Spring Cloud Bus refresh |
-| API Gateway | JWT validation, Redis rate limiting, routes declared for all later services |
+| Traefik | The front door on 8100. File-watched routing, CORS, rate limiting, security headers |
 | `platform-notifications` | Command/receipt contracts, resilience wrapper, worker and connector auto-configuration |
 | **Product Service** | Catalog CRUD, per-row ownership, image upload, catalog events on the bus |
 | **Order Manager** | Order lifecycle state machine, price snapshotting, pessimistic rider claim |
@@ -137,7 +137,7 @@ First run pulls PostGIS and Vault and takes a few minutes. Then:
 
 | Service | URL | Credentials |
 | --- | --- | --- |
-| API Gateway | http://localhost:8100 | Bearer token |
+| Traefik (the API front door) | http://localhost:8100 | Bearer token |
 | Keycloak | http://localhost:8180 | `admin` / `admin` |
 | Config Server | http://localhost:8888 | `config` / `local-config-secret` |
 | RabbitMQ | http://localhost:15673 | `delivery` / `delivery` |
@@ -192,13 +192,14 @@ delivery/
 │   ├── platform-observability/
 │   ├── platform-storage/
 │   └── platform-notifications/   # command + receipt contracts, worker/connector auto-config
-├── services/                  # 15 independently deployable Spring Boot services
-│   ├── config-server/  api-gateway/
+├── services/                  # 18 independently deployable Spring Boot services
+│   ├── config-server/
 │   ├── product-service/  order-manager/  order-tracking/
 │   ├── notifications-manager/  app-notification/  connector-settings/
 │   ├── mail-worker/  push-worker/  sms-worker/
 │   ├── email-connector/  push-connector/  sms-connector/
-│   └── accounting-service/  corebanking-connector/  corebanking-simulator/
+│   ├── accounting-service/  corebanking-connector/  corebanking-simulator/
+│   └── whatsapp-service/  onboarding-service/
 ├── config-repo/               # SEPARATE Git repo - Config Server's Git backend
 ├── infra/                     # docker-compose, Postgres init, Keycloak realm, MinIO, Vault
 ├── clients/                   # Flutter monorepo - 3 apps, 2 shared packages

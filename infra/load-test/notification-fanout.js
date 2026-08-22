@@ -22,7 +22,7 @@ const placeLatency = new Trend('order_place_latency', true);
 const placeFailures = new Rate('order_place_failures');
 const ordersPlaced = new Counter('orders_placed');
 
-const GATEWAY = __ENV.GATEWAY || 'http://api-gateway:8100';
+const GATEWAY = __ENV.GATEWAY || 'http://traefik:8100';
 const CUSTOMER = __ENV.CUSTOMER_TOKEN;
 const PRODUCT_ID = __ENV.PRODUCT_ID;
 

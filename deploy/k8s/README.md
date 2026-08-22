@@ -16,8 +16,14 @@ affordance and it is the most dangerous thing to carry into a cluster: it would 
 `/api/connector/send` — "send an arbitrary SMS", no token required — and the Core Banking
 Simulator's `/test/faults` to anything that can reach a node.
 
-So: **every Service here is `ClusterIP` except the API Gateway**, which is the only intended
-ingress. The security review (`docs/SECURITY_REVIEW.md`, finding 3) records why.
+So: **every Service here is `ClusterIP`**, and exactly one component is meant to be reachable from
+outside. The security review (`docs/SECURITY_REVIEW.md`, finding 3) records why.
+
+That component used to be the Spring API Gateway. It has been removed — Traefik took port 8100 in
+compose and routes straight to the backing services, leaving the gateway outside the request path
+(`infra/traefik/dynamic/routes.yml`). **Traefik has no manifest here yet**, so as things stand this
+directory describes a namespace with no ingress at all. Writing that manifest is the next piece of
+work, and `namespace.yaml`'s `allow-traefik-ingress` policy already selects `app: traefik` for it.
 
 The Core Banking Simulator has no manifest at all. It is dev-only by design (Section 7), and the
 absence is deliberate rather than an omission — in staging and production the same connector points
@@ -27,23 +33,35 @@ at the real bank through the Backoffice toggle.
 
 ```
 deploy/k8s/
-├── namespace.yaml
+├── namespace.yaml                # namespace + the three NetworkPolicies
 ├── base/
-│   ├── configmap-common.yaml     # the non-secret environment every service shares
-│   └── secrets.example.yaml      # SHAPE ONLY - real values come from Vault, see below
-├── gateway.yaml                  # the only externally reachable Service
+│   └── configmap-common.yaml     # the non-secret environment every service shares
 ├── domain-services.yaml          # product, order-manager, order-tracking
-├── notification-services.yaml    # manager, 3 workers, 3 connectors, app-notification
-└── accounting-services.yaml      # accounting-service, corebanking-connector
+└── notification-services.yaml    # manager, 3 workers, 3 connectors, app-notification,
+                                  # connector-settings, accounting-service, corebanking-connector
 ```
+
+Three earlier entries in this list did not describe the directory and have been corrected rather
+than left to mislead: `gateway.yaml` is gone with the service it deployed, `base/secrets.example.yaml`
+was documented below but never written, and `accounting-services.yaml` never existed — accounting
+and the Core Banking connector live in `notification-services.yaml`.
+
+**Still missing a Deployment entirely:** `config-server`, which every other service reaches through
+`CONFIG_IMPORT` and without which none of them boot; `whatsapp-service` and `onboarding-service`,
+both added after this pass; Traefik, as above; and the whole data layer — Postgres, Redis, RabbitMQ,
+Keycloak, MinIO and Vault are all named in `base/configmap-common.yaml` and none of them are
+objects here.
 
 ## Secrets
 
-`secrets.example.yaml` contains no real values and is not applied. Section 6 routes every service's
-secrets through the Config Server's Vault composite, so in a cluster the only credential a service
-needs is the Config Server's, and the Config Server's own AppRole is injected by the platform (the
-Vault Agent injector or CSI driver, depending on what the cluster runs). The example file exists to
-document which keys each service expects, not to hold them.
+Section 6 routes every service's secrets through the Config Server's Vault composite, so in a
+cluster the only credential a service needs is the Config Server's, and the Config Server's own
+AppRole is injected by the platform (the Vault Agent injector or CSI driver, depending on what the
+cluster runs).
+
+A `base/secrets.example.yaml` documenting which keys each service expects — shape only, no values —
+was described here but never written. Note that `domain-services.yaml` and `notification-services.yaml`
+already read a Secret named `config-server-client`, and nothing in this directory creates it.
 
 ## Resource limits and autoscaling
 

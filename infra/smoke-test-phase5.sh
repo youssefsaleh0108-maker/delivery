@@ -14,7 +14,7 @@
 
 set -eu
 
-GW="http://api-gateway:8100"
+GW="http://traefik:8100"
 KC="http://keycloak:8080"
 KCT="$KC/realms/delivery-platform/protocol/openid-connect/token"
 PGHOST="postgres"

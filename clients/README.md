@@ -120,7 +120,7 @@ A phone is not the host machine, and three separate things hand it URLs:
 
 | | Wrong on a device | Correct |
 | --- | --- | --- |
-| API Gateway | `localhost` / `10.0.2.2` | `http://<LAN-IP>:8100` |
+| API front door (Traefik) | `localhost` / `10.0.2.2` | `http://<LAN-IP>:8100` |
 | Keycloak issuer | `localhost` / `10.0.2.2` | `http://<LAN-IP>:8180` |
 | MinIO image URLs | `localhost` | `http://<LAN-IP>:9010` |
 

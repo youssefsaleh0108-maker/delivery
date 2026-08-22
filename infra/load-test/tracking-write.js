@@ -33,7 +33,7 @@ const otherStatus = new Counter('status_other');
 //
 // Pointed straight at order-tracking, you measure what Section 10 actually asks about: how many
 // pings a second the INSERT-plus-Redis-SET path sustains before it becomes the bottleneck.
-const TARGET = __ENV.TARGET || 'http://api-gateway:8100';
+const TARGET = __ENV.TARGET || 'http://traefik:8100';
 const ORDER_ID = __ENV.ORDER_ID;
 const TOKEN = __ENV.RIDER_TOKEN;
 

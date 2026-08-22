@@ -23,16 +23,24 @@ spec:
   policyTypes:
     - Ingress
 ---
-# The Gateway is the only pod that accepts traffic from outside the namespace.
+# Traefik is the only pod that accepts traffic from outside the namespace.
+#
+# This selected the Spring api-gateway until that service was removed: Traefik had already taken
+# 8100 and routes straight to the backing services, so the gateway sat outside the request path.
+#
+# NOT YET WRITTEN: there is no Traefik manifest in this directory. Until one exists this policy
+# selects nothing, which — combined with default-deny-ingress above — seals the namespace to all
+# outside traffic. That is the safe direction to fail, but it does mean the platform has no front
+# door in a cluster until Traefik is deployed here.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-gateway-ingress
+  name: allow-traefik-ingress
   namespace: delivery
 spec:
   podSelector:
     matchLabels:
-      app: api-gateway
+      app: traefik
   policyTypes:
     - Ingress
   ingress:

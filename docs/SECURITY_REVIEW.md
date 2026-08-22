@@ -66,7 +66,7 @@ the simulator's `/test/faults`, which breaks the bank connection — are therefo
 host machine with no token at all.
 
 This is a deliberate dev affordance and is fine on a laptop. It is the single most important thing
-for the Kubernetes manifests to get right: **everything except the API Gateway must be `ClusterIP`**,
+for the Kubernetes manifests to get right: **everything except Traefik must be `ClusterIP`**,
 and the Core Banking Simulator must not be deployed outside dev at all. Recorded here because the
 compose file is the model those manifests were written from, and copying its port list would carry
 this straight into staging.

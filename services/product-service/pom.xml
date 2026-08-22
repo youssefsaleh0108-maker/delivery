@@ -122,7 +122,8 @@
       <artifactId>spring-cloud-starter-bus-amqp</artifactId>
     </dependency>
     <!-- Without these, spring.cloud.config.retry.* is inert and a Config Server that is up but not
-         yet listening kills this service on boot. See services/api-gateway/pom.xml. -->
+         yet listening kills this service on boot. Every service that reads config carries the same
+         pair for the same reason. -->
     <dependency>
       <groupId>org.springframework.retry</groupId>
       <artifactId>spring-retry</artifactId>

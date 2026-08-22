@@ -89,11 +89,12 @@ foreach ($c in $clients) {
 # an addressing error. Learned the hard way: Connector Settings broke because connector-settings and
 # notifications-manager were missing from this list.
 $services = @(
-    'api-gateway', 'product-service', 'order-manager', 'order-tracking',
+    'product-service', 'order-manager', 'order-tracking',
     'notifications-manager', 'connector-settings', 'app-notification', 'accounting-service',
     'mail-worker', 'push-worker', 'sms-worker',
     'email-connector', 'sms-connector', 'push-connector',
-    'corebanking-connector', 'corebanking-simulator'
+    'corebanking-connector', 'corebanking-simulator',
+    'whatsapp-service', 'onboarding-service'
 )
 Push-Location $infra
 # docker compose writes progress to stderr, which Windows PowerShell 5.1 turns into a terminating

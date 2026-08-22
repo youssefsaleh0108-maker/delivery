@@ -15,7 +15,7 @@
 
 set -eu
 
-GW="${GATEWAY:-http://api-gateway:8100}"
+GW="${GATEWAY:-http://traefik:8100}"
 KC="http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/token"
 RUN_ID="$(date +%s)"
 
