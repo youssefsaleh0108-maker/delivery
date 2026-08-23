@@ -60,16 +60,29 @@ class SettlementHealthServiceTest {
          * would count every in-flight settlement as stuck and the alert would be permanently on,
          * which is indistinguishable from having no alert.
          */
+        /**
+         * Bracketed between two readings of the clock rather than compared to one.
+         *
+         * <p>The cutoff is {@code now - threshold} taken at some instant during the call, so the
+         * only thing that can be asserted without a fake clock is that it lands inside the window
+         * the call spanned. An earlier version compared it to a single {@code before - threshold}
+         * with {@code isBeforeOrEqualTo}, which is true only if the clock does not tick between the
+         * two reads — that holds on Windows, whose granularity is about 15ms, and fails on a Linux
+         * runner reading nanoseconds. It passed locally and failed in CI for two years' worth of
+         * reasons that had nothing to do with the code under test.
+         */
         @Test
         void stuck_legs_looks_back_by_the_configured_threshold() {
             Instant before = Instant.now();
 
             health.stuckLegs();
 
+            Instant after = Instant.now();
             ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
             verify(transactions).countByStatusAndCreatedAtBefore(
                     eq(AccountingTransaction.Status.PENDING), cutoff.capture());
-            assertThat(cutoff.getValue()).isBeforeOrEqualTo(before.minus(Duration.ofMinutes(15)));
+            assertThat(cutoff.getValue()).isBetween(
+                    before.minus(Duration.ofMinutes(15)), after.minus(Duration.ofMinutes(15)));
         }
 
         @Test
@@ -78,9 +91,11 @@ class SettlementHealthServiceTest {
 
             health.debitedWithoutCounterpart();
 
+            Instant after = Instant.now();
             ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
             verify(transactions).countDebitedWithoutCounterpartOlderThan(cutoff.capture());
-            assertThat(cutoff.getValue()).isBeforeOrEqualTo(before.minus(Duration.ofMinutes(5)));
+            assertThat(cutoff.getValue()).isBetween(
+                    before.minus(Duration.ofMinutes(5)), after.minus(Duration.ofMinutes(5)));
         }
 
         /**
