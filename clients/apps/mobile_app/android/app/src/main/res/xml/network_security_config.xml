@@ -20,6 +20,11 @@
              UPDATE THIS when DHCP moves the IP, alongside infra/.env. Android's network-security
              config does not accept CIDR ranges, so the specific host has to be listed. -->
         <domain includeSubdomains="false">192.168.10.26</domain>
+        <!-- The Contabo dev box. Without this entry Android refuses every call to it with
+             "Cleartext HTTP traffic to 94.72.112.156 not permitted" — the app builds, installs and
+             then fails to sign in, which looks like a server problem and is not one.
+             Remove it the moment that box serves HTTPS. -->
+        <domain includeSubdomains="false">94.72.112.156</domain>
         <!-- The host via `adb reverse`, which works over USB on a physical device too. -->
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">localhost</domain>
