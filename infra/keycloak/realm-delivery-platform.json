@@ -67,7 +67,7 @@
     {
       "clientId": "delivery-portal",
       "name": "Delivery Portal",
-      "description": "One Flutter Web app for MERCHANT, CARRIER and BACKOFFICE. Replaces merchant-portal, backoffice-web and carrier-portal, which were three clients whose redirect URIs, web origins and azp allow-list entries all had to be kept in step. What a signed-in user can see is decided by the realm roles in their token, not by which client they used.",
+      "description": "One Flutter Web app for MERCHANT, CARRIER and BACKOFFICE. Replaces merchant-portal, backoffice-web and carrier-portal. What a user sees is decided by the realm roles in their token, not by which client they signed in with.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
