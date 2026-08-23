@@ -65,8 +65,7 @@ echo "  customer, rider, merchant, backoffice tokens obtained"
 
 # A second rider, to prove one rider cannot touch another's delivery.
 ADMIN=$(curl -s -X POST "$KC_ADMIN/realms/master/protocol/openid-connect/token" \
-  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}"
-  | jq -r '.access_token')
+  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 curl -s -o /dev/null -X POST "$KC_ADMIN/admin/realms/delivery-platform/users" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
   -d '{"username":"rider2","email":"rider2@dev.local","firstName":"Robin","lastName":"Rider",

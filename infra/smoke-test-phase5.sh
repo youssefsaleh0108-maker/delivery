@@ -64,8 +64,7 @@ MERCHANT=$(token merchant merchant delivery-portal)
 RIDER=$(token rider rider mobile-app)
 BACKOFFICE=$(token backoffice backoffice delivery-portal)
 ADMIN=$(curl -s -X POST "$KC/realms/master/protocol/openid-connect/token" \
-  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}"
-  | jq -r '.access_token')
+  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 
 echo
 echo '=== 1. Only clients this platform serves are accepted ============================'

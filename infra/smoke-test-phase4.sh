@@ -85,8 +85,7 @@ done
 echo "  customer, rider, merchant, backoffice tokens obtained"
 
 ADMIN=$(curl -s -X POST "$KC_ADMIN/realms/master/protocol/openid-connect/token" \
-  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}"
-  | jq -r '.access_token')
+  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 
 # A second merchant whose payout account is FROZEN, so the compensation path can be reached
 # without breaking the working merchant for every other test in this file.

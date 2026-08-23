@@ -82,8 +82,7 @@ echo '=== 2. Second merchant (for the ownership test) ==========================
 # The realm ships one merchant. Cross-merchant isolation is the security property that matters most
 # in this phase, so a second one is created here via the admin API rather than assumed.
 ADMIN=$(curl -s -X POST "$KC_ADMIN/realms/master/protocol/openid-connect/token" \
-  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}"
-  | jq -r '.access_token')
+  -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 
 [ -n "$ADMIN" ] && [ "$ADMIN" != null ] || { echo 'Could not obtain a Keycloak admin token'; exit 1; }
 
