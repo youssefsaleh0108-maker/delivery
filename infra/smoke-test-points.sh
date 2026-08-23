@@ -132,9 +132,9 @@ check 'it is a cash order' 'CASH' "$PAYMENT"
 
 # LEDGER_ONLY: no leg may be left PENDING. A leg still PENDING here means the platform is waiting
 # on a bank that was never deployed, which is the exact failure the settlement mode exists to stop.
-wait_for 40 "[ \"\$(curl -s '$GW/api/accounting/orders/$ORDER' -H 'Authorization: Bearer $BACKOFFICE' | jq '[.legs[]? | select(.status==\"PENDING\")] | length')\" = 0 ]" || true
+wait_for 40 "[ \"\$(curl -s '$GW/api/accounting/orders/$ORDER' -H 'Authorization: Bearer $BACKOFFICE' | jq '[.[] | select(.status==\"PENDING\")] | length')\" = 0 ]" || true
 PENDING=$(curl -s "$GW/api/accounting/orders/$ORDER" -H "Authorization: Bearer $BACKOFFICE" \
-  | jq '[.legs[]? | select(.status=="PENDING")] | length')
+  | jq '[.[] | select(.status=="PENDING")] | length')
 check 'no leg is left waiting on a bank' '0' "${PENDING:-none}"
 
 echo
