@@ -59,10 +59,10 @@ wait_for() {
   return 1
 }
 
-CUSTOMER=$(token customer customer mobile-app)
-MERCHANT=$(token merchant merchant delivery-portal)
-RIDER=$(token rider rider mobile-app)
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+CUSTOMER=$(token customer 100001 mobile-app)
+MERCHANT=$(token merchant 200002 delivery-portal)
+RIDER=$(token rider 300003 mobile-app)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 ADMIN=$(curl -s -X POST "$KC/realms/master/protocol/openid-connect/token" \
   -d 'client_id=admin-cli' -d 'grant_type=password' -d "username=${KEYCLOAK_ADMIN:-admin}" -d "password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token')
 
@@ -81,7 +81,7 @@ PROBE_UUID=$(curl -s "$KC/admin/realms/delivery-platform/clients?clientId=phase5
   -H "Authorization: Bearer $ADMIN" | jq -r '.[0].id')
 
 ROGUE=$(curl -s -X POST "$KCT" -d 'client_id=phase5-probe' -d 'client_secret=probe-secret' \
-  -d 'username=customer' -d 'password=customer' -d 'grant_type=password' | jq -r '.access_token')
+  -d 'username=customer' -d 'password=100001' -d 'grant_type=password' | jq -r '.access_token')
 
 check 'the probe client issues a real token' 'phase5-probe' \
   "$(echo "$ROGUE" | cut -d. -f2 | tr '_-' '/+' | sed 's/$/==/' | base64 -d 2>/dev/null | jq -r '.azp')"

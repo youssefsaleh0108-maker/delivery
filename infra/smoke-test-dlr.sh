@@ -57,7 +57,7 @@ psql_one() {
   psql -h "$PG" -U delivery -d delivery -t -A -c "$1" 2>/dev/null | head -1
 }
 
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 [ -n "$BACKOFFICE" ] && [ "$BACKOFFICE" != null ] || { echo 'No backoffice token'; exit 1; }
 
 echo

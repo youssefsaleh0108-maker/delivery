@@ -25,7 +25,6 @@ SETTINGS="http://connector-settings:8109"
 SMS_CONNECTOR="http://sms-connector:8112"
 EMAIL_CONNECTOR="http://email-connector:8110"
 PUSH_CONNECTOR="http://push-connector:8111"
-MAILPIT="http://mailpit:8025"
 RABBIT="http://rabbitmq:15672"
 
 PASS=0
@@ -78,9 +77,9 @@ wait_for() { # wait_for <seconds> <shell-condition>
 echo
 echo '=== 0. Actors ==================================================================='
 
-CUSTOMER=$(token customer customer mobile-app)
-MERCHANT=$(token merchant merchant delivery-portal)
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+CUSTOMER=$(token customer 100001 mobile-app)
+MERCHANT=$(token merchant 200002 delivery-portal)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 
 for t in CUSTOMER MERCHANT BACKOFFICE; do
   eval "v=\$$t"
@@ -158,7 +157,6 @@ check 'every breaker starts closed'      'CLOSED'  "$(curl -s "$SMS_CONNECTOR/ap
 echo
 echo '=== 3. One order event, fanned out to the right audiences ========================'
 
-MAIL_BEFORE=$(curl -s "$MAILPIT/api/v1/messages?limit=1" | jq '.messages_count')
 
 CATS=$(curl -s "$GW/api/categories" -H "Authorization: Bearer $CUSTOMER")
 FOOD=$(echo "$CATS" | jq -r '[.[] | select(.name=="Food")][0].id')
@@ -237,37 +235,30 @@ check 'a provider message id came back'  'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL")][0].status=="SENT"' | sed 's/true/yes/;s/false/no/')"
 
 echo
-echo '=== 5. The email really arrived =================================================='
-
-wait_for 30 "[ \"\$(curl -s '$MAILPIT/api/v1/messages?limit=200' | jq '.messages_count')\" -gt $MAIL_BEFORE ]" || true
-SHORT_ID=$(echo "$ORDER" | cut -c1-8 | tr 'a-f' 'A-F')
-
-check 'mailpit received mail'            'yes' \
-  "$(curl -s "$MAILPIT/api/v1/messages?limit=200" | jq --argjson b "$MAIL_BEFORE" '.messages_count > $b' | sed 's/true/yes/;s/false/no/')"
-check 'the customer confirmation is there' 'yes' \
-  "$(curl -s "$MAILPIT/api/v1/messages?limit=200" \
-     | jq --arg s "$SHORT_ID" '[.messages[]|select(.To[]?.Address=="customer@dev.local" and (.Subject|contains($s)))]|length>0' \
-     | sed 's/true/yes/;s/false/no/')"
-check 'the merchant work item is there'  'yes' \
-  "$(curl -s "$MAILPIT/api/v1/messages?limit=200" \
-     | jq --arg s "$SHORT_ID" '[.messages[]|select(.To[]?.Address=="merchant@dev.local" and (.Subject|contains($s)))]|length>0' \
-     | sed 's/true/yes/;s/false/no/')"
-
 echo
-echo '=== 6. SMS through the dev test inbox ============================================'
+echo '=== 5. The email left the platform ==============================================='
+
+# Mailpit is gone. The mail sender points at a real relay now, so there is no inbox this script is
+# allowed to read. What can still be asserted is the platform's own record: that a row exists for
+# each audience, addressed to the right person, and that the relay accepted the message.
+#
+# This is STRICTLY WEAKER than the check it replaces. It proves the send succeeded; it does not
+# prove the mail was delivered, nor that the body was right. Reading a real mailbox to close that
+# gap would mean holding somebody's mail credentials, which is not worth it for a smoke test.
+check 'the customer confirmation was sent' 'yes' \
+  "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL" and .status=="SENT" and .recipient=="customer@dev.local")]|length>0' | sed 's/true/yes/;s/false/no/')"
+check 'the merchant work item was sent'    'yes' \
+  "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL" and .status=="SENT" and .recipient=="merchant@dev.local")]|length>0' | sed 's/true/yes/;s/false/no/')"
+check 'the two went to different people'   'yes' \
+  "$(echo "$LOG" | jq '([.[]|select(.channel=="EMAIL" and .status=="SENT")|.recipient]|unique|length)>=2' | sed 's/true/yes/;s/false/no/')"
+echo '=== 6. SMS through the dev provider =============================================='
 
 # A status change, because that is the event the SMS template is attached to.
 curl -s -o /dev/null -X POST "$GW/api/orders/$ORDER/accept" -H "Authorization: Bearer $MERCHANT"
 
-# Scoped to THIS order's number, not just "something reached the test inbox" — the inbox persists
-# across runs, so a broad match would pass on a leftover from a previous one.
-wait_for 60 "curl -s '$MAILPIT/api/v1/messages?limit=200' | jq -e '[.messages[]|select(.To[]?.Address==\"sms-test-inbox@dev.local\" and (.Subject|contains(\"+15550100001\")))]|length>0'" || true
-# The intended number goes in the subject so a QA engineer can tell at a glance who it was for.
-check 'the SMS landed in the test inbox' 'yes' \
-  "$(curl -s "$MAILPIT/api/v1/messages?limit=200" \
-     | jq '[.messages[]|select(.To[]?.Address=="sms-test-inbox@dev.local" and (.Subject|contains("+15550100001")))]|length>0' \
-     | sed 's/true/yes/;s/false/no/')"
-
+# The dev provider logs rather than redirecting to a test inbox, now that there is no inbox to
+# redirect to. So the assertion moves to the notification log: the row for this SMS reaching SENT
+# is what says the chain ran. The body itself is only in the connector's log.
 wait_for 45 "[ \"\$(curl -s '$LOG_URL' -H 'Authorization: Bearer $BACKOFFICE' | jq '[.[]|select(.channel==\"SMS\" and .status==\"SENT\")]|length')\" -ge 1 ]" || true
 check 'the SMS row is SENT'              'yes' \
   "$(curl -s "$LOG_URL" -H "Authorization: Bearer $BACKOFFICE" \
@@ -358,7 +349,7 @@ check 'the worker dead-lettered it'      'yes' \
 # fix rather than reconstructing the message from a log line.
 DLQ_MSG=$(curl -s $RMQ -H 'Content-Type: application/json' \
   -X POST "$RABBIT/api/queues/%2F/notification.dlq/get" \
-  -d '{"count":10,"ackmode":"ack_requeue_true","encoding":"auto"}')
+  -d '{"count":500,"ackmode":"ack_requeue_true","encoding":"auto"}')
 check 'it kept the reason it failed'     'yes' \
   "$(echo "$DLQ_MSG" | jq --arg id "$BAD_ID" \
      '[.[]|select(.payload|contains($id))]|length>0' | sed 's/true/yes/;s/false/no/')"

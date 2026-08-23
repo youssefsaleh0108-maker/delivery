@@ -67,10 +67,10 @@ wait_for() {
 echo
 echo '=== 0. Actors ===================================================================='
 
-CUSTOMER=$(token customer customer)
-MERCHANT=$(token merchant merchant delivery-portal)
-RIDER=$(token rider rider)
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+CUSTOMER=$(token customer 100001)
+MERCHANT=$(token merchant 200002 delivery-portal)
+RIDER=$(token rider 300003)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 
 for t in CUSTOMER MERCHANT RIDER BACKOFFICE; do
   eval "v=\$$t"

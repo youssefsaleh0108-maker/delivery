@@ -66,8 +66,8 @@ route_of() { # route_of <idempotency-key>
   curl -s "$SMS/api/connector/route/$1" | jq -r '.provider'
 }
 
-CUSTOMER=$(token customer customer mobile-app)
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+CUSTOMER=$(token customer 100001 mobile-app)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 
 echo
 echo '=== 1. Delivery rates, the gate on a cutover ====================================='

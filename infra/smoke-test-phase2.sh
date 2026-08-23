@@ -49,10 +49,10 @@ status() { # status <method> <path> <token> [body]
 echo
 echo '=== 0. Actors ==================================================================='
 
-CUSTOMER=$(token customer customer mobile-app)
-RIDER=$(token rider rider mobile-app)
-MERCHANT=$(token merchant merchant delivery-portal)
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+CUSTOMER=$(token customer 100001 mobile-app)
+RIDER=$(token rider 300003 mobile-app)
+MERCHANT=$(token merchant 200002 delivery-portal)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 
 MERCHANT_SUB=$(claim_of "$MERCHANT" '.sub')
 RIDER_SUB=$(claim_of "$RIDER" '.sub')
@@ -75,13 +75,13 @@ R2_ID=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/users?username=rider2&
 curl -s -o /dev/null -X PUT \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$R2_ID/reset-password" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
-  -d '{"type":"password","value":"rider2","temporary":false}'
+  -d '{"type":"password","value":"300013","temporary":false}'
 ROLE=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/roles/DELIVERY" \
   -H "Authorization: Bearer $ADMIN" | jq -c '{id,name}')
 curl -s -o /dev/null -X POST \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$R2_ID/role-mappings/realm" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d "[$ROLE]"
-RIDER2=$(token rider2 rider2 mobile-app)
+RIDER2=$(token rider2 300013 mobile-app)
 check 'second rider provisioned' 'DELIVERY' \
   "$(claim_of "$RIDER2" '.realm_access.roles[]' | grep -x DELIVERY || echo none)"
 

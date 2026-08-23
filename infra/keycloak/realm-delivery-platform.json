@@ -229,7 +229,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "customer",
+          "value": "100001",
           "temporary": false
         }
       ],
@@ -258,7 +258,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "rider",
+          "value": "300003",
           "temporary": false
         }
       ],
@@ -287,7 +287,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "merchant",
+          "value": "200002",
           "temporary": false
         }
       ],
@@ -316,7 +316,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "backoffice",
+          "value": "400004",
           "temporary": false
         }
       ],
@@ -334,7 +334,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "carrier",
+          "value": "500005",
           "temporary": false
         }
       ],

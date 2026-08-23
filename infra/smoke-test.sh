@@ -61,9 +61,9 @@ status() { # status <method> <path> <token> [body]
 echo
 echo '=== 1. Authentication ==========================================================='
 
-MERCHANT=$(token merchant merchant)
-CUSTOMER=$(token customer customer mobile-app)
-BACKOFFICE=$(token backoffice backoffice delivery-portal)
+MERCHANT=$(token merchant 200002)
+CUSTOMER=$(token customer 100001 mobile-app)
+BACKOFFICE=$(token backoffice 400004 delivery-portal)
 
 [ -n "$MERCHANT" ] && [ "$MERCHANT" != null ] || { echo 'Could not obtain a merchant token'; exit 1; }
 
@@ -108,7 +108,7 @@ M2_ID=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/users?username=merchan
 curl -s -o /dev/null -X PUT \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$M2_ID/reset-password" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
-  -d '{"type":"password","value":"merchant2","temporary":false}'
+  -d '{"type":"password","value":"200012","temporary":false}'
 
 ROLE=$(curl -s "$KC_ADMIN/admin/realms/delivery-platform/roles/MERCHANT" \
   -H "Authorization: Bearer $ADMIN" | jq -c '{id,name}')
@@ -116,7 +116,7 @@ curl -s -o /dev/null -X POST \
   "$KC_ADMIN/admin/realms/delivery-platform/users/$M2_ID/role-mappings/realm" \
   -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' -d "[$ROLE]"
 
-MERCHANT2=$(token merchant2 merchant2)
+MERCHANT2=$(token merchant2 200012)
 check 'second merchant provisioned'           'MERCHANT'   "$(claim "$MERCHANT2" '.realm_access.roles[]' | grep -x MERCHANT || echo none)"
 
 echo
