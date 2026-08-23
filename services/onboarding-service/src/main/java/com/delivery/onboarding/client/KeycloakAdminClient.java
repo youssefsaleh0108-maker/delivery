@@ -1,5 +1,6 @@
 package com.delivery.onboarding.client;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +13,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -84,14 +87,18 @@ public class KeycloakAdminClient {
                 "requiredActions", List.of("UPDATE_PASSWORD"),
                 "emailVerified", false);
 
+        String userId;
         try {
-            keycloak.post()
+            // Same as the customer path: the id comes from the Location header, so a plus-alias in
+            // the address cannot leave a created account that we then fail to find.
+            ResponseEntity<Void> created = keycloak.post()
                     .uri("/admin/realms/{realm}/users", realm)
                     .header("Authorization", "Bearer " + bearer)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(user)
                     .retrieve()
                     .toBodilessEntity();
+            userId = idFromLocation(created);
         } catch (Exception e) {
             // A 409 means the username is taken, which on this path means somebody already has an
             // account with that email — worth failing loudly rather than attaching a second
@@ -100,7 +107,8 @@ public class KeycloakAdminClient {
             throw new ProvisioningException("The account could not be created: " + e.getMessage());
         }
 
-        String userId = findUserId(bearer, email);
+
+        // No second lookup: userId came from the Location header above.
         assignRealmRole(bearer, userId, role);
         log.info("Provisioned {} as {}", email, role);
         return userId;
@@ -144,43 +152,64 @@ public class KeycloakAdminClient {
                         // use. `temporary: true` would force a reset screen on first sign-in.
                         "temporary", false)));
 
+        String userId;
         try {
-            keycloak.post()
+            // The created id comes back in the Location header, and taking it from there is the
+            // whole point of not searching for the account again afterwards.
+            //
+            // Looking the account up again by email does not survive a plus-alias. The address goes
+            // into a query parameter, and a '+' in a query is decoded server-side as a space, so
+            // 'me+shop@gmail.com' is searched for as 'me shop@gmail.com' and matches nothing. The
+            // account had already been created at that point, so the caller saw a failure, no
+            // account, and an orphan in Keycloak — for an address form people genuinely use.
+            ResponseEntity<Void> created = keycloak.post()
                     .uri("/admin/realms/{realm}/users", realm)
                     .header("Authorization", "Bearer " + bearer)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(user)
                     .retrieve()
                     .toBodilessEntity();
+            userId = idFromLocation(created);
+        } catch (HttpClientErrorException.Conflict e) {
+            // 409, and only 409, means somebody already holds that email. Said plainly rather than
+            // as a generic failure: the caller has verified the address, so the person on the other
+            // end owns it and the useful answer is "you already have an account".
+            log.warn("An account already exists for {}", email);
+            throw new ProvisioningException("An account already exists for that email address");
+
         } catch (Exception e) {
-            // A 409 here means somebody already has an account on that email. Said plainly rather
-            // than as a generic failure: the caller has verified the address, so the person on the
-            // other end owns it and the useful answer is "you already have an account".
-            log.warn("Could not create a customer account for {}: {}", email, e.getMessage());
+            // Everything else is OUR failure and must not be dressed up as a duplicate. This catch
+            // used to fold every status into the message above, so a 403 from a service account
+            // without manage-users told a brand new user that they already had an account — and
+            // sent them off to reset a password for something that did not exist.
+            log.error("Could not create a customer account for {}", email, e);
             throw new ProvisioningException(
-                    "An account already exists for that email address");
+                    "We could not create the account just now. Please try again in a moment.");
         }
 
-        String userId = findUserId(bearer, email);
+        // No second lookup: userId came from the Location header above.
         assignRealmRole(bearer, userId, "CUSTOMER");
         log.info("Signed up {} as CUSTOMER", email);
         return userId;
     }
 
-    private String findUserId(String bearer, String email) {
-        JsonNode found = keycloak.get()
-                .uri(uri -> uri.path("/admin/realms/{realm}/users")
-                        .queryParam("username", email)
-                        .queryParam("exact", true)
-                        .build(realm))
-                .header("Authorization", "Bearer " + bearer)
-                .retrieve()
-                .body(JsonNode.class);
-
-        if (found == null || !found.isArray() || found.isEmpty()) {
-            throw new ProvisioningException("The account was created but cannot be found again");
+    /**
+     * Pulls the new account's id out of the {@code Location} header Keycloak returns on 201.
+     *
+     * <p>Preferred over searching for the account again because it cannot be defeated by how the
+     * address is spelled — see the note at the call site about plus-aliases.
+     */
+    private String idFromLocation(ResponseEntity<Void> created) {
+        URI location = created.getHeaders().getLocation();
+        if (location == null) {
+            throw new ProvisioningException("The account was created but Keycloak returned no id");
         }
-        return found.get(0).path("id").asText();
+        String path = location.getPath();
+        String id = path.substring(path.lastIndexOf('/') + 1);
+        if (id.isBlank()) {
+            throw new ProvisioningException("The account was created but Keycloak returned no id");
+        }
+        return id;
     }
 
     private void assignRealmRole(String bearer, String userId, String role) {

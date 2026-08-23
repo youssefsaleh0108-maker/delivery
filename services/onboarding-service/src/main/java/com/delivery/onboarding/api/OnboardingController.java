@@ -98,16 +98,18 @@ public class OnboardingController {
      *
      * @param verificationToken proof the email was confirmed, from
      *                          {@code POST /verifications/confirm} on this same address
-     * @param password          minimum eight characters. Length is the only rule enforced here on
-     *                          purpose — Keycloak's realm policy is the authority on what a
-     *                          password must be, and duplicating it would mean two rules that drift
+     * @param password          the six-digit passcode the mobile app's keypad collects. This floor
+     *                          used to be eight, which silently rejected every sign-up the app
+     *                          made — the comment below already warned that a rule duplicated here
+     *                          would drift from the realm's, and it did. Keycloak remains the
+     *                          authority on what a passcode must be; this only bounds the field
      */
     public record SignUpRequest(
             @NotBlank @Email @Size(max = 200) String email,
             @NotBlank @Size(max = 64) String verificationToken,
             @NotBlank @Size(max = 80) String firstName,
             @Size(max = 80) String lastName,
-            @NotBlank @Size(min = 8, max = 128) String password) {
+            @NotBlank @Size(min = 6, max = 128) String password) {
     }
 
     /**
