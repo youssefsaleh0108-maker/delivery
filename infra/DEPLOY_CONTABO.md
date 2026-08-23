@@ -9,23 +9,27 @@ remains the laptop stack and is not used here.
 
 ## Read this first: it does not fit in RAM
 
-The ceilings in `docker-compose.dev.yml` sum to **6.72 GiB** across 22 services. With the Docker
-daemon and the OS that is about **7.1 GiB**. The box reports:
+The ceilings in `docker-compose.dev.yml` sum to **5.72 GiB** across 22 services. With the Docker
+daemon and the OS that is about **6.1 GiB**. The box reports:
 
 ```
 Mem:  5.8Gi total,  5.3Gi available
 Swap: 0B
 ```
 
-**Roughly 1.8 GiB short, and no swap to absorb it.** Started as-is on a box in that state, the
+**Roughly 800 MiB short, and no swap to absorb it.** Started as-is on a box in that state, the
 kernel begins OOM-killing containers partway through the first `up`, and which ones die is decided
 by whatever it reaches first rather than by what matters.
 
-There are 93 GB free on `/`, so swap is the cheap fix:
+The ceilings were cut a tier each to get here — they were 6.72 GiB. They are now close enough to
+what these services actually use that trimming further trades swap slowness for OOM kills, which is
+the worse of the two: a slow service is diagnosable and a killed one looks like a crash.
+
+There are 93 GB free on `/`, so swap covers the rest cheaply:
 
 ```bash
-fallocate -l 8G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo "/swapfile none swap sw 0 0" >> /etc/fstab
 ```
 
 Be clear about what that buys. Swap stops the OOM killer; it does not make the platform fast. JVM
@@ -37,7 +41,7 @@ Two honest alternatives:
 
 - **Resize the box.** 16 GB runs this with headroom and no swap. Everything below is unchanged.
 - **Run less of it.** The ordering path — data layer, Config Server, Traefik, product, orders,
-  tracking — sums to **3.59 GiB** and fits the box as it stands, no swap needed:
+  tracking — sums to **3.00 GiB** and fits the box as it stands, no swap needed:
 
   ```bash
   docker compose -f docker-compose.dev.yml --env-file .env up -d \
@@ -47,7 +51,7 @@ Two honest alternatives:
 
   Compose starts the `depends_on` graph for whatever you name, so this is a complete, working
   subset rather than a broken partial. Add the notification or accounting services when you want to
-  test those, and watch `free -m` as you go — each is 256–448 MiB.
+  test those, and watch `free -m` as you go — each is 256–384 MiB.
 
 ---
 
@@ -81,14 +85,35 @@ Keycloak and MinIO are public because clients reach them **directly**, not throu
 Keycloak through 8100 breaks the `iss` claim; routing MinIO through it breaks the presigned
 signature.
 
-Docker publishes ports by writing its own iptables rules, which bypass ufw's INPUT chain. Confirm
-from somewhere else that the internal ports really are closed — do not assume:
+**ufw alone does not close Docker's published ports.** Docker writes its own iptables rules into the
+`DOCKER` chain, which is traversed before ufw's `INPUT`, so a `ufw deny` on a published port does
+nothing. This is the single most likely way this box ends up exposed.
+
+Two things close it properly. First, this compose file publishes only 8100, 8180 and 9010 to
+`0.0.0.0` — everything else is either internal to the network or bound to `127.0.0.1`, which Docker
+honours. Second, a belt-and-braces rule in `DOCKER-USER`, the chain Docker leaves for exactly this
+and never rewrites:
+
+```bash
+# Allow the three public ports and anything already established; drop the rest before it reaches
+# a container. Replace eth0 if your public interface is named differently — check `ip route`.
+iptables -I DOCKER-USER -i eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+iptables -I DOCKER-USER -i eth0 -p tcp -m multiport --dports 8100,8180,9010 -j RETURN
+iptables -A DOCKER-USER -i eth0 -j DROP
+```
+
+Order matters: `-I` inserts at the top, `-A` appends, so the two RETURNs are evaluated before the
+DROP. Persist with `iptables-persistent`.
+
+Then confirm from somewhere else — do not assume either of the above worked:
 
 ```bash
 nmap -p 5433,6380,8101-8117,8888,15673,8200 <box-ip>
 ```
 
-Anything open on 8110–8113 is a connector, and `/api/connector/send` takes no token.
+Every one should be filtered or closed. Anything open on 8110–8112 is a connector, and
+`/api/connector/send` takes no user token: an open port there is "send an arbitrary SMS" for anyone
+who finds the IP.
 
 ## 3. The repository and the environment file
 
@@ -176,9 +201,9 @@ docker compose -f docker-compose.dev.yml --env-file .env up -d
   `LEDGER_ONLY` mode: the ledger records who is owed what and every leg is terminal as it is
   written. Merchants and riders are paid in points they redeem, and a redemption is a request an
   operator approves and pays by hand — nothing in the platform moves money.
-- **Card payment is still accepted and still parks.** `Payment.Method.CARD` exists and a card order
-  is recorded at `AUTHORIZATION_PENDING`, which never settles because no provider is integrated.
-  Cash-on-delivery-only has not been enforced yet, so a card order placed here is a stuck order.
+- **Cash on delivery only.** Checkout refuses CARD with a 400 — it parks at AUTHORIZATION_PENDING
+  with no provider to authorise it and would never settle. `delivery.ordering.payment-methods` is
+  the switch; add CARD back once a provider exists.
 - **The points screens do not exist.** The API is live at `/api/points`; no client calls it, so
   balances and redemptions are reachable only with `curl`.
 

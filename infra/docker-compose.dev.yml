@@ -36,7 +36,7 @@ services:
   postgres:
     image: postgis/postgis:17-3.5
     container_name: delivery-postgres
-    mem_limit: 512m
+    mem_limit: 384m
     restart: unless-stopped
     environment:
       POSTGRES_DB: delivery
@@ -56,7 +56,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: delivery-redis
-    mem_limit: 96m
+    mem_limit: 80m
     restart: unless-stopped
     command: >
       redis-server
@@ -74,7 +74,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: delivery-rabbitmq
-    mem_limit: 256m
+    mem_limit: 224m
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-delivery}
@@ -91,7 +91,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: delivery-minio
-    mem_limit: 256m
+    mem_limit: 224m
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -113,7 +113,7 @@ services:
   minio-init:
     image: minio/mc:latest
     container_name: delivery-minio-init
-    mem_limit: 64m
+    mem_limit: 48m
     depends_on:
       minio:
         condition: service_healthy
@@ -130,7 +130,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: delivery-keycloak
-    mem_limit: 640m
+    mem_limit: 512m
     restart: unless-stopped
     command: ["start-dev", "--import-realm"]
     environment:
@@ -177,7 +177,7 @@ services:
   vault:
     image: hashicorp/vault:1.18
     container_name: delivery-vault
-    mem_limit: 96m
+    mem_limit: 80m
     restart: unless-stopped
     # Dev mode: in-memory, auto-unsealed, root token fixed. LOCAL ONLY. Staging and production run
     # a real sealed Vault - who hosts and administers it is Section 12 open decision #8.
@@ -198,7 +198,7 @@ services:
   vault-init:
     image: hashicorp/vault:1.18
     container_name: delivery-vault-init
-    mem_limit: 64m
+    mem_limit: 48m
     depends_on:
       vault:
         condition: service_healthy
@@ -217,7 +217,7 @@ services:
   config-server:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-config-server:${IMAGE_TAG:-main}
     container_name: delivery-config-server
-    mem_limit: 400m
+    mem_limit: 352m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8888
@@ -298,7 +298,7 @@ services:
   product-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-product-service:${IMAGE_TAG:-main}
     container_name: delivery-product-service
-    mem_limit: 448m
+    mem_limit: 384m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8103
@@ -337,7 +337,7 @@ services:
   order-manager:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-order-manager:${IMAGE_TAG:-main}
     container_name: delivery-order-manager
-    mem_limit: 384m
+    mem_limit: 320m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8101
@@ -374,7 +374,7 @@ services:
   order-tracking:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-order-tracking:${IMAGE_TAG:-main}
     container_name: delivery-order-tracking
-    mem_limit: 400m
+    mem_limit: 352m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8102
@@ -426,7 +426,7 @@ services:
   connector-settings:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-connector-settings:${IMAGE_TAG:-main}
     container_name: delivery-connector-settings
-    mem_limit: 288m
+    mem_limit: 256m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8109
@@ -460,7 +460,7 @@ services:
   notifications-manager:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-notifications-manager:${IMAGE_TAG:-main}
     container_name: delivery-notifications-manager
-    mem_limit: 384m
+    mem_limit: 320m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8104
@@ -536,7 +536,7 @@ services:
   email-connector:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-email-connector:${IMAGE_TAG:-main}
     container_name: delivery-email-connector
-    mem_limit: 384m
+    mem_limit: 320m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8110
@@ -583,7 +583,7 @@ services:
   push-connector:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-push-connector:${IMAGE_TAG:-main}
     container_name: delivery-push-connector
-    mem_limit: 384m
+    mem_limit: 320m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8111
@@ -614,7 +614,7 @@ services:
   sms-connector:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-sms-connector:${IMAGE_TAG:-main}
     container_name: delivery-sms-connector
-    mem_limit: 384m
+    mem_limit: 320m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8112
@@ -667,7 +667,7 @@ services:
   accounting-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-accounting-service:${IMAGE_TAG:-main}
     container_name: delivery-accounting-service
-    mem_limit: 320m
+    mem_limit: 288m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8115
@@ -701,7 +701,7 @@ services:
   whatsapp-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-whatsapp-service:${IMAGE_TAG:-main}
     container_name: delivery-whatsapp-service
-    mem_limit: 320m
+    mem_limit: 288m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8116
@@ -751,7 +751,7 @@ services:
   onboarding-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-onboarding-service:${IMAGE_TAG:-main}
     container_name: delivery-onboarding-service
-    mem_limit: 448m
+    mem_limit: 384m
     restart: unless-stopped
     environment:
       SERVER_PORT: 8117
