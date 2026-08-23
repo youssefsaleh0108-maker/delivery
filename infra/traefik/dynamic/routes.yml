@@ -121,7 +121,10 @@ http:
 
     # ------------------------------------------------------------------ accounting-service (8115)
     accounting-service:
-      rule: PathPrefix(`/api/accounting`)
+      # /api/points is served by the same service. Reconciliation and points are two views of the
+      # same settlement: the ledger records who is owed what, and points are what a merchant or a
+      # carrier can actually convert into money.
+      rule: PathPrefix(`/api/accounting`) || PathPrefix(`/api/points`)
       service: accounting-service
       entryPoints: [web]
 
