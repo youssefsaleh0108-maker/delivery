@@ -8,7 +8,10 @@ import 'package:flutter/material.dart';
 
 import 'src/customer_shell.dart';
 import 'src/ride_with_us_screen.dart';
+import 'src/sign_in_screen.dart';
+import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
+import 'src/welcome_screen.dart';
 import 'src/rider_home_screen.dart';
 
 /// One codebase, two very different users.
@@ -50,6 +53,13 @@ const String _redirectUrl = String.fromEnvironment(
   defaultValue: 'com.delivery.app://oauth2redirect',
 );
 
+/// Which signed-out screen is showing.
+///
+/// A tiny state machine rather than a Navigator: there are three screens, they are mutually
+/// exclusive, and the whole gate disappears the moment a session exists. A route stack here would
+/// mean guarding against a back gesture landing on a login screen behind a signed-in app.
+enum _Gate { welcome, signIn, signUp }
+
 class DeliveryMobileApp extends StatefulWidget {
   const DeliveryMobileApp({super.key});
 
@@ -90,17 +100,27 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     write: (String code) =>
         const FlutterSecureStorage().write(key: 'delivery.locale', value: code),
   );
-  // No busy flag: sign-in is no longer a button you can watch spin. The app redirects on its own,
-  // so the only states a reader ever sees are "going to Keycloak" and "that failed".
-  Object? _signInError;
+  /// Which of the signed-out screens is showing. The sign-in and sign-up screens own their own
+  /// busy and error state, because both are forms somebody is actively working in.
+  _Gate _gate = _Gate.welcome;
 
-  /// Set when somebody with no account is applying to ride. While it is true the app must not
-  /// try to sign them in again — the whole point is that they have nothing to sign in with.
+  /// Set when somebody with no account is applying to ride. Its own flag rather than a fourth
+  /// [_Gate] because it is reachable from the welcome screen and returns there, and because it is
+  /// the one path that ends in an application rather than a session.
   bool _applyingToRide = false;
 
-  /// Guards the automatic redirect. Without it a failed sign-in re-triggers on every rebuild and
-  /// the app ping-pongs to Keycloak forever.
-  bool _autoSignInAttempted = false;
+  /// Adopts a session from either form. Shared so the two screens cannot drift on what "signed in"
+  /// means — sign-up signs the new account in directly rather than sending them back to a login.
+  void _adoptSession(AuthSession session) {
+    setState(() {
+      // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState asserts
+      // its callback returns nothing. The assignment still lands, so the symptom is a thrown error
+      // immediately after a SUCCESSFUL sign-in — which any enclosing catch then reports as the
+      // sign-in having failed.
+      _bootstrap = Future<AuthSession?>.value(session);
+      _gate = _Gate.welcome;
+    });
+  }
 
   @override
   void initState() {
@@ -108,30 +128,6 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     // Fire and forget: the app renders in the device language and switches the moment the saved
     // preference arrives, rather than holding the first frame for a disk read.
     _locale.load();
-  }
-
-  Future<void> _signIn() async {
-    setState(() => _signInError = null);
-    try {
-      // On web this navigates away and never returns; the session arrives via restore() on the
-      // next load. Null means the user backed out of the flow on a platform where it can return.
-      final AuthSession? session = await _authService.signIn();
-      if (!mounted || session == null) return;
-      setState(() {
-        // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
-        // asserts its callback returns nothing. The assignment still lands, so the symptom is a
-        // thrown error immediately after a SUCCESSFUL sign-in - which any enclosing catch then
-        // reports as the sign-in having failed.
-        _bootstrap = Future<AuthSession?>.value(session);
-      });
-    } catch (e, stack) {
-      // The screen only ever says "We could not sign you in", which is right for a customer and
-      // useless for whoever has to fix it. Without this the cause never leaves the device.
-      debugPrint('SIGN-IN FAILED: $e');
-      debugPrintStack(stackTrace: stack, label: 'sign-in');
-      if (!mounted) return;
-      setState(() => _signInError = e);
-    }
   }
 
   Future<void> _signOut() async {
@@ -172,36 +168,42 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
           final AuthSession? session = snapshot.data;
           if (session == null) {
-            if (!_autoSignInAttempted) {
-              _autoSignInAttempted = true;
-              // After this frame, not during build: signIn() calls setState, and on web it
-              // navigates the page away entirely.
-              //
-              // Held for SplashScreen.hold so the intro actually plays. Bootstrap resolves in
-              // well under a second, so without the floor the redirect fires mid-animation and
-              // the brand screen is a red flicker. Only this path waits — a restored session goes
-              // straight through, and Try again below is immediate, because by then the customer
-              // has already seen the screen and is asking for something.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                Future<void>.delayed(SplashScreen.hold, () {
-                  if (mounted) _signIn();
-                });
-              });
-            }
+            // NOT an automatic redirect any more.
+            //
+            // This used to fire the Keycloak browser tab on its own, a frame after the splash. That
+            // is right for somebody who already has an account and wrong for everybody else: there
+            // was no way to create one from the app at all, and a first-time user's introduction to
+            // the platform was a browser showing a bare IP address asking for a password.
+            //
+            // The gate is a choice now, and every branch of it stays inside the app.
             if (_applyingToRide) {
               return RideWithUsScreen(
                 api: _onboardingApi,
                 onClose: () => setState(() => _applyingToRide = false),
               );
             }
-            return SplashScreen(
-              error: _signInError,
-              onRetry: () {
-                _autoSignInAttempted = true;
-                _signIn();
-              },
-              onApply: () => setState(() => _applyingToRide = true),
-            );
+            switch (_gate) {
+              case _Gate.signIn:
+                return SignInScreen(
+                  authService: _authService,
+                  onSignedIn: _adoptSession,
+                  onBack: () => setState(() => _gate = _Gate.welcome),
+                  onCreateAccount: () => setState(() => _gate = _Gate.signUp),
+                );
+              case _Gate.signUp:
+                return SignUpScreen(
+                  api: _onboardingApi,
+                  authService: _authService,
+                  onSignedIn: _adoptSession,
+                  onBack: () => setState(() => _gate = _Gate.welcome),
+                );
+              case _Gate.welcome:
+                return WelcomeScreen(
+                  onSignIn: () => setState(() => _gate = _Gate.signIn),
+                  onSignUp: () => setState(() => _gate = _Gate.signUp),
+                  onJoinAsPartner: () => setState(() => _applyingToRide = true),
+                );
+            }
           }
 
           // The role branch. A rider's queue wins when an account holds both, because the delivery

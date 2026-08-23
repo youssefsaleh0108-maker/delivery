@@ -1899,6 +1899,55 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get navDashboard => 'لوحة المتابعة';
 
   @override
+  String get createAccount => 'إنشاء حساب';
+
+  @override
+  String get orJoinUs => 'أو';
+
+  @override
+  String get sellOrDeliverWithUs => 'انضم إلينا بائعًا أو موصّلًا';
+
+  @override
+  String get welcomeBack => 'أهلًا بعودتك';
+
+  @override
+  String get usernameOrEmail => 'اسم المستخدم أو البريد الإلكتروني';
+
+  @override
+  String get password => 'كلمة المرور';
+
+  @override
+  String get hide => 'إخفاء';
+
+  @override
+  String get show => 'إظهار';
+
+  @override
+  String get noAccountYet => 'جديد هنا؟';
+
+  @override
+  String get couldNotReachTheServer =>
+      'تعذّر الوصول إلى الخادم. تحقّق من اتصالك وحاول مرة أخرى.';
+
+  @override
+  String get whatIsYourEmail => 'ما بريدك الإلكتروني؟';
+
+  @override
+  String get enterAValidEmail => 'أدخل بريدًا إلكترونيًا صحيحًا.';
+
+  @override
+  String get lastNameOptional => 'اسم العائلة (اختياري)';
+
+  @override
+  String get choosePassword => 'اختر كلمة مرور';
+
+  @override
+  String get atLeastEightCharacters => '٨ أحرف على الأقل';
+
+  @override
+  String get passwordTooShort => 'استخدم ٨ أحرف على الأقل.';
+
+  @override
   String get deliveryPortal => 'بوابة التوصيل';
 
   @override

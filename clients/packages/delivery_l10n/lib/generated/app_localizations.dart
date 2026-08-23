@@ -3428,6 +3428,102 @@ abstract class DeliveryStrings {
   /// **'Dashboard'**
   String get navDashboard;
 
+  /// No description provided for @createAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an account'**
+  String get createAccount;
+
+  /// No description provided for @orJoinUs.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get orJoinUs;
+
+  /// No description provided for @sellOrDeliverWithUs.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell or deliver with us'**
+  String get sellOrDeliverWithUs;
+
+  /// No description provided for @welcomeBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get welcomeBack;
+
+  /// No description provided for @usernameOrEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Username or email'**
+  String get usernameOrEmail;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @hide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get hide;
+
+  /// No description provided for @show.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get show;
+
+  /// No description provided for @noAccountYet.
+  ///
+  /// In en, this message translates to:
+  /// **'New here?'**
+  String get noAccountYet;
+
+  /// No description provided for @couldNotReachTheServer.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not reach the server. Check your connection and try again.'**
+  String get couldNotReachTheServer;
+
+  /// No description provided for @whatIsYourEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your email?'**
+  String get whatIsYourEmail;
+
+  /// No description provided for @enterAValidEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address.'**
+  String get enterAValidEmail;
+
+  /// No description provided for @lastNameOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Last name (optional)'**
+  String get lastNameOptional;
+
+  /// No description provided for @choosePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a password'**
+  String get choosePassword;
+
+  /// No description provided for @atLeastEightCharacters.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters'**
+  String get atLeastEightCharacters;
+
+  /// No description provided for @passwordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at least 8 characters.'**
+  String get passwordTooShort;
+
   /// No description provided for @deliveryPortal.
   ///
   /// In en, this message translates to:

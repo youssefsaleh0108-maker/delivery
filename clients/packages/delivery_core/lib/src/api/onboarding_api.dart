@@ -41,6 +41,30 @@ class OnboardingApi {
     return (token: body['token'] as String, destination: body['destination'] as String);
   }
 
+  /// Creates a shopper's own account.
+  ///
+  /// Not an application: a shopper is not reviewed, so this returns having already created the
+  /// account rather than a reference to follow. The caller signs in immediately afterwards with
+  /// the credentials just chosen.
+  ///
+  /// The token is the same proof the reviewed path uses, from [confirmCode] on this address. It is
+  /// what stops the endpoint creating accounts on addresses the caller does not own.
+  Future<void> signUp({
+    required String email,
+    required String verificationToken,
+    required String firstName,
+    String? lastName,
+    required String password,
+  }) async {
+    await _dio.post<dynamic>('/api/onboarding/signup', data: <String, dynamic>{
+      'email': email,
+      'verificationToken': verificationToken,
+      'firstName': firstName,
+      'lastName': lastName,
+      'password': password,
+    });
+  }
+
   /// Applies to ride for one company. Open, because getting an account is what is being asked for.
   Future<String> applyAsRider({
     required String name,

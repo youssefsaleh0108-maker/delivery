@@ -1,11 +1,26 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 import 'auth_config.dart';
 import 'delivery_role.dart';
 import 'oidc_client.dart';
 
 export 'auth_config.dart';
+
+/// A sign-in that failed for a reason worth showing the user.
+///
+/// Separate from the transport errors underneath it. "That username or password is not right" is
+/// something a person can act on; a SocketException is not, and collapsing the two would put
+/// network noise on a login form.
+class AuthException implements Exception {
+  const AuthException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 /// The signed-in user, as far as the client is concerned.
 class AuthSession {
@@ -94,6 +109,81 @@ class AuthService {
   Future<AuthSession?> signIn() async {
     final TokenSet? tokens = await _oidc.signIn(_config);
     return tokens == null ? null : _adopt(tokens);
+  }
+
+  /// Signs in from a form inside the app, with no browser.
+  ///
+  /// <p>The OAuth Resource Owner Password Credentials grant. It exists so the login screen can be
+  /// the app's own — a browser tab always shows its address bar, by deliberate anti-phishing design
+  /// in Android, so a raw IP was the first thing anybody saw when signing in.
+  ///
+  /// **Know what this trades away.** The password passes through the app rather than going straight
+  /// from the user to Keycloak, which means no SSO, no identity brokering, and no second factor:
+  /// there is no browser to render a challenge in. The spec discourages it for exactly that reason.
+  /// It is defensible here because this is a first-party app talking to the platform's own realm,
+  /// and it is the only way to get a native screen. Anything third-party must keep using [signIn].
+  ///
+  /// Throws [AuthException] on bad credentials so the caller can say so plainly; a 401 from
+  /// Keycloak here means the username or the password is wrong and nothing else.
+  Future<AuthSession> signInWithPassword(String username, String password) async {
+    final http.Response response = await http.post(
+      Uri.parse(_config.tokenEndpoint),
+      headers: const <String, String>{'Content-Type': 'application/x-www-form-urlencoded'},
+      body: <String, String>{
+        'grant_type': 'password',
+        'client_id': _config.clientId,
+        'username': username.trim(),
+        'password': password,
+        'scope': _config.scopes.join(' '),
+      },
+    );
+
+    if (response.statusCode != 200) {
+      // Keycloak distinguishes a disabled account from a wrong password in `error_description`,
+      // and that distinction is worth passing on: "account is disabled" is actionable and "wrong
+      // password" is not the same problem.
+      final String detail = _errorDescription(response.body);
+      throw AuthException(
+        response.statusCode == 401 || response.statusCode == 400
+            ? (detail.isEmpty ? 'That username or password is not right.' : detail)
+            : 'Could not sign in right now. Please try again.',
+      );
+    }
+
+    final Map<String, dynamic> body =
+        jsonDecode(response.body) as Map<String, dynamic>;
+    final String? accessToken = body['access_token'] as String?;
+    if (accessToken == null) {
+      throw const AuthException('Keycloak returned no access token.');
+    }
+
+    final int? expiresIn = body['expires_in'] as int?;
+    return _adopt(TokenSet(
+      accessToken: accessToken,
+      refreshToken: body['refresh_token'] as String?,
+      expiresAt: expiresIn == null
+          ? null
+          : DateTime.now().add(Duration(seconds: expiresIn)),
+    ));
+  }
+
+  /// Keycloak's own wording when it has one, rather than a message invented here.
+  static String _errorDescription(String body) {
+    try {
+      final Object? decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final Object? description = decoded['error_description'];
+        if (description is String && description.isNotEmpty) {
+          // Keycloak says "Invalid user credentials", which is accurate and unfriendly.
+          return description == 'Invalid user credentials'
+              ? 'That username or password is not right.'
+              : description;
+        }
+      }
+    } catch (_) {
+      // Not JSON. Fall through to the caller's default.
+    }
+    return '';
   }
 
   /// Call once at startup, before deciding which screen to show.

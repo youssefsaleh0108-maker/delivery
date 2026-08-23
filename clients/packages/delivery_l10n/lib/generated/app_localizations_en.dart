@@ -1906,6 +1906,55 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get navDashboard => 'Dashboard';
 
   @override
+  String get createAccount => 'Create an account';
+
+  @override
+  String get orJoinUs => 'or';
+
+  @override
+  String get sellOrDeliverWithUs => 'Sell or deliver with us';
+
+  @override
+  String get welcomeBack => 'Welcome back';
+
+  @override
+  String get usernameOrEmail => 'Username or email';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get hide => 'Hide';
+
+  @override
+  String get show => 'Show';
+
+  @override
+  String get noAccountYet => 'New here?';
+
+  @override
+  String get couldNotReachTheServer =>
+      'We could not reach the server. Check your connection and try again.';
+
+  @override
+  String get whatIsYourEmail => 'What\'s your email?';
+
+  @override
+  String get enterAValidEmail => 'Enter a valid email address.';
+
+  @override
+  String get lastNameOptional => 'Last name (optional)';
+
+  @override
+  String get choosePassword => 'Choose a password';
+
+  @override
+  String get atLeastEightCharacters => 'At least 8 characters';
+
+  @override
+  String get passwordTooShort => 'Use at least 8 characters.';
+
+  @override
   String get deliveryPortal => 'Delivery Portal';
 
   @override
