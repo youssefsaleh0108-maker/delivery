@@ -132,6 +132,20 @@
       "protocol": "openid-connect"
     },
     {
+      "clientId": "onboarding-service",
+      "name": "Onboarding Service service account",
+      "description": "Sends verification codes and applicant notifications through Notifications Manager. Its /direct endpoint requires BACKOFFICE, so this service account carries that role — the widest grant on the platform, held by the one service that must message people who have no account yet.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "onboarding-service-dev-secret",
+      "protocol": "openid-connect"
+    },
+    {
       "clientId": "accounting-service",
       "name": "Accounting Service service account",
       "description": "Resolves a Keycloak sub into the bank account that user settles through. Scoped to view-users only: a service that reads a payout account must not be able to write one.",
@@ -177,6 +191,14 @@
     ]
   },
   "users": [
+    {
+      "username": "service-account-onboarding-service",
+      "enabled": true,
+      "serviceAccountClientId": "onboarding-service",
+      "realmRoles": [
+        "BACKOFFICE"
+      ]
+    },
     {
       "username": "service-account-accounting-service",
       "enabled": true,

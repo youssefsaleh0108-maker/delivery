@@ -11,8 +11,16 @@ build/
 # Local environment credentials
 infra/.env
 .env
+# Per-environment copies: infra/.env.contabo holds the deployed box's real secrets, pulled down so
+# they can be read and edited without an SSH session. The wildcard is deliberately broad — a file
+# named after an environment is a file full of that environment's credentials, and the two
+# .example negations below are the only things that should ever be committed.
+.env.*
+infra/.env.*
 !.env.example
 !infra/.env.example
+!.env.dev.example
+!infra/.env.dev.example
 
 # IDE
 .idea/

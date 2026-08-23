@@ -53,7 +53,12 @@ CREATE INDEX IF NOT EXISTS config_properties_lookup
 -- browser client now, so there is one entry to forget.
 INSERT INTO config.config_properties (application, profile, label, prop_key, prop_value) VALUES
   ('application', 'default', 'main', 'delivery.security.allowed-client-ids[0]', 'mobile-app'),
-  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[1]', 'delivery-portal');
+  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[1]', 'delivery-portal'),
+  -- The onboarding service's SERVICE ACCOUNT. It is the one service whose token is checked by
+  -- this list, because it is the only one that calls another platform service rather than
+  -- Keycloak's admin API: it posts verification codes to Notifications Manager. Leave it out and
+  -- every sign-up fails at 'we could not send the code', with a 401 and no body.
+  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[2]', 'onboarding-service');
 
 -- Per-service datasource wiring. Each service's own application.yml defaults point at
 -- localhost:5433 for IDE use; these override that with the in-network address. Passwords are NOT
