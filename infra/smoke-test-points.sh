@@ -120,7 +120,17 @@ deliver_order() {
   echo "$oid"
 }
 
-PID=$(publish_product "$MERCHANT" "Points Pizza" 40.00)
+points_of() { curl -s "$GW/api/points/balance" -H "Authorization: Bearer $1" | jq -r '.points // 0'; }
+
+# Captured before anything is ordered. The balance is CUMULATIVE and this suite has almost
+# certainly run before, so "wait until points > 0" is instantly true and proves nothing — it was
+# already true from the previous run. Every wait below is against this baseline instead.
+BASELINE=$(points_of "$MERCHANT")
+
+# 250.00 rather than a token amount, deliberately. At the default merchant rate of 5 points per
+# unit that is 1250 points, which clears the 1000-point minimum redemption in ONE order. A cheap
+# product earns a few hundred and the redemption section below can never run.
+PID=$(publish_product "$MERCHANT" "Points Feast" 250.00)
 check 'a product is published' 'yes' "$([ -n "$PID" ] && [ "$PID" != null ] && echo yes || echo no)"
 
 ORDER=$(deliver_order "$MERCHANT" "$PID")
@@ -140,16 +150,19 @@ check 'no leg is left waiting on a bank' '0' "${PENDING:-none}"
 echo
 echo '=== 2. The delivered order earns points =========================================='
 
-wait_for 40 "[ \"\$(curl -s '$GW/api/points/balance' -H 'Authorization: Bearer $MERCHANT' | jq -r '.points // 0')\" -gt 0 ]" || true
+# Against the baseline, and on THIS order's ledger row rather than the balance — the award is
+# asynchronous off the bus, and a cumulative balance that was already non-zero says nothing about
+# whether this order landed.
+wait_for 40 "[ \"\$(curl -s '$GW/api/points/history?limit=200' -H 'Authorization: Bearer $MERCHANT' | jq '[.[] | select(.orderId==\"$ORDER\")] | length')\" -gt 0 ]" || true
 
 BAL=$(curl -s "$GW/api/points/balance" -H "Authorization: Bearer $MERCHANT")
 MPOINTS=$(echo "$BAL" | jq -r '.points // 0')
-check 'the merchant earned points' 'yes' "$([ "${MPOINTS:-0}" -gt 0 ] && echo yes || echo no)"
+check 'the merchant earned points' 'yes' "$([ "${MPOINTS:-0}" -gt "${BASELINE:-0}" ] && echo yes || echo no)"
 check 'the balance names the owner kind' 'MERCHANT' "$(echo "$BAL" | jq -r '.ownerKind')"
 check 'the balance carries a cash value' 'yes' \
   "$([ "$(echo "$BAL" | jq -r '.value // 0')" != '0' ] && echo yes || echo no)"
 
-LEDGER=$(curl -s "$GW/api/points/history" -H "Authorization: Bearer $MERCHANT")
+LEDGER=$(curl -s "$GW/api/points/history?limit=200" -H "Authorization: Bearer $MERCHANT")
 check 'the earning is on the ledger' 'ORDER_EARNED' "$(echo "$LEDGER" | jq -r '[.[] | select(.orderId=="'"$ORDER"'")][0].reason')"
 check 'and it names the order' "$ORDER" "$(echo "$LEDGER" | jq -r '[.[] | select(.orderId=="'"$ORDER"'")][0].orderId')"
 
@@ -158,7 +171,7 @@ echo '=== 3. A second delivery adds to the balance =============================
 
 PID2=$(publish_product "$MERCHANT" "Points Pasta" 25.00)
 ORDER2=$(deliver_order "$MERCHANT" "$PID2")
-wait_for 40 "[ \"\$(curl -s '$GW/api/points/balance' -H 'Authorization: Bearer $MERCHANT' | jq -r '.points // 0')\" -gt $MPOINTS ]" || true
+wait_for 40 "[ \"\$(curl -s '$GW/api/points/history?limit=200' -H 'Authorization: Bearer $MERCHANT' | jq '[.[] | select(.orderId==\"$ORDER2\")] | length')\" -gt 0 ]" || true
 MPOINTS2=$(curl -s "$GW/api/points/balance" -H "Authorization: Bearer $MERCHANT" | jq -r '.points // 0')
 check 'the balance grew' 'yes' "$([ "${MPOINTS2:-0}" -gt "${MPOINTS:-0}" ] && echo yes || echo no)"
 
