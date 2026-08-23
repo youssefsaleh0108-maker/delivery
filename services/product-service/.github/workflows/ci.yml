@@ -49,7 +49,11 @@ jobs:
           server-password: MAVEN_TOKEN
 
       - name: Build and test
-        run: mvn -B verify
+        # -U forces a snapshot re-check on every build. Without it Maven applies its default
+        # daily update policy to com.delivery:platform-*, so a service built minutes after a
+        # platform fix silently links against yesterday's jar — which is exactly how an image
+        # shipped with a library that still had the bug it was rebuilt to pick up.
+        run: mvn -B -U verify
         env:
           MAVEN_USERNAME: ${{ github.actor }}
           MAVEN_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}

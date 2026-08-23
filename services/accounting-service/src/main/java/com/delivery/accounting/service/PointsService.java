@@ -16,8 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.delivery.accounting.domain.PointsEntry;
 import com.delivery.accounting.domain.PointsEntry.OwnerKind;
 import com.delivery.accounting.domain.PointsRedemption;
-import com.delivery.accounting.domain.PointsRepositories.PointsEntryRepository;
-import com.delivery.accounting.domain.PointsRepositories.PointsRedemptionRepository;
+import com.delivery.accounting.domain.PointsEntryRepository;
+import com.delivery.accounting.domain.PointsRedemptionRepository;
 
 /**
  * Earning and redeeming points.

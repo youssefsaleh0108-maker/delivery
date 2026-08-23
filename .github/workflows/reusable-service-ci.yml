@@ -76,7 +76,7 @@ jobs:
       # The service depends on the platform-* libraries, so the reactor has to include them.
       # -am builds exactly this module and its dependencies, not all 16 services.
       - name: Build and test
-        run: mvn -B -pl ${{ inputs.service-path }} -am verify
+        run: mvn -B -U -pl ${{ inputs.service-path }} -am verify
 
       - name: Publish test report
         if: always()
