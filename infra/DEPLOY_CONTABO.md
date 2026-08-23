@@ -9,15 +9,15 @@ remains the laptop stack and is not used here.
 
 ## Read this first: it does not fit in RAM
 
-The ceilings in `docker-compose.dev.yml` sum to **7.75 GiB**. With the Docker daemon and the OS
-that is about **8.1 GiB**. The box reports:
+The ceilings in `docker-compose.dev.yml` sum to **6.72 GiB** across 22 services. With the Docker
+daemon and the OS that is about **7.1 GiB**. The box reports:
 
 ```
 Mem:  5.8Gi total,  5.3Gi available
 Swap: 0B
 ```
 
-**Roughly 2.9 GiB short, and no swap to absorb it.** Started as-is on a box in that state, the
+**Roughly 1.8 GiB short, and no swap to absorb it.** Started as-is on a box in that state, the
 kernel begins OOM-killing containers partway through the first `up`, and which ones die is decided
 by whatever it reaches first rather than by what matters.
 
@@ -167,9 +167,19 @@ docker compose -f docker-compose.dev.yml --env-file .env up -d
 ## What this environment is not
 
 - **Vault is `-dev`** — in-memory, fixed root token, every secret lost on restart.
-- **The Core Banking Simulator is deployed.** It is a fake bank with a fault-injection endpoint.
-- **Mailpit accepts any credentials** and holds every email and test SMS the platform sends.
 - **No TLS.** Everything above is plain HTTP, including the login flow, on a public IP.
 - **No backups.**
+- **It sends real email.** Mailpit is not deployed; the relay in `.env` is a real one, so a bad
+  recipient in test data reaches an actual mailbox. The SMS dev-passthrough provider mails every
+  simulated message there too.
+- **There is no bank.** The Core Banking connector and simulator are both gone. Settlement runs in
+  `LEDGER_ONLY` mode: the ledger records who is owed what and every leg is terminal as it is
+  written. Merchants and riders are paid in points they redeem, and a redemption is a request an
+  operator approves and pays by hand — nothing in the platform moves money.
+- **Card payment is still accepted and still parks.** `Payment.Method.CARD` exists and a card order
+  is recorded at `AUTHORIZATION_PENDING`, which never settles because no provider is integrated.
+  Cash-on-delivery-only has not been enforced yet, so a card order placed here is a stuck order.
+- **The points screens do not exist.** The API is live at `/api/points`; no client calls it, so
+  balances and redemptions are reachable only with `curl`.
 
-Do not put real customer data in it, and do not point the Core Banking connector at a live bank.
+Do not put real customer data in it.
