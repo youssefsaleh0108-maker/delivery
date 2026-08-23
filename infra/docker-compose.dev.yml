@@ -38,6 +38,9 @@ services:
     container_name: delivery-postgres
     mem_limit: 384m
     restart: unless-stopped
+    # Loopback only — psql or a GUI client over an SSH tunnel.
+    ports:
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_DB: delivery
       POSTGRES_USER: ${POSTGRES_USER:-delivery}
@@ -62,6 +65,9 @@ services:
     container_name: delivery-redis
     mem_limit: 80m
     restart: unless-stopped
+    # Loopback only — redis-cli over an SSH tunnel. Redis has no UI and no auth worth exposing.
+    ports:
+      - "127.0.0.1:6380:6379"
     command: >
       redis-server
       --appendonly yes
@@ -80,6 +86,10 @@ services:
     container_name: delivery-rabbitmq
     mem_limit: 224m
     restart: unless-stopped
+    # Management UI on loopback only: reach it with an SSH tunnel, never from the internet. A
+    # queue browser that can purge a queue is not something to publish.
+    ports:
+      - "127.0.0.1:15673:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-delivery}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-delivery}
