@@ -101,7 +101,7 @@ abstract class DeliveryStrings {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delivery'**
+  /// **'MYDelivery'**
   String get appTitle;
 
   /// No description provided for @navShops.

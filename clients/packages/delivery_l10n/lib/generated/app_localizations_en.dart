@@ -10,7 +10,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   DeliveryStringsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Delivery';
+  String get appTitle => 'MYDelivery';
 
   @override
   String get navShops => 'Shops';

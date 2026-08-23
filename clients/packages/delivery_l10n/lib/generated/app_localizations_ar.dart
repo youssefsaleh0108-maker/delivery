@@ -10,7 +10,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   DeliveryStringsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appTitle => 'توصيل';
+  String get appTitle => 'MYDelivery';
 
   @override
   String get navShops => 'المتاجر';
