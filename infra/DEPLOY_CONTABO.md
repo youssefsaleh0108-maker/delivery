@@ -94,11 +94,25 @@ Two things close it properly. First, this compose file publishes only 8100, 8180
 honours. Second, a belt-and-braces rule in `DOCKER-USER`, the chain Docker leaves for exactly this
 and never rewrites:
 
+**Match the CONTAINER ports, not the published ones.** Docker DNATs the destination port in
+`PREROUTING`, which runs *before* `FORWARD` and therefore before `DOCKER-USER`. By the time a packet
+reaches this chain, `8180` has already become `8080` and `9010` has become `9000`. A rule written
+against the published numbers silently matches nothing and the DROP catches the traffic:
+
+| Published | After DNAT | Match against `8180`? |
+| --- | --- | --- |
+| 8100 → Traefik | 8100 | yes, only because they happen to be equal |
+| 8180 → Keycloak | **8080** | no — dropped |
+| 9010 → MinIO | **9000** | no — dropped |
+
+The symptom is that the API works and login does not, from every device, with the box looking
+healthy throughout.
+
 ```bash
-# Allow the three public ports and anything already established; drop the rest before it reaches
-# a container. Replace eth0 if your public interface is named differently — check `ip route`.
+# Replace eth0 if your public interface is named differently — check `ip route`.
 iptables -I DOCKER-USER -i eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
-iptables -I DOCKER-USER -i eth0 -p tcp -m multiport --dports 8100,8180,9010 -j RETURN
+# 8100 Traefik, 8080 Keycloak, 9000 MinIO — the ports the CONTAINERS listen on.
+iptables -I DOCKER-USER 2 -i eth0 -p tcp -m multiport --dports 8100,8080,9000 -j RETURN
 iptables -A DOCKER-USER -i eth0 -j DROP
 ```
 
