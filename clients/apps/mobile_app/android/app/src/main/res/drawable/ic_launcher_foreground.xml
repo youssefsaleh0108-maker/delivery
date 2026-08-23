@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The bag from the app's own splash, as the adaptive-icon foreground.
+
+  A VECTOR rather than the five PNGs Flutter ships. Those were the stock Flutter logo — the giveaway
+  is their byte sizes, which are the framework defaults to the byte — so every install showed
+  somebody else's mark on the home screen. Drawing it once here means it is crisp at every density
+  and there is nothing to regenerate when a launcher invents a new one.
+
+  108x108 with the art inside the middle 72x72. Everything outside that safe zone can be cropped by
+  the launcher into a circle, a squircle or whatever the device prefers, so nothing meaningful is
+  allowed near the edge.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Handle. Drawn as a stroked arc so it reads as a loop rather than a filled blob. -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M 44,46 L 44,42 A 10,10 0 0 1 64,42 L 64,46" />
+
+    <!-- Body, with the corners rounded the same way the brand's cards are. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 38,46 L 70,46 A 5,5 0 0 1 75,51 L 75,74 A 6,6 0 0 1 69,80 L 39,80 A 6,6 0 0 1 33,74 L 33,51 A 5,5 0 0 1 38,46 Z" />
+
+    <!-- The two short rules to the left of the bag, lifted from the splash mark. Cut out of the
+         body in brand pink so they read at small sizes instead of turning into mush. -->
+    <path
+        android:fillColor="#C41D4E"
+        android:pathData="M 40,56 L 52,56 A 2.5,2.5 0 0 1 52,61 L 40,61 A 2.5,2.5 0 0 1 40,56 Z" />
+    <path
+        android:fillColor="#C41D4E"
+        android:pathData="M 40,66 L 48,66 A 2.5,2.5 0 0 1 48,71 L 40,71 A 2.5,2.5 0 0 1 40,66 Z" />
+</vector>

@@ -106,6 +106,67 @@ public class KeycloakAdminClient {
         return userId;
     }
 
+    /**
+     * Creates a customer's own account, with the password they just chose.
+     *
+     * <p>Three deliberate differences from {@link #createPartner}, and each of them follows from
+     * the customer being present at the keyboard rather than being provisioned later by somebody
+     * else:
+     *
+     * <ul>
+     *   <li>The password is set here, not left as an {@code UPDATE_PASSWORD} required action. A
+     *       shopper who has just typed a password twice should not be asked for a new one at their
+     *       first login.
+     *   <li>{@code emailVerified} is true. It genuinely is — a one-time code was sent to that
+     *       address and answered before this is called, and the proof is spent in the same
+     *       transaction.
+     *   <li>The role is CUSTOMER. Nothing on this path can grant anything else; a merchant or a
+     *       rider account is what the reviewed onboarding flow is for.
+     * </ul>
+     *
+     * @return the Keycloak {@code sub}
+     */
+    public String createCustomer(String email, String firstName, String lastName, String password) {
+        String bearer = adminToken();
+
+        Map<String, Object> user = Map.of(
+                "username", email,
+                "email", email,
+                "firstName", firstName == null ? "" : firstName,
+                "lastName", lastName == null ? "" : lastName,
+                "enabled", true,
+                // Verified before we got here — see the class note.
+                "emailVerified", true,
+                "credentials", List.of(Map.of(
+                        "type", "password",
+                        "value", password,
+                        // Not a one-time credential: this is the password they chose and expect to
+                        // use. `temporary: true` would force a reset screen on first sign-in.
+                        "temporary", false)));
+
+        try {
+            keycloak.post()
+                    .uri("/admin/realms/{realm}/users", realm)
+                    .header("Authorization", "Bearer " + bearer)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(user)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            // A 409 here means somebody already has an account on that email. Said plainly rather
+            // than as a generic failure: the caller has verified the address, so the person on the
+            // other end owns it and the useful answer is "you already have an account".
+            log.warn("Could not create a customer account for {}: {}", email, e.getMessage());
+            throw new ProvisioningException(
+                    "An account already exists for that email address");
+        }
+
+        String userId = findUserId(bearer, email);
+        assignRealmRole(bearer, userId, "CUSTOMER");
+        log.info("Signed up {} as CUSTOMER", email);
+        return userId;
+    }
+
     private String findUserId(String bearer, String email) {
         JsonNode found = keycloak.get()
                 .uri(uri -> uri.path("/admin/realms/{realm}/users")

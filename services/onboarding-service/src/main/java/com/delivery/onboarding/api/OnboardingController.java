@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.domain.ContactVerification;
 import com.delivery.onboarding.domain.OnboardingApplication;
+import com.delivery.onboarding.service.CustomerSignUpService;
 import com.delivery.onboarding.service.OnboardingService;
 import com.delivery.onboarding.service.VerificationService;
 import com.delivery.platform.security.CurrentUser;
@@ -48,12 +49,14 @@ public class OnboardingController {
     private final OnboardingService onboarding;
     private final VerificationService verifications;
     private final PlatformClient platform;
+    private final CustomerSignUpService signUps;
 
     public OnboardingController(OnboardingService onboarding, VerificationService verifications,
-                                PlatformClient platform) {
+                                PlatformClient platform, CustomerSignUpService signUps) {
         this.onboarding = onboarding;
         this.verifications = verifications;
         this.platform = platform;
+        this.signUps = signUps;
     }
 
     // ---------------------------------------------------------------- shapes
@@ -88,6 +91,23 @@ public class OnboardingController {
             @NotNull ContactVerification.Channel channel,
             @NotBlank @Size(max = 255) String destination,
             @NotBlank @Size(max = 12) String code) {
+    }
+
+    /**
+     * A shopper creating their own account.
+     *
+     * @param verificationToken proof the email was confirmed, from
+     *                          {@code POST /verifications/confirm} on this same address
+     * @param password          minimum eight characters. Length is the only rule enforced here on
+     *                          purpose — Keycloak's realm policy is the authority on what a
+     *                          password must be, and duplicating it would mean two rules that drift
+     */
+    public record SignUpRequest(
+            @NotBlank @Email @Size(max = 200) String email,
+            @NotBlank @Size(max = 64) String verificationToken,
+            @NotBlank @Size(max = 80) String firstName,
+            @Size(max = 80) String lastName,
+            @NotBlank @Size(min = 8, max = 128) String password) {
     }
 
     /**
@@ -151,6 +171,29 @@ public class OnboardingController {
                 request.targetProviderId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApplicationReceipt.of(application));
+    }
+
+    /**
+     * Creating a shopper's account.
+     *
+     * <p>No authentication and no review. A merchant or a rider is reviewed because the platform is
+     * deciding whether to do business with them; a shopper is not, and nobody waits for approval to
+     * order dinner.
+     *
+     * <p>What it is NOT open to is an unverified address. The token proves a one-time code was sent
+     * to that email and answered, and it is spent here — without that this endpoint would create
+     * accounts on addresses the caller does not own.
+     *
+     * <p>Returns 201 and nothing else. The app signs in immediately afterwards with the credentials
+     * the person just chose, so there is no token to hand back and nothing here worth returning
+     * that a caller could not already know.
+     */
+    @PostMapping("/signup")
+    public ResponseEntity<Map<String, String>> signUp(@Valid @RequestBody SignUpRequest request) {
+        signUps.signUp(request.email(), request.verificationToken(),
+                request.firstName(), request.lastName(), request.password());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("email", request.email()));
     }
 
     /**

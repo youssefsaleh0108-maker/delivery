@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DeliveryColors.brand. Kept as a colour resource rather than baked into the vector so the icon
+     background and the app's own brand token cannot drift apart silently. -->
+<resources>
+    <color name="ic_launcher_background">#C41D4E</color>
+</resources>
