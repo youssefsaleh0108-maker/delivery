@@ -187,6 +187,12 @@
         "roles": [
           "view-users"
         ]
+      },
+      {
+        "client": "onboarding-service",
+        "roles": [
+          "manage-users"
+        ]
       }
     ]
   },
@@ -197,7 +203,12 @@
       "serviceAccountClientId": "onboarding-service",
       "realmRoles": [
         "BACKOFFICE"
-      ]
+      ],
+      "clientRoles": {
+        "realm-management": [
+          "manage-users"
+        ]
+      }
     },
     {
       "username": "service-account-accounting-service",

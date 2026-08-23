@@ -1,0 +1,24 @@
+name: onboarding-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/onboarding-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+      - '.github/workflows/reusable-service-ci.yml'
+      - '.github/workflows/onboarding-service.yml'
+  pull_request:
+    paths:
+      - 'services/onboarding-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service-name: onboarding-service
+      service-path: services/onboarding-service
+    secrets: inherit

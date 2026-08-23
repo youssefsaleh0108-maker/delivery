@@ -1,0 +1,24 @@
+name: whatsapp-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/whatsapp-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+      - '.github/workflows/reusable-service-ci.yml'
+      - '.github/workflows/whatsapp-service.yml'
+  pull_request:
+    paths:
+      - 'services/whatsapp-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service-name: whatsapp-service
+      service-path: services/whatsapp-service
+    secrets: inherit
