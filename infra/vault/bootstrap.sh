@@ -40,9 +40,14 @@ echo "==> Seeding dev secrets"
 # receives these merged in and cannot tell they came from a different backend (Section 6).
 
 # Shared across all services.
+# Taken from the environment, not hardcoded. These are the credentials of the SHARED
+# infrastructure — the same RabbitMQ and Redis the compose file starts with generated passwords —
+# so a literal here means Vault hands every service a password that was correct on a laptop and is
+# wrong on any box with a real .env. The service DB passwords below are different: those match
+# postgres/init/02-service-roles.sql, which hardcodes them too, so both sides move together.
 vault kv put secret/application \
-  spring.rabbitmq.password="delivery" \
-  spring.data.redis.password="delivery"
+  spring.rabbitmq.password="${RABBITMQ_PASSWORD:-delivery}" \
+  spring.data.redis.password="${REDIS_PASSWORD:-delivery}"
 
 # Per-service database credentials, matching the roles created in postgres/init/02-service-roles.sql.
 # Product Service also holds MinIO credentials, because it issues presigned URLs for product
@@ -50,11 +55,11 @@ vault kv put secret/application \
 # URL after checking the caller's role and ownership.
 vault kv put secret/product-service \
   spring.datasource.password="product_service_dev_pw" \
-  delivery.storage.minio.access-key="delivery" \
-  delivery.storage.minio.secret-key="delivery123"
+  delivery.storage.minio.access-key="${MINIO_ROOT_USER:-delivery}" \
+  delivery.storage.minio.secret-key="${MINIO_ROOT_PASSWORD:-delivery123}"
 vault kv put secret/order-manager      spring.datasource.password="order_manager_dev_pw"
 vault kv put secret/order-tracking     spring.datasource.password="order_tracking_dev_pw" \
-                                       spring.data.redis.password="delivery"
+                                       spring.data.redis.password="${REDIS_PASSWORD:-delivery}"
 vault kv put secret/connector-settings spring.datasource.password="connector_settings_dev_pw"
 
 # The notification layer. Both services own tables in the `notification` schema and share its
@@ -76,8 +81,8 @@ vault kv put secret/corebanking-simulator \
 
 # MinIO credentials for the file service (Section 5: no client ever holds these).
 vault kv put secret/file-service \
-  delivery.storage.minio.access-key="delivery" \
-  delivery.storage.minio.secret-key="delivery123"
+  delivery.storage.minio.access-key="${MINIO_ROOT_USER:-delivery}" \
+  delivery.storage.minio.secret-key="${MINIO_ROOT_PASSWORD:-delivery123}"
 
 # Connector credential slots. Empty on purpose - Phase 3/4 fills them, and the SMS connector runs
 # in dev-passthrough mode until a commercial decision is made between MontyMobile and Twilio

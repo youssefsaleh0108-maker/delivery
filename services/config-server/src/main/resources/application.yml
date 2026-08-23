@@ -98,6 +98,17 @@ spring:
         composite:
           - type: jdbc
             sql: "SELECT prop_key, prop_value FROM config_properties WHERE application=? AND profile=? AND label=? ORDER BY prop_key"
+            # REQUIRED, and not covered by the global default-label above.
+            #
+            # JdbcEnvironmentRepository carries its own defaultLabel, which is "master". The global
+            # spring.cloud.config.server.default-label does not propagate into a composite entry, so
+            # without this the server queries label='master', matches zero rows, and — because
+            # Spring omits an empty property source rather than reporting one — returns a response
+            # that looks structurally fine with the entire database half simply absent.
+            #
+            # That is the failure mode worth naming: not an error, just missing configuration.
+            # Every service then boots and dies on its first query with no datasource.
+            default-label: ${CONFIG_DEFAULT_LABEL:main}
           - type: vault
             host: ${VAULT_HOST:localhost}
             port: ${VAULT_PORT:8200}
@@ -106,6 +117,23 @@ spring:
             kv-version: 2
             default-key: application
             profile-separator: '/'
+            # REPEATED HERE, not only in the global block above, and both are load-bearing.
+            #
+            # In composite mode each repository is built from ITS OWN entry map. The global block
+            # configures the Vault client bean; this is what tells THIS repository to authenticate
+            # with AppRole. With it absent the entry defaults to TOKEN auth and every request fails
+            # with "Missing required header in HttpServletRequest: X-Config-Token" — the server
+            # starts and reports healthy, and every other service then dies at boot on a 400 it
+            # cannot explain.
+            #
+            # This was never caught locally because application-local.yml carries the auth inside
+            # its composite entry, so the profile that gets run and the profile that gets deployed
+            # were configured differently. Found on the first real deploy.
+            authentication: APPROLE
+            app-role:
+              role-id: ${VAULT_ROLE_ID}
+              secret-id: ${VAULT_SECRET_ID}
+              app-role-path: approle
 
 management:
   endpoints:

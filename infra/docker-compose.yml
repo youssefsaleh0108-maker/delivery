@@ -33,6 +33,10 @@ services:
       POSTGRES_DB: delivery
       POSTGRES_USER: ${POSTGRES_USER:-delivery}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
+      # Read by init/04-config-role-password.sh, which aligns the config_server role with what
+      # the Config Server actually presents. Without it that role keeps the dev password from
+      # 03-config-properties.sql and every service dies at boot on a 500 from the Config Server.
+      CONFIG_DB_PASSWORD: ${CONFIG_DB_PASSWORD:-config_server_dev_pw}
     ports:
       - "5433:5432"
     volumes:
@@ -195,6 +199,11 @@ services:
       VAULT_TOKEN: ${VAULT_ROOT_TOKEN:-delivery-root-token}
       CONFIG_SERVER_ROLE_ID: ${VAULT_ROLE_ID:-config-server-dev-role-id}
       CONFIG_SERVER_SECRET_ID: ${VAULT_SECRET_ID:-config-server-dev-secret-id}
+      # Seeded into Vault so the values it hands out match the services compose actually started.
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-delivery}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-delivery}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-delivery123}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     volumes:
