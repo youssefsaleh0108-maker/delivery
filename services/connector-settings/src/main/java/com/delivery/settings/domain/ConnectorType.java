@@ -29,8 +29,21 @@ public enum ConnectorType {
      */
     PUSH(List.of("DEV_LOG", "FIREBASE")),
 
-    /** SIMULATOR in dev, REAL in staging/prod. The toggle is exposed for demos and testing. */
-    CORE_BANKING(List.of("SIMULATOR", "REAL"));
+    /**
+     * Three, and the difference between the first two matters.
+     *
+     * <p>MOCK is in-process: it accepts every posting, returns a {@code MOCK-} reference and moves
+     * nothing. It is what lets the settlement saga complete and reconciliation report on an
+     * environment with no simulator deployed and no banking agreement.
+     *
+     * <p>SIMULATOR is a separate deployable with a real ledger and a fault-injection endpoint —
+     * the one to pick when the point is to test what happens when a bank refuses or breaks, which
+     * MOCK by design never does.
+     *
+     * <p>REAL refuses every posting until the bank's published spec exists. Selecting it before
+     * then is a misconfiguration, and RealBankClient says so loudly rather than failing quietly.
+     */
+    CORE_BANKING(List.of("MOCK", "SIMULATOR", "REAL"));
 
     private final List<String> providers;
 

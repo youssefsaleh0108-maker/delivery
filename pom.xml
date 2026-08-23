@@ -66,8 +66,6 @@
     <!-- Phase 4, accounting. The simulator is dev-only; the connector and the saga ship
          everywhere, with the simulator/real toggle exposed through the Backoffice. -->
     <module>services/accounting-service</module>
-    <module>services/corebanking-connector</module>
-    <module>services/corebanking-simulator</module>
 
     <!-- WhatsApp ordering. Its own deployable because it is the only service holding a messaging
          vendor's credentials and the only one exposed to a public webhook — the same reasoning that

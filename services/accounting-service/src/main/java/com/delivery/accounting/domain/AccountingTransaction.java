@@ -194,6 +194,27 @@ public class AccountingTransaction {
         return entry;
     }
 
+    /**
+     * Turns an already-built leg into one that records the obligation and asks no bank.
+     *
+     * <p>What {@code LEDGER_ONLY} settlement is made of. The platform runs cash-on-delivery and
+     * pays merchants and riders in points rather than bank transfers, so every leg is discharged
+     * outside any bank — the customer handed over notes, and what the platform owes from there is
+     * a points balance, not a payment instruction.
+     *
+     * <p>A mutator rather than a second factory because the legs are built once, by rules that have
+     * nothing to do with how they will be discharged. Duplicating that construction for two
+     * settlement modes is how the two drift apart.
+     *
+     * <p>Reuses {@link Status#SETTLED_IN_CASH} rather than inventing a status: its whole purpose is
+     * to mark a leg that is done and that no bank statement will ever show, which is exactly this.
+     */
+    public void recordWithoutBank() {
+        this.postingRequired = false;
+        this.status = Status.SETTLED_IN_CASH;
+        this.postedAt = Instant.now();
+    }
+
     public boolean isPostingRequired() {
         return postingRequired;
     }

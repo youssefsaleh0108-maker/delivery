@@ -46,7 +46,7 @@ groups:
           summary: "{{ $value }} settlement leg(s) pending far longer than they should be"
           description: >-
             Legs have sat PENDING past the configured threshold. If the bank is up, suspect a
-            posting result that was never delivered — check the corebanking-connector dead-letter
+            posting result that was never delivered — check the accounting dead-letter
             queue.
 
   - name: outbox

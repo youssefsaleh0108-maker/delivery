@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.service.AccountDirectory;
+import com.delivery.accounting.service.PointsService;
 import com.delivery.accounting.service.SettlementService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,12 +36,14 @@ public class OrderEventListener {
 
     private final SettlementService settlements;
     private final AccountDirectory accounts;
+    private final PointsService points;
     private final ObjectMapper objectMapper;
 
     public OrderEventListener(SettlementService settlements, AccountDirectory accounts,
-                              ObjectMapper objectMapper) {
+                              PointsService points, ObjectMapper objectMapper) {
         this.settlements = settlements;
         this.accounts = accounts;
+        this.points = points;
         this.objectMapper = objectMapper;
     }
 
@@ -170,6 +173,22 @@ public class OrderEventListener {
                         holder, correlationId, waivers);
             }
 
+            // Points, which is what the merchant and the carrier can actually convert into money.
+            //
+            // AFTER settlement and deliberately not inside it. The ledger above records who is owed
+            // what and would be the source of a bank posting; points are what the platform pays
+            // out today. Keeping them separate is what lets the bank path come back without
+            // unpicking the reward scheme, and vice versa.
+            //
+            // In its own try: a points failure must not stop a settled order being settled. The
+            // ledger is the record that matters, and points can be adjusted by an operator; losing
+            // the settlement to a points bug cannot be repaired the same way.
+            try {
+                awardPoints(event, orderId, merchantId, riderId, errand);
+            } catch (Exception e) {
+                log.error("Settled order {} but could not award points", orderId, e);
+            }
+
         } catch (Exception e) {
             log.error("Could not start settlement for event: {}", payload, e);
 
@@ -178,5 +197,43 @@ public class OrderEventListener {
                 MDC.remove("correlationId");
             }
         }
+    }
+
+    /**
+     * Works out who earned what, and from which amount.
+     *
+     * <p>The shop earns on the goods it sold; whoever carried the order earns on the delivery fee.
+     * Both from the total would pay each of them for the other's work.
+     *
+     * <p>An errand has no shop — the rider bought the goods themselves and is reimbursed, not
+     * commissioned — so only the delivery half is awarded.
+     *
+     * <p>{@code deliveryProviderId} names the fleet and {@code deliveryProviderAccount} is null for
+     * the platform's own riders. That null is the discriminator: a rider with a company behind them
+     * earns into the company's balance tagged with their id, and a platform rider holds their own.
+     * Reusing the existing field rather than adding one keeps the event shape unchanged.
+     */
+    private void awardPoints(JsonNode event, UUID orderId, String merchantId, String riderId,
+                             boolean errand) {
+
+        JsonNode fee = event.path("deliveryFee");
+        BigDecimal deliveryFee = fee.isNumber() ? fee.decimalValue() : null;
+
+        JsonNode subtotal = event.path("subtotal");
+        BigDecimal goods = subtotal.isNumber() ? subtotal.decimalValue() : null;
+
+        String carrierAccount = event.path("deliveryProviderAccount").asText(null);
+        String carrierRef = carrierAccount == null
+                ? null
+                : event.path("deliveryProviderId").asText(null);
+
+        points.awardForDelivery(
+                orderId,
+                // No shop earns on an errand: there was not one.
+                errand ? null : merchantId,
+                goods,
+                riderId,
+                carrierRef,
+                deliveryFee);
     }
 }

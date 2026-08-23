@@ -59,7 +59,9 @@ class SettlementWaiverTest {
     private SettlementService service() {
         // 12.5% on goods, 10% of the delivery fee — the platform's real rates.
         return new SettlementService(transactions, floatEntries, postings,
-                new BigDecimal("12.5"), new BigDecimal("10"), PLATFORM, "USD");
+                new BigDecimal("12.5"), new BigDecimal("10"), PLATFORM, "USD",
+                // BANK: these assert the leg arithmetic as it reaches the bank path.
+                SettlementService.SettlementMode.BANK);
     }
 
     /**

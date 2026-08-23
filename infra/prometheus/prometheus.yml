@@ -50,7 +50,6 @@ scrape_configs:
           - 'email-connector:8110'
           - 'push-connector:8111'
           - 'sms-connector:8112'
-          - 'corebanking-connector:8113'
           - 'accounting-service:8115'
           - 'whatsapp-service:8116'
           - 'onboarding-service:8117'

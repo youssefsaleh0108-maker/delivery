@@ -14,7 +14,6 @@
 #   8102 order-tracking    8109 connector-settings   8111 push-connector
 #   8103 product-service                             8112 sms-connector
 #   8104 notifications-mgr
-#   8113 corebanking-connector   8114 corebanking-simulator (DEV ONLY)
 #   8115 accounting-service      8116 whatsapp-service   8117 onboarding-service
 #
 # 8105-8107 are retired. They held mail-worker, push-worker and sms-worker, each of which is now
@@ -635,11 +634,13 @@ services:
 
   # ---------------------------------------------------------------- accounting (Phase 4)
   #
-  # Three services, and the split is the point. accounting-service holds the business rules and a
-  # database but no credentials; corebanking-connector holds the bank credentials and nothing else;
-  # corebanking-simulator stands in for a system outside the platform entirely. Section 10 singles
-  # the bank out as the most sensitive integration in the system, and this is what "isolate it"
-  # looks like in practice.
+  # One service now, not three. corebanking-connector and corebanking-simulator are gone: the
+  # platform runs cash on delivery and pays merchants and riders in points they redeem, so there is
+  # no bank to talk to and nothing to isolate from.
+  #
+  # The settlement ledger is unchanged and still records who is owed what. What changed is how a
+  # leg is discharged: delivery.accounting.settlement-mode is LEDGER_ONLY, so legs are terminal as
+  # they are written. Set it to BANK and redeploy a connector to switch back.
 
   accounting-service:
     build:
@@ -672,66 +673,6 @@ services:
       keycloak:
         condition: service_healthy
     networks: [delivery]
-
-  corebanking-connector:
-    build:
-      context: ../services/corebanking-connector
-    image: delivery/corebanking-connector:0.1.0
-    container_name: delivery-corebanking-connector
-    environment:
-      SERVER_PORT: 8113
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
-      COREBANKING_SIMULATOR_URL: http://corebanking-simulator:8114
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
-    ports:
-      - "8113:8113"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [delivery]
-
-  # DEV ONLY. Section 7 is explicit that this is never deployed to staging or production - there,
-  # the same connector points at the real bank through the Backoffice toggle.
-  corebanking-simulator:
-    build:
-      context: ../services/corebanking-simulator
-    image: delivery/corebanking-simulator:0.1.0
-    container_name: delivery-corebanking-simulator
-    environment:
-      SERVER_PORT: 8114
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      BANK_API_KEY: ${BANK_API_KEY:-simulator-dev-key}
-      FAULT_INJECTION_ENABLED: "true"
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
-    ports:
-      - "8114:8114"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    networks: [delivery]
-
-  # ------------------------------------------------------------------------ WhatsApp ordering
-  #
-  # Its own deployable for the same two reasons the notification connectors are: it is the only
-  # process holding a messaging vendor's credentials, and it is the only one exposed to a public
-  # webhook. Both are reasons to be able to restart, scale and roll it back on its own.
   whatsapp-service:
     build:
       context: ../services/whatsapp-service

@@ -64,7 +64,11 @@ class SettlementServiceTest {
 
     private SettlementService serviceAt(String commissionPercentage) {
         return new SettlementService(transactions, floatEntries, postings,
-                new BigDecimal(commissionPercentage), new BigDecimal("10"), PLATFORM, "USD");
+                new BigDecimal(commissionPercentage), new BigDecimal("10"), PLATFORM, "USD",
+                // BANK explicitly: everything below asserts the bank path — legs opening PENDING,
+                // the posting sequence, the compensation on a refusal. Under LEDGER_ONLY every leg
+                // is terminal at birth and none of it would run.
+                SettlementService.SettlementMode.BANK);
     }
 
     /** An order with no delivery fee: the whole total is goods, so the base equals the total. */

@@ -658,14 +658,11 @@ services:
 
   # ---------------------------------------------------------------- accounting (Phase 4)
   #
-  # Two services here, not the three the laptop stack runs. accounting-service holds the business
-  # rules and a database but no credentials; corebanking-connector holds the bank credentials and
-  # nothing else. Section 10 singles the bank out as the most sensitive integration in the system,
-  # and this is what "isolate it" looks like in practice.
+  # One service. The Core Banking connector and simulator are both gone — the platform runs cash on
+  # delivery and pays in points, so there is no bank in the picture at all.
   #
-  # corebanking-simulator is NOT deployed here — it is a fake bank with a fault-injection endpoint,
-  # and this environment is meant to talk to the real one. See the REAL_BANK_* note below for why
-  # settlement does not yet complete as a result.
+  # Settlement still records who is owed what; delivery.accounting.settlement-mode is LEDGER_ONLY,
+  # so every leg is terminal as it is written rather than waiting on a bank nobody deployed.
 
   accounting-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-accounting-service:${IMAGE_TAG:-main}
@@ -699,49 +696,6 @@ services:
       rabbitmq:
         condition: service_healthy
       keycloak:
-        condition: service_healthy
-    networks: [delivery]
-
-  corebanking-connector:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-corebanking-connector:${IMAGE_TAG:-main}
-    container_name: delivery-corebanking-connector
-    mem_limit: 288m
-    restart: unless-stopped
-    environment:
-      SERVER_PORT: 8113
-      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
-      # shared box: the throughput collectors cost more in threads and metaspace than they return.
-      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
-      CONNECTOR_SETTINGS_URL: http://connector-settings:8109
-      # The real bank. The simulator is not deployed here, so there is nothing to fall back to.
-      #
-      # READ THIS BEFORE SWITCHING THE PROVIDER: RealBankClient is a deliberate stub. It refuses
-      # every posting and logs why, because the bank's published spec does not exist yet. Setting
-      # CORE_BANKING to REAL in the Backoffice with these blank makes every settlement fail
-      # permanently — the saga compensates rather than retrying, so an order settles nobody.
-      #
-      # Until RealBankClient is implemented against a real spec, accounting cannot complete on this
-      # environment at all. That is the cost of dropping the simulator, and it is deliberate.
-      REAL_BANK_URL: ${REAL_BANK_URL:-}
-      REAL_BANK_CLIENT_ID: ${REAL_BANK_CLIENT_ID:-}
-      REAL_BANK_CLIENT_SECRET: ${REAL_BANK_CLIENT_SECRET:-}
-      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
-      # does not resolve on every span and floods the log with export failures.
-      OTEL_SDK_DISABLED: "true"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
     networks: [delivery]
   whatsapp-service:

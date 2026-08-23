@@ -40,9 +40,35 @@ public class SettlementService {
 
     private static final Logger log = LoggerFactory.getLogger(SettlementService.class);
 
+    /**
+     * How a settled leg is discharged.
+     *
+     * <p>A switch rather than a deletion. The bank path — the postings queue, the Core Banking
+     * connector's provider abstraction, the sync log, the compensation on a refused posting — is
+     * built and tested, and the intent is to return to it once there is a banking agreement. What
+     * changed is that there is no bank today, so nothing should be waiting for one.
+     */
+    public enum SettlementMode {
+        /**
+         * Record who is owed what and ask no bank. Every leg is terminal as it is written.
+         *
+         * <p>What the platform runs on now: cash on delivery, and merchants and riders paid in
+         * points they redeem, rather than bank transfers.
+         */
+        LEDGER_ONLY,
+        /**
+         * Publish each leg to the Core Banking connector and advance on its answer.
+         *
+         * <p>Requires that connector to be deployed. It is not, so selecting this leaves every
+         * credit PENDING forever.
+         */
+        BANK
+    }
+
     private final AccountingTransactionRepository transactions;
     private final CashFloatRepository floatEntries;
     private final BankPostingPublisher postings;
+    private final SettlementMode settlementMode;
     private final BigDecimal commissionPercentage;
     private final BigDecimal deliveryCommissionPercentage;
     private final String platformAccount;
@@ -60,10 +86,16 @@ public class SettlementService {
                              BigDecimal deliveryCommissionPercentage,
                              @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
                              String platformAccount,
-                             @Value("${delivery.accounting.currency:USD}") String currency) {
+                             @Value("${delivery.accounting.currency:USD}") String currency,
+                             // LEDGER_ONLY by default, and deliberately so: a default that waits
+                             // for a bank nobody deployed leaves every credit PENDING and pays no
+                             // one, which is a worse failure than a ledger that settles too easily.
+                             @Value("${delivery.accounting.settlement-mode:LEDGER_ONLY}")
+                             SettlementMode settlementMode) {
         this.transactions = transactions;
         this.floatEntries = floatEntries;
         this.postings = postings;
+        this.settlementMode = settlementMode;
         this.commissionPercentage = commissionPercentage;
         this.deliveryCommissionPercentage = deliveryCommissionPercentage;
         this.platformAccount = platformAccount;
@@ -433,6 +465,23 @@ public class SettlementService {
      * the cash is collected and both credits sit at PENDING forever.
      */
     private void openWithTheBank(List<AccountingTransaction> legs) {
+        // LEDGER_ONLY: there is no bank and no Core Banking connector deployed. Every leg is marked
+        // discharged outside any bank as it is written, so nothing is published and the saga has
+        // nothing left to wait for.
+        //
+        // The alternative — leaving the legs PENDING with no consumer on the postings queue — is
+        // the failure this guard exists to prevent: the order delivers, the customer pays cash, and
+        // every credit sits PENDING forever while the reconciliation screen reports a platform that
+        // has settled nobody.
+        //
+        // The whole bank path below is intact and switched by one property, because the intent is
+        // to move back to it once there is a banking agreement.
+        if (settlementMode == SettlementMode.LEDGER_ONLY) {
+            legs.forEach(AccountingTransaction::recordWithoutBank);
+            transactions.saveAll(legs);
+            return;
+        }
+
         legs.stream()
                 .filter(AccountingTransaction::isPostingRequired)
                 .findFirst()

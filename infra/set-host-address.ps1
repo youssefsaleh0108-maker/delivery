@@ -95,7 +95,6 @@ $services = @(
     'product-service', 'order-manager', 'order-tracking',
     'notifications-manager', 'connector-settings', 'app-notification', 'accounting-service',
     'email-connector', 'sms-connector', 'push-connector',
-    'corebanking-connector', 'corebanking-simulator',
     'whatsapp-service', 'onboarding-service'
 )
 Push-Location $infra
