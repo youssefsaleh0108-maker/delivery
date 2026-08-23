@@ -44,13 +44,18 @@
     <module>services/config-server</module>
     <module>services/product-service</module>
     <!--
-      Restored from https://github.com/youssefsaleh0108-maker/delivery.order-manager, which is
-      where this module already lived — the directory was empty in the monorepo checkout, not the
-      source lost. Until it was cloned back, every /api/orders call 504'd and this line had to stay
-      commented out, because Maven fails at model-building on a missing child module and that broke
-      even per-service CI (it runs `mvn -pl <service> -am`, loading this reactor regardless).
+      services/order-manager is deliberately NOT here. It lives in its own repository,
+      https://github.com/youssefsaleh0108-maker/delivery.order-manager, and builds through its own
+      pipeline, so in a checkout of THIS repository the directory is empty.
+
+      Listing it anyway is what kept every service build broken: Maven fails at model-building on a
+      missing child module, and per-service CI runs `mvn -pl <service> -am`, which loads this
+      reactor regardless of which service it was asked for. So one absent directory failed all of
+      them, with an error naming order-manager in a job called sms-connector.
+
+      Clone it into services/order-manager to build it locally; .gitignore keeps git from recording
+      that clone as a gitlink and reintroducing the same empty directory.
     -->
-    <module>services/order-manager</module>
     <module>services/order-tracking</module>
     <module>services/connector-settings</module>
 

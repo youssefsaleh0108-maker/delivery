@@ -62,6 +62,8 @@ jobs:
       packages: write
       # Needed to upload SARIF from the dependency scan below.
       security-events: write
+      # The JUnit reporter publishes results as a check run.
+      checks: write
 
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +103,9 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload scan results
-        if: always()
+        # hashFiles is empty when Trivy wrote nothing, which happens whenever the scan itself
+        # failed. Without this the advisory scan above still fails the build, through the upload.
+        if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif

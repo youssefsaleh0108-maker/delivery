@@ -46,3 +46,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# services/order-manager is its own repository (delivery.order-manager) with its own pipeline, the
+# same way config-repo is. Without this git records it as a bare gitlink with no .gitmodules, and a
+# fresh checkout of THIS repo gets an empty directory that the Maven reactor then cannot read.
+/services/order-manager/
