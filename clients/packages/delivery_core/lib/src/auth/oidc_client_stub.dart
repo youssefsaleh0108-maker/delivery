@@ -12,7 +12,7 @@ class _UnsupportedOidcClient implements OidcClient {
       'No OIDC implementation is available for this platform.');
 
   @override
-  Future<TokenSet?> signIn(AuthConfig config) => _fail();
+  Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) => _fail();
 
   @override
   Future<TokenSet?> completeRedirect(AuthConfig config) async => null;

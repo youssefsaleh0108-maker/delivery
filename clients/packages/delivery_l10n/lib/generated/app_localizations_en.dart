@@ -1909,6 +1909,15 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get createAccount => 'Create an account';
 
   @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get signInWithAPasscode => 'Sign in with a passcode';
+
+  @override
+  String get couldNotSignInWithGoogle => 'Google sign-in did not complete.';
+
+  @override
   String get enterYourPasscode => 'Enter your passcode';
 
   @override

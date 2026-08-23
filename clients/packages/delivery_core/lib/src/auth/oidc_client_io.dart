@@ -11,7 +11,7 @@ class _AppAuthOidcClient implements OidcClient {
   final FlutterAppAuth _appAuth = const FlutterAppAuth();
 
   @override
-  Future<TokenSet?> signIn(AuthConfig config) async {
+  Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async {
     final AuthorizationTokenResponse response = await _appAuth.authorizeAndExchangeCode(
       AuthorizationTokenRequest(
         config.clientId,
@@ -21,6 +21,7 @@ class _AppAuthOidcClient implements OidcClient {
         // True only for an http:// issuer — the local dev stack. AppAuth otherwise refuses the
         // discovery call outright and takes the app down with it. See AuthConfig.
         allowInsecureConnections: config.allowInsecureConnections,
+        additionalParameters: extraParams,
         // PKCE is on by default and is what makes a public client safe here: there is no client
         // secret to ship inside an app binary.
       ),

@@ -111,6 +111,31 @@ class AuthService {
     return tokens == null ? null : _adopt(tokens);
   }
 
+  /// Signs in through a broker — Google today, any Keycloak identity provider by alias.
+  ///
+  /// <p>This one DOES open a browser, and has to: an external provider's consent screen cannot be
+  /// rendered inside the app, and any app that tried would be asking for somebody's Google password
+  /// directly. That is the thing every phishing page does, and Google blocks embedded webviews for
+  /// exactly this reason.
+  ///
+  /// <p>`kc_idp_hint` is what makes it acceptable here. Without it Keycloak shows its own login
+  /// page first, so the browser opens on this platform's address — which on a box with no domain is
+  /// a bare IP, and looks like nothing worth typing a password into. With the hint Keycloak
+  /// redirects immediately and the first page the user sees is accounts.google.com.
+  ///
+  /// <p>Unlike [signInWithPassword] this keeps the full Authorization Code + PKCE flow, so the app
+  /// never handles the credential at all.
+  Future<AuthSession?> signInWithBroker(String alias) async {
+    final TokenSet? tokens = await _oidc.signIn(
+      _config,
+      extraParams: <String, String>{'kc_idp_hint': alias},
+    );
+    return tokens == null ? null : _adopt(tokens);
+  }
+
+  /// The alias the Keycloak identity provider is registered under. Must match the realm.
+  static const String googleBroker = 'google';
+
   /// Signs in from a form inside the app, with no browser.
   ///
   /// <p>The OAuth Resource Owner Password Credentials grant. It exists so the login screen can be

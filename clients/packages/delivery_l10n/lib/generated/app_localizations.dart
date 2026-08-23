@@ -3434,6 +3434,24 @@ abstract class DeliveryStrings {
   /// **'Create an account'**
   String get createAccount;
 
+  /// No description provided for @continueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get continueWithGoogle;
+
+  /// No description provided for @signInWithAPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with a passcode'**
+  String get signInWithAPasscode;
+
+  /// No description provided for @couldNotSignInWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in did not complete.'**
+  String get couldNotSignInWithGoogle;
+
   /// No description provided for @enterYourPasscode.
   ///
   /// In en, this message translates to:

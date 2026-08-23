@@ -27,7 +27,13 @@ abstract interface class OidcClient {
   /// On mobile this opens a system browser tab and returns when it redirects back. On web this
   /// navigates the whole page away and **never returns** — the result arrives on the next app load
   /// via [completeRedirect].
-  Future<TokenSet?> signIn(AuthConfig config);
+  /// [extraParams] rides along on the authorization request.
+  ///
+  /// Used for Keycloak's , which skips its own login page and sends the user
+  /// straight to a broker. That matters for more than a click saved: with the hint the browser
+  /// opens on accounts.google.com, and without it the first thing a user sees is this platform's
+  /// own login page at whatever address it happens to be served from.
+  Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams});
 
   /// Web only: if the current URL carries an authorization code, exchange it for tokens.
   ///

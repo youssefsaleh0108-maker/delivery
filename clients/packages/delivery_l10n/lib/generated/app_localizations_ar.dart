@@ -1902,6 +1902,15 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get createAccount => 'إنشاء حساب';
 
   @override
+  String get continueWithGoogle => 'المتابعة باستخدام Google';
+
+  @override
+  String get signInWithAPasscode => 'تسجيل الدخول برمز المرور';
+
+  @override
+  String get couldNotSignInWithGoogle => 'لم يكتمل تسجيل الدخول عبر Google.';
+
+  @override
   String get enterYourPasscode => 'أدخل رمز المرور';
 
   @override

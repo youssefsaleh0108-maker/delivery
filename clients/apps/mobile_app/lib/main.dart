@@ -105,6 +105,35 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// busy and error state, because both are forms somebody is actively working in.
   _Gate _gate = _Gate.welcome;
 
+  /// True while the Google round trip is in flight.
+  bool _brokering = false;
+
+  /// Signs in through Keycloak's Google broker. Opens a browser, unlike the passcode path — an
+  /// external consent screen cannot be rendered inside the app, and any app that tried would be
+  /// asking for somebody's Google password directly.
+  Future<void> _signInWithGoogle() async {
+    setState(() => _brokering = true);
+    try {
+      final AuthSession? session =
+          await _authService.signInWithBroker(AuthService.googleBroker);
+      // Null means the user backed out of the browser, which is not an error worth a message.
+      if (session != null) {
+        _adoptSession(session);
+        return;
+      }
+    } catch (e, stack) {
+      // The screen says one sentence; without this the cause never leaves the device.
+      debugPrint('GOOGLE SIGN-IN FAILED: ');
+      debugPrintStack(stackTrace: stack, label: 'google-sign-in');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).couldNotSignInWithGoogle),
+        ));
+      }
+    }
+    if (mounted) setState(() => _brokering = false);
+  }
+
   /// Set when somebody with no account is applying to ride. Its own flag rather than a fourth
   /// [_Gate] because it is reachable from the welcome screen and returns there, and because it is
   /// the one path that ends in an application rather than a session.
@@ -200,6 +229,8 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                 );
               case _Gate.welcome:
                 return WelcomeScreen(
+                  busy: _brokering,
+                  onGoogle: _signInWithGoogle,
                   onSignIn: () => setState(() => _gate = _Gate.signIn),
                   onSignUp: () => setState(() => _gate = _Gate.signUp),
                   onJoinAsPartner: () => setState(() => _applyingToRide = true),

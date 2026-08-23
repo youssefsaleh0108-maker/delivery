@@ -20,7 +20,7 @@ class _WebOidcClient implements OidcClient {
   static const String _stateKey = 'delivery.oauth_state';
 
   @override
-  Future<TokenSet?> signIn(AuthConfig config) async {
+  Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async {
     final String verifier = Pkce.generateVerifier();
     final String state = Pkce.generateState();
 
@@ -31,6 +31,9 @@ class _WebOidcClient implements OidcClient {
 
     final Uri authorizeUrl = Uri.parse(config.authorizationEndpoint).replace(
       queryParameters: <String, String>{
+        // FIRST, so the fixed half below wins on any key collision. Spread last, a caller could
+        // replace client_id or the PKCE challenge by passing one in.
+        ...?extraParams,
         'client_id': config.clientId,
         'redirect_uri': config.redirectUrl,
         'response_type': 'code',

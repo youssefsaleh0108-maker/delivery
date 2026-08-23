@@ -18,11 +18,21 @@ class WelcomeScreen extends StatelessWidget {
     required this.onSignIn,
     required this.onSignUp,
     required this.onJoinAsPartner,
+    required this.onGoogle,
+    this.busy = false,
   });
 
   final VoidCallback onSignIn;
   final VoidCallback onSignUp;
   final VoidCallback onJoinAsPartner;
+
+  /// Opens the browser on Google. See [AuthService.signInWithBroker] for why this one leaves the
+  /// app when the other two do not.
+  final VoidCallback onGoogle;
+
+  /// True while the Google round trip is in flight. Only that path can be busy here — the other
+  /// buttons just change screens.
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -66,16 +76,44 @@ class WelcomeScreen extends StatelessWidget {
 
               const Spacer(flex: 4),
 
+              // Google first: for anyone who has an account it is one tap and no typing, and it is
+              // the only option here that needs no passcode remembered.
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: onSignIn,
+                child: ElevatedButton.icon(
+                  onPressed: busy ? null : onGoogle,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: DeliveryColors.white,
-                    foregroundColor: DeliveryColors.brand,
+                    foregroundColor: DeliveryColors.ink,
                     padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.md),
                   ),
-                  child: Text(t.signIn,
+                  icon: busy
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      // Google's brand guidelines want their own mark here. Until that asset is in
+                      // the repo this is a stand-in, not a finished button.
+                      : const Icon(Icons.g_mobiledata, size: 28),
+                  label: Text(
+                    busy ? t.signingIn : t.continueWithGoogle,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: DeliverySpacing.sm),
+
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: busy ? null : onSignIn,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: DeliveryColors.white,
+                    side: const BorderSide(color: DeliveryColors.white, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.md),
+                  ),
+                  child: Text(t.signInWithAPasscode,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
@@ -83,7 +121,7 @@ class WelcomeScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: onSignUp,
+                  onPressed: busy ? null : onSignUp,
                   style: OutlinedButton.styleFrom(
                     // TRANSPARENT, explicitly. The app theme gives every OutlinedButton a white
                     // background — right on the white screens it was designed for, and invisible
