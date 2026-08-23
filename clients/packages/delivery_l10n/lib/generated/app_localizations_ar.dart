@@ -1902,6 +1902,28 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get createAccount => 'إنشاء حساب';
 
   @override
+  String get enterYourPasscode => 'أدخل رمز المرور';
+
+  @override
+  String get chooseAPasscode => 'اختر رمز مرور';
+
+  @override
+  String get confirmYourPasscode => 'أدخله مرة أخرى';
+
+  @override
+  String get sixDigitsYouWillUseToSignIn => 'ستة أرقام تستخدمها لتسجيل الدخول';
+
+  @override
+  String get passcodeMustBeSixDigits =>
+      'يجب أن يتكوّن رمز المرور من ستة أرقام.';
+
+  @override
+  String get passcodesDoNotMatch => 'الرمزان غير متطابقين. حاول مرة أخرى.';
+
+  @override
+  String get merchantHome => 'متجرك';
+
+  @override
   String get orJoinUs => 'أو';
 
   @override

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
+import 'passcode_pad.dart';
+
 /// Creating a shopper's account, in three steps.
 ///
 /// <p>Email, then the code sent to it, then a name and a password. The order is the point: the
@@ -41,14 +43,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _code = TextEditingController();
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
-  final TextEditingController _password = TextEditingController();
+  /// Entered twice on the pad. This IS the Keycloak password, not a local unlock on top of one.
+  String _passcode = '';
+  String _confirmPasscode = '';
 
   /// The proof, held between step two and step three. Spent by the sign-up call.
   String? _token;
   String _verifiedEmail = '';
 
   bool _busy = false;
-  bool _reveal = false;
   String? _error;
 
   @override
@@ -57,7 +60,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _code.dispose();
     _firstName.dispose();
     _lastName.dispose();
-    _password.dispose();
     super.dispose();
   }
 
@@ -124,8 +126,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _error = DeliveryStrings.of(context).requiredField);
       return;
     }
-    if (_password.text.length < 8) {
-      setState(() => _error = DeliveryStrings.of(context).passwordTooShort);
+    if (_passcode.length != PasscodePad.passcodeLength) {
+      setState(() => _error = DeliveryStrings.of(context).passcodeMustBeSixDigits);
+      return;
+    }
+    if (_passcode != _confirmPasscode) {
+      setState(() {
+        _error = DeliveryStrings.of(context).passcodesDoNotMatch;
+        // Only the confirmation is cleared. Wiping both would make somebody re-enter a passcode
+        // they almost certainly got right the first time.
+        _confirmPasscode = '';
+      });
       return;
     }
     setState(() {
@@ -138,12 +149,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         verificationToken: _token!,
         firstName: _firstName.text.trim(),
         lastName: _lastName.text.trim().isEmpty ? null : _lastName.text.trim(),
-        password: _password.text,
+        password: _passcode,
       );
       // Straight in. Asking somebody to sign in with a password they typed ten seconds ago is a
       // step that exists only because the implementation found it convenient.
       final AuthSession session = await widget.authService
-          .signInWithPassword(_verifiedEmail, _password.text);
+          .signInWithPassword(_verifiedEmail, _passcode);
       if (!mounted) return;
       widget.onSignedIn(session);
     } catch (e) {
@@ -298,26 +309,39 @@ class _SignUpScreenState extends State<SignUpScreen> {
             prefixIcon: const Icon(Icons.person_outline),
           ),
         ),
-        const SizedBox(height: DeliverySpacing.md),
-        TextField(
-          controller: _password,
-          enabled: !_busy,
-          obscureText: !_reveal,
-          autocorrect: false,
-          enableSuggestions: false,
-          autofillHints: const <String>[AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: t.choosePassword,
-            helperText: t.atLeastEightCharacters,
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: IconButton(
-              icon: Icon(_reveal ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _reveal = !_reveal),
-            ),
-          ),
-        ),
         const SizedBox(height: DeliverySpacing.xl),
-        _PrimaryButton(busy: _busy, label: t.createAccount, onPressed: _createAccount),
+        Text(
+          _confirmPasscode.isEmpty && _passcode.length < PasscodePad.passcodeLength
+              ? t.chooseAPasscode
+              : t.confirmYourPasscode,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: DeliverySpacing.xs),
+        Text(t.sixDigitsYouWillUseToSignIn,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: DeliverySpacing.lg),
+        // One pad, two passes. The first fills _passcode; once it is full the same pad collects the
+        // confirmation, so there is never a second keypad on screen competing for the thumb.
+        PasscodePad(
+          value: _passcode.length < PasscodePad.passcodeLength ? _passcode : _confirmPasscode,
+          enabled: !_busy,
+          onChanged: (String v) => setState(() {
+            if (_passcode.length < PasscodePad.passcodeLength) {
+              _passcode = v;
+            } else {
+              _confirmPasscode = v;
+            }
+          }),
+          onCompleted: () {
+            // Nothing to do when the FIRST pass completes: the pad simply starts filling the
+            // confirmation on the next digit. Only a full confirmation submits.
+            if (_confirmPasscode.length == PasscodePad.passcodeLength) {
+              _createAccount();
+            }
+          },
+        ),
       ];
 }
 

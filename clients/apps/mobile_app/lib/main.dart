@@ -12,6 +12,7 @@ import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
 import 'src/welcome_screen.dart';
+import 'src/merchant_home_screen.dart';
 import 'src/rider_home_screen.dart';
 
 /// One codebase, two very different users.
@@ -206,12 +207,24 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             }
           }
 
+
+
           // The role branch. A rider's queue wins when an account holds both, because the delivery
           // flow is the one with a time-critical task attached.
           if (session.hasRole(DeliveryRole.delivery)) {
             return RiderHomeScreen(
               api: _orderApi,
               butlerApi: _butlerApi,
+              session: session,
+              onSignOut: _signOut,
+            );
+          }
+          // A merchant gets their queue, not a basket. Before this the branch knew only about
+          // riders and treated everyone else as a shopper, so the person running the shop landed
+          // in the storefront with no way to see their own orders.
+          if (session.hasRole(DeliveryRole.merchant)) {
+            return MerchantHomeScreen(
+              orderApi: _orderApi,
               session: session,
               onSignOut: _signOut,
             );

@@ -3434,6 +3434,48 @@ abstract class DeliveryStrings {
   /// **'Create an account'**
   String get createAccount;
 
+  /// No description provided for @enterYourPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your passcode'**
+  String get enterYourPasscode;
+
+  /// No description provided for @chooseAPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a passcode'**
+  String get chooseAPasscode;
+
+  /// No description provided for @confirmYourPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter it again'**
+  String get confirmYourPasscode;
+
+  /// No description provided for @sixDigitsYouWillUseToSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Six digits you will use to sign in'**
+  String get sixDigitsYouWillUseToSignIn;
+
+  /// No description provided for @passcodeMustBeSixDigits.
+  ///
+  /// In en, this message translates to:
+  /// **'Your passcode must be six digits.'**
+  String get passcodeMustBeSixDigits;
+
+  /// No description provided for @passcodesDoNotMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Those did not match. Try again.'**
+  String get passcodesDoNotMatch;
+
+  /// No description provided for @merchantHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop'**
+  String get merchantHome;
+
   /// No description provided for @orJoinUs.
   ///
   /// In en, this message translates to:

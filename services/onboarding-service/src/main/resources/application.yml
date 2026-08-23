@@ -100,6 +100,15 @@ delivery:
       # so the limits in VerificationService are what stand in for authentication here.
       - /api/onboarding/verifications
       - /api/onboarding/verifications/confirm
+      # A shopper creating their own account. Open for the same reason as the two above and the
+      # application endpoint: having an account is what is being asked for, so there is nothing to
+      # authenticate with.
+      #
+      # What stands in for authentication is the verification token this endpoint requires and
+      # spends. Without it — and it is worth stating plainly, because leaving this line off the
+      # list is safe while removing that check is not — this would create Keycloak accounts on any
+      # address a stranger typed.
+      - /api/onboarding/signup
 
   onboarding:
     verification:

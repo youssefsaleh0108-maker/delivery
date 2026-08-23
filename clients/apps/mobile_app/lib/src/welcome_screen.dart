@@ -85,6 +85,11 @@ class WelcomeScreen extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: onSignUp,
                   style: OutlinedButton.styleFrom(
+                    // TRANSPARENT, explicitly. The app theme gives every OutlinedButton a white
+                    // background — right on the white screens it was designed for, and invisible
+                    // here, where white-on-white made the label disappear entirely. Overriding the
+                    // foreground alone is not enough; the background has to be cleared too.
+                    backgroundColor: Colors.transparent,
                     foregroundColor: DeliveryColors.white,
                     side: const BorderSide(color: DeliveryColors.white, width: 1.5),
                     padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.md),

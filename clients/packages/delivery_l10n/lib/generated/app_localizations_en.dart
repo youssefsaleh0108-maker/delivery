@@ -1909,6 +1909,28 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get createAccount => 'Create an account';
 
   @override
+  String get enterYourPasscode => 'Enter your passcode';
+
+  @override
+  String get chooseAPasscode => 'Choose a passcode';
+
+  @override
+  String get confirmYourPasscode => 'Enter it again';
+
+  @override
+  String get sixDigitsYouWillUseToSignIn =>
+      'Six digits you will use to sign in';
+
+  @override
+  String get passcodeMustBeSixDigits => 'Your passcode must be six digits.';
+
+  @override
+  String get passcodesDoNotMatch => 'Those did not match. Try again.';
+
+  @override
+  String get merchantHome => 'Your shop';
+
+  @override
   String get orJoinUs => 'or';
 
   @override
