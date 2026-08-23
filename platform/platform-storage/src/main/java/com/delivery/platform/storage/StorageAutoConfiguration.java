@@ -1,5 +1,6 @@
 package com.delivery.platform.storage;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -51,10 +52,23 @@ public class StorageAutoConfiguration {
                 .build();
     }
 
+    /**
+     * Two MinioClients, and which is which matters — one talks to MinIO over the internal network,
+     * the other signs URLs against the public endpoint a browser can reach.
+     *
+     * <p><strong>{@code @Qualifier} rather than relying on the parameter names.</strong> Spring
+     * falls back to matching a parameter's NAME against the bean name when a type is ambiguous, and
+     * that only works if the class was compiled with {@code -parameters}. This module configures
+     * maven-compiler-plugin itself and is not built under the Spring Boot parent, so it was not —
+     * every consuming service failed at startup with "required a single bean, but 2 were found".
+     *
+     * <p>The build now passes {@code -parameters} too, but the annotations stay: they are the half
+     * that cannot be silently undone by a compiler setting in a pom somebody edits later.
+     */
     @Bean
     @ConditionalOnMissingBean
-    public StorageService storageService(MinioClient internalMinioClient,
-                                         MinioClient presignMinioClient,
+    public StorageService storageService(@Qualifier("internalMinioClient") MinioClient internalMinioClient,
+                                         @Qualifier("presignMinioClient") MinioClient presignMinioClient,
                                          FileMetadataRepository repository,
                                          StorageProperties properties) {
         return new StorageService(internalMinioClient, presignMinioClient, repository, properties);

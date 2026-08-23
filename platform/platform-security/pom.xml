@@ -83,6 +83,12 @@
         <version>3.13.0</version>
         <configuration>
           <release>${maven.compiler.release}</release>
+          <!-- Spring matches a bean method's parameter against a bean NAME when the type
+               alone is ambiguous, and that fallback needs parameter names in the bytecode.
+               Nothing here inherits the Spring Boot parent, which would have set this, so
+               without it any config class with two beans of one type fails at startup with
+               "required a single bean, but N were found". -->
+          <parameters>true</parameters>
         </configuration>
       </plugin>
     </plugins>
