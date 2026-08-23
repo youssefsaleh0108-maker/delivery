@@ -204,6 +204,9 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-delivery}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-delivery}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-delivery123}
+      # Seeded into secret/email-connector, which is the ONLY place the email connector reads its
+      # relay password from. Without it every vault-init run blanks the slot.
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
     volumes:

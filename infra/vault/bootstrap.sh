@@ -91,8 +91,14 @@ vault kv put secret/sms-connector \
   montymobile.api-key="" \
   twilio.account-sid="" \
   twilio.auth-token=""
+# From the environment, not a literal empty string.
+#
+# This script re-runs on every `docker compose up`, so a hardcoded "" here does not merely leave the
+# slot blank — it ERASES whatever was put there since. A password set by hand in Vault survives
+# until the next time anything recreates a container, and then mail starts failing with "relay
+# authentication failed" for no change anybody made.
 vault kv put secret/email-connector \
-  spring.mail.password=""
+  spring.mail.password="${SMTP_PASSWORD:-}"
 vault kv put secret/push-connector \
   firebase.service-account-json=""
 # Section 10 gives this path its own policy - it is the most sensitive integration in the system.
