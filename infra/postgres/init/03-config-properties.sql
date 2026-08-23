@@ -68,9 +68,6 @@ INSERT INTO config.config_properties (application, profile, label, prop_key, pro
   ('connector-settings',    'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=settings'),
   ('connector-settings',    'docker', 'main', 'spring.datasource.username', 'connector_settings'),
 
-  ('corebanking-simulator', 'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=corebanking'),
-  ('corebanking-simulator', 'docker', 'main', 'spring.datasource.username', 'corebanking_simulator'),
-
   ('notifications-manager', 'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=notification'),
   ('notifications-manager', 'docker', 'main', 'spring.datasource.username', 'notification_service'),
 
@@ -79,6 +76,16 @@ INSERT INTO config.config_properties (application, profile, label, prop_key, pro
 
   ('whatsapp-service',      'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=whatsapp'),
   ('whatsapp-service',      'docker', 'main', 'spring.datasource.username', 'whatsapp_service'),
+
+  -- order-manager had no entry in config-repo at all, and so had none here either. Its own
+  -- application.yml defaults to ${DB_URL:jdbc:postgresql://localhost:5433/...} for running from an
+  -- IDE, and localhost inside a container is the container — so it started, found no Postgres, and
+  -- died in Flyway with "Connection to localhost:5433 refused" while every other service came up.
+  --
+  -- Nothing in compose ever set DB_URL, so this row is the only thing that points it at the
+  -- database. Found on the first deploy where the whole stack actually had to run at once.
+  ('order-manager',         'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=orders'),
+  ('order-manager',         'docker', 'main', 'spring.datasource.username', 'order_manager'),
 
   ('order-tracking',        'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=tracking'),
   ('order-tracking',        'docker', 'main', 'spring.datasource.username', 'order_tracking'),
