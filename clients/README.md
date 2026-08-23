@@ -1,6 +1,12 @@
 # Flutter clients
 
-Three surfaces from one monorepo (Section 9): a role-based mobile app, and two Flutter Web portals.
+Two surfaces from one monorepo (Section 9), both branched on the realm roles in the token: a mobile
+app for Customer and Rider, and a web portal for Merchant, Carrier and Backoffice.
+
+The portal replaced `merchant_portal`, `backoffice_web` and `carrier_portal`. They were three
+builds, three Keycloak clients and three redirect-URI allow-lists that differed only in their
+navigation — and one of them, `carrier-portal`, was missing from the `azp` allow-list entirely, so
+every Carrier token was refused platform-wide.
 
 ```
 clients/
@@ -9,19 +15,18 @@ clients/
 │   └── delivery_core/            # Keycloak OIDC (web + mobile), Dio client, catalog API
 └── apps/
     ├── mobile_app/               # Customer + Rider, branched on the role claim
-    ├── backoffice_web/           # BACKOFFICE only — categories + live catalog
-    └── merchant_portal/          # MERCHANT only — Phase 1 MVP
+    └── delivery_portal/          # MERCHANT + CARRIER + BACKOFFICE, branched the same way
 ```
 
 `packages/` is shared; `apps/` holds only the role-specific screens.
 
 ## Prerequisites
 
-Flutter **3.44.9** (Dart 3.12.2) is installed at `C:\src\flutter` and is on your user PATH. A new
-terminal picks it up automatically; in an existing one:
+Flutter **3.47.1** is installed at `C:\ProgramData\flutter` and is on your PATH. A new terminal
+picks it up automatically; in an existing one:
 
 ```bash
-$env:Path = "$env:Path;C:\src\flutter\bin"
+$env:Path = "$env:Path;C:\ProgramData\flutter\bin"
 ```
 
 The backend must be running — see [`../infra/README.md`](../infra/README.md).
@@ -30,9 +35,10 @@ The backend must be running — see [`../infra/README.md`](../infra/README.md).
 
 | App | Port | Keycloak client |
 | --- | --- | --- |
-| Merchant Portal | **5010** | `merchant-portal` |
-| Backoffice | **5011** | `backoffice-web` |
+| Delivery Portal | **5010** | `delivery-portal` |
 | Mobile app in Chrome | **5012** | `mobile-app` |
+
+5011 and 5013 are free — they held the Backoffice and Carrier portals before the merge.
 
 > **These ports are not arbitrary and must not drift.** A Keycloak client's redirect URIs are an
 > allow-list, and `flutter run` picks a *random* port unless told otherwise — which fails the
@@ -44,11 +50,7 @@ The backend must be running — see [`../infra/README.md`](../infra/README.md).
 ## Running with hot reload (day to day)
 
 ```bash
-cd clients/apps/merchant_portal && flutter run -d chrome --web-port 5010
-```
-
-```bash
-cd clients/apps/backoffice_web && flutter run -d chrome --web-port 5011
+cd clients/apps/delivery_portal && flutter run -d chrome --web-port 5010
 ```
 
 The mobile app in a browser, for quick UI work:
@@ -60,17 +62,17 @@ cd clients/apps/mobile_app && flutter run -d chrome --web-port 5012 --dart-defin
 ## Running the built bundles (no Flutter needed)
 
 ```bash
-cd clients/apps/merchant_portal && flutter build web --release
+cd clients/apps/delivery_portal && flutter build web --release
 ```
 
 ```bash
 cd clients && docker compose -f docker-compose.web.yml up -d
 ```
 
-Serves Merchant Portal on <http://localhost:5010> and Backoffice on <http://localhost:5011> via
-nginx. Rebuild then `docker compose -f docker-compose.web.yml restart` to pick up changes.
+Serves the Delivery Portal on <http://localhost:5010> and the mobile app on <http://localhost:5012>
+via nginx. Rebuild then `docker compose -f docker-compose.web.yml restart` to pick up changes.
 
-## Addressing: one host, three clients
+## Addressing: one host, two clients
 
 Everything uses **`127.0.0.1`**. Not a LAN IP, and not the literal name `localhost`:
 
@@ -217,10 +219,11 @@ vector**, so the hand-rolled half is verified rather than hoped at.
 
 ## Phase 1 walkthrough
 
-1. Merchant Portal (5010), sign in as `merchant` → **New product** → save.
+1. Delivery Portal (5010), sign in as `merchant` → **New product** → save.
 2. **Add photo** → the browser PUTs the bytes *straight to MinIO*, never through the backend.
 3. **Publish** — refused with a clear message until the product has an image.
-4. Backoffice (5011) as `backoffice` → **Catalog** shows it; **Categories** lets you add one.
+4. Same portal as `backoffice` — the token, not the URL, decides the area → **Catalog** shows it;
+   **Categories** lets you add one.
 5. Mobile app as `customer` → the product appears in browse. As `rider` → the rider surface instead.
 
 ## Tests
@@ -230,7 +233,7 @@ cd clients/packages/delivery_core && flutter test
 ```
 
 `delivery_core` covers role/`sub` claim parsing and PKCE; `delivery_design_system` locks every
-Appendix A hex value; `merchant_portal` renders its list screen against canned API responses whose
+Appendix A hex value; `delivery_portal` renders its screens against canned API responses whose
 shapes were copied from real `smoke-test.sh` output.
 
 ## Still open

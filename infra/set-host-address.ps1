@@ -57,8 +57,11 @@ $token = (docker run --rm --network delivery $curl -s -X POST `
     ConvertFrom-Json).access_token
 
 $clients = @(
-    @{ id = 'merchant-portal'; uris = @("http://127.0.0.1:5010/*", "http://localhost:5010/*", "http://${Address}:5010/*") },
-    @{ id = 'backoffice-web';  uris = @("http://127.0.0.1:5011/*", "http://localhost:5011/*", "http://${Address}:5011/*") },
+    # One client for all three web audiences. Merchant, Carrier and Backoffice used to be
+    # merchant-portal on 5010, backoffice-web on 5011 and carrier-portal on 5013 — three
+    # allow-lists that had to be updated together, and one of them (carrier-portal) was also
+    # missing from the azp list entirely.
+    @{ id = 'delivery-portal'; uris = @("http://127.0.0.1:5010/*", "http://localhost:5010/*", "http://${Address}:5010/*") },
     @{ id = 'mobile-app';      uris = @('com.delivery.app://oauth2redirect', 'com.delivery.app://oauth2redirect/*', "http://127.0.0.1:5012/*", "http://localhost:5012/*", "http://${Address}:5012/*") }
 )
 
@@ -117,6 +120,6 @@ if ($Address -ne '127.0.0.1') {
     Write-Host '  2. An inbound firewall rule (elevated PowerShell), scoped to your network profile:'
     Write-Host '     New-NetFirewallRule -DisplayName "Delivery dev stack" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8100,8180,9010 -Profile Any'
     Write-Host ''
-    Write-Host '  Rebuild the web portals so they use this issuer too:'
-    Write-Host "     cd clients/apps/merchant_portal; flutter build web --release --dart-define=KEYCLOAK_ISSUER=http://${Address}:8180/realms/delivery-platform"
+    Write-Host '  Rebuild the portal so it uses this issuer too:'
+    Write-Host "     cd clients/apps/delivery_portal; flutter build web --release --dart-define=KEYCLOAK_ISSUER=http://${Address}:8180/realms/delivery-platform"
 }

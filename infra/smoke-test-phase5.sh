@@ -60,9 +60,9 @@ wait_for() {
 }
 
 CUSTOMER=$(token customer customer mobile-app)
-MERCHANT=$(token merchant merchant merchant-portal)
+MERCHANT=$(token merchant merchant delivery-portal)
 RIDER=$(token rider rider mobile-app)
-BACKOFFICE=$(token backoffice backoffice backoffice-web)
+BACKOFFICE=$(token backoffice backoffice delivery-portal)
 ADMIN=$(curl -s -X POST "$KC/realms/master/protocol/openid-connect/token" \
   -d 'client_id=admin-cli' -d 'username=admin' -d 'password=admin' -d 'grant_type=password' \
   | jq -r '.access_token')

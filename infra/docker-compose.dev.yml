@@ -8,7 +8,8 @@
 #   2. `mem_limit` on everything. Without ceilings the first service to warm up takes the memory
 #      the last one needs, and what dies is decided by whichever the kernel reaches first.
 #   3. Three ports face the internet, not thirty-three. See below.
-#   4. No Jaeger. Tracing is off; the box does not have the memory to spare for it.
+#   4. No Jaeger, no Mailpit, no Core Banking Simulator. Tracing is off to save memory; the other
+#      two are fakes, and this environment integrates with a real SMTP relay and a real bank.
 #
 # PUBLIC PORTS — 8100 Traefik (the API), 8180 Keycloak, 9010 MinIO.
 #
@@ -18,14 +19,15 @@
 #
 # Everything else is on the internal network or bound to loopback. The connectors are the reason
 # that matters: /api/connector/send takes no user token, so a published port on 8110-8113 is
-# "send an arbitrary SMS" for anyone who finds the IP. The Core Banking Simulator on 8114 carries
-# a fault-injection endpoint. Reach any of them with an SSH tunnel:
+# "send an arbitrary SMS" for anyone who finds the IP. Reach any internal service with an SSH
+# tunnel:
 #
-#   ssh -L 15673:localhost:15673 -L 8025:localhost:8025 -L 5433:localhost:5433 user@<box>
+#   ssh -L 15673:localhost:15673 -L 5433:localhost:5433 user@<box>
 #
-# THIS IS A TEST ENVIRONMENT ON A PUBLIC IP. Vault runs in dev mode, the Core Banking Simulator is
-# deployed, and Mailpit accepts any credentials. None of that is safe for real data — do not point
-# this at a live bank or put real customer records in it.
+# THIS IS A TEST ENVIRONMENT ON A PUBLIC IP, and it now sends REAL EMAIL. The relay in .env is a
+# real one, so a bad recipient in test data reaches an actual mailbox, and the SMS dev-passthrough
+# provider mails every simulated message there too. Vault still runs in dev mode. Do not put real
+# customer records here.
 
 name: delivery-dev
 
@@ -212,33 +214,6 @@ services:
       - ./vault/policies:/policies:ro
     restart: "no"
     networks: [delivery]
-
-  # A real SMTP relay that accepts everything and delivers nothing outward, with a web UI to read
-  # what was sent. Two Phase 3 paths depend on it: the email connector's relay, and the SMS
-  # connector's dev-passthrough mode, which redirects "what the SMS would have said" here so QA can
-  # read it without a paid SMS account or a real handset (Section 7).
-  #
-  # Deliberately a real relay rather than a stub in the connector. A no-op provider would leave the
-  # SMTP hop, the failure classification and the receipt path untested until the first day a real
-  # vendor is switched on, which is the worst possible day to discover they were wrong.
-  mailpit:
-    image: axllent/mailpit:v1.21
-    container_name: delivery-mailpit
-    mem_limit: 64m
-    restart: unless-stopped
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: "true"
-      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
-    ports:
-      - "127.0.0.1:1025:1025"    # SMTP
-      - "127.0.0.1:8025:8025"    # web UI — SSH-tunnel to read the test inbox
-    networks: [delivery]
-
-  # ---------------------------------------------------------------- observability
-  # Section 10 treats distributed tracing as a Phase 0 requirement, not a later add-on: once a
-  # customer action fans out across a dozen services, "why didn't this SMS arrive" is only
-  # answerable if the trace was there from the first commit. all-in-one gives an OTLP collector and
-  # a UI in one container, which is all a laptop needs; staging/prod run a real collector pipeline.
   config-server:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-config-server:${IMAGE_TAG:-main}
     container_name: delivery-config-server
@@ -579,8 +554,22 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       CONNECTOR_SETTINGS_URL: http://connector-settings:8109
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
+      # A REAL relay, not Mailpit. Everything below comes from .env — see .env.dev.example.
+      #
+      # SMTP_PASSWORD is read by the connector from Vault at secret/email-connector in the design
+      # (Section 8) and from the environment here, because this box runs Vault in dev mode and
+      # would lose it on every restart.
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      # STARTTLS on 587, implicit TLS on 465. Sending to a real relay without one of them puts
+      # credentials on the wire in clear text.
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      # The envelope sender. Relays reject or spam-file mail whose From is not a domain they are
+      # authorised for, which is the usual cause of "the connector says sent and nothing arrives".
+      EMAIL_FROM: ${EMAIL_FROM:?EMAIL_FROM is required}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
       OTEL_SDK_DISABLED: "true"
@@ -589,8 +578,6 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      mailpit:
-        condition: service_started
     networks: [delivery]
 
   push-connector:
@@ -645,10 +632,20 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       CONNECTOR_SETTINGS_URL: http://connector-settings:8109
-      # The dev-passthrough provider delivers to the same test inbox the email connector uses.
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMS_TEST_INBOX: ${SMS_TEST_INBOX:-sms-test-inbox@dev.local}
+      # STILL DEV_PASSTHROUGH, which mails each "SMS" to a test inbox rather than sending one.
+      # The SMS vendor is an open decision (see the README), and MontyMobile and Twilio are both
+      # implemented and waiting on credentials — switching is a Backoffice change once those exist,
+      # not a redeploy.
+      #
+      # With Mailpit gone this now goes through the SAME REAL RELAY as the email connector, so
+      # every simulated SMS is a real email. Point SMS_TEST_INBOX at a mailbox you own.
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      SMS_TEST_INBOX: ${SMS_TEST_INBOX:?SMS_TEST_INBOX is required}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
       OTEL_SDK_DISABLED: "true"
@@ -657,17 +654,18 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      mailpit:
-        condition: service_started
     networks: [delivery]
 
   # ---------------------------------------------------------------- accounting (Phase 4)
   #
-  # Three services, and the split is the point. accounting-service holds the business rules and a
-  # database but no credentials; corebanking-connector holds the bank credentials and nothing else;
-  # corebanking-simulator stands in for a system outside the platform entirely. Section 10 singles
-  # the bank out as the most sensitive integration in the system, and this is what "isolate it"
-  # looks like in practice.
+  # Two services here, not the three the laptop stack runs. accounting-service holds the business
+  # rules and a database but no credentials; corebanking-connector holds the bank credentials and
+  # nothing else. Section 10 singles the bank out as the most sensitive integration in the system,
+  # and this is what "isolate it" looks like in practice.
+  #
+  # corebanking-simulator is NOT deployed here — it is a fake bank with a fault-injection endpoint,
+  # and this environment is meant to talk to the real one. See the REAL_BANK_* note below for why
+  # settlement does not yet complete as a result.
 
   accounting-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-accounting-service:${IMAGE_TAG:-main}
@@ -725,7 +723,18 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       CONNECTOR_SETTINGS_URL: http://connector-settings:8109
-      COREBANKING_SIMULATOR_URL: http://corebanking-simulator:8114
+      # The real bank. The simulator is not deployed here, so there is nothing to fall back to.
+      #
+      # READ THIS BEFORE SWITCHING THE PROVIDER: RealBankClient is a deliberate stub. It refuses
+      # every posting and logs why, because the bank's published spec does not exist yet. Setting
+      # CORE_BANKING to REAL in the Backoffice with these blank makes every settlement fail
+      # permanently — the saga compensates rather than retrying, so an order settles nobody.
+      #
+      # Until RealBankClient is implemented against a real spec, accounting cannot complete on this
+      # environment at all. That is the cost of dropping the simulator, and it is deliberate.
+      REAL_BANK_URL: ${REAL_BANK_URL:-}
+      REAL_BANK_CLIENT_ID: ${REAL_BANK_CLIENT_ID:-}
+      REAL_BANK_CLIENT_SECRET: ${REAL_BANK_CLIENT_SECRET:-}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
       OTEL_SDK_DISABLED: "true"
@@ -735,40 +744,6 @@ services:
       rabbitmq:
         condition: service_healthy
     networks: [delivery]
-
-  # DEV ONLY. Section 7 is explicit that this is never deployed to staging or production - there,
-  # the same connector points at the real bank through the Backoffice toggle.
-  corebanking-simulator:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-corebanking-simulator:${IMAGE_TAG:-main}
-    container_name: delivery-corebanking-simulator
-    mem_limit: 288m
-    restart: unless-stopped
-    environment:
-      SERVER_PORT: 8114
-      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
-      # shared box: the throughput collectors cost more in threads and metaspace than they return.
-      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
-      SPRING_PROFILES_ACTIVE: docker
-      CONFIG_IMPORT: configserver:http://config-server:8888
-      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
-      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
-      BANK_API_KEY: ${BANK_API_KEY:-simulator-dev-key}
-      FAULT_INJECTION_ENABLED: "true"
-      # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
-      # does not resolve on every span and floods the log with export failures.
-      OTEL_SDK_DISABLED: "true"
-    depends_on:
-      config-server:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    networks: [delivery]
-
-  # ------------------------------------------------------------------------ WhatsApp ordering
-  #
-  # Its own deployable for the same two reasons the notification connectors are: it is the only
-  # process holding a messaging vendor's credentials, and it is the only one exposed to a public
-  # webhook. Both are reasons to be able to restart, scale and roll it back on its own.
   whatsapp-service:
     image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-whatsapp-service:${IMAGE_TAG:-main}
     container_name: delivery-whatsapp-service

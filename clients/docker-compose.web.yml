@@ -4,12 +4,15 @@
 # random port every time, which would fail the redirect_uri check on every run. Ports 5010-5012 are
 # used because the lending stack on this machine already holds 8080-8095.
 #
-#   cd clients/apps/merchant_portal && flutter build web --release
-#   cd clients/apps/backoffice_web  && flutter build web --release
+#   cd clients/apps/delivery_portal && flutter build web --release
 #   cd clients && docker compose -f docker-compose.web.yml up -d
 #
-# Then: Merchant Portal http://127.0.0.1:5010   Backoffice http://127.0.0.1:5011
-#       Mobile app      http://127.0.0.1:5012
+# Then: Delivery Portal http://127.0.0.1:5010   Mobile app http://127.0.0.1:5012
+#       Public website  http://127.0.0.1:5014
+#
+# One portal, not three. Merchant, Carrier and Backoffice were separate builds on 5010, 5011 and
+# 5013; they are one bundle now and the roles in your token decide what you see. 5011 and 5013 are
+# free.
 #
 # USE 127.0.0.1, NOT localhost. Docker Desktop on WSL2 binds ::1 ahead of the loopback proxy and
 # Chrome resolves localhost to ::1 first, so `localhost` gives ERR_CONNECTION_RESET.
@@ -30,22 +33,18 @@
 name: delivery-web
 
 services:
-  merchant-portal:
+  # One portal on 5010, where there used to be three on 5010, 5011 and 5013. Merchant, Carrier and
+  # Backoffice are the same bundle now; which one you get is decided by the roles in your token.
+  #
+  # 5010 is kept rather than picked fresh because it is the port already registered on the Keycloak
+  # client and written into every note in this repo.
+  delivery-portal:
     image: nginx:alpine
-    container_name: delivery-merchant-portal
+    container_name: delivery-portal
     ports:
       - "5010:80"
     volumes:
-      - ./apps/merchant_portal/build/web:/usr/share/nginx/html:ro
-      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
-
-  backoffice-web:
-    image: nginx:alpine
-    container_name: delivery-backoffice-web
-    ports:
-      - "5011:80"
-    volumes:
-      - ./apps/backoffice_web/build/web:/usr/share/nginx/html:ro
+      - ./apps/delivery_portal/build/web:/usr/share/nginx/html:ro
       - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
 
   # The mobile app, served as a web build so the design and the flows can be walked through in a
@@ -79,20 +78,6 @@ services:
     volumes:
       - ./website:/usr/share/nginx/html:ro
       - ./website/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-
-  # The delivery company's app: their jobs, their earnings, their company.
-  #
-  # Was built but never served — it had no entry here, so the only way to look at it was
-  # `flutter run`. Its Keycloak client must have http://127.0.0.1:5013/ among its redirect URIs, on
-  # the same allow-list rules as the other two portals.
-  carrier-portal:
-    image: nginx:alpine
-    container_name: delivery-carrier-portal
-    ports:
-      - "5013:80"
-    volumes:
-      - ./apps/carrier_portal/build/web:/usr/share/nginx/html:ro
-      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
 
   mobile-app:
     image: nginx:alpine

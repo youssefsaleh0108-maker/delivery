@@ -63,7 +63,7 @@ import 'app_localizations_en.dart';
 /// property.
 abstract class DeliveryStrings {
   DeliveryStrings(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class DeliveryStrings {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
-    Locale('en')
+    Locale('en'),
   ];
 
   /// No description provided for @appTitle.
@@ -3428,6 +3428,78 @@ abstract class DeliveryStrings {
   /// **'Dashboard'**
   String get navDashboard;
 
+  /// No description provided for @deliveryPortal.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Portal'**
+  String get deliveryPortal;
+
+  /// No description provided for @backoffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Backoffice'**
+  String get backoffice;
+
+  /// No description provided for @switchArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch portal'**
+  String get switchArea;
+
+  /// No description provided for @navCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get navCategories;
+
+  /// No description provided for @navCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog'**
+  String get navCatalog;
+
+  /// No description provided for @navBanners.
+  ///
+  /// In en, this message translates to:
+  /// **'Banners'**
+  String get navBanners;
+
+  /// No description provided for @navOnboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding'**
+  String get navOnboarding;
+
+  /// No description provided for @navCarriers.
+  ///
+  /// In en, this message translates to:
+  /// **'Carriers'**
+  String get navCarriers;
+
+  /// No description provided for @navAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas'**
+  String get navAreas;
+
+  /// No description provided for @navFinance.
+  ///
+  /// In en, this message translates to:
+  /// **'Finance'**
+  String get navFinance;
+
+  /// No description provided for @navOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers'**
+  String get navOffers;
+
+  /// No description provided for @navSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get navSettings;
+
   /// No description provided for @howTradeIsGoing.
   ///
   /// In en, this message translates to:
@@ -4013,8 +4085,9 @@ DeliveryStrings lookupDeliveryStrings(Locale locale) {
   }
 
   throw FlutterError(
-      'DeliveryStrings.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'DeliveryStrings.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

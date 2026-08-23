@@ -45,10 +45,15 @@ CREATE INDEX IF NOT EXISTS config_properties_lookup
 -- The azp allow-list: which Keycloak clients' tokens this platform accepts at all. Finding 1 of
 -- docs/SECURITY_REVIEW.md. AuthorizedPartyValidator DISABLES ITSELF WHEN THE LIST IS EMPTY, so
 -- losing these three rows is not a startup error — it is a platform that quietly stops checking.
+-- Two clients, not four: delivery-portal replaced backoffice-web, merchant-portal and
+-- carrier-portal when the three web apps merged into one.
+--
+-- carrier-portal was never in this list, which meant every Carrier token was refused by
+-- AuthorizedPartyValidator on every service. The merge removes that class of bug — there is one
+-- browser client now, so there is one entry to forget.
 INSERT INTO config.config_properties (application, profile, label, prop_key, prop_value) VALUES
   ('application', 'default', 'main', 'delivery.security.allowed-client-ids[0]', 'mobile-app'),
-  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[1]', 'backoffice-web'),
-  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[2]', 'merchant-portal');
+  ('application', 'default', 'main', 'delivery.security.allowed-client-ids[1]', 'delivery-portal');
 
 -- Per-service datasource wiring. Each service's own application.yml defaults point at
 -- localhost:5433 for IDE use; these override that with the in-network address. Passwords are NOT

@@ -26,9 +26,9 @@ token() {
 
 echo "==> Fixtures"
 CUSTOMER=$(token customer customer mobile-app)
-MERCHANT=$(token merchant merchant merchant-portal)
+MERCHANT=$(token merchant merchant delivery-portal)
 RIDER=$(token rider rider mobile-app)
-BACKOFFICE=$(token backoffice backoffice backoffice-web)
+BACKOFFICE=$(token backoffice backoffice delivery-portal)
 
 FOOD=$(curl -s "$GW/api/categories" -H "Authorization: Bearer $CUSTOMER" \
   | jq -r '[.[]|select(.name=="Food")][0].id')

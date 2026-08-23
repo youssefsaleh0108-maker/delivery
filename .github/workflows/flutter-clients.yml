@@ -1,8 +1,10 @@
-﻿# One pipeline building the mobile app and both web targets from the shared monorepo (Section 10).
+﻿# One pipeline building the mobile app and the web portal from the shared monorepo (Section 10).
 #
-# Everything here has been run locally against Flutter 3.44.9 / Dart 3.12.2: all three apps and both
-# shared packages analyze clean and their tests pass. The workflow itself has not run on a GitHub
-# runner yet (there is no remote), so treat the Android job in particular as unproven CI-side.
+# delivery_portal replaced backoffice_web, merchant_portal and carrier_portal — one web target now,
+# not three, because the three differed only in their navigation and that is decided by the token's
+# realm roles.
+#
+# The Android job remains unproven CI-side.
 
 name: flutter-clients
 
@@ -20,16 +22,14 @@ jobs:
   analyze-and-build:
     runs-on: ubuntu-latest
     strategy:
-      # Don't let one target's failure hide the others': with three apps sharing two packages, a
+      # Don't let one target's failure hide the other's: with two apps sharing three packages, a
       # break is usually in the shared half and shows up everywhere at once.
       fail-fast: false
       matrix:
         include:
           - app: mobile_app
             target: apk
-          - app: backoffice_web
-            target: web
-          - app: merchant_portal
+          - app: delivery_portal
             target: web
 
     steps:
@@ -77,7 +77,7 @@ jobs:
           channel: stable
           cache: true
 
-      # The shared packages are the blast radius for all three apps, so they are analysed on their
+      # The shared packages are the blast radius for both apps, so they are analysed on their
       # own rather than only via whichever app happens to import the broken symbol.
       - name: Analyze shared packages
         run: |

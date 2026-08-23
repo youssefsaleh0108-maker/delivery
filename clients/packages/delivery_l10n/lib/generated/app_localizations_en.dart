@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -1903,6 +1904,42 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get navDashboard => 'Dashboard';
+
+  @override
+  String get deliveryPortal => 'Delivery Portal';
+
+  @override
+  String get backoffice => 'Backoffice';
+
+  @override
+  String get switchArea => 'Switch portal';
+
+  @override
+  String get navCategories => 'Categories';
+
+  @override
+  String get navCatalog => 'Catalog';
+
+  @override
+  String get navBanners => 'Banners';
+
+  @override
+  String get navOnboarding => 'Onboarding';
+
+  @override
+  String get navCarriers => 'Carriers';
+
+  @override
+  String get navAreas => 'Areas';
+
+  @override
+  String get navFinance => 'Finance';
+
+  @override
+  String get navOffers => 'Offers';
+
+  @override
+  String get navSettings => 'Settings';
 
   @override
   String get howTradeIsGoing => 'How trade is going';

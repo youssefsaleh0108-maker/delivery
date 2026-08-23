@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -1896,6 +1897,42 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get navDashboard => 'لوحة المتابعة';
+
+  @override
+  String get deliveryPortal => 'بوابة التوصيل';
+
+  @override
+  String get backoffice => 'الإدارة';
+
+  @override
+  String get switchArea => 'تبديل البوابة';
+
+  @override
+  String get navCategories => 'الفئات';
+
+  @override
+  String get navCatalog => 'الكتالوج';
+
+  @override
+  String get navBanners => 'اللافتات';
+
+  @override
+  String get navOnboarding => 'طلبات الانضمام';
+
+  @override
+  String get navCarriers => 'شركات التوصيل';
+
+  @override
+  String get navAreas => 'المناطق';
+
+  @override
+  String get navFinance => 'المالية';
+
+  @override
+  String get navOffers => 'العروض';
+
+  @override
+  String get navSettings => 'الإعدادات';
 
   @override
   String get howTradeIsGoing => 'كيف تسير الأعمال';

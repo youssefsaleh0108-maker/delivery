@@ -54,9 +54,9 @@ Verified running on this machine, from a cold `docker compose up -d` with empty 
 | **Core Banking Connector** | The only process holding bank credentials; simulator/real toggle at runtime |
 | **Core Banking Simulator** | Dev-only fake bank with a real ledger, real idempotency and fault injection |
 | Postgres 17 + PostGIS | 9 schemas, one owner role each, `delivery_readonly` |
-| Keycloak 26 | `delivery-platform` realm, 4 roles, 6 clients, 4 dev users, declared user-profile attributes |
+| Keycloak 26 | `delivery-platform` realm, 4 roles, 5 clients, 4 dev users, declared user-profile attributes |
 | MinIO | 5 buckets with per-bucket policies, versioning on `delivery-proof` |
-| Mailpit | SMTP relay and the SMS dev test inbox, readable at http://127.0.0.1:8025 |
+| Mailpit | SMTP relay and the SMS dev test inbox on the laptop stack. NOT deployed to the dev environment, which uses a real relay |
 | Vault | AppRole + read-only policy, 14 secret paths, a dedicated policy for the bank's path |
 | RabbitMQ | Domain-event bus, doubles as Spring Cloud Bus transport |
 | Jaeger | Traces arriving from the Gateway and every domain service |
@@ -92,17 +92,17 @@ cd infra && for t in smoke-test.sh smoke-test-phase2.sh smoke-test-phase3.sh smo
 
 ### Clients
 
-Flutter 3.44.9 is installed at `C:\src\flutter`. All three apps analyze clean, pass their tests, and
-build:
+Two apps, where there were four: `delivery_portal` replaced `merchant_portal`, `backoffice_web` and
+`carrier_portal`, which differed only in their navigation. Both analyze clean and pass their tests
+(96 in the portal):
 
 | App | Port | Surface |
 | --- | --- | --- |
-| Merchant Portal | 5010 | Products, image upload, publish/archive, the live order queue |
-| Backoffice | 5011 | Order dashboard, category taxonomy, catalog, **Finance/reconciliation**, Connector Settings |
+| Delivery Portal | 5010 | One app, three role areas. **Merchant**: products, image upload, publish/archive, the live order queue. **Carrier**: jobs, earnings, applicants, company. **Backoffice**: order dashboard, category taxonomy, catalog, Finance/reconciliation, Connector Settings |
 | Mobile app | 5012 (Chrome) or emulator | Browse, basket, checkout, live rider tracking, **in-app notifications**; rider job board |
 
 ```bash
-cd clients/apps/merchant_portal && flutter run -d chrome --web-port 5010
+cd clients/apps/delivery_portal && flutter run -d chrome --web-port 5010
 ```
 
 Ports are fixed on purpose — Keycloak redirect URIs are an allow-list and `flutter run` otherwise

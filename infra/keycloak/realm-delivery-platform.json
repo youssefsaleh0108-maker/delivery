@@ -65,30 +65,9 @@
       }
     },
     {
-      "clientId": "backoffice-web",
-      "name": "Flutter Web Backoffice",
-      "enabled": true,
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": false,
-      "protocol": "openid-connect",
-      "redirectUris": [
-        "http://localhost:5011/*",
-        "http://127.0.0.1:5011/*",
-        "http://10.182.9.119:5011/*"
-      ],
-      "webOrigins": [
-        "+"
-      ],
-      "attributes": {
-        "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5011/*"
-      }
-    },
-    {
-      "clientId": "merchant-portal",
-      "name": "Flutter Web Merchant Portal",
+      "clientId": "delivery-portal",
+      "name": "Delivery Portal",
+      "description": "One Flutter Web app for MERCHANT, CARRIER and BACKOFFICE. Replaces merchant-portal, backoffice-web and carrier-portal, which were three clients whose redirect URIs, web origins and azp allow-list entries all had to be kept in step. What a signed-in user can see is decided by the realm roles in their token, not by which client they used.",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -97,21 +76,20 @@
       "protocol": "openid-connect",
       "redirectUris": [
         "http://localhost:5010/*",
-        "http://127.0.0.1:5010/*",
-        "http://10.182.9.119:5010/*"
+        "http://127.0.0.1:5010/*"
       ],
       "webOrigins": [
         "+"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5010/*"
+        "post.logout.redirect.uris": "http://localhost:5010/*##http://127.0.0.1:5010/*"
       }
     },
     {
       "clientId": "backend-services",
       "name": "Spring Boot resource servers",
-      "description": "Bearer-only. Validates tokens issued to the three client applications above; never initiates a login of its own.",
+      "description": "Bearer-only. Validates tokens issued to the client applications above; never initiates a login of its own.",
       "enabled": true,
       "publicClient": false,
       "bearerOnly": true,
@@ -147,28 +125,6 @@
       "serviceAccountsEnabled": true,
       "secret": "accounting-service-dev-secret",
       "protocol": "openid-connect"
-    },
-    {
-      "clientId": "carrier-portal",
-      "name": "Carrier Portal",
-      "enabled": true,
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": false,
-      "protocol": "openid-connect",
-      "redirectUris": [
-        "http://127.0.0.1:5013/*",
-        "http://localhost:5013/*"
-      ],
-      "webOrigins": [
-        "http://127.0.0.1:5013",
-        "http://localhost:5013"
-      ],
-      "attributes": {
-        "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5010/*"
-      }
     }
   ],
   "components": {

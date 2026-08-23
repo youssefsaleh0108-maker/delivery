@@ -30,7 +30,7 @@ check() { # check <description> <expected> <actual>
 
 token() { # token <username> <password> [client]
   curl -s -X POST "$KC" \
-    -d "client_id=${3:-merchant-portal}" -d "username=$1" -d "password=$2" \
+    -d "client_id=${3:-delivery-portal}" -d "username=$1" -d "password=$2" \
     -d "grant_type=password" | jq -r '.access_token'
 }
 
@@ -63,7 +63,7 @@ echo '=== 1. Authentication ====================================================
 
 MERCHANT=$(token merchant merchant)
 CUSTOMER=$(token customer customer mobile-app)
-BACKOFFICE=$(token backoffice backoffice backoffice-web)
+BACKOFFICE=$(token backoffice backoffice delivery-portal)
 
 [ -n "$MERCHANT" ] && [ "$MERCHANT" != null ] || { echo 'Could not obtain a merchant token'; exit 1; }
 
