@@ -3,6 +3,7 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'biometric_lock.dart';
 import 'passcode_pad.dart';
 
 /// Signing in without leaving the app: who you are, then your passcode.
@@ -42,6 +43,65 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
+  final BiometricLock _biometrics = BiometricLock();
+
+  /// Whether the fingerprint key is offered on the pad.
+  ///
+  /// Three things have to hold: the phone can do it, somebody enabled it here, and there is a
+  /// session on this device to unlock. Without the last one there is nothing a fingerprint could
+  /// produce — it proves who is holding the phone, it does not fetch a token from the server.
+  bool _fingerprintOffered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFingerprint();
+  }
+
+  Future<void> _checkFingerprint() async {
+    if (!await _biometrics.isAvailable) return;
+    if (!await _biometrics.isEnabledForAnyone()) return;
+    final AuthSession? stored = await widget.authService.restore();
+    if (!mounted) return;
+    setState(() => _fingerprintOffered = stored != null);
+  }
+
+  /// Unlocks the stored session instead of typing the passcode.
+  Future<void> _useFingerprint() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    final BiometricResult result = await _biometrics.authenticate(t.unlockWithFingerprint);
+    if (!mounted) return;
+
+    if (result != BiometricResult.ok) {
+      setState(() {
+        _busy = false;
+        _error = result == BiometricResult.unavailable
+            ? t.fingerprintNotSetUp
+            : t.couldNotVerifyYou;
+      });
+      return;
+    }
+
+    final AuthSession? session = await widget.authService.restore();
+    if (!mounted) return;
+    if (session == null) {
+      // The session went away between offering the key and pressing it — a sign-out elsewhere, or
+      // a refresh token the server rejected. The passcode is still the way in.
+      setState(() {
+        _busy = false;
+        _fingerprintOffered = false;
+        _error = t.couldNotVerifyYou;
+      });
+      return;
+    }
+    widget.onSignedIn(session);
+  }
+
   final TextEditingController _username = TextEditingController();
 
   _Step _step = _Step.username;
@@ -203,6 +263,7 @@ class _SignInScreenState extends State<SignInScreen> {
             enabled: !_busy,
             onChanged: (String v) => setState(() => _passcode = v),
             onCompleted: _submit,
+            onFingerprint: _fingerprintOffered && !_busy ? _useFingerprint : null,
           ),
 
         if (_error != null) ...<Widget>[

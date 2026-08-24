@@ -2448,7 +2448,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get fingerprintNotSetUp =>
-      'This phone has no fingerprint or face unlock set up yet. Add one in your phone settings first.';
+      'No fingerprint or face is set up on this phone yet. Add one in Android Settings, under Biometrics, then come back.';
 
   @override
   String get couldNotVerifyYou =>

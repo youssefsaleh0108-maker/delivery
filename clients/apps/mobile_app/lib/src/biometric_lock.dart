@@ -28,6 +28,20 @@ class BiometricLock {
   ///
   /// Both halves matter. A phone with a sensor and nothing enrolled reports the hardware happily
   /// and then fails at the prompt, so offering the option on hardware alone produces a setting that
+  /// Whether anybody on this device turned it on.
+  ///
+  /// The sign-in screen has no session yet, so it cannot ask about a particular account — it needs
+  /// to know whether to offer the key at all before it knows whose key it would be.
+  Future<bool> isEnabledForAnyone() async {
+    try {
+      final Map<String, String> all = await _storage.readAll();
+      return all.entries.any((MapEntry<String, String> e) =>
+          e.key.startsWith(_keyPrefix) && e.value == 'true');
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// cannot be used.
   Future<bool> get isAvailable async {
     try {

@@ -18,6 +18,7 @@ class PasscodePad extends StatelessWidget {
     required this.onCompleted,
     this.length = passcodeLength,
     this.enabled = true,
+    this.onFingerprint,
   });
 
   /// Six, matching what a phone lock screen asks for.
@@ -33,6 +34,13 @@ class PasscodePad extends StatelessWidget {
   final VoidCallback onCompleted;
   final int length;
   final bool enabled;
+
+  /// Unlock with a fingerprint instead of typing, in the slot under 7.
+  ///
+  /// <p>Null leaves that slot blank, which is where it started: the key only appears where
+  /// biometrics are both available and switched on. A phone lock screen puts it in exactly this
+  /// corner, so a thumb already knows where to go.
+  final VoidCallback? onFingerprint;
 
   void _press(String digit) {
     if (!enabled || value.length >= length) return;
@@ -83,8 +91,10 @@ class PasscodePad extends StatelessWidget {
           <String>['1', '2', '3'],
           <String>['4', '5', '6'],
           <String>['7', '8', '9'],
-          // The blank keeps 0 centred under 8, which is where a thumb expects it.
-          <String>['', '0', '⌫'],
+          // The blank keeps 0 centred under 8, which is where a thumb expects it. When biometrics
+          // are on, that blank becomes the fingerprint key — the same corner a phone lock screen
+          // uses, so nobody has to look for it.
+          <String>['⌾', '0', '⌫'],
         ])
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
@@ -95,9 +105,19 @@ class PasscodePad extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: _Key(
-                      label: key,
+                      // The fingerprint slot collapses back to a blank when there is nothing to
+                      // unlock with, so the grid keeps its shape either way.
+                      label: key == '⌾' && onFingerprint == null ? '' : key,
                       enabled: enabled && key.isNotEmpty,
-                      onTap: () => key == '⌫' ? _backspace() : _press(key),
+                      onTap: () {
+                        if (key == '⌫') {
+                          _backspace();
+                        } else if (key == '⌾') {
+                          onFingerprint?.call();
+                        } else {
+                          _press(key);
+                        }
+                      },
                     ),
                   ),
               ],
@@ -125,23 +145,32 @@ class _Key extends StatelessWidget {
       width: 76,
       height: 76,
       child: Material(
-        color: label == '⌫' ? Colors.transparent : DeliveryColors.brandSoft,
+        // Backspace and fingerprint are actions, not digits, so neither takes the filled circle.
+        color: label == '⌫' || label == '⌾'
+            ? Colors.transparent
+            : DeliveryColors.brandSoft,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: enabled ? onTap : null,
           child: Center(
-            child: label == '⌫'
-                ? Icon(Icons.backspace_outlined,
-                    color: enabled ? DeliveryColors.ink : DeliveryColors.muted)
-                : Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w500,
-                      color: enabled ? DeliveryColors.ink : DeliveryColors.muted,
-                    ),
+            child: switch (label) {
+              '⌫' => Icon(Icons.backspace_outlined,
+                  color: enabled ? DeliveryColors.ink : DeliveryColors.muted),
+              // Brand red, and larger than a digit. It is the only key here that does something
+              // other than enter a character, and it should not read as a seventh number.
+              '⌾' => Icon(Icons.fingerprint,
+                  size: 38,
+                  color: enabled ? DeliveryColors.brand : DeliveryColors.muted),
+              _ => Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w500,
+                    color: enabled ? DeliveryColors.ink : DeliveryColors.muted,
                   ),
+                ),
+            },
           ),
         ),
       ),

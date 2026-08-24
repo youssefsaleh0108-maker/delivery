@@ -34,6 +34,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool? _enabled;
   bool _available = false;
 
+  /// True while the system prompt is out, so the row can say something is happening.
+  bool _working = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,24 +56,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _set(bool on) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
-    // Proved before it is turned on, never after. Enabling on the strength of the sensor merely
-    // existing is how somebody locks themselves out with a finger the phone does not recognise.
-    if (on) {
-      final BiometricResult result = await _biometrics.authenticate(t.unlockWithFingerprint);
-      if (result != BiometricResult.ok) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(result == BiometricResult.unavailable
-              ? t.fingerprintNotSetUp
-              : t.couldNotVerifyYou),
-        ));
-        return;
+    // Busy while the platform call is out. Without it the switch sits there doing nothing visible
+    // and the whole thing reads as hung — which is exactly what it looked like on a phone with no
+    // finger enrolled, where the prompt never appears because there is nothing to match against.
+    setState(() => _working = true);
+    try {
+      if (on) {
+        // Proved before it is turned on, never after. Enabling on the strength of the sensor merely
+        // existing is how somebody locks themselves out with a finger the phone does not recognise.
+        final BiometricResult result = await _biometrics.authenticate(t.unlockWithFingerprint);
+        if (result != BiometricResult.ok) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(seconds: 6),
+            content: Text(result == BiometricResult.unavailable
+                ? t.fingerprintNotSetUp
+                : t.couldNotVerifyYou),
+          ));
+          return;
+        }
       }
-    }
 
-    await _biometrics.setEnabledFor(widget.userId, on);
-    if (!mounted) return;
-    setState(() => _enabled = on);
+      await _biometrics.setEnabledFor(widget.userId, on);
+      if (!mounted) return;
+      setState(() => _enabled = on);
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
   }
 
   @override
@@ -127,8 +139,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _enabled!,
-                  onChanged: _set,
-                  secondary: const Icon(Icons.fingerprint, color: DeliveryColors.muted),
+                  onChanged: _working ? null : _set,
+                  secondary: _working
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.fingerprint, color: DeliveryColors.brand),
                   title: Text(DeliveryStrings.of(context).useFingerprintNextTime,
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
                   subtitle: Text(

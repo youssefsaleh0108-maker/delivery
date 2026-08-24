@@ -2433,7 +2433,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get fingerprintNotSetUp =>
-      'لا توجد بصمة أو فتح بالوجه على هذا الهاتف. أضِف واحدة من إعدادات الهاتف أولًا.';
+      'لا توجد بصمة أو تعرّف وجه مُسجّل على هذا الهاتف. أضِف واحدة من إعدادات أندرويد ثم عُد إلى هنا.';
 
   @override
   String get couldNotVerifyYou =>

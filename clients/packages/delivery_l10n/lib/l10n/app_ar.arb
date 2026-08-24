@@ -921,7 +921,7 @@
   "unlockWithFingerprint": "افتح ببصمة الإصبع",
   "useFingerprintNextTime": "استخدم بصمتك في المرة القادمة",
   "fingerprintKeepsYourAccountClosed": "تبقى جلستك مقفلة حتى تفتحها، فلا يستطيع من يمسك هاتفك الدخول إلى حسابك.",
-  "fingerprintNotSetUp": "لا توجد بصمة أو فتح بالوجه على هذا الهاتف. أضِف واحدة من إعدادات الهاتف أولًا.",
+  "fingerprintNotSetUp": "لا توجد بصمة أو تعرّف وجه مُسجّل على هذا الهاتف. أضِف واحدة من إعدادات أندرويد ثم عُد إلى هنا.",
   "couldNotVerifyYou": "تعذر التحقق منك. أعد المحاولة أو سجّل الدخول برمز الدخول.",
   "signInWithPasscodeInstead": "سأستخدم رمز الدخول",
   "locked": "مقفل",
