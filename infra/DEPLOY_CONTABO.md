@@ -208,9 +208,22 @@ docker compose -f docker-compose.dev.yml --env-file .env up -d
 - **Vault is `-dev`** — in-memory, fixed root token, every secret lost on restart.
 - **No TLS.** Everything above is plain HTTP, including the login flow, on a public IP.
 - **No backups.**
-- **It sends real email.** Mailpit is not deployed; the relay in `.env` is a real one, so a bad
-  recipient in test data reaches an actual mailbox. The SMS dev-passthrough provider mails every
-  simulated message there too.
+- **Mail and SMS go to a sink, not to people.** Mailpit runs alongside the stack and every message
+  the platform sends lands there: verification codes, order mail, and each simulated SMS. That is
+  what makes it safe to register with a made-up address or phone number. Read it over a tunnel:
+
+      ssh -L 8025:127.0.0.1:8025 root@94.72.112.156
+      # then open http://localhost:8025
+
+  It is bound to loopback deliberately. The UI holds every verification code the platform issues,
+  in plain text, with nothing in front of it — this is the one service here that must never be
+  reachable from the internet.
+
+  **To send real mail**, uncomment the `SMTP_*`, `EMAIL_FROM` and `SMS_TEST_INBOX` block in `.env`
+  and restart `email-connector` and `sms-connector`. `SMTP_HOST` is the switch; with it unset the
+  services fall back to the sink. Once it is set, a bad recipient in test data reaches an actual
+  mailbox and every simulated SMS becomes a real email, so point `SMS_TEST_INBOX` at a mailbox you
+  own at the same time.
 - **There is no bank.** The Core Banking connector and simulator are both gone. Settlement runs in
   `LEDGER_ONLY` mode: the ledger records who is owed what and every leg is terminal as it is
   written. Merchants and riders are paid in points they redeem, and a redemption is a request an

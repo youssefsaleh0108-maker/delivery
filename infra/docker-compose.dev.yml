@@ -60,6 +60,37 @@ services:
       retries: 10
     networks: [delivery]
 
+  # The dev mail and SMS sink.
+  #
+  # Everything the platform "sends" lands here instead of in somebody's inbox: verification codes,
+  # order mail, and the simulated SMS the dev provider redirects. That is what makes it safe to
+  # register with made-up addresses and phone numbers, and it is why this compose file defaults the
+  # SMTP settings below to this container rather than to a relay.
+  #
+  # Switching to real mail is a deliberate act: set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and
+  # EMAIL_FROM in .env and restart email-connector. Nothing else changes.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: delivery-mailpit
+    mem_limit: 96m
+    restart: unless-stopped
+    # Loopback only, over an SSH tunnel. This UI holds every verification code the platform issues,
+    # in plain text, with no authentication in front of it — it is the one service here that must
+    # never be reachable from the internet.
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      # Kept small on purpose: this is a test sink on a 6 GB box, not an archive.
+      MP_MAX_MESSAGES: "500"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [delivery]
+
   redis:
     image: redis:7-alpine
     container_name: delivery-redis
@@ -576,26 +607,30 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       CONNECTOR_SETTINGS_URL: http://connector-settings:8109
-      # A REAL relay, not Mailpit. Everything below comes from .env — see .env.dev.example.
+      # DEFAULTS TO THE MAILPIT SINK, so this environment sends nothing to real people and a tester
+      # can register with any address or phone number they like.
       #
-      # SMTP_PASSWORD is read by the connector from Vault at secret/email-connector in the design
-      # (Section 8) and from the environment here, because this box runs Vault in dev mode and
-      # would lose it on every restart.
-      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
-      SMTP_PORT: ${SMTP_PORT:-587}
+      # To use a real relay, set these four in .env and restart this service. Setting SMTP_HOST is
+      # the switch; the rest follow it. SMTP_PASSWORD is read from Vault at secret/email-connector
+      # in the design (Section 8) and from the environment here, because this box runs Vault in dev
+      # mode and would lose it on every restart.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      # STARTTLS on 587, implicit TLS on 465. Sending to a real relay without one of them puts
-      # credentials on the wire in clear text.
-      SMTP_AUTH: ${SMTP_AUTH:-true}
-      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
-      # The envelope sender. Relays reject or spam-file mail whose From is not a domain they are
-      # authorised for, which is the usual cause of "the connector says sent and nothing arrives".
-      EMAIL_FROM: ${EMAIL_FROM:?EMAIL_FROM is required}
+      # Off for the sink, which has neither. STARTTLS on 587 or implicit TLS on 465 for a real
+      # relay — sending to one without either puts the credentials on the wire in clear text.
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      # The envelope sender. A real relay rejects or spam-files mail whose From is not a domain it
+      # is authorised for, which is the usual cause of "the connector says sent and nothing arrives".
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@mydelivery.local}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
       OTEL_SDK_DISABLED: "true"
     depends_on:
+      mailpit:
+        condition: service_healthy
       config-server:
         condition: service_healthy
       rabbitmq:
@@ -659,19 +694,25 @@ services:
       # implemented and waiting on credentials — switching is a Backoffice change once those exist,
       # not a redeploy.
       #
-      # With Mailpit gone this now goes through the SAME REAL RELAY as the email connector, so
-      # every simulated SMS is a real email. Point SMS_TEST_INBOX at a mailbox you own.
-      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
-      SMTP_PORT: ${SMTP_PORT:-587}
+      # Simulated SMS goes to the same sink as the mail, so a tester can register with a made-up
+      # number and still read the message. SMS_TEST_INBOX is a fake address INSIDE mailpit — it
+      # never leaves the box, so it does not have to be a mailbox anybody owns.
+      #
+      # Against a real relay it would be a real send to a real mailbox, so change it at the same
+      # time you change SMTP_HOST.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_AUTH: ${SMTP_AUTH:-true}
-      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
-      SMS_TEST_INBOX: ${SMS_TEST_INBOX:?SMS_TEST_INBOX is required}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      SMS_TEST_INBOX: ${SMS_TEST_INBOX:-sms-test-inbox@dev.local}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
       OTEL_SDK_DISABLED: "true"
     depends_on:
+      mailpit:
+        condition: service_healthy
       config-server:
         condition: service_healthy
       rabbitmq:

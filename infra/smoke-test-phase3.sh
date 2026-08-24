@@ -23,6 +23,8 @@ GW="http://traefik:8100"
 KC="http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/token"
 SETTINGS="http://connector-settings:8109"
 SMS_CONNECTOR="http://sms-connector:8112"
+# The dev mail sink. Absent when mail is pointed at a real relay, which section 5 handles.
+MAILPIT="${MAILPIT_URL:-http://mailpit:8025}"
 EMAIL_CONNECTOR="http://email-connector:8110"
 PUSH_CONNECTOR="http://push-connector:8111"
 RABBIT="http://rabbitmq:15672"
@@ -238,19 +240,39 @@ echo
 echo
 echo '=== 5. The email left the platform ==============================================='
 
-# Mailpit is gone. The mail sender points at a real relay now, so there is no inbox this script is
-# allowed to read. What can still be asserted is the platform's own record: that a row exists for
-# each audience, addressed to the right person, and that the relay accepted the message.
+# Two levels of proof, because this environment has two modes.
 #
-# This is STRICTLY WEAKER than the check it replaces. It proves the send succeeded; it does not
-# prove the mail was delivered, nor that the body was right. Reading a real mailbox to close that
-# gap would mean holding somebody's mail credentials, which is not worth it for a smoke test.
+# The platform's own record is always checkable: a row per audience, addressed to the right person,
+# accepted by whatever relay is configured. That works in both modes and is asserted first.
+#
+# Reading the message itself needs a mailbox this script may read, which means the Mailpit sink.
+# When mail is pointed at a real relay there is no such mailbox — so those assertions are SKIPPED
+# AND SAID TO BE SKIPPED rather than quietly dropped, because a suite that silently checks less
+# reads exactly like a suite that passed.
 check 'the customer confirmation was sent' 'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL" and .status=="SENT" and .recipient=="customer@dev.local")]|length>0' | sed 's/true/yes/;s/false/no/')"
 check 'the merchant work item was sent'    'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL" and .status=="SENT" and .recipient=="merchant@dev.local")]|length>0' | sed 's/true/yes/;s/false/no/')"
 check 'the two went to different people'   'yes' \
   "$(echo "$LOG" | jq '([.[]|select(.channel=="EMAIL" and .status=="SENT")|.recipient]|unique|length)>=2' | sed 's/true/yes/;s/false/no/')"
+
+SHORT_ID=$(echo "$ORDER" | cut -c1-8 | tr 'a-f' 'A-F')
+
+if curl -s -m 3 -o /dev/null "$MAILPIT/api/v1/messages?limit=1"; then
+  wait_for 30 "curl -s '$MAILPIT/api/v1/messages?limit=200' | jq -e --arg s '$SHORT_ID' '[.messages[]|select(.To[]?.Address==\"customer@dev.local\" and (.Subject|contains(\$s)))]|length>0'" || true
+
+  check 'the customer confirmation arrived' 'yes' \
+    "$(curl -s "$MAILPIT/api/v1/messages?limit=200" \
+       | jq --arg s "$SHORT_ID" '[.messages[]|select(.To[]?.Address=="customer@dev.local" and (.Subject|contains($s)))]|length>0' \
+       | sed 's/true/yes/;s/false/no/')"
+  check 'the merchant work item arrived'    'yes' \
+    "$(curl -s "$MAILPIT/api/v1/messages?limit=200" \
+       | jq --arg s "$SHORT_ID" '[.messages[]|select(.To[]?.Address=="merchant@dev.local" and (.Subject|contains($s)))]|length>0' \
+       | sed 's/true/yes/;s/false/no/')"
+else
+  echo '  SKIP  no mail sink reachable — delivery is asserted from the log only'
+fi
+
 echo '=== 6. SMS through the dev provider =============================================='
 
 # A status change, because that is the event the SMS template is attached to.

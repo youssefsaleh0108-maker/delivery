@@ -204,8 +204,18 @@ echo '=== 5. Internal-only endpoints stay internal =============================
 check 'no gateway route to a connector'  '404' "$(status POST "$GW/api/connector/send" "$BACKOFFICE" '{}')"
 check 'no gateway route to the bank'     '404' "$(status GET "$GW/api/core-banking/accounts" "$BACKOFFICE")"
 check 'no gateway route to fault injection' '404' "$(status GET "$GW/test/faults" "$BACKOFFICE")"
-check 'the bank still needs its own key' '401' \
-  "$(curl -s -o /dev/null -w '%{http_code}' http://corebanking-simulator:8114/api/core-banking/accounts)"
+# The core-banking simulator was removed when settlement moved to LEDGER_ONLY and points, so on
+# this deployment there is nothing listening and the check returns 000 rather than 401.
+#
+# Skipped explicitly instead of left failing. An assertion that is always red is worse than no
+# assertion: it trains whoever reads this output to expect one failure, which is how the second one
+# goes unnoticed. When the connector comes back, so does the check, unchanged.
+if curl -s -m 3 -o /dev/null http://corebanking-simulator:8114/actuator/health; then
+  check 'the bank still needs its own key' '401' \
+    "$(curl -s -o /dev/null -w '%{http_code}' http://corebanking-simulator:8114/api/core-banking/accounts)"
+else
+  echo '  SKIP  core banking is not deployed here — settlement is LEDGER_ONLY'
+fi
 
 echo
 echo '================================================================================='

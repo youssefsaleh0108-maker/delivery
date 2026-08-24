@@ -374,5 +374,14 @@
     "en",
     "ar"
   ],
-  "defaultLocale": "en"
+  "defaultLocale": "en",
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "no-reply@mydelivery.local",
+    "fromDisplayName": "MyDelivery",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  }
 }
