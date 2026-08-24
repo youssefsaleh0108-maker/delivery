@@ -6,6 +6,10 @@ import java.util.Properties;
 
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+import java.util.ArrayList;
+import java.util.List;
+
+import jakarta.mail.internet.MimeMultipart;
 
 import org.eclipse.angus.mail.smtp.SMTPSendFailedException;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +22,7 @@ import org.springframework.mail.MailParseException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 
+import com.delivery.connector.email.EmailHtmlLayout;
 import com.delivery.platform.notifications.DeliveryOutcome;
 import com.delivery.platform.notifications.NotificationCommand;
 
@@ -49,7 +54,9 @@ class SmtpEmailClientTest {
     @BeforeEach
     void setUp() {
         mailSender = mock(JavaMailSender.class);
-        client = new SmtpEmailClient(mailSender, "no-reply@delivery.test");
+        client = new SmtpEmailClient(mailSender,
+                new EmailHtmlLayout("MyDelivery", "#C41D4E"),
+                "no-reply@delivery.test", "MyDelivery");
 
         when(mailSender.createMimeMessage()).thenAnswer(call ->
                 new MimeMessage(Session.getInstance(new Properties())));
@@ -94,19 +101,51 @@ class SmtpEmailClientTest {
 
             MimeMessage sent = captureSent();
             assertThat(sent.getAllRecipients()[0].toString()).isEqualTo("sam@example.test");
-            assertThat(sent.getFrom()[0].toString()).isEqualTo("no-reply@delivery.test");
+            // With the display name, so it arrives from MyDelivery rather than a bare address.
+            assertThat(sent.getFrom()[0].toString())
+                    .isEqualTo("MyDelivery <no-reply@delivery.test>");
             assertThat(sent.getSubject()).isEqualTo("Your order is on its way");
         }
 
         /**
-         * Bodies interpolate customer-controlled values — product names, delivery notes. Rendering
-         * them as HTML would turn a product name into an injection point in every inbox.
+         * Multipart, with plain text first and branded HTML second.
+         *
+         * <p>The HTML alternative interpolates nothing unescaped — see {@link EmailHtmlLayout} and
+         * its tests. That is what makes it safe: bodies carry customer-controlled values, product
+         * names and delivery notes, and rendering one as markup would put an injection point in
+         * every inbox. The plain part is what the notification log holds, so it stays first and the
+         * two can never say different things.
          */
         @Test
-        void is_sent_as_plain_text_rather_than_html() throws Exception {
+        void is_sent_as_plain_text_with_a_branded_html_alternative() throws Exception {
             client.send(command());
 
-            assertThat(captureSent().getContentType()).startsWith("text/plain");
+            MimeMessage sent = captureSent();
+            assertThat(sent.getContentType()).startsWith("multipart/");
+
+            // Walked rather than indexed. Spring nests mixed inside related inside alternative, and
+            // the exact nesting is its business, not this test's — what matters is that both
+            // renderings reach the inbox.
+            List<String> types = new ArrayList<>();
+            List<String> bodies = new ArrayList<>();
+            collect(sent.getContent(), types, bodies);
+
+            assertThat(types).anyMatch(t -> t.startsWith("text/plain"));
+            assertThat(types).anyMatch(t -> t.startsWith("text/html"));
+            assertThat(bodies).anySatisfy(b -> assertThat(b).contains("MyDelivery"));
+        }
+
+        /** Flattens the part tree into content types and their text. */
+        private void collect(Object content, List<String> types, List<String> bodies)
+                throws Exception {
+            if (content instanceof MimeMultipart multipart) {
+                for (int i = 0; i < multipart.getCount(); i++) {
+                    types.add(multipart.getBodyPart(i).getContentType());
+                    collect(multipart.getBodyPart(i).getContent(), types, bodies);
+                }
+            } else if (content != null) {
+                bodies.add(content.toString());
+            }
         }
 
         /** Lets a message sitting in somebody's inbox be traced back to its notification_log row. */
@@ -229,7 +268,9 @@ class SmtpEmailClientTest {
                 doThrow(new MailSendException("Could not connect to SMTP host: relay, port: " + port))
                         .when(sender).send(any(MimeMessage.class));
 
-                assertThat(new SmtpEmailClient(sender, "no-reply@delivery.test")
+                assertThat(new SmtpEmailClient(sender,
+                        new EmailHtmlLayout("MyDelivery", "#C41D4E"),
+                        "no-reply@delivery.test", "MyDelivery")
                         .send(command()).retryable())
                         .as("port %d", port)
                         .isTrue();
