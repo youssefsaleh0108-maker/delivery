@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/error_codes.dart' as auth_error;
@@ -45,10 +46,17 @@ class BiometricLock {
   /// cannot be used.
   Future<bool> get isAvailable async {
     try {
-      if (!await _auth.isDeviceSupported()) return false;
-      if (!await _auth.canCheckBiometrics) return false;
-      return (await _auth.getAvailableBiometrics()).isNotEmpty;
-    } on PlatformException {
+      final bool supported = await _auth.isDeviceSupported();
+      final bool canCheck = await _auth.canCheckBiometrics;
+      final List<BiometricType> enrolled = await _auth.getAvailableBiometrics();
+      // Logged because every "the fingerprint does not work" report comes down to which of these
+      // three is false, and none of them is visible from the outside.
+      debugPrint('BIOMETRICS supported=$supported canCheck=$canCheck enrolled=$enrolled');
+      return supported && canCheck && enrolled.isNotEmpty;
+    } on PlatformException catch (e) {
+      // The code distinguishes 'no finger enrolled' from 'sensor locked out' from 'the plugin is
+      // not wired up', and none of those look any different on screen.
+      debugPrint('BIOMETRICS availability check failed: ${e.code} ${e.message}');
       return false;
     }
   }
@@ -92,6 +100,9 @@ class BiometricLock {
       );
       return ok ? BiometricResult.ok : BiometricResult.refused;
     } on PlatformException catch (e) {
+      // The code distinguishes 'no finger enrolled' from 'sensor locked out' from 'the plugin is
+      // not wired up', and none of those look any different on screen.
+      debugPrint('BIOMETRICS prompt failed: ${e.code} ${e.message}');
       if (e.code == auth_error.notEnrolled || e.code == auth_error.notAvailable) {
         return BiometricResult.unavailable;
       }
