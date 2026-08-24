@@ -4,6 +4,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'src/biometric_lock.dart';
@@ -24,7 +25,21 @@ import 'src/rider_home_screen.dart';
 /// Section 9: the Mobile App serves both Customer and Delivery Rider and branches navigation on the
 /// Keycloak role claim after login. Phase 1 gives the Customer side a real catalog to browse;
 /// checkout, tracking and the rider queue arrive with Order Manager in Phase 2.
-void main() {
+Future<void> main() async {
+  // Required before any plugin call, because Firebase is initialised below and that talks to the
+  // platform channel.
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    // Reads the config the Gradle plugin generated from google-services.json. Wrapped because a
+    // build without that file — a fork, or a developer who has not been given the Firebase project
+    // — must still run. Push simply does not work in that case; nothing else is affected.
+    await Firebase.initializeApp();
+  } catch (error, stack) {
+    debugPrint('FIREBASE INIT FAILED, push will not work: $error');
+    debugPrintStack(stackTrace: stack, label: 'firebase-init');
+  }
+
   runApp(const DeliveryMobileApp());
 }
 
