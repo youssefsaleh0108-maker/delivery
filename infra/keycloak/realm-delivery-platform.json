@@ -191,7 +191,8 @@
       {
         "client": "onboarding-service",
         "roles": [
-          "manage-users"
+          "manage-users",
+          "view-realm"
         ]
       }
     ]
@@ -206,7 +207,8 @@
       ],
       "clientRoles": {
         "realm-management": [
-          "manage-users"
+          "manage-users",
+          "view-realm"
         ]
       }
     },
