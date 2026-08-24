@@ -25,7 +25,7 @@ enum PartnerKind {
   /// A shop. Asks the platform for terms, and names no delivery company.
   merchant,
 
-  /// A rider. Either applies to a delivery company, or to MyDelivery's own fleet when no company
+  /// A rider. Either applies to a delivery company, or to YouDrop's own fleet when no company
   /// is chosen — see [_PartnerApplicationScreenState._company].
   rider,
 }
@@ -67,13 +67,13 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   int _step = 0;
 
-  /// The delivery company a rider chose, or null for MyDelivery's own fleet.
+  /// The delivery company a rider chose, or null for YouDrop's own fleet.
   ///
   /// Null is a real answer here, not "not yet decided" — [_ridesForUs] is what separates the two,
   /// so that continuing without a company is a deliberate choice rather than a skipped step.
   HiringCompany? _company;
 
-  /// True once a rider has picked MyDelivery rather than one of the companies.
+  /// True once a rider has picked YouDrop rather than one of the companies.
   bool _ridesForUs = false;
 
   String? _emailToken;
@@ -169,7 +169,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
         // Us first. A rider who wants to work should not have to understand the difference between
         // the platform and the companies on it before they can apply to anyone — and until now
-        // this screen offered only the companies, so riding for MyDelivery was not on the table.
+        // this screen offered only the companies, so riding for YouDrop was not on the table.
         SoftCard(
           selected: _ridesForUs,
           onTap: () => setState(() {
@@ -184,9 +184,9 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(t.rideForMyDelivery,
+                    Text(t.rideForYouDrop,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
-                    Text(t.rideForMyDeliveryBlurb, style: theme.textTheme.bodySmall),
+                    Text(t.rideForYouDropBlurb, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -214,7 +214,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
               ));
             }
             if (snapshot.hasError) {
-              // Not fatal any more: riding for MyDelivery is still available, so this reports the
+              // Not fatal any more: riding for YouDrop is still available, so this reports the
               // companies as unavailable rather than blocking the whole screen.
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,7 +530,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
               name: _name.text.trim(),
               email: _verifiedEmail!,
               emailVerificationToken: _emailToken!,
-              // Null when they chose us. The server reads that as an application to MyDelivery's
+              // Null when they chose us. The server reads that as an application to YouDrop's
               // own fleet and routes it to the backoffice rather than to a company.
               companyId: _company?.id,
               phone: _verifiedPhone,

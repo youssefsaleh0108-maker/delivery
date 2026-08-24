@@ -10,7 +10,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   DeliveryStringsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appTitle => 'MyDelivery';
+  String get appTitle => 'YouDrop';
 
   @override
   String get navShops => 'المتاجر';
@@ -2338,13 +2338,13 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get partnerChoiceIntro => 'اختر ما ينطبق عليك وسنكمل معك الخطوات.';
 
   @override
-  String get applyAsMerchant => 'بيع على ماي دليفري';
+  String get applyAsMerchant => 'بيع على يو دروب';
 
   @override
   String get applyAsMerchantBlurb => 'لديك متجر وتريد عرض منتجاتك في التطبيق.';
 
   @override
-  String get applyAsRider => 'وصّل مع ماي دليفري';
+  String get applyAsRider => 'وصّل مع يو دروب';
 
   @override
   String get applyAsRiderBlurb => 'تريد توصيل الطلبات وتتقاضى أجرًا عن كل طلب.';
@@ -2353,10 +2353,10 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get whoWillYouRideFor => 'لمن ستوصّل؟';
 
   @override
-  String get rideForMyDelivery => 'ماي دليفري';
+  String get rideForYouDrop => 'يو دروب';
 
   @override
-  String get rideForMyDeliveryBlurb =>
+  String get rideForYouDropBlurb =>
       'انضم إلى أسطولنا. نحن نراجع طلبك ونحن ندفع لك.';
 
   @override

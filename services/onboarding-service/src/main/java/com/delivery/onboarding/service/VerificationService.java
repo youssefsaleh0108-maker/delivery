@@ -123,15 +123,15 @@ public class VerificationService {
         // block, and on a phone the first thing in the notification preview is the code itself,
         // which is the only part anybody actually wants.
         String emailBody = code + "\n\n"
-                + "Use this code to confirm your email address for MyDelivery."
+                + "Use this code to confirm your email address for YouDrop."
                 + " It expires in " + minutes + " minutes and can be used once.\n\n"
                 + "If you did not ask for this code, no action is needed —"
                 + " somebody may have typed your address by mistake."
-                + " Do not share it with anyone; MyDelivery will never ask you for it.";
+                + " Do not share it with anyone; YouDrop will never ask you for it.";
 
         // SMS is one line: no layout renders it, and a message split across several parts costs
         // more and can arrive out of order.
-        String smsBody = code + " is your MyDelivery verification code. It expires in "
+        String smsBody = code + " is your YouDrop verification code. It expires in "
                 + minutes + " minutes. Never share it with anyone.";
 
         try {
@@ -142,7 +142,7 @@ public class VerificationService {
                 // to anyone looking at their screen. Every large provider makes the same call, and
                 // the code is already in the body, so this adds no exposure inside our own logs.
                 platform.notifyDirect("EMAIL", destination,
-                        code + " is your MyDelivery verification code",
+                        code + " is your YouDrop verification code",
                         emailBody, "onboarding.verification");
             } else {
                 platform.notifyDirect("SMS", destination, null, smsBody, "onboarding.verification");

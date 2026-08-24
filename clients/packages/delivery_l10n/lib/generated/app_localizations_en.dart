@@ -10,7 +10,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   DeliveryStringsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'MyDelivery';
+  String get appTitle => 'YouDrop';
 
   @override
   String get navShops => 'Shops';
@@ -2350,14 +2350,14 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Tell us which one you are and we will take you through it.';
 
   @override
-  String get applyAsMerchant => 'Sell on MyDelivery';
+  String get applyAsMerchant => 'Sell on YouDrop';
 
   @override
   String get applyAsMerchantBlurb =>
       'You run a shop and want your products in the app.';
 
   @override
-  String get applyAsRider => 'Deliver with MyDelivery';
+  String get applyAsRider => 'Deliver with YouDrop';
 
   @override
   String get applyAsRiderBlurb =>
@@ -2367,10 +2367,10 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get whoWillYouRideFor => 'Who will you ride for?';
 
   @override
-  String get rideForMyDelivery => 'MyDelivery';
+  String get rideForYouDrop => 'YouDrop';
 
   @override
-  String get rideForMyDeliveryBlurb =>
+  String get rideForYouDropBlurb =>
       'Join our own fleet. We review your application and we pay you.';
 
   @override

@@ -55,8 +55,8 @@ class SmtpEmailClientTest {
     void setUp() {
         mailSender = mock(JavaMailSender.class);
         client = new SmtpEmailClient(mailSender,
-                new EmailHtmlLayout("MyDelivery", "#C41D4E"),
-                "no-reply@delivery.test", "MyDelivery");
+                new EmailHtmlLayout("YouDrop", "#C41D4E"),
+                "no-reply@delivery.test", "YouDrop");
 
         when(mailSender.createMimeMessage()).thenAnswer(call ->
                 new MimeMessage(Session.getInstance(new Properties())));
@@ -101,9 +101,9 @@ class SmtpEmailClientTest {
 
             MimeMessage sent = captureSent();
             assertThat(sent.getAllRecipients()[0].toString()).isEqualTo("sam@example.test");
-            // With the display name, so it arrives from MyDelivery rather than a bare address.
+            // With the display name, so it arrives from YouDrop rather than a bare address.
             assertThat(sent.getFrom()[0].toString())
-                    .isEqualTo("MyDelivery <no-reply@delivery.test>");
+                    .isEqualTo("YouDrop <no-reply@delivery.test>");
             assertThat(sent.getSubject()).isEqualTo("Your order is on its way");
         }
 
@@ -136,7 +136,7 @@ class SmtpEmailClientTest {
 
             assertThat(types).anyMatch(t -> t.startsWith("text/plain"));
             assertThat(types).anyMatch(t -> t.startsWith("text/html"));
-            assertThat(bodies).anySatisfy(b -> assertThat(b).contains("MyDelivery"));
+            assertThat(bodies).anySatisfy(b -> assertThat(b).contains("YouDrop"));
         }
 
         /** Flattens the part tree into content types and their text. */
@@ -273,8 +273,8 @@ class SmtpEmailClientTest {
                         .when(sender).send(any(MimeMessage.class));
 
                 assertThat(new SmtpEmailClient(sender,
-                        new EmailHtmlLayout("MyDelivery", "#C41D4E"),
-                        "no-reply@delivery.test", "MyDelivery")
+                        new EmailHtmlLayout("YouDrop", "#C41D4E"),
+                        "no-reply@delivery.test", "YouDrop")
                         .send(command()).retryable())
                         .as("port %d", port)
                         .isTrue();

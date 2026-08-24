@@ -101,7 +101,7 @@ abstract class DeliveryStrings {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'MyDelivery'**
+  /// **'YouDrop'**
   String get appTitle;
 
   /// No description provided for @navShops.
@@ -4229,7 +4229,7 @@ abstract class DeliveryStrings {
   /// No description provided for @applyAsMerchant.
   ///
   /// In en, this message translates to:
-  /// **'Sell on MyDelivery'**
+  /// **'Sell on YouDrop'**
   String get applyAsMerchant;
 
   /// No description provided for @applyAsMerchantBlurb.
@@ -4241,7 +4241,7 @@ abstract class DeliveryStrings {
   /// No description provided for @applyAsRider.
   ///
   /// In en, this message translates to:
-  /// **'Deliver with MyDelivery'**
+  /// **'Deliver with YouDrop'**
   String get applyAsRider;
 
   /// No description provided for @applyAsRiderBlurb.
@@ -4256,17 +4256,17 @@ abstract class DeliveryStrings {
   /// **'Who will you ride for?'**
   String get whoWillYouRideFor;
 
-  /// No description provided for @rideForMyDelivery.
+  /// No description provided for @rideForYouDrop.
   ///
   /// In en, this message translates to:
-  /// **'MyDelivery'**
-  String get rideForMyDelivery;
+  /// **'YouDrop'**
+  String get rideForYouDrop;
 
-  /// No description provided for @rideForMyDeliveryBlurb.
+  /// No description provided for @rideForYouDropBlurb.
   ///
   /// In en, this message translates to:
   /// **'Join our own fleet. We review your application and we pay you.'**
-  String get rideForMyDeliveryBlurb;
+  String get rideForYouDropBlurb;
 
   /// No description provided for @rideForACompany.
   ///

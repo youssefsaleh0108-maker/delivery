@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("the branded email layout")
 class EmailHtmlLayoutTest {
 
-    private final EmailHtmlLayout layout = new EmailHtmlLayout("MyDelivery", "#C41D4E");
+    private final EmailHtmlLayout layout = new EmailHtmlLayout("YouDrop", "#C41D4E");
 
     @Nested
     @DisplayName("escaping, which is the reason this was safe to add")
@@ -89,7 +89,7 @@ class EmailHtmlLayoutTest {
     void brands() {
         String html = layout.render("Anything", "Anything.");
 
-        assertThat(html).contains("MyDelivery");
+        assertThat(html).contains("YouDrop");
         assertThat(html).contains("#C41D4E");
     }
 

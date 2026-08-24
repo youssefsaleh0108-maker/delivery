@@ -39,7 +39,7 @@ public class EmailHtmlLayout {
     private final String brandColour;
 
     public EmailHtmlLayout(
-            @Value("${delivery.email.brand-name:MyDelivery}") String brandName,
+            @Value("${delivery.email.brand-name:YouDrop}") String brandName,
             @Value("${delivery.email.brand-colour:#C41D4E}") String brandColour) {
         this.brandName = brandName;
         this.brandColour = brandColour;

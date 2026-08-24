@@ -29,7 +29,7 @@ public class OnboardingApplication {
      * <p>{@link #RIDER} is the only kind that can be addressed to somebody other than the platform.
      * A shop and a fleet are asking the platform for terms. A rider is either asking a delivery
      * company for work — which the platform has no basis to decide, since it does not know who
-     * turned up for a trial or who was let go last month — or asking to ride for MyDelivery itself,
+     * turned up for a trial or who was let go last month — or asking to ride for YouDrop itself,
      * which the platform does decide, because then it is the employer.
      */
     public enum Kind {
@@ -183,7 +183,7 @@ public class OnboardingApplication {
             throw new IllegalArgumentException("The phone number has to be verified first");
         }
         // A rider may name a company or not: naming one is applying to that company for work,
-        // naming none is applying to ride for MyDelivery itself. The two are decided by different
+        // naming none is applying to ride for YouDrop itself. The two are decided by different
         // people, and the queue each lands in follows from this field alone — the backoffice queue
         // is "target is null", a company's queue is "target is me".
         //

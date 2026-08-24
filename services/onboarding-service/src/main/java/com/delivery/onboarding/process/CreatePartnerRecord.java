@@ -41,7 +41,7 @@ public class CreatePartnerRecord implements JavaDelegate {
     private final PlatformClient platform;
 
     /**
-     * MyDelivery's own fleet, for riders who applied to the platform rather than to a company.
+     * YouDrop's own fleet, for riders who applied to the platform rather than to a company.
      *
      * <p>Seeded by order-manager's V16 as the 'in-house' provider. Configurable rather than
      * inlined, because a deployment that runs no fleet of its own needs to point this somewhere
@@ -91,7 +91,7 @@ public class CreatePartnerRecord implements JavaDelegate {
             // board. Only the rider list is consulted by dispatch and by a claim, so attaching a
             // rider as staff produces an account that looks attached and is offered no work.
             //
-            // No company named means they applied to MyDelivery itself, so they join the house
+            // No company named means they applied to YouDrop itself, so they join the house
             // fleet. Modelling it as an ordinary provider is what keeps this to one line: dispatch,
             // the job board and claims all work off the rider list and never learn the difference.
             case RIDER -> {

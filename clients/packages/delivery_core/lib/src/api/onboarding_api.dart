@@ -65,7 +65,7 @@ class OnboardingApi {
     });
   }
 
-  /// Applies to ride, either for one delivery company or for MyDelivery itself.
+  /// Applies to ride, either for one delivery company or for YouDrop itself.
   ///
   /// [companyId] null means the second of those: no company is named, so the application is the
   /// platform's own to decide and lands in the backoffice queue rather than a company's.
@@ -94,7 +94,7 @@ class OnboardingApi {
     return (response.data as Map<String, dynamic>)['reference'] as String;
   }
 
-  /// Applies to sell on MyDelivery.
+  /// Applies to sell on YouDrop.
   ///
   /// No company is named and none may be: a shop is asking the platform for terms, and a merchant
   /// carrying a delivery company would turn up in that company's applicant list.

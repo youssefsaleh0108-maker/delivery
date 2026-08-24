@@ -43,7 +43,7 @@ public class SmtpEmailClient implements ProviderClient {
     public SmtpEmailClient(JavaMailSender mailSender,
                            EmailHtmlLayout layout,
                            @Value("${delivery.email.from:no-reply@delivery.local}") String from,
-                           @Value("${delivery.email.from-name:MyDelivery}") String fromName) {
+                           @Value("${delivery.email.from-name:YouDrop}") String fromName) {
         this.mailSender = mailSender;
         this.layout = layout;
         this.from = from;
@@ -65,7 +65,7 @@ public class SmtpEmailClient implements ProviderClient {
             MimeMessageHelper helper =
                     new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
 
-            // A display name, so the message arrives from MyDelivery rather than from a bare
+            // A display name, so the message arrives from YouDrop rather than from a bare
             // no-reply address. UnsupportedEncodingException is the only reason this overload
             // throws, and the encoding is a constant.
             helper.setFrom(from, fromName);
