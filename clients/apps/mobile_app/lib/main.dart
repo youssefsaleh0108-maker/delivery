@@ -98,6 +98,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
   late Future<AuthSession?> _bootstrap = _authService.restore();
 
+  /// Writes this device's push token onto the signed-in account.
+  late final DeviceTokenRegistrar _deviceTokens =
+      DeviceTokenRegistrar(dio: _dio, issuer: _issuer);
+
   final BiometricLock _biometrics = BiometricLock();
 
   /// Whether a restored session is still behind the lock screen.
@@ -122,6 +126,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   Future<void> _applyLock(AuthSession session) async {
     if (_lockCheckedFor == session.subject) return;
     _lockCheckedFor = session.subject;
+
+    // A restored session registers too. Tokens rotate while the app is closed, and a session that
+    // only ever registers at sign-in would keep a stale one for as long as somebody stays signed in.
+    _deviceTokens.register();
 
     final bool enabled = await _biometrics.isEnabledFor(session.subject);
     if (!enabled) {
@@ -212,6 +220,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// Adopts a session from either form. Shared so the two screens cannot drift on what "signed in"
   /// means — sign-up signs the new account in directly rather than sending them back to a login.
   void _adoptSession(AuthSession session) {
+    // Register this device for push as soon as there is an account to attach it to. Fire and
+    // forget: it asks for a permission, and somebody who says no still gets a working app.
+    _deviceTokens.register();
     setState(() {
       // They just proved who they are with a passcode, so there is nothing to unlock. Leaving this
       // true would show the lock screen for a moment immediately after a successful sign-in.
@@ -359,22 +370,26 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             );
           }
 
-          // Applied, waiting on a decision. Checked BEFORE the partner roles: an approved account
-          // keeps APPLICANT alongside its real role, so testing this first would strand a merchant
-          // on the pending screen forever.
-          if (!session.hasRole(DeliveryRole.merchant) &&
+          // A pending partner gets their real surface, not a waiting room. They carry the role they
+          // applied for, so every screen works and they can set a shop up or read the job board —
+          // the server refuses only the committing acts, publishing and claiming, until APPLICANT
+          // comes off. The banner on those screens says so.
+          //
+          // Only somebody carrying APPLICANT and nothing else lands on the status screen, which is
+          // the case where there is genuinely no surface to show.
+          final bool pending = session.hasRole(DeliveryRole.applicant);
+          if (pending &&
+              !session.hasRole(DeliveryRole.merchant) &&
               !session.hasRole(DeliveryRole.delivery) &&
-              !session.hasRole(DeliveryRole.carrier) &&
-              session.hasRole(DeliveryRole.applicant)) {
+              !session.hasRole(DeliveryRole.carrier)) {
             return PendingApplicationScreen(
               api: _onboardingApi,
               session: session,
               onSignOut: _signOut,
-              // The role is in the access token, so an approval granted elsewhere does not reach a
-              // session already running. Signing out and back in is what picks it up.
               onApproved: () => _signOut(),
             );
           }
+
 
           // The role branch. A rider's queue wins when an account holds both, because the delivery
           // flow is the one with a time-critical task attached.
@@ -384,6 +399,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               butlerApi: _butlerApi,
               session: session,
               locale: _locale,
+              pendingApproval: pending,
               onSignOut: _signOut,
             );
           }
@@ -395,6 +411,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               orderApi: _orderApi,
               session: session,
               locale: _locale,
+              pendingApproval: pending,
               onSignOut: _signOut,
             );
           }

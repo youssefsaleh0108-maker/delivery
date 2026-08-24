@@ -21,6 +21,7 @@ class MerchantHomeScreen extends StatefulWidget {
     required this.orderApi,
     required this.session,
     required this.locale,
+    this.pendingApproval = false,
     required this.onSignOut,
   });
 
@@ -29,6 +30,12 @@ class MerchantHomeScreen extends StatefulWidget {
 
   /// Passed through to Settings, which is reachable from here now.
   final LocaleController locale;
+
+  /// True while the application behind this account is still being decided.
+  ///
+  /// The screen works either way — the server is what refuses the committing act — but saying so
+  /// up front beats letting somebody build a shop and discover the refusal at the last step.
+  final bool pendingApproval;
 
   final Future<void> Function() onSignOut;
 
@@ -100,7 +107,17 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
+      body: Column(
+        children: <Widget>[
+          if (widget.pendingApproval)
+            Padding(
+              padding: const EdgeInsets.all(DeliverySpacing.md),
+              child: SoftNote(
+                  icon: Icons.hourglass_top_rounded,
+                  text: t.pendingBannerMerchant),
+            ),
+          Expanded(
+            child: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<Paged<DeliveryOrder>>(
           future: _orders,
@@ -139,6 +156,9 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
             );
           },
         ),
+            ),
+          ),
+        ],
       ),
     );
   }

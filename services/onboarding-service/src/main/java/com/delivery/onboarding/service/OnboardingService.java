@@ -211,10 +211,19 @@ public class OnboardingService {
             throw new ApplicationRuleException("That application already has a sign-in");
         }
 
+        // The same mapping approval uses. Granted now so they can explore what they applied for;
+        // APPLICANT rides alongside it until somebody decides.
+        String role = switch (application.getKind()) {
+            case MERCHANT -> "MERCHANT";
+            case CARRIER -> "CARRIER";
+            case RIDER -> "DELIVERY";
+        };
+
         String userRef = keycloak.createApplicant(
                 application.getContactEmail(),
                 firstNameOf(application.getContactName()),
                 lastNameOf(application.getContactName()),
+                role,
                 password);
 
         application.applicantAccountCreated(userRef);

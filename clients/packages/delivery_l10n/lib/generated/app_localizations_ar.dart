@@ -2507,4 +2507,18 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get couldNotCreateSignIn =>
       'تعذّر إعداد تسجيل الدخول. طلبك استُلم على أي حال.';
+
+  @override
+  String get pendingBannerMerchant =>
+      'طلبك قيد المراجعة. جهّز متجرك الآن — يمكنك النشر في السوق بعد الموافقة.';
+
+  @override
+  String get pendingBannerRider =>
+      'طلبك قيد المراجعة. تصفّح لوحة الطلبات — يمكنك استلام التوصيلات بعد الموافقة.';
+
+  @override
+  String get notWhilePending => 'يمكنك فعل ذلك بعد الموافقة على طلبك.';
+
+  @override
+  String get viewApplication => 'عرض الطلب';
 }

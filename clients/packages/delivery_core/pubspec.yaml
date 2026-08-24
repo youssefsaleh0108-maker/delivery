@@ -22,6 +22,7 @@ dependencies:
   http: ^1.2.2
   web: ^1.1.0
 
+  firebase_messaging: ^15.1.5
   dio: ^5.7.0
   # The translated labels for the display enums. delivery_l10n depends on nothing local, so
   # this cannot cycle.

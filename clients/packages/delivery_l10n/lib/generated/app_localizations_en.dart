@@ -2523,4 +2523,19 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get couldNotCreateSignIn =>
       'We could not set up your sign-in. Your application was still received.';
+
+  @override
+  String get pendingBannerMerchant =>
+      'Your application is being reviewed. Set your shop up now — you can publish to the market once you are approved.';
+
+  @override
+  String get pendingBannerRider =>
+      'Your application is being reviewed. Look around the board — you can take deliveries once you are approved.';
+
+  @override
+  String get notWhilePending =>
+      'You can do this once your application is approved.';
+
+  @override
+  String get viewApplication => 'View application';
 }

@@ -69,10 +69,15 @@ public class ProvisionAccount implements JavaDelegate {
         // worst possible time to hand somebody a new set of credentials.
         String applicantRef = application.getApplicantUserRef();
         if (applicantRef != null) {
+            // They already hold the role they applied for — it was granted at sign-up so they could
+            // explore. Approval is the removal of APPLICANT, which is what the publish and claim
+            // endpoints refuse on. Granting the role again is harmless and kept for the case where
+            // an older applicant account predates that change.
             keycloak.grantRealmRole(applicantRef, role);
+            keycloak.revokeRealmRole(applicantRef, "APPLICANT");
             execution.setVariable("userRef", applicantRef);
-            log.info("Application {} approved; granted {} to existing account {}",
-                    applicationId, role, applicantRef);
+            log.info("Application {} approved; {} can now act, not just explore",
+                    applicationId, applicantRef);
             return;
         }
 

@@ -117,10 +117,11 @@ public class KeycloakAdminClient {
     /**
      * The account an applicant signs in with while their application is being decided.
      *
-     * <p>Carries the APPLICANT realm role and nothing else. That role is checked by no endpoint on
-     * the platform, which is the point: the token proves who they are and says explicitly that they
-     * are not yet a merchant, a carrier or a rider. The real role is granted to this same account
-     * on approval — see ProvisionAccount.
+     * <p>Carries BOTH the role they applied for and APPLICANT. The first is what makes every screen
+     * work, so somebody can set a shop up or read the job board while they wait. The second is what
+     * the committing endpoints refuse on — publishing goods, claiming a delivery — so exploring is
+     * free and acting is not. Approval removes APPLICANT and nothing else changes, which is why the
+     * passcode they have been using keeps working.
      *
      * <p>{@code emailVerified} is true because it genuinely is: the application could not have been
      * submitted without a code answered on this address.
@@ -128,6 +129,7 @@ public class KeycloakAdminClient {
      * @return the Keycloak {@code sub}
      */
     public String createApplicant(String email, String firstName, String lastName,
+                                  String role,
                                   String password) {
         String bearer = adminToken();
 
@@ -164,8 +166,12 @@ public class KeycloakAdminClient {
                     "We could not finish setting up your sign-in just now. Please try again.");
         }
 
+        // Both roles. The real one so every screen works and they can explore what they applied
+        // for; APPLICANT so the committing acts — publishing goods, claiming a delivery — refuse
+        // until somebody approves. Approval removes APPLICANT and changes nothing else.
+        assignRealmRole(bearer, userId, role);
         assignRealmRole(bearer, userId, "APPLICANT");
-        log.info("Applicant {} can now sign in while their application is decided", email);
+        log.info("Applicant {} can sign in as {} while their application is decided", email, role);
         return userId;
     }
 
@@ -265,6 +271,31 @@ public class KeycloakAdminClient {
             throw new ProvisioningException("The account was created but Keycloak returned no id");
         }
         return id;
+    }
+
+    /**
+     * Takes a realm role away from an account.
+     *
+     * <p>Used at approval to drop APPLICANT, which is the whole of what approval changes: the role
+     * they applied for was granted when they signed up so they could explore, and removing this one
+     * is what lets the committing endpoints through.
+     */
+    public void revokeRealmRole(String userRef, String role) {
+        String bearer = adminToken();
+        JsonNode representation = keycloak.get()
+                .uri("/admin/realms/{realm}/roles/{role}", realm, role)
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+
+        keycloak.method(org.springframework.http.HttpMethod.DELETE)
+                .uri("/admin/realms/{realm}/users/{id}/role-mappings/realm", realm, userRef)
+                .header("Authorization", "Bearer " + bearer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(List.of(representation))
+                .retrieve()
+                .toBodilessEntity();
+        log.info("Revoked {} from {}", role, userRef);
     }
 
     /**

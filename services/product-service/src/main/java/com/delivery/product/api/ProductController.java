@@ -111,7 +111,10 @@ public class ProductController {
     }
 
     @PostMapping("/{id}/publish")
-    @PreAuthorize("hasRole('MERCHANT')")
+    // Explorable before approval, not publishable. A pending merchant carries MERCHANT so they can
+    // set the shop up and see every screen, and APPLICANT until somebody approves them — so the one
+    // thing gated is the act that puts goods in front of customers.
+    @PreAuthorize("hasRole('MERCHANT') and !hasRole('APPLICANT')")
     public ProductResponse publish(@PathVariable UUID id) {
         return toResponse(catalog.publish(id, CurrentUser.requireId()));
     }

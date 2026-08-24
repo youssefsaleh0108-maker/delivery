@@ -1411,5 +1411,9 @@
         "type": "String"
       }
     }
-  }
+  },
+  "pendingBannerMerchant": "Your application is being reviewed. Set your shop up now — you can publish to the market once you are approved.",
+  "pendingBannerRider": "Your application is being reviewed. Look around the board — you can take deliveries once you are approved.",
+  "notWhilePending": "You can do this once your application is approved.",
+  "viewApplication": "View application"
 }

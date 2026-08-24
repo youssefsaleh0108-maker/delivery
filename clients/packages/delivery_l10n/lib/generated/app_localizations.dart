@@ -4531,6 +4531,30 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'We could not set up your sign-in. Your application was still received.'**
   String get couldNotCreateSignIn;
+
+  /// No description provided for @pendingBannerMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is being reviewed. Set your shop up now — you can publish to the market once you are approved.'**
+  String get pendingBannerMerchant;
+
+  /// No description provided for @pendingBannerRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is being reviewed. Look around the board — you can take deliveries once you are approved.'**
+  String get pendingBannerRider;
+
+  /// No description provided for @notWhilePending.
+  ///
+  /// In en, this message translates to:
+  /// **'You can do this once your application is approved.'**
+  String get notWhilePending;
+
+  /// No description provided for @viewApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'View application'**
+  String get viewApplication;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

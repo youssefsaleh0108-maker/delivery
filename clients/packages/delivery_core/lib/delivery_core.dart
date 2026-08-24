@@ -30,6 +30,7 @@ export 'src/models/zone_models.dart';
 export 'src/models/localised_labels.dart';
 export 'src/auth/auth_config.dart';
 export 'src/auth/auth_service.dart';
+export 'src/auth/device_token.dart';
 export 'src/auth/delivery_role.dart';
 export 'src/models/catalog_models.dart';
 export 'src/network/api_client.dart';
