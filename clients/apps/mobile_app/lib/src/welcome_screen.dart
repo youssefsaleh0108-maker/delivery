@@ -18,7 +18,7 @@ class WelcomeScreen extends StatelessWidget {
     required this.onSignIn,
     required this.onSignUp,
     required this.onJoinAsPartner,
-    required this.onGoogle,
+    this.onGoogle,
     this.busy = false,
   });
 
@@ -26,9 +26,13 @@ class WelcomeScreen extends StatelessWidget {
   final VoidCallback onSignUp;
   final VoidCallback onJoinAsPartner;
 
-  /// Opens the browser on Google. See [AuthService.signInWithBroker] for why this one leaves the
-  /// app when the other two do not.
-  final VoidCallback onGoogle;
+  /// Opens the browser on Google, or null when Google sign-in is not configured.
+  ///
+  /// Null hides the control entirely rather than disabling it. A greyed-out Google button still
+  /// reads as "this should work", and a tester who taps one that cannot work learns nothing except
+  /// that the app is broken. It comes back the moment a client id and secret exist — see the
+  /// identity provider in infra/keycloak/realm-delivery-platform.json.
+  final VoidCallback? onGoogle;
 
   /// True while the Google round trip is in flight. Only that path can be busy here — the other
   /// buttons just change screens.
@@ -76,6 +80,8 @@ class WelcomeScreen extends StatelessWidget {
 
               const Spacer(flex: 4),
 
+              // Only when there is somewhere to send them. See [onGoogle].
+              if (onGoogle != null) ...<Widget>[
               // An icon, not a full-width button. Google is one way in among several and the
               // passcode is the one most people here will use, so it sits beside the others rather
               // than above them competing with the primary action.
@@ -117,6 +123,7 @@ class WelcomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: DeliverySpacing.lg),
+              ],
 
               SizedBox(
                 width: double.infinity,

@@ -109,9 +109,13 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// True while the Google round trip is in flight.
   bool _brokering = false;
 
+  // Kept, not deleted: the broker round trip is written and correct, and it is wired back in by
+  // passing it to WelcomeScreen again once Google credentials exist. Deleting it would mean
+  // rewriting it later from nothing.
   /// Signs in through Keycloak's Google broker. Opens a browser, unlike the passcode path — an
   /// external consent screen cannot be rendered inside the app, and any app that tried would be
   /// asking for somebody's Google password directly.
+  // ignore: unused_element
   Future<void> _signInWithGoogle() async {
     setState(() => _brokering = true);
     try {
@@ -244,7 +248,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               case _Gate.welcome:
                 return WelcomeScreen(
                   busy: _brokering,
-                  onGoogle: _signInWithGoogle,
+                  // Null until a Google client id and secret exist. Google refuses to register a
+                  // redirect URI on a bare IP over http, which is what this deployment is, so the
+                  // round trip cannot work yet and a control that cannot work should not be shown.
+                  // Restore this to _signInWithGoogle once the box has a hostname and TLS.
+                  onGoogle: null,
                   onSignIn: () => setState(() => _gate = _Gate.signIn),
                   onSignUp: () => setState(() => _gate = _Gate.signUp),
                   onJoinAsPartner: () => setState(() {

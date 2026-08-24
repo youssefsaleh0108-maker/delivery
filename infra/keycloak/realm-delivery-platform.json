@@ -45,7 +45,7 @@
       "alias": "google",
       "displayName": "Google",
       "providerId": "google",
-      "enabled": true,
+      "enabled": false,
       "trustEmail": true,
       "storeToken": false,
       "linkOnly": false,
