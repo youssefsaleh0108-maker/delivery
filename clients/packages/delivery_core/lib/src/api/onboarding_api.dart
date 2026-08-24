@@ -65,12 +65,15 @@ class OnboardingApi {
     });
   }
 
-  /// Applies to ride for one company. Open, because getting an account is what is being asked for.
+  /// Applies to ride, either for one delivery company or for MyDelivery itself.
+  ///
+  /// [companyId] null means the second of those: no company is named, so the application is the
+  /// platform's own to decide and lands in the backoffice queue rather than a company's.
   Future<String> applyAsRider({
     required String name,
     required String email,
     required String emailVerificationToken,
-    required String companyId,
+    String? companyId,
     String? phone,
     String? phoneVerificationToken,
     String? notes,
@@ -86,6 +89,33 @@ class OnboardingApi {
       'contactPhone': phone,
       'phoneVerificationToken': phoneVerificationToken,
       'targetProviderId': companyId,
+      'notes': notes,
+    });
+    return (response.data as Map<String, dynamic>)['reference'] as String;
+  }
+
+  /// Applies to sell on MyDelivery.
+  ///
+  /// No company is named and none may be: a shop is asking the platform for terms, and a merchant
+  /// carrying a delivery company would turn up in that company's applicant list.
+  Future<String> applyAsMerchant({
+    required String businessName,
+    required String contactName,
+    required String email,
+    required String emailVerificationToken,
+    String? phone,
+    String? phoneVerificationToken,
+    String? notes,
+  }) async {
+    final Response<dynamic> response =
+        await _dio.post<dynamic>('/api/onboarding/applications', data: <String, dynamic>{
+      'kind': 'MERCHANT',
+      'businessName': businessName,
+      'contactName': contactName,
+      'contactEmail': email,
+      'emailVerificationToken': emailVerificationToken,
+      'contactPhone': phone,
+      'phoneVerificationToken': phoneVerificationToken,
       'notes': notes,
     });
     return (response.data as Map<String, dynamic>)['reference'] as String;

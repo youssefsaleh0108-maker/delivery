@@ -26,16 +26,17 @@ public class OnboardingApplication {
     /**
      * What they are applying to be. The commercial relationship, not the Keycloak role.
      *
-     * <p>{@link #RIDER} is addressed to a delivery company rather than to the platform, and is the
-     * only kind that is. A shop and a fleet are asking the platform for terms; a rider is asking a
-     * company for work, and the platform has no basis for that decision — it does not know who
-     * turned up for a trial or who was let go last month.
+     * <p>{@link #RIDER} is the only kind that can be addressed to somebody other than the platform.
+     * A shop and a fleet are asking the platform for terms. A rider is either asking a delivery
+     * company for work — which the platform has no basis to decide, since it does not know who
+     * turned up for a trial or who was let go last month — or asking to ride for MyDelivery itself,
+     * which the platform does decide, because then it is the employer.
      */
     public enum Kind {
         MERCHANT, CARRIER, RIDER;
 
-        /** Whether this application is somebody else's to decide. */
-        public boolean isDecidedByCompany() {
+        /** Whether an application of this kind may name a delivery company at all. */
+        public boolean mayNameACompany() {
             return this == RIDER;
         }
     }
@@ -167,12 +168,13 @@ public class OnboardingApplication {
         if (contactPhone != null && phoneVerifiedAt == null) {
             throw new IllegalArgumentException("The phone number has to be verified first");
         }
-        // Both directions, matching the database constraint. A rider with no company is an
-        // application nobody can decide; a shop carrying one would appear in a company's queue.
-        if (kind.isDecidedByCompany() && targetProviderId == null) {
-            throw new IllegalArgumentException("Choose the delivery company you want to ride for");
-        }
-        if (!kind.isDecidedByCompany() && targetProviderId != null) {
+        // A rider may name a company or not: naming one is applying to that company for work,
+        // naming none is applying to ride for MyDelivery itself. The two are decided by different
+        // people, and the queue each lands in follows from this field alone — the backoffice queue
+        // is "target is null", a company's queue is "target is me".
+        //
+        // A shop or a fleet naming a company is still nonsense and still refused.
+        if (!kind.mayNameACompany() && targetProviderId != null) {
             throw new IllegalArgumentException("Only a rider applies to a delivery company");
         }
         this.targetProviderId = targetProviderId;

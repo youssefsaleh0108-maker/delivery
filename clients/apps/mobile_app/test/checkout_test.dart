@@ -77,7 +77,7 @@ void main() {
   /// test that could not select an address would be testing the storage plugin rather than this
   /// screen.
   Future<DeliveryAddressStore> storeWithAddresses() async {
-    final DeliveryAddressStore store = DeliveryAddressStore();
+    final DeliveryAddressStore store = DeliveryAddressStore(ownerId: 'test-user');
     await store.select(const DeliveryAddress(
       line: '4 Mill Lane',
       label: 'Work',
@@ -210,7 +210,7 @@ void main() {
       (WidgetTester tester) async {
     final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
     await pumpCheckout(
-        tester, dio: recorder.dio, addresses: DeliveryAddressStore(), cart: cartWithOneItem());
+        tester, dio: recorder.dio, addresses: DeliveryAddressStore(ownerId: 'test-user'), cart: cartWithOneItem());
 
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();

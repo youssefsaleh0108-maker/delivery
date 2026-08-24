@@ -10,7 +10,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   DeliveryStringsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'MYDelivery';
+  String get appTitle => 'MyDelivery';
 
   @override
   String get navShops => 'Shops';
@@ -2341,4 +2341,73 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get alreadyPaid => 'Already paid';
+
+  @override
+  String get partnerChoiceTitle => 'Sell or deliver with us';
+
+  @override
+  String get partnerChoiceIntro =>
+      'Tell us which one you are and we will take you through it.';
+
+  @override
+  String get applyAsMerchant => 'Sell on MyDelivery';
+
+  @override
+  String get applyAsMerchantBlurb =>
+      'You run a shop and want your products in the app.';
+
+  @override
+  String get applyAsRider => 'Deliver with MyDelivery';
+
+  @override
+  String get applyAsRiderBlurb =>
+      'You want to carry orders and get paid for each one.';
+
+  @override
+  String get whoWillYouRideFor => 'Who will you ride for?';
+
+  @override
+  String get rideForMyDelivery => 'MyDelivery';
+
+  @override
+  String get rideForMyDeliveryBlurb =>
+      'Join our own fleet. We review your application and we pay you.';
+
+  @override
+  String get rideForACompany => 'A delivery company';
+
+  @override
+  String get rideForACompanyBlurb =>
+      'Apply to one of the companies below. They decide, not us.';
+
+  @override
+  String get yourBusiness => 'Your business';
+
+  @override
+  String get businessName => 'Business name';
+
+  @override
+  String get theNameCustomersWillSee =>
+      'The name customers will see in the app.';
+
+  @override
+  String get yourNameAsOwner => 'Your name';
+
+  @override
+  String get anythingWeShouldKnowMerchant =>
+      'Anything we should know? (optional)';
+
+  @override
+  String get weWillBeInTouch => 'We will read it and be in touch by email.';
+
+  @override
+  String get finishSettingUpInTheApp =>
+      'Once you are approved you finish setting up right here in the app — no paperwork, no separate site.';
+
+  @override
+  String get continueAsGuest => 'Continue without an account';
+
+  @override
+  String get guestApplicationExplainer =>
+      'You do not need an account to apply. We create one for you when you are approved.';
 }

@@ -116,15 +116,36 @@ public class VerificationService {
     }
 
     private void deliver(Channel channel, String destination, String code) {
-        String body = "Your Delivery verification code is " + code
-                + ". It expires in " + ContactVerification.LIFETIME.toMinutes() + " minutes."
-                + " If you did not ask for it, ignore this message.";
+        long minutes = ContactVerification.LIFETIME.toMinutes();
+
+        // The code stands alone on the first line, and everything else follows in prose. That shape
+        // is what makes both renderings work: the email layout shows a lone short code as a code
+        // block, and on a phone the first thing in the notification preview is the code itself,
+        // which is the only part anybody actually wants.
+        String emailBody = code + "\n\n"
+                + "Use this code to confirm your email address for MyDelivery."
+                + " It expires in " + minutes + " minutes and can be used once.\n\n"
+                + "If you did not ask for this code, no action is needed —"
+                + " somebody may have typed your address by mistake."
+                + " Do not share it with anyone; MyDelivery will never ask you for it.";
+
+        // SMS is one line: no layout renders it, and a message split across several parts costs
+        // more and can arrive out of order.
+        String smsBody = code + " is your MyDelivery verification code. It expires in "
+                + minutes + " minutes. Never share it with anyone.";
+
         try {
             if (channel == Channel.EMAIL) {
-                platform.notifyDirect("EMAIL", destination, "Your verification code", body,
-                        "onboarding.verification");
+                // The code is in the subject as well as the body. That is deliberate and it is a
+                // trade: it means somebody can read the code from a preview without opening the
+                // mail, which is the fastest path for the person who asked for it and also visible
+                // to anyone looking at their screen. Every large provider makes the same call, and
+                // the code is already in the body, so this adds no exposure inside our own logs.
+                platform.notifyDirect("EMAIL", destination,
+                        code + " is your MyDelivery verification code",
+                        emailBody, "onboarding.verification");
             } else {
-                platform.notifyDirect("SMS", destination, null, body, "onboarding.verification");
+                platform.notifyDirect("SMS", destination, null, smsBody, "onboarding.verification");
             }
         } catch (Exception e) {
             // Told plainly rather than reported as success. "We have sent you a code" is a promise,

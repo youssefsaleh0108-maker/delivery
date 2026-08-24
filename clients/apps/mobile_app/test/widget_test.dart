@@ -305,7 +305,7 @@ void main() {
         ],
         supportedLocales: LocaleController.supported,
         home: ButlerScreen(
-          addresses: DeliveryAddressStore(),
+          addresses: DeliveryAddressStore(ownerId: 'test-user'),
           api: ButlerApi(dio),
           orderApi: OrderApi(dio),
           storeApi: StoreApi(dio),

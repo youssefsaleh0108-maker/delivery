@@ -6,6 +6,7 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.delivery.onboarding.client.PlatformClient;
@@ -39,10 +40,22 @@ public class CreatePartnerRecord implements JavaDelegate {
     private final OnboardingApplicationRepository applications;
     private final PlatformClient platform;
 
+    /**
+     * MyDelivery's own fleet, for riders who applied to the platform rather than to a company.
+     *
+     * <p>Seeded by order-manager's V16 as the 'in-house' provider. Configurable rather than
+     * inlined, because a deployment that runs no fleet of its own needs to point this somewhere
+     * else — or find out at the first approval that it cannot.
+     */
+    private final UUID houseFleetId;
+
     public CreatePartnerRecord(OnboardingApplicationRepository applications,
-                               PlatformClient platform) {
+                               PlatformClient platform,
+                               @Value("${delivery.onboarding.house-fleet-id:00000000-0000-4000-8000-00000000d001}")
+                               UUID houseFleetId) {
         this.applications = applications;
         this.platform = platform;
+        this.houseFleetId = houseFleetId;
     }
 
     @Override
@@ -73,12 +86,18 @@ public class CreatePartnerRecord implements JavaDelegate {
                     application.getContactPhone(),
                     userRef);
 
-            // A rider joins a company that already exists. They are attached as a RIDER, not as
+            // A rider joins a fleet that already exists. They are attached as a RIDER, not as
             // staff: staff run the company and get the portal, riders carry for it and get the job
             // board. Only the rider list is consulted by dispatch and by a claim, so attaching a
             // rider as staff produces an account that looks attached and is offered no work.
+            //
+            // No company named means they applied to MyDelivery itself, so they join the house
+            // fleet. Modelling it as an ordinary provider is what keeps this to one line: dispatch,
+            // the job board and claims all work off the rider list and never learn the difference.
             case RIDER -> {
-                entityId = application.getTargetProviderId();
+                entityId = application.getTargetProviderId() == null
+                        ? houseFleetId
+                        : application.getTargetProviderId();
                 platform.attachRider(entityId, userRef);
             }
 

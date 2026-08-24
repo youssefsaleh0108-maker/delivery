@@ -76,32 +76,47 @@ class WelcomeScreen extends StatelessWidget {
 
               const Spacer(flex: 4),
 
-              // Google first: for anyone who has an account it is one tap and no typing, and it is
-              // the only option here that needs no passcode remembered.
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: busy ? null : onGoogle,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: DeliveryColors.white,
-                    foregroundColor: DeliveryColors.ink,
-                    padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.md),
+              // An icon, not a full-width button. Google is one way in among several and the
+              // passcode is the one most people here will use, so it sits beside the others rather
+              // than above them competing with the primary action.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Tooltip(
+                    message: t.continueWithGoogle,
+                    child: Semantics(
+                      button: true,
+                      // The label the icon does not carry. Without it a screen reader announces
+                      // "button" and nothing else.
+                      label: t.continueWithGoogle,
+                      child: InkWell(
+                        onTap: busy ? null : onGoogle,
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          height: 56,
+                          width: 56,
+                          decoration: const BoxDecoration(
+                            color: DeliveryColors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: busy
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2))
+                                // Google's brand guidelines want their own mark here. Until that
+                                // asset is in the repo this is a stand-in, not a finished button.
+                                : const Icon(Icons.g_mobiledata,
+                                    size: 36, color: DeliveryColors.ink),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  icon: busy
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      // Google's brand guidelines want their own mark here. Until that asset is in
-                      // the repo this is a stand-in, not a finished button.
-                      : const Icon(Icons.g_mobiledata, size: 28),
-                  label: Text(
-                    busy ? t.signingIn : t.continueWithGoogle,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
+                ],
               ),
-              const SizedBox(height: DeliverySpacing.sm),
+              const SizedBox(height: DeliverySpacing.lg),
 
               SizedBox(
                 width: double.infinity,

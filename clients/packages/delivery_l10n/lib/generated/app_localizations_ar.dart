@@ -10,7 +10,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   DeliveryStringsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appTitle => 'MYDelivery';
+  String get appTitle => 'MyDelivery';
 
   @override
   String get navShops => 'المتاجر';
@@ -2330,4 +2330,69 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get alreadyPaid => 'مدفوع مسبقاً';
+
+  @override
+  String get partnerChoiceTitle => 'بيع أو وصّل معنا';
+
+  @override
+  String get partnerChoiceIntro => 'اختر ما ينطبق عليك وسنكمل معك الخطوات.';
+
+  @override
+  String get applyAsMerchant => 'بيع على ماي دليفري';
+
+  @override
+  String get applyAsMerchantBlurb => 'لديك متجر وتريد عرض منتجاتك في التطبيق.';
+
+  @override
+  String get applyAsRider => 'وصّل مع ماي دليفري';
+
+  @override
+  String get applyAsRiderBlurb => 'تريد توصيل الطلبات وتتقاضى أجرًا عن كل طلب.';
+
+  @override
+  String get whoWillYouRideFor => 'لمن ستوصّل؟';
+
+  @override
+  String get rideForMyDelivery => 'ماي دليفري';
+
+  @override
+  String get rideForMyDeliveryBlurb =>
+      'انضم إلى أسطولنا. نحن نراجع طلبك ونحن ندفع لك.';
+
+  @override
+  String get rideForACompany => 'شركة توصيل';
+
+  @override
+  String get rideForACompanyBlurb =>
+      'قدّم إلى إحدى الشركات أدناه. هي من تقرر، لا نحن.';
+
+  @override
+  String get yourBusiness => 'نشاطك التجاري';
+
+  @override
+  String get businessName => 'اسم النشاط';
+
+  @override
+  String get theNameCustomersWillSee => 'الاسم الذي سيراه العملاء في التطبيق.';
+
+  @override
+  String get yourNameAsOwner => 'اسمك';
+
+  @override
+  String get anythingWeShouldKnowMerchant =>
+      'هل من شيء نحتاج معرفته؟ (اختياري)';
+
+  @override
+  String get weWillBeInTouch => 'سنقرأ طلبك ونتواصل معك عبر البريد.';
+
+  @override
+  String get finishSettingUpInTheApp =>
+      'بعد الموافقة تُكمل الإعداد هنا في التطبيق — بلا أوراق ولا موقع منفصل.';
+
+  @override
+  String get continueAsGuest => 'المتابعة بدون حساب';
+
+  @override
+  String get guestApplicationExplainer =>
+      'لا تحتاج حسابًا لتقديم الطلب. ننشئ لك حسابًا عند الموافقة.';
 }

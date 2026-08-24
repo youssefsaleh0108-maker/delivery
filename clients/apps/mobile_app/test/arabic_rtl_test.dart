@@ -19,7 +19,7 @@ import 'package:mobile_app/src/delivery_address.dart';
 ///
 /// The sheet only reads what is already in memory, and `load()` is deliberately not called — a
 /// platform channel in a widget test would fail for reasons that have nothing to do with language.
-DeliveryAddressStore _emptyStore() => DeliveryAddressStore();
+DeliveryAddressStore _emptyStore() => DeliveryAddressStore(ownerId: 'test-user');
 
 Widget _wrap(Widget child, Locale locale) => MaterialApp(
       locale: locale,

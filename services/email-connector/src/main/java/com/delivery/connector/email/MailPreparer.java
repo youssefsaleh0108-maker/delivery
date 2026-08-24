@@ -32,7 +32,7 @@ public class MailPreparer implements ChannelPreparer {
 
     private final String defaultSubject;
 
-    public MailPreparer(@Value("${delivery.email.default-subject:Delivery}") String defaultSubject) {
+    public MailPreparer(@Value("${delivery.email.default-subject:MyDelivery}") String defaultSubject) {
         this.defaultSubject = defaultSubject;
     }
 

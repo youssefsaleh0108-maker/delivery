@@ -7,7 +7,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 
 import 'src/customer_shell.dart';
-import 'src/ride_with_us_screen.dart';
+import 'src/partner_application_screen.dart';
+import 'src/partner_choice_screen.dart';
 import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
@@ -134,10 +135,13 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     if (mounted) setState(() => _brokering = false);
   }
 
-  /// Set when somebody with no account is applying to ride. Its own flag rather than a fourth
-  /// [_Gate] because it is reachable from the welcome screen and returns there, and because it is
-  /// the one path that ends in an application rather than a session.
-  bool _applyingToRide = false;
+  /// Set when somebody with no account is applying to sell or to ride.
+  ///
+  /// Two fields rather than a fourth [_Gate] because this is reachable from the welcome screen and
+  /// returns there, and because it is the one path that ends in an application rather than a
+  /// session. Null kind means the choice screen is showing and they have not picked yet.
+  bool _applyingAsPartner = false;
+  PartnerKind? _partnerKind;
 
   /// Adopts a session from either form. Shared so the two screens cannot drift on what "signed in"
   /// means — sign-up signs the new account in directly rather than sending them back to a login.
@@ -206,10 +210,20 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             // the platform was a browser showing a bare IP address asking for a password.
             //
             // The gate is a choice now, and every branch of it stays inside the app.
-            if (_applyingToRide) {
-              return RideWithUsScreen(
+            if (_applyingAsPartner) {
+              // The choice first, then the form for whichever they picked. Back from the form
+              // returns to the choice rather than all the way out, because picking the wrong one
+              // is an easy mistake and should cost one tap.
+              if (_partnerKind == null) {
+                return PartnerChoiceScreen(
+                  onChoose: (PartnerKind kind) => setState(() => _partnerKind = kind),
+                  onClose: () => setState(() => _applyingAsPartner = false),
+                );
+              }
+              return PartnerApplicationScreen(
                 api: _onboardingApi,
-                onClose: () => setState(() => _applyingToRide = false),
+                kind: _partnerKind!,
+                onClose: () => setState(() => _partnerKind = null),
               );
             }
             switch (_gate) {
@@ -233,7 +247,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   onGoogle: _signInWithGoogle,
                   onSignIn: () => setState(() => _gate = _Gate.signIn),
                   onSignUp: () => setState(() => _gate = _Gate.signUp),
-                  onJoinAsPartner: () => setState(() => _applyingToRide = true),
+                  onJoinAsPartner: () => setState(() {
+                    _applyingAsPartner = true;
+                    _partnerKind = null;
+                  }),
                 );
             }
           }
@@ -261,6 +278,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             );
           }
           return CustomerShell(
+            // Keyed by the account. Without it Flutter may reuse the previous session's State when
+            // one user signs out and another signs in, and the screen would keep the first
+            // person's basket, address and inbox — the same class of bug as the shared storage key.
+            key: ValueKey<String?>(session.subject),
             storeApi: _storeApi,
             orderApi: _orderApi,
             offerApi: _offerApi,

@@ -101,7 +101,7 @@ abstract class DeliveryStrings {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'MYDelivery'**
+  /// **'MyDelivery'**
   String get appTitle;
 
   /// No description provided for @navShops.
@@ -4213,6 +4213,126 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Already paid'**
   String get alreadyPaid;
+
+  /// No description provided for @partnerChoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell or deliver with us'**
+  String get partnerChoiceTitle;
+
+  /// No description provided for @partnerChoiceIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us which one you are and we will take you through it.'**
+  String get partnerChoiceIntro;
+
+  /// No description provided for @applyAsMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell on MyDelivery'**
+  String get applyAsMerchant;
+
+  /// No description provided for @applyAsMerchantBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'You run a shop and want your products in the app.'**
+  String get applyAsMerchantBlurb;
+
+  /// No description provided for @applyAsRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver with MyDelivery'**
+  String get applyAsRider;
+
+  /// No description provided for @applyAsRiderBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'You want to carry orders and get paid for each one.'**
+  String get applyAsRiderBlurb;
+
+  /// No description provided for @whoWillYouRideFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Who will you ride for?'**
+  String get whoWillYouRideFor;
+
+  /// No description provided for @rideForMyDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'MyDelivery'**
+  String get rideForMyDelivery;
+
+  /// No description provided for @rideForMyDeliveryBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Join our own fleet. We review your application and we pay you.'**
+  String get rideForMyDeliveryBlurb;
+
+  /// No description provided for @rideForACompany.
+  ///
+  /// In en, this message translates to:
+  /// **'A delivery company'**
+  String get rideForACompany;
+
+  /// No description provided for @rideForACompanyBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to one of the companies below. They decide, not us.'**
+  String get rideForACompanyBlurb;
+
+  /// No description provided for @yourBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Your business'**
+  String get yourBusiness;
+
+  /// No description provided for @businessName.
+  ///
+  /// In en, this message translates to:
+  /// **'Business name'**
+  String get businessName;
+
+  /// No description provided for @theNameCustomersWillSee.
+  ///
+  /// In en, this message translates to:
+  /// **'The name customers will see in the app.'**
+  String get theNameCustomersWillSee;
+
+  /// No description provided for @yourNameAsOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get yourNameAsOwner;
+
+  /// No description provided for @anythingWeShouldKnowMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything we should know? (optional)'**
+  String get anythingWeShouldKnowMerchant;
+
+  /// No description provided for @weWillBeInTouch.
+  ///
+  /// In en, this message translates to:
+  /// **'We will read it and be in touch by email.'**
+  String get weWillBeInTouch;
+
+  /// No description provided for @finishSettingUpInTheApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Once you are approved you finish setting up right here in the app — no paperwork, no separate site.'**
+  String get finishSettingUpInTheApp;
+
+  /// No description provided for @continueAsGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue without an account'**
+  String get continueAsGuest;
+
+  /// No description provided for @guestApplicationExplainer.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not need an account to apply. We create one for you when you are approved.'**
+  String get guestApplicationExplainer;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

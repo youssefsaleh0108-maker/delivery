@@ -4,28 +4,48 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-/// Applying to ride for a delivery company, from inside the app and before having an account.
+/// Applying to sell or to deliver, from inside the app and before having an account.
 ///
 /// Everything else in this app assumes a signed-in person. This screen cannot: getting an account
 /// is the thing being asked for. So it runs on the open endpoints — the public list of companies
 /// that are hiring, and the verification pair — and the proof it collects is what stands in for a
-/// token.
+/// token. Nobody has to create an account to apply; one is created for them if they are approved.
+///
+/// One screen for both partner kinds rather than two, because everything after the first step —
+/// who you are, proving your address, proving your number, the receipt — is identical. Only the
+/// first step and the wording differ, and duplicating four steps to vary one is how the two drift.
 ///
 /// Steps rather than one long form, for the same reason the website has them: verifying an address
 /// means leaving the app to fetch a code, and a form that asks for that has to hold its place while
 /// somebody does.
-class RideWithUsScreen extends StatefulWidget {
-  const RideWithUsScreen({super.key, required this.api, required this.onClose});
+enum PartnerKind {
+  /// A shop. Asks the platform for terms, and names no delivery company.
+  merchant,
+
+  /// A rider. Either applies to a delivery company, or to MyDelivery's own fleet when no company
+  /// is chosen — see [_PartnerApplicationScreenState._company].
+  rider,
+}
+
+class PartnerApplicationScreen extends StatefulWidget {
+  const PartnerApplicationScreen({
+    super.key,
+    required this.api,
+    required this.kind,
+    required this.onClose,
+  });
 
   final OnboardingApi api;
+  final PartnerKind kind;
   final VoidCallback onClose;
 
   @override
-  State<RideWithUsScreen> createState() => _RideWithUsScreenState();
+  State<PartnerApplicationScreen> createState() => _PartnerApplicationScreenState();
 }
 
-class _RideWithUsScreenState extends State<RideWithUsScreen> {
+class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   final TextEditingController _name = TextEditingController();
+  final TextEditingController _business = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _emailCode = TextEditingController();
   final TextEditingController _phone = TextEditingController();
@@ -35,7 +55,16 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
   late Future<List<HiringCompany>> _companies = widget.api.hiringCompanies();
 
   int _step = 0;
+
+  /// The delivery company a rider chose, or null for MyDelivery's own fleet.
+  ///
+  /// Null is a real answer here, not "not yet decided" — [_ridesForUs] is what separates the two,
+  /// so that continuing without a company is a deliberate choice rather than a skipped step.
   HiringCompany? _company;
+
+  /// True once a rider has picked MyDelivery rather than one of the companies.
+  bool _ridesForUs = false;
+
   String? _emailToken;
   String? _verifiedEmail;
   String? _phoneToken;
@@ -46,10 +75,12 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
   String? _error;
   String? _reference;
 
+  bool get _isRider => widget.kind == PartnerKind.rider;
+
   @override
   void dispose() {
     for (final TextEditingController c in <TextEditingController>[
-      _name, _email, _emailCode, _phone, _phoneCode, _notes
+      _name, _business, _email, _emailCode, _phone, _phoneCode, _notes
     ]) {
       c.dispose();
     }
@@ -62,7 +93,7 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.rideWithUs),
+        title: Text(_isRider ? t.applyAsRider : t.applyAsMerchant),
         leading: IconButton(
           onPressed: widget.onClose,
           icon: const Icon(Icons.close),
@@ -77,7 +108,7 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
                 _stepDots(),
                 const SizedBox(height: DeliverySpacing.lg),
                 switch (_step) {
-                  0 => _chooseCompany(t),
+                  0 => _isRider ? _chooseWhoYouRideFor(t) : _yourBusiness(t),
                   1 => _aboutYou(t),
                   2 => _verifyEmail(t),
                   _ => _verifyPhone(t),
@@ -111,32 +142,69 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
     );
   }
 
-  // ------------------------------------------------------------------ 1. company
+  // ------------------------------------------------------------------ 1a. rider: who for
 
-  Widget _chooseCompany(DeliveryStrings t) {
+  Widget _chooseWhoYouRideFor(DeliveryStrings t) {
+    final ThemeData theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(t.whoWouldYouRideFor, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: DeliverySpacing.xs),
-        // Said plainly at the start, because it is the thing most likely to be misunderstood: the
-        // platform is not the employer here, and waiting on the wrong party is a bad surprise.
-        Text(t.theCompanyDecidesNotUs, style: Theme.of(context).textTheme.bodySmall),
+        Text(t.whoWillYouRideFor, style: theme.textTheme.titleLarge),
         const SizedBox(height: DeliverySpacing.lg),
+
+        // Us first. A rider who wants to work should not have to understand the difference between
+        // the platform and the companies on it before they can apply to anyone — and until now
+        // this screen offered only the companies, so riding for MyDelivery was not on the table.
+        SoftCard(
+          selected: _ridesForUs,
+          onTap: () => setState(() {
+            _ridesForUs = true;
+            _company = null;
+          }),
+          child: Row(
+            children: <Widget>[
+              const Icon(Icons.verified_outlined, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(t.rideForMyDelivery,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(t.rideForMyDeliveryBlurb, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              if (_ridesForUs) const Icon(Icons.check_circle, color: DeliveryColors.brand),
+            ],
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.lg),
+
+        Text(t.rideForACompany, style: theme.textTheme.titleMedium),
+        const SizedBox(height: DeliverySpacing.xs),
+        // Said plainly, because it is the thing most likely to be misunderstood: for these the
+        // platform is not the employer, and waiting on the wrong party is a bad surprise.
+        Text(t.theCompanyDecidesNotUs, style: theme.textTheme.bodySmall),
+        const SizedBox(height: DeliverySpacing.sm),
+
         FutureBuilder<List<HiringCompany>>(
           future: _companies,
           builder: (BuildContext context, AsyncSnapshot<List<HiringCompany>> snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(
                   child: Padding(
-                padding: EdgeInsets.all(DeliverySpacing.xl),
+                padding: EdgeInsets.all(DeliverySpacing.lg),
                 child: CircularProgressIndicator(color: DeliveryColors.brand),
               ));
             }
             if (snapshot.hasError) {
+              // Not fatal any more: riding for MyDelivery is still available, so this reports the
+              // companies as unavailable rather than blocking the whole screen.
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(t.couldNotLoadCompanies, style: Theme.of(context).textTheme.bodyMedium),
+                  Text(t.couldNotLoadCompanies, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: DeliverySpacing.sm),
                   OutlinedButton(
                     onPressed: () =>
@@ -148,8 +216,7 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
             }
             final List<HiringCompany> companies = snapshot.data ?? <HiringCompany>[];
             if (companies.isEmpty) {
-              return Text(t.nobodyIsHiringRightNow,
-                  style: Theme.of(context).textTheme.bodyMedium);
+              return Text(t.nobodyIsHiringRightNow, style: theme.textTheme.bodyMedium);
             }
             return Column(
               children: <Widget>[
@@ -158,7 +225,10 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
                     padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
                     child: SoftCard(
                       selected: _company?.id == company.id,
-                      onTap: () => setState(() => _company = company),
+                      onTap: () => setState(() {
+                        _company = company;
+                        _ridesForUs = false;
+                      }),
                       child: Row(
                         children: <Widget>[
                           const Icon(Icons.local_shipping_outlined,
@@ -179,14 +249,50 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
           },
         ),
         const SizedBox(height: DeliverySpacing.md),
+        SoftNote(text: t.guestApplicationExplainer, icon: Icons.info_outline),
+        const SizedBox(height: DeliverySpacing.md),
         PrimaryAction(
           label: t.continueLabel,
-          onPressed: _company == null ? null : () => setState(() => _step = 1),
+          onPressed: (_ridesForUs || _company != null)
+              ? () => setState(() => _step = 1)
+              : null,
         ),
       ],
     );
   }
 
+  // ------------------------------------------------------------------ 1b. merchant: the shop
+
+  Widget _yourBusiness(DeliveryStrings t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(t.yourBusiness, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: DeliverySpacing.lg),
+        TextField(
+          controller: _business,
+          textCapitalization: TextCapitalization.words,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: t.businessName,
+            helperText: t.theNameCustomersWillSee,
+            helperMaxLines: 2,
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        SoftNote(text: t.finishSettingUpInTheApp, icon: Icons.info_outline),
+        const SizedBox(height: DeliverySpacing.md),
+        SoftNote(text: t.guestApplicationExplainer, icon: Icons.person_outline),
+        const SizedBox(height: DeliverySpacing.md),
+        PrimaryAction(
+          label: t.continueLabel,
+          onPressed: _business.text.trim().isEmpty
+              ? null
+              : () => setState(() => _step = 1),
+        ),
+      ],
+    );
+  }
   // ------------------------------------------------------------------ 2. you
 
   Widget _aboutYou(DeliveryStrings t) {
@@ -198,13 +304,18 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
         TextField(
           controller: _name,
           textCapitalization: TextCapitalization.words,
-          decoration: InputDecoration(labelText: t.yourName),
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+              labelText: _isRider ? t.yourName : t.yourNameAsOwner),
         ),
         const SizedBox(height: DeliverySpacing.md),
         TextField(
           controller: _notes,
           maxLines: 3,
-          decoration: InputDecoration(labelText: t.anythingWeShouldKnowRider),
+          decoration: InputDecoration(
+              labelText: _isRider
+                  ? t.anythingWeShouldKnowRider
+                  : t.anythingWeShouldKnowMerchant),
         ),
         const SizedBox(height: DeliverySpacing.lg),
         Row(
@@ -396,15 +507,27 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
       _error = null;
     });
     try {
-      final String reference = await widget.api.applyAsRider(
-        name: _name.text.trim(),
-        email: _verifiedEmail!,
-        emailVerificationToken: _emailToken!,
-        companyId: _company!.id,
-        phone: _verifiedPhone,
-        phoneVerificationToken: _phoneToken,
-        notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-      );
+      final String reference = _isRider
+          ? await widget.api.applyAsRider(
+              name: _name.text.trim(),
+              email: _verifiedEmail!,
+              emailVerificationToken: _emailToken!,
+              // Null when they chose us. The server reads that as an application to MyDelivery's
+              // own fleet and routes it to the backoffice rather than to a company.
+              companyId: _company?.id,
+              phone: _verifiedPhone,
+              phoneVerificationToken: _phoneToken,
+              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+            )
+          : await widget.api.applyAsMerchant(
+              businessName: _business.text.trim(),
+              contactName: _name.text.trim(),
+              email: _verifiedEmail!,
+              emailVerificationToken: _emailToken!,
+              phone: _verifiedPhone,
+              phoneVerificationToken: _phoneToken,
+              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+            );
       setState(() => _reference = reference);
     } catch (e) {
       setState(() => _error = _messageFrom(e));
@@ -434,7 +557,10 @@ class _RideWithUsScreenState extends State<RideWithUsScreen> {
         Text(t.applicationSent, textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: DeliverySpacing.sm),
-        Text(t.companyWillBeInTouch(_company!.name), textAlign: TextAlign.center,
+        // Whoever is actually deciding. Naming the company when one was chosen, and us when it
+        // was not, is the difference between knowing who to expect an email from and not.
+        Text(_company == null ? t.weWillBeInTouch : t.companyWillBeInTouch(_company!.name),
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: DeliverySpacing.lg),
         SoftCard(

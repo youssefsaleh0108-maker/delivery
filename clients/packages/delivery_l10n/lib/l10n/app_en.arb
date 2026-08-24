@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "MYDelivery",
+  "appTitle": "MyDelivery",
   "navShops": "Shops",
   "navBasket": "Basket",
   "navOrders": "Orders",
@@ -1344,5 +1344,25 @@
       }
     }
   },
-  "alreadyPaid": "Already paid"
+  "alreadyPaid": "Already paid",
+  "partnerChoiceTitle": "Sell or deliver with us",
+  "partnerChoiceIntro": "Tell us which one you are and we will take you through it.",
+  "applyAsMerchant": "Sell on MyDelivery",
+  "applyAsMerchantBlurb": "You run a shop and want your products in the app.",
+  "applyAsRider": "Deliver with MyDelivery",
+  "applyAsRiderBlurb": "You want to carry orders and get paid for each one.",
+  "whoWillYouRideFor": "Who will you ride for?",
+  "rideForMyDelivery": "MyDelivery",
+  "rideForMyDeliveryBlurb": "Join our own fleet. We review your application and we pay you.",
+  "rideForACompany": "A delivery company",
+  "rideForACompanyBlurb": "Apply to one of the companies below. They decide, not us.",
+  "yourBusiness": "Your business",
+  "businessName": "Business name",
+  "theNameCustomersWillSee": "The name customers will see in the app.",
+  "yourNameAsOwner": "Your name",
+  "anythingWeShouldKnowMerchant": "Anything we should know? (optional)",
+  "weWillBeInTouch": "We will read it and be in touch by email.",
+  "finishSettingUpInTheApp": "Once you are approved you finish setting up right here in the app — no paperwork, no separate site.",
+  "continueAsGuest": "Continue without an account",
+  "guestApplicationExplainer": "You do not need an account to apply. We create one for you when you are approved."
 }

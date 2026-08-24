@@ -1,6 +1,6 @@
 {
   "@@locale": "ar",
-  "appTitle": "MYDelivery",
+  "appTitle": "MyDelivery",
   "navShops": "المتاجر",
   "navBasket": "السلة",
   "navOrders": "الطلبات",
@@ -883,5 +883,25 @@
       }
     }
   },
-  "alreadyPaid": "مدفوع مسبقاً"
+  "alreadyPaid": "مدفوع مسبقاً",
+  "partnerChoiceTitle": "بيع أو وصّل معنا",
+  "partnerChoiceIntro": "اختر ما ينطبق عليك وسنكمل معك الخطوات.",
+  "applyAsMerchant": "بيع على ماي دليفري",
+  "applyAsMerchantBlurb": "لديك متجر وتريد عرض منتجاتك في التطبيق.",
+  "applyAsRider": "وصّل مع ماي دليفري",
+  "applyAsRiderBlurb": "تريد توصيل الطلبات وتتقاضى أجرًا عن كل طلب.",
+  "whoWillYouRideFor": "لمن ستوصّل؟",
+  "rideForMyDelivery": "ماي دليفري",
+  "rideForMyDeliveryBlurb": "انضم إلى أسطولنا. نحن نراجع طلبك ونحن ندفع لك.",
+  "rideForACompany": "شركة توصيل",
+  "rideForACompanyBlurb": "قدّم إلى إحدى الشركات أدناه. هي من تقرر، لا نحن.",
+  "yourBusiness": "نشاطك التجاري",
+  "businessName": "اسم النشاط",
+  "theNameCustomersWillSee": "الاسم الذي سيراه العملاء في التطبيق.",
+  "yourNameAsOwner": "اسمك",
+  "anythingWeShouldKnowMerchant": "هل من شيء نحتاج معرفته؟ (اختياري)",
+  "weWillBeInTouch": "سنقرأ طلبك ونتواصل معك عبر البريد.",
+  "finishSettingUpInTheApp": "بعد الموافقة تُكمل الإعداد هنا في التطبيق — بلا أوراق ولا موقع منفصل.",
+  "continueAsGuest": "المتابعة بدون حساب",
+  "guestApplicationExplainer": "لا تحتاج حسابًا لتقديم الطلب. ننشئ لك حسابًا عند الموافقة."
 }

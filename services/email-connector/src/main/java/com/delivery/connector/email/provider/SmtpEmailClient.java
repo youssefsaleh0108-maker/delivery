@@ -16,6 +16,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
+import com.delivery.connector.email.EmailHtmlLayout;
 import com.delivery.platform.notifications.DeliveryOutcome;
 import com.delivery.platform.notifications.NotificationCommand;
 import com.delivery.platform.notifications.ProviderClient;
@@ -35,12 +36,18 @@ public class SmtpEmailClient implements ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(SmtpEmailClient.class);
 
     private final JavaMailSender mailSender;
+    private final EmailHtmlLayout layout;
     private final String from;
+    private final String fromName;
 
     public SmtpEmailClient(JavaMailSender mailSender,
-                           @Value("${delivery.email.from:no-reply@delivery.local}") String from) {
+                           EmailHtmlLayout layout,
+                           @Value("${delivery.email.from:no-reply@delivery.local}") String from,
+                           @Value("${delivery.email.from-name:MyDelivery}") String fromName) {
         this.mailSender = mailSender;
+        this.layout = layout;
         this.from = from;
+        this.fromName = fromName;
     }
 
     @Override
@@ -52,15 +59,23 @@ public class SmtpEmailClient implements ProviderClient {
     public DeliveryOutcome send(NotificationCommand command) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            // Multipart: plain text first, branded HTML second. A client that will not render HTML
+            // still shows the message rather than nothing, and the plain part is what the log row
+            // holds, so the two can never say different things.
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
 
-            helper.setFrom(from);
+            // A display name, so the message arrives from MyDelivery rather than from a bare
+            // no-reply address. UnsupportedEncodingException is the only reason this overload
+            // throws, and the encoding is a constant.
+            helper.setFrom(from, fromName);
             helper.setTo(command.recipient());
             helper.setSubject(command.subject() == null ? "" : command.subject());
-            // Plain text, not HTML. The bodies come from templates that interpolate customer-
-            // controlled values (product names, delivery notes); rendering those as HTML would turn
-            // a product name into an injection point in every customer's inbox.
-            helper.setText(command.body(), false);
+            // The HTML alternative interpolates NOTHING unescaped — see EmailHtmlLayout. That is
+            // what makes this safe: bodies carry customer-controlled values such as product names
+            // and delivery notes, and rendering one of those as markup would put an injection
+            // point in every customer's inbox.
+            helper.setText(command.body(), layout.render(command.subject(), command.body()));
 
             // Survives the relay and appears in the delivered headers, so a message in someone's
             // inbox can be traced back to its notification_log row (Section 10).

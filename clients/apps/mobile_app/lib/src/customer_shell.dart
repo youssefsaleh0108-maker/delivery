@@ -61,7 +61,11 @@ class _CustomerShellState extends State<CustomerShell> {
 
   /// The delivery address, owned here for the same reason: the home header shows it and checkout
   /// uses it, and those two must never disagree.
-  final DeliveryAddressStore _addresses = DeliveryAddressStore();
+  ///
+  /// Scoped to the signed-in person, so one account never inherits another one's saved addresses
+  /// on a shared phone. See [DeliveryAddressStore] for what that used to do.
+  late final DeliveryAddressStore _addresses =
+      DeliveryAddressStore(ownerId: widget.session.subject);
 
   /// Owned here for the same reason: the unread badge has to stay right while the user is on the
   /// Browse tab, so the poll cannot live inside the notifications screen.

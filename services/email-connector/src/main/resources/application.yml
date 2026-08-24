@@ -115,9 +115,15 @@ delivery:
 
   email:
     from: ${EMAIL_FROM:no-reply@delivery.local}
+    # The display name on every message. Without it mail arrives from a bare no-reply address,
+    # which reads as machine-generated and is the first thing a recipient judges.
+    from-name: ${EMAIL_FROM_NAME:MyDelivery}
     # Used by MailPreparer when a rendered template leaves the subject blank. A generic subject
     # reaches the customer; a rejected notification does not.
-    default-subject: Delivery
+    default-subject: MyDelivery
+    # EmailHtmlLayout's branding. The colour is DeliveryColors.brand from the app's design tokens, so the two match.
+    brand-name: ${EMAIL_BRAND_NAME:MyDelivery}
+    brand-colour: ${EMAIL_BRAND_COLOUR:#C41D4E}
 
 management:
   endpoints:
