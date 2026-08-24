@@ -121,6 +121,10 @@ class SmtpEmailClientTest {
             client.send(command());
 
             MimeMessage sent = captureSent();
+            // What a real JavaMailSenderImpl does before handing the message to the transport.
+            // The mock does not, so without it the content-type header is still the placeholder
+            // one and reads as text/plain no matter what parts were attached.
+            sent.saveChanges();
             assertThat(sent.getContentType()).startsWith("multipart/");
 
             // Walked rather than indexed. Spring nests mixed inside related inside alternative, and
