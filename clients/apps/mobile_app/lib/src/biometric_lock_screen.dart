@@ -70,26 +70,40 @@ class BiometricLockScreen extends StatelessWidget {
                 ),
               ],
               const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: busy ? null : onUnlock,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: DeliveryColors.white,
-                    foregroundColor: DeliveryColors.ink,
-                    padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.md),
+              // An icon, not a wide button. It sits where the passcode would be typed and is the
+              // one thing on this screen worth tapping, so it reads as "put your finger here"
+              // rather than as one option among several.
+              Semantics(
+                button: true,
+                label: t.unlockWithFingerprint,
+                child: InkWell(
+                  onTap: busy ? null : onUnlock,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    height: 96,
+                    width: 96,
+                    decoration: BoxDecoration(
+                      color: DeliveryColors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: DeliveryColors.white, width: 2),
+                    ),
+                    child: Center(
+                      child: busy
+                          ? const SizedBox(
+                              height: 28,
+                              width: 28,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: DeliveryColors.white))
+                          : const Icon(Icons.fingerprint,
+                              size: 52, color: DeliveryColors.white),
+                    ),
                   ),
-                  icon: busy
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.fingerprint),
-                  label: Text(t.unlockWithFingerprint,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
               const SizedBox(height: DeliverySpacing.sm),
+              Text(t.unlockWithFingerprint,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: DeliveryColors.white)),
               TextButton(
                 onPressed: busy ? null : onUsePasscode,
                 child: Text(t.signInWithPasscodeInstead,

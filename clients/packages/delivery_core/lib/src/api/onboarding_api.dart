@@ -121,6 +121,34 @@ class OnboardingApi {
     return (response.data as Map<String, dynamic>)['reference'] as String;
   }
 
+  /// Chooses a passcode at the end of an application, so the applicant can sign in and watch it.
+  ///
+  /// Open, like the application itself: the account being created is the one they would otherwise
+  /// need in order to call this. The reference is what stands in for a token.
+  Future<void> createApplicantAccount({
+    required String reference,
+    required String password,
+  }) async {
+    await _dio.post<dynamic>(
+      '/api/onboarding/applications/$reference/account',
+      data: <String, dynamic>{'password': password},
+    );
+  }
+
+  /// The signed-in applicant's own application, by their token rather than a reference.
+  ///
+  /// Null when they have none — including an approved partner whose application is behind them,
+  /// which is how the app knows to stop showing the pending screen.
+  Future<OnboardingApplication?> mine() async {
+    try {
+      final Response<dynamic> response =
+          await _dio.get<dynamic>('/api/onboarding/applications/mine');
+      return OnboardingApplication.fromJson(response.data as Map<String, dynamic>);
+    } on DioException {
+      return null;
+    }
+  }
+
   /// Following your own application with the reference you were given, and nothing else.
   Future<OnboardingApplication?> byReference(String reference) async {
     try {

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'one_time_code.dart';
+import 'passcode_pad.dart';
 
 /// Applying to sell or to deliver, from inside the app and before having an account.
 ///
@@ -34,11 +35,19 @@ class PartnerApplicationScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.kind,
+    required this.authService,
+    required this.onSignedIn,
     required this.onClose,
   });
 
   final OnboardingApi api;
   final PartnerKind kind;
+
+  /// Applying now ends in a session: the applicant chooses a passcode at the end and is signed
+  /// straight in, so this screen needs the same two things the sign-up screen does.
+  final AuthService authService;
+  final void Function(AuthSession session) onSignedIn;
+
   final VoidCallback onClose;
 
   @override
@@ -77,6 +86,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   String? _error;
   String? _reference;
 
+  /// The passcode they choose once the application is in, and its confirmation.
+  String _passcode = '';
+  String _confirmPasscode = '';
+
   bool get _isRider => widget.kind == PartnerKind.rider;
 
   @override
@@ -103,7 +116,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         ),
       ),
       body: _reference != null
-          ? _done(t)
+          ? _choosePasscode(t)
           : ListView(
               padding: const EdgeInsets.all(DeliverySpacing.lg),
               children: <Widget>[
@@ -552,52 +565,98 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   // ------------------------------------------------------------------ receipt
 
-  Widget _done(DeliveryStrings t) {
+  /// After submitting: choose a passcode, get an account, and go straight in.
+  ///
+  /// The application used to end here at a reference number and an instruction to wait for an
+  /// email. Now the applicant picks six digits, the server creates an account holding APPLICANT and
+  /// nothing else, and they sign in to watch their own application instead of wondering.
+  Widget _choosePasscode(DeliveryStrings t) {
+    final ThemeData theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(DeliverySpacing.lg),
       children: <Widget>[
-        const SizedBox(height: DeliverySpacing.xl),
-        const Icon(Icons.check_circle, size: 56, color: Color(0xFF25834B)),
         const SizedBox(height: DeliverySpacing.md),
-        Text(t.applicationSent, textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge),
+        const Icon(Icons.check_circle, size: 48, color: Color(0xFF25834B)),
         const SizedBox(height: DeliverySpacing.sm),
-        // Whoever is actually deciding. Naming the company when one was chosen, and us when it
-        // was not, is the difference between knowing who to expect an email from and not.
-        Text(_company == null ? t.weWillBeInTouch : t.companyWillBeInTouch(_company!.name),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium),
+        Text(t.applicationSent,
+            textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
         const SizedBox(height: DeliverySpacing.lg),
-        SoftCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(t.yourApplicationReference,
-                  style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: DeliverySpacing.xs),
-              SelectableText(_reference!,
-                  style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16)),
-              const SizedBox(height: DeliverySpacing.sm),
-              // Said here because it was not said anywhere: the screen showed a monospace string
-              // with 'keep this' above it and left people to guess whether it was a password.
-              Text(t.referenceExplainer,
-                  style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
+        Text(t.chooseYourPasscode, style: theme.textTheme.titleMedium),
+        const SizedBox(height: DeliverySpacing.xs),
+        Text(t.passcodeLetsYouFollowIt, style: theme.textTheme.bodySmall),
+        const SizedBox(height: DeliverySpacing.lg),
+        Text(
+          _confirmPasscode.isEmpty && _passcode.length < PasscodePad.passcodeLength
+              ? t.chooseAPasscode
+              : t.confirmYourPasscode,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: DeliverySpacing.md),
-        // The other question this screen raised and did not answer. A sign-up asks for a passcode
-        // at the end and an application does not, which reads as a step having been skipped.
-        SoftNote(
-          icon: Icons.lock_clock_outlined,
-          text: '${t.whyNoPasscodeYet} ${t.passcodeComesAfterApproval}',
+        // One pad, two passes, exactly as the shopper's sign-up does it.
+        PasscodePad(
+          value: _passcode.length < PasscodePad.passcodeLength ? _passcode : _confirmPasscode,
+          enabled: !_busy,
+          onChanged: (String v) => setState(() {
+            if (_passcode.length < PasscodePad.passcodeLength) {
+              _passcode = v;
+            } else {
+              _confirmPasscode = v;
+            }
+          }),
+          onCompleted: () {
+            // Only once the second pass is full. The pad fires on every completed six digits, and
+            // the first of those is the passcode being chosen rather than confirmed.
+            if (_confirmPasscode.length == PasscodePad.passcodeLength) {
+              _finishAccount();
+            }
+          },
         ),
-        const SizedBox(height: DeliverySpacing.lg),
-        PrimaryAction(label: t.done, onPressed: widget.onClose),
+        if (_error != null) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md),
+          SoftNote(text: _error!, accent: DeliveryAccent.critical, icon: Icons.error_outline),
+        ],
       ],
     );
+  }
+
+  /// Creates the applicant's account and signs them in with the passcode they just chose.
+  Future<void> _finishAccount() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    if (_passcode.length != PasscodePad.passcodeLength) {
+      setState(() => _error = t.passcodeMustBeSixDigits);
+      return;
+    }
+    if (_passcode != _confirmPasscode) {
+      setState(() {
+        _error = t.passcodesDoNotMatch;
+        // Only the confirmation is cleared, so nobody re-enters a passcode they typed correctly.
+        _confirmPasscode = '';
+      });
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.api.createApplicantAccount(
+        reference: _reference!,
+        password: _passcode,
+      );
+      final AuthSession session =
+          await widget.authService.signInWithPassword(_verifiedEmail!, _passcode);
+      widget.onSignedIn(session);
+    } catch (e) {
+      setState(() {
+        // The application is already in. Saying so matters: without it this reads as the whole
+        // thing having failed, and somebody would apply a second time.
+        _error = '${t.couldNotCreateSignIn} ${_messageFrom(e)}';
+        _confirmPasscode = '';
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }

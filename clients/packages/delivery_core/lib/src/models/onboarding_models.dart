@@ -102,7 +102,10 @@ class OnboardingApplication {
   bool get phoneVerified => phoneVerifiedAt != null;
 
   factory OnboardingApplication.fromJson(Map<String, dynamic> json) => OnboardingApplication(
-        id: json['id'] as String,
+        // Tolerant, because two shapes arrive here: the reviewer's full view, and the thin receipt
+        // an applicant gets, which carries no id. Parsed strictly this threw on every status
+        // lookup — the one call a person with no account is meant to be able to make.
+        id: json['id'] as String? ?? '',
         reference: json['reference'] as String? ?? '',
         kind: OnboardingKind.fromWire(json['kind'] as String? ?? 'MERCHANT'),
         businessName: json['businessName'] as String? ?? '',

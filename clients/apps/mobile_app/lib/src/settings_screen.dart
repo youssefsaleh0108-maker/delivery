@@ -2,6 +2,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'biometric_lock.dart';
+
 /// App settings — how the app behaves, as distinct from who you are.
 ///
 /// Split from the Account tab deliberately. An account page answers "who am I and where do I live";
@@ -10,13 +12,70 @@ import 'package:flutter/material.dart';
 ///
 /// Reached from the gear in the home app bar rather than from a tab: it is a place you visit
 /// rarely and leave, which is what a pushed route means and what a tab does not.
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.locale});
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key, required this.locale, this.userId});
 
   final LocaleController locale;
 
+  /// Whose fingerprint setting this is. Null on a surface with no session, in which case the
+  /// unlock section is not offered at all — there would be nothing to lock.
+  final String? userId;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final BiometricLock _biometrics = BiometricLock();
+
+  /// Null until the checks answer. The row is not drawn while it is null rather than drawn off — a
+  /// switch that flicks itself on a moment after the screen opens looks like the app changing a
+  /// security setting by itself.
+  bool? _enabled;
+  bool _available = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final bool available = await _biometrics.isAvailable;
+    final bool enabled = await _biometrics.isEnabledFor(widget.userId);
+    if (!mounted) return;
+    setState(() {
+      _available = available;
+      _enabled = enabled;
+    });
+  }
+
+  Future<void> _set(bool on) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    // Proved before it is turned on, never after. Enabling on the strength of the sensor merely
+    // existing is how somebody locks themselves out with a finger the phone does not recognise.
+    if (on) {
+      final BiometricResult result = await _biometrics.authenticate(t.unlockWithFingerprint);
+      if (result != BiometricResult.ok) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result == BiometricResult.unavailable
+              ? t.fingerprintNotSetUp
+              : t.couldNotVerifyYou),
+        ));
+        return;
+      }
+    }
+
+    await _biometrics.setEnabledFor(widget.userId, on);
+    if (!mounted) return;
+    setState(() => _enabled = on);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final LocaleController locale = widget.locale;
 
     return AnimatedBuilder(
       animation: locale,
@@ -60,6 +119,24 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ]),
+            // Here rather than on the Account tab, which is where it was and which only exists on
+            // the customer surface — so a merchant, a rider or an applicant could never reach it.
+            if (widget.userId != null && _available && _enabled != null) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.md),
+              _card(DeliveryStrings.of(context).biometricUnlock, <Widget>[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _enabled!,
+                  onChanged: _set,
+                  secondary: const Icon(Icons.fingerprint, color: DeliveryColors.muted),
+                  title: Text(DeliveryStrings.of(context).useFingerprintNextTime,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                  subtitle: Text(
+                      DeliveryStrings.of(context).fingerprintKeepsYourAccountClosed,
+                      style: const TextStyle(fontSize: 12.5)),
+                ),
+              ]),
+            ],
             const SizedBox(height: DeliverySpacing.md),
             // Nothing else is claimed here on purpose. A settings page padded with switches that
             // are not wired to anything is worse than a short one.

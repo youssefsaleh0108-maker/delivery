@@ -2453,4 +2453,58 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get biometricUnlock => 'الفتح بالبصمة';
+
+  @override
+  String get chooseYourPasscode => 'اختر رمز الدخول';
+
+  @override
+  String get passcodeLetsYouFollowIt =>
+      'ستة أرقام. ستستخدمها لتسجيل الدخول ومتابعة طلبك أثناء مراجعتنا له.';
+
+  @override
+  String get applicationPending => 'تم استلام طلبك';
+
+  @override
+  String get weAreReadingIt =>
+      'نقرأ طلبك الآن. سنراسلك فور صدور القرار، وتبقى الحالة ظاهرة هنا.';
+
+  @override
+  String companyIsReadingIt(String company) {
+    return '$company تقرأ طلبك. ستصلك رسالة فور اتخاذ القرار.';
+  }
+
+  @override
+  String get applicationStatus => 'الحالة';
+
+  @override
+  String get statusSubmitted => 'بانتظار المراجعة';
+
+  @override
+  String get statusInReview => 'قيد المراجعة الآن';
+
+  @override
+  String get statusApproved => 'تمت الموافقة — يجري إعداد حسابك';
+
+  @override
+  String get statusRejected => 'لم يُقبل';
+
+  @override
+  String get statusProvisioned => 'تمت الموافقة';
+
+  @override
+  String get statusFailed => 'حدث خطأ أثناء إعداد حسابك. نحن نعالج الأمر.';
+
+  @override
+  String get checkAgain => 'تحديث';
+
+  @override
+  String get whatHappensNext => 'ما الخطوة التالية';
+
+  @override
+  String get nextStepsPending =>
+      'لا شيء عليك الآن. بعد الموافقة يصبح هذا التطبيق متجرك أو لوحة طلباتك — بنفس تسجيل الدخول ونفس رمز الدخول.';
+
+  @override
+  String get couldNotCreateSignIn =>
+      'تعذّر إعداد تسجيل الدخول. طلبك استُلم على أي حال.';
 }

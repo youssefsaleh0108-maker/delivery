@@ -11,6 +11,7 @@ import 'src/biometric_lock_screen.dart';
 import 'src/customer_shell.dart';
 import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
+import 'src/pending_application_screen.dart';
 import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
@@ -298,6 +299,16 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               return PartnerApplicationScreen(
                 api: _onboardingApi,
                 kind: _partnerKind!,
+                authService: _authService,
+                onSignedIn: (AuthSession session) {
+                  // Out of the application flow entirely: they have an account now, and the role
+                  // branch below puts them on the pending screen until somebody decides.
+                  setState(() {
+                    _applyingAsPartner = false;
+                    _partnerKind = null;
+                  });
+                  _adoptSession(session);
+                },
                 onClose: () => setState(() => _partnerKind = null),
               );
             }
@@ -348,6 +359,23 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             );
           }
 
+          // Applied, waiting on a decision. Checked BEFORE the partner roles: an approved account
+          // keeps APPLICANT alongside its real role, so testing this first would strand a merchant
+          // on the pending screen forever.
+          if (!session.hasRole(DeliveryRole.merchant) &&
+              !session.hasRole(DeliveryRole.delivery) &&
+              !session.hasRole(DeliveryRole.carrier) &&
+              session.hasRole(DeliveryRole.applicant)) {
+            return PendingApplicationScreen(
+              api: _onboardingApi,
+              session: session,
+              onSignOut: _signOut,
+              // The role is in the access token, so an approval granted elsewhere does not reach a
+              // session already running. Signing out and back in is what picks it up.
+              onApproved: () => _signOut(),
+            );
+          }
+
           // The role branch. A rider's queue wins when an account holds both, because the delivery
           // flow is the one with a time-critical task attached.
           if (session.hasRole(DeliveryRole.delivery)) {
@@ -355,6 +383,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               api: _orderApi,
               butlerApi: _butlerApi,
               session: session,
+              locale: _locale,
               onSignOut: _signOut,
             );
           }
@@ -365,6 +394,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             return MerchantHomeScreen(
               orderApi: _orderApi,
               session: session,
+              locale: _locale,
               onSignOut: _signOut,
             );
           }

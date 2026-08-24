@@ -62,6 +62,20 @@ public class ProvisionAccount implements JavaDelegate {
             case RIDER -> "DELIVERY";
         };
 
+        // They may already have signed in. An applicant who chose a passcode at the end of the form
+        // has an account holding APPLICANT and nothing else, so approval GRANTS the real role to
+        // that account rather than making a second one — otherwise the passcode they have been
+        // using since they applied would stop working the moment they were accepted, which is the
+        // worst possible time to hand somebody a new set of credentials.
+        String applicantRef = application.getApplicantUserRef();
+        if (applicantRef != null) {
+            keycloak.grantRealmRole(applicantRef, role);
+            execution.setVariable("userRef", applicantRef);
+            log.info("Application {} approved; granted {} to existing account {}",
+                    applicationId, role, applicantRef);
+            return;
+        }
+
         String userRef = keycloak.createPartner(
                 application.getContactEmail(),
                 firstNameOf(application.getContactName()),

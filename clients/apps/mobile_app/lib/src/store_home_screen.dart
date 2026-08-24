@@ -416,7 +416,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         IconButton(
           tooltip: DeliveryStrings.of(context).settings,
           onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => SettingsScreen(locale: widget.locale),
+            builder: (_) => SettingsScreen(
+                locale: widget.locale, userId: widget.session.subject),
           )),
           icon: const Icon(Icons.settings_outlined),
         ),

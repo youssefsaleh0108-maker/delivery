@@ -1388,5 +1388,28 @@
   "locked": "Locked",
   "notNow": "Not now",
   "turnOn": "Turn on",
-  "biometricUnlock": "Fingerprint unlock"
+  "biometricUnlock": "Fingerprint unlock",
+  "chooseYourPasscode": "Choose a passcode",
+  "passcodeLetsYouFollowIt": "Six digits. You will use them to sign in and follow your application while we read it.",
+  "applicationPending": "Application received",
+  "weAreReadingIt": "We are reading your application. You will get an email as soon as there is a decision, and this screen keeps the status.",
+  "companyIsReadingIt": "{company} is reading your application. You will get an email as soon as they decide.",
+  "applicationStatus": "Status",
+  "statusSubmitted": "Waiting to be read",
+  "statusInReview": "Being read now",
+  "statusApproved": "Approved — setting up your account",
+  "statusRejected": "Not accepted",
+  "statusProvisioned": "Approved",
+  "statusFailed": "Something went wrong setting you up. We are on it.",
+  "checkAgain": "Check again",
+  "whatHappensNext": "What happens next",
+  "nextStepsPending": "Nothing to do for now. When you are approved this app becomes your shop or your job board — same sign-in, same passcode.",
+  "couldNotCreateSignIn": "We could not set up your sign-in. Your application was still received.",
+  "@companyIsReadingIt": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  }
 }

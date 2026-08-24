@@ -3,6 +3,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'settings_screen.dart';
+
 /// The shop owner's surface, on a phone.
 ///
 /// <p>A merchant signing into the mobile app used to land in the customer storefront — the role
@@ -18,11 +20,16 @@ class MerchantHomeScreen extends StatefulWidget {
     super.key,
     required this.orderApi,
     required this.session,
+    required this.locale,
     required this.onSignOut,
   });
 
   final OrderApi orderApi;
   final AuthSession session;
+
+  /// Passed through to Settings, which is reachable from here now.
+  final LocaleController locale;
+
   final Future<void> Function() onSignOut;
 
   @override
@@ -74,6 +81,17 @@ class _MerchantHomeScreenState extends State<MerchantHomeScreen> {
             icon: const Icon(Icons.refresh),
             tooltip: t.refresh,
             onPressed: _acting ? null : _refresh,
+          ),
+          // Settings, on every surface rather than only the customer one. Fingerprint unlock lives
+          // there, and before this a merchant or a rider had no route to it at all — the setting
+          // existed and could not be reached, which reads exactly like a setting that is broken.
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: t.settings,
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => SettingsScreen(
+                  locale: widget.locale, userId: widget.session.subject),
+            )),
           ),
           IconButton(
             icon: const Icon(Icons.logout),

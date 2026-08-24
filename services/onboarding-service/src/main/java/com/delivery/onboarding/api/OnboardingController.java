@@ -82,6 +82,13 @@ public class OnboardingController {
             UUID targetProviderId) {
     }
 
+    /**
+     * @param password the six-digit passcode the app's keypad collects, same floor as sign-up
+     */
+    public record ApplicantAccountRequest(
+            @NotBlank @Size(min = 6, max = 128) String password) {
+    }
+
     public record VerificationRequest(
             @NotNull ContactVerification.Channel channel,
             @NotBlank @Size(max = 255) String destination) {
@@ -240,6 +247,39 @@ public class OnboardingController {
     @GetMapping("/applications/by-reference/{reference}")
     public ResponseEntity<ApplicationReceipt> status(@PathVariable String reference) {
         return onboarding.byReference(reference)
+                .map(ApplicationReceipt::of)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Choosing a passcode at the end of an application, so the applicant can get in and watch it.
+     *
+     * <p>Open, like the application itself, because the account being created is the one they would
+     * otherwise have to authenticate with. What stands in for a token is the reference: 160 bits,
+     * handed to one person, and tied to an address that was already proved with a code.
+     *
+     * <p>The account created carries APPLICANT and nothing else. It cannot sell, carry or dispatch
+     * anything until a decision goes its way.
+     */
+    @PostMapping("/applications/{reference}/account")
+    public ResponseEntity<Void> createApplicantAccount(
+            @PathVariable String reference,
+            @Valid @RequestBody ApplicantAccountRequest request) {
+        onboarding.createApplicantAccount(reference, request.password());
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    /**
+     * An applicant looking at their own application, by their token rather than by a reference.
+     *
+     * <p>404 when the caller has no application. That includes a signed-in merchant whose
+     * application was approved and cleaned up — there is nothing here for them and the app should
+     * be showing them their shop.
+     */
+    @GetMapping("/applications/mine")
+    public ResponseEntity<ApplicationReceipt> mine() {
+        return onboarding.forApplicant(CurrentUser.requireId())
                 .map(ApplicationReceipt::of)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

@@ -4435,6 +4435,102 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Fingerprint unlock'**
   String get biometricUnlock;
+
+  /// No description provided for @chooseYourPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a passcode'**
+  String get chooseYourPasscode;
+
+  /// No description provided for @passcodeLetsYouFollowIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Six digits. You will use them to sign in and follow your application while we read it.'**
+  String get passcodeLetsYouFollowIt;
+
+  /// No description provided for @applicationPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Application received'**
+  String get applicationPending;
+
+  /// No description provided for @weAreReadingIt.
+  ///
+  /// In en, this message translates to:
+  /// **'We are reading your application. You will get an email as soon as there is a decision, and this screen keeps the status.'**
+  String get weAreReadingIt;
+
+  /// No description provided for @companyIsReadingIt.
+  ///
+  /// In en, this message translates to:
+  /// **'{company} is reading your application. You will get an email as soon as they decide.'**
+  String companyIsReadingIt(String company);
+
+  /// No description provided for @applicationStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get applicationStatus;
+
+  /// No description provided for @statusSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to be read'**
+  String get statusSubmitted;
+
+  /// No description provided for @statusInReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Being read now'**
+  String get statusInReview;
+
+  /// No description provided for @statusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved — setting up your account'**
+  String get statusApproved;
+
+  /// No description provided for @statusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not accepted'**
+  String get statusRejected;
+
+  /// No description provided for @statusProvisioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get statusProvisioned;
+
+  /// No description provided for @statusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong setting you up. We are on it.'**
+  String get statusFailed;
+
+  /// No description provided for @checkAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get checkAgain;
+
+  /// No description provided for @whatHappensNext.
+  ///
+  /// In en, this message translates to:
+  /// **'What happens next'**
+  String get whatHappensNext;
+
+  /// No description provided for @nextStepsPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to do for now. When you are approved this app becomes your shop or your job board — same sign-in, same passcode.'**
+  String get nextStepsPending;
+
+  /// No description provided for @couldNotCreateSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not set up your sign-in. Your application was still received.'**
+  String get couldNotCreateSignIn;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

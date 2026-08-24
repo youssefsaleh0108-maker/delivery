@@ -115,6 +115,61 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * The account an applicant signs in with while their application is being decided.
+     *
+     * <p>Carries the APPLICANT realm role and nothing else. That role is checked by no endpoint on
+     * the platform, which is the point: the token proves who they are and says explicitly that they
+     * are not yet a merchant, a carrier or a rider. The real role is granted to this same account
+     * on approval — see ProvisionAccount.
+     *
+     * <p>{@code emailVerified} is true because it genuinely is: the application could not have been
+     * submitted without a code answered on this address.
+     *
+     * @return the Keycloak {@code sub}
+     */
+    public String createApplicant(String email, String firstName, String lastName,
+                                  String password) {
+        String bearer = adminToken();
+
+        Map<String, Object> user = Map.of(
+                "username", email,
+                "email", email,
+                "firstName", firstName == null ? "" : firstName,
+                "lastName", lastName == null ? "" : lastName,
+                "enabled", true,
+                "emailVerified", true,
+                "credentials", List.of(Map.of(
+                        "type", "password",
+                        "value", password,
+                        // The passcode they chose and expect to use. `temporary: true` would put a
+                        // reset screen in front of somebody who has not been approved yet.
+                        "temporary", false)));
+
+        String userId;
+        try {
+            ResponseEntity<Void> created = keycloak.post()
+                    .uri("/admin/realms/{realm}/users", realm)
+                    .header("Authorization", "Bearer " + bearer)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(user)
+                    .retrieve()
+                    .toBodilessEntity();
+            userId = idFromLocation(created);
+        } catch (HttpClientErrorException.Conflict e) {
+            log.warn("An account already exists for applicant {}", email);
+            throw new ProvisioningException("An account already exists for that email address");
+        } catch (Exception e) {
+            log.error("Could not create an applicant account for {}", email, e);
+            throw new ProvisioningException(
+                    "We could not finish setting up your sign-in just now. Please try again.");
+        }
+
+        assignRealmRole(bearer, userId, "APPLICANT");
+        log.info("Applicant {} can now sign in while their application is decided", email);
+        return userId;
+    }
+
+    /**
      * Creates a customer's own account, with the password they just chose.
      *
      * <p>Three deliberate differences from {@link #createPartner}, and each of them follows from
@@ -210,6 +265,18 @@ public class KeycloakAdminClient {
             throw new ProvisioningException("The account was created but Keycloak returned no id");
         }
         return id;
+    }
+
+    /**
+     * Grants a realm role to an account that already exists.
+     *
+     * <p>Used at approval, when the applicant signed up with a passcode before anybody decided.
+     * They keep the account and the passcode they chose; what changes is that the token starts
+     * carrying MERCHANT, CARRIER or DELIVERY beside APPLICANT.
+     */
+    public void grantRealmRole(String userRef, String role) {
+        assignRealmRole(adminToken(), userRef, role);
+        log.info("Granted {} to {}", role, userRef);
     }
 
     private void assignRealmRole(String bearer, String userId, String role) {

@@ -7,6 +7,8 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'settings_screen.dart';
+
 import 'rider_butler_board.dart';
 import 'rider_job_card.dart';
 
@@ -25,12 +27,16 @@ class RiderHomeScreen extends StatefulWidget {
     required this.api,
     required this.butlerApi,
     required this.session,
+    required this.locale,
     required this.onSignOut,
   });
 
   final OrderApi api;
   final ButlerApi butlerApi;
   final AuthSession session;
+
+  /// Passed through to Settings, which is reachable from here now.
+  final LocaleController locale;
   final Future<void> Function() onSignOut;
 
   @override
@@ -231,6 +237,14 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => SettingsScreen(
+                          locale: widget.locale, userId: widget.session.subject),
+                    )),
+                    icon: const Icon(Icons.settings_outlined, color: DeliveryColors.white),
+                    tooltip: t.settings,
                   ),
                   IconButton(
                     onPressed: widget.onSignOut,

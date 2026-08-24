@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.delivery.onboarding.client.KeycloakAdminClient;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplicationRepository;
 
@@ -34,14 +35,17 @@ public class OnboardingService {
     private final ApplicationIntake intake;
     private final RuntimeService runtime;
     private final TaskService tasks;
+    private final KeycloakAdminClient keycloak;
 
     public OnboardingService(OnboardingApplicationRepository applications,
                              ApplicationIntake intake,
-                             RuntimeService runtime, TaskService tasks) {
+                             RuntimeService runtime, TaskService tasks,
+                             KeycloakAdminClient keycloak) {
         this.applications = applications;
         this.intake = intake;
         this.runtime = runtime;
         this.tasks = tasks;
+        this.keycloak = keycloak;
     }
 
     /** Thrown when an application cannot be accepted or decided as asked. */
@@ -185,6 +189,59 @@ public class OnboardingService {
         completeReview(application, true);
         log.info("{} approved application {}", reviewer, application.getReference());
         return application;
+    }
+
+    /**
+     * Gives an applicant a way in while their application is being decided.
+     *
+     * <p>Creates the Keycloak account, records it against the application, and leaves the decision
+     * untouched — the account holds APPLICANT and nothing else until somebody approves.
+     *
+     * <p>Keyed on the reference rather than on a token, for the same reason the status lookup is:
+     * there is no caller identity yet. The reference is 160 bits, was handed to one person, and the
+     * address on the application was already proved with a code, so this cannot mint an account on
+     * an address the applicant does not control.
+     */
+    @Transactional
+    public void createApplicantAccount(String reference, String password) {
+        OnboardingApplication application = applications.findByReference(reference)
+                .orElseThrow(() -> new ApplicationRuleException("No application with that reference"));
+
+        if (application.getApplicantUserRef() != null) {
+            throw new ApplicationRuleException("That application already has a sign-in");
+        }
+
+        String userRef = keycloak.createApplicant(
+                application.getContactEmail(),
+                firstNameOf(application.getContactName()),
+                lastNameOf(application.getContactName()),
+                password);
+
+        application.applicantAccountCreated(userRef);
+        applications.save(application);
+        log.info("Applicant account created for application {}", application.getReference());
+    }
+
+    /** What a signed-in applicant is shown about their own application. */
+    @Transactional(readOnly = true)
+    public Optional<OnboardingApplication> forApplicant(String userRef) {
+        return applications.findByApplicantUserRef(userRef);
+    }
+
+    /**
+     * Splits a name somebody typed into one box. Crude on purpose: Keycloak wants two fields and
+     * the form asks for one, so this is a presentation guess rather than a fact.
+     */
+    private static String firstNameOf(String contactName) {
+        String trimmed = contactName == null ? "" : contactName.trim();
+        int space = trimmed.indexOf(' ');
+        return space < 0 ? trimmed : trimmed.substring(0, space);
+    }
+
+    private static String lastNameOf(String contactName) {
+        String trimmed = contactName == null ? "" : contactName.trim();
+        int space = trimmed.indexOf(' ');
+        return space < 0 ? "" : trimmed.substring(space + 1).trim();
     }
 
     @Transactional

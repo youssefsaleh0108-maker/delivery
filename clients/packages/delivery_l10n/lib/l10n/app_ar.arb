@@ -927,5 +927,28 @@
   "locked": "مقفل",
   "notNow": "ليس الآن",
   "turnOn": "تفعيل",
-  "biometricUnlock": "الفتح بالبصمة"
+  "biometricUnlock": "الفتح بالبصمة",
+  "chooseYourPasscode": "اختر رمز الدخول",
+  "passcodeLetsYouFollowIt": "ستة أرقام. ستستخدمها لتسجيل الدخول ومتابعة طلبك أثناء مراجعتنا له.",
+  "applicationPending": "تم استلام طلبك",
+  "weAreReadingIt": "نقرأ طلبك الآن. سنراسلك فور صدور القرار، وتبقى الحالة ظاهرة هنا.",
+  "companyIsReadingIt": "{company} تقرأ طلبك. ستصلك رسالة فور اتخاذ القرار.",
+  "applicationStatus": "الحالة",
+  "statusSubmitted": "بانتظار المراجعة",
+  "statusInReview": "قيد المراجعة الآن",
+  "statusApproved": "تمت الموافقة — يجري إعداد حسابك",
+  "statusRejected": "لم يُقبل",
+  "statusProvisioned": "تمت الموافقة",
+  "statusFailed": "حدث خطأ أثناء إعداد حسابك. نحن نعالج الأمر.",
+  "checkAgain": "تحديث",
+  "whatHappensNext": "ما الخطوة التالية",
+  "nextStepsPending": "لا شيء عليك الآن. بعد الموافقة يصبح هذا التطبيق متجرك أو لوحة طلباتك — بنفس تسجيل الدخول ونفس رمز الدخول.",
+  "couldNotCreateSignIn": "تعذّر إعداد تسجيل الدخول. طلبك استُلم على أي حال.",
+  "@companyIsReadingIt": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  }
 }

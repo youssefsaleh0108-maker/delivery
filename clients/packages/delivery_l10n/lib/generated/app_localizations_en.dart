@@ -2468,4 +2468,59 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get biometricUnlock => 'Fingerprint unlock';
+
+  @override
+  String get chooseYourPasscode => 'Choose a passcode';
+
+  @override
+  String get passcodeLetsYouFollowIt =>
+      'Six digits. You will use them to sign in and follow your application while we read it.';
+
+  @override
+  String get applicationPending => 'Application received';
+
+  @override
+  String get weAreReadingIt =>
+      'We are reading your application. You will get an email as soon as there is a decision, and this screen keeps the status.';
+
+  @override
+  String companyIsReadingIt(String company) {
+    return '$company is reading your application. You will get an email as soon as they decide.';
+  }
+
+  @override
+  String get applicationStatus => 'Status';
+
+  @override
+  String get statusSubmitted => 'Waiting to be read';
+
+  @override
+  String get statusInReview => 'Being read now';
+
+  @override
+  String get statusApproved => 'Approved — setting up your account';
+
+  @override
+  String get statusRejected => 'Not accepted';
+
+  @override
+  String get statusProvisioned => 'Approved';
+
+  @override
+  String get statusFailed =>
+      'Something went wrong setting you up. We are on it.';
+
+  @override
+  String get checkAgain => 'Check again';
+
+  @override
+  String get whatHappensNext => 'What happens next';
+
+  @override
+  String get nextStepsPending =>
+      'Nothing to do for now. When you are approved this app becomes your shop or your job board — same sign-in, same passcode.';
+
+  @override
+  String get couldNotCreateSignIn =>
+      'We could not set up your sign-in. Your application was still received.';
 }

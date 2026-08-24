@@ -137,6 +137,20 @@ public class OnboardingApplication {
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
 
+    /**
+     * The account created for the applicant when they chose a passcode, before any decision.
+     *
+     * <p>Holds the APPLICANT role only, so it can sign in and see this application's status and
+     * nothing else. On approval the real role is granted to this same account rather than a second
+     * one being made.
+     *
+     * <p>Separate from {@link #provisionedUserRef}, which means approved and set up. Folding the
+     * two together would make an application look provisioned the moment somebody picked a
+     * passcode, which is before anybody has decided anything.
+     */
+    @Column(name = "applicant_user_ref", length = 64)
+    private String applicantUserRef;
+
     @Column(name = "provisioned_user_ref", length = 64)
     private String provisionedUserRef;
 
@@ -306,6 +320,24 @@ public class OnboardingApplication {
         return rejectionReason;
     }
 
+
+    /**
+     * Records the account the applicant signed up with.
+     *
+     * <p>Refuses a second one. Retrying the account step after a timeout must not leave an orphan
+     * Keycloak user attached to nothing, and two accounts for one application would make "which of
+     * these is the applicant" unanswerable at approval time.
+     */
+    public void applicantAccountCreated(String userRef) {
+        if (this.applicantUserRef != null) {
+            throw new IllegalStateException("This application already has an account");
+        }
+        this.applicantUserRef = userRef;
+    }
+
+    public String getApplicantUserRef() {
+        return applicantUserRef;
+    }
     public String getProvisionedUserRef() {
         return provisionedUserRef;
     }

@@ -37,6 +37,10 @@
       {
         "name": "CARRIER",
         "description": "Staff of a delivery company: administers their own carrier, not the platform."
+      },
+      {
+        "name": "APPLICANT",
+        "description": "Applied to sell, carry or deliver and is waiting on a decision. Grants nothing: it exists so a token can say who somebody is without saying they are a merchant yet."
       }
     ]
   },

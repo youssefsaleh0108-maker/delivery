@@ -12,6 +12,9 @@ public interface OnboardingApplicationRepository
     /** How an applicant with no account finds their own application, and only their own. */
     Optional<OnboardingApplication> findByReference(String reference);
 
+    /** The application belonging to a signed-in applicant, for the "how is mine going" screen. */
+    Optional<OnboardingApplication> findByApplicantUserRef(String applicantUserRef);
+
     /** The reviewer's queue: oldest first, because waiting three days should not lose to today. */
     List<OnboardingApplication> findByStatusInOrderByCreatedAtAsc(
             List<OnboardingApplication.Status> statuses);

@@ -11,7 +11,14 @@ enum DeliveryRole {
   merchant('MERCHANT'),
   /// Staff of a delivery company: administers their own carrier, not the platform.
   carrier('CARRIER'),
-  backoffice('BACKOFFICE');
+  backoffice('BACKOFFICE'),
+
+  /// Applied to sell, carry or deliver and waiting on a decision.
+  ///
+  /// Grants nothing. It is what an account holds between choosing a passcode at the end of the
+  /// application and somebody approving it, so the app can show the application's progress instead
+  /// of a shop that does not exist yet.
+  applicant('APPLICANT');
 
   const DeliveryRole(this.claimValue);
 
