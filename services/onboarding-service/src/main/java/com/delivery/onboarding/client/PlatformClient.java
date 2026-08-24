@@ -194,6 +194,30 @@ public class PlatformClient {
     }
 
     /**
+     * Pushes to somebody who has an account and an app on a phone.
+     *
+     * <p>Addressed by account, not by device token: Notifications Manager resolves the device from
+     * the same directory the order events use, so this service never has to hold one.
+     *
+     * <p>Quiet when there is no device on file — that is a 204 and not a failure. Somebody who
+     * applied from a browser has no token, and the decision they are being told about has already
+     * been made.
+     */
+    public void notifyDirectPush(String recipientId, String subject, String body, String purpose) {
+        notifications.post()
+                .uri("/api/notifications/direct/push")
+                .header("Authorization", "Bearer " + serviceToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "recipientId", recipientId,
+                        "subject", subject == null ? "" : subject,
+                        "body", body,
+                        "purpose", purpose))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    /**
      * A handle for the company, derived from its name.
      *
      * <p>Suffixed with a short random tail because two businesses genuinely can share a name, and a

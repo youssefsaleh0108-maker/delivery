@@ -46,17 +46,24 @@ public class NotifyApplicant implements JavaDelegate {
         }
 
         boolean rejected = application.getStatus() == OnboardingApplication.Status.REJECTED;
-        String subject = rejected
-                ? "About your application"
-                : "You are approved";
+
+        String subject = rejected ? "About your application" : "You are approved";
+
+        // The approved text used to say "we have created your account, choose forgot password to
+        // set one". That stopped being true when applicants started choosing a passcode at the end
+        // of the form: they already have an account, and telling somebody to reset a password they
+        // never set sends them round a loop for no reason.
         String body = rejected
                 ? "Thank you for applying with " + application.getBusinessName() + "."
                 + "\n\nWe are not able to take it forward this time: "
                 + application.getRejectionReason()
                 + "\n\nIf that changes, you are welcome to apply again."
                 : "Good news — " + application.getBusinessName() + " is approved."
-                + "\n\nWe have created your account. Open your portal and choose"
-                + " \"forgot password\" to set one, using this email address."
+                + "\n\nSign in with the passcode you chose when you applied. Everything you could"
+                + " look at before now works for real: "
+                + (application.getKind() == OnboardingApplication.Kind.RIDER
+                        ? "you can take deliveries from the board."
+                        : "you can publish to the market.")
                 + "\n\nYour reference is " + application.getReference() + ".";
 
         try {
@@ -69,6 +76,27 @@ public class NotifyApplicant implements JavaDelegate {
             // worse than being told but far better than being un-decided.
             log.error("Could not email the decision on application {} — it stands regardless",
                     application.getReference(), e);
+        }
+
+        // And a push, because they are holding the app. An email about a decision they have been
+        // waiting on can sit unread for a day; the phone in their hand cannot.
+        //
+        // Only when they signed up with a passcode — an older applicant has no account to address,
+        // and somebody who applied from a browser has no device on file. Both are quiet no-ops.
+        String applicantRef = application.getApplicantUserRef();
+        if (applicantRef != null) {
+            try {
+                platform.notifyDirectPush(applicantRef, subject,
+                        rejected
+                                ? "We could not take your application forward. Open the app for the reason."
+                                : "You are approved. Open the app — you can start straight away.",
+                        "onboarding.decision");
+            } catch (Exception e) {
+                // Same reasoning as the email above, and more so: this is the second of two ways
+                // they are being told.
+                log.error("Could not push the decision on application {} — it stands regardless",
+                        application.getReference(), e);
+            }
         }
     }
 }
