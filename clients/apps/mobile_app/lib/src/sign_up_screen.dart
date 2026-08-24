@@ -3,8 +3,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/services.dart';
 
+import 'one_time_code.dart';
 import 'passcode_pad.dart';
 
 /// Creating a shopper's account, in three steps.
@@ -234,43 +234,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ];
 
   List<Widget> _codeStep(DeliveryStrings t) => <Widget>[
-        Text(t.theCodeWeSent, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: DeliverySpacing.xs),
-        Text(_email.text.trim(), style: Theme.of(context).textTheme.bodyMedium),
+        Text(t.enterTheCode, style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: DeliverySpacing.lg),
+        OneTimeCodeSentNote(destination: _email.text.trim()),
         const SizedBox(height: DeliverySpacing.xl),
-        // A passcode entry, not a text field: the code is short, numeric and fixed-length, so the
-        // input should say so. Digits only, a number pad, and one glance to check what was typed.
-        TextField(
+        OneTimeCodeField(
           controller: _code,
           enabled: !_busy,
-          keyboardType: TextInputType.number,
-          inputFormatters: <TextInputFormatter>[
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(6),
-          ],
-          textAlign: TextAlign.center,
           autofocus: true,
-          style: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 16,
-          ),
-          decoration: const InputDecoration(
-            hintText: '······',
-            counterText: '',
-          ),
-          onChanged: (String v) {
-            // Submits itself on the last digit. Asking somebody to type six digits and then reach
-            // for a button is a step with no purpose.
-            if (v.length == 6 && !_busy) _confirmCode();
-          },
+          onCompleted: _confirmCode,
         ),
         const SizedBox(height: DeliverySpacing.xl),
         _PrimaryButton(busy: _busy, label: t.verify, onPressed: _confirmCode),
         const SizedBox(height: DeliverySpacing.sm),
         TextButton(
           onPressed: _busy ? null : _sendCode,
-          child: Text(t.sendAnother),
+          child: Text('${t.didntGetIt} ${t.sendAnother}'),
         ),
       ];
 

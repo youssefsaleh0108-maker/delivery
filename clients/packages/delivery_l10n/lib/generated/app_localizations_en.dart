@@ -2410,4 +2410,62 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get guestApplicationExplainer =>
       'You do not need an account to apply. We create one for you when you are approved.';
+
+  @override
+  String codeSentTo(String destination) {
+    return 'We sent a 6-digit code to $destination. It expires in 10 minutes and can be used once.';
+  }
+
+  @override
+  String get enterTheCode => 'Enter the code';
+
+  @override
+  String get didntGetIt => 'Did not get it?';
+
+  @override
+  String get yourApplicationReference => 'Your application reference';
+
+  @override
+  String get referenceExplainer =>
+      'Quote this if you contact us, and use it to check your application at any time. It is not a password and it is not needed to sign in.';
+
+  @override
+  String get whyNoPasscodeYet => 'Why no passcode yet?';
+
+  @override
+  String get passcodeComesAfterApproval =>
+      'Your account is created once your application is approved. We email you then, and you choose your passcode at that point — so nothing is set up for an account that might not be approved.';
+
+  @override
+  String get unlockWithFingerprint => 'Unlock with fingerprint';
+
+  @override
+  String get useFingerprintNextTime => 'Use your fingerprint next time';
+
+  @override
+  String get fingerprintKeepsYourAccountClosed =>
+      'Your session stays locked until you unlock it, so someone holding your phone cannot open your account.';
+
+  @override
+  String get fingerprintNotSetUp =>
+      'This phone has no fingerprint or face unlock set up yet. Add one in your phone settings first.';
+
+  @override
+  String get couldNotVerifyYou =>
+      'We could not verify you. Try again, or sign in with your passcode.';
+
+  @override
+  String get signInWithPasscodeInstead => 'Use my passcode instead';
+
+  @override
+  String get locked => 'Locked';
+
+  @override
+  String get notNow => 'Not now';
+
+  @override
+  String get turnOn => 'Turn on';
+
+  @override
+  String get biometricUnlock => 'Fingerprint unlock';
 }

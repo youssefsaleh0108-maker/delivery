@@ -4333,6 +4333,108 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'You do not need an account to apply. We create one for you when you are approved.'**
   String get guestApplicationExplainer;
+
+  /// No description provided for @codeSentTo.
+  ///
+  /// In en, this message translates to:
+  /// **'We sent a 6-digit code to {destination}. It expires in 10 minutes and can be used once.'**
+  String codeSentTo(String destination);
+
+  /// No description provided for @enterTheCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code'**
+  String get enterTheCode;
+
+  /// No description provided for @didntGetIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Did not get it?'**
+  String get didntGetIt;
+
+  /// No description provided for @yourApplicationReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application reference'**
+  String get yourApplicationReference;
+
+  /// No description provided for @referenceExplainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote this if you contact us, and use it to check your application at any time. It is not a password and it is not needed to sign in.'**
+  String get referenceExplainer;
+
+  /// No description provided for @whyNoPasscodeYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Why no passcode yet?'**
+  String get whyNoPasscodeYet;
+
+  /// No description provided for @passcodeComesAfterApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is created once your application is approved. We email you then, and you choose your passcode at that point — so nothing is set up for an account that might not be approved.'**
+  String get passcodeComesAfterApproval;
+
+  /// No description provided for @unlockWithFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with fingerprint'**
+  String get unlockWithFingerprint;
+
+  /// No description provided for @useFingerprintNextTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your fingerprint next time'**
+  String get useFingerprintNextTime;
+
+  /// No description provided for @fingerprintKeepsYourAccountClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session stays locked until you unlock it, so someone holding your phone cannot open your account.'**
+  String get fingerprintKeepsYourAccountClosed;
+
+  /// No description provided for @fingerprintNotSetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone has no fingerprint or face unlock set up yet. Add one in your phone settings first.'**
+  String get fingerprintNotSetUp;
+
+  /// No description provided for @couldNotVerifyYou.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not verify you. Try again, or sign in with your passcode.'**
+  String get couldNotVerifyYou;
+
+  /// No description provided for @signInWithPasscodeInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Use my passcode instead'**
+  String get signInWithPasscodeInstead;
+
+  /// No description provided for @locked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get locked;
+
+  /// No description provided for @notNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get notNow;
+
+  /// No description provided for @turnOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get turnOn;
+
+  /// No description provided for @biometricUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint unlock'**
+  String get biometricUnlock;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

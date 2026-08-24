@@ -903,5 +903,29 @@
   "weWillBeInTouch": "سنقرأ طلبك ونتواصل معك عبر البريد.",
   "finishSettingUpInTheApp": "بعد الموافقة تُكمل الإعداد هنا في التطبيق — بلا أوراق ولا موقع منفصل.",
   "continueAsGuest": "المتابعة بدون حساب",
-  "guestApplicationExplainer": "لا تحتاج حسابًا لتقديم الطلب. ننشئ لك حسابًا عند الموافقة."
+  "guestApplicationExplainer": "لا تحتاج حسابًا لتقديم الطلب. ننشئ لك حسابًا عند الموافقة.",
+  "codeSentTo": "أرسلنا رمزًا من 6 أرقام إلى {destination}. ينتهي خلال 10 دقائق ويُستخدم مرة واحدة.",
+  "@codeSentTo": {
+    "placeholders": {
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "enterTheCode": "أدخل الرمز",
+  "didntGetIt": "لم يصلك؟",
+  "yourApplicationReference": "رقم طلبك المرجعي",
+  "referenceExplainer": "اذكره عند التواصل معنا، واستخدمه لمتابعة طلبك في أي وقت. ليس كلمة مرور ولا يُستخدم لتسجيل الدخول.",
+  "whyNoPasscodeYet": "لماذا لا يوجد رمز دخول بعد؟",
+  "passcodeComesAfterApproval": "يُنشأ حسابك بعد الموافقة على طلبك. سنراسلك عندها وتختار رمز الدخول في تلك اللحظة — حتى لا نُعِد حسابًا قد لا تتم الموافقة عليه.",
+  "unlockWithFingerprint": "افتح ببصمة الإصبع",
+  "useFingerprintNextTime": "استخدم بصمتك في المرة القادمة",
+  "fingerprintKeepsYourAccountClosed": "تبقى جلستك مقفلة حتى تفتحها، فلا يستطيع من يمسك هاتفك الدخول إلى حسابك.",
+  "fingerprintNotSetUp": "لا توجد بصمة أو فتح بالوجه على هذا الهاتف. أضِف واحدة من إعدادات الهاتف أولًا.",
+  "couldNotVerifyYou": "تعذر التحقق منك. أعد المحاولة أو سجّل الدخول برمز الدخول.",
+  "signInWithPasscodeInstead": "سأستخدم رمز الدخول",
+  "locked": "مقفل",
+  "notNow": "ليس الآن",
+  "turnOn": "تفعيل",
+  "biometricUnlock": "الفتح بالبصمة"
 }

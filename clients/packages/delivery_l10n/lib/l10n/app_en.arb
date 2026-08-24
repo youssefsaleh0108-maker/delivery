@@ -1364,5 +1364,29 @@
   "weWillBeInTouch": "We will read it and be in touch by email.",
   "finishSettingUpInTheApp": "Once you are approved you finish setting up right here in the app — no paperwork, no separate site.",
   "continueAsGuest": "Continue without an account",
-  "guestApplicationExplainer": "You do not need an account to apply. We create one for you when you are approved."
+  "guestApplicationExplainer": "You do not need an account to apply. We create one for you when you are approved.",
+  "codeSentTo": "We sent a 6-digit code to {destination}. It expires in 10 minutes and can be used once.",
+  "@codeSentTo": {
+    "placeholders": {
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "enterTheCode": "Enter the code",
+  "didntGetIt": "Did not get it?",
+  "yourApplicationReference": "Your application reference",
+  "referenceExplainer": "Quote this if you contact us, and use it to check your application at any time. It is not a password and it is not needed to sign in.",
+  "whyNoPasscodeYet": "Why no passcode yet?",
+  "passcodeComesAfterApproval": "Your account is created once your application is approved. We email you then, and you choose your passcode at that point — so nothing is set up for an account that might not be approved.",
+  "unlockWithFingerprint": "Unlock with fingerprint",
+  "useFingerprintNextTime": "Use your fingerprint next time",
+  "fingerprintKeepsYourAccountClosed": "Your session stays locked until you unlock it, so someone holding your phone cannot open your account.",
+  "fingerprintNotSetUp": "This phone has no fingerprint or face unlock set up yet. Add one in your phone settings first.",
+  "couldNotVerifyYou": "We could not verify you. Try again, or sign in with your passcode.",
+  "signInWithPasscodeInstead": "Use my passcode instead",
+  "locked": "Locked",
+  "notNow": "Not now",
+  "turnOn": "Turn on",
+  "biometricUnlock": "Fingerprint unlock"
 }

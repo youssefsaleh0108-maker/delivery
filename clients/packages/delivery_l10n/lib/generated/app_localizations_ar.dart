@@ -2395,4 +2395,62 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get guestApplicationExplainer =>
       'لا تحتاج حسابًا لتقديم الطلب. ننشئ لك حسابًا عند الموافقة.';
+
+  @override
+  String codeSentTo(String destination) {
+    return 'أرسلنا رمزًا من 6 أرقام إلى $destination. ينتهي خلال 10 دقائق ويُستخدم مرة واحدة.';
+  }
+
+  @override
+  String get enterTheCode => 'أدخل الرمز';
+
+  @override
+  String get didntGetIt => 'لم يصلك؟';
+
+  @override
+  String get yourApplicationReference => 'رقم طلبك المرجعي';
+
+  @override
+  String get referenceExplainer =>
+      'اذكره عند التواصل معنا، واستخدمه لمتابعة طلبك في أي وقت. ليس كلمة مرور ولا يُستخدم لتسجيل الدخول.';
+
+  @override
+  String get whyNoPasscodeYet => 'لماذا لا يوجد رمز دخول بعد؟';
+
+  @override
+  String get passcodeComesAfterApproval =>
+      'يُنشأ حسابك بعد الموافقة على طلبك. سنراسلك عندها وتختار رمز الدخول في تلك اللحظة — حتى لا نُعِد حسابًا قد لا تتم الموافقة عليه.';
+
+  @override
+  String get unlockWithFingerprint => 'افتح ببصمة الإصبع';
+
+  @override
+  String get useFingerprintNextTime => 'استخدم بصمتك في المرة القادمة';
+
+  @override
+  String get fingerprintKeepsYourAccountClosed =>
+      'تبقى جلستك مقفلة حتى تفتحها، فلا يستطيع من يمسك هاتفك الدخول إلى حسابك.';
+
+  @override
+  String get fingerprintNotSetUp =>
+      'لا توجد بصمة أو فتح بالوجه على هذا الهاتف. أضِف واحدة من إعدادات الهاتف أولًا.';
+
+  @override
+  String get couldNotVerifyYou =>
+      'تعذر التحقق منك. أعد المحاولة أو سجّل الدخول برمز الدخول.';
+
+  @override
+  String get signInWithPasscodeInstead => 'سأستخدم رمز الدخول';
+
+  @override
+  String get locked => 'مقفل';
+
+  @override
+  String get notNow => 'ليس الآن';
+
+  @override
+  String get turnOn => 'تفعيل';
+
+  @override
+  String get biometricUnlock => 'الفتح بالبصمة';
 }

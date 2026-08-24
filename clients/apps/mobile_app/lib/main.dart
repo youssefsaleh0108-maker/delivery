@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 
+import 'src/biometric_lock.dart';
+import 'src/biometric_lock_screen.dart';
 import 'src/customer_shell.dart';
 import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
@@ -95,6 +97,65 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
   late Future<AuthSession?> _bootstrap = _authService.restore();
 
+  final BiometricLock _biometrics = BiometricLock();
+
+  /// Whether a restored session is still behind the lock screen.
+  ///
+  /// Starts true and is cleared either by a successful unlock or by finding that this account never
+  /// turned the setting on. Starting FALSE would show the app for a frame before locking it, which
+  /// is a frame of somebody else's account.
+  bool _locked = true;
+
+  /// True while the system prompt is up.
+  bool _unlocking = false;
+  String? _lockError;
+
+  /// Set once the checks below have run, so the lock decision is made exactly once per session
+  /// rather than on every rebuild.
+  String? _lockCheckedFor;
+
+  /// Decides whether this session needs unlocking, then unlocks it if so.
+  ///
+  /// Called from the builder rather than initState because it needs the restored session, which is
+  /// not available until the future completes.
+  Future<void> _applyLock(AuthSession session) async {
+    if (_lockCheckedFor == session.subject) return;
+    _lockCheckedFor = session.subject;
+
+    final bool enabled = await _biometrics.isEnabledFor(session.subject);
+    if (!enabled) {
+      if (mounted) setState(() => _locked = false);
+      return;
+    }
+    await _unlock();
+  }
+
+  Future<void> _unlock() async {
+    setState(() {
+      _unlocking = true;
+      _lockError = null;
+    });
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final BiometricResult result =
+        await _biometrics.authenticate(t.unlockWithFingerprint);
+    if (!mounted) return;
+    setState(() {
+      _unlocking = false;
+      switch (result) {
+        case BiometricResult.ok:
+          _locked = false;
+        case BiometricResult.unavailable:
+          // The enrolment went away since this was turned on. Locking somebody out of their own
+          // session over a setting they cannot satisfy would be worse than letting them in — the
+          // phone's own lock screen is still between a stranger and this app.
+          _locked = false;
+        case BiometricResult.refused:
+          _lockError = t.couldNotVerifyYou;
+      }
+    });
+  }
+
+
   /// The chosen language, persisted next to the tokens so it survives a restart. Secure storage is
   /// overkill for a language code, but it is already here and adds no dependency.
   late final LocaleController _locale = LocaleController(
@@ -151,6 +212,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// means — sign-up signs the new account in directly rather than sending them back to a login.
   void _adoptSession(AuthSession session) {
     setState(() {
+      // They just proved who they are with a passcode, so there is nothing to unlock. Leaving this
+      // true would show the lock screen for a moment immediately after a successful sign-in.
+      _locked = false;
+      _lockCheckedFor = session.subject;
+      _lockError = null;
       // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState asserts
       // its callback returns nothing. The assignment still lands, so the symptom is a thrown error
       // immediately after a SUCCESSFUL sign-in — which any enclosing catch then reports as the
@@ -171,6 +237,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   Future<void> _signOut() async {
     await _authService.signOut();
     setState(() {
+      // Re-armed. Without this the next person to sign in on this phone walks straight past the
+      // lock, because _locked would still be false from the session that just ended.
+      _locked = true;
+      _lockError = null;
+      _lockCheckedFor = null;
       // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
       // asserts its callback returns nothing.
       _bootstrap = Future<AuthSession?>.value(null);
@@ -264,6 +335,18 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
           }
 
 
+
+          // Signed in, but possibly not unlocked. The check runs once per session and the screen
+          // below shows nothing about the account it is protecting.
+          if (_locked) {
+            _applyLock(session);
+            return BiometricLockScreen(
+              busy: _unlocking,
+              error: _lockError,
+              onUnlock: _unlock,
+              onUsePasscode: _signOut,
+            );
+          }
 
           // The role branch. A rider's queue wins when an account holds both, because the delivery
           // flow is the one with a time-critical task attached.

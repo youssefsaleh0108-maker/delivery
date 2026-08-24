@@ -24,6 +24,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_secure_storage: ^9.2.2
+  # Fingerprint and face unlock. Only ever used to gate a session that is ALREADY on the device —
+  # it authenticates the person holding the phone, it does not authenticate to the server.
+  local_auth: ^2.3.0
   # Dates on the order page. `any` so it stays pinned to whatever the Flutter SDK resolves for
   # flutter_localizations — a version constraint here would fight it on every SDK bump.
   intl: any

@@ -3,6 +3,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'biometric_lock.dart';
+
 import 'address_sheet.dart';
 import 'delivery_address.dart';
 
@@ -35,6 +37,55 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
+  final BiometricLock _biometrics = BiometricLock();
+
+  /// Null until the two checks below answer. The row is not drawn while it is null rather than
+  /// drawn off — a switch that flicks itself on a moment after the screen opens looks like the app
+  /// changing a security setting by itself.
+  bool? _biometricsEnabled;
+  bool _biometricsAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricState();
+  }
+
+  Future<void> _loadBiometricState() async {
+    final bool available = await _biometrics.isAvailable;
+    final bool enabled = await _biometrics.isEnabledFor(widget.session.subject);
+    if (!mounted) return;
+    setState(() {
+      _biometricsAvailable = available;
+      _biometricsEnabled = enabled;
+    });
+  }
+
+  Future<void> _setBiometrics(bool on) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    // Proved before it is turned on, never after. Enabling on the strength of the sensor merely
+    // existing is how somebody locks themselves out of their own session with a finger the phone
+    // does not actually recognise.
+    if (on) {
+      final BiometricResult result =
+          await _biometrics.authenticate(t.unlockWithFingerprint);
+      if (result != BiometricResult.ok) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result == BiometricResult.unavailable
+              ? t.fingerprintNotSetUp
+              : t.couldNotVerifyYou),
+        ));
+        return;
+      }
+    }
+
+    await _biometrics.setEnabledFor(widget.session.subject, on);
+    if (!mounted) return;
+    setState(() => _biometricsEnabled = on);
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
@@ -75,6 +126,25 @@ class _AccountScreenState extends State<AccountScreen> {
                 onTap: () => showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi),
               ),
             ]),
+            // Only when the phone can actually do it. Showing a disabled switch on a phone with no
+            // sensor is a setting that reads as broken rather than as unavailable.
+            if (_biometricsAvailable && _biometricsEnabled != null) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.md),
+              _card(t.biometricUnlock, <Widget>[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _biometricsEnabled!,
+                  onChanged: _setBiometrics,
+                  secondary:
+                      const Icon(Icons.fingerprint, color: DeliveryColors.muted),
+                  title: Text(t.useFingerprintNextTime,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14.5)),
+                  subtitle: Text(t.fingerprintKeepsYourAccountClosed,
+                      style: const TextStyle(fontSize: 12.5)),
+                ),
+              ]),
+            ],
             const SizedBox(height: DeliverySpacing.lg),
             SizedBox(
               height: 48,

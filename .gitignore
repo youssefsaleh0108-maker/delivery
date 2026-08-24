@@ -51,3 +51,7 @@ Thumbs.db
 # same way config-repo is. Without this git records it as a bare gitlink with no .gitmodules, and a
 # fresh checkout of THIS repo gets an empty directory that the Maven reactor then cannot read.
 /services/order-manager/
+
+# Kotlin compiler session files. Written and deleted while Gradle runs, so a `git add` racing a
+# build fails on a path that existed a moment earlier.
+clients/**/android/.kotlin/

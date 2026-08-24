@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Reaching the Gateway and Keycloak. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Fingerprint and face unlock. Gates a session already on this device; nothing is sent. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
 
     <application
         android:label="MyDelivery"

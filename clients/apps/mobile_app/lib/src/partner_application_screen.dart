@@ -4,6 +4,8 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'one_time_code.dart';
+
 /// Applying to sell or to deliver, from inside the app and before having an account.
 ///
 /// Everything else in this app assumes a signed-in person. This screen cannot: getting an account
@@ -430,13 +432,16 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         ],
         if (sent && !verified) ...<Widget>[
           const SizedBox(height: DeliverySpacing.md),
-          TextField(
+          // The same entry and the same confirmation the shopper's sign-up shows. This used to be a
+          // labelled TextField with a character counter and no word about what had been sent.
+          OneTimeCodeSentNote(destination: field.text.trim()),
+          const SizedBox(height: DeliverySpacing.md),
+          OneTimeCodeField(
             controller: codeField,
-            keyboardType: TextInputType.number,
-            autofillHints: const <String>[AutofillHints.oneTimeCode],
-            maxLength: 6,
-            decoration: InputDecoration(labelText: t.theCodeWeSent),
+            enabled: !_busy,
+            onCompleted: onConfirm,
           ),
+          const SizedBox(height: DeliverySpacing.md),
           PrimaryAction(label: t.verify, onPressed: _busy ? null : onConfirm, busy: _busy),
         ],
         const SizedBox(height: DeliverySpacing.lg),
@@ -565,15 +570,30 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         const SizedBox(height: DeliverySpacing.lg),
         SoftCard(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(t.keepThisReference, style: Theme.of(context).textTheme.bodySmall),
+              Text(t.yourApplicationReference,
+                  style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: DeliverySpacing.xs),
               SelectableText(_reference!,
-                  textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontFamily: 'monospace', fontWeight: FontWeight.w700)),
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16)),
+              const SizedBox(height: DeliverySpacing.sm),
+              // Said here because it was not said anywhere: the screen showed a monospace string
+              // with 'keep this' above it and left people to guess whether it was a password.
+              Text(t.referenceExplainer,
+                  style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        // The other question this screen raised and did not answer. A sign-up asks for a passcode
+        // at the end and an application does not, which reads as a step having been skipped.
+        SoftNote(
+          icon: Icons.lock_clock_outlined,
+          text: '${t.whyNoPasscodeYet} ${t.passcodeComesAfterApproval}',
         ),
         const SizedBox(height: DeliverySpacing.lg),
         PrimaryAction(label: t.done, onPressed: widget.onClose),
