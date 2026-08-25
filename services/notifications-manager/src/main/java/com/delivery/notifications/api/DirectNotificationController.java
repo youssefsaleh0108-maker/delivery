@@ -113,8 +113,8 @@ public class DirectNotificationController {
         }
 
         UUID id = dispatch.sendDirect(
-                NotificationCommand.CHANNEL_PUSH, device, request.subject(), request.body(),
-                request.purpose(), MDC.get("correlationId"));
+                NotificationCommand.CHANNEL_PUSH, device, request.recipientId(), request.subject(),
+                request.body(), request.purpose(), MDC.get("correlationId"));
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(Map.of("notificationId", id.toString()));
     }

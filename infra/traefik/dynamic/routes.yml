@@ -152,6 +152,22 @@ http:
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
+    # Two services own paths under /api/notifications: App Notification serves the in-app inbox at
+    # the prefix, and Notifications Manager owns the direct-send endpoints beneath it. Without this
+    # router the prefix swallows them, and a backoffice call to /api/notifications/direct/push gets
+    # a 404 from a service that never had that endpoint — which reads as "the feature is broken"
+    # rather than "the request went to the wrong place".
+    #
+    # Traefik ranks by rule length, so the longer rule would already win. The priority is explicit
+    # anyway: leaving a routing decision this consequential to an implicit tie-break is what shadowed
+    # the endpoint to begin with, and a future edit to either rule could silently flip it back.
+    notification-direct:
+      rule: PathPrefix(`/api/notifications/direct`)
+      service: notifications-manager
+      priority: 100
+      entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
     # The DLR callback. A carrier's delivery receipt arrives with no token — it cannot have one —
     # and is authenticated by a signature instead. Routed, but nothing else about it is public.
     sms-dlr-webhook:

@@ -166,9 +166,26 @@ public class NotificationDispatchService {
     @Transactional
     public UUID sendDirect(String channel, String recipient, String subject, String body,
                            String purpose, String correlationId) {
-        NotificationLog entry = new NotificationLog(
-                null, ANONYMOUS_RECIPIENT, channel, recipient, purpose, subject, body,
+        return sendDirect(channel, recipient, ANONYMOUS_RECIPIENT, subject, body, purpose,
                 correlationId);
+    }
+
+    /**
+     * As above, for a direct send where the platform DOES know who it is reaching.
+     *
+     * <p>Pushing to an approved applicant resolves their device from their account, so the user id
+     * is in hand and putting {@link #ANONYMOUS_RECIPIENT} on the row would be throwing away a fact
+     * rather than honestly recording the absence of one. It matters twice over: an operator asking
+     * which of a user's addresses have gone dead finds nothing, and a suppression triggered by this
+     * send cannot evict that user's cached contacts — so a token already known to be dead keeps
+     * being handed out until the TTL lapses.
+     */
+    @Transactional
+    public UUID sendDirect(String channel, String recipient, String recipientId, String subject,
+                           String body, String purpose, String correlationId) {
+        NotificationLog entry = new NotificationLog(
+                null, recipientId == null || recipientId.isBlank() ? ANONYMOUS_RECIPIENT : recipientId,
+                channel, recipient, purpose, subject, body, correlationId);
         logs.saveAndFlush(entry);
         send(entry);
         // The address is deliberately absent from this line. A one-time code is sent to prove an

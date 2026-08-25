@@ -3,8 +3,28 @@
 #
 # Four differences, and they are the whole point of a separate file:
 #
-#   1. No `build:`. Images come from Docker Hub at ${IMAGE_TAG}, because the box has no source
-#      checkout and compiling seventeen JVMs on 5.8 GB is not something to attempt.
+#   1. No `build:`. Images are pulled at ${IMAGE_TAG}, because the box has no source checkout and
+#      compiling seventeen JVMs on 5.8 GB is not something to attempt.
+#
+#      They come from ghcr.io, which is where CI actually publishes. It used to say Docker Hub, and
+#      that was the bug: the pipeline pushes to Docker Hub only when DOCKERHUB_TOKEN is set, skips
+#      the step silently when it is not, and reports success either way. With the secret absent,
+#      every green build for days published to a registry nothing pulled from, while this file kept
+#      deploying images that were by then three days stale. A deploy that quietly does nothing is
+#      worse than one that fails, because the run is green and the version looks current.
+#
+#      Both registries are still reachable, and they name images differently — ghcr.io allows a path
+#      (youssefsaleh0108-maker/product-service) where a Hub namespace is flat and needs the repo
+#      itself prefixed (youssefsaleh0108/delivery-product-service). Hence two variables rather than
+#      one. To go back to Docker Hub, set both in .env and add the secret to the repository:
+#
+#          IMAGE_REPO=youssefsaleh0108
+#          IMAGE_NAME_PREFIX=delivery-
+#
+#      The ghcr.io packages are public, so no pull credential is needed here. That is a deliberate
+#      trade: the images carry no secrets — config comes from Vault and the environment at runtime —
+#      but anyone can pull them. Make the packages private and give the host a read token if that
+#      is not wanted.
 #   2. `mem_limit` on everything. Without ceilings the first service to warm up takes the memory
 #      the last one needs, and what dies is decided by whichever the kernel reaches first.
 #   3. Three ports face the internet, not thirty-three. See below.
@@ -338,7 +358,7 @@ services:
     restart: "no"
     networks: [delivery]
   config-server:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-config-server:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}config-server:${IMAGE_TAG:-main}
     container_name: delivery-config-server
     mem_limit: 352m
     restart: unless-stopped
@@ -430,7 +450,7 @@ services:
 
   # ---------------------------------------------------------------- domain services
   product-service:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-product-service:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}product-service:${IMAGE_TAG:-main}
     container_name: delivery-product-service
     mem_limit: 384m
     restart: unless-stopped
@@ -469,7 +489,16 @@ services:
     networks: [delivery]
 
   order-manager:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-order-manager:${IMAGE_TAG:-main}
+    # The one service still on Docker Hub, and deliberately pinned rather than left to the default.
+    #
+    # It lives in its own repository with its own pipeline, and that pipeline has never published a
+    # ghcr.io package under this account — there is no order-manager container package at all. So
+    # the shared default would resolve to an image that does not exist and take the service down.
+    #
+    # This is the thing to fix before the production cutover: the service that owns orders is the
+    # one whose deploys are least reproducible, and it is currently pinned to an image whose build
+    # nobody can point at.
+    image: youssefsaleh0108/delivery-order-manager:${IMAGE_TAG:-main}
     container_name: delivery-order-manager
     mem_limit: 320m
     restart: unless-stopped
@@ -506,7 +535,7 @@ services:
     networks: [delivery]
 
   order-tracking:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-order-tracking:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}order-tracking:${IMAGE_TAG:-main}
     container_name: delivery-order-tracking
     mem_limit: 352m
     restart: unless-stopped
@@ -558,7 +587,7 @@ services:
   # now one.
 
   connector-settings:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-connector-settings:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}connector-settings:${IMAGE_TAG:-main}
     container_name: delivery-connector-settings
     mem_limit: 256m
     restart: unless-stopped
@@ -592,7 +621,7 @@ services:
     networks: [delivery]
 
   notifications-manager:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-notifications-manager:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}notifications-manager:${IMAGE_TAG:-main}
     container_name: delivery-notifications-manager
     mem_limit: 320m
     restart: unless-stopped
@@ -629,7 +658,7 @@ services:
     networks: [delivery]
 
   app-notification:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-app-notification:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}app-notification:${IMAGE_TAG:-main}
     container_name: delivery-app-notification
     mem_limit: 288m
     restart: unless-stopped
@@ -668,7 +697,7 @@ services:
         condition: service_healthy
     networks: [delivery]
   email-connector:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-email-connector:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}email-connector:${IMAGE_TAG:-main}
     container_name: delivery-email-connector
     mem_limit: 320m
     restart: unless-stopped
@@ -719,7 +748,7 @@ services:
     networks: [delivery]
 
   push-connector:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-push-connector:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}push-connector:${IMAGE_TAG:-main}
     container_name: delivery-push-connector
     mem_limit: 320m
     restart: unless-stopped
@@ -750,7 +779,7 @@ services:
     networks: [delivery]
 
   sms-connector:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-sms-connector:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}sms-connector:${IMAGE_TAG:-main}
     container_name: delivery-sms-connector
     mem_limit: 320m
     restart: unless-stopped
@@ -809,7 +838,7 @@ services:
   # so every leg is terminal as it is written rather than waiting on a bank nobody deployed.
 
   accounting-service:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-accounting-service:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}accounting-service:${IMAGE_TAG:-main}
     container_name: delivery-accounting-service
     mem_limit: 288m
     restart: unless-stopped
@@ -843,7 +872,7 @@ services:
         condition: service_healthy
     networks: [delivery]
   whatsapp-service:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-whatsapp-service:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}whatsapp-service:${IMAGE_TAG:-main}
     container_name: delivery-whatsapp-service
     mem_limit: 288m
     restart: unless-stopped
@@ -893,7 +922,7 @@ services:
   # with no token at all, and the only workflow engine. Both are things worth being able to
   # restart, scale and rate-limit on their own.
   onboarding-service:
-    image: ${REGISTRY_NS:-youssefsaleh0108}/delivery-onboarding-service:${IMAGE_TAG:-main}
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}onboarding-service:${IMAGE_TAG:-main}
     container_name: delivery-onboarding-service
     mem_limit: 384m
     restart: unless-stopped
