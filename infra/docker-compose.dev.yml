@@ -294,6 +294,13 @@ services:
     volumes:
       - ./vault/bootstrap.sh:/bootstrap.sh:ro
       - ./vault/policies:/policies:ro
+      # The Firebase service account, if one has been put on the box. Mounted rather than passed
+      # as an environment variable: it is a 2 KB private key, and an env var that size is readable
+      # from docker inspect and from anything that dumps the environment on a crash.
+      #
+      # Optional by design — the file may not exist, and bootstrap.sh falls back to the dev push
+      # provider when it does not, so a fresh clone still comes up.
+      - ./secrets:/run/secrets:ro
     restart: "no"
     networks: [delivery]
   config-server:

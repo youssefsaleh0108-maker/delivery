@@ -55,3 +55,13 @@ Thumbs.db
 # Kotlin compiler session files. Written and deleted while Gradle runs, so a `git add` racing a
 # build fails on a path that existed a moment earlier.
 clients/**/android/.kotlin/
+
+# Real credentials mounted into the stack — the Firebase service account among them. The directory
+# is expected to exist and be empty in a clone; bootstrap.sh falls back to the dev push provider.
+infra/secrets/
+
+# Firebase ADMIN service-account keys. These are SERVER credentials: anything holding one can send
+# push as this project. They must never be in the repo and never inside the app source tree, where
+# a careless assets glob would bundle one into a shipped APK. The app's own google-services.json is
+# a different file and is safe to commit.
+*firebase-adminsdk*.json

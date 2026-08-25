@@ -99,8 +99,27 @@ vault kv put secret/sms-connector \
 # authentication failed" for no change anybody made.
 vault kv put secret/email-connector \
   spring.mail.password="${SMTP_PASSWORD:-}"
-vault kv put secret/push-connector \
-  firebase.service-account-json=""
+# The Firebase service account, read from a file mounted into this container rather than passed as
+# an environment variable. It is a 2 KB JSON document containing a private key: an env var that size
+# shows up in `docker inspect`, in `ps` output and in any crash dump that prints the environment.
+#
+# Same hazard as the mail password above — a hardcoded "" here does not merely leave the slot blank,
+# it ERASES the key on every `compose up`, and push then fails with "credentials are not
+# provisioned" for no change anybody made.
+#
+# The key is the FULL property path. Spring binds a Vault secret by its key name, so the short
+# "firebase.service-account-json" this used to write never matched the
+# "delivery.push.firebase.service-account-json" the client reads — the slot was populated and the
+# client still saw blank. Nobody noticed because the value was empty either way until now.
+if [ -s /run/secrets/firebase-service-account.json ]; then
+  vault kv put secret/push-connector \
+    delivery.push.firebase.service-account-json=@/run/secrets/firebase-service-account.json
+  echo "  push-connector: Firebase service account loaded"
+else
+  vault kv put secret/push-connector \
+    delivery.push.firebase.service-account-json=""
+  echo "  push-connector: no Firebase service account present, push will use the dev provider"
+fi
 # Section 10 gives this path its own policy - it is the most sensitive integration in the system.
 # The simulator key is a dev constant and protects nothing; the real bank's credentials stay empty
 # until the banking agreement exists, and RealBankClient refuses every posting while they are.
