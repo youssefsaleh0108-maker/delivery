@@ -17,6 +17,10 @@ dependencies:
   # Arabic is not optional for this market; a merchant reads their own dashboard.
   delivery_l10n:
     path: ../../packages/delivery_l10n
+  # The merchant pages themselves. Shared with the Android app rather than kept here, because a
+  # shop that applied from their phone may never open this portal at all.
+  delivery_merchant:
+    path: ../../packages/delivery_merchant
   flutter_localizations:
     sdk: flutter
   # Holds the chosen language across reloads; there is nowhere else on web that survives one.

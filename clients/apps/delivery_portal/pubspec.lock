@@ -102,6 +102,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  delivery_merchant:
+    dependency: "direct main"
+    description:
+      path: "../../packages/delivery_merchant"
+      relative: true
+    source: path
+    version: "0.1.0"
   dio:
     dependency: "direct main"
     description:

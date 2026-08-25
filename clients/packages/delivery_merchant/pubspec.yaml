@@ -1,0 +1,34 @@
+name: delivery_merchant
+description: The merchant screens, shared by the Flutter Web portal and the Android app so a shop gets the same pages on either.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  delivery_core:
+    path: ../delivery_core
+  delivery_design_system:
+    path: ../delivery_design_system
+  # Every screen here reads its labels from DeliveryStrings; Arabic is not optional in this market.
+  delivery_l10n:
+    path: ../delivery_l10n
+  # Imported directly for DioException, which is how these screens tell a 404 apart from a dead
+  # connection and word the failure differently.
+  dio: ^5.7.0
+  # Product photos and the shop logo. Chosen over image_picker because it has a real Flutter Web
+  # implementation, and it has an endorsed Android one too — which is what lets these screens run
+  # on the phone unchanged.
+  file_selector: ^1.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

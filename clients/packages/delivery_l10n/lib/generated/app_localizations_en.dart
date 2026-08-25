@@ -2535,4 +2535,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get accountReadySignInInstead =>
       'Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose.';
+
+  @override
+  String get dayByDay => 'Day by day';
 }

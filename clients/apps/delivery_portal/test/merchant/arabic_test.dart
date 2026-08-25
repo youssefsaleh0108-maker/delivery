@@ -8,7 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:delivery_portal/src/merchant/product_list_screen.dart';
+import 'package:delivery_merchant/delivery_merchant.dart';
 
 // This portal had no localisation at all — no delegates, no saved locale, no dependency — while the
 // market it serves reads Arabic. These assert on what a merchant would actually see.

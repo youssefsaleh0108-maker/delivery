@@ -79,6 +79,28 @@ services:
   # Stock nginx over a mounted build rather than an image of its own. The build is static output
   # with no server side to it, and an image would mean a registry round trip on every copy change.
   # Refresh it with infra/deploy-portal.sh.
+  # The public website: landing page, partner registration, and the unadvertised /admin door.
+  #
+  # Static files over stock nginx, the same shape as the portal — there is no build step and no
+  # server side, so deploying it is a file copy.
+  website:
+    image: nginx:1.27-alpine
+    container_name: delivery-website
+    mem_limit: 64m
+    restart: unless-stopped
+    volumes:
+      - ./website/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./website/html:/usr/share/nginx/html:ro
+    healthcheck:
+      # 127.0.0.1, not localhost. In this image localhost resolves to ::1 first and the site listens
+      # on IPv4 only, so the check reported "connection refused" against an nginx that was serving
+      # every real request perfectly — a container marked unhealthy for a reason that was not real.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [delivery]
+
   portal:
     image: nginx:1.27-alpine
     container_name: delivery-portal
@@ -224,6 +246,10 @@ services:
       # working in a desktop browser. Everything that consumes the issuer reads the same variable.
       KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
       KC_HOSTNAME_STRICT: "false"
+      # Behind Traefik, Keycloak must be told to trust the forwarded headers. Without this it builds
+      # every redirect and every issuer from the connection it actually sees — which is plain HTTP
+      # from inside the docker network — and hands out an issuer no client can reach.
+      KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
     ports:
@@ -364,6 +390,10 @@ services:
       - --configFile=/etc/traefik/traefik.yml
     ports:
       - "8100:8100"
+      # Public TLS. 80 exists for the ACME challenge and to redirect to 443; nothing is served
+      # over it. 8100 stays published because every deployed client addresses it by IP.
+      - "80:80"
+      - "443:443"
       # The dashboard and Traefik's own Prometheus metrics. Bound to the loopback interface only —
       # a routing dashboard is useful to whoever runs the platform and to nobody else, and this one
       # would otherwise be reachable from any machine on the network.
@@ -373,6 +403,10 @@ services:
       # rewrite its own routing table is one compromise away from rerouting the platform.
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      # acme.json holds the private keys for every certificate. A named volume rather than a bind
+      # mount: Traefik requires it to be 0600 and a bind mount inherits the host directory mode,
+      # which it then refuses to start with.
+      - traefik-acme:/letsencrypt
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
@@ -895,6 +929,10 @@ volumes:
   redis-data:
   rabbitmq-data:
   minio-data:
+
+  # Certificates and their private keys. Survives a recreate, so a restart does not re-issue and
+  # spend the Let.s Encrypt rate limit.
+  traefik-acme:
 
 networks:
   delivery:

@@ -1414,5 +1414,6 @@
   "pendingBannerRider": "Your application is being reviewed. Look around the board — you can take deliveries once you are approved.",
   "notWhilePending": "You can do this once your application is approved.",
   "viewApplication": "View application",
-  "accountReadySignInInstead": "Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose."
+  "accountReadySignInInstead": "Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose.",
+  "dayByDay": "Day by day"
 }

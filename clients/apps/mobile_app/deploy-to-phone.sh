@@ -8,7 +8,9 @@
 set -euo pipefail
 
 ADB="${ADB:-/c/Users/Administrator/AppData/Local/Android/Sdk/platform-tools/adb.exe}"
-HOST="${PUBLIC_HOST:-94.72.112.156}"
+# The public hostnames, not the IP. TLS terminates at Traefik for both.
+API_HOST="${API_HOST:-api-dev.youdrop.shop}"
+IAM_HOST="${IAM_HOST:-iam-dev.youdrop.shop}"
 APP="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$APP"
@@ -18,10 +20,10 @@ if ! "$ADB" devices | grep -qw device; then
   exit 1
 fi
 
-echo "Building against $HOST..."
+echo "Building against $API_HOST / $IAM_HOST..."
 flutter build apk --release --split-per-abi --target-platform android-arm64 \
-  --dart-define=KEYCLOAK_ISSUER="http://${HOST}:8180/realms/delivery-platform" \
-  --dart-define=API_BASE_URL="http://${HOST}:8100" \
+  --dart-define=KEYCLOAK_ISSUER="https://${IAM_HOST}/realms/delivery-platform" \
+  --dart-define=API_BASE_URL="https://${API_HOST}" \
   | grep -E 'Built|error' || true
 
 APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk

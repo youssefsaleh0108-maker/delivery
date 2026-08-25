@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:delivery_portal/src/merchant/product_list_screen.dart';
+import 'package:delivery_merchant/delivery_merchant.dart';
 
 /// Serves canned JSON without a network or a running backend.
 ///

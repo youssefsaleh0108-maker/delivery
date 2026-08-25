@@ -8,8 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:delivery_portal/src/merchant/whatsapp_draft_panel.dart';
-import 'package:delivery_portal/src/merchant/whatsapp_screen.dart';
+import 'package:delivery_merchant/delivery_merchant.dart';
 
 /// Serves canned JSON without a backend. Shapes copied from real responses captured by
 /// `infra/smoke-test-whatsapp*.js`, so a server-side contract change breaks these tests rather than

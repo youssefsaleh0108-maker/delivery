@@ -4549,6 +4549,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose.'**
   String get accountReadySignInInstead;
+
+  /// No description provided for @dayByDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day by day'**
+  String get dayByDay;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

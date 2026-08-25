@@ -2518,4 +2518,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get accountReadySignInInstead =>
       'حسابك جاهز، لكن تعذّر تسجيل دخولك. أغلق هذه الشاشة وسجّل الدخول ببريدك ورمز الدخول الذي اخترته.';
+
+  @override
+  String get dayByDay => 'يومًا بيوم';
 }

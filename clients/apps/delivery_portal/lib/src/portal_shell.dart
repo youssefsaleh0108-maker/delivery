@@ -1,6 +1,9 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+// The merchant pages are not in this app. The Android app mounts these same widgets, so the rail
+// below is only the portal's framing around them.
+import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:flutter/material.dart';
 
 import 'backoffice/banners_screen.dart';
@@ -12,21 +15,15 @@ import 'backoffice/onboarding_screen.dart';
 import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
 import 'backoffice/settings_screen.dart';
-// Prefixed: both areas have a ZonesScreen, and they are different pages — the Backoffice one
-// administers platform-wide areas, the merchant one picks which of them a shop delivers to.
+// Prefixed: this and delivery_merchant's ZonesScreen share a name and are different pages — the
+// Backoffice one administers platform-wide areas, the merchant one picks which of them a shop
+// delivers to. The prefix goes on this one because it is the local file of the two.
 import 'backoffice/zones_screen.dart' as backoffice;
 import 'carrier/applicants_screen.dart';
 import 'carrier/company_screen.dart';
 import 'carrier/dashboard_screen.dart';
 import 'carrier/earnings_screen.dart';
 import 'carrier/jobs_screen.dart';
-import 'merchant/dashboard_screen.dart';
-import 'merchant/delivery_screen.dart';
-import 'merchant/orders_screen.dart';
-import 'merchant/product_list_screen.dart';
-import 'merchant/store_screen.dart';
-import 'merchant/whatsapp_screen.dart';
-import 'merchant/zones_screen.dart' as merchant;
 
 /// Every API the portal can use, built once in main and handed down.
 ///
@@ -154,7 +151,7 @@ class PortalArea {
         selectedIcon: Icons.map,
         label: (DeliveryStrings t) => t.deliveryAreas,
         build: (PortalApis a, _, __, ___) =>
-            merchant.ZonesScreen(api: a.zone, storeApi: a.store),
+            ZonesScreen(api: a.zone, storeApi: a.store),
       ),
       PortalDestination(
         icon: Icons.store_outlined,

@@ -23,6 +23,25 @@
 
 http:
   middlewares:
+
+    # ---------------------------------------------------------------- ops tools
+    #
+    # One shared login for the dev tools on monitoring-dev. The hash is bcrypt and the plaintext
+    # lives only in .env on the box — it is not in this repository and must not be.
+    ops-auth:
+      basicAuth:
+        users:
+          - "ops:$2y$05$jZ..JpeOHQUdnP1p5AzPBuNp8CaAPY0WDkWiQ5mBdtZKiJtKH3caG"
+
+    # The tools are mounted under /rabbitmq, /mailpit and /minio, but each one believes it owns the
+    # root of its origin. Without stripping the prefix every asset they reference 404s and the page
+    # renders unstyled or blank.
+    strip-ops-prefix:
+      stripPrefix:
+        prefixes:
+          - "/rabbitmq"
+          - "/mailpit"
+          - "/minio"
     platform-cors:
       headers:
         # localhost and 127.0.0.1 are different origins to a browser. Both, or one of the portals
@@ -72,7 +91,7 @@ http:
         || PathPrefix(`/api/stores`) || PathPrefix(`/api/banners`)
         || PathPrefix(`/api/delivery-zones`)
       service: product-service
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ order-manager (8101)
     order-manager:
@@ -80,44 +99,44 @@ http:
         PathPrefix(`/api/orders`) || PathPrefix(`/api/butler`)
         || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`)
       service: order-manager
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ order-tracking (8102)
     order-tracking:
       rule: PathPrefix(`/api/tracking`)
       service: order-tracking
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # Websockets need no special handling in Traefik — it upgrades in place, where the Spring
     # gateway needed a separate ws:// route for the same path family.
     order-tracking-ws:
       rule: PathPrefix(`/ws/tracking`)
       service: order-tracking
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ app-notification (8108)
     app-notification:
       rule: PathPrefix(`/api/notifications`)
       service: app-notification
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     app-notification-ws:
       rule: PathPrefix(`/ws/notifications`)
       service: app-notification
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ notifications-manager (8104)
     notification-log:
       rule: PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`)
       service: notifications-manager
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # The DLR callback. A carrier's delivery receipt arrives with no token — it cannot have one —
     # and is authenticated by a signature instead. Routed, but nothing else about it is public.
     sms-dlr-webhook:
       rule: PathPrefix(`/webhooks/dlr`)
       service: notifications-manager
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ accounting-service (8115)
     accounting-service:
@@ -126,30 +145,30 @@ http:
       # carrier can actually convert into money.
       rule: PathPrefix(`/api/accounting`) || PathPrefix(`/api/points`)
       service: accounting-service
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ connector-settings (8109)
     connector-settings:
       rule: PathPrefix(`/api/settings/connectors`)
       service: connector-settings
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ whatsapp-service (8116)
     whatsapp-service:
       rule: PathPrefix(`/api/whatsapp`)
       service: whatsapp-service
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     whatsapp-webhook:
       rule: PathPrefix(`/webhooks/whatsapp`)
       service: whatsapp-service
-      entryPoints: [web]
+      entryPoints: [web, https]
 
     # ------------------------------------------------------------------ onboarding-service (8117)
     onboarding-service:
       rule: PathPrefix(`/api/onboarding`)
       service: onboarding-service
-      entryPoints: [web]
+      entryPoints: [web, https]
 
   # NOTE ON WHAT IS ABSENT.
   #
@@ -158,6 +177,81 @@ http:
   # only on the internal network; a route would put them behind the same door as the customer app.
   # The simulator additionally carries a fault-injection endpoint — "break the bank connection"
   # does not belong on the public edge at any price.
+
+    # ================================================================ TLS by hostname
+    #
+    # These carry a Host rule; the API routers above do not, because their paths (/api/*) already
+    # say which service they mean and adding a hostname to each would mean maintaining the same
+    # rule twice.
+
+
+    # ------------------------------------------------------------------ the public website
+    #
+    # Four hostnames, because this site has two futures and both should work.
+    #
+    # app-dev is reachable today. The apex and www are declared too, so that repointing them from
+    # the GoDaddy Website Builder to this box is a DNS change and nothing else — no config edit, no
+    # restart, and a certificate that is already waiting.
+    website-tls:
+      rule: >-
+        Host(`app-dev.youdrop.shop`) || Host(`youdrop.shop`)
+        || Host(`www.youdrop.shop`)
+      service: website
+      entryPoints: [https]
+    # ------------------------------------------------------------------ Keycloak, on iam-dev
+    #
+    # Every path, because Keycloak owns its whole origin: /realms, /resources, the account console
+    # and the admin console all live under it.
+    #
+    # KEYCLOAK_PUBLIC_URL must match this exactly. Keycloak stamps one issuer into every token, and
+    # a token whose iss differs from what the services expect is refused at the gateway — which
+    # presents as an auth failure rather than an addressing one, and is expensive to diagnose.
+    keycloak-tls:
+      rule: Host(`iam-dev.youdrop.shop`)
+      service: keycloak
+      entryPoints: [https]
+
+    # ------------------------------------------------------------------ the portal, on portal-dev
+    portal-tls:
+      rule: Host(`portal-dev.youdrop.shop`)
+      service: portal
+      entryPoints: [https]
+
+    # ------------------------------------------------------------------ ops tools, on monitoring-dev
+    #
+    # ALL of these sit behind basic auth, and that is not decoration. The mail sink holds every
+    # verification code the platform issues, in plain text; the broker console can publish, purge
+    # and delete queues; the object store console can read and delete every uploaded file. Any one
+    # of them open to the internet is a full compromise of something.
+    #
+    # Basic auth over TLS is the floor, not a good answer. It is one shared password with no second
+    # factor and no per-person audit trail. It is here because it is the strongest thing Traefik can
+    # do without an identity provider in front, and these are dev tools on a dev box.
+    rabbitmq-tls:
+      rule: Host(`monitoring-dev.youdrop.shop`) && PathPrefix(`/rabbitmq`)
+      service: rabbitmq
+      entryPoints: [https]
+      middlewares: [ops-auth@file, strip-ops-prefix@file]
+
+    mailpit-tls:
+      rule: Host(`monitoring-dev.youdrop.shop`) && PathPrefix(`/mailpit`)
+      service: mailpit
+      entryPoints: [https]
+      middlewares: [ops-auth@file, strip-ops-prefix@file]
+
+    minio-tls:
+      rule: Host(`monitoring-dev.youdrop.shop`) && PathPrefix(`/minio`)
+      service: minio-console
+      entryPoints: [https]
+      middlewares: [ops-auth@file, strip-ops-prefix@file]
+
+    # The landing page at the root of monitoring-dev, so somebody arriving there is told what is
+    # under it rather than meeting a 404.
+    ops-index-tls:
+      rule: Host(`monitoring-dev.youdrop.shop`) && Path(`/`)
+      service: ops-index
+      entryPoints: [https]
+      middlewares: [ops-auth@file]
   services:
     product-service:
       loadBalancer:
@@ -203,3 +297,46 @@ http:
       loadBalancer:
         servers:
           - url: http://onboarding-service:8117
+
+    # ---------------------------------------------------------------- TLS-only backends
+    #
+    # Reachable only through the hostname routers above, never from the 8100 entrypoint, and never
+    # published to the host. The container ports here are the INTERNAL ones — 8180, 8200 and 8025
+    # are host-side publications and mean nothing inside this network.
+    keycloak:
+      loadBalancer:
+        servers:
+          - url: http://keycloak:8080
+
+    portal:
+      loadBalancer:
+        servers:
+          - url: http://portal:8200
+
+    rabbitmq:
+      loadBalancer:
+        servers:
+          - url: http://rabbitmq:15672
+
+    mailpit:
+      loadBalancer:
+        servers:
+          - url: http://mailpit:8025
+
+    minio-console:
+      loadBalancer:
+        servers:
+          - url: http://minio:9001
+
+    # A single static page listing what lives under this hostname. Traefik cannot serve a file, so
+    # it is the portal's nginx answering a path that returns its own index — good enough for a
+    # signpost and one less container to run.
+    ops-index:
+      loadBalancer:
+        servers:
+          - url: http://portal:8200
+
+    website:
+      loadBalancer:
+        servers:
+          - url: http://website:80

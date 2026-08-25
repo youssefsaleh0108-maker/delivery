@@ -27,6 +27,42 @@ entryPoints:
   traefik:
     address: ":8099"
 
+  # ---------------------------------------------------------------- public TLS
+  #
+  # 8100 above stays exactly as it was. Everything already deployed — the phones in testers' hands,
+  # every dart-define in the repo, every smoke suite — addresses that port by IP, and breaking them
+  # to add TLS would be trading a working system for a certificate.
+  #
+  # These two are additive: the same services, reachable by hostname over HTTPS.
+
+  # Port 80 exists for two reasons, and only two: Let's Encrypt's HTTP-01 challenge has to land
+  # somewhere, and anybody typing the bare hostname has to end up on TLS rather than on a blank
+  # page. Everything else it receives is redirected.
+  http:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: https
+          scheme: https
+          permanent: true
+
+  https:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+        # Named explicitly because the API routers match on PATH, not on host — their rules are
+        # /api/* and say nothing about a hostname. Traefik asks the CA for a certificate per
+        # hostname it finds in a Host rule, so without this list api-dev would be served the
+        # built-in self-signed certificate and every client would refuse it.
+        domains:
+          - main: api-dev.youdrop.shop
+          - main: iam-dev.youdrop.shop
+          - main: portal-dev.youdrop.shop
+          - main: monitoring-dev.youdrop.shop
+          - main: app-dev.youdrop.shop
+
 providers:
   file:
     directory: /etc/traefik/dynamic
@@ -63,3 +99,22 @@ accessLog:
         X-Correlation-Id: keep
         User-Agent: keep
         Content-Type: keep
+
+# ---------------------------------------------------------------- certificates
+#
+# Let's Encrypt over the HTTP-01 challenge, which needs two things to be true: every hostname below
+# must resolve to THIS box, and port 80 must reach it. A name that resolves anywhere else fails
+# validation, and five failures per hostname per hour is all Let's Encrypt allows.
+#
+# Production. Staging was used first to prove the chain — DNS, port 80, the challenge, the routers
+# — without spending the production rate limit, which allows only five failed validations per
+# hostname per hour and is easy to exhaust while DNS is still being sorted out. Put the staging
+# caServer back if any of that ever needs re-testing:
+#   caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: youssef.saleh0108@gmail.com
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: http

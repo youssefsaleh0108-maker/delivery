@@ -16,6 +16,12 @@ dependencies:
     path: ../../packages/delivery_design_system
   delivery_l10n:
     path: ../../packages/delivery_l10n
+  # The same merchant pages the web portal shows. A shop can apply and be signed in from the phone,
+  # so the phone is often the only device they have — telling them to find a desktop browser to
+  # price a delivery zone is not an answer. Depended on before any screen is wired up, so the
+  # Android build is proved to resolve it.
+  delivery_merchant:
+    path: ../../packages/delivery_merchant
   # Used directly to build the shared Dio instance in main.dart.
   dio: ^5.7.0
   # Both are imported directly here — the localisation delegates in main.dart and the saved
