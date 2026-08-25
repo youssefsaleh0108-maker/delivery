@@ -4319,7 +4319,7 @@ abstract class DeliveryStrings {
   /// No description provided for @finishSettingUpInTheApp.
   ///
   /// In en, this message translates to:
-  /// **'Once you are approved you finish setting up right here in the app — no paperwork, no separate site.'**
+  /// **'Set your shop up now and look around. Publishing to the market unlocks once you are approved.'**
   String get finishSettingUpInTheApp;
 
   /// No description provided for @continueAsGuest.
@@ -4331,7 +4331,7 @@ abstract class DeliveryStrings {
   /// No description provided for @guestApplicationExplainer.
   ///
   /// In en, this message translates to:
-  /// **'You do not need an account to apply. We create one for you when you are approved.'**
+  /// **'No account needed to apply. You choose a passcode at the end and can sign in straight away, then watch your application while we read it.'**
   String get guestApplicationExplainer;
 
   /// No description provided for @codeSentTo.
@@ -4363,18 +4363,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Quote this if you contact us, and use it to check your application at any time. It is not a password and it is not needed to sign in.'**
   String get referenceExplainer;
-
-  /// No description provided for @whyNoPasscodeYet.
-  ///
-  /// In en, this message translates to:
-  /// **'Why no passcode yet?'**
-  String get whyNoPasscodeYet;
-
-  /// No description provided for @passcodeComesAfterApproval.
-  ///
-  /// In en, this message translates to:
-  /// **'Your account is created once your application is approved. We email you then, and you choose your passcode at that point — so nothing is set up for an account that might not be approved.'**
-  String get passcodeComesAfterApproval;
 
   /// No description provided for @unlockWithFingerprint.
   ///
@@ -4555,6 +4543,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'View application'**
   String get viewApplication;
+
+  /// No description provided for @accountReadySignInInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose.'**
+  String get accountReadySignInInstead;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

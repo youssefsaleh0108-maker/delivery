@@ -1362,9 +1362,9 @@
   "yourNameAsOwner": "Your name",
   "anythingWeShouldKnowMerchant": "Anything we should know? (optional)",
   "weWillBeInTouch": "We will read it and be in touch by email.",
-  "finishSettingUpInTheApp": "Once you are approved you finish setting up right here in the app — no paperwork, no separate site.",
+  "finishSettingUpInTheApp": "Set your shop up now and look around. Publishing to the market unlocks once you are approved.",
   "continueAsGuest": "Continue without an account",
-  "guestApplicationExplainer": "You do not need an account to apply. We create one for you when you are approved.",
+  "guestApplicationExplainer": "No account needed to apply. You choose a passcode at the end and can sign in straight away, then watch your application while we read it.",
   "codeSentTo": "We sent a 6-digit code to {destination}. It expires in 10 minutes and can be used once.",
   "@codeSentTo": {
     "placeholders": {
@@ -1377,8 +1377,6 @@
   "didntGetIt": "Did not get it?",
   "yourApplicationReference": "Your application reference",
   "referenceExplainer": "Quote this if you contact us, and use it to check your application at any time. It is not a password and it is not needed to sign in.",
-  "whyNoPasscodeYet": "Why no passcode yet?",
-  "passcodeComesAfterApproval": "Your account is created once your application is approved. We email you then, and you choose your passcode at that point — so nothing is set up for an account that might not be approved.",
   "unlockWithFingerprint": "Unlock with fingerprint",
   "useFingerprintNextTime": "Use your fingerprint next time",
   "fingerprintKeepsYourAccountClosed": "Your session stays locked until you unlock it, so someone holding your phone cannot open your account.",
@@ -1415,5 +1413,6 @@
   "pendingBannerMerchant": "Your application is being reviewed. Set your shop up now — you can publish to the market once you are approved.",
   "pendingBannerRider": "Your application is being reviewed. Look around the board — you can take deliveries once you are approved.",
   "notWhilePending": "You can do this once your application is approved.",
-  "viewApplication": "View application"
+  "viewApplication": "View application",
+  "accountReadySignInInstead": "Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose."
 }

@@ -90,6 +90,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   String _passcode = '';
   String _confirmPasscode = '';
 
+  /// True once the account exists. Creating it is not retryable — the server refuses a second
+  /// sign-in for one application — so a later failure must retry the sign-in alone.
+  bool _accountCreated = false;
+
   bool get _isRider => widget.kind == PartnerKind.rider;
 
   @override
@@ -621,6 +625,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   }
 
   /// Creates the applicant's account and signs them in with the passcode they just chose.
+  ///
+  /// The two halves are tracked separately. The account is created ONCE — retrying its creation
+  /// fails, because the application already has a sign-in — so a failure after that point must
+  /// retry only the sign-in. Without that distinction a single hiccup left somebody typing their
+  /// passcode over and over against a call that could never succeed again.
   Future<void> _finishAccount() async {
     final DeliveryStrings t = DeliveryStrings.of(context);
     if (_passcode.length != PasscodePad.passcodeLength) {
@@ -641,18 +650,28 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       _error = null;
     });
     try {
-      await widget.api.createApplicantAccount(
-        reference: _reference!,
-        password: _passcode,
-      );
+      if (!_accountCreated) {
+        await widget.api.createApplicantAccount(
+          reference: _reference!,
+          password: _passcode,
+        );
+        _accountCreated = true;
+      }
+
       final AuthSession session =
           await widget.authService.signInWithPassword(_verifiedEmail!, _passcode);
       widget.onSignedIn(session);
-    } catch (e) {
+    } catch (e, stack) {
+      // Without this the cause never leaves the device: the screen says one sentence, and a
+      // Keycloak refusal and a network failure look identical in it.
+      debugPrint('APPLICANT SIGN-IN FAILED (accountCreated=$_accountCreated): $e');
+      debugPrintStack(stackTrace: stack, label: 'applicant-sign-in');
       setState(() {
-        // The application is already in. Saying so matters: without it this reads as the whole
-        // thing having failed, and somebody would apply a second time.
-        _error = '${t.couldNotCreateSignIn} ${_messageFrom(e)}';
+        // Two genuinely different situations, and telling them apart is the difference between
+        // "try again" and "stop typing, you already have an account".
+        _error = _accountCreated
+            ? '${t.accountReadySignInInstead} ${_messageFrom(e)}'
+            : '${t.couldNotCreateSignIn} ${_messageFrom(e)}';
         _confirmPasscode = '';
       });
     } finally {

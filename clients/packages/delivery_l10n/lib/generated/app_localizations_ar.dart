@@ -2387,14 +2387,14 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get finishSettingUpInTheApp =>
-      'بعد الموافقة تُكمل الإعداد هنا في التطبيق — بلا أوراق ولا موقع منفصل.';
+      'جهّز متجرك الآن وتصفّح كل شيء. يُفتح النشر في السوق بعد الموافقة.';
 
   @override
   String get continueAsGuest => 'المتابعة بدون حساب';
 
   @override
   String get guestApplicationExplainer =>
-      'لا تحتاج حسابًا لتقديم الطلب. ننشئ لك حسابًا عند الموافقة.';
+      'لا تحتاج حسابًا لتقديم الطلب. تختار رمز الدخول في النهاية وتستطيع الدخول فورًا ومتابعة طلبك أثناء مراجعتنا له.';
 
   @override
   String codeSentTo(String destination) {
@@ -2413,13 +2413,6 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get referenceExplainer =>
       'اذكره عند التواصل معنا، واستخدمه لمتابعة طلبك في أي وقت. ليس كلمة مرور ولا يُستخدم لتسجيل الدخول.';
-
-  @override
-  String get whyNoPasscodeYet => 'لماذا لا يوجد رمز دخول بعد؟';
-
-  @override
-  String get passcodeComesAfterApproval =>
-      'يُنشأ حسابك بعد الموافقة على طلبك. سنراسلك عندها وتختار رمز الدخول في تلك اللحظة — حتى لا نُعِد حسابًا قد لا تتم الموافقة عليه.';
 
   @override
   String get unlockWithFingerprint => 'افتح ببصمة الإصبع';
@@ -2521,4 +2514,8 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get viewApplication => 'عرض الطلب';
+
+  @override
+  String get accountReadySignInInstead =>
+      'حسابك جاهز، لكن تعذّر تسجيل دخولك. أغلق هذه الشاشة وسجّل الدخول ببريدك ورمز الدخول الذي اخترته.';
 }

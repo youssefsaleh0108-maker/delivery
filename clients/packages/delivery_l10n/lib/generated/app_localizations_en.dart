@@ -2402,14 +2402,14 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get finishSettingUpInTheApp =>
-      'Once you are approved you finish setting up right here in the app — no paperwork, no separate site.';
+      'Set your shop up now and look around. Publishing to the market unlocks once you are approved.';
 
   @override
   String get continueAsGuest => 'Continue without an account';
 
   @override
   String get guestApplicationExplainer =>
-      'You do not need an account to apply. We create one for you when you are approved.';
+      'No account needed to apply. You choose a passcode at the end and can sign in straight away, then watch your application while we read it.';
 
   @override
   String codeSentTo(String destination) {
@@ -2428,13 +2428,6 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get referenceExplainer =>
       'Quote this if you contact us, and use it to check your application at any time. It is not a password and it is not needed to sign in.';
-
-  @override
-  String get whyNoPasscodeYet => 'Why no passcode yet?';
-
-  @override
-  String get passcodeComesAfterApproval =>
-      'Your account is created once your application is approved. We email you then, and you choose your passcode at that point — so nothing is set up for an account that might not be approved.';
 
   @override
   String get unlockWithFingerprint => 'Unlock with fingerprint';
@@ -2538,4 +2531,8 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get viewApplication => 'View application';
+
+  @override
+  String get accountReadySignInInstead =>
+      'Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose.';
 }
