@@ -15,6 +15,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
+import com.delivery.notifications.domain.SuppressedAddressRepository;
 import com.delivery.platform.notifications.NotificationCommand;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -32,6 +33,11 @@ import com.fasterxml.jackson.databind.JsonNode;
  * <p>Results are cached briefly. Without it, a five-notification order would make five identical
  * admin-API calls, and Keycloak's admin API is not built for that rate — but the TTL is short
  * enough that a customer who corrects their phone number is not sent to the old one for long.
+ *
+ * <p>Addresses a provider has reported dead are dropped here, on the way out. Keycloak stays the
+ * source of truth for what a user's address is; the suppression table records what the platform has
+ * learnt about whether it still works. Filtering at resolution time rather than editing the user is
+ * what lets this service keep {@code view-users} and no write scope at all.
  */
 @Service
 public class RecipientDirectory {
@@ -50,6 +56,7 @@ public class RecipientDirectory {
     private static final String DEVICE_TOKEN_ATTRIBUTE = "fcmToken";
 
     private final RestClient keycloak;
+    private final SuppressedAddressRepository suppressed;
     private final String realm;
     private final String clientId;
     private final String clientSecret;
@@ -60,16 +67,30 @@ public class RecipientDirectory {
 
     public RecipientDirectory(
             RestClient.Builder builder,
+            SuppressedAddressRepository suppressed,
             @Value("${delivery.notifications.keycloak.base-url:http://localhost:8180}") String baseUrl,
             @Value("${delivery.notifications.keycloak.realm:delivery-platform}") String realm,
             @Value("${delivery.notifications.keycloak.client-id:notifications-manager}") String clientId,
             @Value("${delivery.notifications.keycloak.client-secret:}") String clientSecret,
             @Value("${delivery.notifications.recipient-cache-ttl:5m}") Duration cacheTtl) {
         this.keycloak = builder.baseUrl(baseUrl).build();
+        this.suppressed = suppressed;
         this.realm = realm;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.cacheTtl = cacheTtl;
+    }
+
+    /**
+     * Forgets a cached lookup, so a just-suppressed address is not handed out for the rest of the
+     * TTL.
+     *
+     * <p>Cheap because it is rare: suppression happens when a device dies, not per notification.
+     */
+    public void evict(String userId) {
+        if (userId != null) {
+            cache.remove(userId);
+        }
     }
 
     /**
@@ -129,7 +150,40 @@ public class RecipientDirectory {
             log.warn("Could not read contacts for {} from Keycloak: {}", userId, e.getMessage());
         }
 
+        dropSuppressed(contacts, userId);
         return contacts;
+    }
+
+    /**
+     * Removes addresses a provider has already reported as dead.
+     *
+     * <p>Failing open is deliberate. If the suppression table cannot be read, the platform sends to
+     * an address that may be dead — one wasted send, logged. The alternative, failing closed, would
+     * silently mute every channel for every user on a database hiccup, which is a far worse outcome
+     * than a redundant push.
+     */
+    private void dropSuppressed(Map<String, String> contacts, String userId) {
+        // IN_APP is addressed by user id and has no provider to declare it undeliverable, so it is
+        // never suppressed — and keeping it out of the query means a user whose every external
+        // address has died can still be reached in the app.
+        Map<String, String> external = new HashMap<>(contacts);
+        external.remove(NotificationCommand.CHANNEL_IN_APP);
+        if (external.isEmpty()) {
+            return;
+        }
+
+        for (Map.Entry<String, String> entry : external.entrySet()) {
+            try {
+                if (!suppressed.suppressedAmong(entry.getKey(), java.util.List.of(entry.getValue()))
+                        .isEmpty()) {
+                    contacts.remove(entry.getKey());
+                    log.debug("Skipping {} for {}: address is suppressed", entry.getKey(), userId);
+                }
+            } catch (Exception e) {
+                log.warn("Could not check suppression for {} on {}: {}",
+                        userId, entry.getKey(), e.getMessage());
+            }
+        }
     }
 
     /** Keycloak returns user attributes as arrays, even when single-valued. */

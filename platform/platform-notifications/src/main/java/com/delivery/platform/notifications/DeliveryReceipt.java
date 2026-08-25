@@ -22,6 +22,7 @@ public record DeliveryReceipt(
         String provider,
         boolean success,
         boolean deadLettered,
+        boolean addressInvalid,
         String providerMessageId,
         String failureReason,
         Instant occurredAt) {
@@ -40,6 +41,7 @@ public record DeliveryReceipt(
                 outcome.success(),
                 // Exhausted or permanent: either way nothing further will be attempted for it.
                 !outcome.success() && !outcome.retryable(),
+                outcome.addressInvalid(),
                 outcome.providerMessageId(),
                 outcome.failureReason(),
                 Instant.now());

@@ -133,15 +133,24 @@ public class FirebasePushClient implements ProviderClient {
      *
      * <p>Getting this wrong in the permanent direction drops real notifications, and in the
      * transient direction retries every uninstalled app forever.
+     *
+     * <p>Three of the permanent codes condemn the TOKEN rather than the message, and are reported as
+     * such so the platform stops addressing a device that is gone. {@code THIRD_PARTY_AUTH_ERROR} is
+     * deliberately not among them: it means this sender's APNs credentials are wrong, which is our
+     * configuration problem, and discarding every Apple token on the strength of it would turn a
+     * fixable outage into permanent data loss.
      */
     private DeliveryOutcome classify(FirebaseMessagingException e) {
         MessagingErrorCode code = e.getMessagingErrorCode();
-        boolean permanent = code == MessagingErrorCode.UNREGISTERED
+        boolean tokenIsDead = code == MessagingErrorCode.UNREGISTERED
                 || code == MessagingErrorCode.INVALID_ARGUMENT
-                || code == MessagingErrorCode.SENDER_ID_MISMATCH
-                || code == MessagingErrorCode.THIRD_PARTY_AUTH_ERROR;
+                || code == MessagingErrorCode.SENDER_ID_MISMATCH;
+        boolean permanent = tokenIsDead || code == MessagingErrorCode.THIRD_PARTY_AUTH_ERROR;
 
         String reason = (code == null ? "UNKNOWN" : code.name()) + ": " + e.getMessage();
+        if (tokenIsDead) {
+            return DeliveryOutcome.invalidAddress(NAME, reason);
+        }
         return permanent
                 ? DeliveryOutcome.permanentFailure(NAME, reason)
                 : DeliveryOutcome.transientFailure(NAME, reason);

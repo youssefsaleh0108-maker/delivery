@@ -13,26 +13,46 @@ package com.delivery.platform.notifications;
  * active provider is a runtime setting the connector owns (Section 8). Without it, "which vendor
  * did this go through" is unanswerable from the notification log, which is the one place someone
  * looks after a switch.
+ *
+ * <p>{@code addressInvalid} is a narrower claim than {@code !retryable}: not merely "this attempt
+ * will never succeed" but "this ADDRESS will never work again, for any message". A provider outage
+ * that exhausts its retries is permanent for the message and says nothing about the recipient; an
+ * uninstalled app or a disconnected number condemns the address itself. Only the second is grounds
+ * for the platform to stop using an address it was given, which is why it needs its own flag rather
+ * than being inferred from the failure text.
  */
 public record DeliveryOutcome(
         boolean success,
         boolean retryable,
+        boolean addressInvalid,
         String provider,
         String providerMessageId,
         String failureReason) {
 
     public static DeliveryOutcome sent(String provider, String providerMessageId) {
-        return new DeliveryOutcome(true, false, provider, providerMessageId, null);
+        return new DeliveryOutcome(true, false, false, provider, providerMessageId, null);
     }
 
     /** Transient: rate limit, timeout, provider 5xx. Worth retrying with backoff. */
     public static DeliveryOutcome transientFailure(String provider, String reason) {
-        return new DeliveryOutcome(false, true, provider, null, reason);
+        return new DeliveryOutcome(false, true, false, provider, null, reason);
     }
 
-    /** Permanent: malformed recipient, rejected content, unknown device token. Do not retry. */
+    /** Permanent: rejected content, provider refusal. Do not retry, but the address may be fine. */
     public static DeliveryOutcome permanentFailure(String provider, String reason) {
-        return new DeliveryOutcome(false, false, provider, null, reason);
+        return new DeliveryOutcome(false, false, false, provider, null, reason);
+    }
+
+    /**
+     * The address itself is dead: app uninstalled, token rotated, number disconnected.
+     *
+     * <p>Permanent like {@link #permanentFailure}, and additionally a signal to stop addressing this
+     * recipient here. Without acting on it, one uninstall produces a failed notification for every
+     * message that user is ever sent again — each one indistinguishable, in the "what is stuck"
+     * view, from a delivery problem somebody needs to look at.
+     */
+    public static DeliveryOutcome invalidAddress(String provider, String reason) {
+        return new DeliveryOutcome(false, false, true, provider, null, reason);
     }
 
     /**
@@ -42,10 +62,10 @@ public record DeliveryOutcome(
      * the idempotency key is what makes retrying that safe.
      */
     public static DeliveryOutcome transientFailure(String reason) {
-        return new DeliveryOutcome(false, true, null, null, reason);
+        return new DeliveryOutcome(false, true, false, null, null, reason);
     }
 
     public static DeliveryOutcome permanentFailure(String reason) {
-        return new DeliveryOutcome(false, false, null, null, reason);
+        return new DeliveryOutcome(false, false, false, null, null, reason);
     }
 }
