@@ -11,12 +11,13 @@ entryPoints:
   # than a rename across four apps and a website.
   web:
     address: ":8100"
-    http:
-      middlewares:
-        - platform-cors@file
-        - platform-rate-limit@file
-        - strip-identity-headers@file
-        - security-headers@file
+    # The middleware chain lives on the API ROUTERS now, not here. It used to hang off this
+    # entrypoint, which meant it applied to 8100 and to nothing else — so the moment the same
+    # services started answering on 443 they answered without CORS, and every browser call from the
+    # website failed its preflight with a 403 and no headers to explain why.
+    #
+    # On the routers it follows the API wherever the API is served, and it stays off Keycloak, the
+    # portal and the website, which set their own headers and must not be given a second set.
 
   # Traefik's own metrics and dashboard, on a port that is not the public one. The dashboard is
   # useful and is emphatically not something to serve beside the customer API.
@@ -49,6 +50,12 @@ entryPoints:
 
   https:
     address: ":443"
+    # HTTP/3, because the round trip to this box is roughly 240ms and TLS costs a whole extra one.
+    # QUIC folds the transport and TLS handshakes together, so a first connection is one round trip
+    # rather than two — worth about a quarter of a second on every cold connection from the region
+    # these users are actually in. Clients that do not speak it stay on HTTP/2 over TCP.
+    http3:
+      advertisedPort: 443
     http:
       tls:
         certResolver: letsencrypt
@@ -61,7 +68,11 @@ entryPoints:
           - main: iam-dev.youdrop.shop
           - main: portal-dev.youdrop.shop
           - main: monitoring-dev.youdrop.shop
-          - main: app-dev.youdrop.shop
+          # www is where the public site lives. app-dev was dropped: it has no DNS record, and
+          # every retry against a name that does not exist spends the five-failures-per-hour
+          # budget for the whole account. The apex is out for the same reason — it still answers
+          # from the GoDaddy Website Builder.
+          - main: www.youdrop.shop
 
 providers:
   file:

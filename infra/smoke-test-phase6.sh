@@ -208,14 +208,14 @@ echo '=== 7. Real traffic still flows on the primary ===========================
 
 # The cutover machinery must not have broken ordinary sending. Cheapest possible end-to-end proof:
 # a real notification through the real connector to the real dev inbox.
-BEFORE=$(curl -s "http://mailpit:8025/api/v1/messages?limit=1" | jq '.messages_count')
+BEFORE=$(curl -s "http://mailpit:8025/mailpit/api/v1/messages?limit=1" | jq '.messages_count')
 curl -s -o /dev/null -X POST "$SMS/api/connector/send" -H 'Content-Type: application/json' \
   -d "{\"notificationId\":\"$(date +%s)-phase6\",\"channel\":\"SMS\",\"recipient\":\"+15550100001\",
        \"subject\":null,\"body\":\"phase 6 smoke\",\"metadata\":{},\"correlationId\":\"phase6\",
        \"createdAt\":\"2026-01-01T00:00:00Z\"}"
-wait_for 30 "[ \"\$(curl -s 'http://mailpit:8025/api/v1/messages?limit=1' | jq '.messages_count')\" -gt $BEFORE ]" || true
+wait_for 30 "[ \"\$(curl -s 'http://mailpit:8025/mailpit/api/v1/messages?limit=1' | jq '.messages_count')\" -gt $BEFORE ]" || true
 check 'a real SMS still reaches the inbox'   'yes' \
-  "$(curl -s "http://mailpit:8025/api/v1/messages?limit=1" \
+  "$(curl -s "http://mailpit:8025/mailpit/api/v1/messages?limit=1" \
      | jq --argjson b "$BEFORE" '.messages_count > $b' | sed 's/true/yes/;s/false/no/')"
 
 echo

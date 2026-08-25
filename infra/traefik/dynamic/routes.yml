@@ -33,22 +33,36 @@ http:
         users:
           - "ops:$2y$05$jZ..JpeOHQUdnP1p5AzPBuNp8CaAPY0WDkWiQ5mBdtZKiJtKH3caG"
 
-    # The tools are mounted under /rabbitmq, /mailpit and /minio, but each one believes it owns the
-    # root of its origin. Without stripping the prefix every asset they reference 404s and the page
-    # renders unstyled or blank.
+    # RabbitMQ and MinIO are mounted under a path but believe they own the root of their origin,
+    # so the prefix is stripped before it reaches them.
+    #
+    # MAILPIT IS NOT IN THIS LIST, deliberately. Stripping its prefix made its own UI ask for
+    # /api/v1/messages absolute, which on this hostname matches the PLATFORM API routers and comes
+    # back 401 — so the tool looked like it was rejecting a correct password when the request had
+    # never reached it. It is told its webroot instead (MP_WEBROOT), so it builds its own URLs.
     strip-ops-prefix:
       stripPrefix:
         prefixes:
           - "/rabbitmq"
-          - "/mailpit"
           - "/minio"
     platform-cors:
       headers:
         # localhost and 127.0.0.1 are different origins to a browser. Both, or one of the portals
         # silently fails every request — which is exactly the bug that is impossible to see from
         # the server side.
+        #
+        # The deployed origins are listed too. Without them the website's registration form fails
+        # its preflight: the browser sends Origin: https://www.youdrop.shop, no rule matches, and
+        # Traefik answers without an Access-Control-Allow-Origin header at all — so the request is
+        # blocked in the browser and the server log shows a perfectly ordinary 200 on the OPTIONS.
+        # Nothing on the server side looks wrong, which is what makes it expensive to find.
         accessControlAllowOriginListRegex:
-          - "^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$"
+          # Single-quoted, because in a double-quoted YAML scalar a backslash is an escape:
+          # every dot here would need doubling, and one missed pair silently turns '.' into
+          # "any character" — a CORS rule that quietly matches more origins than intended.
+          - '^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$'
+          - '^https://(www\.)?youdrop\.shop$'
+          - '^https://[a-z0-9-]+\.youdrop\.shop$'
         accessControlAllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
         accessControlAllowHeaders: ["*"]
         accessControlExposeHeaders: [X-Correlation-Id]
@@ -92,6 +106,7 @@ http:
         || PathPrefix(`/api/delivery-zones`)
       service: product-service
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ order-manager (8101)
     order-manager:
@@ -100,12 +115,14 @@ http:
         || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`)
       service: order-manager
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ order-tracking (8102)
     order-tracking:
       rule: PathPrefix(`/api/tracking`)
       service: order-tracking
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # Websockets need no special handling in Traefik — it upgrades in place, where the Spring
     # gateway needed a separate ws:// route for the same path family.
@@ -113,23 +130,27 @@ http:
       rule: PathPrefix(`/ws/tracking`)
       service: order-tracking
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ app-notification (8108)
     app-notification:
       rule: PathPrefix(`/api/notifications`)
       service: app-notification
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     app-notification-ws:
       rule: PathPrefix(`/ws/notifications`)
       service: app-notification
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ notifications-manager (8104)
     notification-log:
       rule: PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`)
       service: notifications-manager
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # The DLR callback. A carrier's delivery receipt arrives with no token — it cannot have one —
     # and is authenticated by a signature instead. Routed, but nothing else about it is public.
@@ -137,6 +158,7 @@ http:
       rule: PathPrefix(`/webhooks/dlr`)
       service: notifications-manager
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ accounting-service (8115)
     accounting-service:
@@ -146,29 +168,34 @@ http:
       rule: PathPrefix(`/api/accounting`) || PathPrefix(`/api/points`)
       service: accounting-service
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ connector-settings (8109)
     connector-settings:
       rule: PathPrefix(`/api/settings/connectors`)
       service: connector-settings
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ whatsapp-service (8116)
     whatsapp-service:
       rule: PathPrefix(`/api/whatsapp`)
       service: whatsapp-service
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     whatsapp-webhook:
       rule: PathPrefix(`/webhooks/whatsapp`)
       service: whatsapp-service
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ onboarding-service (8117)
     onboarding-service:
       rule: PathPrefix(`/api/onboarding`)
       service: onboarding-service
       entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
   # NOTE ON WHAT IS ABSENT.
   #
@@ -237,7 +264,7 @@ http:
       rule: Host(`monitoring-dev.youdrop.shop`) && PathPrefix(`/mailpit`)
       service: mailpit
       entryPoints: [https]
-      middlewares: [ops-auth@file, strip-ops-prefix@file]
+      middlewares: [ops-auth@file]
 
     minio-tls:
       rule: Host(`monitoring-dev.youdrop.shop`) && PathPrefix(`/minio`)

@@ -78,7 +78,22 @@ for t in CUSTOMER MERCHANT RIDER BACKOFFICE; do
 done
 echo '  customer, merchant, rider, backoffice tokens obtained'
 
-MERCHANT_SUB=$(echo "$MERCHANT" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r '.sub')
+# Padded before decoding. JWT segments are base64url with the padding stripped, and busybox
+# `base64 -d` returns EMPTY rather than erroring on an unpadded input — so this read silently
+# produced "" and every ownership assertion below compared "" to "" and passed.
+#
+# It only started failing when the issuer moved from an IP to a hostname: that changed the payload
+# length, and with it whether padding happened to be needed. The bug was always here.
+claim_of() { # claim_of <jwt> <jq-filter>
+  p=$(echo "$1" | cut -d. -f2 | tr '_-' '/+')
+  case $(( ${#p} % 4 )) in
+    2) p="$p==" ;;
+    3) p="$p=" ;;
+  esac
+  echo "$p" | base64 -d 2>/dev/null | jq -r "$2"
+}
+
+MERCHANT_SUB=$(claim_of "$MERCHANT" '.sub')
 
 echo
 echo '=== 1. A delivered order settles without a bank =================================='

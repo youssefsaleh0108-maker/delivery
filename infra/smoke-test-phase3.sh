@@ -24,7 +24,9 @@ KC="http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/token"
 SETTINGS="http://connector-settings:8109"
 SMS_CONNECTOR="http://sms-connector:8112"
 # The dev mail sink. Absent when mail is pointed at a real relay, which section 5 handles.
-MAILPIT="${MAILPIT_URL:-http://mailpit:8025}"
+# /mailpit, because the sink is mounted under that path on monitoring-dev and is told so with
+# MP_WEBROOT — its API moved with its UI.
+MAILPIT="${MAILPIT_URL:-http://mailpit:8025/mailpit}"
 EMAIL_CONNECTOR="http://email-connector:8110"
 PUSH_CONNECTOR="http://push-connector:8111"
 RABBIT="http://rabbitmq:15672"
@@ -228,10 +230,25 @@ LOG=$(curl -s "$LOG_URL" -H "Authorization: Bearer $BACKOFFICE")
 # Without the worker receipt every row would sit at PENDING forever and the log would be useless
 # for the one question it exists to answer.
 check 'nothing left PENDING'             '0' "$(echo "$LOG" | jq '[.[]|select(.status=="PENDING")]|length')"
-check 'everything reached SENT'          '0' "$(echo "$LOG" | jq '[.[]|select(.status!="SENT")]|length')"
+
+# Push is provider-aware, because "not SENT" means different things in the two modes. With the dev
+# provider everything should reach SENT. With Firebase the SEEDED accounts carry placeholder device
+# tokens and Google refuses them — correctly — so a refusal there is not a platform fault and must
+# not read as one. Only an account that has signed in on a real handset has a token Google accepts.
+PUSH_PROVIDER=$(curl -s "$PUSH_CONNECTOR/api/connector/status" | jq -r '.activeProvider')
+echo "  NOTE  active push provider is $PUSH_PROVIDER"
+
+if [ "$PUSH_PROVIDER" = "FIREBASE" ]; then
+  check 'every non-push notification SENT' '0' \
+    "$(echo "$LOG" | jq '[.[]|select(.channel!="PUSH" and .status!="SENT")]|length')"
+  echo "  NOTE  push rows to seeded accounts are refused by Firebase; see smoke-test-push.sh"
+else
+  check 'everything reached SENT'          '0' "$(echo "$LOG" | jq '[.[]|select(.status!="SENT")]|length')"
+fi
+
 check 'email records the provider used'  'SMTP' \
   "$(echo "$LOG" | jq -r '[.[]|select(.channel=="EMAIL")][0].provider')"
-check 'push records the provider used'   'DEV_LOG' \
+check 'push records the provider used'   "$PUSH_PROVIDER" \
   "$(echo "$LOG" | jq -r '[.[]|select(.channel=="PUSH")][0].provider')"
 check 'a provider message id came back'  'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL")][0].status=="SENT"' | sed 's/true/yes/;s/false/no/')"
