@@ -12,8 +12,10 @@ import 'backoffice/categories_screen.dart';
 import 'backoffice/dashboard_screen.dart';
 import 'backoffice/offers_screen.dart';
 import 'backoffice/onboarding_screen.dart';
+import 'backoffice/overview_screen.dart';
 import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
+import 'backoffice/riders_screen.dart';
 import 'backoffice/settings_screen.dart';
 // Prefixed: this and delivery_merchant's ZonesScreen share a name and are different pages — the
 // Backoffice one administers platform-wide areas, the merchant one picks which of them a shop
@@ -24,6 +26,10 @@ import 'carrier/company_screen.dart';
 import 'carrier/dashboard_screen.dart';
 import 'carrier/earnings_screen.dart';
 import 'carrier/jobs_screen.dart';
+// No prefix needed: this file's class is `CarrierSettingsScreen`, distinct from the Backoffice
+// `SettingsScreen` imported above, because the two administer entirely different things.
+import 'carrier/settings_screen.dart';
+import 'shell/shell.dart';
 
 /// Every API the portal can use, built once in main and handed down.
 ///
@@ -86,11 +92,33 @@ class PortalArea {
   const PortalArea({
     required this.role,
     required this.title,
+    required this.wordmark,
+    required this.accountRole,
+    required this.logoIcon,
     required this.destinations,
   });
 
   final DeliveryRole role;
   final String Function(DeliveryStrings) title;
+
+  /// The line under "YouDrop" in the sidebar — the design's per-console wordmark, `BACKOFFICE` and
+  /// `CARRIER HUB`.
+  ///
+  /// An inline English constant rather than a [DeliveryStrings] key, matching the rest of this
+  /// portal: the console screens are English-only in this wave and a half-translated rail would be
+  /// worse than an untranslated one.
+  final String wordmark;
+
+  /// What the signed-in person is, on the sidebar's footer card.
+  ///
+  /// Their *access*, not their job title — the token carries a realm role and nothing that would
+  /// let us print "Super Admin" honestly.
+  final String accountRole;
+
+  /// The glyph in the 32px brand tile. Per the design this is the console's subject — a package for
+  /// the Backoffice, a truck for the Carrier Hub — not a company mark.
+  final IconData logoIcon;
+
   final List<PortalDestination> destinations;
 
   /// The areas a session's token grants, in a fixed order.
@@ -109,6 +137,9 @@ class PortalArea {
   static final PortalArea merchant_ = PortalArea(
     role: DeliveryRole.merchant,
     title: (DeliveryStrings t) => t.merchantPortal,
+    wordmark: 'Merchant Hub',
+    accountRole: 'Merchant partner',
+    logoIcon: Icons.storefront,
     destinations: <PortalDestination>[
       // First, and ahead of the catalog. A shop opening the portal wants to know what came in
       // overnight and whether yesterday was any good; the menu is what they edit occasionally.
@@ -165,10 +196,19 @@ class PortalArea {
   // ------------------------------------------------------------------- carrier
   //
   // In the order a company thinks about its day: how are we doing, what are we carrying, what will
-  // we be paid, who is waiting to be hired, and who are we.
+  // we be paid, who rides for us, who is waiting to be hired, and how are we set up.
+  //
+  // The 2026-08 Figma carrier rail (3:3438) draws four items — Dashboard, Riders, Onboarding,
+  // Settings — and this one has six. The two extra are Jobs and Earnings, which answer the two
+  // questions a delivery company actually opens the portal to ask and which the design has no
+  // frame for; dropping them to match a four-item rail would delete working pages. Their glyphs and
+  // the order around them follow the design.
   static final PortalArea carrier_ = PortalArea(
     role: DeliveryRole.carrier,
     title: (DeliveryStrings t) => t.carrierPortal,
+    wordmark: 'Carrier Hub',
+    accountRole: 'Carrier partner',
+    logoIcon: Icons.local_shipping,
     destinations: <PortalDestination>[
       PortalDestination(
         icon: Icons.insights_outlined,
@@ -176,6 +216,7 @@ class PortalArea {
         label: (DeliveryStrings t) => t.navDashboard,
         build: (PortalApis a, _, __, void Function(int) jump) => CarrierDashboardScreen(
           api: a.order,
+          providerApi: a.provider,
           onShowJobs: () => jump(1),
         ),
       ),
@@ -191,22 +232,31 @@ class PortalArea {
         label: (DeliveryStrings t) => t.navEarnings,
         build: (PortalApis a, _, __, ___) => EarningsScreen(api: a.order),
       ),
-      // Before Company, after the day-to-day pages. Hiring is occasional and must not be missed:
+      // The design's `users-round` glyph. This is the fleet page — the company's own record is on
+      // Settings now, where the design puts it.
+      PortalDestination(
+        icon: Icons.groups_outlined,
+        selectedIcon: Icons.groups,
+        label: (DeliveryStrings t) => t.navCompany,
+        build: (PortalApis a, _, __, ___) =>
+            CompanyScreen(api: a.provider, orderApi: a.order),
+      ),
+      // Immediately after the fleet, as drawn. Hiring is occasional and must not be missed:
       // somebody is waiting to be told yes or no, which is not true of any other page here.
       PortalDestination(
-        icon: Icons.person_search_outlined,
-        selectedIcon: Icons.person_search,
+        icon: Icons.description_outlined,
+        selectedIcon: Icons.description,
         label: (DeliveryStrings t) => t.navApplicants,
         build: (PortalApis a, _, __, ___) =>
             ApplicantsScreen(api: a.onboarding, providerApi: a.provider),
       ),
+      // Last, per the design and for the same reason the Backoffice's is: the least-used page here.
       PortalDestination(
-        icon: Icons.business_outlined,
-        selectedIcon: Icons.business,
-        label: (DeliveryStrings t) => t.navCompany,
-        build: (PortalApis a, LocaleController locale,
-                Future<void> Function() onSignOut, ___) =>
-            CompanyScreen(api: a.provider, locale: locale, onSignOut: onSignOut),
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: (DeliveryStrings t) => t.navSettings,
+        build: (PortalApis a, LocaleController locale, _, __) =>
+            CarrierSettingsScreen(api: a.provider, locale: locale),
       ),
     ],
   );
@@ -215,11 +265,26 @@ class PortalArea {
   static final PortalArea backoffice_ = PortalArea(
     role: DeliveryRole.backoffice,
     title: (DeliveryStrings t) => t.backoffice,
+    wordmark: 'Backoffice',
+    accountRole: 'Backoffice operator',
+    logoIcon: Icons.inventory_2,
     destinations: <PortalDestination>[
-      // Orders first: monitoring live operations is what a Backoffice user opens this for.
+      // The overview first, then the ledger it summarises — the order the redesign draws, and the
+      // order the two pages are read in: the numbers, then the rows behind them.
       PortalDestination(
-        icon: Icons.dashboard_outlined,
-        selectedIcon: Icons.dashboard,
+        icon: Icons.bar_chart,
+        selectedIcon: Icons.bar_chart,
+        label: (DeliveryStrings t) => t.navDashboard,
+        build: (PortalApis a, _, __, void Function(int) jump) => OverviewScreen(
+          api: a.order,
+          storeApi: a.store,
+          onShowOrders: () => jump(1),
+        ),
+      ),
+      // Monitoring live operations is what a Backoffice user opens this for.
+      PortalDestination(
+        icon: Icons.shopping_bag_outlined,
+        selectedIcon: Icons.shopping_bag,
         label: (DeliveryStrings t) => t.navOrders,
         build: (PortalApis a, _, __, ___) => DashboardScreen(api: a.order),
       ),
@@ -259,6 +324,17 @@ class PortalArea {
         selectedIcon: Icons.local_shipping,
         label: (DeliveryStrings t) => t.navCarriers,
         build: (PortalApis a, _, __, ___) => ProvidersScreen(api: a.provider),
+      ),
+      // Immediately after Carriers, because a rider is reached through one: the roster is
+      // assembled from the same register the page above lists.
+      //
+      // An inline English label rather than a [DeliveryStrings] key — the console screens are
+      // English-only in this wave, and half a translated rail is worse than none.
+      PortalDestination(
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        label: (DeliveryStrings _) => 'Riders',
+        build: (PortalApis a, _, __, ___) => RidersScreen(api: a.provider),
       ),
       PortalDestination(
         icon: Icons.map_outlined,
@@ -302,12 +378,19 @@ class PortalShell extends StatefulWidget {
     required this.areas,
     required this.apis,
     required this.locale,
+    required this.session,
     required this.onSignOut,
   });
 
   final List<PortalArea> areas;
   final PortalApis apis;
   final LocaleController locale;
+
+  /// Only ever read for what it can say about the person signed in — their display name for the
+  /// sidebar's footer card. Nothing here is a security decision; every request is authorised again
+  /// server-side.
+  final AuthSession session;
+
   final Future<void> Function() onSignOut;
 
   @override
@@ -327,65 +410,89 @@ class _PortalShellState extends State<PortalShell> {
     });
   }
 
+  /// The sidebar footer's menu: the two things that used to live in the crimson AppBar.
+  ///
+  /// The design's footer card is user information and nothing else, and the console has no app bar
+  /// to put these back into — the rail *is* the chrome. Hanging them off the card that already
+  /// names the account is the closest reading of the design that still leaves a signed-in user a
+  /// way to change language or leave.
+  Widget _accountMenu(DeliveryStrings t) {
+    // Boxed to 24: an unconstrained PopupMenuButton is an IconButton with a 48px minimum, which
+    // would push the footer card from the design's 60 to 72.
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: PopupMenuButton<String>(
+        tooltip: t.language,
+        position: PopupMenuPosition.under,
+        icon: const Icon(Icons.unfold_more, size: 16, color: DeliveryColors.onShellMuted),
+        padding: EdgeInsets.zero,
+        onSelected: (String value) {
+          if (value == _signOutValue) {
+            widget.onSignOut();
+          } else {
+            widget.locale.setLanguage(value);
+          }
+        },
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          // Each language named in its own script, which is what makes the menu readable to
+          // somebody who cannot read the language currently on screen.
+          CheckedPopupMenuItem<String>(
+            value: 'en',
+            checked: !widget.locale.isArabic,
+            child: Text(t.english),
+          ),
+          CheckedPopupMenuItem<String>(
+            value: 'ar',
+            checked: widget.locale.isArabic,
+            child: Text(t.arabic),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            value: _signOutValue,
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.logout, size: 16, color: DeliveryColors.muted),
+                const SizedBox(width: DeliverySpacing.sm),
+                Text(t.signOut),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const String _signOutValue = '__sign_out__';
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final PortalArea area = widget.areas[_area];
 
     return Scaffold(
-      appBar: AppBar(
-        title: DeliveryWordmark(title: area.title(t)),
-        actions: <Widget>[
-          if (widget.areas.length > 1)
-            PopupMenuButton<int>(
-              icon: const Icon(Icons.swap_horiz),
-              tooltip: t.switchArea,
-              initialValue: _area,
-              onSelected: _switchArea,
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<int>>[
-                for (int i = 0; i < widget.areas.length; i++)
-                  PopupMenuItem<int>(value: i, child: Text(widget.areas[i].title(t))),
-              ],
-            ),
-          // In the bar rather than buried in a settings page: two of the three areas have no
-          // settings page, and someone who cannot read the English one cannot navigate to where
-          // the switch would be.
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.language),
-            tooltip: t.language,
-            initialValue: widget.locale.isArabic ? 'ar' : 'en',
-            onSelected: widget.locale.setLanguage,
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              // Each language named in its own script, which is what makes the menu readable to
-              // somebody who cannot read the language currently on screen.
-              PopupMenuItem<String>(value: 'en', child: Text(t.english)),
-              PopupMenuItem<String>(value: 'ar', child: Text(t.arabic)),
-            ],
-          ),
-          IconButton(
-            onPressed: widget.onSignOut,
-            icon: const Icon(Icons.logout),
-            tooltip: t.signOut,
-          ),
-        ],
-      ),
+      backgroundColor: DeliveryColors.background,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          NavigationRail(
-            selectedIndex: _index,
-            onDestinationSelected: (int i) => setState(() => _index = i),
-            labelType: NavigationRailLabelType.all,
-            indicatorColor: DeliveryColors.brandSoft,
-            destinations: <NavigationRailDestination>[
-              for (final PortalDestination d in area.destinations)
-                NavigationRailDestination(
-                  icon: Icon(d.icon),
-                  selectedIcon: Icon(d.selectedIcon, color: DeliveryColors.brand),
-                  label: Text(d.label(t)),
-                ),
+          ConsoleSidebar(
+            area: ConsoleArea(wordmark: area.wordmark, logoIcon: area.logoIcon),
+            areas: <ConsoleArea>[
+              for (final PortalArea a in widget.areas)
+                ConsoleArea(wordmark: a.wordmark, logoIcon: a.logoIcon),
             ],
+            areaIndex: _area,
+            onAreaSelected: widget.areas.length > 1 ? _switchArea : null,
+            entries: <ConsoleNavEntry>[
+              for (final PortalDestination d in area.destinations)
+                ConsoleNavEntry(icon: d.icon, label: d.label(t)),
+            ],
+            selectedIndex: _index,
+            onSelected: (int i) => setState(() => _index = i),
+            userName: widget.session.displayName,
+            userRole: area.accountRole,
+            accountMenu: _accountMenu(t),
           ),
-          const VerticalDivider(width: 1),
           Expanded(
             child: area.destinations[_index].build(
               widget.apis,

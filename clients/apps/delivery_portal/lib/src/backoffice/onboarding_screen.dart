@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:delivery_core/delivery_core.dart';
-import 'package:dio/dio.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import '../shell/shell.dart';
 
 /// Who is asking to join, and the decision.
 ///
@@ -16,6 +18,11 @@ import 'package:flutter/material.dart';
 /// expected outcome and the process does the rest. Declining takes a sentence, because a refusal
 /// with no reason produces the phone call, the reapplication, and the same review done twice — and
 /// because the applicant is told the reason verbatim.
+///
+/// Drawn as `backoffice-merchants` (Figma 3:2666): a directory of partners across two tabs, with
+/// the decision itself moved off the row and into a drawer. A row is scanned; a decision that is
+/// sent to a person verbatim is read. Keeping both on the same surface made the table either too
+/// tall to scan or too terse to decide from.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, required this.api});
 
@@ -25,16 +32,28 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
+/// Which population the directory is showing.
+///
+/// Not a status filter: "All Partners" and "Pending Approval" are answered by two different
+/// endpoints, because the queue endpoint is the one that guarantees oldest-first.
+enum _Tab { all, pending }
+
 class _OnboardingScreenState extends State<OnboardingScreen> {
   /// Applications arrive from a public form at any hour, so the queue refreshes itself.
   static const Duration _pollInterval = Duration(seconds: 30);
 
   Timer? _poll;
   List<OnboardingApplication> _applications = <OnboardingApplication>[];
-  bool _showDecided = false;
+  _Tab _tab = _Tab.pending;
   bool _loading = true;
   Object? _error;
   String? _busyId;
+
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
+  /// The Category filter's chosen value, or null for all of them.
+  String? _category;
 
   @override
   void initState() {
@@ -46,6 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _search.dispose();
     super.dispose();
   }
 
@@ -53,7 +73,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!silent) setState(() => _loading = true);
     try {
       final List<OnboardingApplication> loaded =
-          _showDecided ? await widget.api.all() : await widget.api.queue();
+          _tab == _Tab.all ? await widget.api.all() : await widget.api.queue();
       if (!mounted) return;
       setState(() {
         _applications = loaded;
@@ -69,207 +89,268 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  // -------------------------------------------------------------------- reading the list
+
+  /// What the Category column shows, and what the Category filter filters on.
+  ///
+  /// The applicant's own answer where the signup wizard asked for one, and what they applied to be
+  /// otherwise. Never a guess: a shop that did not say what it sells is "Shop", not "Restaurant".
+  static String _categoryOf(OnboardingApplication a) =>
+      a.details['businessType'] ?? a.details['vehicleType'] ?? a.kind.label;
+
+  /// The categories actually present in what is loaded, so the filter can only offer real answers.
+  List<String> get _categories {
+    final Set<String> found =
+        _applications.map(_categoryOf).where((String c) => c.isNotEmpty).toSet();
+    return found.toList()..sort();
+  }
+
+  List<OnboardingApplication> get _visible {
+    final String q = _query.trim().toLowerCase();
+    return _applications.where((OnboardingApplication a) {
+      if (_category != null && _categoryOf(a) != _category) return false;
+      if (q.isEmpty) return true;
+      return a.businessName.toLowerCase().contains(q) ||
+          a.contactName.toLowerCase().contains(q) ||
+          a.contactEmail.toLowerCase().contains(q) ||
+          a.reference.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  int get _waiting =>
+      _applications.where((OnboardingApplication a) => !a.status.isDecided).length;
+
   @override
   Widget build(BuildContext context) {
-    final int waiting = _applications.where((OnboardingApplication a) => !a.status.isDecided).length;
-
-    return Padding(
-      padding: const EdgeInsets.all(DeliverySpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text('Onboarding', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(width: DeliverySpacing.md),
-              if (_loading)
-                const SizedBox(
-                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-              const Spacer(),
-              // A record of what was decided, not just what is outstanding. Somebody asking "why
-              // was this shop turned down" needs the answer to survive the decision.
-              FilterChip(
-                label: Text(_showDecided ? 'All applications' : 'Waiting only'),
-                selected: _showDecided,
-                selectedColor: DeliveryColors.brandSoft,
-                onSelected: (bool on) {
-                  setState(() => _showDecided = on);
-                  _refresh();
-                },
-              ),
-              const SizedBox(width: DeliverySpacing.sm),
-              IconButton(
-                onPressed: () => _refresh(),
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Refresh',
-              ),
-            ],
+    return ConsolePage(
+      header: ConsoleTopbar(
+        title: 'Merchants Directory',
+        subtitle: 'Review, approve, and suspend merchant partners',
+        actions: <Widget>[
+          // Drawn on every console frame and answered by nothing: there is no cross-entity search
+          // endpoint. Rendered rather than removed, greyed rather than pretending.
+          const ConsoleSearchField.global(
+            hintText: 'Search backoffice...',
+            enabled: false,
           ),
-          Text(
-            _showDecided
-                ? 'Everything ever applied for, newest first.'
-                : '$waiting waiting · oldest first, so nothing is left behind',
-            style: Theme.of(context).textTheme.bodySmall,
+          const ConsoleIconAction(
+            icon: Icons.notifications_none,
+            tooltip: 'Notifications — no feed yet',
           ),
-          const SizedBox(height: DeliverySpacing.md),
-          Expanded(child: _body()),
+          const ConsoleComingSoonChip(),
+          // Not in the design, and kept: the queue polls itself every 30s, and an operator who has
+          // just told somebody "you're approved" wants to see it now rather than in 29 seconds.
+          ConsoleIconAction(
+            icon: Icons.refresh,
+            tooltip: 'Refresh',
+            onPressed: _loading ? null : () => _refresh(),
+          ),
         ],
       ),
+      children: <Widget>[
+        _controls(),
+        _table(),
+      ],
     );
   }
 
-  Widget _body() {
-    if (_error != null) {
-      return Center(child: Text('Could not load applications.\n$_error', textAlign: TextAlign.center));
-    }
-    if (_loading && _applications.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
-    }
-    if (_applications.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.inbox_outlined, size: 40, color: DeliveryColors.muted),
-            const SizedBox(height: DeliverySpacing.sm),
-            Text(_showDecided ? 'Nobody has applied yet.' : 'Nothing waiting to be read.',
-                style: Theme.of(context).textTheme.titleMedium),
+  /// Figma `controls-row` (3:2720): the tabs against the left edge, the filters against the right.
+  ///
+  /// A [Wrap] rather than a Row with a Spacer. At 1440 the two groups sit exactly where the design
+  /// draws them; the difference shows up at 1024, where a Row overflowed by two pixels because the
+  /// two groups happened to add up to slightly more than the content width. A breakpoint would only
+  /// have moved the guess — this drops the filters onto a second line whenever they genuinely do
+  /// not fit, at whatever width that turns out to be.
+  Widget _controls() {
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: DeliverySpacing.md,
+      runSpacing: DeliverySpacing.md,
+      children: <Widget>[
+        ConsoleFilterTabs(
+          tabs: <ConsoleFilterTab>[
+            const ConsoleFilterTab(label: 'All Partners'),
+            // The design's bracketed count, and real on either tab: the queue endpoint returns
+            // only what is waiting, and the full list carries the same applications with their
+            // status on them, so counting the undecided ones is correct in both cases. Suppressed
+            // while loading rather than shown as zero — no applications and none loaded yet are
+            // different things, and only one of them is good news.
+            ConsoleFilterTab(
+              label: 'Pending Approval',
+              count: _loading ? null : _waiting,
+            ),
           ],
+          selectedIndex: _tab == _Tab.all ? 0 : 1,
+          onSelected: (int i) {
+            setState(() => _tab = i == 0 ? _Tab.all : _Tab.pending);
+            _refresh();
+          },
+        ),
+        Wrap(
+          spacing: DeliverySpacing.md - DeliverySpacing.xs,
+          runSpacing: DeliverySpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            ConsoleSearchField(
+              hintText: 'Search merchants...',
+              controller: _search,
+              width: 232,
+              onChanged: (String v) => setState(() => _query = v),
+            ),
+            _categoryFilter(),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Figma `filter-btn` (3:2731), wired: the values come from the applications on screen, so it can
+  /// only ever offer a category something actually is.
+  Widget _categoryFilter() {
+    return ConsoleSelect(
+      label: _category ?? 'Category',
+      icon: Icons.tune,
+      tooltip: 'Filter by category',
+      options: <ConsoleOption>[
+        const ConsoleOption(label: 'All categories', value: null),
+        for (final String category in _categories)
+          ConsoleOption(label: category, value: category),
+      ],
+      onSelected: (String? value) => setState(() => _category = value),
+    );
+  }
+
+  // -------------------------------------------------------------------- the table
+
+  Widget _table() {
+    if (_error != null) {
+      return ConsoleCard(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(Icons.cloud_off, size: 28, color: DeliveryAccent.critical.color),
+                const SizedBox(height: DeliverySpacing.sm),
+                const Text('Could not load applications.', style: ConsoleText.cardTitle),
+                const SizedBox(height: DeliverySpacing.xs),
+                Text('$_error', style: ConsoleText.meta, textAlign: TextAlign.center),
+                const SizedBox(height: DeliverySpacing.md),
+                ConsoleButton(label: 'Try again', onPressed: () => _refresh()),
+              ],
+            ),
+          ),
         ),
       );
     }
 
-    return ListView.separated(
-      itemCount: _applications.length,
-      separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.sm),
-      itemBuilder: (BuildContext context, int i) => _card(_applications[i]),
-    );
-  }
-
-  Widget _card(OnboardingApplication a) {
-    final bool busy = _busyId == a.id;
-
-    return SoftCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(a.businessName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Text('${a.kind.label} · applied ${_when(a.createdAt)}',
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              StatePill(label: a.status.label, accent: _accentOf(a.status)),
-            ],
+    if (_loading && _applications.isEmpty) {
+      return const ConsoleCard(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: DeliverySpacing.xl),
+            child: CircularProgressIndicator(color: DeliveryColors.brand),
           ),
-          const SizedBox(height: DeliverySpacing.md),
+        ),
+      );
+    }
 
-          Wrap(
-            spacing: DeliverySpacing.lg,
-            runSpacing: DeliverySpacing.sm,
-            children: <Widget>[
-              _fact('Contact', a.contactName),
-              // The verification marks are the point of showing these at all. Approving an
-              // application whose address was never proved sends an account to whoever actually
-              // owns that inbox — so the reviewer sees which details were checked before deciding.
-              _fact('Email', a.contactEmail, verified: a.emailVerified),
-              _fact('Phone', a.contactPhone ?? 'Not given',
-                  verified: a.phoneVerified, absent: a.contactPhone == null),
-            ],
-          ),
+    final List<OnboardingApplication> rows = _visible;
 
-          if ((a.notes ?? '').isNotEmpty) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.md),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(DeliverySpacing.sm + 2),
-              decoration: BoxDecoration(
-                color: DeliveryColors.background,
-                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-              ),
-              child: Text(a.notes!, style: Theme.of(context).textTheme.bodySmall),
+    return ConsoleTable(
+      minWidth: 980,
+      columns: const <ConsoleColumn>[
+        ConsoleColumn(label: 'Merchant Name', flex: 1),
+        ConsoleColumn(label: 'Category', width: 150),
+        ConsoleColumn(label: 'Status', width: 120),
+        ConsoleColumn(label: 'Products', width: 100),
+        ConsoleColumn(label: 'Orders', width: 100),
+        ConsoleColumn(label: 'Join Date', width: 140),
+        ConsoleColumn(label: 'Actions', width: 120, alignRight: true),
+      ],
+      rows: <ConsoleTableRow>[
+        for (final OnboardingApplication a in rows) _row(a),
+      ],
+      empty: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(Icons.inbox_outlined, size: 28, color: DeliveryColors.faint),
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              _applications.isEmpty
+                  ? (_tab == _Tab.all
+                      ? 'Nobody has applied yet.'
+                      : 'Nothing waiting to be read.')
+                  : 'No partner matches that search.',
+              style: ConsoleText.cellStrong,
             ),
           ],
-
-          // What happened after the decision, for the ones already decided.
-          if (a.status.isDecided) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.md),
-            Text(_outcomeOf(a), style: Theme.of(context).textTheme.bodySmall),
-          ],
-
-          if (!a.status.isDecided) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.md),
-            // The one warning worth interrupting a reviewer with. Applications taken before
-            // verification existed carry no proof, and approving one means the account goes to an
-            // address nobody confirmed.
-            if (!a.emailVerified)
-              const Padding(
-                padding: EdgeInsets.only(bottom: DeliverySpacing.sm),
-                child: SoftNote(
-                  text: 'This email address was never verified. Anything sent to it — including '
-                      'how to sign in — may reach somebody else.',
-                  accent: DeliveryAccent.caution,
-                  icon: Icons.warning_amber_rounded,
-                ),
-              ),
-            Row(
-              children: <Widget>[
-                OutlinedButton.icon(
-                  onPressed: busy ? null : () => _decline(a),
-                  icon: const Icon(Icons.close, size: 18),
-                  label: const Text('Decline'),
-                ),
-                const SizedBox(width: DeliverySpacing.sm),
-                ElevatedButton.icon(
-                  onPressed: busy ? null : () => _approve(a),
-                  icon: busy
-                      ? const SizedBox(
-                          width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.check, size: 18),
-                  label: Text(a.kind == OnboardingKind.carrier
-                      ? 'Approve and set up the company'
-                      : 'Approve'),
-                ),
-              ],
-            ),
-          ],
-        ],
+        ),
+      ),
+      // Two of the design's columns have no source. Said once, under the table, rather than
+      // stamped into forty cells.
+      footer: const ConsoleInertNote(
+        text: 'Product and order counts per partner are not aggregated by any endpoint yet, and '
+            'a partner cannot be edited or suspended from here.',
       ),
     );
   }
 
-  Widget _fact(String label, String value, {bool verified = false, bool absent = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(label.toUpperCase(),
-            style: const TextStyle(
-                fontSize: 10.5, fontWeight: FontWeight.w700,
-                letterSpacing: 0.6, color: DeliveryColors.muted)),
-        const SizedBox(height: 2),
+  ConsoleTableRow _row(OnboardingApplication a) {
+    final bool busy = _busyId == a.id;
+    final bool pending = !a.status.isDecided;
+
+    return ConsoleTableRow(
+      onTap: () => _open(a),
+      cells: <Widget>[
+        ConsoleNameCell(
+          name: a.businessName,
+          secondary: a.contactName.isEmpty ? a.reference : a.contactName,
+          leading: ConsoleInitialTile(label: a.businessName),
+        ),
+        Text(
+          _categoryOf(a),
+          overflow: TextOverflow.ellipsis,
+          style: ConsoleText.cellMuted,
+        ),
+        ConsoleStatusPill(label: a.status.label, accent: _accentOf(a.status)),
+        const ConsoleNoValue(tooltip: 'No per-partner product count yet'),
+        const ConsoleNoValue(tooltip: 'No per-partner order count yet'),
+        Text(_date(a.createdAt), style: ConsoleText.cellMuted),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text(value,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: absent ? DeliveryColors.muted : DeliveryColors.ink)),
-            if (!absent) ...<Widget>[
-              const SizedBox(width: 5),
-              Icon(verified ? Icons.verified_rounded : Icons.error_outline_rounded,
-                  size: 15,
-                  color: verified ? DeliveryAccent.positive.color : DeliveryAccent.caution.color),
+            if (pending) ...<Widget>[
+              // The live decision, in the design's row-action geometry. Approve is one tap;
+              // Decline goes through the reason dialog, as it always has.
+              ConsoleRowAction(
+                icon: Icons.check,
+                tooltip: 'Approve',
+                onPressed: busy ? null : () => _approve(a),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              ConsoleRowAction(
+                icon: Icons.close,
+                tooltip: 'Decline',
+                destructive: true,
+                onPressed: busy ? null : () => _decline(a),
+              ),
+            ] else ...<Widget>[
+              // Drawn by the design against every partner; there is no endpoint behind either for a
+              // partner who is already live.
+              const ConsoleRowAction(
+                icon: Icons.edit_outlined,
+                tooltip: 'Edit partner — coming soon',
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              const ConsoleRowAction(
+                icon: Icons.block,
+                tooltip: 'Suspend partner — coming soon',
+                destructive: true,
+              ),
             ],
           ],
         ),
@@ -277,22 +358,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  String _outcomeOf(OnboardingApplication a) {
-    final String who = a.decidedBy == null ? '' : ' by ${_short(a.decidedBy!)}';
-    return switch (a.status) {
-      OnboardingStatus.rejected =>
-        'Declined$who ${_when(a.decidedAt)} — ${a.rejectionReason ?? "no reason recorded"}',
-      OnboardingStatus.provisioned =>
-        'Approved$who ${_when(a.decidedAt)}. Account created; they can set a password and sign in.',
-      OnboardingStatus.approved =>
-        'Approved$who ${_when(a.decidedAt)}. Setting the account up now.',
-      // Its own state because it needs different work: an approved application is waiting on a
-      // machine, a failed one is waiting on a person.
-      OnboardingStatus.failed =>
-        'Approved$who, but setting the account up did not finish. Somebody has to look at this.',
-      _ => '',
-    };
+  // -------------------------------------------------------------------- the drawer
+
+  Future<void> _open(OnboardingApplication a) async {
+    await showConsoleDrawer<void>(
+      context: context,
+      title: a.businessName,
+      subtitle: '${a.kind.label} · applied ${_when(a.createdAt)}',
+      badge: ConsoleStatusPill(label: a.status.label, accent: _accentOf(a.status)),
+      builder: (BuildContext drawerContext) => _ApplicationDetail(
+        application: a,
+        onApprove: () {
+          Navigator.of(drawerContext).pop();
+          _approve(a);
+        },
+        onDecline: () {
+          Navigator.of(drawerContext).pop();
+          _decline(a);
+        },
+      ),
+    );
   }
+
+  // -------------------------------------------------------------------- the decisions
 
   Future<void> _approve(OnboardingApplication a) async {
     setState(() => _busyId = a.id);
@@ -353,7 +441,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         OnboardingStatus.failed => DeliveryAccent.critical,
       };
 
-  static String _short(String id) => id.length <= 8 ? id : '${id.substring(0, 8)}…';
+  /// The design's join-date spelling — "Oct 12, 2025".
+  static String _date(DateTime? at) {
+    if (at == null) return '—';
+    const List<String> months = <String>[
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[at.month - 1]} ${at.day.toString().padLeft(2, '0')}, ${at.year}';
+  }
 
   static String _when(DateTime? at) {
     if (at == null) return 'at an unknown time';
@@ -363,6 +459,200 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (ago.inHours < 24) return '${ago.inHours}h ago';
     if (ago.inDays < 30) return '${ago.inDays}d ago';
     return '${at.year}-${at.month.toString().padLeft(2, '0')}-${at.day.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Everything a decision is made on, in the drawer the row opens.
+///
+/// The contact details and their verification marks, the applicant's own words, whatever the signup
+/// wizard collected, and — for one already decided — what happened afterwards.
+class _ApplicationDetail extends StatelessWidget {
+  const _ApplicationDetail({
+    required this.application,
+    required this.onApprove,
+    required this.onDecline,
+  });
+
+  final OnboardingApplication application;
+  final VoidCallback onApprove;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final OnboardingApplication a = application;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        // The one warning worth interrupting a reviewer with. Applications taken before
+        // verification existed carry no proof, and approving one means the account goes to an
+        // address nobody confirmed.
+        if (!a.status.isDecided && !a.emailVerified) ...<Widget>[
+          _Note(
+            text: 'This email address was never verified. Anything sent to it — including how to '
+                'sign in — may reach somebody else.',
+            accent: DeliveryAccent.caution,
+            icon: Icons.warning_amber_rounded,
+          ),
+          const SizedBox(height: ConsoleMetrics.pageGap),
+        ],
+
+        ConsoleDrawerSection(
+          title: 'Applicant',
+          first: true,
+          child: ConsoleFactGrid(
+            facts: <ConsoleFact>[
+              ConsoleFact('Contact', a.contactName.isEmpty ? 'Not given' : a.contactName,
+                  absent: a.contactName.isEmpty),
+              // The verification marks are the point of showing these at all. Approving an
+              // application whose address was never proved sends an account to whoever actually
+              // owns that inbox — so the reviewer sees which details were checked before deciding.
+              ConsoleFact(
+                'Email',
+                a.contactEmail,
+                mark: a.emailVerified
+                    ? const ConsoleFactMark.verified()
+                    : const ConsoleFactMark.unverified(),
+              ),
+              ConsoleFact(
+                'Phone',
+                a.contactPhone ?? 'Not given',
+                absent: a.contactPhone == null,
+                mark: a.contactPhone == null
+                    ? null
+                    : (a.phoneVerified
+                        ? const ConsoleFactMark.verified()
+                        : const ConsoleFactMark.unverified()),
+              ),
+              ConsoleFact('Reference', a.reference.isEmpty ? '—' : a.reference,
+                  absent: a.reference.isEmpty),
+            ],
+          ),
+        ),
+
+        // The signup wizard's own answers — vehicle, work region, business type. Present on
+        // applications taken through the newer flow and absent on everything older, which is why
+        // the whole section disappears rather than showing a row of dashes.
+        if (a.details.isNotEmpty)
+          ConsoleDrawerSection(
+            title: 'From their application',
+            child: ConsoleFactGrid(
+              facts: <ConsoleFact>[
+                for (final MapEntry<String, String> e in a.details.entries)
+                  ConsoleFact(_humanise(e.key), e.value),
+              ],
+            ),
+          ),
+
+        if ((a.notes ?? '').isNotEmpty)
+          ConsoleDrawerSection(
+            title: 'What they wrote',
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(DeliverySpacing.md - 2),
+              decoration: BoxDecoration(
+                color: DeliveryColors.background,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+              ),
+              child: Text(a.notes!, style: ConsoleText.body),
+            ),
+          ),
+
+        if (a.status.isDecided)
+          ConsoleDrawerSection(
+            title: 'Outcome',
+            child: Text(_outcomeOf(a), style: ConsoleText.body),
+          ),
+
+        if (!a.status.isDecided) ...<Widget>[
+          const SizedBox(height: ConsoleMetrics.pageGap),
+          const Divider(height: 1, color: DeliveryColors.border),
+          const SizedBox(height: ConsoleMetrics.pageGap),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: ConsoleButton(
+                  label: a.kind == OnboardingKind.carrier
+                      ? 'Approve and set up the company'
+                      : 'Approve',
+                  icon: Icons.check,
+                  tone: ConsoleButtonTone.solid,
+                  onPressed: onApprove,
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              ConsoleButton(
+                label: 'Decline',
+                icon: Icons.close,
+                tone: ConsoleButtonTone.outlined,
+                onPressed: onDecline,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  static String _outcomeOf(OnboardingApplication a) {
+    final String who = a.decidedBy == null ? '' : ' by ${_short(a.decidedBy!)}';
+    final String at = _OnboardingScreenState._when(a.decidedAt);
+    return switch (a.status) {
+      OnboardingStatus.rejected =>
+        'Declined$who $at — ${a.rejectionReason ?? "no reason recorded"}',
+      OnboardingStatus.provisioned =>
+        'Approved$who $at. Account created; they can set a password and sign in.',
+      OnboardingStatus.approved => 'Approved$who $at. Setting the account up now.',
+      // Its own state because it needs different work: an approved application is waiting on a
+      // machine, a failed one is waiting on a person.
+      OnboardingStatus.failed =>
+        'Approved$who, but setting the account up did not finish. Somebody has to look at this.',
+      _ => '',
+    };
+  }
+
+  static String _short(String id) => id.length <= 8 ? id : '${id.substring(0, 8)}…';
+
+  /// `businessType` → `Business type`. The wizard's keys are camelCase and are shown to a person.
+  static String _humanise(String key) {
+    final String spaced = key
+        .replaceAllMapped(RegExp(r'(?<=[a-z0-9])([A-Z])'), (Match m) => ' ${m[1]!.toLowerCase()}')
+        .replaceAll(RegExp(r'[_-]+'), ' ')
+        .trim();
+    if (spaced.isEmpty) return key;
+    return spaced[0].toUpperCase() + spaced.substring(1);
+  }
+}
+
+/// The console's inline note: a tinted panel with a glyph, for the one thing a reviewer must read.
+class _Note extends StatelessWidget {
+  const _Note({required this.text, required this.accent, required this.icon});
+
+  final String text;
+  final DeliveryAccent accent;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(DeliverySpacing.md - 2),
+      decoration: BoxDecoration(
+        color: accent.tint,
+        border: Border.all(color: accent.line),
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 16, color: accent.color),
+          const SizedBox(width: DeliverySpacing.sm + 2),
+          Expanded(
+            child: Text(text, style: ConsoleText.body.copyWith(height: 1.4)),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -392,22 +682,45 @@ class _DeclineDialogState extends State<_DeclineDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Decline ${widget.businessName}'),
+      backgroundColor: DeliveryColors.white,
+      surfaceTintColor: DeliveryColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+      title: Text('Decline ${widget.businessName}', style: ConsoleText.cardTitle),
       content: SizedBox(
         width: 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Text('They are sent this word for word. Say what would have to change.'),
+            const Text(
+              'They are sent this word for word. Say what would have to change.',
+              style: ConsoleText.pageSubtitle,
+            ),
             const SizedBox(height: DeliverySpacing.md),
             TextField(
               controller: _reason,
               maxLines: 3,
               maxLength: 500,
               autofocus: true,
-              decoration: const InputDecoration(
+              style: ConsoleText.cell,
+              cursorColor: DeliveryColors.brand,
+              decoration: InputDecoration(
                 hintText: 'The address given is outside the area we cover',
+                hintStyle: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
+                filled: true,
+                fillColor: DeliveryColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.brand),
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -415,14 +728,19 @@ class _DeclineDialogState extends State<_DeclineDialog> {
         ),
       ),
       actions: <Widget>[
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(
+        ConsoleButton(
+          label: 'Cancel',
+          tone: ConsoleButtonTone.outlined,
+          onPressed: () => Navigator.pop(context),
+        ),
+        ConsoleButton(
+          label: 'Decline',
+          tone: ConsoleButtonTone.solid,
           // Disabled rather than validated on submit: the server refuses an empty reason, and
           // finding that out after pressing the button teaches nothing the button could have said.
           onPressed: _reason.text.trim().isEmpty
               ? null
               : () => Navigator.pop(context, _reason.text.trim()),
-          child: const Text('Decline'),
         ),
       ],
     );

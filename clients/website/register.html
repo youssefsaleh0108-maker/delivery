@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apply to join — Delivery</title>
+  <title>Apply to join — YouDrop</title>
   <meta name="description" content="Apply to put your shop on the platform, or to bring your delivery fleet onto it.">
   <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="register.css">
 </head>
 <body>
 
@@ -17,202 +18,584 @@
   a stray click on the backdrop, and losing it loses everything typed. That is a fair bargain for a
   short form and a bad one for a flow that asks somebody to leave, open their inbox, and come back
   with a code. A page has an address, survives a reload, and can be sent to a colleague to finish.
+
+  It is now the two-panel wizard from the 2026-08 redesign: a brand panel that does not move and a
+  form that shows one step. The site's drifting backdrop and its masthead are gone from this page on
+  purpose — both are for a document somebody is browsing, and this is a form somebody is filling in.
 -->
 
-<div class="backdrop" aria-hidden="true">
-  <span class="orb orb-a"></span>
-  <span class="orb orb-b"></span>
-  <span class="orb orb-c"></span>
-  <span class="grain"></span>
-  <span class="dawn"></span>
+<div class="wizard" id="wizard">
+
+  <!-- ---------------------------------------------------------------- brand panel -->
+  <aside class="w-brand">
+    <!-- The logo is the way back to the site, which is the only navigation this page needs. -->
+    <a class="w-logo" href="/">
+      <span class="w-logo-tile">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M11.6668 14.9995V5.0005C11.6668 4.55852 11.4912 4.13464 11.1786 3.82211C10.866 3.50958 10.4421 3.334 10 3.334H3.3328C2.89074 3.334 2.46678 3.50958 2.15419 3.82211C1.84161 4.13464 1.666 4.55852 1.666 5.0005V14.1662C1.666 14.3872 1.7538 14.5992 1.9101 14.7554C2.06639 14.9117 2.27837 14.9995 2.4994 14.9995H4.1662M4.1662 14.9995C4.1662 15.9199 4.91245 16.666 5.833 16.666C6.75355 16.666 7.4998 15.9199 7.4998 14.9995M4.1662 14.9995C4.1662 14.0791 4.91245 13.333 5.833 13.333C6.75355 13.333 7.4998 14.0791 7.4998 14.9995M7.4998 14.9995H12.5002M12.5002 14.9995C12.5002 15.9199 13.2465 16.666 14.167 16.666C15.0875 16.666 15.8338 15.9199 15.8338 14.9995M12.5002 14.9995C12.5002 14.0791 13.2465 13.333 14.167 13.333C15.0875 13.333 15.8338 14.0791 15.8338 14.9995M15.8338 14.9995H17.5006C17.7216 14.9995 17.9336 14.9117 18.0899 14.7554C18.2462 14.5992 18.334 14.3872 18.334 14.1662V11.1249C18.3337 10.9358 18.269 10.7524 18.1507 10.6049L15.2504 6.9803C15.1725 6.88271 15.0736 6.80389 14.9611 6.74966C14.8485 6.69543 14.7253 6.66718 14.6004 6.667H11.6668"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="w-logo-text">
+        <b>YouDrop</b>
+        <span class="w-eyebrow" id="brand-eyebrow">Carrier Hub</span>
+      </span>
+    </a>
+
+    <!-- Headline and paragraph change with the step, the way the design's frames do. -->
+    <div class="w-brand-copy">
+      <h1 id="brand-headline">Start your last-mile delivery partnership.</h1>
+      <p id="brand-lede">
+        Connect your fleet to the most advanced last-mile delivery network in the region. Real-time
+        routing, automated dispatch, and unified billing.
+      </p>
+    </div>
+
+    <div class="w-brand-foot">
+      <!-- The applicant's own company, as typed on the first step. Empty until they type it. -->
+      <span id="brand-company">Carrier Partner Application</span>
+      <small>© 2026 YouDrop Technologies Inc.</small>
+    </div>
+  </aside>
+
+  <!-- ---------------------------------------------------------------- form panel -->
+  <main class="w-form">
+
+    <div class="w-top">
+      <p class="w-top-note">
+        <!-- The same destination the site's own footer signs people in at. One portal now serves
+             shops and delivery companies alike, so there is nothing left to choose between. -->
+        Already registered? <a href="https://portal-dev.youdrop.shop">Sign in</a>
+      </p>
+      <div class="w-top-right">
+        <span class="w-lang" aria-disabled="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M14.6672 8C14.6672 11.6822 11.6822 14.6672 8 14.6672M14.6672 8C14.6672 4.31781 11.6822 1.3328 8 1.3328M14.6672 8H1.3328M8 14.6672C4.31781 14.6672 1.3328 11.6822 1.3328 8M8 14.6672C6.28802 12.8696 5.33312 10.4824 5.33312 8C5.33312 5.51763 6.28802 3.13038 8 1.3328M8 14.6672C9.71198 12.8696 10.6669 10.4824 10.6669 8C10.6669 5.51763 9.71198 3.13038 8 1.3328M8 1.3328C4.31781 1.3328 1.3328 4.31781 1.3328 8"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          AR / EN
+        </span>
+        <span class="w-soon">Coming soon</span>
+      </div>
+    </div>
+
+    <div class="w-col">
+
+      <!-- The step indicator. Numbered out of however many steps this kind of applicant has: a
+           shop has four and a delivery company six, and saying "of 6" to a shop would be a lie. -->
+      <div class="w-head">
+        <div class="w-progress">
+          <div class="w-progress-row">
+            <span class="w-step-of" id="step-of">Step 1 of 4</span>
+            <span class="w-percent" id="step-percent">25% Complete</span>
+          </div>
+          <div class="w-bar" role="progressbar" aria-labelledby="step-of">
+            <span class="w-bar-fill" id="bar-fill"></span>
+          </div>
+        </div>
+        <div class="w-title">
+          <h2 id="step-title">Company Profile</h2>
+          <p id="step-lede">Provide official registration details of your business.</p>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------ business -->
+      <section class="wstep" data-step="business">
+        <fieldset class="w-kinds">
+          <legend>What are you applying as?</legend>
+          <label class="w-kind">
+            <input type="radio" name="kind" value="MERCHANT" checked>
+            <span>
+              <b>A shop</b>
+              <small>Put your menu in front of the city and let us find the rider</small>
+            </span>
+          </label>
+          <label class="w-kind">
+            <input type="radio" name="kind" value="CARRIER">
+            <span>
+              <b>A delivery company</b>
+              <small>Bring your fleet onto the platform and get work routed to you</small>
+            </span>
+          </label>
+        </fieldset>
+
+        <div class="w-field">
+          <label class="w-label" for="businessName">
+            <span id="business-label">Shop name</span><span class="req">*</span>
+          </label>
+          <input id="businessName" type="text" required maxlength="200" autocomplete="organization"
+                 placeholder="e.g. FastFlow Logistics">
+        </div>
+
+        <!-- Carrier only. A shop's application has never carried a CR number and the reviewer does
+             not ask for one; a delivery company's is the first thing they check. -->
+        <div class="w-field" data-kind="CARRIER" hidden>
+          <label class="w-label" for="registrationNumber">
+            Commercial Registration Number<span class="req">*</span>
+          </label>
+          <input id="registrationNumber" type="text" maxlength="64" placeholder="e.g. CR-894211A">
+        </div>
+
+        <div class="w-field" data-kind="CARRIER" hidden>
+          <label class="w-label" for="companyType">Company Type<span class="req">*</span></label>
+          <select id="companyType">
+            <option value="LOGISTICS_COMPANY">Logistics Company</option>
+            <option value="COURIER_SERVICE">Courier Service</option>
+            <option value="FREIGHT_TRUCKING">Freight &amp; Trucking</option>
+            <option value="SOLE_PROPRIETOR">Individual / Sole Proprietor</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+
+        <div class="w-row">
+          <div class="w-field">
+            <label class="w-label" for="contactName">
+              <span id="contact-label">Your name</span><span class="req">*</span>
+            </label>
+            <input id="contactName" type="text" required maxlength="160" autocomplete="name"
+                   placeholder="John Doe">
+          </div>
+          <!--
+            The design puts a contact phone here. This page verifies the phone with a code on a step
+            of its own, so this field is the same number, entered early: what is typed here seeds
+            the verification step and is never submitted on its own.
+          -->
+          <div class="w-field">
+            <label class="w-label" for="phoneSeed">
+              Contact Phone<span class="w-optional">optional</span>
+            </label>
+            <input id="phoneSeed" type="tel" maxlength="32" autocomplete="tel" placeholder="+961 …">
+          </div>
+        </div>
+
+        <div class="w-field">
+          <label class="w-label" for="notes">
+            <span id="notes-label">Anything else we should know</span>
+          </label>
+          <textarea id="notes" rows="3" maxlength="2000"></textarea>
+        </div>
+
+        <p class="form-error" id="page-error" hidden></p>
+
+        <div class="w-actions">
+          <button class="primary" data-nav="next">
+            <span class="w-next-label">Continue</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ email -->
+      <section class="wstep" data-step="email" hidden>
+        <p class="w-note">
+          We send a six-digit code to check the address reaches you. Everything after this —
+          including the decision and how to sign in — goes there, so it has to be one you can open.
+        </p>
+
+        <div class="w-verify">
+          <div class="w-field">
+            <label class="w-label" for="contactEmail">Email<span class="req">*</span></label>
+            <input id="contactEmail" type="email" required maxlength="200" autocomplete="email"
+                   placeholder="you@company.com">
+          </div>
+          <button class="secondary w-send" id="email-send">Send code</button>
+        </div>
+
+        <div class="w-code" id="email-code-box" hidden>
+          <div class="w-field">
+            <label class="w-label" for="email-code">The code we sent</label>
+            <!-- inputmode numeric so a phone offers a number pad; one-time-code lets both iOS and
+                 Android offer to fill it from the message itself. -->
+            <input id="email-code" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="6" placeholder="000000">
+          </div>
+          <button class="primary w-confirm" id="email-confirm">Verify</button>
+          <p class="w-code-foot">
+            <span id="email-expiry"></span>
+            <button class="linkish" id="email-resend" disabled>Send another</button>
+          </p>
+        </div>
+
+        <p class="w-verified" id="email-verified" hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M14.5335 6.66681C14.838 8.161 14.621 9.71442 13.9187 11.068C13.2165 12.4216 12.0714 13.4935 10.6745 14.105C9.2776 14.7165 7.71326 14.8307 6.24237 14.4284C4.77149 14.0261 3.48297 13.1317 2.59169 11.8944C1.70041 10.6571 1.26025 9.15163 1.34461 7.62906C1.42898 6.10649 2.03276 4.65887 3.05527 3.52759C4.07779 2.39631 5.45723 1.64976 6.96355 1.41244C8.46987 1.17512 10.012 1.46138 11.3328 2.22347M5.99976 7.33315L7.99976 9.33315L14.6664 2.66649"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Verified
+        </p>
+        <p class="form-error" id="email-error" hidden></p>
+
+        <div class="w-actions">
+          <button class="secondary" data-nav="back">Back</button>
+          <button class="primary" data-nav="next" id="email-continue" disabled>
+            <span class="w-next-label">Continue</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ phone -->
+      <section class="wstep" data-step="phone" hidden>
+        <p class="w-note">
+          Useful when something about an order needs sorting out quickly. If you would rather not,
+          skip this — it changes nothing about your application.
+        </p>
+
+        <div class="w-verify">
+          <div class="w-field">
+            <label class="w-label" for="contactPhone">
+              Phone<span class="w-optional">optional</span>
+            </label>
+            <input id="contactPhone" type="tel" maxlength="32" autocomplete="tel" placeholder="+961 …">
+          </div>
+          <button class="secondary w-send" id="phone-send">Send code</button>
+        </div>
+
+        <div class="w-code" id="phone-code-box" hidden>
+          <div class="w-field">
+            <label class="w-label" for="phone-code">The code we sent</label>
+            <input id="phone-code" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="6" placeholder="000000">
+          </div>
+          <button class="primary w-confirm" id="phone-confirm">Verify</button>
+          <p class="w-code-foot">
+            <span id="phone-expiry"></span>
+            <button class="linkish" id="phone-resend" disabled>Send another</button>
+          </p>
+        </div>
+
+        <p class="w-verified" id="phone-verified" hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M14.5335 6.66681C14.838 8.161 14.621 9.71442 13.9187 11.068C13.2165 12.4216 12.0714 13.4935 10.6745 14.105C9.2776 14.7165 7.71326 14.8307 6.24237 14.4284C4.77149 14.0261 3.48297 13.1317 2.59169 11.8944C1.70041 10.6571 1.26025 9.15163 1.34461 7.62906C1.42898 6.10649 2.03276 4.65887 3.05527 3.52759C4.07779 2.39631 5.45723 1.64976 6.96355 1.41244C8.46987 1.17512 10.012 1.46138 11.3328 2.22347M5.99976 7.33315L7.99976 9.33315L14.6664 2.66649"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Verified
+        </p>
+        <p class="form-error" id="phone-error" hidden></p>
+
+        <!-- Skip is a button beside the others, not a small link underneath them. An optional step
+             whose way out is hidden is not optional in practice. -->
+        <div class="w-actions">
+          <button class="secondary" data-nav="back">Back</button>
+          <button class="secondary" id="phone-skip">Skip this</button>
+          <button class="primary" data-nav="next" id="phone-continue" disabled>
+            <span class="w-next-label">Continue</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ documents -->
+      <!--
+        Drawn as designed, and inert.
+
+        There is no document store behind this yet — no upload endpoint, no per-document state, no
+        reviewer screen that shows a file. Rather than a Choose File button that opens a picker and
+        then drops what it is given, every row is shown in its empty state with the button disabled
+        and the reason said once, at the top. The accepted state is in register.css, ready for the
+        day the pipeline lands.
+      -->
+      <section class="wstep" data-step="documents" hidden>
+        <p class="w-note">
+          <span class="w-soon">Coming soon</span>
+          Uploads are not open yet. Your application is read without them, and we will ask for these
+          by email if we need them before deciding.
+        </p>
+
+        <div class="w-uploads">
+          <div class="w-upload">
+            <span class="w-upload-tile">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="w-upload-text">
+              <b>Commercial Registration (CR)</b>
+              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
+            </span>
+            <button class="w-choose" disabled>Choose File</button>
+          </div>
+
+          <div class="w-upload">
+            <span class="w-upload-tile">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="w-upload-text">
+              <b>Tax &amp; VAT Certificate</b>
+              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
+            </span>
+            <button class="w-choose" disabled>Choose File</button>
+          </div>
+
+          <div class="w-upload">
+            <span class="w-upload-tile">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="w-upload-text">
+              <b>Active Fleet Insurance Certificate</b>
+              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
+            </span>
+            <button class="w-choose" disabled>Choose File</button>
+          </div>
+
+          <div class="w-upload">
+            <span class="w-upload-tile">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="w-upload-text">
+              <b>Authorized Signatory Owner ID</b>
+              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
+            </span>
+            <button class="w-choose" disabled>Choose File</button>
+          </div>
+        </div>
+
+        <div class="w-actions">
+          <button class="secondary" data-nav="back">Back</button>
+          <button class="primary" data-nav="next">
+            <span class="w-next-label">Continue</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ fleet -->
+      <section class="wstep" data-step="fleet" hidden>
+        <div class="w-field">
+          <label class="w-label" for="fleetSize">
+            Estimated Number of Active Riders/Drivers<span class="req">*</span>
+          </label>
+          <input id="fleetSize" type="number" min="1" max="100000" step="1" placeholder="48">
+        </div>
+
+        <div class="w-field">
+          <span class="w-label" id="vehicles-label">Vehicle Types Available</span>
+          <div class="w-chips" role="group" aria-labelledby="vehicles-label">
+            <label class="w-chip">
+              <input type="checkbox" name="vehicleType" value="MOTORCYCLE">
+              <svg class="on" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M13.3328 4L6.0002 11.3328L2.6672 7.99971" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <svg class="off" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Motorcycles
+            </label>
+            <label class="w-chip">
+              <input type="checkbox" name="vehicleType" value="CAR">
+              <svg class="on" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M13.3328 4L6.0002 11.3328L2.6672 7.99971" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <svg class="off" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Cars
+            </label>
+            <label class="w-chip">
+              <input type="checkbox" name="vehicleType" value="VAN">
+              <svg class="on" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M13.3328 4L6.0002 11.3328L2.6672 7.99971" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <svg class="off" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Vans
+            </label>
+            <label class="w-chip">
+              <input type="checkbox" name="vehicleType" value="TRUCK">
+              <svg class="on" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M13.3328 4L6.0002 11.3328L2.6672 7.99971" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <svg class="off" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Trucks
+            </label>
+          </div>
+        </div>
+
+        <!--
+          Typed, not chosen from a menu.
+
+          The design draws this as a select. There is no catalogue of regions anywhere behind this
+          page — no zones service, nothing on the application the reviewer reads — so a menu here
+          would be a list somebody made up, shown to applicants as though it were where we operate.
+          The field keeps the design's shape and lets them name their own areas.
+        -->
+        <div class="w-field">
+          <label class="w-label" for="operatingRegions">
+            Preferred Operating Regions<span class="req">*</span>
+          </label>
+          <input id="operatingRegions" type="text" maxlength="240"
+                 placeholder="e.g. Beirut, Mount Lebanon">
+        </div>
+
+        <div class="w-field">
+          <label class="w-label" for="operatingHours">
+            Preferred Operating Hours<span class="req">*</span>
+          </label>
+          <select id="operatingHours">
+            <option value="TWENTY_FOUR_HOURS">24 Hours (Full Service)</option>
+            <option value="DAYTIME">Daytime (08:00 – 20:00)</option>
+            <option value="EVENINGS">Evenings and nights (16:00 – 02:00)</option>
+            <option value="WEEKENDS">Weekends only</option>
+            <option value="OTHER">Other — described in the notes</option>
+          </select>
+        </div>
+
+        <p class="form-error" id="fleet-error" hidden></p>
+
+        <div class="w-actions">
+          <button class="secondary" data-nav="back">Back</button>
+          <button class="primary" data-nav="next">
+            <span class="w-next-label">Continue</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ review -->
+      <section class="wstep" data-step="review" hidden>
+        <dl class="w-summary" id="summary"></dl>
+        <p class="form-error" id="submit-error" hidden></p>
+        <div class="w-actions">
+          <button class="secondary" data-nav="back">Back</button>
+          <button class="primary" id="submit">Send application</button>
+        </div>
+        <p class="w-note">We read every application. You will hear from us either way.</p>
+      </section>
+
+    </div>
+
+    <div class="w-form-tail" aria-hidden="true"></div>
+  </main>
 </div>
 
-<header class="masthead">
-  <a class="wordmark" href="/">
-    <span class="mark" aria-hidden="true"></span>
-    Delivery
+<!-- ---------------------------------------------------------------- receipt -->
+<!--
+  Its own screen rather than a fifth step: the application is in, so there is no step left to point
+  at and no form left to sit beside.
+-->
+<div class="w-receipt wizard-done" id="receipt" hidden>
+  <a class="w-receipt-logo" href="/">
+    <span class="w-receipt-tile">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M14.0002 17.9994V6.0006C14.0002 5.47022 13.7894 4.96156 13.4143 4.58653C13.0392 4.21149 12.5305 4.0008 12 4.0008H3.99936C3.46888 4.0008 2.96014 4.21149 2.58503 4.58653C2.20993 4.96156 1.9992 5.47022 1.9992 6.0006V16.9995C1.9992 17.2647 2.10457 17.519 2.29212 17.7065C2.47967 17.8941 2.73404 17.9994 2.99928 17.9994H4.99944M4.99944 17.9994C4.99944 19.1039 5.89494 19.9992 6.9996 19.9992C8.10426 19.9992 8.99976 19.1039 8.99976 17.9994M4.99944 17.9994C4.99944 16.8949 5.89494 15.9996 6.9996 15.9996C8.10426 15.9996 8.99976 16.8949 8.99976 17.9994M8.99976 17.9994H15.0002M15.0002 17.9994C15.0002 19.1039 15.8957 19.9992 17.0004 19.9992C18.1051 19.9992 19.0006 19.1039 19.0006 17.9994M15.0002 17.9994C15.0002 16.8949 15.8957 15.9996 17.0004 15.9996C18.1051 15.9996 19.0006 16.8949 19.0006 17.9994M19.0006 17.9994H21.0007C21.266 17.9994 21.5203 17.8941 21.7079 17.7065C21.8954 17.519 22.0008 17.2647 22.0008 16.9995V13.3499C22.0004 13.123 21.9228 12.9029 21.7808 12.7259L18.3005 8.37636C18.207 8.25925 18.0883 8.16466 17.9533 8.09959C17.8183 8.03451 17.6703 8.00061 17.5204 8.0004H14.0002"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <span class="w-logo-text">
+      <b>YouDrop</b>
+      <span class="w-eyebrow" id="receipt-eyebrow">Carrier Hub</span>
+    </span>
   </a>
-  <nav>
-    <a href="/">Back to the site</a>
-  </nav>
-</header>
 
-<main class="apply-page">
-  <h1 id="apply-heading">Apply to join</h1>
-  <p class="section-lede" id="apply-sub">A few short steps. We read every application.</p>
-
-  <!--
-    The progress rail.
-
-    Steps are numbered and named, and the ones already done stay visible. A bare "3 of 4" tells
-    somebody how much is left but not what is coming, and what is coming is the part that decides
-    whether they start at all: nobody minds a code if they can see it is one step of four.
-  -->
-  <ol class="steps" id="steps" aria-label="Progress">
-    <li data-step="1"><span class="dot">1</span><span class="step-name">Your business</span></li>
-    <li data-step="2"><span class="dot">2</span><span class="step-name">Email</span></li>
-    <li data-step="3"><span class="dot">3</span><span class="step-name">Phone</span></li>
-    <li data-step="4"><span class="dot">4</span><span class="step-name">Send it</span></li>
-  </ol>
-
-  <p class="form-error" id="page-error" hidden></p>
-
-  <!-- ---------------------------------------------------------------- 1. business -->
-  <section class="panel step" data-step="1">
-    <h2>Your business</h2>
-    <p class="panel-lede">Tell us who is applying. Nothing here is published anywhere.</p>
-
-    <fieldset class="kind-choice">
-      <legend>What are you applying as?</legend>
-      <label class="kind">
-        <input type="radio" name="kind" value="MERCHANT" checked>
-        <span>
-          <strong>A shop</strong>
-          <small>Put your menu in front of the city and let us find the rider</small>
-        </span>
-      </label>
-      <label class="kind">
-        <input type="radio" name="kind" value="CARRIER">
-        <span>
-          <strong>A delivery company</strong>
-          <small>Bring your fleet onto the platform and get work routed to you</small>
-        </span>
-      </label>
-    </fieldset>
-
-    <label>
-      <span id="business-label">Shop name</span>
-      <input id="businessName" required maxlength="200" autocomplete="organization">
-    </label>
-    <label>
-      <span>Your name</span>
-      <input id="contactName" required maxlength="160" autocomplete="name">
-    </label>
-    <label>
-      <span id="notes-label">Anything else we should know</span>
-      <textarea id="notes" rows="3" maxlength="2000"></textarea>
-    </label>
-
-    <div class="step-actions">
-      <span></span>
-      <button class="primary" data-next="2">Continue</button>
-    </div>
-  </section>
-
-  <!-- ---------------------------------------------------------------- 2. email -->
-  <section class="panel step" data-step="2" hidden>
-    <h2>Your email address</h2>
-    <p class="panel-lede">
-      We send a six-digit code to check it reaches you. Everything after this — including the
-      decision and how to sign in — goes to this address, so it has to be one you can open.
-    </p>
-
-    <div class="verify-row">
-      <label class="grow">
-        <span>Email</span>
-        <input id="contactEmail" type="email" required maxlength="200" autocomplete="email">
-      </label>
-      <button class="secondary" id="email-send">Send code</button>
+  <div class="w-card">
+    <div class="w-card-head">
+      <span class="w-badge">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <path d="M33.332 10L15.0005 28.332L6.668 19.9993" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <h1>Application Submitted Successfully</h1>
+        <p>
+          Thank you for applying. We are currently verifying your business details and, where they
+          apply, your fleet credentials.
+        </p>
+      </div>
     </div>
 
-    <div class="code-box" id="email-code-box" hidden>
-      <label>
-        <span>The code we sent</span>
-        <!-- inputmode numeric so a phone offers a number pad; one-time-code lets both iOS and
-             Android offer to fill it from the message itself. -->
-        <input id="email-code" inputmode="numeric" autocomplete="one-time-code"
-               maxlength="6" placeholder="000000">
-      </label>
-      <button class="primary" id="email-confirm">Verify</button>
-      <p class="hint">
-        <span id="email-expiry"></span>
-        <button class="linkish" id="email-resend" disabled>Send another</button>
-      </p>
+    <div class="w-rule"></div>
+
+    <!-- The reference. Keep it: it is the only way to check on an application before we reply, and
+         it has also gone to the email address that was verified. -->
+    <div class="w-block">
+      <p class="w-block-title">Your reference</p>
+      <p class="reference" id="reference"></p>
     </div>
 
-    <p class="verified" id="email-verified" hidden>✓ Verified</p>
-    <p class="form-error" id="email-error" hidden></p>
+    <div class="w-rule"></div>
 
-    <div class="step-actions">
-      <button class="secondary" data-back="1">Back</button>
-      <button class="primary" data-next="3" id="email-continue" disabled>Continue</button>
-    </div>
-  </section>
-
-  <!-- ---------------------------------------------------------------- 3. phone -->
-  <section class="panel step" data-step="3" hidden>
-    <h2>A phone number <span class="optional">optional</span></h2>
-    <p class="panel-lede">
-      Useful when something about an order needs sorting out quickly. If you would rather not,
-      skip this — it changes nothing about your application.
-    </p>
-
-    <div class="verify-row">
-      <label class="grow">
-        <span>Phone</span>
-        <input id="contactPhone" type="tel" maxlength="32" autocomplete="tel" placeholder="+961 …">
-      </label>
-      <button class="secondary" id="phone-send">Send code</button>
-    </div>
-
-    <div class="code-box" id="phone-code-box" hidden>
-      <label>
-        <span>The code we sent</span>
-        <input id="phone-code" inputmode="numeric" autocomplete="one-time-code"
-               maxlength="6" placeholder="000000">
-      </label>
-      <button class="primary" id="phone-confirm">Verify</button>
-      <p class="hint">
-        <span id="phone-expiry"></span>
-        <button class="linkish" id="phone-resend" disabled>Send another</button>
-      </p>
+    <div class="w-block">
+      <p class="w-block-title">What happens next?</p>
+      <div class="w-block">
+        <div class="w-next-row is-now">
+          <span class="w-next-num">1</span>
+          <span class="w-next-text">
+            <b>Documents Auditing</b>
+            <span>Our partner relations unit is evaluating your business registration details.</span>
+          </span>
+        </div>
+        <div class="w-next-row">
+          <span class="w-next-num">2</span>
+          <span class="w-next-text">
+            <b>Verification Call</b>
+            <span>We'll set up a brief onboarding phone call to verify availability.</span>
+          </span>
+        </div>
+        <div class="w-next-row">
+          <span class="w-next-num">3</span>
+          <span class="w-next-text">
+            <b>Hub Activation</b>
+            <span>You'll receive an email to set a password and open your dashboard.</span>
+          </span>
+        </div>
+      </div>
     </div>
 
-    <p class="verified" id="phone-verified" hidden>✓ Verified</p>
-    <p class="form-error" id="phone-error" hidden></p>
+    <div class="w-rule"></div>
 
-    <div class="step-actions">
-      <button class="secondary" data-back="2">Back</button>
-      <span class="spacer"></span>
-      <!-- Skip is a plain button beside Continue, not a small link underneath it. An optional step
-           whose way out is hidden is not optional in practice. -->
-      <button class="ghost" id="phone-skip">Skip this</button>
-      <button class="primary" data-next="4" id="phone-continue" disabled>Continue</button>
+    <div class="w-info">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M10 13.3336V10M10 6.6664H10.0083M18.334 10C18.334 14.6027 14.6027 18.334 10 18.334C5.39726 18.334 1.666 14.6027 1.666 10C1.666 5.39726 5.39726 1.666 10 1.666C14.6027 1.666 18.334 5.39726 18.334 10Z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p>Verification typically takes 1 – 5 business days. You'll receive email alerts at every step.</p>
     </div>
-  </section>
 
-  <!-- ---------------------------------------------------------------- 4. send -->
-  <section class="panel step" data-step="4" hidden>
-    <h2>Check and send</h2>
-    <p class="panel-lede">This is what we will read. Go back and change anything that is not right.</p>
-
-    <dl class="summary" id="summary"></dl>
-
-    <p class="form-error" id="submit-error" hidden></p>
-
-    <div class="step-actions">
-      <button class="secondary" data-back="3">Back</button>
-      <button class="primary" id="submit">Send application</button>
+    <div class="w-actions">
+      <button class="primary" id="check">Check its status</button>
+      <a class="secondary" href="/">Back to the site</a>
     </div>
-    <p class="sheet-foot">We read every application. You will hear from us either way.</p>
-  </section>
 
-  <!-- ---------------------------------------------------------------- receipt -->
-  <section class="panel step" data-step="done" hidden>
-    <p class="done-mark" aria-hidden="true">✓</p>
-    <h2>Thank you — we have it.</h2>
-    <p class="panel-lede">
-      Keep this reference. It is the only way to check on your application before we reply, and we
-      have also sent it to your email address.
-    </p>
-    <p class="reference" id="reference"></p>
-    <div class="step-actions">
-      <button class="secondary" id="check">Check its status</button>
-      <a class="primary" href="/">Back to the site</a>
-    </div>
     <p class="status-line" id="status" hidden></p>
-  </section>
-</main>
+  </div>
+</div>
 
 <script src="config.js"></script>
 <script src="register.js"></script>

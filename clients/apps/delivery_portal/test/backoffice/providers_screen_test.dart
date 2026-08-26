@@ -1,4 +1,5 @@
 import 'package:delivery_portal/src/backoffice/providers_screen.dart';
+import 'package:delivery_portal/src/shell/shell.dart';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:dio/dio.dart';
@@ -8,6 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 /// A carrier the platform cannot pay is silent until an order has already been delivered, so the
 /// only thing that surfaces it is this screen. Driven through a real [DeliveryProviderApi] over a
 /// stubbed transport, so the JSON mapping is under test too.
+///
+/// Reshaped for the `backoffice-carriers` redesign (Figma 3:2940): the register is a grid of cards,
+/// and everything that is not the carrier's name, size, score and state now lives one tap away in
+/// the card's drawer. The assertions below therefore open the drawer where they used to read the
+/// card — the behaviours themselves are unchanged, and that is the point of keeping them.
 class _FakeAdapter implements HttpClientAdapter {
   _FakeAdapter(this.handler);
 
@@ -88,14 +94,14 @@ void main() {
  {"providerId":"p2","name":"Unchecked Couriers","score":70,"orders":2,
   "completionRate":1.0,"avgSecondsToClaim":null,"avgSecondsOnRoad":null,"provisional":true}]''');
       }
-      if (options.path.contains('/riders')) return _json('[]');
+      if (options.path.contains('/riders')) return _json('{"providerId":"p","riders":[]}');
       return _json(_providersJson);
     });
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
     api = DeliveryProviderApi(dio);
   });
 
-  Future<void> pump(WidgetTester tester, {Size size = const Size(1400, 1400)}) async {
+  Future<void> pump(WidgetTester tester, {Size size = const Size(1400, 1600)}) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -107,39 +113,79 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('counts carriers whose payout account was never checked',
+  /// The 260px card a carrier is drawn on.
+  Finder cardOf(String name) => find.ancestor(
+        of: find.text(name),
+        matching: find.byWidgetPredicate(
+            (Widget w) => w is SizedBox && w.width == 260),
+      );
+
+  /// Closes whatever drawer is open, by the barrier the design gives it.
+  Future<void> close(WidgetTester tester) async {
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+  }
+
+  /// Opens one carrier's drawer — where its payout, logins and roster now live.
+  Future<void> manage(WidgetTester tester, String name) async {
+    await tester.tap(find.descendant(
+      of: cardOf(name),
+      matching: find.widgetWithText(ConsoleButton, 'Manage'),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a carrier the bank has not confirmed says so on its own card',
       (WidgetTester tester) async {
     await pump(tester);
 
-    // Counted rather than left to be found by reading every card: an unpayable carrier says
-    // nothing until an order has already been delivered.
-    expect(find.text('UNCHECKED PAYOUT'), findsOneWidget);
-    expect(find.text('ask the bank'), findsOneWidget);
+    // On the card rather than only in the drawer: an unpayable carrier says nothing until an order
+    // has already been delivered, so it must not wait for somebody to go looking.
+    expect(
+      find.descendant(
+        of: cardOf('Unchecked Couriers'),
+        matching: find.textContaining('The bank has not confirmed this account'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: cardOf('Verified Couriers'),
+        matching: find.textContaining('has not confirmed'),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('says which account is confirmed and which is not',
       (WidgetTester tester) async {
     await pump(tester);
 
+    await manage(tester, 'Verified Couriers');
     expect(find.textContaining('ACC-GOOD · verified'), findsOneWidget);
+    await close(tester);
+
+    await manage(tester, 'Unchecked Couriers');
     expect(find.textContaining('ACC-UNKNOWN · unconfirmed'), findsOneWidget);
   });
 
   testWidgets('an unconfirmed account is not described as a bad one',
       (WidgetTester tester) async {
     await pump(tester);
+    await manage(tester, 'Unchecked Couriers');
 
     // It usually is not one. Saying otherwise sends an operator to chase a carrier about a
     // problem at our end.
-    expect(find.textContaining('has not confirmed this account'), findsOneWidget);
+    expect(find.textContaining('has not confirmed this account'), findsWidgets);
     expect(find.textContaining('bank unreachable'), findsOneWidget);
   });
 
   testWidgets('offers to ask the bank, and reports what came back',
       (WidgetTester tester) async {
     await pump(tester);
+    await manage(tester, 'Unchecked Couriers');
 
-    await tester.tap(find.widgetWithText(TextButton, 'Check with the bank'));
+    await tester.tap(find.widgetWithText(ConsoleButton, 'Check with the bank'));
     await tester.pumpAndSettle();
 
     expect(adapter.calls.any((String c) => c.contains('POST') && c.contains('p2/verify-payout')),
@@ -156,8 +202,9 @@ void main() {
         accountRef: 'ACC-UNKNOWN', payoutState: 'UNCONFIRMED',
         payoutDetail: 'no such account at the bank');
     await pump(tester);
+    await manage(tester, 'Unchecked Couriers');
 
-    await tester.tap(find.widgetWithText(TextButton, 'Check with the bank'));
+    await tester.tap(find.widgetWithText(ConsoleButton, 'Check with the bank'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('still unconfirmed'), findsOneWidget);
@@ -168,9 +215,39 @@ void main() {
       (WidgetTester tester) async {
     await pump(tester);
 
-    // Two carriers have accounts; the in-house fleet has none and cannot have one.
-    expect(find.widgetWithText(TextButton, 'Check with the bank'), findsOneWidget);
-    expect(find.widgetWithText(TextButton, 'Re-check account'), findsOneWidget);
+    // The in-house fleet has no payout account and cannot have one.
+    await manage(tester, 'In-house fleet');
+    expect(find.widgetWithText(ConsoleButton, 'Check with the bank'), findsNothing);
+    expect(find.widgetWithText(ConsoleButton, 'Re-check account'), findsNothing);
+    await close(tester);
+
+    await manage(tester, 'Verified Couriers');
+    expect(find.widgetWithText(ConsoleButton, 'Re-check account'), findsOneWidget);
+  });
+
+  testWidgets('the in-house fleet cannot be suspended out of existence',
+      (WidgetTester tester) async {
+    await pump(tester);
+
+    // Every order with no other carrier goes to it; stopping it would stop them all.
+    final ConsoleButton suspend = tester.widget<ConsoleButton>(find.descendant(
+      of: cardOf('In-house fleet'),
+      matching: find.widgetWithText(ConsoleButton, 'Suspend'),
+    ));
+    expect(suspend.onPressed, isNull);
+  });
+
+  testWidgets('suspends a company from its own card', (WidgetTester tester) async {
+    await pump(tester);
+
+    await tester.tap(find.descendant(
+      of: cardOf('Verified Couriers'),
+      matching: find.widgetWithText(ConsoleButton, 'Suspend'),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(adapter.calls.any((String c) => c.contains('POST') && c.contains('p1/suspend')),
+        isTrue);
   });
 
   group('the delivery score', () {
@@ -184,6 +261,7 @@ void main() {
 
     testWidgets('with the parts an operator can quote back', (WidgetTester tester) async {
       await pump(tester);
+      await manage(tester, 'Verified Couriers');
 
       // "Why am I being sent less work" is the question this answers.
       expect(find.textContaining('97% of 140 delivered'), findsOneWidget);
@@ -196,7 +274,7 @@ void main() {
       adapter = _FakeAdapter((RequestOptions options) {
         if (options.path.contains('/scores')) throw StateError('scores are down');
         if (options.path.endsWith('/staff')) return _json('{"providerId":"p1","riders":[]}');
-        if (options.path.contains('/riders')) return _json('[]');
+        if (options.path.contains('/riders')) return _json('{"providerId":"p","riders":[]}');
         return _json(_providersJson);
       });
       api = DeliveryProviderApi(
@@ -216,23 +294,27 @@ void main() {
       adapter = _FakeAdapter((RequestOptions options) {
         if (options.path.endsWith('/staff')) return _json('{"providerId":"p1","riders":[]}');
         if (options.path.contains('/scores')) return _json('[]');
-        if (options.path.contains('/riders')) return _json('[]');
+        if (options.path.contains('/riders')) return _json('{"providerId":"p","riders":[]}');
         return _json(_providersJson);
       });
       api = DeliveryProviderApi(
           Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
       await pump(tester);
+      await manage(tester, 'Verified Couriers');
 
-      expect(find.textContaining('Nobody can sign in'), findsWidgets);
+      expect(find.textContaining('Nobody can sign in'), findsOneWidget);
     });
 
     testWidgets('and one can be given access', (WidgetTester tester) async {
       await pump(tester);
+      await manage(tester, 'Verified Couriers');
 
-      await tester.tap(find.widgetWithText(TextButton, 'Give someone access').first);
+      await tester.tap(find.widgetWithText(ConsoleButton, 'Give someone access'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'sub-abc-123');
-      await tester.tap(find.widgetWithText(FilledButton, 'Give access'));
+      await tester.enterText(
+          find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+          'sub-abc-123');
+      await tester.tap(find.widgetWithText(ConsoleButton, 'Give access'));
       await tester.pumpAndSettle();
 
       expect(
@@ -246,8 +328,20 @@ void main() {
       await pump(tester);
 
       // p3 is a merchant's own fleet: its owner administers it from their own portal.
-      final int companies = 2;
-      expect(find.widgetWithText(TextButton, 'Give someone access'), findsNWidgets(companies));
+      await manage(tester, 'Own drivers');
+      expect(find.widgetWithText(ConsoleButton, 'Give someone access'), findsNothing);
+      // It still has a roster, which is the other half of the same distinction.
+      expect(find.text('RIDERS'), findsOneWidget);
     });
+  });
+
+  testWidgets('finds one carrier in the register', (WidgetTester tester) async {
+    await pump(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'unchecked');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unchecked Couriers'), findsOneWidget);
+    expect(find.text('Verified Couriers'), findsNothing);
   });
 }

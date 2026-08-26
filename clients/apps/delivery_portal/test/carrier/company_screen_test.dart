@@ -1,39 +1,52 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:delivery_portal/src/carrier/company_screen.dart';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:delivery_portal/src/carrier/company_screen.dart';
+import 'package:delivery_portal/src/shell/console_controls.dart';
+import 'package:delivery_portal/src/shell/shell.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The delivery company's own view.
+/// Riders Management — Figma `carrier-riders` (3:3589).
 ///
-/// What matters here is that a carrier is told the things that decide whether they get work: their
-/// score and what it is made of, whether they are taking orders, whether they have any riders, and
-/// whether they can actually be paid. Each of those was invisible to them before this screen.
+/// The design's table has seven columns and the platform can fill two of them. What matters here is
+/// that the other five say "not recorded" rather than showing a number a company would act on, that
+/// the drawn-but-unbacked "Add New Rider" button cannot be pressed into a dead end, and that the
+/// two live things this page has always done — the score, and the switch that stops work arriving —
+/// still work after the restyle.
 class _StubAdapter implements HttpClientAdapter {
-  _StubAdapter(this.responses);
+  _StubAdapter(this.responses, {this.failing = const <String>{}});
 
   final Map<String, Object> responses;
+  final Set<String> failing;
   final List<String> calls = <String>[];
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
       Future<void>? cancelFuture) async {
     calls.add('${options.method} ${options.path}');
-    for (final MapEntry<String, Object> entry in responses.entries) {
-      if (options.path.endsWith(entry.key)) {
-        return ResponseBody.fromString(jsonEncode(entry.value), 200,
-            headers: <String, List<String>>{
-              Headers.contentTypeHeader: <String>[Headers.jsonContentType]
-            });
+
+    for (final String path in failing) {
+      if (options.path.contains(path)) {
+        return ResponseBody.fromString('{"message":"no"}', 404);
       }
     }
-    return ResponseBody.fromString('{}', 404);
+
+    final List<String> matches = responses.keys
+        .where((String key) => options.path.contains(key))
+        .toList()
+      ..sort((String a, String b) => b.length.compareTo(a.length));
+
+    if (matches.isEmpty) return ResponseBody.fromString('{}', 404);
+    return ResponseBody.fromString(jsonEncode(responses[matches.first]), 200,
+        headers: <String, List<String>>{
+          Headers.contentTypeHeader: <String>[Headers.jsonContentType]
+        });
   }
 
   @override
@@ -43,8 +56,6 @@ class _StubAdapter implements HttpClientAdapter {
 Map<String, dynamic> _company({
   String status = 'ACTIVE',
   bool canTakeWork = true,
-  String payoutState = 'VERIFIED',
-  String? accountRef = 'ACC-CARRIER',
 }) =>
     <String, dynamic>{
       'id': 'p1',
@@ -54,13 +65,10 @@ Map<String, dynamic> _company({
       'status': status,
       'canTakeWork': canTakeWork,
       'ownerRef': null,
-      'accountRef': accountRef,
+      'accountRef': 'ACC-CARRIER',
       'contactName': 'Cara',
       'contactPhone': '+100',
-      'payoutState': payoutState,
-      'payoutCheckedAt': '2026-08-15T09:00:00Z',
-      'payoutDetail': 'bank holder: Swift Couriers Ltd',
-      'createdAt': '2026-08-01T09:00:00Z',
+      'payoutState': 'VERIFIED',
     };
 
 Map<String, dynamic> _score({int score = 84, bool provisional = false, double completion = 0.96}) =>
@@ -75,23 +83,63 @@ Map<String, dynamic> _score({int score = 84, bool provisional = false, double co
       'provisional': provisional,
     };
 
-/// The adapter the current test is driving, so an assertion can read what was called.
+Map<String, dynamic> _job({
+  required String id,
+  String status = 'DELIVERED',
+  String? riderId = 'rider-aaaaaaaa',
+}) =>
+    <String, dynamic>{
+      'id': id,
+      'customerId': 'c1',
+      'merchantId': 'm1',
+      'riderId': riderId,
+      'status': status,
+      'totalAmount': 50.0,
+      'deliveryAddress': '12 Bliss Street',
+      'deliveryFee': 5.0,
+      'contactPhone': '+100',
+      'notes': null,
+      'items': <dynamic>[],
+      'availableActions': <dynamic>[],
+      'placedAt': '2026-08-16T09:00:00Z',
+      'deliveredAt': status == 'DELIVERED' ? '2026-08-16T10:00:00Z' : null,
+      'cancelReason': null,
+    };
+
+Map<String, dynamic> _page(List<Map<String, dynamic>> jobs) => <String, dynamic>{
+      'content': jobs,
+      'page': 0,
+      'size': 100,
+      'totalElements': jobs.length,
+      'totalPages': 1,
+    };
+
 late _StubAdapter _adapter;
 
-DeliveryProviderApi _api({
+({DeliveryProviderApi provider, OrderApi order}) _apis({
   Map<String, dynamic>? company,
   Map<String, dynamic>? score,
   List<String> riders = const <String>['rider-aaaaaaaa', 'rider-bbbbbbbb'],
+  List<Map<String, dynamic>>? jobs,
+  Set<String> failing = const <String>{},
 }) {
-  _adapter = _StubAdapter(<String, Object>{
-    '/my-company/score': score ?? _score(),
-    '/my-company/riders': <String, dynamic>{'providerId': 'p1', 'riders': riders},
-    '/my-company/pause': _company(status: 'PAUSED', canTakeWork: false),
-    '/my-company/resume': _company(),
-    '/my-company': company ?? _company(),
-  });
+  _adapter = _StubAdapter(
+    <String, Object>{
+      '/my-company/score': score ?? _score(),
+      '/my-company/riders': <String, dynamic>{'providerId': 'p1', 'riders': riders},
+      '/my-company/pause': _company(status: 'PAUSED', canTakeWork: false),
+      '/my-company/resume': _company(),
+      '/my-company': company ?? _company(),
+      '/orders/carrier': _page(jobs ??
+          <Map<String, dynamic>>[
+            _job(id: 'aaaaaaaa11'),
+            _job(id: 'bbbbbbbb22', status: 'PICKED_UP', riderId: 'rider-bbbbbbbb'),
+          ]),
+    },
+    failing: failing,
+  );
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = _adapter;
-  return DeliveryProviderApi(dio);
+  return (provider: DeliveryProviderApi(dio), order: OrderApi(dio));
 }
 
 Widget _wrap(Widget child, {Locale locale = const Locale('en')}) => MaterialApp(
@@ -104,22 +152,17 @@ Widget _wrap(Widget child, {Locale locale = const Locale('en')}) => MaterialApp(
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: child,
+      home: Scaffold(body: child),
     );
 
-LocaleController _locale() => LocaleController(
-      read: () async => null,
-      write: (String _) async {},
-    );
-
-Future<void> pump(WidgetTester tester, DeliveryProviderApi api,
-    {Locale locale = const Locale('en')}) async {
-  tester.view.physicalSize = const Size(1400, 1800);
+Future<void> pump(WidgetTester tester, ({DeliveryProviderApi provider, OrderApi order}) apis,
+    {Locale locale = const Locale('en'), double width = 1180}) async {
+  tester.view.physicalSize = Size(width, 2400);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(_wrap(
-    CompanyScreen(api: api, locale: _locale(), onSignOut: () async {}),
+    CompanyScreen(api: apis.provider, orderApi: apis.order),
     locale: locale,
   ));
   await tester.pumpAndSettle();
@@ -129,8 +172,59 @@ void main() {
   final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
   final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
 
+  testWidgets('is the design table, with all seven columns', (WidgetTester tester) async {
+    await pump(tester, _apis());
+
+    expect(find.text('Riders Management'), findsOneWidget);
+    for (final String column in <String>[
+      'Rider Name',
+      'Status',
+      'Region',
+      'Deliveries',
+      'Rating',
+      'Join Date',
+      'Actions',
+    ]) {
+      expect(find.text(column), findsOneWidget, reason: column);
+    }
+    expect(find.byType(ConsoleNameCell), findsNWidgets(2));
+  });
+
+  testWidgets('fills the columns it can and dashes the ones it cannot',
+      (WidgetTester tester) async {
+    // rider-aa carried one delivered job; rider-bb is out on one that has not finished.
+    await pump(tester, _apis());
+
+    expect(find.text('RIDER-AA'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('On a job'), findsOneWidget);
+    // Region, Rating and Join Date have no backend at all — three dashes on each of two rows,
+    // plus the status of the rider who is not out.
+    expect(find.text('—'), findsNWidgets(7));
+    expect(find.textContaining('are not recorded for a rider'), findsOneWidget);
+  });
+
+  testWidgets('a job board that did not load does not become a row of zeroes',
+      (WidgetTester tester) async {
+    await pump(tester, _apis(failing: const <String>{'/orders/carrier'}));
+
+    expect(find.text('0'), findsNothing);
+    expect(find.textContaining('could not be read just now'), findsOneWidget);
+  });
+
+  testWidgets('Add New Rider is drawn, inert, and explained', (WidgetTester tester) async {
+    // Riders reach a fleet by applying and being approved. There is no endpoint that creates one
+    // directly, so the design's primary button must not open a form nothing can submit.
+    await pump(tester, _apis());
+
+    final Finder button = find.widgetWithText(ConsolePrimaryButton, 'Add New Rider');
+    expect(button, findsOneWidget);
+    expect(tester.widget<ConsolePrimaryButton>(button).onPressed, isNull);
+    expect(find.byType(ConsoleComingSoonChip), findsWidgets);
+  });
+
   testWidgets('shows the score and what it is made of', (WidgetTester tester) async {
-    await pump(tester, _api());
+    await pump(tester, _apis());
 
     // The number alone is a verdict nobody can act on; the parts are the target.
     expect(find.text('84'), findsOneWidget);
@@ -142,17 +236,17 @@ void main() {
 
   testWidgets('a provisional score says so rather than looking earned',
       (WidgetTester tester) async {
-    await pump(tester, _api(score: _score(score: 70, provisional: true, completion: 1)));
+    await pump(tester, _apis(score: _score(score: 70, provisional: true, completion: 1)));
 
     expect(find.text(en.tooEarlyToTell), findsOneWidget);
     expect(find.textContaining('benefit of the doubt'), findsOneWidget);
   });
 
-  testWidgets('a carrier can stop taking orders', (WidgetTester tester) async {
-    await pump(tester, _api());
+  testWidgets('a carrier can still stop taking orders', (WidgetTester tester) async {
+    await pump(tester, _apis());
 
     expect(find.text(en.youAreTakingOrders), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, en.pauseNewOrders));
+    await tester.tap(find.widgetWithText(ConsolePrimaryButton, en.pauseNewOrders));
     await tester.pumpAndSettle();
 
     expect(_adapter.calls.any((String c) => c.contains('POST') && c.contains('/my-company/pause')),
@@ -162,33 +256,40 @@ void main() {
   testWidgets('a suspended carrier is not offered a button that would fail',
       (WidgetTester tester) async {
     // Suspension is the platform's decision and a carrier cannot resume out of it. A button that
-    // silently 422s would be worse than no button.
-    await pump(tester, _api(company: _company(status: 'SUSPENDED', canTakeWork: false)));
+    // silently fails would be worse than no button.
+    await pump(tester, _apis(company: _company(status: 'SUSPENDED', canTakeWork: false)));
 
     expect(find.textContaining('suspended'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, en.startTakingOrders), findsNothing);
+    expect(find.widgetWithText(ConsolePrimaryButton, en.startTakingOrders), findsNothing);
   });
 
   testWidgets('an empty fleet is called out, not left to be inferred',
       (WidgetTester tester) async {
     // A company with no riders looks available and can collect nothing — the most confusing way to
     // be sent no work.
-    await pump(tester, _api(riders: const <String>[]));
+    await pump(tester, _apis(riders: const <String>[]));
 
     expect(find.textContaining('no riders'), findsOneWidget);
   });
 
-  testWidgets('an unconfirmed payout account is flagged', (WidgetTester tester) async {
-    await pump(tester, _api(company: _company(payoutState: 'UNCONFIRMED')));
+  testWidgets('the parts that are still translated stay translated',
+      (WidgetTester tester) async {
+    // The console's own chrome is English-only in this wave; the score and availability cards were
+    // localised before it and stay that way.
+    await pump(tester, _apis(), locale: const Locale('ar'));
 
-    expect(find.textContaining('has not confirmed'), findsOneWidget);
-  });
-
-  testWidgets('and the whole screen works in Arabic', (WidgetTester tester) async {
-    await pump(tester, _api(), locale: const Locale('ar'));
-
-    expect(find.text(ar.howYouAreDoing.toUpperCase()), findsOneWidget);
-    expect(find.text(en.howYouAreDoing.toUpperCase()), findsNothing);
+    expect(find.text(ar.howYouAreDoing), findsOneWidget);
+    expect(find.text(en.howYouAreDoing), findsNothing);
     expect(Directionality.of(tester.element(find.byType(CompanyScreen))), TextDirection.rtl);
   });
+
+  // What a 1440 / 1280 / 1024 window leaves the content column once the 260px rail has its share.
+  // The table scrolls sideways below its own minimum rather than compressing; the cards under it
+  // stack. An overflow fails the test.
+  for (final double width in <double>[1180, 1020, 764]) {
+    testWidgets('lays out at a ${width.toInt()}px content column', (WidgetTester tester) async {
+      await pump(tester, _apis(), width: width);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

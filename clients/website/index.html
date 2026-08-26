@@ -1,192 +1,703 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Delivery — your city, delivered</title>
-  <meta name="description" content="Restaurants, pharmacies and anything else, brought to the door. Partner with us as a shop or a delivery company.">
+  <title>YouDrop — the delivery platform that connects everyone</title>
+  <meta name="description" content="YouDrop connects customers, local merchants, independent riders and corporate carriers in one delivery platform. Open a shop, bring your fleet, or order anything.">
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
 
 <!--
-  The public front door.
+  The public front door. Rebuilt from Figma frame 14:4 (4lIJm9HXkQtTQHqhBIpNfB).
 
-  Four audiences arrive here and only two of them belong on this page. A shop or a delivery company
-  signs a commercial agreement and needs a review before they can trade, so they get a form. A
-  customer or a rider signs themselves up in the app in under a minute, so sending them to a web
-  form would be a longer road to the same place — they get a link to the app instead.
+  Four audiences arrive here and only two of them can be served by a web form. A shop or a delivery
+  company signs a commercial agreement and needs a review before it can trade, so it gets /register.
+  A customer or a rider signs themselves up inside the app in under a minute — and the app is not in
+  either store yet, which is why every route to it on this page carries a "Coming soon" chip instead
+  of a link to nowhere.
 
   The Backoffice is deliberately absent from this page, and its address is deliberately absent from
-  this comment too — a note in the page source naming the door is the same as a link to it. Staff
-  know where it is. Not a security control on its own: that portal enforces the BACKOFFICE role on
-  every request. It is simply not a public entrance, so it is not on the public map.
--->
+  this comment too — a note in the page source naming the door is the same as a link to it. Not a
+  security control on its own: that portal enforces the BACKOFFICE role on every request. It is
+  simply not a public entrance, so it is not on the public map.
 
-<!--
-  The moving backdrop.
+  --------------------------------------------------------------------------------------------
+  CONTENT STILL PENDING SIGN-OFF. Three things the design fills in and this page does not:
 
-  Decorative and nothing else, so it is aria-hidden and takes no pointer events — a screen reader
-  should not announce three empty spans, and nothing here should ever swallow a click meant for the
-  page. It is also the first thing in the body rather than a background on an element, so it can sit
-  behind the whole document without any section having to know it exists.
+    1. The counters band. Designed as: 10,000+ Active Merchants / 50,000+ Deliveries Daily /
+       5,000+ Verified Riders / 98.4% Satisfaction Rate. Nothing on the platform produces those
+       numbers. Ships with the labels and an empty figure.
+    2. The three testimonials. Designed as quotes from "Chef Marco Rossi (Pizzeria Antica)",
+       "Zoe Chen (Independent Courier)" and "Sophia Martinez (Butler Service Enthusiast)", each
+       with a photographic portrait. The portraits are generated likenesses of people who do not
+       exist and the quotes are nobody's words, so neither ships. The cards keep their geometry.
+    3. The hero's partner row. Designed as "Trusted by logistics partners globally: DHL, FedEx,
+       Aramex, UPS". Naming four real carriers as partners is a claim about them, not about us.
+       Removed until there is an agreement to point at.
+
+  The one invented figure that DOES ship is inside the Control Tower card in the hero — that card
+  is a picture of the product's own dashboard, sitting on a phone mockup, and sample data in a
+  product screenshot is a screenshot, not a claim about the business.
+  --------------------------------------------------------------------------------------------
 -->
-<div class="backdrop" aria-hidden="true">
-  <span class="orb orb-a"></span>
-  <span class="orb orb-b"></span>
-  <span class="orb orb-c"></span>
-  <span class="grain"></span>
-  <span class="dawn"></span>
-</div>
 
 <header class="masthead">
-  <a class="wordmark" href="/">
+  <a class="wordmark" href="/" aria-label="YouDrop">
     <span class="mark" aria-hidden="true"></span>
-    Delivery
+    <span class="wordmark-text">YouDrop</span>
   </a>
-  <nav>
-    <a href="#about">About us</a>
-    <a href="#contact">Contact us</a>
-    <!--
-      The one way in for a business, and it goes straight to the form.
 
-      There used to be two cards further down the page saying the same thing in more words, each
-      with its own button. They were a second entry point to a page that already asks, as its first
-      question, which of the two you are — so the cards restated a choice the form was going to
-      make anyway, and split the traffic between two places to keep in step.
-    -->
-    <a href="/register">Partner with us</a>
-    <a href="#app">Get the app</a>
-    <button class="ghost" data-open="signin">Sign in</button>
+  <!--
+    The design draws five nav links. Two of them — Pricing and About — go to pages that do not
+    exist, and a link into a 404 is worse than no link, so they are not rendered. The three that
+    remain are anchors into this page.
+  -->
+  <nav aria-label="Sections">
+    <a href="#merchants" data-t="nav-merchants">For Merchants</a>
+    <a href="#carriers" data-t="nav-carriers">For Carriers</a>
+    <a href="#riders" data-t="nav-riders">For Riders</a>
   </nav>
+
+  <div class="masthead-actions">
+    <!--
+      The language switch. It works without a round trip: the dictionary is inline in site.js and
+      the choice is remembered in localStorage. With scripting off the button simply does nothing
+      and the page stays in English, which is the language it is written in.
+    -->
+    <button class="lang" type="button" data-lang-toggle aria-pressed="false">
+      <img src="icons/globe.svg" alt="" width="18" height="18">
+      <span>EN / AR</span>
+    </button>
+    <a class="primary" href="/register" data-t="cta-get-started">Get Started</a>
+  </div>
 </header>
 
 <main>
+
+  <!-- ---------------------------------------------------------------- hero -->
   <section class="hero">
-    <div class="hero-copy">
-      <h1>Your city, delivered.</h1>
-      <p class="lede">
-        Restaurants, pharmacies, groceries — and anything else you need fetched.
-        Ordered in the app, or straight from a WhatsApp message to the shop.
-      </p>
-      <div class="hero-actions">
-        <!-- Straight to the form. On a narrow screen the masthead links are hidden, so this is the
-             only way a business reaches it — a link to a section that no longer exists would have
-             left mobile visitors with no route in at all. -->
-        <a class="primary" href="/register">Partner with us</a>
-        <a class="secondary" href="#app">Order something</a>
+    <div class="hero-inner">
+      <div class="stack hero-copy">
+        <div class="heading-block">
+          <span class="eyebrow eyebrow-hero" data-t="hero-eyebrow">⚡ Unified Logistics &amp; Delivery Engine</span>
+          <h1 data-t="hero-title">The Delivery Platform That Connects Everyone</h1>
+          <p class="hero-lede" data-t="hero-lede">
+            YouDrop seamlessly orchestrates customers, local merchants, independent riders, and
+            corporate carriers. One ecosystem, infinite efficiency.
+          </p>
+        </div>
+
+        <div class="hero-actions">
+          <a class="primary" href="/register?kind=MERCHANT" data-t="cta-merchant">Start as Merchant</a>
+          <!-- Riders sign themselves up inside the app, and the app is not published yet. -->
+          <span class="cta-soon">
+            <span class="secondary" aria-disabled="true" data-t="cta-rider">Become a Rider</span>
+            <span class="soon" data-t="soon">Coming soon</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="hero-media">
+        <!-- A picture of the product's dashboard. Sample data, as in any product screenshot. -->
+        <div class="control-tower" role="img" aria-label="A preview of the YouDrop control tower dashboard">
+          <div class="row">
+            <span class="label" data-t="tower-label">CONTROL TOWER</span>
+            <span class="dot" aria-hidden="true"></span>
+          </div>
+          <span class="figure">$42,510</span>
+          <span class="delta" data-t="tower-delta">+8.4% vs last week</span>
+        </div>
+
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div aria-hidden="true">
+                <img class="sig" src="icons/ios-signal.svg" alt="" width="16" height="10">
+                <img class="wifi" src="icons/ios-wifi.svg" alt="" width="16" height="10">
+                <img class="bat" src="icons/ios-battery.svg" alt="" width="20" height="10">
+              </div>
+            </div>
+            <div class="phone-body">
+              <img src="img/screen-customer-tracking.jpg" width="456" height="891"
+                   alt="The YouDrop customer app tracking a delivery on a map">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    <!--
-      Placeholder for the Canva hero. Drawn in CSS rather than left blank so the page is complete
-      on its own — a broken image frame reads as a broken site, and an empty box reads as an
-      unfinished one.
-    -->
-    <div class="hero-art" role="img" aria-label="A courier bag and a scooter, stylised">
-      <div class="art-bag"></div>
-      <div class="art-wheel art-wheel-a"></div>
-      <div class="art-wheel art-wheel-b"></div>
-      <div class="art-road"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- how it works -->
+  <section class="band">
+    <div class="band-inner band-stack">
+      <div class="heading-block heading-centered">
+        <span class="eyebrow" data-t="cycle-eyebrow">Logistics Cycle</span>
+        <h2 data-t="cycle-title">Three Sides, One Perfect Loop</h2>
+        <p data-t="cycle-lede">
+          YouDrop works dynamically in real-time to bring absolute transparency to every milestone.
+        </p>
+      </div>
+
+      <ol class="steps-row">
+        <li class="step-card">
+          <div class="num-row">
+            <span class="num" aria-hidden="true">01</span>
+            <span class="rule" aria-hidden="true"></span>
+          </div>
+          <h3 data-t="step1-title">Merchants List</h3>
+          <p data-t="step1-body">
+            Shops upload their catalog and customize delivery windows using the Merchant App.
+          </p>
+        </li>
+        <li class="step-card">
+          <div class="num-row">
+            <span class="num" aria-hidden="true">02</span>
+            <span class="rule" aria-hidden="true"></span>
+          </div>
+          <h3 data-t="step2-title">Customers Order</h3>
+          <p data-t="step2-body">
+            Users search locally, order food or goods, or send packages via YouDrop Butler.
+          </p>
+        </li>
+        <li class="step-card">
+          <!-- No rule after the last step: there is nothing further along to point at. -->
+          <div class="num-row">
+            <span class="num" aria-hidden="true">03</span>
+          </div>
+          <h3 data-t="step3-title">Riders Deliver</h3>
+          <p data-t="step3-body">
+            Riders and carrier fleets optimize routes and deliver in record-breaking times.
+          </p>
+        </li>
+      </ol>
     </div>
   </section>
 
-  <section class="strip">
-    <div><strong>Same-day</strong><span>Most orders inside the hour</span></div>
-    <div><strong>Any shop</strong><span>Food, pharmacy, groceries, errands</span></div>
-    <div><strong>Cash or card</strong><span>Pay however suits you</span></div>
-    <div><strong>Arabic &amp; English</strong><span>The whole app, both ways round</span></div>
-  </section>
+  <!-- ---------------------------------------------------------------- merchants -->
+  <section class="band band-muted" id="merchants">
+    <div class="band-inner split">
+      <div class="split-media">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div aria-hidden="true">
+                <img class="sig" src="icons/ios-signal.svg" alt="" width="16" height="10">
+                <img class="wifi" src="icons/ios-wifi.svg" alt="" width="16" height="10">
+                <img class="bat" src="icons/ios-battery.svg" alt="" width="20" height="10">
+              </div>
+            </div>
+            <div class="phone-body">
+              <img src="img/screen-merchant-orders.jpg" width="456" height="891" loading="lazy"
+                   alt="The YouDrop merchant app showing a list of incoming orders">
+            </div>
+          </div>
+        </div>
+      </div>
 
-  <section id="about" class="prose">
-    <h2>About us</h2>
-    <p class="section-lede">
-      We connect the shops in your city with the people who deliver for them, and take the awkward
-      parts off both of their hands.
-    </p>
-    <p>
-      A shop gets its menu in front of the whole city and keeps taking orders the way it already
-      does — including straight from the WhatsApp messages it already receives. A delivery company
-      brings its own fleet and is sent work on merit: the more it completes and the faster it
-      claims, the more it is offered. Nobody has to choose between the two, and nobody has to run
-      their own riders to be on the platform.
-    </p>
-    <p>
-      The whole thing works in Arabic and English, both ways round, and takes cash as seriously as
-      it takes cards — because most of this city still pays at the door.
-    </p>
-  </section>
+      <div class="stack">
+        <div class="heading-block">
+          <span class="eyebrow" data-t="merchants-eyebrow">For Merchants</span>
+          <h2 data-t="merchants-title">Drive More Revenue, Outsource The Logistics</h2>
+          <p data-t="merchants-lede">
+            Focus on crafting great products. From restaurant dishes to retail inventory, YouDrop
+            handles the entire dispatch pipeline.
+          </p>
+        </div>
 
-  <section id="contact" class="prose">
-    <h2>Contact us</h2>
-    <p class="section-lede">
-      Something gone wrong with an order, or a question before you apply? Talk to a person.
-    </p>
-    <!--
-      PLACEHOLDERS. These are not real routes yet and need replacing before this site is public —
-      an address on a contact page that nobody reads is worse than no contact page, because a
-      customer who writes to it believes they have been in touch.
-    -->
-    <dl class="contact-list">
-      <dt>Email</dt>
-      <dd><a href="mailto:hello@delivery.example">hello@delivery.example</a></dd>
-      <dt>WhatsApp</dt>
-      <dd>The number on your order confirmation reaches the shop directly.</dd>
-      <dt>Already a partner?</dt>
-      <dd>Sign in to your portal — support is on every screen.</dd>
-    </dl>
-  </section>
+        <ul class="features">
+          <li>
+            <span class="tile"><img src="icons/check.svg" alt="" width="14" height="14"></span>
+            <span data-t="merchants-f1">Intuitive catalog and product management</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/check.svg" alt="" width="14" height="14"></span>
+            <span data-t="merchants-f2">Real-time order routing &amp; courier matching</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/check.svg" alt="" width="14" height="14"></span>
+            <span data-t="merchants-f3">Advanced analytics with back-office portal integration</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/check.svg" alt="" width="14" height="14"></span>
+            <span data-t="merchants-f4">Flexible pricing tiers built for local commerce</span>
+          </li>
+        </ul>
 
-  <section id="app" class="app">
-    <h2>Ordering, or riding?</h2>
-    <p class="section-lede">
-      Both live in the app — the same one, and it knows which you are when you sign in.
-      No application, no waiting: you are set up in a minute.
-    </p>
-    <div class="app-actions">
-      <a class="primary" href="http://127.0.0.1:5012" target="_blank" rel="noopener">Open the app</a>
-      <span class="hint">Customers order. Riders pick up work. Same sign-in.</span>
+        <a class="primary" href="/register?kind=MERCHANT" data-t="cta-shop">Open Your Shop Now</a>
+      </div>
     </div>
   </section>
+
+  <!-- ---------------------------------------------------------------- carriers -->
+  <section class="band" id="carriers">
+    <div class="band-inner split">
+      <div class="stack">
+        <div class="heading-block">
+          <span class="eyebrow" data-t="carriers-eyebrow">For Carriers</span>
+          <h2 data-t="carriers-title">Empower Your Fleet &amp; Command the Region</h2>
+          <p data-t="carriers-lede">
+            Corporate delivery giants and logistics firms partner with YouDrop to manage riders,
+            onboard personnel, and track high-density shipments in absolute real-time.
+          </p>
+        </div>
+
+        <ul class="features">
+          <li>
+            <span class="tile"><img src="icons/truck.svg" alt="" width="14" height="14"></span>
+            <span data-t="carriers-f1">State-of-the-art Carrier Control Center</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/truck.svg" alt="" width="14" height="14"></span>
+            <span data-t="carriers-f2">Direct API integration with legacy logistics grids</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/truck.svg" alt="" width="14" height="14"></span>
+            <span data-t="carriers-f3">Flexible shift planning and dispatcher dashboards</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/truck.svg" alt="" width="14" height="14"></span>
+            <span data-t="carriers-f4">Instant batch settlements and payout tracking</span>
+          </li>
+        </ul>
+
+        <a class="secondary" href="/register?kind=CARRIER" data-t="cta-partner">Partner With Us</a>
+      </div>
+
+      <div class="split-media">
+        <div class="dashboard">
+          <div class="dashboard-head">
+            <h3 data-t="fleet-title">Fleet Dispatch Center</h3>
+            <span class="live" data-t="fleet-live">Live Stream</span>
+          </div>
+          <img src="img/fleet-dispatch.jpg" width="867" height="330" loading="lazy"
+               alt="The carrier dispatch dashboard tracking vehicles across a city map">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- riders -->
+  <section class="band band-muted" id="riders">
+    <div class="band-inner split">
+      <div class="split-media">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div aria-hidden="true">
+                <img class="sig" src="icons/ios-signal.svg" alt="" width="16" height="10">
+                <img class="wifi" src="icons/ios-wifi.svg" alt="" width="16" height="10">
+                <img class="bat" src="icons/ios-battery.svg" alt="" width="20" height="10">
+              </div>
+            </div>
+            <div class="phone-body">
+              <img src="img/screen-rider-route.jpg" width="456" height="891" loading="lazy"
+                   alt="The YouDrop rider app showing an active delivery route">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="heading-block">
+          <span class="eyebrow" data-t="riders-eyebrow">For Riders</span>
+          <h2 data-t="riders-title">Deliver When You Want. Make Great Money.</h2>
+          <p data-t="riders-lede">
+            YouDrop offers absolute flexibility. Whether you ride a bicycle, scooter, motorbike, or
+            drive a car — jump online, accept orders, and earn instantly.
+          </p>
+        </div>
+
+        <ul class="features">
+          <li>
+            <span class="tile"><img src="icons/award.svg" alt="" width="14" height="14"></span>
+            <span data-t="riders-f1">Top-tier competitive earnings and tips</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/award.svg" alt="" width="14" height="14"></span>
+            <span data-t="riders-f2">Flexible hours — log on whenever you need</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/award.svg" alt="" width="14" height="14"></span>
+            <span data-t="riders-f3">Smart routing system for quick drops &amp; less wait time</span>
+          </li>
+          <li>
+            <span class="tile"><img src="icons/award.svg" alt="" width="14" height="14"></span>
+            <span data-t="riders-f4">Instant payouts directly to your digital wallet</span>
+          </li>
+        </ul>
+
+        <span class="cta-soon">
+          <span class="primary" aria-disabled="true" data-t="cta-rider">Become a Rider</span>
+          <span class="soon" data-t="soon">Coming soon</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- customers / Butler -->
+  <section class="band" id="customers">
+    <div class="band-inner split">
+      <div class="stack">
+        <div class="heading-block">
+          <span class="eyebrow" data-t="customers-eyebrow">For Customers</span>
+          <h2 data-t="customers-title">YouDrop Butler: Buy or Send Anything</h2>
+          <p data-t="customers-lede">
+            Our premium Butler service isn't limited to standard menus. If a local shop exists,
+            we'll buy from it. Need keys picked up? We are on it.
+          </p>
+        </div>
+
+        <div class="butler-cards">
+          <div class="butler-card butler-buy">
+            <img src="icons/shopping-cart.svg" alt="" width="28" height="28">
+            <h3 data-t="butler-buy-title">Buy Anything</h3>
+            <p data-t="butler-buy-body">Tell us what to buy, and we will courier it to you.</p>
+          </div>
+          <div class="butler-card butler-send">
+            <img src="icons/package-brand.svg" alt="" width="28" height="28">
+            <h3 data-t="butler-send-title">Send Anything</h3>
+            <p data-t="butler-send-body">Instantly pick up, drop off, or deliver items across the city.</p>
+          </div>
+        </div>
+
+        <span class="cta-soon">
+          <span class="primary" aria-disabled="true" data-t="cta-download">Download Customer App</span>
+          <span class="soon" data-t="soon">Coming soon</span>
+        </span>
+      </div>
+
+      <div class="split-media">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div aria-hidden="true">
+                <img class="sig" src="icons/ios-signal.svg" alt="" width="16" height="10">
+                <img class="wifi" src="icons/ios-wifi.svg" alt="" width="16" height="10">
+                <img class="bat" src="icons/ios-battery.svg" alt="" width="20" height="10">
+              </div>
+            </div>
+            <div class="phone-body">
+              <img src="img/screen-butler.jpg" width="456" height="891" loading="lazy"
+                   alt="The YouDrop Butler screen, browsing local shops">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- counters -->
+  <!--
+    Designed figures, held back until somebody can source them:
+      10,000+  Active Merchants
+      50,000+  Deliveries Daily
+       5,000+  Verified Riders
+        98.4%  Satisfaction Rate
+  -->
+  <section class="band band-dark">
+    <div class="band-inner stats-wrap">
+      <div class="stats">
+        <div class="stat">
+          <span class="figure pending" aria-hidden="true">—</span>
+          <span class="label" data-t="stat1">Active Merchants</span>
+        </div>
+        <div class="stat">
+          <span class="figure pending" aria-hidden="true">—</span>
+          <span class="label" data-t="stat2">Deliveries Daily</span>
+        </div>
+        <div class="stat">
+          <span class="figure pending" aria-hidden="true">—</span>
+          <span class="label" data-t="stat3">Verified Riders</span>
+        </div>
+        <div class="stat">
+          <span class="figure pending" aria-hidden="true">—</span>
+          <span class="label" data-t="stat4">Satisfaction Rate</span>
+        </div>
+      </div>
+      <span class="soon soon-on-dark" data-t="soon">Coming soon</span>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- testimonials -->
+  <section class="band band-muted">
+    <div class="band-inner band-stack">
+      <div class="heading-block heading-centered">
+        <span class="eyebrow" data-t="stories-eyebrow">Success Stories</span>
+        <h2 data-t="stories-title">Loved by Merchants, Riders, &amp; Customers</h2>
+        <p data-t="stories-lede">
+          Don't take our word for it. Hear from the core segments of our vibrant marketplace.
+        </p>
+        <span class="soon" data-t="soon">Coming soon</span>
+      </div>
+
+      <div class="quotes">
+        <figure class="quote">
+          <div class="quote-head">
+            <div class="quote-who">
+              <span class="quote-avatar pending" aria-hidden="true">&#8220;</span>
+              <span>
+                <span class="quote-name pending" data-t="quote-pending-name">Awaiting a merchant</span><br>
+                <span class="quote-role" data-t="quote-pending-role">Real name and shop</span>
+              </span>
+            </div>
+            <span class="quote-tag" data-t="tag-merchant">Merchant Partner</span>
+          </div>
+          <blockquote class="pending" data-t="quote-pending-body">
+            A merchant's own words go here once one has been asked for them.
+          </blockquote>
+        </figure>
+
+        <figure class="quote">
+          <div class="quote-head">
+            <div class="quote-who">
+              <span class="quote-avatar pending" aria-hidden="true">&#8220;</span>
+              <span>
+                <span class="quote-name pending" data-t="quote-pending-name-r">Awaiting a rider</span><br>
+                <span class="quote-role" data-t="quote-pending-role-r">Real name and city</span>
+              </span>
+            </div>
+            <span class="quote-tag" data-t="tag-rider">Active Rider</span>
+          </div>
+          <blockquote class="pending" data-t="quote-pending-body-r">
+            A rider's own words go here once one has been asked for them.
+          </blockquote>
+        </figure>
+
+        <figure class="quote">
+          <div class="quote-head">
+            <div class="quote-who">
+              <span class="quote-avatar pending" aria-hidden="true">&#8220;</span>
+              <span>
+                <span class="quote-name pending" data-t="quote-pending-name-c">Awaiting a customer</span><br>
+                <span class="quote-role" data-t="quote-pending-role-c">Real name and city</span>
+              </span>
+            </div>
+            <span class="quote-tag" data-t="tag-customer">Customer</span>
+          </div>
+          <blockquote class="pending" data-t="quote-pending-body-c">
+            A customer's own words go here once one has been asked for them.
+          </blockquote>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- app download -->
+  <section class="band band-dark">
+    <div class="band-inner split">
+      <div class="stack">
+        <div class="heading-block">
+          <span class="eyebrow eyebrow-on-dark" data-t="mobile-eyebrow">Mobile Access</span>
+          <h2 data-t="mobile-title">Get YouDrop on Your Smartphone Today</h2>
+          <!-- The design's copy ends "...from your preferred digital store app store". One store
+               too many; corrected here rather than reproduced. -->
+          <p data-t="mobile-lede">
+            Available for iOS and Android devices. Scan the QR code to install or download directly
+            from your preferred app store.
+          </p>
+        </div>
+
+        <div class="download-row">
+          <div class="qr">
+            <div class="qr-slot" data-t="qr-slot">QR code coming soon</div>
+          </div>
+
+          <div class="stores">
+            <div class="store-row">
+              <span class="store">
+                <img src="icons/apple.svg" alt="" width="18" height="18">
+                App Store
+              </span>
+              <span class="store">
+                <img src="icons/app-window.svg" alt="" width="18" height="18">
+                Google Play
+              </span>
+            </div>
+            <span class="soon soon-on-dark" data-t="soon">Coming soon</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="split-media">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="status-bar">
+              <span>9:41</span>
+              <div aria-hidden="true">
+                <img class="sig" src="icons/ios-signal.svg" alt="" width="16" height="10">
+                <img class="wifi" src="icons/ios-wifi.svg" alt="" width="16" height="10">
+                <img class="bat" src="icons/ios-battery.svg" alt="" width="20" height="10">
+              </div>
+            </div>
+            <div class="phone-body">
+              <img src="img/screen-customer-home.jpg" width="456" height="891" loading="lazy"
+                   alt="The YouDrop customer app home screen, browsing nearby restaurants">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- faq -->
+  <section class="band" id="faq">
+    <div class="band-inner band-stack">
+      <div class="heading-block heading-centered">
+        <span class="eyebrow" data-t="faq-eyebrow">Help Center</span>
+        <h2 data-t="faq-title">Frequently Asked Questions</h2>
+        <p data-t="faq-lede">
+          Got questions about YouDrop? We have collected answers to the most common queries.
+        </p>
+      </div>
+
+      <!--
+        Open by default, exactly as the design draws them, and built on <details> so they collapse
+        again with no script at all.
+      -->
+      <div class="faq-grid">
+        <details class="faq-item" open>
+          <summary>
+            <span data-t="faq1-q">How do I sign up as a Merchant?</span>
+            <img src="icons/chevron-down.svg" alt="" width="18" height="18">
+          </summary>
+          <p data-t="faq1-a">
+            Simply click the 'Start as Merchant' button, upload your business documents, menu, or
+            store catalog, and our team will audit and activate your account within 24 hours.
+          </p>
+        </details>
+
+        <details class="faq-item" open>
+          <summary>
+            <span data-t="faq2-q">What is the YouDrop Butler service?</span>
+            <img src="icons/chevron-down.svg" alt="" width="18" height="18">
+          </summary>
+          <p data-t="faq2-a">
+            YouDrop Butler lets you request custom orders from any shop in your city. Select 'Buy
+            Anything' or 'Send Anything' in the app to dispatch a personal courier instantly.
+          </p>
+        </details>
+
+        <details class="faq-item" open>
+          <summary>
+            <span data-t="faq3-q">Are delivery fleets managed directly?</span>
+            <img src="icons/chevron-down.svg" alt="" width="18" height="18">
+          </summary>
+          <p data-t="faq3-a">
+            Yes. Carriers get access to our unified dispatcher dashboard to onboard custom fleets,
+            plan shifts, and track operations directly through the corporate control tower.
+          </p>
+        </details>
+
+        <details class="faq-item" open>
+          <summary>
+            <span data-t="faq4-q">How fast are rider earnings paid out?</span>
+            <img src="icons/chevron-down.svg" alt="" width="18" height="18">
+          </summary>
+          <p data-t="faq4-a">
+            Riders are paid instantly. The moment a delivery is confirmed as completed, your
+            earnings and tips are routed directly to your app wallet for immediate cash-out.
+          </p>
+        </details>
+
+        <details class="faq-item" open>
+          <summary>
+            <span data-t="faq5-q">Which regions does YouDrop operate in?</span>
+            <img src="icons/chevron-down.svg" alt="" width="18" height="18">
+          </summary>
+          <p data-t="faq5-a">
+            We operate across major urban hubs. Check our map widget or search for your city
+            directly in the app to view live coverage and available shops.
+          </p>
+        </details>
+
+        <details class="faq-item" open>
+          <summary>
+            <span data-t="faq6-q">What are the platform onboarding fees?</span>
+            <img src="icons/chevron-down.svg" alt="" width="18" height="18">
+          </summary>
+          <p data-t="faq6-a">
+            We maintain absolute transparency. There are zero upfront onboarding fees. YouDrop works
+            on a minor transactional commission tier tailored to your volume.
+          </p>
+        </details>
+      </div>
+    </div>
+  </section>
+
 </main>
 
-<footer>
-  <span>© Delivery</span>
-  <nav>
-    <a href="#about">About us</a>
-    <a href="#contact">Contact us</a>
-    <a href="/register">Partner with us</a>
-    <a href="#app">Get the app</a>
-  </nav>
-</footer>
-
-<!-- ------------------------------------------------------------------ sign in -->
-<dialog id="signin" class="sheet">
-  <form method="dialog" class="sheet-head">
-    <h2>Sign in</h2>
-    <button class="icon" aria-label="Close">&times;</button>
-  </form>
-  <p class="sheet-lede">Which portal are you here for?</p>
-  <div class="choices">
-    <a class="choice" href="http://127.0.0.1:5010">
-      <strong>Shop</strong>
-      <span>Menu, orders, your WhatsApp inbox</span>
-    </a>
-    <a class="choice" href="http://127.0.0.1:5013">
-      <strong>Delivery company</strong>
-      <span>Your jobs, your earnings, your fleet</span>
-    </a>
-  </div>
-  <p class="sheet-foot">
-    Ordering or riding? <a href="http://127.0.0.1:5012">Open the app instead</a>.
-  </p>
-</dialog>
-
 <!--
-  The apply sheet used to live here. It moved to /register, and became a page with steps, when
-  verification entered the flow: a dialog that can be dismissed with the Escape key or a stray click
-  on the backdrop is a poor place to keep somebody's half-finished application while they go and
-  find a code in their inbox.
+  The footer.
+
+  The design draws three link columns. Of its twelve links, five point at pages that exist as
+  anchors on this page; the other seven — About YouDrop, Careers, Press Kit, Logistics Blog, Safety
+  Guidelines, Terms of Service, Privacy Policy — have no page behind them and are not rendered.
+  The Company column would have been empty, so it carries the two doors the site really does have:
+  the partner form, and the portal that partners sign in to. Terms and Privacy in particular need
+  writing before this page is public.
 -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <span class="wordmark">
+          <span class="mark" aria-hidden="true"></span>
+          <span class="wordmark-text">YouDrop</span>
+        </span>
+        <p data-t="footer-blurb">
+          Deploying next-generation logistics technology that connects commerce, riders, and fleets
+          universally.
+        </p>
+        <!--
+          Four tiles, no hrefs. There are no YouDrop accounts on any of these networks to point at,
+          and a Facebook icon that opens facebook.com is a worse answer than an icon that admits it
+          is waiting: one wastes the reader's click, the other tells them the truth. Give each
+          <span> an <a href> when the accounts exist and the chip comes out.
+        -->
+        <ul class="social">
+          <li><span role="img" aria-label="Facebook"><img src="icons/facebook.svg" alt="" width="16" height="16"></span></li>
+          <li><span role="img" aria-label="Instagram"><img src="icons/instagram.svg" alt="" width="16" height="16"></span></li>
+          <li><span role="img" aria-label="X"><img src="icons/twitter.svg" alt="" width="16" height="16"></span></li>
+          <li><span role="img" aria-label="LinkedIn"><img src="icons/linkedin.svg" alt="" width="16" height="16"></span></li>
+          <li><span class="soon soon-on-dark" data-t="soon">Coming soon</span></li>
+        </ul>
+      </div>
+
+      <nav class="footer-col" aria-label="Platform">
+        <h2 data-t="footer-platform">Platform</h2>
+        <a href="#merchants" data-t="nav-merchants">For Merchants</a>
+        <a href="#carriers" data-t="nav-carriers">For Carriers</a>
+        <a href="#riders" data-t="nav-riders">For Riders</a>
+        <a href="#customers" data-t="nav-customers">For Customers</a>
+      </nav>
+
+      <nav class="footer-col" aria-label="Company">
+        <h2 data-t="footer-company">Company</h2>
+        <a href="/register" data-t="footer-partner">Partner with us</a>
+        <a href="https://portal-dev.youdrop.shop" data-t="footer-signin">Sign in</a>
+      </nav>
+
+      <nav class="footer-col" aria-label="Support">
+        <h2 data-t="footer-support">Support</h2>
+        <a href="#faq" data-t="faq-eyebrow">Help Center</a>
+      </nav>
+    </div>
+
+    <div class="footer-bottom">
+      <p data-t="footer-legal">© 2026 YouDrop Logistics Technologies. All rights reserved.</p>
+      <button class="footer-lang" type="button" data-lang-toggle aria-pressed="false">
+        <span data-lang-label>English (US)</span>
+        <img src="icons/globe-muted.svg" alt="" width="14" height="14">
+      </button>
+    </div>
+  </div>
+</footer>
 
 <script src="config.js"></script>
 <script src="site.js"></script>

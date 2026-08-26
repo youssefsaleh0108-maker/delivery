@@ -51,7 +51,10 @@
     <div class="lock" aria-hidden="true">&#9679;</div>
     <h1>Platform administration</h1>
     <p>Staff only. You will be asked to sign in.</p>
-    <a class="primary wide" href="http://127.0.0.1:5011">Open the Backoffice</a>
+    <!-- The deployed portal, not a developer's loopback address. This link read
+         http://127.0.0.1:5011 — a port that resolves to nothing from any machine but the one the
+         stack was built on, which is every machine that will ever load this page. -->
+    <a class="primary wide" href="https://portal-dev.youdrop.shop">Open the Backoffice</a>
     <a class="back" href="/">Back to the site</a>
   </main>
 </body>

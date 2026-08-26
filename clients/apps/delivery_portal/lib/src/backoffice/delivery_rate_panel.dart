@@ -2,6 +2,8 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:flutter/material.dart';
 
+import '../shell/shell.dart';
+
 /// Delivery rates per provider, shown on the connector card that can change them (Phase 6).
 ///
 /// Deliberately on the Settings screen rather than on a monitoring page of its own. The person
@@ -11,6 +13,11 @@ import 'package:flutter/material.dart';
 ///
 /// Only shown for connectors that have a real choice of provider. SMTP-only email has nothing to
 /// compare against, and a success rate with one row is a number without a question attached.
+///
+/// Restyled for the 2026-08 redesign into the console's language — the window switch is the
+/// design's segmented trough, the type is the console ramp, and the three states below now read
+/// from [DeliveryAccent] rather than from the two hard-coded greens this file used to carry. The
+/// numbers, the windows and the wording are unchanged.
 class DeliveryRatePanel extends StatefulWidget {
   const DeliveryRatePanel({
     super.key,
@@ -27,6 +34,10 @@ class DeliveryRatePanel extends StatefulWidget {
 }
 
 class _DeliveryRatePanelState extends State<DeliveryRatePanel> {
+  /// The windows the panel offers, and the labels the trough shows for them.
+  static const List<int> _windows = <int>[1, 24, 168];
+  static const List<String> _windowLabels = <String>['1h', '24h', '7d'];
+
   int _windowHours = 24;
   late Future<List<ProviderDeliveryRate>> _rates = _load();
 
@@ -49,13 +60,16 @@ class _DeliveryRatePanelState extends State<DeliveryRatePanel> {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
-            child: LinearProgressIndicator(),
+            child: LinearProgressIndicator(
+              color: DeliveryColors.brand,
+              backgroundColor: DeliveryColors.border,
+            ),
           );
         }
         if (snapshot.hasError) {
           return Text(
             'Delivery rates unavailable: ${snapshot.error}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: DeliveryColors.muted),
+            style: ConsoleText.cellMuted,
           );
         }
 
@@ -68,35 +82,27 @@ class _DeliveryRatePanelState extends State<DeliveryRatePanel> {
               children: <Widget>[
                 // Was "Delivery rate" when only acceptance could be measured, which overstated what
                 // the number meant. Now both are shown, so the heading names both.
-                Text('Accepted / delivered',
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(color: DeliveryColors.muted)),
-                const Spacer(),
-                for (final int hours in <int>[1, 24, 168])
-                  Padding(
-                    padding: const EdgeInsets.only(left: DeliverySpacing.xs),
-                    child: ChoiceChip(
-                      label: Text(hours == 168 ? '7d' : '${hours}h'),
-                      selected: _windowHours == hours,
-                      onSelected: (_) => _setWindow(hours),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
+                const Expanded(
+                  child: Text('Accepted / delivered', style: ConsoleText.kpiLabel),
+                ),
+                ConsoleFilterTabs(
+                  tabs: <ConsoleFilterTab>[
+                    for (final String label in _windowLabels) ConsoleFilterTab(label: label),
+                  ],
+                  selectedIndex: _windows.indexOf(_windowHours),
+                  onSelected: (int i) => _setWindow(_windows[i]),
+                ),
               ],
             ),
-            const SizedBox(height: DeliverySpacing.xs),
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             if (rates.isEmpty)
               Text(
                 'Nothing sent on this channel in the last '
                 '${_windowHours == 168 ? "7 days" : "$_windowHours hours"}.',
-                style:
-                    Theme.of(context).textTheme.bodySmall?.copyWith(color: DeliveryColors.muted),
+                style: ConsoleText.cellMuted,
               )
             else
-              for (final ProviderDeliveryRate rate in rates)
-                _RateRow(rate: rate),
+              for (final ProviderDeliveryRate rate in rates) _RateRow(rate: rate),
           ],
         );
       },
@@ -114,21 +120,21 @@ class _RateRow extends StatelessWidget {
     // Three states, not two. "No completed sends yet" is not a failure and must not be coloured
     // like one — during the first minutes of a ramp it is the expected state.
     final Color colour = !rate.hasData
-        ? DeliveryColors.muted
+        ? DeliveryColors.faint
         : rate.isHealthy
-            ? const Color(0xFF2E7D32)
-            : DeliveryColors.brand;
+            ? DeliveryAccent.positive.color
+            : DeliveryAccent.critical.color;
 
     // Delivery is its own three-state axis. "Not measured" is the common case — most SMS traffic
     // produces no carrier receipt at all — and it must not be coloured, or read, like failure.
     final Color deliveryColour = !rate.hasDeliveryData
-        ? DeliveryColors.muted
+        ? DeliveryColors.faint
         : rate.isDeliveryHealthy
-            ? const Color(0xFF2E7D32)
-            : DeliveryColors.brand;
+            ? DeliveryAccent.positive.color
+            : DeliveryAccent.critical.color;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
+      padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -136,18 +142,21 @@ class _RateRow extends StatelessWidget {
             children: <Widget>[
               SizedBox(
                 width: 150,
-                child: Text(rate.provider,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    overflow: TextOverflow.ellipsis),
+                child: Text(
+                  rate.provider,
+                  style: ConsoleText.cellStrong,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               SizedBox(
                 width: 70,
                 child: Text(
                   rate.hasData ? '${rate.successRate!.toStringAsFixed(1)}%' : '—',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: colour, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colour,
+                  ),
                 ),
               ),
               Expanded(
@@ -156,7 +165,7 @@ class _RateRow extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: rate.hasData ? (rate.successRate! / 100) : 0,
                     minHeight: 6,
-                    backgroundColor: DeliveryColors.background,
+                    backgroundColor: DeliveryColors.border,
                     valueColor: AlwaysStoppedAnimation<Color>(colour),
                   ),
                 ),
@@ -166,7 +175,7 @@ class _RateRow extends StatelessWidget {
               Text(
                 'accepted ${rate.sent}/${rate.sent + rate.failed}'
                 '${rate.inFlight > 0 ? ' (+${rate.inFlight} in flight)' : ''}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: DeliveryColors.muted),
+                style: ConsoleText.meta,
               ),
             ],
           ),
@@ -180,11 +189,11 @@ class _RateRow extends StatelessWidget {
                     rate.hasDeliveryData
                         ? '${rate.deliveryRate!.toStringAsFixed(1)}%'
                         : 'not measured',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: deliveryColour,
-                          fontWeight:
-                              rate.hasDeliveryData ? FontWeight.w600 : FontWeight.normal,
-                        ),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: deliveryColour,
+                      fontWeight: rate.hasDeliveryData ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                 ),
                 Expanded(
@@ -196,10 +205,7 @@ class _RateRow extends StatelessWidget {
                         ? 'delivered ${rate.delivered}/${rate.delivered + rate.undelivered}'
                             '${rate.awaitingReceipt > 0 ? ' (+${rate.awaitingReceipt} awaiting receipt)' : ''}'
                         : 'no carrier receipts — acceptance above is not proof of delivery',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: DeliveryColors.muted),
+                    style: ConsoleText.meta,
                   ),
                 ),
               ],

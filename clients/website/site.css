@@ -4,6 +4,11 @@
   Colours, spacing and radii are lifted from delivery_design_system/tokens.dart rather than picked
   fresh. A visitor who applies here lands in a portal thirty seconds later, and a site that looks
   like a different company from the product it sells is a small, constant tax on trust.
+
+  Rebuilt 2026-08 from the Figma frame 14:4 "delivio-website"
+  (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). This file is shared by three pages — index.html,
+  register.html and admin.html — so the primitives near the top (buttons, masthead, panel, form,
+  sheet) are the shared vocabulary and the section rules further down belong to the landing page.
 */
 
 :root {
@@ -14,152 +19,60 @@
   --brand-line: #FDA4AF;
   --ink: #0F172A;
   --muted: #475569;
+  --ink-soft: #475569;
 
   /*
-    For secondary text that sits on the warm top rather than on the plain background.
-
-    --muted was chosen against #FCF6F8, where it manages 4.69:1 — over the 4.5:1 minimum, but not by
-    much. Warming the top of the page darkens what that text sits on and takes it to 3.91:1, which
-    is under. This is the same grey walked far enough down to clear it with room to spare (5.8:1),
-    rather than a global change: the rest of the page still sits on the pale background --muted was
-    picked for, and darkening it everywhere would flatten a distinction that is doing real work.
+    The third step down the slate ramp. Secondary text on a dark band, the "trusted by" row, and
+    the testimonial by-lines all sit on it — it is too pale for body copy on white, which is why
+    --muted exists separately and why nothing here uses one for the other's job.
   */
-  --ink-soft: #475569;
+  --faint: #94A3B8;
+
   --border: #E2E8F0;
   --bg: #F8FAFC;
   --white: #FFFFFF;
 
   /*
-    The warm side of the palette, used only at the top of the page.
+    The dark shell, from the same tokens the portal's chrome uses.
 
-    The brand is a crimson, and a whole page washed in tints of one cool red is tidy in a way that
-    reads clinical — correct for a dashboard, wrong for the first thing a stranger sees. Apricot and
-    cream are what crimson's neighbours are on the warm side: close enough to look deliberate,
-    different enough to feel like daylight rather than more of the same pink.
+    Two greys, not one. --shell is the band colour; --shell-deep is what sits *on* it — the phone
+    bezel, the store buttons — so the nested surfaces read as recessed rather than as a flat panel
+    with a border drawn round it.
   */
-  --warm: #FFB88C;
-  --warm-soft: #FFD6A8;
-  --warm-cream: #FFF0E4;
+  --shell: #111827;
+  --shell-deep: #0F172A;
+
+  /* The only non-brand accent on the page: "live", "up", "healthy". */
+  --emerald: #10B981;
 
   --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 22px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 24px;
+  --r-pill: 100px;
 
-  --shadow: 0 1px 2px rgba(36, 19, 25, .06), 0 8px 24px rgba(36, 19, 25, .06);
+  --shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .06);
+
+  /*
+    One gutter for the whole page.
+
+    The design is drawn at 1440 with 80px of air either side. Everything from the navbar to the
+    footer bottom rule lines up on it, so it is a variable rather than a number repeated twenty
+    times — and it collapses on small screens in one place instead of twenty.
+  */
+  --gutter: clamp(20px, 5.56vw, 80px);
+
+  /* 1440 minus the two 80px gutters. The measure every band's content is drawn to. */
+  --measure: 1280px;
 }
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
-
-/* ------------------------------------------------------------------ backdrop */
-
-/*
-  A slow drift behind the whole page.
-
-  Three blurred shapes on long, mismatched cycles, so the pattern never repeats visibly and nothing
-  ever crosses the reader's eye fast enough to pull it off a sentence. This is the page somebody
-  loads before they trust us, and motion that competes with the copy costs more than it earns.
-
-  Only transform and opacity are animated. Both are handled by the compositor, so this stays off the
-  main thread and does not force layout or repaint on every frame — which is the difference between
-  a background that idles at nearly no cost and one that makes a mid-range phone warm.
-*/
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  /* The blur is the expensive part, and it is applied once and never animated: a filter that
-     changes has to be re-rasterised on every frame. */
-  filter: blur(70px);
-  will-change: transform;
-}
-
-.orb-a {
-  width: 46vmax; height: 46vmax;
-  top: -14vmax; left: -10vmax;
-  background: radial-gradient(circle at 30% 30%, rgba(196, 29, 78, .30), rgba(196, 29, 78, 0) 70%);
-  animation: drift-a 34s ease-in-out infinite alternate;
-}
-
-/* The warm one, and it is the one nearest the top on purpose. */
-.orb-b {
-  width: 40vmax; height: 40vmax;
-  top: 6vmax; right: -12vmax;
-  background: radial-gradient(circle at 60% 40%, rgba(255, 184, 140, .42), rgba(255, 184, 140, 0) 70%);
-  animation: drift-b 44s ease-in-out infinite alternate;
-}
-
-.orb-c {
-  width: 52vmax; height: 52vmax;
-  bottom: -22vmax; left: 24vmax;
-  background: radial-gradient(circle at 40% 60%, rgba(142, 18, 53, .16), rgba(142, 18, 53, 0) 70%);
-  animation: drift-c 52s ease-in-out infinite alternate;
-}
-
-/* A faint tint over the orbs so they read as one surface rather than three shapes. Static: the
-   texture is there to soften the gradient banding, and moving it would be visible as noise.
-
-   Weakest at the very top and strongest at the bottom. The veil is what keeps the middle of the
-   page calm enough to read a paragraph on; at the top there is nothing to protect but a headline,
-   so the colour is allowed through. */
-.grain {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg,
-      rgba(252, 246, 248, .22) 0%,
-      rgba(252, 246, 248, .62) 40%,
-      rgba(252, 246, 248, .86) 100%);
-}
-
-/*
-  The warm top.
-
-  Sits above the veil rather than under it, so it tints what is already there instead of being
-  muted by it — the layer order here is the whole trick. Anchored to the top of the viewport and
-  faded out well before the first section of real content, so it reads as light coming into the
-  page rather than as a coloured band with an edge.
-
-  It breathes on a long, slow cycle. Opacity only, which the compositor handles for free.
-*/
-.dawn {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 92vh;
-  background:
-      radial-gradient(120% 74% at 14% -8%, rgba(255, 184, 140, .46), rgba(255, 184, 140, 0) 62%),
-      radial-gradient(96% 62% at 86% 2%, rgba(255, 214, 168, .40), rgba(255, 214, 168, 0) 64%),
-      linear-gradient(180deg, rgba(255, 240, 228, .62) 0%, rgba(255, 240, 228, 0) 82%);
-  animation: warmth 22s ease-in-out infinite alternate;
-}
-
-@keyframes warmth {
-  from { opacity: .84; }
-  to   { opacity: 1; }
-}
-
-/* Different distances, different rhythms. Equal ones would sync up and the whole thing would
-   visibly pulse. */
-@keyframes drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(9vmax, 6vmax, 0) scale(1.12); }
-}
-
-@keyframes drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1.06); }
-  to   { transform: translate3d(-11vmax, 9vmax, 0) scale(0.94); }
-}
-
-@keyframes drift-c {
-  from { transform: translate3d(0, 0, 0) scale(0.96); }
-  to   { transform: translate3d(7vmax, -8vmax, 0) scale(1.1); }
+html {
+  scroll-behavior: smooth;
+  /* The navbar is sticky, so an anchored section would otherwise land underneath it. */
+  scroll-padding-top: 96px;
 }
 
 /*
@@ -168,8 +81,11 @@ html { scroll-behavior: smooth; }
   One variable file rather than five static weights: it is what Google serves modern browsers
   anyway, it is 35KB against ~175KB per static weight, and `font-weight: 400 800` lets every
   weight the design uses resolve from it. Self-hosted because the page should not depend on a
-  third-party host for its own typeface — and latin-only, which covers the site's current copy;
-  the Arabic side of the product lives in the apps, not on this page.
+  third-party host for its own typeface.
+
+  Latin-only. The Arabic side of this page therefore falls back to the reader's system Arabic face
+  (see [lang="ar"] below) — Rubik does publish an Arabic subset, and bundling it is the one thing
+  that would make the two languages look like one typeface.
 */
 @font-face {
   font-family: Rubik;
@@ -180,13 +96,159 @@ html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--white);
   color: var(--ink);
   font: 16px/1.6 Rubik, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3 { line-height: 1.15; letter-spacing: -.02em; margin: 0; }
+/*
+  Arabic.
+
+  A system stack rather than Rubik, because the bundled subset has no Arabic glyphs and a missing
+  glyph is worse than a different typeface. Tracking is reset too: negative letter-spacing pulls
+  Latin display type together and, on a joined script, pulls the letters of a word into each other.
+*/
+html[lang="ar"] body {
+  font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", "Geeza Pro", system-ui, sans-serif;
+}
+html[lang="ar"] * { letter-spacing: normal; }
+
+h1, h2, h3 { margin: 0; line-height: 1.2; }
+
+img { max-width: 100%; }
+
+a { color: inherit; }
+
+/*
+  The old animated backdrop.
+
+  register.html still carries the five spans that drove it. The rebuilt design has no moving
+  backdrop, so the rules are gone and the leftover markup is hidden rather than left to render as
+  empty boxes. The spans can come out of register.html whenever that page is next touched.
+*/
+.backdrop { display: none; }
+
+/* ------------------------------------------------------------------ shared bits */
+
+/*
+  The section eyebrow: a small rose capsule above every heading on the page.
+
+  One rule with one variant. The hero's is a shade larger and fully round; every other band uses
+  the 12px/20px-radius form, and they are the same object at two sizes rather than two objects.
+*/
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: normal;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: var(--r-xl);
+}
+
+.eyebrow-hero {
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+}
+
+/* On the two dark bands the rose capsule would disappear, so it becomes a wash of the band's own
+   white instead of a second colour nobody asked for. */
+.eyebrow-on-dark {
+  background: rgba(255, 255, 255, .15);
+  color: var(--white);
+}
+
+/*
+  "Coming soon".
+
+  Every one of these marks a control the design draws and the platform cannot yet honour — an app
+  that is not in either store, a rider sign-up that only exists inside the app. The alternative was
+  a button that looks live and does nothing, which costs more trust than the admission does.
+*/
+.soon {
+  display: inline-flex;
+  align-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.soon-on-dark {
+  background: rgba(255, 255, 255, .15);
+  color: var(--white);
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+button, .primary, .secondary, .ghost {
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+  border-radius: var(--r-md);
+  /*
+    No border on the base button, and every bordered variant pays for its own out of its padding.
+
+    Figma draws a stroke inside the box: a 198x51 filled button and a 178x51 outlined one are the
+    same height, and both measure 28px from edge to text. CSS adds the border on top of the
+    padding, so a straight translation makes every outlined control two pixels taller and two
+    pixels wider than the one beside it. Subtracting the stroke from the padding puts them back on
+    the same baseline.
+  */
+  border: none;
+  padding: 16px 28px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .06s ease, background .15s ease, border-color .15s ease;
+}
+button:active, .primary:active, .secondary:active, .ghost:active { transform: translateY(1px); }
+
+.primary { background: var(--brand); color: var(--white); }
+.primary:hover { background: var(--brand-dark); }
+
+/*
+  The outline button, exactly as drawn: a 2px crimson rule on nothing.
+
+  It has to end up in the same box as .primary — 51px tall, 28px from edge to text — so it takes
+  its 2px of stroke out of its own 16/28 padding rather than adding it on top. Two pixels sounds
+  like nothing until the two buttons sit side by side in the hero, where one standing taller than
+  the other is the first thing the eye finds.
+*/
+.secondary {
+  background: transparent;
+  color: var(--brand);
+  border: 2px solid var(--brand);
+  padding: 14px 26px;
+}
+.secondary:hover { background: var(--brand-soft); }
+
+/* The small, quiet one. Used by the register flow, not by the landing page. */
+.ghost {
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--brand-line);
+  padding: 9px 17px;
+  font-size: 14px;
+}
+.ghost:hover { background: var(--brand-soft); }
+
+.wide { width: 100%; }
+
+button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ------------------------------------------------------------------ masthead */
 
@@ -195,408 +257,1048 @@ h1, h2, h3 { line-height: 1.15; letter-spacing: -.02em; margin: 0; }
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 18px clamp(16px, 5vw, 64px);
+  padding: 20px var(--gutter);
   position: sticky;
   top: 0;
-  z-index: 10;
-  /* Warmer and more transparent than it was. An opaque bar the colour of the old background sat on
-     the warm top like a strip of something else; letting the light through makes it part of the
-     page. The blur is what keeps the wordmark legible once content scrolls underneath. */
-  background: rgba(255, 249, 244, .72);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(234, 217, 223, .7);
+  z-index: 20;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
 }
 
 .wordmark {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  font-size: 22px;
   font-weight: 800;
-  font-size: 19px;
-  letter-spacing: -.02em;
+  line-height: normal;
   color: var(--ink);
   text-decoration: none;
-}
-
-/* The mark: a courier bag reduced to a rounded square with a handle. */
-.mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--brand);
-  position: relative;
   flex: none;
 }
-.mark::before {
-  content: "";
-  position: absolute;
-  inset: -5px 7px auto 7px;
-  height: 9px;
-  border: 2.5px solid var(--brand);
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
+
+/*
+  The mark: a crimson tile with the package glyph centred in it.
+
+  The glyph is the exported asset (icons/package.svg, white stroke) rather than a redrawn shape,
+  and the tile and the leaf are sized separately — 36 outer, 20 inner — because that padding is
+  what makes it read as a logo rather than as an icon that happens to have a background.
+*/
+.mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--brand) url("icons/package.svg") center / 20px 20px no-repeat;
+  flex: none;
 }
 
-.masthead nav { display: flex; align-items: center; gap: 6px; }
+.masthead nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
 
 .masthead nav a {
-  color: var(--ink);
+  color: var(--muted);
   text-decoration: none;
-  font-weight: 600;
-  font-size: 14.5px;
-  padding: 9px 12px;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: normal;
+}
+.masthead nav a:hover { color: var(--brand); }
+
+.masthead-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+}
+
+/*
+  The language switch.
+
+  A real button, not a link: it changes the page in place rather than going anywhere, and a screen
+  reader should be told which of the two is currently on — hence aria-pressed in the markup.
+*/
+.lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: none;
   border-radius: var(--r-sm);
-}
-.masthead nav a:hover { background: var(--brand-soft); }
-
-/* ------------------------------------------------------------------ buttons */
-
-button, .primary, .secondary, .ghost {
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  border-radius: var(--r-md);
-  border: 1px solid transparent;
-  padding: 12px 20px;
-  text-decoration: none;
-  display: inline-block;
-  transition: transform .06s ease, background .15s ease;
-}
-button:active, .primary:active, .secondary:active { transform: translateY(1px); }
-
-.primary { background: var(--brand); color: var(--white); }
-.primary:hover { background: var(--brand-dark); }
-
-.secondary {
-  background: var(--white);
-  color: var(--ink);
-  border-color: var(--border);
-}
-.secondary:hover { border-color: var(--brand-line); background: var(--brand-soft); }
-
-.ghost {
   background: transparent;
-  color: var(--brand);
-  border-color: var(--brand-line);
-  padding: 9px 16px;
-  font-size: 14.5px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
-.ghost:hover { background: var(--brand-soft); }
+.lang:hover { background: var(--bg); }
+.lang img { width: 18px; height: 18px; display: block; }
 
-.wide { width: 100%; }
+/* The navbar's own call to action is smaller than the ones in the bands below it. */
+.masthead .primary {
+  font-size: 14px;
+  padding: 12px 20px;
+}
+
+/* ------------------------------------------------------------------ bands */
+
+/*
+  Every section on the page is a band: full-bleed colour, 100px of air top and bottom, and its
+  content drawn to the same 1280px measure. Three colours alternate down the page — white, the
+  pale slate, and the dark shell — and nothing else is allowed in.
+*/
+.band {
+  padding: 100px var(--gutter);
+  background: var(--white);
+}
+.band-muted { background: var(--bg); }
+.band-dark { background: var(--shell); color: var(--white); }
+
+.band-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+/* The two-column bands: copy on one side, a device or a dashboard on the other. */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+/*
+  Where the picture is drawn first in the design, it is first in the markup too — the reading order
+  on a narrow screen then matches the design's own top-to-bottom order.
+
+  Centred with a flex box on a full-width column rather than with `justify-self`. `justify-self`
+  shrinks the grid item to its own max-content, and a max-content parent is not a length: the
+  phone's `width: min(320px, 100%)` then has no percentage to resolve against and falls back to its
+  content — which, for a lazily-loaded image that has not arrived yet, is nearly nothing. The band
+  collapsed to two thirds of its height until the reader scrolled far enough to load the picture.
+  A column that is definitely 100% wide gives the percentage something real to measure.
+*/
+.split-media {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.heading-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.heading-block h2 {
+  font-size: clamp(26px, 3.4vw, 40px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.heading-block p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 640px;
+}
+
+/* The centred variant, used by the three full-width bands. */
+.heading-centered {
+  align-items: center;
+  text-align: center;
+}
+.heading-centered .eyebrow { align-self: center; }
+.heading-centered p { margin-inline: auto; }
+
+.band-dark .heading-block h2 { color: var(--white); }
+.band-dark .heading-block p { color: var(--faint); }
+
+/* ------------------------------------------------------------------ feature lists */
+
+/*
+  The ticked list that appears in the merchant, carrier and rider bands.
+
+  The three use different glyphs — check, truck, award — on the same 24px rose tile, so the tile
+  is the rule and the glyph is set per item in the markup. Each leaf is 14px inside a 24px box:
+  both dimensions are declared, because a glyph left to fill its tile loses the padding that makes
+  the tile a tile.
+*/
+.features {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: normal;
+  color: var(--ink);
+}
+
+.features .tile {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-md);
+  background: var(--brand-soft);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.features .tile img { width: 14px; height: 14px; display: block; }
+
+/* ------------------------------------------------------------------ phone mockup */
+
+/*
+  The device.
+
+  Fixed 320x640 at the size it is drawn, and it shrinks below that rather than forcing the page
+  wider: `min(320px, 100%)` with the aspect ratio held is what keeps a 360px-wide phone from
+  scrolling sideways to see a picture of a phone.
+*/
+.phone {
+  width: min(320px, 100%);
+  aspect-ratio: 320 / 640;
+  background: var(--shell-deep);
+  /* 6px of bezel and 2px of inner air: together the 8px the design puts between the outer edge
+     and the screen, so the screen lands at its drawn 304x624 inside a 320x640 device. */
+  border: 6px solid rgba(0, 0, 0, .2);
+  border-radius: 40px;
+  padding: 2px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, .13);
+  overflow: hidden;
+  flex: none;
+}
+
+.phone-screen {
+  height: 100%;
+  background: var(--bg);
+  border-radius: 32px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dark on light, because every screen behind it is a light app screen. */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 4px;
+  flex: none;
+  color: var(--ink);
+}
+.status-bar span {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: normal;
+  color: var(--ink);
+}
+.status-bar div { display: flex; align-items: center; gap: 6px; }
+/* Three unlike glyphs, so three sizes — a single rule across all of them would stretch the
+   battery into the signal bars' box. */
+.status-bar .sig { width: 16px; height: 10px; display: block; }
+.status-bar .wifi { width: 16px; height: 10px; display: block; }
+.status-bar .bat { width: 20px; height: 10px; display: block; }
+
+.phone-body { flex: 1; min-height: 0; overflow: hidden; }
+.phone-body img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* ------------------------------------------------------------------ hero */
 
 .hero {
-  display: grid;
-  grid-template-columns: 1.05fr .95fr;
-  gap: clamp(24px, 5vw, 64px);
-  align-items: center;
-  padding: clamp(40px, 7vw, 96px) clamp(16px, 5vw, 64px);
-  max-width: 1240px;
+  background: var(--bg);
+  padding: 80px var(--gutter);
+}
+
+.hero-inner {
+  max-width: var(--measure);
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: center;
 }
 
 .hero h1 {
-  font-size: clamp(38px, 6.2vw, 68px);
+  font-size: clamp(32px, 5vw, 56px);
   font-weight: 800;
+  line-height: 1.15;
+  color: var(--ink);
 }
 
-.lede {
-  font-size: clamp(16px, 1.6vw, 19px);
-  /* Darker than the rest of the secondary text, because it is the only paragraph that sits on the
-     warm wash. See --ink-soft. */
-  color: var(--ink-soft);
-  max-width: 46ch;
-  margin: 18px 0 0;
+/* Two classes, so it outranks the .heading-block p rule above — the hero's paragraph is the one
+   piece of body copy on the page set larger than 16px. */
+.hero .hero-lede {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: none;
 }
 
-.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.hero-copy { gap: 32px; }
+.hero-copy > .heading-block { gap: 16px; }
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
 
 /*
-  The hero artwork, drawn in CSS.
+  A call to action the platform cannot honour yet, and the chip that says so.
 
-  A placeholder until a Canva export replaces it — but a finished-looking one. An empty frame or a
-  broken image icon says "unfinished site" far louder than plain shapes say "simple illustration".
+  The button keeps its designed box so the row still balances, but it is a span rather than an
+  anchor — nothing to click, nothing to tab onto, and no href pointing at a door that is not there.
 */
-.hero-art {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--r-lg);
-  /* Warm cream into white, picking up the light behind it. The crimson scooter has more to push
-     against on a warm panel than it did on a pink one. */
-  background: linear-gradient(160deg, var(--warm-cream), var(--white) 72%);
-  border: 1px solid rgba(255, 214, 168, .8);
-  overflow: hidden;
+.cta-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.art-bag {
-  position: absolute;
-  left: 26%; top: 22%;
-  width: 46%; aspect-ratio: 1;
-  background: var(--brand);
-  border-radius: 18px;
-  /* The rotation lives in the keyframes as well as here, because a transform on the element and a
-     transform in an animation are the same property — declaring the tilt only here would mean the
-     animation silently discards it and the bag snaps upright on the first frame. */
-  transform: rotate(-8deg);
-  animation: bob 3.4s ease-in-out infinite alternate;
-}
-.art-bag::before {
-  content: "";
-  position: absolute;
-  left: 26%; right: 26%; top: -14%;
-  height: 18%;
-  border: 6px solid var(--brand);
-  border-bottom: none;
-  border-radius: 12px 12px 0 0;
-}
-.art-wheel {
-  position: absolute;
-  bottom: 15%;
-  width: 15%; aspect-ratio: 1;
-  border: 6px solid var(--brand-dark);
-  border-radius: 50%;
-  background: var(--white);
-  animation: roll 1.9s linear infinite;
-}
-/* A spoke. Without it the wheels are circles, and a rotating circle is a still circle — the
-   animation would run and nobody would see anything move. */
-.art-wheel::before {
-  content: "";
-  position: absolute;
-  left: 50%; top: 12%;
-  width: 2px; height: 76%;
-  margin-left: -1px;
-  background: var(--brand-line);
-  border-radius: 2px;
-}
-.art-wheel-a { left: 18%; }
-/* Offset so the two wheels are never at the same angle. Identical phase reads as one object. */
-.art-wheel-b { right: 18%; animation-delay: -.6s; }
-
-/* The road is what actually says "moving". The wheels turning on a static line looks like a scooter
-   spinning its wheels; the line travelling underneath turns the same wheels into travel. */
-.art-road {
-  position: absolute;
-  left: 8%; right: 8%; bottom: 14%;
-  height: 3px;
-  overflow: hidden;
-  border-radius: 2px;
-}
-.art-road::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  /* Twice the width, translated by exactly half: the dashes leave on the left as their copies
-     arrive on the right, so the loop has no seam. */
-  width: 200%;
-  background: repeating-linear-gradient(
-      90deg,
-      var(--brand-line) 0 22px,
-      transparent 22px 44px);
-  animation: road 1.9s linear infinite;
-}
-
-@keyframes bob {
-  from { transform: rotate(-8deg) translateY(0); }
-  to   { transform: rotate(-6deg) translateY(-9px); }
-}
-
-@keyframes roll {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-@keyframes road {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(-44px, 0, 0); }
-}
-
-/* ------------------------------------------------------------------ strip */
+.cta-soon .secondary,
+.cta-soon .primary { cursor: default; }
 
 /*
-  Four cards rather than one banded strip.
-
-  As a full-bleed band with hairline dividers these read as a table of specifications — true, and
-  about as inviting as a spec sheet. Separated onto their own cards they read as four small promises,
-  which is what they actually are. It also gives the warm wash behind them somewhere to show through,
-  so the section belongs to the top of the page instead of capping it off.
-
-  Same white, same radius, same shadow as the partner cards below. One card language on one page:
-  a second one would make a reader work out whether the difference means anything.
+  The hero's partner row is not styled here because it is not on the page. The design puts "Trusted
+  by logistics partners globally" under the buttons and names DHL, FedEx, Aramex and UPS beneath it.
+  That is a statement about four other companies, and there is no agreement with any of them to
+  point at, so the block came out rather than shipping as a claim in a stylesheet's worth of type.
 */
-.strip {
-  display: grid;
-  /*
-    An explicit column count, not auto-fit.
 
-    auto-fit is the tidier-looking rule and it is wrong for this row. It packs in as many columns as
-    fit, which at tablet widths is three — leaving the fourth card stranded alone on a second row.
-    With a set of exactly four, the counts that read well are 4, 2 and 1, and nothing else; the
-    breakpoints below say so directly rather than hoping the arithmetic lands there.
-  */
-  grid-template-columns: repeat(4, 1fr);
-  gap: clamp(12px, 1.6vw, 20px);
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 0 clamp(16px, 5vw, 64px);
+/*
+  The hero's right-hand side: a small dashboard card lapping over the phone.
+
+  The overlap is the whole point of the composition, so the card carries a negative inline-end
+  margin rather than being positioned — that way it flips with the page in Arabic without a second
+  rule, and it collapses to a normal stacked layout on a narrow screen where an overlap would
+  simply cover the phone.
+*/
+.hero-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.strip div {
+
+.control-tower {
+  width: 300px;
+  flex: none;
   background: var(--white);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow);
-  padding: clamp(18px, 2.2vw, 24px);
+  border-radius: var(--r-xl);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
+  margin-inline-end: -40px;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(-20px 30px 20px rgba(15, 23, 42, .05));
 }
-.strip strong { font-size: 16px; letter-spacing: -.01em; }
-.strip span { color: var(--muted); font-size: 13.5px; }
-
-/* ------------------------------------------------------------------ sections */
-
-.prose, .app {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: clamp(48px, 7vw, 96px) clamp(16px, 5vw, 64px);
+.control-tower .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.control-tower .label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--muted);
+}
+.control-tower .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--emerald);
+  flex: none;
+}
+.control-tower .figure {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--ink);
+}
+.control-tower .delta {
+  font-size: 11px;
+  line-height: normal;
+  color: var(--emerald);
 }
 
-/* Reading width, not page width. A paragraph stretched across 1240px is measurably harder to read:
-   the eye loses the line it was on when it travels back to the left. */
-.prose p { max-width: 62ch; color: var(--muted); }
-.prose p + p { margin-top: 14px; }
-/* Anchored from the nav, so they need the same clearance from the sticky masthead the steps have. */
-.prose { scroll-margin-top: 88px; }
+/* ------------------------------------------------------------------ how it works */
 
-.contact-list {
-  display: grid;
-  grid-template-columns: minmax(140px, auto) 1fr;
-  gap: 10px 24px;
-  margin: 28px 0 0;
-  max-width: 62ch;
-}
-.contact-list dt { font-weight: 700; font-size: 14.5px; }
-.contact-list dd { margin: 0; color: var(--muted); font-size: 14.5px; }
-.contact-list a { color: var(--brand); }
-
-@media (max-width: 560px) {
-  .contact-list { grid-template-columns: 1fr; gap: 2px 0; }
-  .contact-list dd { margin-bottom: 14px; }
-}
-
-h2 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 800; }
-
-.section-lede { color: var(--muted); max-width: 58ch; margin: 14px 0 0; }
-
-/* The .cards / .card rules that stood here styled the two partner cards, and went when they did.
-   Left in place they would read as a component something still depends on — the next person to
-   want a card on this page would extend rules nothing renders. The four .strip cards have their
-   own, above. */
-
-.app { text-align: center; }
-.app .section-lede { margin-inline: auto; }
-.app-actions {
-  margin-top: 30px;
+.band-stack {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 64px;
+}
+
+.steps-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 48px;
+  width: 100%;
+}
+
+.step-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.step-card .num-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/*
+  The step number, in the rose tint rather than a colour.
+
+  It is the palest thing on the page on purpose: it numbers the steps without competing with the
+  step titles, which are what somebody actually reads.
+*/
+.step-card .num {
+  font-size: clamp(36px, 4vw, 48px);
+  font-weight: 800;
+  line-height: normal;
+  color: var(--brand-soft);
+}
+
+/* The rule that runs from the number towards the next step. Fixed at the length it is drawn, and
+   absent on the last step because there is nothing after it to point at. */
+.step-card .rule {
+  width: 100px;
+  height: 2px;
+  background: var(--border);
+  flex: none;
+}
+
+.step-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--ink);
+}
+
+.step-card p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ carriers dashboard */
+
+.dashboard {
+  background: var(--shell);
+  border: 2px solid var(--shell-deep);
+  border-radius: var(--r-2xl);
+  padding: 22px;
+  width: 100%;
+  filter: drop-shadow(0 24px 24px rgba(15, 23, 42, .13));
+}
+
+.dashboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+}
+
+.dashboard-head h3 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--white);
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(16, 185, 129, .2);
+  color: var(--emerald);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.dashboard img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  display: block;
+}
+
+/* ------------------------------------------------------------------ butler cards */
+
+.butler-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/*
+  The two Butler cards.
+
+  Deliberately not a matched pair: "Buy" is the rose one and "Send" is the plain slate one with a
+  border, because the design makes the first the headline of the service and the second its
+  companion. Their glyphs are coloured to match — a crimson cart, a slate package — which is why
+  they are two separate exported assets and not one file recoloured.
+*/
+.butler-card {
+  border-radius: var(--r-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid transparent;
+}
+.butler-card img { width: 28px; height: 28px; display: block; }
+.butler-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--ink);
+}
+.butler-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: normal;
+  color: var(--muted);
+}
+.butler-buy { background: var(--brand-soft); }
+.butler-send { background: var(--bg); border-color: var(--border); }
+
+/* ------------------------------------------------------------------ stats */
+
+/*
+  The counters.
+
+  The design fills these with round numbers — ten thousand merchants, fifty thousand deliveries a
+  day, a 98.4% satisfaction rate. Nothing on the platform produces any of them, and a figure that
+  nobody can source is a claim, not a statistic, so the band ships with its labels and its layout
+  and an empty figure. The exact wording the design wanted is in the comment beside it in
+  index.html; dropping it back in is one edit once somebody can stand behind it.
+*/
+.stats-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px;
+  width: 100%;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.stat .figure {
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 800;
+  line-height: normal;
+  color: var(--brand);
+}
+.stat .figure.pending { color: rgba(225, 29, 72, .45); }
+
+.stat .label {
+  font-size: clamp(13px, 1.2vw, 15px);
+  font-weight: 600;
+  line-height: normal;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ------------------------------------------------------------------ testimonials */
+
+.quotes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.quote {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 0;
+  filter: drop-shadow(0 10px 10px rgba(15, 23, 42, .02));
+}
+
+.quote-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
-.hint { color: var(--muted); font-size: 13.5px; }
+
+.quote-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/*
+  The by-line portrait.
+
+  The design supplies a photograph here. It is a generated likeness of a person who does not exist,
+  attached to a quote nobody said, so it is not shipped — see the note in index.html. What stays is
+  the geometry the design drew: a 48px circle, 24px radius, in the brand tint, carrying the
+  speaker's initial. Swap it for a real photograph the moment there is a real customer behind it.
+*/
+.quote-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: normal;
+  flex: none;
+}
+
+.quote-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--ink);
+}
+.quote-role {
+  font-size: 13px;
+  line-height: normal;
+  color: var(--faint);
+}
+
+.quote-tag {
+  display: inline-flex;
+  align-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.quote blockquote {
+  margin: 0;
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/*
+  The waiting state.
+
+  Same card, same 32px of padding, same 24px gaps — only the words are missing, and they read as
+  missing rather than as somebody's opinion. The italic comes off because nothing here is a
+  quotation yet.
+*/
+.quote-name.pending,
+.quote blockquote.pending {
+  color: var(--faint);
+  font-style: normal;
+}
+.quote-name.pending { font-weight: 600; }
+.quote-avatar.pending { color: var(--brand-line); }
+
+/* ------------------------------------------------------------------ app download */
+
+.download-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+}
+
+/*
+  The QR slot.
+
+  The design puts a code here. The one in the file is branded for a different product name and
+  encodes a destination nobody on this side can verify, so the tile is drawn at the geometry it was
+  designed at — a white 16px-radius tile, 12px of padding, a 100px square inside — and says what it
+  is instead of pointing somewhere unknown.
+*/
+.qr {
+  background: var(--white);
+  border-radius: var(--r-lg);
+  padding: 12px;
+  flex: none;
+}
+.qr-slot {
+  width: 100px;
+  height: 100px;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.stores {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.store-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/*
+  The two store buttons.
+
+  Rendered as spans, not links: neither listing exists yet. They keep the design's box exactly —
+  the recessed shell colour, the hairline of the band's own white, 16/10 padding, an 18px glyph —
+  and carry the "Coming soon" chip beneath rather than a href that goes nowhere.
+*/
+.store {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--shell-deep);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 10px;
+  padding: 9px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: normal;
+  color: var(--white);
+}
+.store img { width: 18px; height: 18px; display: block; }
+
+.downloads-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: normal;
+  color: var(--faint);
+}
+
+/* ------------------------------------------------------------------ faq */
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+/*
+  The questions.
+
+  <details> rather than a scripted accordion: it opens and closes with no JavaScript at all, it is
+  keyboard-operable and announced correctly for free, and `open` in the markup means the page reads
+  exactly as drawn — every answer visible — before a single byte of script arrives.
+*/
+.faq-item {
+  background: var(--bg);
+  border-radius: var(--r-lg);
+  padding: 24px;
+}
+
+.faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: normal;
+  color: var(--ink);
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+
+.faq-item summary img {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex: none;
+  transition: transform .15s ease;
+}
+.faq-item[open] summary img { transform: rotate(180deg); }
+
+.faq-item p {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
 
 /* ------------------------------------------------------------------ footer */
 
 footer {
-  border-top: 1px solid var(--border);
-  padding: 26px clamp(16px, 5vw, 64px);
+  background: var(--shell);
+  color: var(--white);
+  padding: 80px var(--gutter) 40px;
+}
+
+.footer-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
   display: flex;
+  flex-direction: column;
+  gap: 64px;
+}
+
+.footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 48px;
+}
+
+.footer-brand {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+.footer-brand .wordmark { color: var(--white); }
+.footer-brand p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+.social {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The tile is the same 36px circle whether it is a link yet or not, so wiring the accounts up
+   later is an href and nothing else. */
+.social a,
+.social span[role="img"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .1);
+  display: grid;
+  place-items: center;
+}
+.social a:hover { background: rgba(255, 255, 255, .2); }
+.social img { width: 16px; height: 16px; display: block; }
+
+.footer-col {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.footer-col h2 {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: normal;
+  text-transform: uppercase;
+  color: var(--white);
+}
+.footer-col a {
+  font-size: 14px;
+  line-height: normal;
+  color: var(--faint);
+  text-decoration: none;
+}
+.footer-col a:hover { color: var(--white); }
+
+.footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  padding-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  line-height: normal;
+  color: var(--faint);
+}
+.footer-bottom p { margin: 0; }
+
+/* The footer's own language control, the same switch as the navbar's in a quieter dress. */
+.footer-lang {
+  display: inline-flex;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
-  color: var(--muted);
-  font-size: 14px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--faint);
+  cursor: pointer;
 }
-footer nav { display: flex; gap: 18px; }
-footer a { color: var(--muted); text-decoration: none; }
-footer a:hover { color: var(--brand); }
+.footer-lang:hover { color: var(--white); }
+.footer-lang img { width: 14px; height: 14px; display: block; }
 
 /* ------------------------------------------------------------------ applying */
 
+/*
+  Everything from here down belongs to register.html and admin.html.
+
+  It is kept in this file, and kept under the same class names, because those two pages link this
+  stylesheet and are owned elsewhere — renaming a selector here would break a page this change is
+  not allowed to touch. The rules are re-pointed at the rebuilt tokens so the three pages still
+  look like one site.
+*/
+
 .apply-page {
-  max-width: 720px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: clamp(28px, 5vw, 56px) clamp(16px, 5vw, 48px) clamp(48px, 8vw, 96px);
+  padding: clamp(32px, 6vw, 64px) var(--gutter) 96px;
 }
-.apply-page h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; }
+
+.apply-page h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.section-lede {
+  color: var(--muted);
+  max-width: 58ch;
+  margin: 14px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
 .apply-page .section-lede { margin-bottom: clamp(24px, 4vw, 36px); }
 
 /* The progress rail. Names, not just numbers: "3 of 4" says how much is left but not what is
-   coming, and what is coming is what decides whether somebody starts at all. */
+   coming, and what is coming is the part that decides whether somebody starts at all. */
 .steps {
   display: flex;
-  gap: clamp(6px, 1.4vw, 16px);
-  list-style: none;
-  margin: 0 0 clamp(20px, 3vw, 28px);
+  gap: 8px;
+  margin: 0 0 24px;
   padding: 0;
+  list-style: none;
 }
+
 .steps li {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
+  border-top: 2px solid var(--border);
   padding-top: 10px;
-  border-top: 3px solid var(--border);
+  font-size: 13px;
+  color: var(--faint);
 }
 .steps li.current, .steps li.done { color: var(--ink); border-top-color: var(--brand); }
+
 .dot {
-  width: 22px; height: 22px;
-  flex: none;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
+  background: var(--border);
+  color: var(--muted);
   display: grid;
   place-items: center;
   font-size: 12px;
   font-weight: 700;
-  background: var(--border);
-  color: var(--ink);
+  flex: none;
 }
 .steps li.current .dot, .steps li.done .dot { background: var(--brand); color: var(--white); }
 .steps li.done .dot { font-size: 0; }
-.steps li.done .dot::after { content: "✓"; font-size: 12px; }
+.steps li.done .dot::after { content: "\2713"; font-size: 12px; }
 
 .panel {
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
-  padding: clamp(22px, 3.5vw, 36px);
+  padding: clamp(20px, 4vw, 32px);
   display: grid;
-  gap: 16px;
-  /* The masthead is sticky, so a panel scrolled flush to the top of the viewport has its heading
-     underneath it. This is the gap that keeps the first line of the new step readable. */
-  scroll-margin-top: 88px;
+  gap: 18px;
 }
-.panel h2 { font-size: 23px; }
-.panel-lede { color: var(--muted); margin: -6px 0 4px; font-size: 14.5px; }
+
+.panel h2 { font-size: 23px; font-weight: 700; }
+.panel-lede { color: var(--muted); margin: -6px 0 4px; font-size: 14px; }
 
 .optional {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border-radius: 999px;
-  padding: 3px 9px;
-  vertical-align: middle;
+  color: var(--faint);
+  font-weight: 400;
+  font-size: 13px;
 }
 
 .kind-choice { border: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .kind-choice legend { font-size: 14px; font-weight: 600; padding: 0 0 8px; }
+
 .kind {
   display: flex;
   gap: 12px;
@@ -605,105 +1307,97 @@ footer a:hover { color: var(--brand); }
   border-radius: var(--r-md);
   padding: 14px 16px;
   cursor: pointer;
-  font-weight: 400;
 }
 .kind:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
 .kind input { width: auto; margin-top: 3px; accent-color: var(--brand); }
 .kind strong { display: block; font-size: 15px; }
 .kind small { color: var(--muted); font-size: 13px; }
 
-/* The address and its Send button on one line, so the two read as one action. */
 .verify-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .verify-row .grow { flex: 1 1 240px; }
 .verify-row button { flex: none; }
 
 .code-box {
-  display: grid;
-  gap: 10px;
   background: var(--bg);
-  border: 1px dashed var(--brand-line);
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 16px;
+  display: grid;
+  gap: 10px;
 }
 .code-box input {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 22px;
-  letter-spacing: .35em;
   text-align: center;
+  font-size: 22px;
+  letter-spacing: .4em;
+  font-weight: 700;
 }
 .code-box .hint { display: flex; gap: 6px; align-items: center; justify-content: center; }
 
-/* A button that reads as a link: resending is a minor action next to Verify, and giving it the
-   same weight would make two primary things compete on one small panel. */
+.hint { color: var(--muted); font-size: 13px; }
+
+/* A button that reads as a link: resending is a minor action next to Verify. */
 .linkish {
   background: none;
   border: none;
   padding: 0;
-  font-size: 13.5px;
-  font-weight: 600;
   color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
   text-decoration: underline;
+  cursor: pointer;
 }
 .linkish:disabled { color: var(--muted); text-decoration: none; cursor: default; }
 
 .verified {
-  margin: 0;
-  font-weight: 700;
-  color: #25834B;
+  color: var(--emerald);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .step-actions {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin-top: 4px;
   flex-wrap: wrap;
 }
 .step-actions .spacer { flex: 1; }
 .step-actions .primary, .step-actions .secondary, .step-actions .ghost { flex: none; }
-button:disabled { opacity: .5; cursor: not-allowed; }
 
 .summary { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 8px 20px; margin: 0; }
-.summary dt { color: var(--muted); font-size: 13.5px; }
+.summary dt { color: var(--muted); font-size: 13px; }
 .summary dd { margin: 0; font-weight: 600; word-break: break-word; }
-
-@media (max-width: 560px) {
-  /* The names go, the numbers stay. Four names at this width wrap into a block that takes more
-     room than the step it is describing. */
-  .step-name { display: none; }
-  .steps li { justify-content: center; }
-}
 
 /* ------------------------------------------------------------------ dialogs */
 
 .sheet {
   border: none;
-  border-radius: var(--r-lg);
-  padding: clamp(22px, 3vw, 32px);
+  border-radius: var(--r-2xl);
+  padding: clamp(20px, 4vw, 32px);
   width: min(460px, calc(100vw - 32px));
-  box-shadow: 0 24px 70px rgba(36, 19, 25, .22);
-  color: var(--ink);
   background: var(--white);
+  color: var(--ink);
+  box-shadow: var(--shadow);
 }
-.sheet::backdrop { background: rgba(36, 19, 25, .45); backdrop-filter: blur(3px); }
+.sheet::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(3px); }
 
 .sheet-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
-.sheet-head h2 { font-size: 25px; }
+.sheet-head h2 { font-size: 25px; font-weight: 700; }
 
 .icon {
-  background: transparent;
+  background: none;
   border: none;
-  color: var(--muted);
-  font-size: 26px;
+  padding: 4px 8px;
+  font-size: 24px;
   line-height: 1;
-  padding: 0 4px;
+  color: var(--muted);
   border-radius: var(--r-sm);
+  cursor: pointer;
 }
 .icon:hover { color: var(--ink); background: var(--brand-soft); }
 
@@ -712,18 +1406,18 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .choices { display: grid; gap: 12px; }
 .choice {
   display: grid;
-  gap: 3px;
-  padding: 16px 18px;
+  gap: 2px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  padding: 14px 16px;
   text-decoration: none;
   color: var(--ink);
 }
 .choice:hover { border-color: var(--brand); background: var(--brand-soft); }
 .choice strong { font-size: 16px; }
-.choice span { color: var(--muted); font-size: 13.5px; }
+.choice span { color: var(--muted); font-size: 13px; }
 
-.sheet-foot { color: var(--muted); font-size: 13.5px; margin: 18px 0 0; text-align: center; }
+.sheet-foot { color: var(--muted); font-size: 13px; margin: 18px 0 0; text-align: center; }
 .sheet-foot a { color: var(--brand); }
 
 /* ------------------------------------------------------------------ form */
@@ -735,110 +1429,146 @@ label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
 input, textarea {
   font: inherit;
   font-weight: 400;
-  padding: 11px 13px;
+  width: 100%;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: var(--bg);
+  background: var(--white);
   color: var(--ink);
-  width: 100%;
-  resize: vertical;
 }
 input:focus, textarea:focus {
-  outline: 2px solid var(--brand);
-  outline-offset: 1px;
-  background: var(--white);
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
 }
 
 .form-error {
-  margin: 0;
-  color: var(--brand-dark);
   background: var(--brand-soft);
   border: 1px solid var(--brand-line);
+  color: var(--brand-dark);
   border-radius: var(--r-md);
-  padding: 10px 13px;
+  padding: 12px 14px;
   font-size: 14px;
+  margin: 0 0 16px;
 }
 
 /* ------------------------------------------------------------------ receipt */
 
 #apply-done { text-align: center; }
 .done-mark {
-  font-size: 34px;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: var(--brand-soft);
   color: var(--brand);
-  margin: 6px 0 10px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
 }
-#apply-done h3 { font-size: 21px; }
+#apply-done h3 { font-size: 21px; font-weight: 700; }
 #apply-done p { color: var(--muted); }
 
-/* The reference is the applicant's only key to their own application, so it is made easy to copy
-   and hard to mistranscribe: monospace, spaced out, and selectable in one click. */
+/* The reference is the applicant's only key to their own application, so it is made easy to copy. */
 .reference {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 15px;
-  letter-spacing: .04em;
-  color: var(--ink) !important;
-  background: var(--brand-soft);
-  border: 1px dashed var(--brand-line);
+  display: inline-block;
+  background: var(--bg);
+  border: 1px dashed var(--border);
   border-radius: var(--r-md);
-  padding: 13px;
-  margin: 16px 0 18px;
+  padding: 10px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 16px;
+  font-weight: 700;
   user-select: all;
-  word-break: break-all;
 }
 
 .status-line {
-  margin: 14px 0 0;
-  font-weight: 600;
-  color: var(--ink) !important;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 /* ------------------------------------------------------------------ narrow */
 
-@media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; }
-  .hero-art { order: -1; max-height: 260px; }
-  /* Two and two. Three across would leave the fourth card on a row by itself. */
-  .strip { grid-template-columns: repeat(2, 1fr); }
-  .masthead nav a { display: none; }
+/*
+  Three collapses, in the order the layout actually breaks.
+
+  1024 — the two-column bands and the hero become one column; below this the copy column would be
+  narrower than its own measure and the phone would be squeezed.
+  900  — the three- and four-across grids halve, and the navbar's link list goes (the design draws
+  no mobile menu; the same anchors are reachable from the footer's Platform column).
+  560  — everything left that is still side-by-side stacks.
+*/
+@media (max-width: 1024px) {
+  .hero-inner,
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+  }
+
+  .hero-media { flex-direction: column; gap: 24px; }
+  /* The overlap only works when there is room for it. Stacked, the card sits above the phone at
+     its own width. */
+  .control-tower { margin-inline-end: 0; width: min(300px, 100%); }
+
+  /* No re-ordering: each band's markup is already in the design's own top-to-bottom order, so a
+     stacked column reads the way the designer drew it — phone first in the merchant and rider
+     bands, copy first in the carrier and customer ones. */
+
+  .band, .hero { padding-block: 72px; }
+  footer { padding-block: 64px 40px; }
 }
 
-@media (max-width: 480px) {
-  .strip { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .masthead nav { display: none; }
+
+  .steps-row,
+  .quotes,
+  .faq-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 16px; }
+
+  .band-stack { gap: 48px; }
+}
+
+@media (max-width: 560px) {
+  /*
+    The masthead at phone width.
+
+    The three groups add up to more than 360px at their designed sizes, and a sticky bar that wraps
+    onto two rows eats a fifth of a small screen for the whole scroll. So the wordmark drops to its
+    mark alone — the anchor carries an aria-label, so it is still announced as "YouDrop" — and the
+    switch and the call to action come in a size. Everything stays on one row and stays reachable.
+  */
+  .masthead { gap: 12px; }
+  .masthead .wordmark-text { display: none; }
+  .masthead-actions { gap: 12px; }
+  .lang { font-size: 13px; padding: 6px; }
+  .masthead .primary { font-size: 13px; padding: 10px 14px; }
+
+  .butler-cards { grid-template-columns: minmax(0, 1fr); }
+
+  .footer-top { flex-direction: column; gap: 40px; }
+  .footer-brand, .footer-col { width: 100%; }
+
+  .summary { grid-template-columns: 1fr; gap: 2px; }
+  .summary dd { margin-bottom: 10px; }
+
+  .steps li { font-size: 0; gap: 0; }
+  .steps li .dot { font-size: 12px; }
+  .steps li.done .dot::after { font-size: 12px; }
+
+  .band, .hero { padding-block: 56px; }
+  .quote { padding: 24px; }
 }
 
 /* ------------------------------------------------------------------ stillness */
 
 /*
-  Somebody who has asked their operating system for less motion has asked for it here too.
-  For a few people this is not a preference: vestibular disorders make drifting, parallax and
-  looping motion genuinely unpleasant, and this is a public page nobody chose to open.
-
-  Everything stops rather than slows. The page was designed to be complete without any of it — the
-  orbs settle into a static wash, the scooter becomes the still illustration it already was.
-  scroll-behavior goes with it: a smooth-scrolled jump is motion the same as any other.
+  Motion is decoration here — a chevron turning, a button dipping a pixel. Somebody who has asked
+  their system for less of it loses nothing by having none of it.
 */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-
-  .orb,
-  .dawn,
-  .art-bag,
-  .art-wheel,
-  .art-road::before {
-    animation: none;
-  }
-
-  /* The warm top stays — it is colour, not movement, and stilling it would take the friendliness
-     away from the people who asked only for the motion to stop. Pinned at full strength so it does
-     not sit at whatever opacity the cancelled animation left behind. */
-  .dawn { opacity: 1; }
-
-  /* The tilt was in the keyframes as well as on the element; with the animation gone the
-     declaration on the element still holds it, so the bag stays as drawn. */
-  .orb-b { transform: scale(1.06); }
-
-  /* Belt and braces for anything added later: a new decorative animation should inherit the
-     preference rather than wait for somebody to remember this block. */
   *, *::before, *::after {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;

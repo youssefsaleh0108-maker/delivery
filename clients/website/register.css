@@ -1,0 +1,764 @@
+/*
+  The application wizard.
+
+  Its own stylesheet rather than more of site.css. The marketing page and this one now diverge on
+  purpose: the site is a scrolling document with a warm drifting backdrop, and this is a two-panel
+  console — a fixed brand panel and a form that holds one step at a time. Sharing a file would mean
+  every rule here carrying a selector to keep it off the site, and every rule there carrying one to
+  keep it off this page.
+
+  What is shared is the part worth sharing: site.css is loaded first, so the palette, the radii, the
+  self-hosted Rubik and the button system all come from one place. Nothing below re-declares a
+  colour that already has a name there.
+*/
+
+:root {
+  /*
+    Four values and three radii the 2026-08 Figma redesign uses that site.css has no name for yet.
+    Declared here rather than added there, so this wave touches one file: when the site's own
+    redesign lands they should move up and these should go.
+  */
+  --brand-deep: #881337;   /* rose-950 — the foot of the brand panel's gradient */
+  --faint: #94A3B8;        /* slate-400 — placeholder text, unchecked checkbox glyphs */
+  --ok: #10B981;           /* emerald-500 — a document that has been accepted */
+  --ok-soft: #ECFDF5;      /* emerald-50 — its icon tile */
+
+  --r-xs: 6px;             /* the language pill, the Choose File button */
+  --r-12: 12px;            /* upload rows, the receipt's info bar */
+  --r-sheet: 24px;         /* the receipt card */
+}
+
+/*
+  Hiding wins over laying out.
+
+  Nearly every block on this page is a flex container, and `display: flex` from a class beats the
+  browser's own `[hidden] { display: none }`. One step of a wizard showing all six at once is the
+  bug that produces, so the attribute is given the last word here rather than in six separate
+  rules that somebody has to remember to add the seventh time.
+*/
+[hidden] { display: none !important; }
+
+/* ------------------------------------------------------------------ the two panels */
+
+/*
+  Full height, and the brand panel does not scroll with the form.
+
+  A wizard is a sequence of short screens, and the thing that makes it feel like one screen rather
+  than five is that the left half never moves. The form half owns the scrollbar; on the one step
+  tall enough to need it, the brand panel stays put.
+*/
+.wizard {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.w-brand {
+  flex: 0 0 480px;
+  width: 480px;
+  align-self: stretch;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px;
+  background: linear-gradient(180deg, var(--brand) 0%, var(--brand-deep) 100%);
+  color: var(--white);
+}
+
+.w-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+
+/* 40px tile, 20px leaf. The tile is the constant; the glyph inside it is drawn at its own size and
+   is never stretched to fill. */
+.w-logo-tile {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.w-logo-text { display: flex; flex-direction: column; line-height: normal; }
+.w-logo-text b { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.w-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--brand-soft);
+}
+
+.w-brand-copy { display: flex; flex-direction: column; gap: 24px; }
+.w-brand-copy h1 {
+  font-size: 32px;
+  line-height: 42px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  margin: 0;
+}
+.w-brand-copy p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--brand-soft);
+  opacity: .8;
+}
+
+.w-brand-foot { display: flex; flex-direction: column; gap: 8px; color: var(--brand-soft); }
+.w-brand-foot span { font-size: 13px; font-weight: 500; opacity: .7; }
+.w-brand-foot small { font-size: 12px; opacity: .5; }
+
+/*
+  The form half.
+
+  space-between with an empty tail element, which is how the design balances the column: the top
+  row sits against the top, the form sits a little above centre, and the tail holds the rest. A
+  plain centre would drop the form when a step is short and shove it off the top when it is long.
+*/
+.w-form {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 64px clamp(24px, 8vw, 120px);
+}
+
+.w-form-tail { height: 40px; flex: none; }
+
+.w-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.w-top-note { margin: 0; font-size: 14px; font-weight: 500; color: var(--muted); }
+.w-top-note a { color: var(--brand); font-weight: 600; text-decoration: none; }
+.w-top-note a:hover { text-decoration: underline; }
+
+.w-top-right { display: flex; align-items: center; gap: 8px; }
+
+/* The language pill. Drawn as designed and inert — see the chip beside it. */
+.w-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  cursor: default;
+}
+
+/*
+  Coming soon.
+
+  Small, grey and next to the thing it is about. An affordance the design draws but no backend can
+  answer for yet is better shown greyed with a word of explanation than quietly deleted: deleting it
+  makes the page disagree with the design, and leaving it live makes it disagree with reality.
+*/
+.w-soon {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ the form column */
+
+.w-col {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.w-head { display: flex; flex-direction: column; gap: 16px; }
+
+.w-progress { display: flex; flex-direction: column; gap: 8px; }
+.w-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.w-progress-row .w-step-of {
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.w-progress-row .w-percent { font-weight: 500; color: var(--muted); }
+
+.w-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.w-bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: var(--brand);
+  transition: width .25s ease;
+}
+
+.w-title { display: flex; flex-direction: column; gap: 6px; }
+.w-title h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.w-title p { margin: 0; font-size: 14px; color: var(--muted); }
+
+/* One step at a time; the rest are hidden outright rather than moved off-screen, so nothing inside
+   them is tabbable while they are away. */
+.wstep { display: flex; flex-direction: column; gap: 16px; }
+.wstep[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ fields */
+
+.w-field { display: flex; flex-direction: column; gap: 8px; }
+.w-row { display: flex; gap: 16px; }
+.w-row > .w-field { flex: 1 1 0; min-width: 0; }
+
+.w-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.w-label .req { color: var(--brand); font-weight: 400; }
+.w-label .w-optional {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+/*
+  Inputs, overriding site.css: the design's field is white on the page background with an 8px
+  radius, not the site's tinted 14px one. Fields are the most repeated shape on this page and
+  getting them a pixel wrong is visible six times over.
+*/
+.wizard input[type="text"],
+.wizard input[type="email"],
+.wizard input[type="tel"],
+.wizard input[type="number"],
+.wizard textarea,
+.wizard select {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--white);
+  color: var(--ink);
+  appearance: none;
+}
+.wizard textarea { resize: vertical; line-height: 1.5; }
+.wizard ::placeholder { color: var(--faint); opacity: 1; }
+
+.wizard input:focus,
+.wizard textarea:focus,
+.wizard select:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+  background: var(--white);
+}
+
+/* The chevron is the design's 18px lucide glyph, inlined as a data URI so the select keeps being a
+   real <select> — a native menu on a phone is worth more than a custom one. */
+.wizard select {
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18' fill='none'%3E%3Cpath d='M4.5 6.75L9 11.25L13.5 6.75' stroke='%23475569' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ what are you applying as */
+
+/*
+  Not in the carrier frames, because those frames are the carrier's own front door. This page is
+  both front doors — the site links here without a kind — so the choice has to be made somewhere,
+  and it is made in the field language of the step it sits on.
+*/
+.w-kinds { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.w-kinds legend {
+  padding: 0 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.w-kind {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--white);
+  cursor: pointer;
+}
+.w-kind:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+/* width and appearance back to the browser's: site.css sizes every input to the full width of its
+   field, which is right for the text boxes it was written for and absurd on a radio. */
+.w-kind input {
+  flex: none;
+  width: auto;
+  margin: 3px 0 0;
+  padding: 0;
+  appearance: auto;
+  accent-color: var(--brand);
+}
+.w-kind b { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.w-kind small { display: block; font-size: 12px; color: var(--muted); }
+.w-kind:has(input:checked) b { color: var(--brand); }
+
+/* ------------------------------------------------------------------ verifying */
+
+/* The address and its Send button on one line, so the two read as one action. */
+.w-verify { display: flex; gap: 12px; align-items: flex-end; }
+.w-verify .w-field { flex: 1 1 auto; min-width: 0; }
+.w-verify .w-send { flex: none; }
+
+.w-code {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed var(--brand-line);
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+}
+.wizard .w-code input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: .35em;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.w-code-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.w-verified {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+/* ------------------------------------------------------------------ documents */
+
+.w-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.w-note .w-soon { margin-right: 6px; vertical-align: middle; }
+
+.w-uploads { display: flex; flex-direction: column; gap: 12px; }
+
+.w-upload {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-12);
+  background: var(--white);
+}
+/* The accepted state the design draws for a document already on file. Nothing sets it yet — see
+   the note on the step — but it is the same row, so it is defined here with it. */
+.w-upload.is-done { border-color: var(--ok); }
+
+.w-upload-tile {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.w-upload.is-done .w-upload-tile { background: var(--ok-soft); color: var(--ok); }
+
+.w-upload-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.w-upload-text b { font-size: 14px; font-weight: 600; color: var(--ink); }
+.w-upload-text span { font-size: 12px; color: var(--muted); }
+
+.wizard .w-choose {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--white);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.w-uploaded {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ok);
+}
+
+/* ------------------------------------------------------------------ vehicle chips */
+
+.w-chips { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.w-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--white);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.w-chip:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+/* The real checkbox stays in the DOM and keeps the keyboard and the form working; the two lucide
+   glyphs are what is seen. */
+.w-chip input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  margin: 0;
+  pointer-events: none;
+}
+.w-chip:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+.w-chip .on { display: none; }
+.w-chip .off { display: block; color: var(--faint); }
+.w-chip:has(input:checked) .on { display: block; }
+.w-chip:has(input:checked) .off { display: none; }
+
+/* ------------------------------------------------------------------ summary */
+
+.w-summary {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 10px 20px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-12);
+  background: var(--white);
+}
+.w-summary dt { font-size: 13px; color: var(--muted); }
+.w-summary dd { margin: 0; font-size: 14px; font-weight: 500; color: var(--ink); word-break: break-word; }
+
+/* ------------------------------------------------------------------ step buttons */
+
+/*
+  Full width when there is one and half each when there are two, which is what the design draws and
+  is also the honest shape: at this point in a wizard there is exactly one thing to do next and one
+  way back, and neither is a small link in a corner.
+*/
+.w-actions { display: flex; gap: 16px; }
+
+.wizard button, .w-receipt button { font-family: inherit; cursor: pointer; }
+
+/* Not scoped to .wizard: the receipt card, which is outside it, ends on the same pair. */
+.w-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+.w-actions .primary { background: var(--brand); color: var(--white); border-color: var(--brand); }
+.w-actions .primary:hover:not(:disabled) { background: var(--brand-dark); border-color: var(--brand-dark); }
+.w-actions .secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+.w-actions .secondary:hover:not(:disabled) { background: var(--white); border-color: var(--faint); }
+
+/* Send code / Verify sit inside a field row, so they take the field's height rather than the
+   full-width step-button height. */
+.wizard .w-send, .wizard .w-confirm {
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wizard button:disabled, .w-receipt button:disabled { opacity: .5; cursor: not-allowed; }
+
+/*
+  Two shapes that used to live in site.css and only this page ever used: the error line and the
+  button that reads as a link. Written out in full here rather than leaned on over there, because
+  the moment the site stops using them they are dead rules in somebody else's file — and the day
+  they are swept up should not be the day applying breaks.
+*/
+.wizard .form-error {
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--brand-line);
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 13.5px;
+}
+
+/* Resending is a minor action next to Verify, and giving it the same weight would make two primary
+   things compete inside one small box. */
+.wizard .linkish {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.wizard .linkish:disabled { color: var(--muted); text-decoration: none; cursor: default; }
+
+/* ------------------------------------------------------------------ the receipt */
+
+/*
+  A different page, not a fifth step.
+
+  Once the application is in, the two-panel frame has nothing left to do — there is no next step for
+  the progress bar to point at and no form for the brand panel to sit beside. The design says so
+  too: one card, centred, on the plain background.
+*/
+.w-receipt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  min-height: 100vh;
+  padding: clamp(24px, 6vw, 64px);
+}
+
+.w-receipt-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.w-receipt-tile {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-12);
+  background: var(--brand);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.w-receipt-logo b { font-size: 24px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
+.w-receipt-logo .w-eyebrow { color: var(--brand); }
+
+.w-card {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: clamp(24px, 5vw, 48px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sheet);
+  background: var(--white);
+  box-shadow: 0 8px 12px rgba(15, 23, 42, .03);
+}
+
+.w-card-head { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.w-badge {
+  width: 80px;
+  height: 80px;
+  border-radius: 40px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.w-card-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  letter-spacing: -.02em;
+}
+.w-card-head p { margin: 0; font-size: 15px; color: var(--muted); text-align: center; }
+
+.w-rule { height: 1px; background: var(--border); }
+
+.w-block { display: flex; flex-direction: column; gap: 16px; }
+.w-block-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.w-next-row { display: flex; gap: 16px; align-items: flex-start; }
+.w-next-num {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.w-next-row.is-now .w-next-num { background: var(--brand); color: var(--white); }
+.w-next-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.w-next-text b { font-size: 15px; font-weight: 600; color: var(--ink); }
+.w-next-text span { font-size: 13px; color: var(--muted); }
+
+.w-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+}
+.w-info svg { flex: none; color: var(--brand); }
+.w-info p { margin: 0; font-size: 13px; font-weight: 500; color: var(--brand); }
+
+/*
+  The reference, which the design does not draw and the applicant cannot do without: it is the only
+  key to their own application until we write back. It gets the card's own block treatment rather
+  than a box of its own invention — monospace, selectable in one click, hard to mistranscribe.
+*/
+.wizard-done .reference {
+  display: block;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--brand-line);
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--ink);
+  user-select: all;
+  word-break: break-all;
+}
+
+.w-card .w-actions .secondary { background: var(--white); }
+
+.wizard-done .status-line {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ narrow */
+
+/*
+  Under 1100px the brand panel gives up its fixed 480 and shrinks with the viewport; under 880 it
+  stops being a panel at all and becomes a band across the top, keeping the logo and the headline
+  and dropping the paragraph and the footer. Those two carry no instruction — on a phone they would
+  push the first field of the form below the fold to say nothing the applicant needs.
+*/
+@media (max-width: 1100px) {
+  .w-brand { flex-basis: clamp(320px, 34vw, 480px); width: auto; padding: 40px 32px; }
+  .w-brand-copy h1 { font-size: 28px; line-height: 36px; }
+}
+
+@media (max-width: 880px) {
+  .wizard { flex-direction: column; }
+  .w-brand {
+    flex: none;
+    width: auto;
+    position: static;
+    height: auto;
+    gap: 20px;
+    padding: 24px clamp(16px, 5vw, 32px);
+  }
+  .w-brand-copy { gap: 12px; }
+  .w-brand-copy h1 { font-size: 22px; line-height: 30px; }
+  .w-brand-copy p, .w-brand-foot { display: none; }
+  .w-form { padding: 32px clamp(16px, 5vw, 32px); gap: 28px; }
+  .w-form-tail { display: none; }
+  .w-col { max-width: none; }
+}
+
+@media (max-width: 560px) {
+  .w-row { flex-direction: column; gap: 16px; }
+  .w-verify { flex-direction: column; align-items: stretch; }
+  .w-verify .w-send { width: 100%; }
+  .w-upload { flex-wrap: wrap; }
+  .w-actions { flex-direction: column-reverse; }
+}
