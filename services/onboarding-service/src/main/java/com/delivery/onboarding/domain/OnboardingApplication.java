@@ -3,7 +3,11 @@ package com.delivery.onboarding.domain;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -103,6 +107,24 @@ public class OnboardingApplication {
     private String notes;
 
     /**
+     * What the client's onboarding wizard collected beyond the fixed columns: vehicle type and
+     * plate, preferred work region, business type, date of birth, national id, bank/payout details
+     * (account holder, IBAN) — different questions for different kinds of applicant.
+     *
+     * <p>Deliberately a free-form document rather than columns, and validated for size only
+     * (16KB serialised, at the API edge). The wizards change with the product, none of these
+     * answers is queried by this service — a reviewer reads them whole in the portal — and a
+     * fixed shape here would mean a schema migration and an API change every time a wizard adds
+     * a step. The shape is the client's to evolve.
+     *
+     * <p>Sensitive: bank details live in here. It must never appear in a log statement, and it is
+     * only ever bound as a JPA parameter — never concatenated into a query.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details", columnDefinition = "jsonb")
+    private Map<String, Object> details;
+
+    /**
      * The delivery company a rider is applying to. Null for every other kind.
      *
      * <p>Set once, at submission, and never updatable: it decides whose queue this sits in and who
@@ -175,7 +197,7 @@ public class OnboardingApplication {
     public OnboardingApplication(Kind kind, String businessName, String contactName,
                                  String contactEmail, Instant emailVerifiedAt,
                                  String contactPhone, Instant phoneVerifiedAt, String notes,
-                                 UUID targetProviderId) {
+                                 Map<String, Object> details, UUID targetProviderId) {
         if (emailVerifiedAt == null) {
             throw new IllegalArgumentException("The email address has to be verified first");
         }
@@ -201,6 +223,7 @@ public class OnboardingApplication {
         this.contactPhone = contactPhone;
         this.phoneVerifiedAt = phoneVerifiedAt;
         this.notes = notes;
+        this.details = details;
         this.status = Status.SUBMITTED;
         this.reference = newReference();
     }
@@ -294,6 +317,11 @@ public class OnboardingApplication {
 
     public String getNotes() {
         return notes;
+    }
+
+    /** May be null. See the field for why it is free-form, and why it must never be logged. */
+    public Map<String, Object> getDetails() {
+        return details;
     }
 
     public Status getStatus() {

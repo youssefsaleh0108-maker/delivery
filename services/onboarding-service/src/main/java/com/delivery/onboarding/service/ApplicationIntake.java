@@ -54,6 +54,7 @@ public class ApplicationIntake {
                                         String contactName, String contactEmail,
                                         String emailVerificationToken, String contactPhone,
                                         String phoneVerificationToken, String notes,
+                                        java.util.Map<String, Object> details,
                                         java.util.UUID targetProviderId) {
 
         Instant emailVerifiedAt = verifications.consume(
@@ -68,7 +69,7 @@ public class ApplicationIntake {
                 kind, businessName.trim(), contactName.trim(),
                 VerificationService.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
                 phone == null ? null : VerificationService.normalise(Channel.PHONE, phone),
-                phoneVerifiedAt, notes, targetProviderId);
+                phoneVerifiedAt, notes, details, targetProviderId);
 
         try {
             applications.saveAndFlush(application);

@@ -61,6 +61,9 @@ public class OnboardingController {
 
     // ---------------------------------------------------------------- shapes
 
+    /** The budget for the free-form {@code details} document: 16KB serialised. */
+    static final int MAX_DETAILS_BYTES = 16 * 1024;
+
     /**
      * @param emailVerificationToken proof the address was confirmed. Required: everything that
      *                               follows an application is sent there, so an unverified address
@@ -78,6 +81,17 @@ public class OnboardingController {
             @Size(max = 32) String contactPhone,
             @Size(max = 64) String phoneVerificationToken,
             @Size(max = 2000) String notes,
+            /**
+             * What the wizard collected beyond the fixed fields: vehicle type and plate, preferred
+             * work region, business type, date of birth, national id, bank/payout details (account
+             * holder, IBAN) — different questions per kind of applicant.
+             *
+             * <p>Free-form on purpose, validated for size only. The wizards evolve with the
+             * product, and no key in here is queried server-side — a reviewer reads the document
+             * whole — so a fixed shape would cost a migration and an API change per wizard step
+             * for nothing. Sensitive (bank details): never logged, JSON in and out only.
+             */
+            @MaxSerializedSize(bytes = MAX_DETAILS_BYTES) Map<String, Object> details,
             /** The delivery company a rider is applying to. Only a rider sends one. */
             UUID targetProviderId) {
     }
@@ -141,7 +155,8 @@ public class OnboardingController {
                                   String contactName, String contactEmail, String contactPhone,
                                   UUID targetProviderId,
                                   Instant emailVerifiedAt, Instant phoneVerifiedAt,
-                                  String notes, String status, Instant createdAt,
+                                  String notes, Map<String, Object> details,
+                                  String status, Instant createdAt,
                                   Instant decidedAt, String decidedBy, String rejectionReason,
                                   String provisionedUserRef, UUID provisionedEntityId) {
 
@@ -154,7 +169,11 @@ public class OnboardingController {
                     // actually owns that inbox. Applications taken before verification existed
                     // carry nulls here, and reading as "not checked" is exactly right for them.
                     a.getEmailVerifiedAt(), a.getPhoneVerifiedAt(),
-                    a.getNotes(), a.getStatus().name(), a.getCreatedAt(),
+                    // The wizard's free-form answers, bank details included. The reviewer is
+                    // entitled to them — they are what is being reviewed. The unauthenticated
+                    // receipt above deliberately is not: a forwarded reference must not read
+                    // somebody's IBAN.
+                    a.getNotes(), a.getDetails(), a.getStatus().name(), a.getCreatedAt(),
                     a.getDecidedAt(), a.getDecidedBy(), a.getRejectionReason(),
                     a.getProvisionedUserRef(), a.getProvisionedEntityId());
         }
@@ -177,7 +196,7 @@ public class OnboardingController {
                 request.kind(), request.businessName(), request.contactName(),
                 request.contactEmail(), request.emailVerificationToken(),
                 request.contactPhone(), request.phoneVerificationToken(), request.notes(),
-                request.targetProviderId());
+                request.details(), request.targetProviderId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApplicationReceipt.of(application));
     }

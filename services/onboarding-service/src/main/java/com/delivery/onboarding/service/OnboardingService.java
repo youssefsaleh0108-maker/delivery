@@ -83,13 +83,16 @@ public class OnboardingService {
                                         String contactName, String contactEmail,
                                         String emailVerificationToken, String contactPhone,
                                         String phoneVerificationToken, String notes,
+                                        Map<String, Object> details,
                                         UUID targetProviderId) {
 
         OnboardingApplication application;
         try {
+            // details is applicant-supplied and holds bank details — it goes into the record and
+            // nowhere else: not into a log line, not into a process variable.
             application = intake.record(
                     kind, businessName, contactName, contactEmail, emailVerificationToken,
-                    contactPhone, phoneVerificationToken, notes, targetProviderId);
+                    contactPhone, phoneVerificationToken, notes, details, targetProviderId);
         } catch (IllegalArgumentException e) {
             // "Choose the delivery company you want to ride for" is something the applicant can act
             // on; an unhandled 500 is not.
