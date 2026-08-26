@@ -17,6 +17,27 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
-  # Inter is not bundled here yet - Appendix A allows a system-font fallback, which is what the
-  # clients get until the font files are added to this package under assets/fonts/.
   uses-material-design: true
+
+  # Rubik, the face of the 2026-08 Figma redesign, bundled so every client renders it identically
+  # rather than falling back to whatever the device ships. Static instances rather than the variable
+  # font, because Flutter maps FontWeight to a bundled weight table directly but drives a variable
+  # font's wght axis only through per-TextStyle FontVariation — and the theme speaks FontWeight.
+  #
+  # SIL OFL 1.1; the licence text ships beside the files as fonts/OFL.txt.
+  #
+  # Declared in the PACKAGE, so clients reference the family as "packages/delivery_design_system/Rubik"
+  # via DeliveryTypography.fontFamily rather than each bundling their own copy.
+  fonts:
+    - family: Rubik
+      fonts:
+        - asset: fonts/Rubik-Regular.ttf
+          weight: 400
+        - asset: fonts/Rubik-Medium.ttf
+          weight: 500
+        - asset: fonts/Rubik-SemiBold.ttf
+          weight: 600
+        - asset: fonts/Rubik-Bold.ttf
+          weight: 700
+        - asset: fonts/Rubik-ExtraBold.ttf
+          weight: 800

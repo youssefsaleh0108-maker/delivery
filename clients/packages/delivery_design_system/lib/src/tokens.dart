@@ -1,63 +1,77 @@
 import 'package:flutter/material.dart';
 
-/// The rose-red / white brand system.
+/// The crimson brand system, matched to the owner's 2026-08 Figma redesign
+/// (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB, "YouDrop").
 ///
-/// Fire-engine red originally, rose since 2026-08-12. Orange was tried the same day and reverted at
-/// the owner's request — the token *names* are from that attempt and were kept deliberately, since
-/// `brand` stays true whatever colour it holds and `red` did not.
+/// Third palette this file has carried: fire-engine red, then rose (2026-08-12, picked against
+/// WCAG), now the Figma crimson — applied as designed, at the owner's explicit request. The token
+/// *names* survive every repaint on purpose; `brand` stays true whatever colour it holds.
 ///
 /// Every surface in the platform reads from these values — the three Flutter clients through this
 /// file, and the Keycloak login page through the matching custom properties in
 /// `infra/keycloak/themes/delivery/login/resources/css/delivery.css`. **Those two lists must be
 /// changed together**, or the sign-in page stops matching the app it signs you into.
 ///
-/// Picked against WCAG contrast rather than by eye:
+/// Contrast, measured not asserted:
 ///
-/// | pairing                  | old red | rose |
-/// | ------------------------ | ------- | ---- |
-/// | white on primary         |    4.98 | 5.78 |
-/// | primary on the soft tint |    4.30 | 5.11 |
-/// | muted on the background  |    4.10 | 4.69 |
+/// | pairing                  | rose (previous) | figma crimson |
+/// | ------------------------ | --------------- | ------------- |
+/// | white on primary         |            5.78 | 4.70          |
+/// | primary on the soft tint |            5.11 | 3.91          |
 ///
-/// The middle row is the one that mattered: red-on-tint failed AA for body text and rose does not.
-///
-/// For the record, since it is the reason a brand colour cannot simply be picked from a mood board:
-/// the orange that was tried scored 5.18 and 4.76 on the first two rows — passing, but worse than
-/// rose — and the *brighter* orange it was derived from scored **2.80**, which fails outright and
-/// would have made every button in the platform unreadable.
+/// White-on-primary still clears AA. Primary-on-tint no longer does for body text (3.91 < 4.5,
+/// fine for 18px+/14px-bold). The design was applied exactly as drawn and the owner was told;
+/// until it is revisited in Figma, do not put body-sized brand text on [brandSoft] — use [ink].
 abstract final class DeliveryColors {
-  /// Primary buttons, active nav state, brand accents.
+  /// Primary buttons, active nav state, brand accents, and — new in this design — whole-screen
+  /// hero backgrounds (welcome, pending-approval).
   ///
-  /// One value, not two: rose clears AA both on white and as text on white, so unlike an orange
-  /// brand it needs no separate darker variant for anything carrying text.
-  static const Color brand = Color(0xFFC41D4E);
+  /// Figma: the fill on `unified-welcome` and every primary button.
+  static const Color brand = Color(0xFFE11D48);
 
   /// Gradients, header fills, hover/pressed states.
-  static const Color brandDark = Color(0xFF8E1235);
+  ///
+  /// Tailwind rose-800, the darker stop the design pairs with the primary.
+  static const Color brandDark = Color(0xFF9F1239);
 
   /// Badges, subtle tinted backgrounds, empty-state icon rings.
-  static const Color brandSoft = Color(0xFFFDEDF1);
+  ///
+  /// Figma: the rose wash used for secondary text ON the brand colour and for tinted chips
+  /// on white (`#ffe4e6`).
+  static const Color brandSoft = Color(0xFFFFE4E6);
 
   /// Borders on brand-tinted surfaces (e.g. dropzones).
-  static const Color brandLine = Color(0xFFF1C6D3);
+  static const Color brandLine = Color(0xFFFDA4AF);
 
   /// Primary text.
-  static const Color ink = Color(0xFF241319);
+  static const Color ink = Color(0xFF1F2937);
 
   /// Secondary / help text.
   ///
   /// Carries caption text at 11–12px, so it is picked to clear AA on both the page background and
   /// white rather than to sit prettily between them.
-  static const Color muted = Color(0xFF7E6A73);
+  static const Color muted = Color(0xFF6B7280);
 
   /// Card and input borders.
-  static const Color border = Color(0xFFEAD9DF);
+  static const Color border = Color(0xFFE5E7EB);
 
   /// App / page background.
-  static const Color background = Color(0xFFFCF6F8);
+  static const Color background = Color(0xFFF9FAFB);
 
   /// Cards, surfaces, primary-button text.
   static const Color white = Color(0xFFFFFFFF);
+
+  /// Text and icons on [brand] that the design renders in the rose wash rather than pure white —
+  /// taglines, card subtitles on the welcome screen. 3.91:1 on brand: large/bold text only.
+  static const Color onBrandSoft = Color(0xFFFFE4E6);
+
+  /// Translucent white card fill used on brand-coloured screens (role cards, language pill).
+  ///
+  /// Figma: `rgba(255,255,255,0.15)` with a `rgba(255,255,255,0.2)` border.
+  static const Color onBrandSurface = Color(0x26FFFFFF);
+
+  /// Border for [onBrandSurface] cards.
+  static const Color onBrandBorder = Color(0x33FFFFFF);
 }
 
 /// The semantic accents, added 2026-08-12 to soften the interface.
@@ -188,16 +202,29 @@ abstract final class DeliverySpacing {
   static const double xxl = 48;
 }
 
+/// Corner radii, from the Figma redesign's geometry.
+///
+/// The design is noticeably rounder than the previous system: cards sit at 20, screen sheets at
+/// 32, icon tiles at 14. The old names keep their meaning (sm = chips/inputs, md = tiles,
+/// lg = cards) so call sites repaint without renaming.
 abstract final class DeliveryRadius {
-  static const double sm = 6;
-  static const double md = 10;
-  static const double lg = 16;
+  static const double sm = 8;
+  static const double md = 14;
+  static const double lg = 20;
+
+  /// Full-screen sheets and the phone-frame corner the design draws on every mobile screen.
+  static const double sheet = 32;
+
   static const double pill = 999;
 }
 
 abstract final class DeliveryTypography {
-  /// Appendix A: Inter, with a system fallback for platforms where it is not bundled.
-  static const String fontFamily = 'Inter';
+  /// Rubik, per the 2026-08 Figma redesign — bundled in this package (see pubspec), so the
+  /// family resolves identically on every platform instead of falling back per-device.
+  ///
+  /// The `packages/` prefix is how Flutter addresses a font declared in a dependency package;
+  /// without it the clients would each need their own copy of the files.
+  static const String fontFamily = 'packages/delivery_design_system/Rubik';
   static const List<String> fontFamilyFallback = <String>[
     '-apple-system',
     'Segoe UI',

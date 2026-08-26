@@ -7,12 +7,13 @@
 */
 
 :root {
-  --brand: #C41D4E;
-  --brand-dark: #8E1235;
-  --brand-soft: #FDEDF1;
-  --brand-line: #F1C6D3;
-  --ink: #241319;
-  --muted: #7E6A73;
+  /* 2026-08 Figma redesign (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). */
+  --brand: #E11D48;
+  --brand-dark: #9F1239;
+  --brand-soft: #FFE4E6;
+  --brand-line: #FDA4AF;
+  --ink: #1F2937;
+  --muted: #6B7280;
 
   /*
     For secondary text that sits on the warm top rather than on the plain background.
@@ -161,11 +162,27 @@ html { scroll-behavior: smooth; }
   to   { transform: translate3d(7vmax, -8vmax, 0) scale(1.1); }
 }
 
+/*
+  Rubik, self-hosted (fonts/Rubik-var.woff2, SIL OFL — licence beside it).
+
+  One variable file rather than five static weights: it is what Google serves modern browsers
+  anyway, it is 35KB against ~175KB per static weight, and `font-weight: 400 800` lets every
+  weight the design uses resolve from it. Self-hosted because the page should not depend on a
+  third-party host for its own typeface — and latin-only, which covers the site's current copy;
+  the Arabic side of the product lives in the apps, not on this page.
+*/
+@font-face {
+  font-family: Rubik;
+  src: url("fonts/Rubik-var.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 16px/1.6 Rubik, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
