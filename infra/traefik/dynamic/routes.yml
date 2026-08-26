@@ -170,9 +170,19 @@ http:
 
     # The DLR callback. A carrier's delivery receipt arrives with no token — it cannot have one —
     # and is authenticated by a signature instead. Routed, but nothing else about it is public.
+    #
+    # It goes to sms-connector, which is where the receipt actually lands: the controller ships in
+    # the shared platform-notifications library and so exists in several services, but only the
+    # connector registers the per-vendor translators that verify the signature, and only its
+    # security config permits the path without a JWT. Pointed at Notifications Manager, every
+    # callback was rejected with 401 before the controller ever ran — the exact failure the
+    # controller's own comment warns about, where a forged receipt and a misconfigured route look
+    # identical and real delivery data is discarded until somebody notices.
+    #
+    # This does NOT widen /api/connector/**, which stays unrouted; the rule is this one path.
     sms-dlr-webhook:
       rule: PathPrefix(`/webhooks/dlr`)
-      service: notifications-manager
+      service: sms-connector-dlr
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
@@ -296,6 +306,18 @@ http:
       entryPoints: [https]
       middlewares: [ops-auth@file]
   services:
+    # The SMS connector, reachable for ONE path only: the carrier delivery-receipt callback.
+    #
+    # Named apart from the connector's other endpoints on purpose. /api/connector/** is deliberately
+    # unrouted — it takes no user token, so exposing it would be "send an arbitrary SMS to anyone
+    # who finds the host" — and the Phase 5 suite asserts it stays unreachable. Giving the DLR path
+    # its own service entry keeps that guarantee textual: there is no route to the connector, only a
+    # route to its webhook.
+    sms-connector-dlr:
+      loadBalancer:
+        servers:
+          - url: http://sms-connector:8112
+
     product-service:
       loadBalancer:
         servers:
