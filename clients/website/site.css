@@ -10,10 +10,10 @@
   /* 2026-08 Figma redesign (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). */
   --brand: #E11D48;
   --brand-dark: #9F1239;
-  --brand-soft: #FFE4E6;
+  --brand-soft: #FFF1F2;
   --brand-line: #FDA4AF;
-  --ink: #1F2937;
-  --muted: #6B7280;
+  --ink: #0F172A;
+  --muted: #475569;
 
   /*
     For secondary text that sits on the warm top rather than on the plain background.
@@ -24,9 +24,9 @@
     rather than a global change: the rest of the page still sits on the pale background --muted was
     picked for, and darkening it everywhere would flatten a distinction that is doing real work.
   */
-  --ink-soft: #63505A;
-  --border: #EAD9DF;
-  --bg: #FCF6F8;
+  --ink-soft: #475569;
+  --border: #E2E8F0;
+  --bg: #F8FAFC;
   --white: #FFFFFF;
 
   /*

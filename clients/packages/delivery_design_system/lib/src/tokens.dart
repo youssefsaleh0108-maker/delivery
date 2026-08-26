@@ -17,9 +17,9 @@ import 'package:flutter/material.dart';
 /// | pairing                  | rose (previous) | figma crimson |
 /// | ------------------------ | --------------- | ------------- |
 /// | white on primary         |            5.78 | 4.70          |
-/// | primary on the soft tint |            5.11 | 3.91          |
+/// | primary on the soft tint |            5.11 | 4.28          |
 ///
-/// White-on-primary still clears AA. Primary-on-tint no longer does for body text (3.91 < 4.5,
+/// White-on-primary still clears AA. Primary-on-tint no longer does for body text (4.28 < 4.5,
 /// fine for 18px+/14px-bold). The design was applied exactly as drawn and the owner was told;
 /// until it is revisited in Figma, do not put body-sized brand text on [brandSoft] — use [ink].
 abstract final class DeliveryColors {
@@ -36,27 +36,50 @@ abstract final class DeliveryColors {
 
   /// Badges, subtle tinted backgrounds, empty-state icon rings.
   ///
-  /// Figma: the rose wash used for secondary text ON the brand colour and for tinted chips
-  /// on white (`#ffe4e6`).
-  static const Color brandSoft = Color(0xFFFFE4E6);
+  /// Rose-50: the tint the design uses on the overwhelming majority of screens (status pills,
+  /// Edit chips, icon rings). A handful of frames stray to rose-100/red-100; the inventory
+  /// treats those as design slips rather than a second token.
+  static const Color brandSoft = Color(0xFFFFF1F2);
+
+  /// A stronger wash where the soft tint would disappear — selected chips, pressed tints.
+  static const Color brandSoftStrong = Color(0xFFFFE4E6);
 
   /// Borders on brand-tinted surfaces (e.g. dropzones).
   static const Color brandLine = Color(0xFFFDA4AF);
 
-  /// Primary text.
-  static const Color ink = Color(0xFF1F2937);
+  /// Primary text. Slate-900 — the design draws every neutral on the slate ramp.
+  static const Color ink = Color(0xFF0F172A);
 
-  /// Secondary / help text.
+  /// Secondary / help text (slate-600).
   ///
   /// Carries caption text at 11–12px, so it is picked to clear AA on both the page background and
   /// white rather than to sit prettily between them.
-  static const Color muted = Color(0xFF6B7280);
+  static const Color muted = Color(0xFF475569);
 
-  /// Card and input borders.
-  static const Color border = Color(0xFFE5E7EB);
+  /// The third text tier the design adds below [muted]: placeholders, timestamps, de-emphasised
+  /// meta (slate-400). Decorative sizes only — 3.0:1 on white, it does not clear AA for body text.
+  static const Color faint = Color(0xFF94A3B8);
 
-  /// App / page background.
-  static const Color background = Color(0xFFF9FAFB);
+  /// Card and input borders (slate-200).
+  static const Color border = Color(0xFFE2E8F0);
+
+  /// The lighter border weight the design gives auth inputs at rest (slate-100).
+  static const Color borderFaint = Color(0xFFF1F5F9);
+
+  /// App / page background (slate-50).
+  static const Color background = Color(0xFFF8FAFC);
+
+  /// The dark shell the web consoles and marketing bands sit on: sidebar background.
+  static const Color shell = Color(0xFF111827);
+
+  /// Raised elements on [shell] — the active nav item, the sidebar footer card.
+  static const Color shellRaised = Color(0xFF1F2937);
+
+  /// The darkest shell stop: page-width dark banners, the tracking pill.
+  static const Color shellDeep = Color(0xFF0F172A);
+
+  /// Secondary text on the dark shell.
+  static const Color onShellMuted = Color(0xFF9CA3AF);
 
   /// Cards, surfaces, primary-button text.
   static const Color white = Color(0xFFFFFFFF);
@@ -89,23 +112,28 @@ abstract final class DeliveryColors {
 /// both failed — amber badly, at 2.68 on white. A cheerful palette nobody can read is a worse
 /// outcome than the flat interface it replaced.
 enum DeliveryAccent {
-  /// Healthy, live, complete.
-  positive(Color(0xFF25834B)),
+  /// Healthy, live, complete. Emerald-500, per the Figma redesign.
+  ///
+  /// The previous values here were darkened until they cleared 3:1 on white; the design's are
+  /// brighter and do not all clear it (this green is 2.5:1 on white). Applied as designed at the
+  /// owner's request — so the old rule hardens into: the strong value is for glyphs and numbers ON
+  /// the tint, never for text on bare white at body sizes.
+  positive(Color(0xFF10B981)),
 
   /// Needs a look, but nothing is broken — pending, near a limit, waiting on somebody.
-  ///
-  /// The darkest of the five relative to its hue, because amber is the colour that most often gets
-  /// shipped illegible: at the brightness people reach for it lands near 2.7 on white.
-  caution(Color(0xFFB86E0C)),
+  caution(Color(0xFFF59E0B)),
 
   /// Stopped, failed, refused.
-  critical(Color(0xFFD4483B)),
+  critical(Color(0xFFEF4444)),
 
   /// Categorical rather than judgemental: a count that is neither good nor bad.
+  ///
+  /// Kept from the previous system — the design never paints purple, but existing call sites do,
+  /// and a categorical colour that matches nothing else in the palette is doing its job.
   neutral(Color(0xFF6C5CE0)),
 
-  /// Informational, and the one that reads as "in motion".
-  info(Color(0xFF2582C2));
+  /// Informational, and the one that reads as "in motion". Blue-500.
+  info(Color(0xFF3B82F6));
 
   const DeliveryAccent(this.color);
 
@@ -152,13 +180,14 @@ abstract final class DeliveryShadows {
 /// signed off. The *mapping* is the part that matters and is fixed: a status must not change
 /// colour meaning between the Backoffice tables, the Merchant Portal and in-app tracking.
 ///
-/// `inTransit` deliberately reuses the brand colour rather than introducing a sixth, because
-/// in-transit is the state the brand naturally draws the eye to.
+/// `inTransit` was the brand colour until the 2026-08 Figma redesign, which paints "ON THE WAY"
+/// blue on every surface that shows it. Blue also reads better here: on the redesigned screens the
+/// brand crimson is everywhere, and a status that shares it stops standing for anything.
 enum DeliveryStatusColor {
   placed(Color(0xFF546E7A), 'Placed'),
   preparing(Color(0xFFF59E0B), 'Preparing'),
-  inTransit(DeliveryColors.brand, 'In transit'),
-  delivered(Color(0xFF2E7D32), 'Delivered'),
+  inTransit(Color(0xFF3B82F6), 'In transit'),
+  delivered(Color(0xFF10B981), 'Delivered'),
   offline(Color(0xFF9E9E9E), 'Offline');
 
   const DeliveryStatusColor(this.color, this.label);
@@ -202,18 +231,19 @@ abstract final class DeliverySpacing {
   static const double xxl = 48;
 }
 
-/// Corner radii, from the Figma redesign's geometry.
+/// Corner radii, from the Figma redesign's measured geometry.
 ///
-/// The design is noticeably rounder than the previous system: cards sit at 20, screen sheets at
-/// 32, icon tiles at 14. The old names keep their meaning (sm = chips/inputs, md = tiles,
-/// lg = cards) so call sites repaint without renaming.
+/// Read off the frames rather than estimated: chips/tags 8–10, inputs/buttons/images 12, cards 16,
+/// sheet tops 24, and the customer app's tall CTAs fully rounded. (The 32px corner every mobile
+/// frame carries is the drawn phone bezel, not an app surface — adopting it as a token was an
+/// early misreading, corrected here.)
 abstract final class DeliveryRadius {
   static const double sm = 8;
-  static const double md = 14;
-  static const double lg = 20;
+  static const double md = 12;
+  static const double lg = 16;
 
-  /// Full-screen sheets and the phone-frame corner the design draws on every mobile screen.
-  static const double sheet = 32;
+  /// Bottom-sheet and modal tops.
+  static const double sheet = 24;
 
   static const double pill = 999;
 }

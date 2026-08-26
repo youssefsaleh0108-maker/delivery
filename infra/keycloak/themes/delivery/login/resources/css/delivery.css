@@ -13,14 +13,14 @@
   /* 2026-08 Figma redesign (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). */
   --delivery-brand: #e11d48;
   --delivery-brand-dark: #9f1239;
-  --delivery-brand-soft: #ffe4e6;
+  --delivery-brand-soft: #fff1f2;
   --delivery-brand-line: #fda4af;
-  --delivery-ink: #1f2937;
-  --delivery-muted: #6b7280;
-  --delivery-border: #e5e7eb;
-  --delivery-bg: #f9fafb;
-  --delivery-radius: 20px;
-  --delivery-radius-sm: 14px;
+  --delivery-ink: #0f172a;
+  --delivery-muted: #475569;
+  --delivery-border: #e2e8f0;
+  --delivery-bg: #f8fafc;
+  --delivery-radius: 16px;
+  --delivery-radius-sm: 12px;
 }
 
 html,
