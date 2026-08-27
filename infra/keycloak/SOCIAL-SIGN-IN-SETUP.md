@@ -28,33 +28,22 @@ here.
 
 ---
 
-## Step 0 — Keycloak needs a real hostname and TLS first. This is a blocker.
+## Step 0 — Keycloak needs a real hostname and TLS. Already done.
 
-Right now the deployed box publishes Keycloak as:
+Google's OAuth client form rejects plain `http` on anything other than `localhost`, rejects bare
+IP addresses, and rejects a port on a public host — so a redirect URI has to be a real HTTPS
+hostname before anything else can happen.
 
-```
-KEYCLOAK_PUBLIC_URL=http://94.72.112.156:8180
-```
-
-**Google will not register a redirect URI that looks like that.** Its OAuth client form rejects
-plain `http` on anything other than `localhost`, rejects bare IP addresses, and rejects a port on a
-public host. There is no setting on our side that works around it — the sign-in would fail on
-Google's page, before Keycloak is ever reached.
-
-Traefik already routes `iam-dev.youdrop.shop` to Keycloak over HTTPS and already holds a
-certificate for it (`infra/traefik/traefik.yml`). What is missing is that the issuer still points
-at the IP. So, on the box, in `infra/.env`:
+It is. The deployed box already publishes
 
 ```
 KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
 ```
 
-then restart Keycloak and every service that validates tokens.
-
-**Know what this breaks while you do it.** `KEYCLOAK_PUBLIC_URL` becomes the `iss` claim of every
-token, and a token whose `iss` does not match what a service expects is refused. Changing it
-invalidates every session that is currently open — everybody signs in again, once. Do it in a
-window where that is acceptable, and change it in one place: everything reads the same variable.
+behind Traefik with a Let's Encrypt certificate (verified against the live `.env` and the running
+container on 2026-08-27, during the TLS cutover earlier that week). There is nothing to do here;
+the redirect URI in step 2 can be registered as written. The paragraph exists so nobody re-derives
+the requirement and thinks it is outstanding.
 
 ---
 
