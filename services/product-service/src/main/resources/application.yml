@@ -36,6 +36,15 @@ spring:
     locations: classpath:db/migration/shared,classpath:db/migration/product
     schemas: product
     default-schema: product
+    # The outbox library pins its migrations high (V50) so they sort after any service's own.
+    # The cost surfaces on the FIRST service migration added after V50 has run: it sorts below the
+    # schema's high-water mark and Flyway's default validation refuses to fill the gap — which
+    # crash-looped this service in dev when V20–V22 landed. Out-of-order is the designed answer:
+    # library space stays 50+, service space stays 1–49, and a new service migration in its own
+    # range is applied even though a higher library version already ran. Renumbering service
+    # migrations above 50 was rejected — it steals the library's next version and collides the
+    # first time the library ships V51.
+    out-of-order: true
 
   jpa:
     open-in-view: false
