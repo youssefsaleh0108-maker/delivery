@@ -298,6 +298,32 @@ http:
       entryPoints: [https]
       middlewares: [ops-auth@file, strip-ops-prefix@file]
 
+    # Object storage itself, over TLS, so a phone can actually load a product photo.
+    #
+    # Presigned URLs used to be signed for http://<ip>:9010, and the app's Android network policy
+    # denies cleartext to any public address on purpose — so every image 404'd at the socket before
+    # it was ever requested. Serving them over the API hostname fixes that without a new DNS record.
+    #
+    # The prefix is NOT stripped, and that is the whole trick: an S3 signature covers the host and
+    # the path, and the bucket name is the first path segment. Forwarding /product-images/... to
+    # MinIO unchanged, with Traefik passing the original Host through, leaves the signature exactly
+    # what the signer produced. Stripping anything here would invalidate every URL.
+    #
+    # Routing a bucket does not make it public: MinIO still rejects anything without a valid
+    # signature, which is why this needs no auth middleware of its own. Only the two buckets clients
+    # actually fetch are listed — merchant-kyc, receipts and delivery-proof stay unrouted, because
+    # an identity document has no business being one guessed URL away from the internet even with a
+    # signature in front of it.
+    #
+    # No rate-limit middleware: one product page pulls a gallery's worth of objects, and the
+    # platform limiter is sized for API calls, not images.
+    minio-objects:
+      rule: Host(`api-dev.youdrop.shop`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`))
+      service: minio-s3
+      priority: 90
+      entryPoints: [web, https]
+      middlewares: [security-headers@file]
+
     # The landing page at the root of monitoring-dev, so somebody arriving there is told what is
     # under it rather than meeting a 404.
     ops-index-tls:
@@ -392,6 +418,14 @@ http:
       loadBalancer:
         servers:
           - url: http://minio:9001
+
+    # The S3 API, not the console. Separate service entry so the object route and the operator
+    # console can never be confused for one another — they have different ports, different auth and
+    # very different blast radii.
+    minio-s3:
+      loadBalancer:
+        servers:
+          - url: http://minio:9000
 
     # A single static page listing what lives under this hostname. Traefik cannot serve a file, so
     # it is the portal's nginx answering a path that returns its own index — good enough for a
