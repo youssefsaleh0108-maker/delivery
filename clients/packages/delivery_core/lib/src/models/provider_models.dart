@@ -86,6 +86,7 @@ class DeliveryProviderInfo {
     this.payoutState = PayoutState.none,
     this.payoutCheckedAt,
     this.payoutDetail,
+    this.createdAt,
   });
 
   final String id;
@@ -112,6 +113,11 @@ class DeliveryProviderInfo {
   /// Why it is unconfirmed, or the name the bank has on the account.
   final String? payoutDetail;
 
+  /// When the carrier was registered — "partner since". Sent on every view of a provider,
+  /// including the public one, and optional here only because the receipt-shaped responses that
+  /// predate it exist in the wild.
+  final DateTime? createdAt;
+
   bool get isInHouse => kind == ProviderKind.platform;
 
   factory DeliveryProviderInfo.fromJson(Map<String, dynamic> json) => DeliveryProviderInfo(
@@ -130,6 +136,9 @@ class DeliveryProviderInfo {
             ? null
             : DateTime.parse(json['payoutCheckedAt'] as String),
         payoutDetail: json['payoutDetail'] as String?,
+        createdAt: json['createdAt'] == null
+            ? null
+            : DateTime.tryParse(json['createdAt'] as String)?.toLocal(),
       );
 }
 

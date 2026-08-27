@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -11,6 +10,9 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get appTitle => 'YouDrop';
+
+  @override
+  String get navHome => 'Home';
 
   @override
   String get navShops => 'Shops';
@@ -1304,6 +1306,17 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get noPhoto => 'No photo';
 
   @override
+  String photoCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count photos',
+      one: '1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get archived => 'Archived';
 
   @override
@@ -2538,4 +2551,1028 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get dayByDay => 'Day by day';
+
+  @override
+  String get authTagline => 'Anything delivered, anywhere';
+
+  @override
+  String get authRoleCustomer => 'Customer';
+
+  @override
+  String get authRoleCustomerBlurb => 'Order and get deliveries';
+
+  @override
+  String get authRoleRider => 'Rider';
+
+  @override
+  String get authRoleRiderBlurb => 'Deliver and earn';
+
+  @override
+  String get authRoleMerchant => 'Merchant';
+
+  @override
+  String get authRoleMerchantBlurb => 'Sell and grow your business';
+
+  @override
+  String get authAlreadyHaveAnAccount => 'Already have an account?';
+
+  @override
+  String get authDontHaveAnAccount => 'Don\'t have an account?';
+
+  @override
+  String get authSignUp => 'Sign up';
+
+  @override
+  String get authSignInSubtitle => 'Please enter your credentials to log in.';
+
+  @override
+  String get authEmailOrPhone => 'Email or phone number';
+
+  @override
+  String get authEmailOrPhoneHint => 'e.g. name@domain.com or +961…';
+
+  @override
+  String get authPasscodeHint => 'Your six-digit passcode';
+
+  @override
+  String get authForgotPassword => 'Forgot password?';
+
+  @override
+  String get authUseTheKeypad => 'Use the keypad';
+
+  @override
+  String get authOrContinueWith => 'Or continue with';
+
+  @override
+  String get authComingSoon => 'Soon';
+
+  @override
+  String get authShowPassword => 'Show passcode';
+
+  @override
+  String get authHidePassword => 'Hide passcode';
+
+  @override
+  String get authDeleteDigit => 'Delete last digit';
+
+  @override
+  String get authCreateAccountSubtitle =>
+      'Start getting anything delivered anywhere.';
+
+  @override
+  String get authFullName => 'Full name';
+
+  @override
+  String get authFullNameHint => 'e.g. Sarah Jenkins';
+
+  @override
+  String get authEmailAddress => 'Email address';
+
+  @override
+  String get authEmailHint => 'e.g. sarah.j@gmail.com';
+
+  @override
+  String get authPhoneNumber => 'Phone number';
+
+  @override
+  String get authPhoneHint => '70 123 456';
+
+  @override
+  String get authConfirmPassword => 'Confirm passcode';
+
+  @override
+  String get authPasscodeKeepGoing => 'Keep going';
+
+  @override
+  String get authPasscodeComplete => 'Complete';
+
+  @override
+  String get authAgreeToTerms => 'I agree to the terms and the privacy policy';
+
+  @override
+  String get authTermsPrefix => 'By signing up, you agree to our ';
+
+  @override
+  String get authTermsOfService => 'Terms of Service';
+
+  @override
+  String get authTermsAnd => ' and ';
+
+  @override
+  String get authPrivacyPolicy => 'Privacy Policy';
+
+  @override
+  String get authPleaseAcceptTheTerms => 'Please accept the terms to continue.';
+
+  @override
+  String get authVerifyYourEmail => 'Verify your email';
+
+  @override
+  String get authVerifyYourNumber => 'Verify your number';
+
+  @override
+  String get authStep => 'Step';
+
+  @override
+  String get authComplete => 'complete';
+
+  @override
+  String get authNext => 'Next';
+
+  @override
+  String get authGetStarted => 'Get started';
+
+  @override
+  String get authSubmitApplication => 'Submit application';
+
+  @override
+  String get authSendingApplication => 'Sending your application…';
+
+  @override
+  String get authCouldNotSendApplication =>
+      'We could not send your application. Nothing was lost — try again.';
+
+  @override
+  String get authRiderIntroTitle => 'Join as a rider';
+
+  @override
+  String get authRiderIntroBlurb =>
+      'Flexible hours, competitive pay, and easy navigation — start delivering with YouDrop in a few minutes.';
+
+  @override
+  String get authRiderBenefitHours => 'Flexible hours';
+
+  @override
+  String get authRiderBenefitPay => 'Competitive pay';
+
+  @override
+  String get authRiderBenefitNavigation => 'Easy navigation';
+
+  @override
+  String get authWhatYouNeedToSignUp => 'What you\'ll need to sign up';
+
+  @override
+  String get authNeedValidId => 'Valid ID';
+
+  @override
+  String get authNeedDriversLicence => 'Driving licence';
+
+  @override
+  String get authNeedVehicleDocuments => 'Vehicle documents';
+
+  @override
+  String get authMerchantSignUp => 'Merchant sign up';
+
+  @override
+  String get authMerchantIntroTitle => 'Register your business';
+
+  @override
+  String get authMerchantIntroBlurb =>
+      'Reach more customers, manage products easily, and track performance in real time.';
+
+  @override
+  String get authWhatYouGet => 'What you\'ll get';
+
+  @override
+  String get authMerchantBenefitReach =>
+      'Reach more customers through our delivery network';
+
+  @override
+  String get authMerchantBenefitManage =>
+      'Easy product management and order fulfilment';
+
+  @override
+  String get authMerchantBenefitAnalytics =>
+      'Real-time analytics to optimise your sales';
+
+  @override
+  String get authWhatYouNeed => 'What you\'ll need';
+
+  @override
+  String get authNeedBusinessLicence => 'Business licence';
+
+  @override
+  String get authNeedTaxCertificate => 'Tax certificate';
+
+  @override
+  String get authNeedBankDetails => 'Bank details';
+
+  @override
+  String get authPersonalInformation => 'Personal information';
+
+  @override
+  String get authPersonalInformationBlurb =>
+      'Please fill in your primary details to establish your rider profile.';
+
+  @override
+  String get authDateOfBirth => 'Date of birth';
+
+  @override
+  String get authDateOfBirthHint => 'DD / MM / YYYY';
+
+  @override
+  String get authNationalId => 'National ID number';
+
+  @override
+  String get authNationalIdHint => 'As printed on your ID';
+
+  @override
+  String get authVehicleDetails => 'Vehicle details';
+
+  @override
+  String get authVehicleDetailsBlurb =>
+      'Select your vehicle category and register its official details.';
+
+  @override
+  String get authVehicleType => 'Vehicle type';
+
+  @override
+  String get authVehicleMotorcycle => 'Motorcycle';
+
+  @override
+  String get authVehicleCar => 'Car';
+
+  @override
+  String get authVehicleBicycle => 'Bicycle';
+
+  @override
+  String get authVehicleVan => 'Van';
+
+  @override
+  String get authVehicleModel => 'Vehicle make / model';
+
+  @override
+  String get authVehicleModelHint => 'e.g. Yamaha TMAX / Toyota Yaris';
+
+  @override
+  String get authPlateNumber => 'Plate number';
+
+  @override
+  String get authPlateNumberHint => 'e.g. 1234 ABC';
+
+  @override
+  String get authVehicleYear => 'Vehicle year';
+
+  @override
+  String get authVehicleYearHint => 'e.g. 2024';
+
+  @override
+  String get authSelectDeliveryZone => 'Select delivery zone';
+
+  @override
+  String get authSelectDeliveryZoneBlurb =>
+      'Which parts of the city do you prefer to deliver in?';
+
+  @override
+  String get authMapComingSoon => 'Coverage map coming soon';
+
+  @override
+  String get authPreferredArea => 'Preferred area';
+
+  @override
+  String get authPreferredAreaHint => 'e.g. Hamra, Achrafieh';
+
+  @override
+  String get authAvailableZones => 'Available zones';
+
+  @override
+  String get authZonesComingSoonTitle => 'Zones are not mapped yet';
+
+  @override
+  String get authZonesComingSoonBlurb =>
+      'Pickable delivery zones arrive with the coverage map. Until then, the area above is what we go by.';
+
+  @override
+  String get authBusinessInformation => 'Business information';
+
+  @override
+  String get authBusinessInformationBlurb =>
+      'Tell us about your company and the contact person.';
+
+  @override
+  String get authBusinessShopName => 'Business / shop name';
+
+  @override
+  String get authBusinessShopNameHint => 'e.g. Rose Garden Pizzeria';
+
+  @override
+  String get authOwnerFullName => 'Owner full name';
+
+  @override
+  String get authOwnerFullNameHint => 'e.g. Jane Cooper';
+
+  @override
+  String get authBusinessType => 'Business type';
+
+  @override
+  String get authBusinessTypeHint => 'Choose one';
+
+  @override
+  String get authBusinessTypeRestaurant => 'Restaurant';
+
+  @override
+  String get authBusinessTypeGrocery => 'Grocery';
+
+  @override
+  String get authBusinessTypePharmacy => 'Pharmacy';
+
+  @override
+  String get authBusinessTypeBakery => 'Bakery';
+
+  @override
+  String get authBusinessTypeRetail => 'Retail';
+
+  @override
+  String get authBusinessTypeOther => 'Other';
+
+  @override
+  String get authContactEmail => 'Contact email address';
+
+  @override
+  String get authReviewAndSubmit => 'Review and submit';
+
+  @override
+  String get authReviewAndSubmitBlurb =>
+      'Check what we are about to send. You can go back and change any of it.';
+
+  @override
+  String get authDocuments => 'Documents';
+
+  @override
+  String get authDocumentsBlurb =>
+      'The papers we will need before you can start.';
+
+  @override
+  String get authDocumentsComingSoonTitle => 'Uploading opens shortly';
+
+  @override
+  String get authDocumentsComingSoonBlurb =>
+      'You can finish your application without it — we will ask for the papers by email before you start.';
+
+  @override
+  String get authBankDetails => 'Bank details';
+
+  @override
+  String get authBankDetailsBlurb => 'Where your payouts will go.';
+
+  @override
+  String get authBankComingSoonTitle => 'Payout setup opens shortly';
+
+  @override
+  String get authBankComingSoonBlurb =>
+      'We never take bank details before a decision. You will set payouts up once you are approved.';
+
+  @override
+  String get authApplicationSubmitted => 'Application submitted';
+
+  @override
+  String get authApplicationSubmittedBlurb =>
+      'We have your application and our operations team is reading it now.';
+
+  @override
+  String get authWhatToExpectNext => 'What to expect next';
+
+  @override
+  String get authExpectVerification => 'We check your details (1–3 days)';
+
+  @override
+  String get authExpectBackgroundCheck => 'Background check';
+
+  @override
+  String get authExpectTrainingInvite => 'Invitation to rider training';
+
+  @override
+  String get authWeWillNotifyYou =>
+      'We will let you know by email as soon as there is a decision.';
+
+  @override
+  String get authApplicationUnderReview => 'Application under review';
+
+  @override
+  String get authApplicationUnderReviewBlurb =>
+      'Thank you. Your registration is in and our team is checking it over. This usually takes a day or two.';
+
+  @override
+  String get authExplorationModeActive => 'Exploration mode is on';
+
+  @override
+  String get authExplorationModeBlurb =>
+      'While you wait you can set your products and menus up and look around. Nothing goes live until you are approved.';
+
+  @override
+  String get authApplicationChecklist => 'Application checklist';
+
+  @override
+  String get authChecklistAccountCreated => 'Account created';
+
+  @override
+  String get authChecklistDocuments => 'Documents uploaded';
+
+  @override
+  String get authChecklistAudit => 'Security and compliance check';
+
+  @override
+  String get authChecklistActivation => 'Shop activated and published';
+
+  @override
+  String get authExploreDashboard => 'Explore dashboard';
+
+  @override
+  String get custSeeAll => 'See All';
+
+  @override
+  String get custShowLess => 'Show Less';
+
+  @override
+  String get custAllCategories => 'All Categories';
+
+  @override
+  String get custFilters => 'Filters';
+
+  @override
+  String get custMyBasket => 'My Basket';
+
+  @override
+  String get custPromoCode => 'Promo Code';
+
+  @override
+  String get custApply => 'Apply';
+
+  @override
+  String get custOrderSummary => 'Order Summary';
+
+  @override
+  String get custDiscounts => 'Discounts';
+
+  @override
+  String get custTotalAmount => 'Total Amount';
+
+  @override
+  String get custProceedToCheckout => 'Proceed to Checkout';
+
+  @override
+  String get custAddToBasket => 'Add to Basket';
+
+  @override
+  String get custDeliveryTime => 'Delivery Time';
+
+  @override
+  String get custMinOrderStat => 'Min. Order';
+
+  @override
+  String custRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Ratings',
+      one: '1 Rating',
+      zero: 'No ratings',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String custShopsInCategory(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Shops',
+      one: '1 Shop',
+      zero: 'No shops',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get custPeopleAlsoOrdered => 'People Also Ordered';
+
+  @override
+  String get custSoon => 'Soon';
+
+  @override
+  String get custIncreaseQuantity => 'Increase quantity';
+
+  @override
+  String get custDecreaseQuantity => 'Decrease quantity';
+
+  @override
+  String get custSearchInShop => 'Search this shop';
+
+  @override
+  String get custShopSearchHint => 'Search the menu';
+
+  @override
+  String get custButlerTitle => 'YouDrop Butler';
+
+  @override
+  String get custChooseWhatYouNeed => 'Choose what you need help with';
+
+  @override
+  String get custBuyAnything => 'Buy Anything';
+
+  @override
+  String get custBuyAnythingBlurb => 'We buy & deliver from anywhere';
+
+  @override
+  String get custSendAnything => 'Send Anything';
+
+  @override
+  String get custSendAnythingBlurb => 'Courier, pick up, or send items';
+
+  @override
+  String get custRecentTasks => 'Recent tasks';
+
+  @override
+  String get custSearchTasksHint => 'Search your errands';
+
+  @override
+  String get custNoTasksMatch => 'No errands match that search';
+
+  @override
+  String get custStatusPending => 'Pending';
+
+  @override
+  String get custWaitingOnYou => 'Waiting on you';
+
+  @override
+  String get custApplePay => 'Apple Pay';
+
+  @override
+  String get custOrderNotes => 'Order Notes';
+
+  @override
+  String get custOrderNotesHint =>
+      'e.g. Leave package at the door, bell is not working...';
+
+  @override
+  String get custTotalPrice => 'Total Price';
+
+  @override
+  String get custPlaceOrder => 'Place Order';
+
+  @override
+  String get custOrderStatus => 'Order Status';
+
+  @override
+  String get custOrderRef => 'Order';
+
+  @override
+  String get custItemsOrdered => 'Items Ordered';
+
+  @override
+  String get custLiveMap => 'Live map';
+
+  @override
+  String get custAccountSettings => 'Account Settings';
+
+  @override
+  String get custAppLanguage => 'App Language';
+
+  @override
+  String get custMyAddresses => 'My Addresses';
+
+  @override
+  String get custPaymentMethods => 'Payment Methods';
+
+  @override
+  String get custOrderHistory => 'Order History';
+
+  @override
+  String get custHelpSupport => 'Help & Support';
+
+  @override
+  String get custLabelAddressAs => 'Label Address As:';
+
+  @override
+  String get custLabelHome => 'Home';
+
+  @override
+  String get custLabelWork => 'Work';
+
+  @override
+  String get custLabelOther => 'Other';
+
+  @override
+  String get merchTodaySummary => 'Today\'s Summary';
+
+  @override
+  String get merchPendingOrders => 'Pending Orders';
+
+  @override
+  String get merchNewOrders => 'New Orders';
+
+  @override
+  String get merchView => 'View';
+
+  @override
+  String get merchRecentOrders => 'Recent Orders';
+
+  @override
+  String get merchViewAll => 'View All';
+
+  @override
+  String get merchActive => 'Active';
+
+  @override
+  String get merchInactive => 'Inactive';
+
+  @override
+  String get merchPublishShop => 'Publish your shop';
+
+  @override
+  String get merchShopHidden => 'Your shop is hidden from the market.';
+
+  @override
+  String get merchOrderFlow => 'Order Flow';
+
+  @override
+  String get merchManagerView => 'Manager View';
+
+  @override
+  String get merchTabNew => 'New';
+
+  @override
+  String get merchTabCompleted => 'Completed';
+
+  @override
+  String get merchReject => 'Reject';
+
+  @override
+  String get merchFlowStatus => 'Flow Status';
+
+  @override
+  String get merchCustomerDetails => 'Customer Details';
+
+  @override
+  String get merchItemsBreakdown => 'Items Breakdown';
+
+  @override
+  String get merchSpecialInstructions => 'Special Instructions';
+
+  @override
+  String get merchGrandTotal => 'Grand Total';
+
+  @override
+  String get merchStepPickedUp => 'Picked Up';
+
+  @override
+  String get merchNothingInThisList => 'Nothing in this list.';
+
+  @override
+  String get merchOpenOrder => 'Open order';
+
+  @override
+  String get merchbMenuItems => 'Menu Items';
+
+  @override
+  String get merchbManageAvailability => 'Manage availability';
+
+  @override
+  String get merchbSearchMenuItems => 'Search menu items...';
+
+  @override
+  String get merchbAvailable => 'Available';
+
+  @override
+  String get merchbOffShelf => 'Off-shelf';
+
+  @override
+  String get merchbAddProduct => 'Add Product';
+
+  @override
+  String get merchbAvailability => 'Availability';
+
+  @override
+  String get merchbNoMatchingItems => 'No matching items';
+
+  @override
+  String get merchbAddNewProduct => 'Add New Product';
+
+  @override
+  String get merchbProductImage => 'Product Image';
+
+  @override
+  String get merchbUploadImageCta => 'Upload delicious food image';
+
+  @override
+  String get merchbUploadHint => 'PNG, JPG up to 5MB';
+
+  @override
+  String get merchbVariantsOptions => 'Variants & Options';
+
+  @override
+  String get merchbAddOption => '+ Add option';
+
+  @override
+  String merchbChoicesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count choices',
+      one: '1 choice',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchbNoOptionsYet => 'No options on this item yet';
+
+  @override
+  String get merchbOptionsReadOnly =>
+      'Shown as customers see them. Editing options arrives soon.';
+
+  @override
+  String get merchbSaveMenuItem => 'Save Menu Item';
+
+  @override
+  String get merchbSoon => 'Soon';
+
+  @override
+  String get merchbShopConfiguration => 'Shop Configuration';
+
+  @override
+  String get merchbShopStatus => 'Shop status';
+
+  @override
+  String get merchbBannerAndLogo => 'Shop Banner & Logo';
+
+  @override
+  String get merchbChangeCover => 'Change Cover';
+
+  @override
+  String get merchbChangeLogo => 'Change Logo';
+
+  @override
+  String get merchbShopAddress => 'Shop Address';
+
+  @override
+  String get merchbMapPreviewSoon => 'Map preview';
+
+  @override
+  String get merchbOperatingDetails => 'Operating Details';
+
+  @override
+  String get merchbSaveShopSettings => 'Save Shop Settings';
+
+  @override
+  String merchbHoursDaily(String from, String to) {
+    return 'Daily: $from - $to';
+  }
+
+  @override
+  String get merchbHoursCustom => 'Custom schedule';
+
+  @override
+  String get merchbHoursNone => 'No hours set';
+
+  @override
+  String get merchbEditHours => 'Edit opening hours';
+
+  @override
+  String get merchbDay => 'Day';
+
+  @override
+  String get merchbTimeHint => 'HH:mm';
+
+  @override
+  String get merchbDayMonday => 'Monday';
+
+  @override
+  String get merchbDayTuesday => 'Tuesday';
+
+  @override
+  String get merchbDayWednesday => 'Wednesday';
+
+  @override
+  String get merchbDayThursday => 'Thursday';
+
+  @override
+  String get merchbDayFriday => 'Friday';
+
+  @override
+  String get merchbDaySaturday => 'Saturday';
+
+  @override
+  String get merchbDaySunday => 'Sunday';
+
+  @override
+  String get merchbAccountSettings => 'Account Settings';
+
+  @override
+  String get merchbRoleOwner => 'Owner';
+
+  @override
+  String get merchbAppLanguage => 'App Language';
+
+  @override
+  String get merchbLangShortEn => 'EN';
+
+  @override
+  String get merchbLangShortAr => 'AR';
+
+  @override
+  String get merchbShopProfile => 'Shop Profile';
+
+  @override
+  String get merchbPaymentBankDetails => 'Payment & Bank details';
+
+  @override
+  String get merchbNotificationSettings => 'Notification Settings';
+
+  @override
+  String get merchbShopAnalytics => 'Shop Analytics';
+
+  @override
+  String get merchbLogOutAccount => 'Log Out Account';
+
+  @override
+  String get riderComingSoon => 'Coming soon';
+
+  @override
+  String get riderTabAvailable => 'Available';
+
+  @override
+  String get riderTabActive => 'Active';
+
+  @override
+  String get riderTabEarnings => 'Earnings';
+
+  @override
+  String get riderSegmentDeliveries => 'Deliveries';
+
+  @override
+  String get riderRegionZone => 'Region zone';
+
+  @override
+  String riderDeliveriesNearby(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count deliveries nearby',
+      one: '1 delivery nearby',
+      zero: 'No deliveries nearby',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get riderOffersNearYou => 'Offers near you';
+
+  @override
+  String get riderAcceptDelivery => 'Accept delivery';
+
+  @override
+  String get riderMyActiveTasks => 'My active tasks';
+
+  @override
+  String riderActiveCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count active',
+      one: '1 active',
+      zero: 'None active',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String riderOrderRef(String ref) {
+    return 'Order #$ref';
+  }
+
+  @override
+  String riderMinutesAgo(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes min ago',
+      one: '1 min ago',
+      zero: 'Just now',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String riderHoursAgo(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: '$hours hrs ago',
+      one: '1 hr ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get riderNavigate => 'Navigate';
+
+  @override
+  String get riderViewDetails => 'View details';
+
+  @override
+  String get riderStartNavigation => 'Start navigation';
+
+  @override
+  String get riderYourPayout => 'Your payout';
+
+  @override
+  String get riderRouteTimeline => 'Route timeline';
+
+  @override
+  String get riderPickupAddress => 'Pickup address';
+
+  @override
+  String get riderDeliveryAddress => 'Delivery address';
+
+  @override
+  String get riderItemsToCollect => 'Items to collect';
+
+  @override
+  String riderItemLine(int qty, String name) {
+    return '${qty}x $name';
+  }
+
+  @override
+  String get riderNoItemsListed => 'This order has no itemised list.';
+
+  @override
+  String get riderDeliveryInstructions => 'Delivery instructions';
+
+  @override
+  String get riderMyEarnings => 'My earnings';
+
+  @override
+  String get riderPayout => 'Payout';
+
+  @override
+  String get riderPeriodToday => 'Today';
+
+  @override
+  String get riderPeriodWeekly => 'Weekly';
+
+  @override
+  String get riderTotalEarnings => 'Total earnings';
+
+  @override
+  String get riderEarningsDerived =>
+      'Added up from the delivery fees on your own completed deliveries.';
+
+  @override
+  String get riderHoursOnline => 'Hours online';
+
+  @override
+  String get riderAcceptRate => 'Accept rate';
+
+  @override
+  String get riderRating => 'Rating';
+
+  @override
+  String get riderWeeklyOverview => 'Weekly overview';
+
+  @override
+  String get riderTodaysDeliveries => 'Today\'s deliveries';
+
+  @override
+  String get riderThisWeeksDeliveries => 'This week\'s deliveries';
+
+  @override
+  String get riderNothingDeliveredYet =>
+      'Nothing delivered in this period yet.';
+
+  @override
+  String get riderCouldNotLoadEarnings => 'Could not load your earnings';
+
+  @override
+  String get riderDriverSettings => 'Driver settings';
+
+  @override
+  String get riderVehicleProfile => 'Vehicle profile';
+
+  @override
+  String get riderActiveDuty => 'Active duty (online)';
+
+  @override
+  String get riderAppLanguage => 'App language';
+
+  @override
+  String get riderDocuments => 'Documents & licences';
+
+  @override
+  String get riderBankDetails => 'Bank account details';
+
+  @override
+  String get riderNotificationPreferences => 'Notification preferences';
+
+  @override
+  String get riderHelpAndSupport => 'Help & live chat support';
+
+  @override
+  String get riderErrandTry => 'Try';
+
+  @override
+  String get riderErrandTo => 'To';
+
+  @override
+  String get riderErrandCap => 'Cap';
 }

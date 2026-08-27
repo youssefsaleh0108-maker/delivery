@@ -3,6 +3,10 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+// The stepper and the CTA are the redesign's, shared with the full product screen that replaced
+// this sheet on the shop page. See the note at the foot of that file for why they live there.
+import 'product_detail_screen.dart' show QuantityStepper;
+
 /// What the customer chose, and what the catalog says it costs.
 class ConfiguredProduct {
   const ConfiguredProduct({
@@ -27,6 +31,10 @@ class ConfiguredProduct {
 /// Prices are never computed here. Every change re-asks the catalog, which is the same endpoint
 /// Order Manager calls at checkout — so the number on this button is the number that gets charged,
 /// by construction rather than by two implementations agreeing.
+///
+/// The 2026-08 redesign promotes this to a full screen — see `product_detail_screen.dart`, which
+/// the shop page now opens instead. The sheet stays for any caller that wants the lighter surface,
+/// restyled to the same visual language so the two do not read as two different products.
 Future<ConfiguredProduct?> showProductOptionsSheet(
   BuildContext context, {
   required StoreApi api,
@@ -38,7 +46,7 @@ Future<ConfiguredProduct?> showProductOptionsSheet(
     isScrollControlled: true,
     backgroundColor: DeliveryColors.white,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.lg)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.sheet)),
     ),
     builder: (BuildContext context) =>
         _OptionsSheet(api: api, product: product, groups: groups),
@@ -185,8 +193,8 @@ class _OptionsSheetState extends State<_OptionsSheet> {
           Expanded(
             child: ListView(
               controller: controller,
-              padding: const EdgeInsets.fromLTRB(DeliverySpacing.md, DeliverySpacing.sm,
-                  DeliverySpacing.md, DeliverySpacing.md),
+              padding: const EdgeInsetsDirectional.fromSTEB(DeliverySpacing.lg,
+                  DeliverySpacing.sm, DeliverySpacing.lg, DeliverySpacing.md),
               children: <Widget>[
                 Center(
                   child: Container(
@@ -200,15 +208,30 @@ class _OptionsSheetState extends State<_OptionsSheet> {
                 ),
                 const SizedBox(height: DeliverySpacing.md),
                 Text(widget.product.name,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.2,
+                    )),
+                const SizedBox(height: DeliverySpacing.sm),
+                Text(
+                  widget.product.price.toStringAsFixed(2),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.brand,
+                  ),
+                ),
                 if (widget.product.description != null &&
                     widget.product.description!.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: DeliverySpacing.xs),
+                  const SizedBox(height: DeliverySpacing.sm),
                   Text(widget.product.description!,
                       style: const TextStyle(
-                          fontSize: 13.5, color: DeliveryColors.muted, height: 1.35)),
+                          fontSize: 14, color: DeliveryColors.muted, height: 1.45)),
                 ],
-                const SizedBox(height: DeliverySpacing.lg),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                const Divider(height: 1, thickness: 1, color: DeliveryColors.border),
                 for (final OptionGroup group in widget.groups) _group(group),
               ],
             ),
@@ -220,34 +243,33 @@ class _OptionsSheetState extends State<_OptionsSheet> {
   }
 
   Widget _group(OptionGroup group) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(group.name,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.sm, vertical: 3),
-              decoration: BoxDecoration(
-                color: group.required ? DeliveryColors.brandSoft : DeliveryColors.background,
-                borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(top: DeliverySpacing.lg - DeliverySpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(group.name,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink)),
               ),
-              child: Text(group.rule,
+              const SizedBox(width: DeliverySpacing.sm),
+              Text(group.rule,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: group.required ? DeliveryColors.brand : DeliveryColors.muted,
+                    color: group.required ? DeliveryColors.brand : DeliveryColors.faint,
                   )),
-            ),
-          ],
-        ),
-        const SizedBox(height: DeliverySpacing.sm),
-        for (final ProductOptionChoice option in group.options) _option(group, option),
-        const SizedBox(height: DeliverySpacing.lg),
-      ],
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          for (final ProductOptionChoice option in group.options) _option(group, option),
+        ],
+      ),
     );
   }
 
@@ -261,40 +283,38 @@ class _OptionsSheetState extends State<_OptionsSheet> {
         onTap: enabled ? () => _toggle(group, option) : null,
         borderRadius: BorderRadius.circular(DeliveryRadius.sm),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
+          padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
           child: Row(
             children: <Widget>[
               Icon(
                 group.singleChoice
                     ? (selected
-                        ? Icons.radio_button_checked_rounded
-                        : Icons.radio_button_off_rounded)
-                    : (selected
-                        ? Icons.check_box_rounded
-                        : Icons.check_box_outline_blank_rounded),
-                color: selected ? DeliveryColors.brand : DeliveryColors.muted,
-                size: 22,
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked)
+                    : (selected ? Icons.check_box : Icons.check_box_outline_blank),
+                color: selected ? DeliveryColors.brand : DeliveryColors.faint,
+                size: 20,
               ),
               const SizedBox(width: DeliverySpacing.sm + 2),
               Expanded(
                 child: Text(
                   enabled ? option.name : DeliveryStrings.of(context).optionSoldOut(option.name),
                   style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: DeliveryColors.ink,
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: selected ? DeliveryColors.ink : DeliveryColors.muted,
                   ),
                 ),
               ),
               if (option.deltaLabel.isNotEmpty)
                 Text(option.deltaLabel,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       // A discount is not a surcharge; showing both in the same colour makes a
                       // cheaper size look like an upsell.
                       color: option.priceDelta < 0
-                          ? const Color(0xFF2E7D32)
+                          ? DeliveryAccent.positive.color
                           : DeliveryColors.muted,
                     )),
             ],
@@ -315,76 +335,41 @@ class _OptionsSheetState extends State<_OptionsSheet> {
           color: DeliveryColors.white,
           border: Border(top: BorderSide(color: DeliveryColors.border)),
         ),
-        padding: const EdgeInsets.all(DeliverySpacing.md),
+        padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             if (_priceError != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
+                padding: const EdgeInsetsDirectional.only(bottom: DeliverySpacing.sm),
                 child: Text(_priceError!,
                     style: const TextStyle(color: DeliveryColors.brand, fontSize: 12.5)),
               ),
             Row(
               children: <Widget>[
-                _stepper(),
+                QuantityStepper(
+                  quantity: _qty,
+                  onDecrease: _qty > 1 ? () => setState(() => _qty--) : null,
+                  onIncrease: _qty < 99 ? () => setState(() => _qty++) : null,
+                ),
                 const SizedBox(width: DeliverySpacing.md),
                 Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: FilledButton(
-                      onPressed: canAdd ? _add : null,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: DeliveryColors.brand,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(DeliveryRadius.md)),
-                      ),
-                      child: _pricing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : Text(
-                              // Generic rather than "Choose $missing": a group named "Choose Size"
-                              // would make that read "Choose Choose Size". The specific group is
-                              // already marked Required in the list above.
-                              missing != null
-                                  ? DeliveryStrings.of(context).selectRequiredOptions
-                                  : DeliveryStrings.of(context).addWithTotal(total.toStringAsFixed(2)),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700, fontSize: 15)),
-                    ),
+                  child: YdPillButton(
+                    // Generic rather than "Choose $missing": a group named "Choose Size" would
+                    // make that read "Choose Choose Size". The specific group is already marked
+                    // Required in the list above.
+                    label: missing != null
+                        ? DeliveryStrings.of(context).selectRequiredOptions
+                        : DeliveryStrings.of(context)
+                            .addWithTotal(total.toStringAsFixed(2)),
+                    busy: _pricing,
+                    onPressed: canAdd ? _add : null,
                   ),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _stepper() {
-    return Container(
-      height: 48,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        border: Border.all(color: DeliveryColors.border),
-      ),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
-            icon: const Icon(Icons.remove_rounded, size: 18),
-          ),
-          Text('$_qty',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-          IconButton(
-            onPressed: _qty < 99 ? () => setState(() => _qty++) : null,
-            icon: const Icon(Icons.add_rounded, size: 18),
-          ),
-        ],
       ),
     );
   }

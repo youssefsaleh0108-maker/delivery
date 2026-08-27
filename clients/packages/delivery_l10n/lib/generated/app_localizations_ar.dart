@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -11,6 +10,9 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get appTitle => 'YouDrop';
+
+  @override
+  String get navHome => 'الرئيسية';
 
   @override
   String get navShops => 'المتاجر';
@@ -1307,6 +1309,21 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get noPhoto => 'لا صورة';
 
   @override
+  String photoCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صورة',
+      many: '$count صورة',
+      few: '$count صور',
+      two: 'صورتان',
+      one: 'صورة واحدة',
+      zero: 'لا صور',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get archived => 'مؤرشفة';
 
   @override
@@ -2521,4 +2538,1045 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get dayByDay => 'يومًا بيوم';
+
+  @override
+  String get authTagline => 'أي شيء يُوصَل، إلى أي مكان';
+
+  @override
+  String get authRoleCustomer => 'زبون';
+
+  @override
+  String get authRoleCustomerBlurb => 'اطلب واستلم توصيلاتك';
+
+  @override
+  String get authRoleRider => 'سائق توصيل';
+
+  @override
+  String get authRoleRiderBlurb => 'وصّل الطلبات واكسب';
+
+  @override
+  String get authRoleMerchant => 'تاجر';
+
+  @override
+  String get authRoleMerchantBlurb => 'بِع ونمِّ عملك';
+
+  @override
+  String get authAlreadyHaveAnAccount => 'لديك حساب بالفعل؟';
+
+  @override
+  String get authDontHaveAnAccount => 'ليس لديك حساب؟';
+
+  @override
+  String get authSignUp => 'أنشئ حساباً';
+
+  @override
+  String get authSignInSubtitle => 'أدخل بياناتك لتسجيل الدخول.';
+
+  @override
+  String get authEmailOrPhone => 'البريد الإلكتروني أو رقم الهاتف';
+
+  @override
+  String get authEmailOrPhoneHint => 'مثال: name@domain.com أو ‎+961…';
+
+  @override
+  String get authPasscodeHint => 'رمزك المكوَّن من ستة أرقام';
+
+  @override
+  String get authForgotPassword => 'نسيت كلمة المرور؟';
+
+  @override
+  String get authUseTheKeypad => 'استخدم لوحة الأرقام';
+
+  @override
+  String get authOrContinueWith => 'أو تابع باستخدام';
+
+  @override
+  String get authComingSoon => 'قريباً';
+
+  @override
+  String get authShowPassword => 'إظهار الرمز';
+
+  @override
+  String get authHidePassword => 'إخفاء الرمز';
+
+  @override
+  String get authDeleteDigit => 'حذف آخر رقم';
+
+  @override
+  String get authCreateAccountSubtitle => 'ابدأ باستلام أي شيء إلى أي مكان.';
+
+  @override
+  String get authFullName => 'الاسم الكامل';
+
+  @override
+  String get authFullNameHint => 'مثال: سارة جنكينز';
+
+  @override
+  String get authEmailAddress => 'البريد الإلكتروني';
+
+  @override
+  String get authEmailHint => 'مثال: sarah.j@gmail.com';
+
+  @override
+  String get authPhoneNumber => 'رقم الهاتف';
+
+  @override
+  String get authPhoneHint => '70 123 456';
+
+  @override
+  String get authConfirmPassword => 'تأكيد الرمز';
+
+  @override
+  String get authPasscodeKeepGoing => 'تابع';
+
+  @override
+  String get authPasscodeComplete => 'مكتمل';
+
+  @override
+  String get authAgreeToTerms => 'أوافق على الشروط وسياسة الخصوصية';
+
+  @override
+  String get authTermsPrefix => 'بإنشائك حساباً فإنك توافق على ';
+
+  @override
+  String get authTermsOfService => 'شروط الخدمة';
+
+  @override
+  String get authTermsAnd => ' و';
+
+  @override
+  String get authPrivacyPolicy => 'سياسة الخصوصية';
+
+  @override
+  String get authPleaseAcceptTheTerms => 'يرجى الموافقة على الشروط للمتابعة.';
+
+  @override
+  String get authVerifyYourEmail => 'تحقق من بريدك الإلكتروني';
+
+  @override
+  String get authVerifyYourNumber => 'تحقق من رقمك';
+
+  @override
+  String get authStep => 'الخطوة';
+
+  @override
+  String get authComplete => 'مكتمل';
+
+  @override
+  String get authNext => 'التالي';
+
+  @override
+  String get authGetStarted => 'لنبدأ';
+
+  @override
+  String get authSubmitApplication => 'إرسال الطلب';
+
+  @override
+  String get authSendingApplication => 'جارٍ إرسال طلبك…';
+
+  @override
+  String get authCouldNotSendApplication =>
+      'تعذّر إرسال طلبك. لم يُفقد شيء — حاول مرة أخرى.';
+
+  @override
+  String get authRiderIntroTitle => 'انضم كسائق توصيل';
+
+  @override
+  String get authRiderIntroBlurb =>
+      'ساعات مرنة، أجر تنافسي، وتنقّل سهل — ابدأ التوصيل مع يودروب خلال دقائق.';
+
+  @override
+  String get authRiderBenefitHours => 'ساعات مرنة';
+
+  @override
+  String get authRiderBenefitPay => 'أجر تنافسي';
+
+  @override
+  String get authRiderBenefitNavigation => 'تنقّل سهل';
+
+  @override
+  String get authWhatYouNeedToSignUp => 'ما تحتاجه للتسجيل';
+
+  @override
+  String get authNeedValidId => 'هوية سارية';
+
+  @override
+  String get authNeedDriversLicence => 'رخصة قيادة';
+
+  @override
+  String get authNeedVehicleDocuments => 'أوراق المركبة';
+
+  @override
+  String get authMerchantSignUp => 'تسجيل التاجر';
+
+  @override
+  String get authMerchantIntroTitle => 'سجّل عملك';
+
+  @override
+  String get authMerchantIntroBlurb =>
+      'اصل إلى زبائن أكثر، أدر منتجاتك بسهولة، وتابع أداءك لحظة بلحظة.';
+
+  @override
+  String get authWhatYouGet => 'ما ستحصل عليه';
+
+  @override
+  String get authMerchantBenefitReach =>
+      'الوصول إلى زبائن أكثر عبر شبكة التوصيل لدينا';
+
+  @override
+  String get authMerchantBenefitManage => 'إدارة سهلة للمنتجات وتنفيذ الطلبات';
+
+  @override
+  String get authMerchantBenefitAnalytics => 'تحليلات لحظية لتحسين مبيعاتك';
+
+  @override
+  String get authWhatYouNeed => 'ما تحتاجه';
+
+  @override
+  String get authNeedBusinessLicence => 'رخصة تجارية';
+
+  @override
+  String get authNeedTaxCertificate => 'شهادة ضريبية';
+
+  @override
+  String get authNeedBankDetails => 'بيانات الحساب المصرفي';
+
+  @override
+  String get authPersonalInformation => 'المعلومات الشخصية';
+
+  @override
+  String get authPersonalInformationBlurb =>
+      'املأ بياناتك الأساسية لإنشاء ملفك كسائق توصيل.';
+
+  @override
+  String get authDateOfBirth => 'تاريخ الميلاد';
+
+  @override
+  String get authDateOfBirthHint => 'يوم / شهر / سنة';
+
+  @override
+  String get authNationalId => 'رقم الهوية الوطنية';
+
+  @override
+  String get authNationalIdHint => 'كما هو مطبوع على هويتك';
+
+  @override
+  String get authVehicleDetails => 'تفاصيل المركبة';
+
+  @override
+  String get authVehicleDetailsBlurb =>
+      'اختر فئة مركبتك وسجّل بياناتها الرسمية.';
+
+  @override
+  String get authVehicleType => 'نوع المركبة';
+
+  @override
+  String get authVehicleMotorcycle => 'دراجة نارية';
+
+  @override
+  String get authVehicleCar => 'سيارة';
+
+  @override
+  String get authVehicleBicycle => 'دراجة هوائية';
+
+  @override
+  String get authVehicleVan => 'شاحنة صغيرة';
+
+  @override
+  String get authVehicleModel => 'ماركة المركبة / الطراز';
+
+  @override
+  String get authVehicleModelHint => 'مثال: ياماها TMAX / تويوتا يارِس';
+
+  @override
+  String get authPlateNumber => 'رقم اللوحة';
+
+  @override
+  String get authPlateNumberHint => 'مثال: 1234 ABC';
+
+  @override
+  String get authVehicleYear => 'سنة الصنع';
+
+  @override
+  String get authVehicleYearHint => 'مثال: 2024';
+
+  @override
+  String get authSelectDeliveryZone => 'اختر منطقة التوصيل';
+
+  @override
+  String get authSelectDeliveryZoneBlurb =>
+      'في أي مناطق من المدينة تفضّل التوصيل؟';
+
+  @override
+  String get authMapComingSoon => 'خريطة التغطية قريباً';
+
+  @override
+  String get authPreferredArea => 'المنطقة المفضّلة';
+
+  @override
+  String get authPreferredAreaHint => 'مثال: الحمرا، الأشرفية';
+
+  @override
+  String get authAvailableZones => 'المناطق المتاحة';
+
+  @override
+  String get authZonesComingSoonTitle => 'لم تُرسَم المناطق بعد';
+
+  @override
+  String get authZonesComingSoonBlurb =>
+      'ستتوفّر المناطق القابلة للاختيار مع خريطة التغطية. حتى ذلك الحين نعتمد على المنطقة المذكورة أعلاه.';
+
+  @override
+  String get authBusinessInformation => 'معلومات العمل';
+
+  @override
+  String get authBusinessInformationBlurb =>
+      'أخبرنا عن شركتك وعن الشخص المسؤول.';
+
+  @override
+  String get authBusinessShopName => 'اسم العمل / المتجر';
+
+  @override
+  String get authBusinessShopNameHint => 'مثال: مطعم روز غاردن';
+
+  @override
+  String get authOwnerFullName => 'الاسم الكامل للمالك';
+
+  @override
+  String get authOwnerFullNameHint => 'مثال: جين كوبر';
+
+  @override
+  String get authBusinessType => 'نوع العمل';
+
+  @override
+  String get authBusinessTypeHint => 'اختر واحداً';
+
+  @override
+  String get authBusinessTypeRestaurant => 'مطعم';
+
+  @override
+  String get authBusinessTypeGrocery => 'بقالة';
+
+  @override
+  String get authBusinessTypePharmacy => 'صيدلية';
+
+  @override
+  String get authBusinessTypeBakery => 'مخبز';
+
+  @override
+  String get authBusinessTypeRetail => 'بيع بالتجزئة';
+
+  @override
+  String get authBusinessTypeOther => 'أخرى';
+
+  @override
+  String get authContactEmail => 'البريد الإلكتروني للتواصل';
+
+  @override
+  String get authReviewAndSubmit => 'المراجعة والإرسال';
+
+  @override
+  String get authReviewAndSubmitBlurb =>
+      'راجع ما سنرسله. يمكنك العودة وتعديل أي شيء.';
+
+  @override
+  String get authDocuments => 'المستندات';
+
+  @override
+  String get authDocumentsBlurb => 'الأوراق التي سنحتاجها قبل أن تبدأ.';
+
+  @override
+  String get authDocumentsComingSoonTitle => 'رفع المستندات سيتاح قريباً';
+
+  @override
+  String get authDocumentsComingSoonBlurb =>
+      'يمكنك إكمال طلبك من دونه — سنطلب الأوراق عبر البريد الإلكتروني قبل أن تبدأ.';
+
+  @override
+  String get authBankDetails => 'بيانات الحساب المصرفي';
+
+  @override
+  String get authBankDetailsBlurb => 'إلى أين ستُحوَّل أرباحك.';
+
+  @override
+  String get authBankComingSoonTitle => 'إعداد التحويلات سيتاح قريباً';
+
+  @override
+  String get authBankComingSoonBlurb =>
+      'لا نأخذ بيانات الحساب المصرفي قبل صدور القرار. ستُعدّ التحويلات بعد الموافقة على طلبك.';
+
+  @override
+  String get authApplicationSubmitted => 'تم إرسال الطلب';
+
+  @override
+  String get authApplicationSubmittedBlurb =>
+      'استلمنا طلبك وفريق العمليات لدينا يطّلع عليه الآن.';
+
+  @override
+  String get authWhatToExpectNext => 'ما الذي سيحدث تالياً';
+
+  @override
+  String get authExpectVerification => 'نتحقق من بياناتك (١–٣ أيام)';
+
+  @override
+  String get authExpectBackgroundCheck => 'التحقق من الخلفية';
+
+  @override
+  String get authExpectTrainingInvite => 'دعوة إلى تدريب السائقين';
+
+  @override
+  String get authWeWillNotifyYou =>
+      'سنعلمك عبر البريد الإلكتروني فور صدور القرار.';
+
+  @override
+  String get authApplicationUnderReview => 'الطلب قيد المراجعة';
+
+  @override
+  String get authApplicationUnderReviewBlurb =>
+      'شكراً لك. وصلنا تسجيلك وفريقنا يراجعه الآن. عادةً ما يستغرق ذلك يوماً أو يومين.';
+
+  @override
+  String get authExplorationModeActive => 'وضع الاستكشاف مُفعَّل';
+
+  @override
+  String get authExplorationModeBlurb =>
+      'بينما تنتظر، يمكنك إعداد منتجاتك وقوائمك والتجوّل في التطبيق. لن يُنشر شيء قبل الموافقة على طلبك.';
+
+  @override
+  String get authApplicationChecklist => 'قائمة مراحل الطلب';
+
+  @override
+  String get authChecklistAccountCreated => 'أُنشئ الحساب';
+
+  @override
+  String get authChecklistDocuments => 'رفع المستندات';
+
+  @override
+  String get authChecklistAudit => 'التدقيق الأمني والامتثال';
+
+  @override
+  String get authChecklistActivation => 'تفعيل المتجر ونشره';
+
+  @override
+  String get authExploreDashboard => 'استكشف لوحة التحكم';
+
+  @override
+  String get custSeeAll => 'عرض الكل';
+
+  @override
+  String get custShowLess => 'عرض أقل';
+
+  @override
+  String get custAllCategories => 'كل الفئات';
+
+  @override
+  String get custFilters => 'عوامل التصفية';
+
+  @override
+  String get custMyBasket => 'سلّتي';
+
+  @override
+  String get custPromoCode => 'رمز الخصم';
+
+  @override
+  String get custApply => 'تطبيق';
+
+  @override
+  String get custOrderSummary => 'ملخّص الطلب';
+
+  @override
+  String get custDiscounts => 'الخصومات';
+
+  @override
+  String get custTotalAmount => 'المبلغ الإجمالي';
+
+  @override
+  String get custProceedToCheckout => 'المتابعة إلى الدفع';
+
+  @override
+  String get custAddToBasket => 'أضف إلى السلة';
+
+  @override
+  String get custDeliveryTime => 'وقت التوصيل';
+
+  @override
+  String get custMinOrderStat => 'الحد الأدنى';
+
+  @override
+  String custRatingsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تقييم',
+      many: '$count تقييمًا',
+      few: '$count تقييمات',
+      two: 'تقييمان',
+      one: 'تقييم واحد',
+      zero: 'لا تقييمات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String custShopsInCategory(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count متجر',
+      many: '$count متجرًا',
+      few: '$count متاجر',
+      two: 'متجران',
+      one: 'متجر واحد',
+      zero: 'لا متاجر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get custPeopleAlsoOrdered => 'طلب الآخرون أيضًا';
+
+  @override
+  String get custSoon => 'قريبًا';
+
+  @override
+  String get custIncreaseQuantity => 'زيادة الكمية';
+
+  @override
+  String get custDecreaseQuantity => 'إنقاص الكمية';
+
+  @override
+  String get custSearchInShop => 'ابحث في هذا المتجر';
+
+  @override
+  String get custShopSearchHint => 'ابحث في القائمة';
+
+  @override
+  String get custButlerTitle => 'خدمة يودروب الشخصية';
+
+  @override
+  String get custChooseWhatYouNeed => 'اختر ما تحتاج المساعدة فيه';
+
+  @override
+  String get custBuyAnything => 'اشترِ أي شيء';
+
+  @override
+  String get custBuyAnythingBlurb => 'نشتري ونوصّل من أي مكان';
+
+  @override
+  String get custSendAnything => 'أرسل أي شيء';
+
+  @override
+  String get custSendAnythingBlurb => 'توصيل واستلام وإرسال الأغراض';
+
+  @override
+  String get custRecentTasks => 'المهام الأخيرة';
+
+  @override
+  String get custSearchTasksHint => 'ابحث في مهامك';
+
+  @override
+  String get custNoTasksMatch => 'لا توجد مهام تطابق هذا البحث';
+
+  @override
+  String get custStatusPending => 'قيد الانتظار';
+
+  @override
+  String get custWaitingOnYou => 'بانتظار ردّك';
+
+  @override
+  String get custApplePay => 'أبل باي';
+
+  @override
+  String get custOrderNotes => 'ملاحظات الطلب';
+
+  @override
+  String get custOrderNotesHint =>
+      'مثلًا: اترك الطلب عند الباب، الجرس لا يعمل...';
+
+  @override
+  String get custTotalPrice => 'السعر الإجمالي';
+
+  @override
+  String get custPlaceOrder => 'تأكيد الطلب';
+
+  @override
+  String get custOrderStatus => 'حالة الطلب';
+
+  @override
+  String get custOrderRef => 'طلب';
+
+  @override
+  String get custItemsOrdered => 'الأصناف المطلوبة';
+
+  @override
+  String get custLiveMap => 'الخريطة المباشرة';
+
+  @override
+  String get custAccountSettings => 'إعدادات الحساب';
+
+  @override
+  String get custAppLanguage => 'لغة التطبيق';
+
+  @override
+  String get custMyAddresses => 'عناويني';
+
+  @override
+  String get custPaymentMethods => 'طرق الدفع';
+
+  @override
+  String get custOrderHistory => 'سجل الطلبات';
+
+  @override
+  String get custHelpSupport => 'المساعدة والدعم';
+
+  @override
+  String get custLabelAddressAs => 'سمِّ هذا العنوان:';
+
+  @override
+  String get custLabelHome => 'المنزل';
+
+  @override
+  String get custLabelWork => 'العمل';
+
+  @override
+  String get custLabelOther => 'أخرى';
+
+  @override
+  String get merchTodaySummary => 'ملخص اليوم';
+
+  @override
+  String get merchPendingOrders => 'الطلبات المعلّقة';
+
+  @override
+  String get merchNewOrders => 'طلبات جديدة';
+
+  @override
+  String get merchView => 'عرض';
+
+  @override
+  String get merchRecentOrders => 'أحدث الطلبات';
+
+  @override
+  String get merchViewAll => 'عرض الكل';
+
+  @override
+  String get merchActive => 'نشط';
+
+  @override
+  String get merchInactive => 'غير نشط';
+
+  @override
+  String get merchPublishShop => 'انشر متجرك';
+
+  @override
+  String get merchShopHidden => 'تم إخفاء متجرك عن السوق.';
+
+  @override
+  String get merchOrderFlow => 'مسار الطلبات';
+
+  @override
+  String get merchManagerView => 'عرض المدير';
+
+  @override
+  String get merchTabNew => 'جديد';
+
+  @override
+  String get merchTabCompleted => 'مكتملة';
+
+  @override
+  String get merchReject => 'رفض';
+
+  @override
+  String get merchFlowStatus => 'حالة المسار';
+
+  @override
+  String get merchCustomerDetails => 'بيانات العميل';
+
+  @override
+  String get merchItemsBreakdown => 'تفاصيل الأصناف';
+
+  @override
+  String get merchSpecialInstructions => 'تعليمات خاصة';
+
+  @override
+  String get merchGrandTotal => 'الإجمالي الكلي';
+
+  @override
+  String get merchStepPickedUp => 'تم الاستلام';
+
+  @override
+  String get merchNothingInThisList => 'لا يوجد شيء في هذه القائمة.';
+
+  @override
+  String get merchOpenOrder => 'فتح الطلب';
+
+  @override
+  String get merchbMenuItems => 'أصناف القائمة';
+
+  @override
+  String get merchbManageAvailability => 'إدارة التوفر';
+
+  @override
+  String get merchbSearchMenuItems => 'ابحث في أصناف القائمة...';
+
+  @override
+  String get merchbAvailable => 'متاح';
+
+  @override
+  String get merchbOffShelf => 'خارج العرض';
+
+  @override
+  String get merchbAddProduct => 'إضافة منتج';
+
+  @override
+  String get merchbAvailability => 'التوفر';
+
+  @override
+  String get merchbNoMatchingItems => 'لا توجد أصناف مطابقة';
+
+  @override
+  String get merchbAddNewProduct => 'إضافة منتج جديد';
+
+  @override
+  String get merchbProductImage => 'صورة المنتج';
+
+  @override
+  String get merchbUploadImageCta => 'ارفع صورة شهية للطبق';
+
+  @override
+  String get merchbUploadHint => 'PNG أو JPG بحجم أقصاه 5 ميغابايت';
+
+  @override
+  String get merchbVariantsOptions => 'الخيارات والإضافات';
+
+  @override
+  String get merchbAddOption => '+ إضافة خيار';
+
+  @override
+  String merchbChoicesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count خيار',
+      few: '$count خيارات',
+      two: 'خياران',
+      one: 'خيار واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get merchbNoOptionsYet => 'لا توجد خيارات على هذا الصنف بعد';
+
+  @override
+  String get merchbOptionsReadOnly =>
+      'تظهر كما يراها الزبون. تعديل الخيارات سيتوفر قريباً.';
+
+  @override
+  String get merchbSaveMenuItem => 'حفظ الصنف';
+
+  @override
+  String get merchbSoon => 'قريباً';
+
+  @override
+  String get merchbShopConfiguration => 'إعدادات المتجر';
+
+  @override
+  String get merchbShopStatus => 'حالة المتجر';
+
+  @override
+  String get merchbBannerAndLogo => 'غلاف المتجر وشعاره';
+
+  @override
+  String get merchbChangeCover => 'تغيير الغلاف';
+
+  @override
+  String get merchbChangeLogo => 'تغيير الشعار';
+
+  @override
+  String get merchbShopAddress => 'عنوان المتجر';
+
+  @override
+  String get merchbMapPreviewSoon => 'معاينة الخريطة';
+
+  @override
+  String get merchbOperatingDetails => 'تفاصيل التشغيل';
+
+  @override
+  String get merchbSaveShopSettings => 'حفظ إعدادات المتجر';
+
+  @override
+  String merchbHoursDaily(String from, String to) {
+    return 'يومياً: $from - $to';
+  }
+
+  @override
+  String get merchbHoursCustom => 'جدول مخصص';
+
+  @override
+  String get merchbHoursNone => 'لم تُحدَّد ساعات العمل';
+
+  @override
+  String get merchbEditHours => 'تعديل ساعات العمل';
+
+  @override
+  String get merchbDay => 'اليوم';
+
+  @override
+  String get merchbTimeHint => 'ساعة:دقيقة';
+
+  @override
+  String get merchbDayMonday => 'الاثنين';
+
+  @override
+  String get merchbDayTuesday => 'الثلاثاء';
+
+  @override
+  String get merchbDayWednesday => 'الأربعاء';
+
+  @override
+  String get merchbDayThursday => 'الخميس';
+
+  @override
+  String get merchbDayFriday => 'الجمعة';
+
+  @override
+  String get merchbDaySaturday => 'السبت';
+
+  @override
+  String get merchbDaySunday => 'الأحد';
+
+  @override
+  String get merchbAccountSettings => 'إعدادات الحساب';
+
+  @override
+  String get merchbRoleOwner => 'المالك';
+
+  @override
+  String get merchbAppLanguage => 'لغة التطبيق';
+
+  @override
+  String get merchbLangShortEn => 'EN';
+
+  @override
+  String get merchbLangShortAr => 'AR';
+
+  @override
+  String get merchbShopProfile => 'ملف المتجر';
+
+  @override
+  String get merchbPaymentBankDetails => 'الدفع والحساب البنكي';
+
+  @override
+  String get merchbNotificationSettings => 'إعدادات الإشعارات';
+
+  @override
+  String get merchbShopAnalytics => 'تحليلات المتجر';
+
+  @override
+  String get merchbLogOutAccount => 'تسجيل الخروج من الحساب';
+
+  @override
+  String get riderComingSoon => 'قريباً';
+
+  @override
+  String get riderTabAvailable => 'المتاحة';
+
+  @override
+  String get riderTabActive => 'الجارية';
+
+  @override
+  String get riderTabEarnings => 'الأرباح';
+
+  @override
+  String get riderSegmentDeliveries => 'التوصيلات';
+
+  @override
+  String get riderRegionZone => 'منطقة العمل';
+
+  @override
+  String riderDeliveriesNearby(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توصيلة قريبة',
+      many: '$count توصيلة قريبة',
+      few: '$count توصيلات قريبة',
+      two: 'توصيلتان قريبتان',
+      one: 'توصيلة واحدة قريبة',
+      zero: 'لا توجد توصيلات قريبة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get riderOffersNearYou => 'عروض قريبة منك';
+
+  @override
+  String get riderAcceptDelivery => 'قبول التوصيلة';
+
+  @override
+  String get riderMyActiveTasks => 'مهامي الجارية';
+
+  @override
+  String riderActiveCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count جارية',
+      many: '$count جارية',
+      few: '$count جارية',
+      two: 'اثنتان جاريتان',
+      one: 'واحدة جارية',
+      zero: 'لا يوجد جارٍ',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String riderOrderRef(String ref) {
+    return 'طلب رقم $ref';
+  }
+
+  @override
+  String riderMinutesAgo(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'منذ $minutes دقيقة',
+      many: 'منذ $minutes دقيقة',
+      few: 'منذ $minutes دقائق',
+      two: 'منذ دقيقتين',
+      one: 'منذ دقيقة',
+      zero: 'الآن',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String riderHoursAgo(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'منذ $hours ساعة',
+      many: 'منذ $hours ساعة',
+      few: 'منذ $hours ساعات',
+      two: 'منذ ساعتين',
+      one: 'منذ ساعة',
+      zero: 'الآن',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get riderNavigate => 'الاتجاهات';
+
+  @override
+  String get riderViewDetails => 'عرض التفاصيل';
+
+  @override
+  String get riderStartNavigation => 'بدء التوجيه';
+
+  @override
+  String get riderYourPayout => 'مستحقاتك';
+
+  @override
+  String get riderRouteTimeline => 'مسار الرحلة';
+
+  @override
+  String get riderPickupAddress => 'عنوان الاستلام';
+
+  @override
+  String get riderDeliveryAddress => 'عنوان التسليم';
+
+  @override
+  String get riderItemsToCollect => 'الأصناف المطلوب استلامها';
+
+  @override
+  String riderItemLine(int qty, String name) {
+    return '$qty× $name';
+  }
+
+  @override
+  String get riderNoItemsListed => 'لا توجد قائمة أصناف لهذا الطلب.';
+
+  @override
+  String get riderDeliveryInstructions => 'تعليمات التسليم';
+
+  @override
+  String get riderMyEarnings => 'أرباحي';
+
+  @override
+  String get riderPayout => 'صرف المستحقات';
+
+  @override
+  String get riderPeriodToday => 'اليوم';
+
+  @override
+  String get riderPeriodWeekly => 'أسبوعي';
+
+  @override
+  String get riderTotalEarnings => 'إجمالي الأرباح';
+
+  @override
+  String get riderEarningsDerived =>
+      'محسوبة من رسوم التوصيل على التوصيلات التي أكملتها بنفسك.';
+
+  @override
+  String get riderHoursOnline => 'ساعات الاتصال';
+
+  @override
+  String get riderAcceptRate => 'معدل القبول';
+
+  @override
+  String get riderRating => 'التقييم';
+
+  @override
+  String get riderWeeklyOverview => 'نظرة على الأسبوع';
+
+  @override
+  String get riderTodaysDeliveries => 'توصيلات اليوم';
+
+  @override
+  String get riderThisWeeksDeliveries => 'توصيلات هذا الأسبوع';
+
+  @override
+  String get riderNothingDeliveredYet =>
+      'لم تُسلَّم أي توصيلة في هذه الفترة بعد.';
+
+  @override
+  String get riderCouldNotLoadEarnings => 'تعذّر تحميل أرباحك';
+
+  @override
+  String get riderDriverSettings => 'إعدادات السائق';
+
+  @override
+  String get riderVehicleProfile => 'بيانات المركبة';
+
+  @override
+  String get riderActiveDuty => 'على رأس العمل (متصل)';
+
+  @override
+  String get riderAppLanguage => 'لغة التطبيق';
+
+  @override
+  String get riderDocuments => 'المستندات والرخص';
+
+  @override
+  String get riderBankDetails => 'بيانات الحساب البنكي';
+
+  @override
+  String get riderNotificationPreferences => 'تفضيلات الإشعارات';
+
+  @override
+  String get riderHelpAndSupport => 'المساعدة والدعم المباشر';
+
+  @override
+  String get riderErrandTry => 'جرّب';
+
+  @override
+  String get riderErrandTo => 'إلى';
+
+  @override
+  String get riderErrandCap => 'الحد الأقصى';
 }

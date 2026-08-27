@@ -14,9 +14,14 @@ import 'widget_test.dart' show product, storeCard;
 
 /// What the checkout screen sends, and what it refuses to send.
 ///
-/// These are the two changes that can silently ship wrong: an address picked in the dropdown that
-/// travels without the area it belongs to, and a payment method the customer never saw. Both are
-/// invisible on screen and only visible in the request body, so that is what is asserted.
+/// These are the two changes that can silently ship wrong: an address picked from the saved list
+/// that travels without the area it belongs to, and a payment method the customer never saw. Both
+/// are invisible on screen and only visible in the request body, so that is what is asserted.
+///
+/// The 2026-08 redesign changed the controls under all of it — the address dropdown became a list
+/// of radio cards, the payment radios became a two-up strip of cards, and the place button became a
+/// [YdPillButton] — so the finders below moved with them. Every assertion about the *request* is
+/// unchanged, which is the point: the wire format survived the repaint.
 void main() {
   /// Secure storage, answered in-process.
   ///
@@ -126,15 +131,33 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Whether the card carrying [label] reads as the chosen one.
+  ///
+  /// Selection is a border colour and a radio dot now rather than a widget type, so it is read off
+  /// the semantics the cards publish — which is also what a screen reader is told, and therefore
+  /// the version of "chosen" that has to be right.
+  bool isSelected(WidgetTester tester, String label) {
+    return tester
+        .widgetList<Semantics>(find.ancestor(
+          of: find.text(label),
+          matching: find.byType(Semantics),
+        ))
+        .any((Semantics s) => s.properties.selected ?? false);
+  }
+
   testWidgets('the address is picked from a list, not typed', (WidgetTester tester) async {
     final DeliveryAddressStore addresses = await storeWithAddresses();
     await pumpCheckout(
         tester, dio: recordingDio().dio, addresses: addresses, cart: cartWithOneItem());
 
-    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    // No free-text box for the address anywhere on the screen: both saved addresses are offered as
+    // cards, and one of them is chosen.
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Work'), findsOneWidget);
     // The most recently selected one, already chosen — the customer picked it on the home screen
     // and should not have to pick it again.
-    expect(find.text('Home · 12 Rose Street'), findsOneWidget);
+    expect(isSelected(tester, 'Home'), isTrue);
+    expect(isSelected(tester, 'Work'), isFalse);
     // And the area behind it, which is what the fee is priced from.
     expect(find.textContaining('Riverside'), findsOneWidget);
   });
@@ -148,8 +171,14 @@ void main() {
     expect(find.text('Cash on delivery'), findsOneWidget);
     // Chosen, not merely listed. An unselected sole option is a decision the customer has to make
     // for no reason.
-    expect(find.byIcon(Icons.radio_button_checked_rounded), findsOneWidget);
-    // The one method that has no provider behind it must not be offered.
+    expect(isSelected(tester, 'Cash on delivery'), isTrue);
+    // The design draws Apple Pay beside it and there is no provider behind it, so it is present,
+    // marked, and inert — never a card the customer can pick and then not be charged through.
+    expect(find.text('Apple Pay'), findsOneWidget);
+    // The chip uppercases its label — it is a note about the control, not another control.
+    expect(find.text('SOON'), findsWidgets);
+    expect(isSelected(tester, 'Apple Pay'), isFalse);
+    // The one method that has no provider behind it must not be offered as a real choice.
     expect(find.text('Card'), findsNothing);
   });
 
@@ -162,12 +191,10 @@ void main() {
 
     // Switch to the other saved address: the zone has to follow the choice, which is the whole
     // reason the free-text box went.
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Work · 4 Mill Lane').last);
+    await tester.tap(find.text('Work'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(YdPillButton));
     await tester.pumpAndSettle();
 
     expect(recorder.sent, hasLength(1));
@@ -184,18 +211,22 @@ void main() {
     await pumpCheckout(
         tester, dio: recorder.dio, addresses: addresses, cart: cartWithOneItem());
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Work · 4 Mill Lane').last);
+    await tester.tap(find.text('Work'));
     await tester.pumpAndSettle();
 
     // Switching door brings that door's instructions with it, rather than carrying the previous
-    // address's over.
-    expect(find.text('Reception desk, ask for me'), findsWidgets);
+    // address's over. The redesign shows them on the address card itself, in its detail line.
+    expect(find.textContaining('Reception desk, ask for me'), findsWidgets);
 
+    // The order note is its own box now, headed "Order Notes" and hinted rather than labelled.
     await tester.enterText(
-        find.widgetWithText(TextFormField, 'Notes for the merchant (optional)'), 'No onions');
-    await tester.tap(find.byType(ElevatedButton));
+      find.ancestor(
+        of: find.text('e.g. Leave package at the door, bell is not working...'),
+        matching: find.byType(TextFormField),
+      ),
+      'No onions',
+    );
+    await tester.tap(find.byType(YdPillButton));
     await tester.pumpAndSettle();
 
     // Placing re-selects the address to promote it in the recents, which notifies the store — and
@@ -212,7 +243,7 @@ void main() {
     await pumpCheckout(
         tester, dio: recorder.dio, addresses: DeliveryAddressStore(ownerId: 'test-user'), cart: cartWithOneItem());
 
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(YdPillButton));
     await tester.pumpAndSettle();
 
     // No request, and a reason on screen rather than a silent no-op.

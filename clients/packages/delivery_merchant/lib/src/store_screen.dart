@@ -6,12 +6,19 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
-/// "My Shop" — everything a merchant needs to get their store listed and keep it accurate.
+/// Shop Configuration — everything a merchant needs to get their store listed and keep it accurate.
 ///
-/// This screen exists because the storefront made a store mandatory but left no way to manage one.
-/// A merchant's first product auto-provisions a DRAFT store called "My Store" with no opening
-/// hours, and `publish` refuses a store without hours — so without this page a real merchant is
-/// stuck in DRAFT with no way out.
+/// Drawn to the 2026-08 Figma frame `merchant-shop-config` (3:2039): a 120px cover area with a
+/// "Change Cover" badge over a scrim, a bordered address card above a map thumbnail, and one
+/// "Operating Details" card holding the hours, the minimum order and the delivery fee as labelled
+/// boxes, closed by a full-width brand save button.
+///
+/// The frame draws four fields. This shop has more, and every one of them is load-bearing: the
+/// storefront made a store mandatory but left no way to manage one, a merchant's first product
+/// auto-provisions a DRAFT store called "My Store" with no opening hours, and `publish` refuses a
+/// store without hours. So the profile fields, the ETA window, the logo and the publish/busy
+/// controls all stay — restyled into the frame's own card-and-labelled-box language rather than
+/// dropped, because dropping them would strand a real merchant in DRAFT with no way out.
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key, required this.api});
 
@@ -36,6 +43,11 @@ class _StoreScreenState extends State<StoreScreen> {
 
   StoreVertical _vertical = StoreVertical.restaurant;
   List<OpeningWindow> _hours = <OpeningWindow>[];
+
+  /// The frame shows opening hours as one summary line. Seven editable rows behind a summary is
+  /// the same information one tap further away, and it keeps the frame's rhythm intact for the
+  /// merchant who is not here to change their hours today.
+  bool _hoursOpen = false;
 
   Store? _store;
   bool _loading = true;
@@ -124,7 +136,10 @@ class _StoreScreenState extends State<StoreScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_message(e, DeliveryStrings.of(context))), backgroundColor: DeliveryColors.brandDark),
+        SnackBar(
+          content: Text(_message(e, DeliveryStrings.of(context))),
+          backgroundColor: DeliveryColors.brandDark,
+        ),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -171,328 +186,718 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final Store? store = _store;
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      body: Column(
+        children: <Widget>[
+          YdScreenHeader(
+            title: t.merchbShopConfiguration,
+            // The frame's subtitle is the shop's own name.
+            subtitle: store?.name,
+          ),
+          Expanded(child: _body(t, store)),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(DeliveryStrings t, Store? store) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
     }
     if (_error != null) {
-      return _centred(Icons.cloud_off_rounded, DeliveryStrings.of(context).couldNotLoadYourShop, '$_error',
-          action: FilledButton(onPressed: _load, child: Text(DeliveryStrings.of(context).tryAgain)));
+      return YdEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: t.couldNotLoadYourShop,
+        message: '$_error',
+        action: YdPillButton.secondary(
+          label: t.tryAgain,
+          onPressed: _load,
+          size: YdPillButtonSize.compact,
+          expand: false,
+        ),
+      );
     }
-    if (_store == null) {
-      return _centred(Icons.storefront_outlined, DeliveryStrings.of(context).noShopYet,
-          DeliveryStrings.of(context).shopCreatedAutomatically);
+    if (store == null) {
+      return YdEmptyState(
+        icon: Icons.storefront_outlined,
+        title: t.noShopYet,
+        message: t.shopCreatedAutomatically,
+      );
     }
 
-    final Store store = _store!;
-    return Scrollbar(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(DeliverySpacing.lg),
+    return Align(
+      alignment: AlignmentDirectional.topCenter,
+      child: ConstrainedBox(
+        // The frame is a phone column. On a portal pane it stays a column rather than stretching a
+        // 12px-padded input box the width of a monitor.
+        constraints: const BoxConstraints(maxWidth: 760),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Scrollbar(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                DeliverySpacing.lg - DeliverySpacing.xs,
+                DeliverySpacing.lg - DeliverySpacing.xs,
+                DeliverySpacing.lg - DeliverySpacing.xs,
+                DeliverySpacing.lg - DeliverySpacing.xs +
+                    MediaQuery.paddingOf(context).bottom,
+              ),
+              children: <Widget>[
+                _statusCard(t, store),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                _bannerSection(t, store),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                _profileCard(t),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                _addressSection(t),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                _operatingCard(t),
+                const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                _saveButton(t),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- status
+
+  /// Whether the shop is taking orders, and the three things a merchant can do about it.
+  ///
+  /// The frame puts the publish toggle on the dashboard rather than here, but Busy / Not busy /
+  /// Publish are the controls that decide whether this shop appears on the storefront at all, and
+  /// this is the screen that gets a shop listed. They stay, in the frame's button language.
+  Widget _statusCard(DeliveryStrings t, Store store) {
+    final bool listed =
+        store.availability != StoreAvailability.closed || store.closesAt != null;
+
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
             children: <Widget>[
-              _header(store),
-              const SizedBox(height: DeliverySpacing.lg),
-              _card(DeliveryStrings.of(context).profile, DeliveryStrings.of(context).howYourShopAppears, <Widget>[
-                _text(_name, DeliveryStrings.of(context).shopName, required: true),
-                _text(_tagline, DeliveryStrings.of(context).tagline, hint: DeliveryStrings.of(context).taglineHint),
-                DropdownButtonFormField<StoreVertical>(
-                  initialValue: _vertical,
-                  decoration: InputDecoration(labelText: DeliveryStrings.of(context).categoryLabel),
-                  items: StoreVertical.values
-                      .map((StoreVertical v) => DropdownMenuItem<StoreVertical>(
-                          value: v, child: Text(v.label)))
-                      .toList(),
-                  onChanged: (StoreVertical? v) =>
-                      setState(() => _vertical = v ?? _vertical),
-                ),
-                const SizedBox(height: DeliverySpacing.md),
-                _text(_tags, DeliveryStrings.of(context).tags, hint: DeliveryStrings.of(context).tagsHint),
-                _text(_description, DeliveryStrings.of(context).descriptionLabel, maxLines: 3),
-                _text(_address, DeliveryStrings.of(context).addressLabel),
-              ]),
-              _card(DeliveryStrings.of(context).pictures,
-                  DeliveryStrings.of(context).logoRecognisedBy, <Widget>[
-                Row(
+              StoreAvatar(name: store.name, logoUrl: store.logoUrl, size: 44),
+              const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    _imageSlot(
-                      store: store,
-                      slot: 'logo',
-                      label: DeliveryStrings.of(context).logo,
-                      hint: DeliveryStrings.of(context).logoHint,
-                      url: store.logoUrl,
-                      preview: StoreAvatar(
-                          name: store.name, logoUrl: store.logoUrl, size: 88),
+                    Text(
+                      t.merchbShopStatus,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.25,
+                      ),
                     ),
-                    const SizedBox(width: DeliverySpacing.lg),
-                    _imageSlot(
-                      store: store,
-                      slot: 'cover',
-                      label: DeliveryStrings.of(context).cover,
-                      hint: DeliveryStrings.of(context).coverHint,
-                      url: store.coverUrl,
-                      preview: SizedBox(
-                        width: 176,
-                        height: 88,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(DeliveryRadius.md),
-                          child: store.coverUrl == null || store.coverUrl!.isEmpty
-                              ? StoreMonogram(name: store.name, radius: 0)
-                              : Image.network(store.coverUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      StoreMonogram(name: store.name, radius: 0)),
+                    const SizedBox(height: DeliverySpacing.xs),
+                    Text(
+                      listed ? t.listedOnStorefront : t.notListedYet,
+                      style: const TextStyle(fontSize: 12, color: DeliveryColors.faint, height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              StoreStatePill(state: _stateOf(store.availability)),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Wrap(
+            spacing: DeliverySpacing.sm,
+            runSpacing: DeliverySpacing.sm,
+            children: <Widget>[
+              // Busy is a 30-minute flag that clears itself, so it is safe to offer as one tap.
+              _ActionButton(
+                label: t.busy30m,
+                icon: Icons.timelapse_rounded,
+                onPressed: _saving
+                    ? null
+                    : () => _run(
+                          () => widget.api.setBusy(store.id, minutes: 30).then((_) {}),
+                          t.markedBusy30,
                         ),
+              ),
+              _ActionButton(
+                label: t.notBusy,
+                icon: Icons.check_circle_outline_rounded,
+                onPressed: _saving
+                    ? null
+                    : () => _run(
+                          () => widget.api.clearBusy(store.id).then((_) {}),
+                          t.noLongerBusy,
+                        ),
+              ),
+              _ActionButton(
+                label: t.publish,
+                icon: Icons.rocket_launch_rounded,
+                primary: true,
+                onPressed: _saving
+                    ? null
+                    : () => _run(
+                          () => widget.api.publish(store.id).then((_) {}),
+                          t.yourShopIsLive,
+                        ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- banner
+
+  Widget _bannerSection(DeliveryStrings t, Store store) {
+    final bool hasCover = store.coverUrl != null && store.coverUrl!.isNotEmpty;
+    final bool hasLogo = store.logoUrl != null && store.logoUrl!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _SectionLabel(t.merchbBannerAndLogo),
+        const SizedBox(height: DeliverySpacing.sm),
+        SizedBox(
+          height: 120,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+                child: hasCover
+                    ? Image.network(
+                        store.coverUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => StoreMonogram(name: store.name, radius: 0),
+                      )
+                    : StoreMonogram(name: store.name, radius: 0),
+              ),
+              // The frame's scrim, so the badge stays legible over any photograph.
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: DeliveryColors.ink.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _saving ? null : () => _pickAndUpload(store, 'cover'),
+                  borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: DeliveryColors.ink.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                      ),
+                      child: Text(
+                        hasCover ? t.merchbChangeCover : t.upload,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: DeliveryColors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (hasCover)
+                PositionedDirectional(
+                  top: DeliverySpacing.sm,
+                  end: DeliverySpacing.sm,
+                  child: Material(
+                    color: DeliveryColors.white,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      iconSize: 16,
+                      visualDensity: VisualDensity.compact,
+                      tooltip: t.remove,
+                      onPressed: _saving
+                          ? null
+                          : () => _run(
+                                () => widget.api
+                                    .removeImage(storeId: store.id, slot: 'cover')
+                                    .then((_) {}),
+                                t.labelRemoved(t.cover),
+                              ),
+                      icon: const Icon(Icons.close, color: DeliveryColors.brand),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+        // The logo, which the frame does not draw and the storefront cannot do without — a shop
+        // with no logo is a monogram on every card a customer sees.
+        YdCard.bordered(
+          padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+          radius: DeliveryRadius.md,
+          child: Row(
+            children: <Widget>[
+              StoreAvatar(name: store.name, logoUrl: store.logoUrl, size: 44),
+              const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      t.logo,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.ink,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      t.logoHint,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: DeliveryColors.faint,
+                        height: 1.3,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: DeliverySpacing.sm),
-                Text(
-                    DeliveryStrings.of(context).generatedTileBlurb,
-                  style: TextStyle(fontSize: 12.5, color: DeliveryColors.muted),
-                ),
-              ]),
-              _card(DeliveryStrings.of(context).navDelivery, DeliveryStrings.of(context).whatCustomersAreCharged, <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(child: _number(_fee, DeliveryStrings.of(context).deliveryFeeLabelMerchant, decimals: true)),
-                    const SizedBox(width: DeliverySpacing.md),
-                    Expanded(child: _number(_minOrder, DeliveryStrings.of(context).minimumOrder, decimals: true)),
-                  ],
-                ),
-                const SizedBox(height: DeliverySpacing.md),
-                Row(
-                  children: <Widget>[
-                    Expanded(child: _number(_etaMin, DeliveryStrings.of(context).etaFromMin)),
-                    const SizedBox(width: DeliverySpacing.md),
-                    Expanded(child: _number(_etaMax, DeliveryStrings.of(context).etaToMin)),
-                  ],
-                ),
-                const SizedBox(height: DeliverySpacing.sm),
-                Text(
-            DeliveryStrings.of(context).serverAppliesTerms,
-                  style: TextStyle(fontSize: 12.5, color: DeliveryColors.muted),
-                ),
-              ]),
-              _card(DeliveryStrings.of(context).openingHours,
-                  DeliveryStrings.of(context).openingHoursBlurb, <Widget>[
-                for (int i = 0; i < _hours.length; i++) _hoursRow(i),
-                const SizedBox(height: DeliverySpacing.sm),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => setState(() => _hours = <OpeningWindow>[
-                          ..._hours,
-                          OpeningWindow(dayOfWeek: 1, opensAt: '14:00', closesAt: '19:00'),
-                        ]),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: Text(DeliveryStrings.of(context).addASecondWindow),
-                    style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
-                  ),
-                ),
-                Text(
-              DeliveryStrings.of(context).secondWindowBlurb,
-                  style: TextStyle(fontSize: 12.5, color: DeliveryColors.muted),
-                ),
-              ]),
-              const SizedBox(height: DeliverySpacing.md),
-              FilledButton.icon(
-                onPressed: _saving ? null : _saveProfile,
-                style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
-                icon: _saving
-                    ? const SizedBox(
-                        width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.save_rounded, size: 18),
-                label: Text(DeliveryStrings.of(context).saveChanges),
               ),
-              const SizedBox(height: DeliverySpacing.xl),
+              const SizedBox(width: DeliverySpacing.sm),
+              _ChipButton(
+                label: hasLogo ? t.merchbChangeLogo : t.upload,
+                onPressed: _saving ? null : () => _pickAndUpload(store, 'logo'),
+              ),
+              if (hasLogo)
+                IconButton(
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: t.remove,
+                  onPressed: _saving
+                      ? null
+                      : () => _run(
+                            () => widget.api
+                                .removeImage(storeId: store.id, slot: 'logo')
+                                .then((_) {}),
+                            t.labelRemoved(t.logo),
+                          ),
+                  icon: const Icon(Icons.close, color: DeliveryColors.faint),
+                ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _header(Store store) {
-    final bool listed = store.availability != StoreAvailability.closed ||
-        store.closesAt != null;
-    return Container(
-      padding: const EdgeInsets.all(DeliverySpacing.md),
-      decoration: BoxDecoration(
-        color: DeliveryColors.white,
-        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
-        // Lifted rather than ringed, matching every other card in the platform.
-        boxShadow: DeliveryShadows.card,
-      ),
-      child: Row(
-        children: <Widget>[
-          StoreAvatar(name: store.name, logoUrl: store.logoUrl, size: 56),
-          const SizedBox(width: DeliverySpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(store.name,
-                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-                const SizedBox(height: DeliverySpacing.xs),
-                Row(
-                  children: <Widget>[
-                    StoreStatePill(state: _stateOf(store.availability)),
-                    const SizedBox(width: DeliverySpacing.sm),
-                    Text(
-                      listed ? DeliveryStrings.of(context).listedOnStorefront : DeliveryStrings.of(context).notListedYet,
-                      style: const TextStyle(fontSize: 12.5, color: DeliveryColors.muted),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          _publishControls(store),
-        ],
-      ),
-    );
-  }
-
-  Widget _publishControls(Store store) {
-    return Wrap(
-      spacing: DeliverySpacing.sm,
-      children: <Widget>[
-        // Busy is a 30-minute flag that clears itself, so it is safe to offer as one tap.
-        OutlinedButton.icon(
-          onPressed: _saving
-              ? null
-              : () => _run(
-                  () => widget.api.setBusy(store.id, minutes: 30).then((_) {}),
-                  DeliveryStrings.of(context).markedBusy30),
-          icon: const Icon(Icons.timelapse_rounded, size: 17),
-          label: Text(DeliveryStrings.of(context).busy30m),
-        ),
-        OutlinedButton.icon(
-          onPressed: _saving
-              ? null
-              : () => _run(() => widget.api.clearBusy(store.id).then((_) {}),
-                  DeliveryStrings.of(context).noLongerBusy),
-          icon: const Icon(Icons.check_circle_outline_rounded, size: 17),
-          label: Text(DeliveryStrings.of(context).notBusy),
-        ),
-        FilledButton.icon(
-          onPressed: _saving
-              ? null
-              : () => _run(() => widget.api.publish(store.id).then((_) {}),
-                  DeliveryStrings.of(context).yourShopIsLive),
-          style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
-          icon: const Icon(Icons.rocket_launch_rounded, size: 17),
-          label: Text(DeliveryStrings.of(context).publish),
+        const SizedBox(height: DeliverySpacing.sm),
+        Text(
+          t.generatedTileBlurb,
+          style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
         ),
       ],
     );
   }
 
-  Widget _hoursRow(int index) {
+  // ---------------------------------------------------------------- profile
+
+  Widget _profileCard(DeliveryStrings t) {
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _CardTitle(t.profile, subtitle: t.howYourShopAppears),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _CardField(
+            label: t.shopName,
+            child: TextFormField(
+              controller: _name,
+              style: _cardValueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _cardBoxDecoration(),
+              validator: (String? v) =>
+                  (v == null || v.trim().isEmpty) ? t.requiredField : null,
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _CardField(
+            label: t.tagline,
+            child: TextFormField(
+              controller: _tagline,
+              style: _cardValueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _cardBoxDecoration(hint: t.taglineHint),
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _CardField(
+            label: t.categoryLabel,
+            child: DropdownButtonFormField<StoreVertical>(
+              initialValue: _vertical,
+              isExpanded: true,
+              style: _cardValueStyle,
+              icon: const Icon(Icons.expand_more, size: 16, color: DeliveryColors.ink),
+              decoration: _cardBoxDecoration(),
+              items: StoreVertical.values
+                  .map((StoreVertical v) => DropdownMenuItem<StoreVertical>(
+                        value: v,
+                        child: Text(v.labelIn(t), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList(),
+              onChanged: (StoreVertical? v) => setState(() => _vertical = v ?? _vertical),
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _CardField(
+            label: t.tags,
+            child: TextFormField(
+              controller: _tags,
+              style: _cardValueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _cardBoxDecoration(hint: t.tagsHint),
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _CardField(
+            label: t.descriptionLabel,
+            child: TextFormField(
+              controller: _description,
+              maxLines: 3,
+              style: _cardValueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _cardBoxDecoration(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------- address
+
+  Widget _addressSection(DeliveryStrings t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _SectionLabel(t.merchbShopAddress),
+        const SizedBox(height: DeliverySpacing.sm),
+        Container(
+          padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+          decoration: BoxDecoration(
+            color: DeliveryColors.white,
+            border: Border.all(color: DeliveryColors.border),
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          ),
+          child: Row(
+            children: <Widget>[
+              const Icon(Icons.place_outlined, size: 18, color: DeliveryColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextFormField(
+                  controller: _address,
+                  style: const TextStyle(fontSize: 13, color: DeliveryColors.ink, height: 1.35),
+                  cursorColor: DeliveryColors.brand,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: t.addressLabel,
+                    hintStyle: const TextStyle(fontSize: 13, color: DeliveryColors.faint),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.sm),
+        _MapPlaceholder(label: t.merchbMapPreviewSoon, soonLabel: t.merchbSoon),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------- operating
+
+  Widget _operatingCard(DeliveryStrings t) {
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _CardTitle(t.merchbOperatingDetails, subtitle: t.whatCustomersAreCharged),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _CardField(
+            label: t.openingHours,
+            child: Semantics(
+              button: true,
+              label: t.merchbEditHours,
+              child: Material(
+                color: DeliveryColors.background,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
+                child: InkWell(
+                  onTap: () => setState(() => _hoursOpen = !_hoursOpen),
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.all(
+                      DeliverySpacing.md - DeliverySpacing.xs,
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            _hoursSummary(t),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: DeliveryColors.ink,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: DeliverySpacing.sm),
+                        Icon(
+                          _hoursOpen ? Icons.expand_less : Icons.schedule,
+                          size: 16,
+                          color: DeliveryColors.faint,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_hoursOpen) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            for (int i = 0; i < _hours.length; i++) _hoursRow(t, i),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _hours = <OpeningWindow>[
+                      ..._hours,
+                      const OpeningWindow(dayOfWeek: 1, opensAt: '14:00', closesAt: '19:00'),
+                    ]),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(t.addASecondWindow),
+                style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+              ),
+            ),
+            Text(
+              t.secondWindowBlurb,
+              style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+            ),
+          ],
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: _CardField(
+                  label: t.minimumOrder,
+                  child: _number(t, _minOrder, decimals: true),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+              Expanded(
+                child: _CardField(
+                  label: t.deliveryFeeLabelMerchant,
+                  child: _number(t, _fee, decimals: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: _CardField(label: t.etaFromMin, child: _number(t, _etaMin)),
+              ),
+              const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+              Expanded(
+                child: _CardField(label: t.etaToMin, child: _number(t, _etaMax)),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.serverAppliesTerms,
+            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The one-line answer to "when are you open", or the honest admission that it is complicated.
+  String _hoursSummary(DeliveryStrings t) {
+    if (_hours.isEmpty) {
+      return t.merchbHoursNone;
+    }
+    final OpeningWindow first = _hours.first;
+    final bool everyDayOnce = _hours.length == 7 &&
+        _hours.map((OpeningWindow w) => w.dayOfWeek).toSet().length == 7;
+    final bool sameWindow = _hours.every((OpeningWindow w) =>
+        w.opensAtLabel == first.opensAtLabel && w.closesAtLabel == first.closesAtLabel);
+
+    return everyDayOnce && sameWindow
+        ? t.merchbHoursDaily(first.opensAtLabel, first.closesAtLabel)
+        : t.merchbHoursCustom;
+  }
+
+  Widget _hoursRow(DeliveryStrings t, int index) {
     final OpeningWindow window = _hours[index];
     return Padding(
       padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          SizedBox(
-            width: 150,
-            child: DropdownButtonFormField<int>(
-              initialValue: window.dayOfWeek,
-              decoration: const InputDecoration(isDense: true, labelText: 'Day'),
-              items: <DropdownMenuItem<int>>[
-                for (int d = 1; d <= 7; d++)
-                  DropdownMenuItem<int>(
-                      value: d, child: Text(OpeningWindow.dayNames[d - 1])),
-              ],
-              onChanged: (int? d) => setState(() => _hours[index] = OpeningWindow(
-                  dayOfWeek: d ?? window.dayOfWeek,
-                  opensAt: window.opensAt,
-                  closesAt: window.closesAt)),
+          Expanded(
+            flex: 3,
+            child: _CardField(
+              label: t.merchbDay,
+              child: DropdownButtonFormField<int>(
+                initialValue: window.dayOfWeek,
+                isExpanded: true,
+                style: _cardValueStyle,
+                icon: const Icon(Icons.expand_more, size: 16, color: DeliveryColors.ink),
+                decoration: _cardBoxDecoration(),
+                items: <DropdownMenuItem<int>>[
+                  for (int d = 1; d <= 7; d++)
+                    DropdownMenuItem<int>(
+                      value: d,
+                      child: Text(
+                        _dayName(t, d),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (int? d) => setState(() => _hours[index] = OpeningWindow(
+                      dayOfWeek: d ?? window.dayOfWeek,
+                      opensAt: window.opensAt,
+                      closesAt: window.closesAt,
+                    )),
+              ),
             ),
           ),
-          const SizedBox(width: DeliverySpacing.md),
-          Expanded(child: _timeField(window.opensAtLabel, DeliveryStrings.of(context).opens,
-              (String v) => setState(() => _hours[index] = window.copyWith(opensAt: v)))),
           const SizedBox(width: DeliverySpacing.sm),
-          Expanded(child: _timeField(window.closesAtLabel, DeliveryStrings.of(context).closes,
-              (String v) => setState(() => _hours[index] = window.copyWith(closesAt: v)))),
+          Expanded(
+            flex: 2,
+            child: _CardField(
+              label: t.opens,
+              child: _timeField(
+                t,
+                window.opensAtLabel,
+                (String v) => setState(() => _hours[index] = window.copyWith(opensAt: v)),
+              ),
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            flex: 2,
+            child: _CardField(
+              label: t.closes,
+              child: _timeField(
+                t,
+                window.closesAtLabel,
+                (String v) => setState(() => _hours[index] = window.copyWith(closesAt: v)),
+              ),
+            ),
+          ),
           IconButton(
-            tooltip: DeliveryStrings.of(context).removeThisWindow,
+            tooltip: t.removeThisWindow,
             onPressed: () => setState(() => _hours.removeAt(index)),
-            icon: const Icon(Icons.close_rounded, size: 18),
+            icon: const Icon(Icons.close_rounded, size: 18, color: DeliveryColors.faint),
           ),
         ],
       ),
     );
   }
 
+  /// Monday is 1, matching the ISO day the wire uses.
+  static String _dayName(DeliveryStrings t, int day) => switch (day) {
+        1 => t.merchbDayMonday,
+        2 => t.merchbDayTuesday,
+        3 => t.merchbDayWednesday,
+        4 => t.merchbDayThursday,
+        5 => t.merchbDayFriday,
+        6 => t.merchbDaySaturday,
+        _ => t.merchbDaySunday,
+      };
+
   /// A plain HH:mm field rather than a time picker: a merchant setting seven days of hours types
   /// far faster than they tap through fourteen dialogs.
-  Widget _timeField(String value, String label, ValueChanged<String> onChanged) {
+  Widget _timeField(DeliveryStrings t, String value, ValueChanged<String> onChanged) {
     return TextFormField(
       initialValue: value,
-      decoration: InputDecoration(labelText: label, isDense: true, hintText: 'HH:mm'),
+      style: _cardValueStyle,
+      cursorColor: DeliveryColors.brand,
+      decoration: _cardBoxDecoration(hint: t.merchbTimeHint),
       validator: (String? v) =>
-          RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(v ?? '') ? null : 'HH:mm',
+          RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(v ?? '') ? null : t.merchbTimeHint,
       onChanged: onChanged,
     );
   }
 
-  /// One picture slot: what it looks like now, and the controls to change it.
-  Widget _imageSlot({
-    required Store store,
-    required String slot,
-    required String label,
-    required String hint,
-    required String? url,
-    required Widget preview,
-  }) {
-    final bool hasImage = url != null && url.isNotEmpty;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-        const SizedBox(height: DeliverySpacing.xs),
-        preview,
-        const SizedBox(height: DeliverySpacing.sm),
-        SizedBox(
-          width: 176,
-          child: Text(hint,
-              style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
-        ),
-        const SizedBox(height: DeliverySpacing.xs),
-        Row(
-          children: <Widget>[
-            TextButton.icon(
-              onPressed: _saving ? null : () => _pickAndUpload(store, slot),
-              icon: const Icon(Icons.upload_rounded, size: 17),
-              label: Text(hasImage ? DeliveryStrings.of(context).replace : DeliveryStrings.of(context).upload),
-              style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
-            ),
-            if (hasImage)
-              TextButton(
-                onPressed: _saving
-                    ? null
-                    : () => _run(
-                        () => widget.api
-                            .removeImage(storeId: store.id, slot: slot)
-                            .then((_) {}),
-                        DeliveryStrings.of(context).labelRemoved(label)),
-                style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
-                child: Text(DeliveryStrings.of(context).remove),
-              ),
-          ],
-        ),
-      ],
+  Widget _number(DeliveryStrings t, TextEditingController controller, {bool decimals = false}) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.numberWithOptions(decimal: decimals),
+      style: _cardValueStyle,
+      cursorColor: DeliveryColors.brand,
+      decoration: _cardBoxDecoration(),
+      validator: (String? v) {
+        final num? parsed = decimals ? double.tryParse(v ?? '') : int.tryParse(v ?? '');
+        if (parsed == null) return t.aNumber;
+        if (parsed < 0) return t.cannotBeNegative;
+        return null;
+      },
     );
   }
+
+  // ------------------------------------------------------------------- save
+
+  Widget _saveButton(DeliveryStrings t) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _saving ? null : _saveProfile,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: DeliveryColors.brand,
+          foregroundColor: DeliveryColors.white,
+          disabledBackgroundColor: DeliveryColors.brandLine,
+          disabledForegroundColor: DeliveryColors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.md)),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        child: _saving
+            ? const SizedBox.square(
+                dimension: 19,
+                child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.white),
+              )
+            : Text(t.merchbSaveShopSettings),
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- upload
 
   /// Opens the picker and runs the three-step upload.
   ///
@@ -518,10 +923,11 @@ class _StoreScreenState extends State<StoreScreen> {
     await _run(
       () => widget.api
           .uploadImage(
-              storeId: store.id,
-              slot: slot,
-              bytes: bytes,
-              contentType: _contentTypeFor(file))
+            storeId: store.id,
+            slot: slot,
+            bytes: bytes,
+            contentType: _contentTypeFor(file),
+          )
           .then((_) {}),
       DeliveryStrings.of(context).pictureUpdated,
     );
@@ -539,94 +945,309 @@ class _StoreScreenState extends State<StoreScreen> {
     return 'image/jpeg';
   }
 
-  Widget _card(String title, String subtitle, List<Widget> children) {
-    return Padding(
-      padding: const EdgeInsets.only(top: DeliverySpacing.md),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(DeliverySpacing.lg),
-        decoration: BoxDecoration(
-          color: DeliveryColors.white,
-          borderRadius: BorderRadius.circular(DeliveryRadius.lg),
-          // Lifted rather than ringed, matching every other card in the platform.
-          boxShadow: DeliveryShadows.card,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            Text(subtitle,
-                style: const TextStyle(fontSize: 12.5, color: DeliveryColors.muted)),
-            const SizedBox(height: DeliverySpacing.md),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _text(TextEditingController controller, String label,
-      {String? hint, int maxLines = 1, bool required = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: DeliverySpacing.md),
-      child: TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        decoration: InputDecoration(labelText: label, hintText: hint),
-        validator: required
-            ? (String? v) => (v == null || v.trim().isEmpty) ? DeliveryStrings.of(context).requiredField : null
-            : null,
-      ),
-    );
-  }
-
-  Widget _number(TextEditingController controller, String label, {bool decimals = false}) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.numberWithOptions(decimal: decimals),
-      decoration: InputDecoration(labelText: label),
-      validator: (String? v) {
-        final num? parsed = decimals ? double.tryParse(v ?? '') : int.tryParse(v ?? '');
-        if (parsed == null) return DeliveryStrings.of(context).aNumber;
-        if (parsed < 0) return DeliveryStrings.of(context).cannotBeNegative;
-        return null;
-      },
-    );
-  }
-
-  Widget _centred(IconData icon, String title, String body, {Widget? action}) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(DeliverySpacing.md),
-              decoration:
-                  const BoxDecoration(color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-              child: Icon(icon, size: 30, color: DeliveryColors.brand),
-            ),
-            const SizedBox(height: DeliverySpacing.md),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-            const SizedBox(height: DeliverySpacing.xs),
-            Text(body,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: DeliveryColors.muted)),
-            if (action != null) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.md),
-              action,
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   static DeliveryStoreState _stateOf(StoreAvailability availability) => switch (availability) {
         StoreAvailability.open => DeliveryStoreState.open,
         StoreAvailability.busy => DeliveryStoreState.busy,
         StoreAvailability.closingSoon => DeliveryStoreState.closingSoon,
         StoreAvailability.closed => DeliveryStoreState.closed,
       };
+}
+
+/// The frame's in-card input value: Regular 13 in ink.
+const TextStyle _cardValueStyle = TextStyle(
+  fontSize: 13,
+  color: DeliveryColors.ink,
+  height: 1.35,
+);
+
+/// The frame's in-card input box: the background token as a fill, no border, radius 10, 12px
+/// padding. Distinct on purpose from the add-product frame's white bordered box — the design uses
+/// the quieter fill wherever a field sits *inside* a card that already has an outline.
+InputDecoration _cardBoxDecoration({String? hint}) {
+  OutlineInputBorder border([Color? color, double width = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
+        borderSide: color == null ? BorderSide.none : BorderSide(color: color, width: width),
+      );
+
+  return InputDecoration(
+    isDense: true,
+    filled: true,
+    fillColor: DeliveryColors.background,
+    counterText: '',
+    hintText: hint,
+    contentPadding:
+        const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+    border: border(),
+    enabledBorder: border(),
+    focusedBorder: border(DeliveryColors.brand, 1.5),
+    errorBorder: border(DeliveryAccent.critical.color),
+    focusedErrorBorder: border(DeliveryAccent.critical.color, 1.5),
+    hintStyle: const TextStyle(fontSize: 13, color: DeliveryColors.faint),
+    errorStyle: TextStyle(fontSize: 11, color: DeliveryAccent.critical.color),
+  );
+}
+
+/// The SemiBold 14 ink label that heads a block on the page background.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: DeliveryColors.ink,
+          height: 1.25,
+        ),
+      );
+}
+
+/// The Bold 14 title inside a card, with the muted line the existing screen used to explain it.
+class _CardTitle extends StatelessWidget {
+  const _CardTitle(this.title, {this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.25,
+          ),
+        ),
+        if (subtitle != null) ...<Widget>[
+          const SizedBox(height: 2),
+          Text(
+            subtitle!,
+            style: const TextStyle(fontSize: 12, color: DeliveryColors.faint, height: 1.3),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A Regular 12 muted label six pixels above its field — the frame's in-card `input-field` group.
+class _CardField extends StatelessWidget {
+  const _CardField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: DeliveryColors.faint, height: 1.25),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+/// The frame's paired action button: radius 10, 12px padding, filled brand or the quiet
+/// background-token fill with muted text.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.primary = false,
+  });
+
+  /// Already localised by the caller.
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onPressed != null;
+    final Color background = primary
+        ? (enabled ? DeliveryColors.brand : DeliveryColors.brandLine)
+        : DeliveryColors.background;
+    final Color foreground = primary
+        ? DeliveryColors.white
+        : (enabled ? DeliveryColors.muted : DeliveryColors.faint);
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.sm + 2);
+
+    return Semantics(
+      button: true,
+      child: Material(
+        color: background,
+        borderRadius: corners,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+              vertical: 10,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: 16, color: foreground),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: foreground,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The design's brand-tinted chip used as a button — the `Edit` badge, borrowed for "Change Logo".
+class _ChipButton extends StatelessWidget {
+  const _ChipButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.md);
+    return Semantics(
+      button: true,
+      child: Material(
+        color: DeliveryColors.brandSoft,
+        borderRadius: corners,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+              vertical: 6,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: onPressed == null ? DeliveryColors.brandLine : DeliveryColors.brand,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The frame's 100px map thumbnail, as a styled surface rather than a map.
+///
+/// Nothing in the data model carries coordinates — not a store, not an address — so there is no
+/// map to draw and no pin to place. The slot keeps the exact size and radius the frame gives it,
+/// painted as a faint grid with a pin glyph, and says plainly that it is not live yet. Faking a
+/// location here would be worse than leaving it empty: a merchant would believe it.
+class _MapPlaceholder extends StatelessWidget {
+  const _MapPlaceholder({required this.label, required this.soonLabel});
+
+  /// Already localised by the caller.
+  final String label;
+  final String soonLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 100,
+      width: double.infinity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: DeliveryColors.background,
+            border: Border.all(color: DeliveryColors.border),
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          ),
+          child: Stack(
+            children: <Widget>[
+              const Positioned.fill(
+                child: CustomPaint(painter: _GridPainter()),
+              ),
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Icon(Icons.place_outlined, size: 18, color: DeliveryColors.faint),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.faint,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(width: DeliverySpacing.sm),
+                    YdComingSoon(label: soonLabel),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The faint 16px lattice behind the map slot — enough to read as "a map goes here", not enough to
+/// be mistaken for one.
+class _GridPainter extends CustomPainter {
+  const _GridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = DeliveryColors.border
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 16) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += 16) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GridPainter oldDelegate) => false;
 }

@@ -24,35 +24,50 @@ void main() {
   // hex value, the build says so.
   group('Appendix A design tokens', () {
     test('brand colours match the approved table exactly', () {
-      // Rose-red since 2026-08-12. If you change one of these, change the matching custom
-      // property in infra/keycloak/themes/delivery/login/resources/css/delivery.css too — the
-      // login page is the one surface in the platform that cannot read this file.
-      expect(DeliveryColors.brand, const Color(0xFFC41D4E));
-      expect(DeliveryColors.brandDark, const Color(0xFF8E1235));
-      expect(DeliveryColors.brandSoft, const Color(0xFFFDEDF1));
-      expect(DeliveryColors.brandLine, const Color(0xFFF1C6D3));
-      expect(DeliveryColors.ink, const Color(0xFF241319));
-      expect(DeliveryColors.muted, const Color(0xFF7E6A73));
-      expect(DeliveryColors.border, const Color(0xFFEAD9DF));
-      expect(DeliveryColors.background, const Color(0xFFFCF6F8));
+      // The Figma crimson since 2026-08: third palette this table has carried (fire-engine red,
+      // then a rose picked against WCAG, now the owner's design applied as drawn). If you change
+      // one of these, change the matching custom property in
+      // infra/keycloak/themes/delivery/login/resources/css/delivery.css too — the login page is
+      // the one surface in the platform that cannot read this file.
+      expect(DeliveryColors.brand, const Color(0xFFE11D48));
+      expect(DeliveryColors.brandDark, const Color(0xFF9F1239));
+      expect(DeliveryColors.brandSoft, const Color(0xFFFFF1F2));
+      expect(DeliveryColors.brandLine, const Color(0xFFFDA4AF));
+      expect(DeliveryColors.ink, const Color(0xFF0F172A));
+      expect(DeliveryColors.muted, const Color(0xFF475569));
+      expect(DeliveryColors.faint, const Color(0xFF94A3B8));
+      expect(DeliveryColors.border, const Color(0xFFE2E8F0));
+      expect(DeliveryColors.background, const Color(0xFFF8FAFC));
       expect(DeliveryColors.white, const Color(0xFFFFFFFF));
     });
 
     test('text on brand surfaces clears WCAG AA', () {
-      // The palette was picked against these numbers rather than by eye, so they are worth
-      // holding: a future tweak that looks nicer but drops body text below 4.5 should fail here
-      // rather than ship.
+      // These numbers are measured, not asserted by hope: a tweak that looks nicer and drops body
+      // text below 4.5 should fail here rather than ship.
       expect(contrast(DeliveryColors.white, DeliveryColors.brand), greaterThan(4.5));
       expect(contrast(DeliveryColors.brand, DeliveryColors.white), greaterThan(4.5));
-      expect(contrast(DeliveryColors.brand, DeliveryColors.brandSoft), greaterThan(4.5));
       expect(contrast(DeliveryColors.ink, DeliveryColors.background), greaterThan(4.5));
       // Carries caption text at 11-12px, which is exactly where a marginal ratio hurts most.
       expect(contrast(DeliveryColors.muted, DeliveryColors.background), greaterThan(4.5));
       expect(contrast(DeliveryColors.muted, DeliveryColors.white), greaterThan(4.5));
     });
 
-    test('in-transit reuses the brand red rather than a sixth colour', () {
-      expect(DeliveryStatusColor.inTransit.color, DeliveryColors.brand);
+    test('brand text on the brand tint is a large-text pairing only', () {
+      // 4.28 on the Figma crimson, where the previous rose managed 5.11. It clears AA for 18px+
+      // or 14px-bold and does NOT clear it for body copy. The design was applied exactly as drawn
+      // at the owner's explicit request and the trade-off was recorded in tokens.dart, which also
+      // carries the rule this pins: body-sized text on brandSoft uses `ink`, never `brand`.
+      final double ratio = contrast(DeliveryColors.brand, DeliveryColors.brandSoft);
+      expect(ratio, greaterThan(3.0));
+      expect(ratio, lessThan(4.5));
+    });
+
+    test('in-transit is blue rather than the brand red', () {
+      // It was the brand colour until the 2026-08 redesign, which paints "ON THE WAY" blue on
+      // every surface that shows it. Blue also reads better here: on the redesigned screens the
+      // crimson is everywhere, and a status that shares it stops standing for anything.
+      expect(DeliveryStatusColor.inTransit.color, const Color(0xFF3B82F6));
+      expect(DeliveryStatusColor.inTransit.color, isNot(DeliveryColors.brand));
     });
 
     test('every status has a distinct colour', () {
@@ -87,16 +102,45 @@ void main() {
   });
 
   group('the semantic accents', () {
-    test('every accent is legible on white and on its own tint', () {
-      // These carry numbers and short labels at 10–24px. An accent that looks friendly and cannot
-      // be read is a worse outcome than the flat interface it replaced.
+    test('the accents are exactly the design\'s', () {
+      // Pinned the same way the brand table is, so a "tidy" of one of these fails the build.
+      expect(DeliveryAccent.positive.color, const Color(0xFF10B981));
+      expect(DeliveryAccent.caution.color, const Color(0xFFF59E0B));
+      expect(DeliveryAccent.critical.color, const Color(0xFFEF4444));
+      expect(DeliveryAccent.info.color, const Color(0xFF3B82F6));
+      // Kept from the previous system: the design never paints purple, but existing call sites do,
+      // and a categorical colour that matches nothing else in the palette is doing its job.
+      expect(DeliveryAccent.neutral.color, const Color(0xFF6C5CE0));
+    });
+
+    test('no accent drifts below the contrast the design itself ships', () {
+      // This used to assert a 3:1 floor on white, and the previous palette was darkened until it
+      // held. The Figma accents are brighter and two of them do not clear it — positive measures
+      // 2.54 on white and caution 2.15 — so asserting 3:1 here would be asserting something the
+      // shipped design is not. Applied as drawn at the owner's explicit request; tokens.dart
+      // records the consequence as a rule instead: the strong value is for glyphs and numbers ON
+      // the tint, never for text on bare white at body sizes.
+      //
+      // The floors below are the design's own measured minimums rounded down. They no longer
+      // certify accessibility — they catch a *further* drop, which is the part still worth a test.
       for (final DeliveryAccent accent in DeliveryAccent.values) {
-        expect(contrast(accent.color, DeliveryColors.white), greaterThan(3.0),
+        expect(contrast(accent.color, DeliveryColors.white), greaterThan(2.1),
             reason: '${accent.name} on white');
         // Composited over white, because that is what a 12% alpha tint actually renders as.
         final Color onWhite = Color.alphaBlend(accent.tint, DeliveryColors.white);
-        expect(contrast(accent.color, onWhite), greaterThan(3.0),
+        expect(contrast(accent.color, onWhite), greaterThan(1.9),
             reason: '${accent.name} on its own tint');
+      }
+
+      // The three that carry status *text* rather than a glyph do still clear WCAG's 3:1
+      // non-text minimum, and that much is worth holding to.
+      for (final DeliveryAccent accent in <DeliveryAccent>[
+        DeliveryAccent.critical,
+        DeliveryAccent.info,
+        DeliveryAccent.neutral,
+      ]) {
+        expect(contrast(accent.color, DeliveryColors.white), greaterThan(3.0),
+            reason: '${accent.name} on white');
       }
     });
 

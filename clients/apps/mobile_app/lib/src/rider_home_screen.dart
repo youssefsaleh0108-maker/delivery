@@ -7,20 +7,27 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'rider_butler_board.dart';
+import 'rider_earnings_screen.dart';
+import 'rider_job_card.dart';
+import 'rider_order_detail_screen.dart';
+import 'rider_settings_widgets.dart';
 import 'settings_screen.dart';
 
-import 'rider_butler_board.dart';
-import 'rider_job_card.dart';
-
-/// The Delivery Rider surface (Phase 2): the job board, and the rider's own deliveries.
+/// The Delivery Rider surface — the four-tab shell of the 2026-08 Figma redesign.
+///
+/// Frames 3:1163 (Available), 3:1255 (Active), 3:1486 (Earnings) and 3:1591 (Settings) are one
+/// app with one bottom bar, so they are one widget here: the tabs share the poll that keeps the
+/// board fresh, and a job claimed on Available appears on Active without a second round trip.
 ///
 /// While an order is PICKED_UP this screen reports the rider's position on a timer, which is what
-/// feeds the customer's tracking card.
+/// feeds the customer's tracking card. That, the 5-second refresh and the action wiring are older
+/// than the redesign and are carried through it unchanged — the restyle happens around them.
 ///
-/// The layout is deliberately warmer than a list of rows. A rider reads this on a phone, outdoors,
-/// usually with one hand and often with a helmet on — so the address is the largest thing on each
-/// card, the action is a full-width button rather than one of several equal ones, and anything that
-/// changes what happens at the door (cash to collect, above all) is a chip rather than a sentence.
+/// The design has no home for the errands board, which is a live feature: a customer can raise a
+/// Butler request right now and a rider has to be able to claim it. So Available carries a
+/// two-chip segmented toggle, in the design's own chip language, and Errands lives behind it
+/// rather than being dropped.
 class RiderHomeScreen extends StatefulWidget {
   const RiderHomeScreen({
     super.key,
@@ -36,19 +43,22 @@ class RiderHomeScreen extends StatefulWidget {
   final ButlerApi butlerApi;
   final AuthSession session;
 
-  /// Passed through to Settings, which is reachable from here now.
+  /// Passed through to Settings, which is a tab of its own now.
   final LocaleController locale;
 
   /// True while the application behind this account is still being decided.
   ///
   /// The screen works either way — the server is what refuses the committing act — but saying so
-  /// up front beats letting somebody build a shop and discover the refusal at the last step.
+  /// up front beats letting somebody read the board and discover the refusal at the last step.
   final bool pendingApproval;
   final Future<void> Function() onSignOut;
 
   @override
   State<RiderHomeScreen> createState() => _RiderHomeScreenState();
 }
+
+/// What the Available tab is showing. Deliveries and errands are two boards, not two filters.
+enum _Board { deliveries, errands }
 
 class _RiderHomeScreenState extends State<RiderHomeScreen> {
   static const Duration _refreshInterval = Duration(seconds: 5);
@@ -60,6 +70,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   Timer? _refreshTimer;
   Timer? _pingTimer;
   final Random _random = Random();
+
+  int _tab = 0;
+  _Board _board = _Board.deliveries;
 
   List<DeliveryOrder> _available = <DeliveryOrder>[];
   List<DeliveryOrder> _assigned = <DeliveryOrder>[];
@@ -151,228 +164,440 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     }
   }
 
+  /// A claim taken from Available belongs on Active, so the tab follows the job.
+  Future<void> _claimAndFollow(DeliveryOrder order, OrderAction action) async {
+    await _act(order, action);
+    if (!mounted || action != OrderAction.claim) return;
+    setState(() => _tab = 1);
+  }
+
+  void _openDetail(DeliveryOrder order) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RiderOrderDetailScreen(
+        order: order,
+        onAction: (OrderAction action) => _act(order, action),
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: DeliveryColors.background,
-        body: Column(
-          children: <Widget>[
-            _header(context, t),
-            if (widget.pendingApproval)
-              Padding(
-                padding: const EdgeInsets.all(DeliverySpacing.md),
-                child: SoftNote(
-                    icon: Icons.hourglass_top_rounded,
-                    text: t.pendingBannerRider),
-              ),
-            Expanded(
-              child: _loading && _available.isEmpty && _assigned.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(
-                      children: <Widget>[
-                        _list(
-                          _available,
-                          icon: Icons.inbox_rounded,
-                          title: t.nothingWaitingForPickup,
-                          subtitle: t.newJobsAppearHere,
-                        ),
-                        _list(
-                          _assigned,
-                          icon: Icons.delivery_dining_rounded,
-                          title: t.noActiveDeliveries,
-                          subtitle: t.claimOneToSeeItHere,
-                        ),
-                        // An approved errand becomes an ordinary order and shows up in Mine, so
-                        // this board covers only the part that is not a delivery yet: claiming, and
-                        // agreeing what the goods cost.
-                        RiderButlerBoard(api: widget.butlerApi),
-                      ],
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// The greeting, the day's shape, and the tabs — one brand-coloured block.
-  ///
-  /// It replaces a plain AppBar because the first thing a rider opening the app wants to know is
-  /// whether there is work, and a title reading "Deliveries" answers a question nobody asked.
-  Widget _header(BuildContext context, DeliveryStrings t) {
-    final int onTheWay = _assigned
-        .where((DeliveryOrder o) => o.status == OrderStatus.pickedUp)
-        .length;
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[DeliveryColors.brand, DeliveryColors.brandDark],
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(DeliveryRadius.lg + 6)),
-      ),
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      body: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-              DeliverySpacing.md, DeliverySpacing.sm, DeliverySpacing.md, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          t.riderGreeting(widget.session.displayName),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: DeliveryColors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          t.riderHeaderLine,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: DeliveryColors.white.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => SettingsScreen(
-                          locale: widget.locale, userId: widget.session.subject),
-                    )),
-                    icon: const Icon(Icons.settings_outlined, color: DeliveryColors.white),
-                    tooltip: t.settings,
-                  ),
-                  IconButton(
-                    onPressed: widget.onSignOut,
-                    icon: const Icon(Icons.logout_rounded, color: DeliveryColors.white),
-                    tooltip: t.signOut,
-                  ),
-                ],
-              ),
-              const SizedBox(height: DeliverySpacing.sm + 4),
-              Row(
-                children: <Widget>[
-                  _statPill(Icons.hourglass_bottom_rounded, t.riderWaitingCount(_available.length)),
-                  const SizedBox(width: DeliverySpacing.sm),
-                  _statPill(Icons.two_wheeler_rounded, t.riderOnTheWayCount(onTheWay)),
-                ],
-              ),
-              const SizedBox(height: DeliverySpacing.sm),
-              TabBar(
-                indicatorColor: DeliveryColors.white,
-                indicatorWeight: 3,
-                labelColor: DeliveryColors.white,
-                unselectedLabelColor: DeliveryColors.brandSoft,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                tabs: <Widget>[
-                  Tab(text: t.availableWithCount(_available.length)),
-                  Tab(text: t.mineWithCount(_assigned.length)),
-                  // No count: errands load on their own timer, and a number that lags the list it
-                  // labels is worse than no number.
-                  Tab(text: t.errands),
-                ],
-              ),
-            ],
+        child: switch (_tab) {
+          0 => _availableTab(t),
+          1 => _activeTab(t),
+          2 => RiderEarningsScreen(api: widget.api),
+          _ => _settingsTab(t),
+        },
+      ),
+      bottomNavigationBar: YdBottomNav(
+        currentIndex: _tab,
+        onTap: (int i) => setState(() => _tab = i),
+        items: <YdBottomNavItem>[
+          YdBottomNavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_rounded,
+            label: t.riderTabAvailable,
           ),
-        ),
-      ),
-    );
-  }
-
-  /// A count with its meaning attached, on the header's own colour.
-  Widget _statPill(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: DeliverySpacing.sm + 2, vertical: DeliverySpacing.xs + 2),
-      decoration: BoxDecoration(
-        color: DeliveryColors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 15, color: DeliveryColors.white),
-          const SizedBox(width: DeliverySpacing.xs + 2),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 12.5, fontWeight: FontWeight.w700, color: DeliveryColors.white)),
+          YdBottomNavItem(
+            icon: Icons.assignment_outlined,
+            activeIcon: Icons.assignment_rounded,
+            label: t.riderTabActive,
+          ),
+          YdBottomNavItem(
+            icon: Icons.trending_up_rounded,
+            label: t.riderTabEarnings,
+          ),
+          YdBottomNavItem(
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
+            label: t.settings,
+          ),
         ],
       ),
     );
   }
 
-  Widget _list(
-    List<DeliveryOrder> orders, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    if (orders.isEmpty) {
-      // Still scrollable, so pull-to-refresh works on an empty board — which is exactly the board a
-      // rider is most likely to pull on.
-      return RefreshIndicator(
-        onRefresh: () => _refresh(),
-        child: ListView(
-          padding: const EdgeInsets.all(DeliverySpacing.lg),
-          children: <Widget>[
-            const SizedBox(height: DeliverySpacing.xxl),
-            // Centred explicitly: a ListView stretches its children to the full width, which would
-            // turn the circle into a stadium.
-            Center(
-              child: Container(
-                width: 84,
-                height: 84,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                    color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-                child: Icon(icon, size: 38, color: DeliveryColors.brand),
+  // ------------------------------------------------------------------ available
+
+  Widget _availableTab(DeliveryStrings t) {
+    return Column(
+      children: <Widget>[
+        _regionBar(t),
+        _mapSlot(t),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Row(
+            children: <Widget>[
+              YdChip(
+                label: t.riderSegmentDeliveries,
+                selected: _board == _Board.deliveries,
+                onTap: () => setState(() => _board = _Board.deliveries),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              YdChip(
+                label: t.errands,
+                selected: _board == _Board.errands,
+                onTap: () => setState(() => _board = _Board.errands),
+              ),
+            ],
+          ),
+        ),
+        if (widget.pendingApproval)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, DeliverySpacing.md, 20, 0),
+            child: SoftNote(
+                icon: Icons.hourglass_top_rounded, text: t.pendingBannerRider),
+          ),
+        Expanded(
+          child: _board == _Board.errands
+              // An approved errand becomes an ordinary order and shows up in Active, so this board
+              // covers only the part that is not a delivery yet: claiming, and agreeing what the
+              // goods cost.
+              ? RiderButlerBoard(api: widget.butlerApi)
+              : _offers(t),
+        ),
+      ],
+    );
+  }
+
+  /// The white `region-selector` bar.
+  ///
+  /// The design's chevron opens a zone picker. A rider's account carries no zone preference and the
+  /// board is not filtered by one — every approved rider sees every ready order — so there is
+  /// nothing here to choose between yet. The row is drawn as designed and says so, rather than
+  /// offering a menu that would change nothing.
+  Widget _regionBar(DeliveryStrings t) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: DeliverySpacing.lg,
+        vertical: DeliverySpacing.md - DeliverySpacing.xs,
+      ),
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(bottom: BorderSide(color: DeliveryColors.border)),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.place_outlined, size: 20, color: DeliveryColors.brand),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  t.riderRegionZone,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: DeliveryColors.faint,
+                    height: 1.3,
+                  ),
+                ),
+                Text(
+                  t.appTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          YdComingSoon(label: t.riderComingSoon),
+        ],
+      ),
+    );
+  }
+
+  /// The 160px `regional-mini-map`, painted as a placeholder surface.
+  ///
+  /// No entity on this platform carries coordinates — the rider's own position is a random walk
+  /// from a hard-coded origin — so there is nothing to draw a map from. It keeps its exact designed
+  /// height and its dark overlay pill, and the pill carries a real number: how many orders are
+  /// waiting on the board right now.
+  Widget _mapSlot(DeliveryStrings t) {
+    return SizedBox(
+      height: 160,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _MapGridPainter(),
+              child: const SizedBox.expand(),
+            ),
+          ),
+          for (final Alignment where in const <Alignment>[
+            Alignment(-0.62, -0.45),
+            Alignment(0.48, -0.6),
+            Alignment(-0.3, 0.55),
+            Alignment(0.66, 0.4),
+          ])
+            Align(
+              alignment: where,
+              child: Icon(
+                Icons.place,
+                size: 16,
+                color: DeliveryColors.brand.withValues(alpha: 0.35),
               ),
             ),
-            const SizedBox(height: DeliverySpacing.md),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
-            const SizedBox(height: DeliverySpacing.xs),
-            Text(subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.4)),
-          ],
-        ),
-      );
+          Container(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: DeliveryColors.shellDeep,
+              borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+            ),
+            child: Text(
+              t.riderDeliveriesNearby(_available.length),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.white,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _offers(DeliveryStrings t) {
+    if (_loading && _available.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
     }
 
     return RefreshIndicator(
       onRefresh: () => _refresh(),
-      child: ListView.separated(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
-        itemCount: orders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.sm + 4),
-        itemBuilder: (BuildContext context, int i) => RiderJobCard(
-          order: orders[i],
-          busy: _busyId == orders[i].id,
-          onAction: (OrderAction a) => _act(orders[i], a),
-        ),
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: <Widget>[
+          Text(
+            t.riderOffersNearYou,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.ink,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          if (_available.isEmpty)
+            YdEmptyState(
+              icon: Icons.inbox_rounded,
+              title: t.nothingWaitingForPickup,
+              message: t.newJobsAppearHere,
+            )
+          else
+            for (final DeliveryOrder order in _available)
+              Padding(
+                padding: const EdgeInsets.only(
+                    bottom: DeliverySpacing.md - DeliverySpacing.xs),
+                child: RiderJobCard(
+                  order: order,
+                  busy: _busyId == order.id,
+                  onAction: (OrderAction a) => _claimAndFollow(order, a),
+                ),
+              ),
+        ],
       ),
     );
   }
+
+  // --------------------------------------------------------------------- active
+
+  Widget _activeTab(DeliveryStrings t) {
+    return Column(
+      children: <Widget>[
+        _screenHeader(
+          title: t.riderMyActiveTasks,
+          trailing: Text(
+            t.riderActiveCount(_assigned.length),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: DeliveryColors.brand,
+            ),
+          ),
+        ),
+        Expanded(
+          child: _loading && _assigned.isEmpty
+              ? const Center(
+                  child: CircularProgressIndicator(color: DeliveryColors.brand))
+              : RefreshIndicator(
+                  onRefresh: () => _refresh(),
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: <Widget>[
+                      if (_assigned.isEmpty)
+                        YdEmptyState(
+                          icon: Icons.two_wheeler_rounded,
+                          title: t.noActiveDeliveries,
+                          message: t.claimOneToSeeItHere,
+                        )
+                      else
+                        for (final DeliveryOrder order in _assigned)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                bottom: DeliverySpacing.md),
+                            child: RiderTaskCard(
+                              order: order,
+                              onOpen: () => _openDetail(order),
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------------- settings
+
+  Widget _settingsTab(DeliveryStrings t) {
+    return AnimatedBuilder(
+      animation: widget.locale,
+      builder: (BuildContext context, _) => Column(
+        children: <Widget>[
+          _screenHeader(title: t.riderDriverSettings),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: <Widget>[
+                RiderProfileCard(name: widget.session.displayName),
+                const SizedBox(height: DeliverySpacing.md),
+                const RiderDutyToggleCard(),
+                const SizedBox(height: DeliverySpacing.md),
+                // The language itself is set on the shared settings screen, which is also where
+                // fingerprint unlock lives. Two places to change one setting is one too many, so
+                // this row shows the answer and opens the page that owns the question.
+                RiderLanguageRow(
+                  value: widget.locale.isArabic ? 'العربية' : 'English',
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => SettingsScreen(
+                      locale: widget.locale,
+                      userId: widget.session.subject,
+                    ),
+                  )),
+                ),
+                const SizedBox(height: DeliverySpacing.md),
+                RiderPreferencesGroup(
+                  rows: <RiderPreference>[
+                    // Document upload, payout details, per-rider notification preferences and live
+                    // chat are all new capabilities with no backend behind them yet.
+                    RiderPreference(
+                      icon: Icons.folder_outlined,
+                      label: t.riderDocuments,
+                      inert: true,
+                    ),
+                    RiderPreference(
+                      icon: Icons.credit_card_outlined,
+                      label: t.riderBankDetails,
+                      inert: true,
+                    ),
+                    RiderPreference(
+                      icon: Icons.notifications_outlined,
+                      label: t.riderNotificationPreferences,
+                      inert: true,
+                    ),
+                    RiderPreference(
+                      icon: Icons.help_outline_rounded,
+                      label: t.riderHelpAndSupport,
+                      inert: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DeliverySpacing.md),
+                RiderLogOutButton(onPressed: widget.onSignOut),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------- parts
+
+  /// The redesign's 56px white screen header: title hard against the start edge, an optional
+  /// accent-coloured fact against the end edge.
+  ///
+  /// Deliberately not [YdScreenHeader], which centres its title as soon as it is given a trailing
+  /// widget. These rider frames keep the title left and the count right.
+  Widget _screenHeader({required String title, Widget? trailing}) {
+    return Container(
+      height: 56,
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: DeliverySpacing.lg),
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(bottom: BorderSide(color: DeliveryColors.border)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: DeliveryColors.ink,
+              ),
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+}
+
+/// The map placeholder's ruled backdrop.
+///
+/// Not a decorative flourish: it is what stops a flat grey rectangle reading as a failed image
+/// load. Drawn in the border token at a low contrast so it stays behind the pill overlay.
+class _MapGridPainter extends CustomPainter {
+  static const double _cell = 28;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = DeliveryColors.background,
+    );
+
+    final Paint line = Paint()
+      ..color = DeliveryColors.border
+      ..strokeWidth = 1;
+
+    for (double x = _cell; x < size.width; x += _cell) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
+    }
+    for (double y = _cell; y < size.height; y += _cell) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MapGridPainter oldDelegate) => false;
 }

@@ -75,20 +75,27 @@ class _SplashScreenState extends State<SplashScreen>
                   opacity: _markFade,
                   child: ScaleTransition(
                     scale: _markScale,
-                    child: DecoratedBox(
+                    child: Container(
+                      // The welcome frame's hero, exactly: a 100px white disc holding a 48px brand
+                      // mark. The splash drew a 96px rounded tile, so the first two screens of the
+                      // app gave the same mark two different shapes. Still the platform's own bag
+                      // rather than a Material glyph — this one screen is where the mark belongs.
+                      width: 100,
+                      height: 100,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
+                        color: DeliveryColors.white,
+                        shape: BoxShape.circle,
                         boxShadow: <BoxShadow>[
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 24,
+                            color: DeliveryColors.ink.withValues(alpha: 0.12),
+                            blurRadius: 12,
                             offset: const Offset(0, 8),
                           ),
                         ],
                       ),
-                      child: const DeliveryLogo(
-                        size: 96,
-                        background: DeliveryColors.white,
+                      child: const DeliveryLogo.mark(
+                        size: 48,
                         foreground: DeliveryColors.brand,
                       ),
                     ),
@@ -109,12 +116,14 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     child: Text(
                       DeliveryStrings.of(context).appTitle,
+                      // ExtraBold 36 with tight tracking, matched to the welcome wordmark so the
+                      // name does not change size between the splash and the screen after it.
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 40,
+                        color: DeliveryColors.white,
+                        fontSize: 36,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -1,
-                        height: 1.1,
+                        height: 1.15,
                       ),
                     ),
                   ),
@@ -125,10 +134,11 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Text(
                     DeliveryStrings.of(context).splashTagline,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 14.5,
-                      height: 1.35,
+                    style: const TextStyle(
+                      color: DeliveryColors.onBrandSoft,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
                     ),
                   ),
                 ),
@@ -139,20 +149,20 @@ class _SplashScreenState extends State<SplashScreen>
                     width: 26,
                     height: 26,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2.5, color: Colors.white),
+                        strokeWidth: 2.5, color: DeliveryColors.white),
                   )
                 else ...<Widget>[
                   Text(
                     DeliveryStrings.of(context).signInFailed,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.95), fontSize: 14),
+                    style: const TextStyle(
+                        color: DeliveryColors.onBrandSoft, fontSize: 14),
                   ),
                   const SizedBox(height: DeliverySpacing.md),
                   FilledButton(
                     onPressed: widget.onRetry,
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
+                      backgroundColor: DeliveryColors.white,
                       foregroundColor: DeliveryColors.brand,
                       minimumSize: const Size(180, 48),
                       shape: RoundedRectangleBorder(
@@ -175,10 +185,10 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Text(
                         DeliveryStrings.of(context).wantToRideForACompany,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.95),
+                        style: const TextStyle(
+                          color: DeliveryColors.onBrandSoft,
                           decoration: TextDecoration.underline,
-                          decorationColor: Colors.white70,
+                          decorationColor: DeliveryColors.onBrandBorder,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

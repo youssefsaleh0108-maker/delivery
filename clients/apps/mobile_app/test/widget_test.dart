@@ -277,6 +277,10 @@ void main() {
   });
 
   group('Butler', () {
+    // The 2026-08 redesign replaced the mode toggle with a pair of cards and renamed the modes
+    // ("Deliver your stuff" is "Send Anything" now). The questions each mode asks did not change,
+    // and those are what these tests are about — only the control that switches between them moved.
+
     /// The store is never `load()`ed, so it stays empty and touches no platform channel.
     ///
     /// The view is made tall enough for the whole form: the default 800x600 leaves the submit
@@ -331,7 +335,7 @@ void main() {
         (WidgetTester tester) async {
       await pumpButler(tester);
 
-      await tester.tap(find.text('Deliver your stuff'));
+      await tester.tap(find.text('Send Anything'));
       await tester.pumpAndSettle();
 
       expect(find.text('Pick up from'), findsOneWidget);
@@ -345,7 +349,7 @@ void main() {
     testWidgets('a pickup will not submit without somewhere to collect from',
         (WidgetTester tester) async {
       await pumpButler(tester);
-      await tester.tap(find.text('Deliver your stuff'));
+      await tester.tap(find.text('Send Anything'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).first, 'A4 envelope of documents');
@@ -365,7 +369,7 @@ void main() {
       expect(find.text('A bit more detail so the shopper knows what to buy'), findsOneWidget);
 
       // ...then leave it. The complaint was about a field this mode does not have.
-      await tester.tap(find.text('Deliver your stuff'));
+      await tester.tap(find.text('Send Anything'));
       await tester.pumpAndSettle();
       expect(find.text('A bit more detail so the shopper knows what to buy'), findsNothing);
     });

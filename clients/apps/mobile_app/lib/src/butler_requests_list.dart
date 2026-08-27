@@ -14,8 +14,10 @@ import 'order_details_screen.dart';
 /// surface for that answer the request simply stalls, and the shopper is left holding goods nobody
 /// has agreed to pay for.
 ///
-/// Quoted requests are pulled to the top for that reason — everything else here is history, and
-/// only these are waiting on the person reading the screen.
+/// The redesign's butler page (Figma 20:4) draws only a `recent-tasks` card — a history list with
+/// no decision in it. It is drawn here as designed, with the requests waiting on an answer lifted
+/// out of it and into their own cards above, in the same card language. That is not decoration:
+/// a quote buried three rows down a history list is a quote nobody answers.
 class ButlerRequestsList extends StatefulWidget {
   const ButlerRequestsList({
     super.key,
@@ -24,6 +26,7 @@ class ButlerRequestsList extends StatefulWidget {
     required this.storeApi,
     required this.cart,
     this.version = 0,
+    this.query = '',
   });
 
   final ButlerApi api;
@@ -34,6 +37,10 @@ class ButlerRequestsList extends StatefulWidget {
   /// Bumped by the form above when it submits, to reload without a manual pull.
   final int version;
 
+  /// The butler header's search box. Filters the history in place — there is no task-search
+  /// endpoint, and the list it searches is already in memory.
+  final String query;
+
   @override
   State<ButlerRequestsList> createState() => _ButlerRequestsListState();
 }
@@ -41,6 +48,12 @@ class ButlerRequestsList extends StatefulWidget {
 class _ButlerRequestsListState extends State<ButlerRequestsList> {
   late Future<Paged<ButlerRequest>> _page = widget.api.mine();
   String? _busyId;
+
+  /// The history card shows a handful; "See All" opens the rest. The design draws the link and
+  /// this is the only place it can lead — there is no separate task screen to route to.
+  bool _expanded = false;
+
+  static const int _collapsedCount = 4;
 
   @override
   void didUpdateWidget(ButlerRequestsList old) {
@@ -82,8 +95,18 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
     return t.thatDidNotWork;
   }
 
+  bool _matches(ButlerRequest r) {
+    final String q = widget.query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return r.what.toLowerCase().contains(q) ||
+        (r.sourceHint ?? '').toLowerCase().contains(q) ||
+        (r.pickupAddress ?? '').toLowerCase().contains(q);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
     return FutureBuilder<Paged<ButlerRequest>>(
       future: _page,
       builder: (BuildContext context, AsyncSnapshot<Paged<ButlerRequest>> snapshot) {
@@ -96,181 +119,291 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.all(DeliverySpacing.md),
-            child: Text(DeliveryStrings.of(context).couldNotLoadErrands,
-                style: const TextStyle(color: DeliveryColors.muted)),
+            child: Text(t.couldNotLoadErrands,
+                style: const TextStyle(color: DeliveryColors.muted, fontSize: 13)),
           );
         }
 
-        final List<ButlerRequest> all = snapshot.data!.content;
-        if (all.isEmpty) return const SizedBox.shrink();
+        final List<ButlerRequest> all =
+            snapshot.data!.content.where(_matches).toList(growable: false);
 
-        // Anything waiting on an answer first; the rest in the order it came back.
-        final List<ButlerRequest> sorted = <ButlerRequest>[
-          ...all.where((ButlerRequest r) => r.awaitingApproval),
-          ...all.where((ButlerRequest r) => !r.awaitingApproval),
-        ];
+        // Anything waiting on an answer first, in its own card; the rest is history.
+        final List<ButlerRequest> waiting =
+            all.where((ButlerRequest r) => r.awaitingApproval).toList();
+        final List<ButlerRequest> history =
+            all.where((ButlerRequest r) => !r.awaitingApproval).toList();
+
+        if (all.isEmpty) {
+          // A search that matched nothing is worth saying; an account with no errands at all is
+          // not — the form above it is the whole answer.
+          return widget.query.trim().isEmpty
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.all(DeliverySpacing.md),
+                  child: Text(t.custNoTasksMatch,
+                      style: const TextStyle(color: DeliveryColors.muted, fontSize: 13)),
+                );
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const SizedBox(height: DeliverySpacing.lg),
-            Text(DeliveryStrings.of(context).yourErrands,
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: DeliverySpacing.sm),
-            for (final ButlerRequest request in sorted) _card(request),
+            for (final ButlerRequest r in waiting) ...<Widget>[
+              _quoteCard(r),
+              const SizedBox(height: DeliverySpacing.md),
+            ],
+            if (history.isNotEmpty) _historyCard(history),
           ],
         );
       },
     );
   }
 
-  Widget _card(ButlerRequest r) {
+  /// A request waiting on the customer, in the design's selected-card treatment — the brand tint
+  /// with a brand hairline, which is exactly how the frame marks the thing you are being asked to
+  /// choose.
+  Widget _quoteCard(ButlerRequest r) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     final bool busy = _busyId == r.id;
-    final bool decide = r.awaitingApproval;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: DeliverySpacing.sm),
-      padding: const EdgeInsets.all(DeliverySpacing.md),
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
       decoration: BoxDecoration(
-        color: DeliveryColors.white,
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        // A request waiting on the customer is ringed, because it is the only one that needs them.
-        border: Border.all(
-          color: decide ? DeliveryColors.brand : DeliveryColors.border,
-          width: decide ? 1.5 : 1,
-        ),
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+        border: Border.all(color: DeliveryColors.brand),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(
-                  r.mode == ButlerMode.buy
-                      ? Icons.shopping_basket_outlined
-                      : Icons.local_shipping_outlined,
-                  size: 18,
-                  color: DeliveryColors.brand),
-              const SizedBox(width: DeliverySpacing.xs + 2),
+              _iconChip(r, background: DeliveryColors.white),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(r.what,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                child: Text(
+                  r.what,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
               ),
-              _statusChip(r),
+              const SizedBox(width: DeliverySpacing.sm),
+              YdBadge.brand(label: t.custWaitingOnYou, uppercase: false, fontSize: 11),
             ],
           ),
-          const SizedBox(height: DeliverySpacing.xs),
-          Text(_lineFor(r),
-              style: const TextStyle(fontSize: 12.5, color: DeliveryColors.muted, height: 1.3)),
-          if (decide) ...<Widget>[
-            if (r.overBudget) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.xs),
-              Text(
-                DeliveryStrings.of(context).aboveYourCap(r.budgetCap!.toStringAsFixed(2)),
-                style: const TextStyle(
-                    fontSize: 12.5, color: DeliveryColors.brand, fontWeight: FontWeight.w600),
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            _lineFor(r),
+            style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+          ),
+          if (r.overBudget) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              t.aboveYourCap(r.budgetCap!.toStringAsFixed(2)),
+              style: const TextStyle(
+                  fontSize: 12, color: DeliveryColors.brand, fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: DeliverySpacing.md),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: YdPillButton.secondary(
+                  label: t.noThanks,
+                  size: YdPillButtonSize.compact,
+                  busy: busy,
+                  onPressed: busy
+                      ? null
+                      : () => _run(r.id, () => widget.api.decline(r.id), t.declined),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: YdPillButton(
+                  label: t.payAmount(r.payableTotal.toStringAsFixed(2)),
+                  size: YdPillButtonSize.compact,
+                  busy: busy,
+                  onPressed: busy
+                      ? null
+                      : () => _run(
+                          r.id, () => widget.api.approve(r.id), t.approvedOnItsWay),
+                ),
               ),
             ],
-            const SizedBox(height: DeliverySpacing.sm),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: busy
-                        ? null
-                        : () => _run(r.id, () => widget.api.decline(r.id), DeliveryStrings.of(context).declined),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: DeliveryColors.brand,
-                      side: const BorderSide(color: DeliveryColors.brandLine),
-                    ),
-                    child: Text(DeliveryStrings.of(context).noThanks),
-                  ),
-                ),
-                const SizedBox(width: DeliverySpacing.sm),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: busy
-                        ? null
-                        : () => _run(r.id, () => widget.api.approve(r.id),
-                            DeliveryStrings.of(context).approvedOnItsWay),
-                    style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
-                    child: Text(DeliveryStrings.of(context).payAmount(r.payableTotal.toStringAsFixed(2))),
-                  ),
-                ),
-              ],
-            ),
-          ] else if (r.status == ButlerStatus.requested ||
-              r.status == ButlerStatus.claimed) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.xs),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                onPressed: busy ? null : () => _run(r.id, () => widget.api.cancel(r.id), DeliveryStrings.of(context).cancelled),
-                child: Text(DeliveryStrings.of(context).cancel),
-              ),
-            ),
-          ] else if (r.orderId != null) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.xs),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              // Once approved it is an ordinary order, and the ordinary order screen is where it
-              // belongs — tracking, status and receipt all already work there.
-              child: TextButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => OrderDetailsScreen(
-                    orderId: r.orderId!,
-                    orderApi: widget.orderApi,
-                    storeApi: widget.storeApi,
-                    cart: widget.cart,
-                  ),
-                )),
-                child: Text(DeliveryStrings.of(context).trackIt),
-              ),
-            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// `recent-tasks`: a bordered white card, a heading with a text action, and the rows.
+  Widget _historyCard(List<ButlerRequest> history) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool truncated = history.length > _collapsedCount;
+    final List<ButlerRequest> shown =
+        _expanded || !truncated ? history : history.take(_collapsedCount).toList();
+
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          YdSectionHeader(
+            title: t.custRecentTasks,
+            actionLabel: truncated ? (_expanded ? t.custShowLess : t.custSeeAll) : null,
+            onAction: truncated ? () => setState(() => _expanded = !_expanded) : null,
+          ),
+          const SizedBox(height: DeliverySpacing.md - 4),
+          for (int i = 0; i < shown.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(height: 10),
+            _taskRow(shown[i]),
           ],
         ],
       ),
     );
   }
 
+  /// `task-item`: the round icon chip, the title over its detail line, and the status word.
+  Widget _taskRow(ButlerRequest r) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool busy = _busyId == r.id;
+    final bool cancellable =
+        r.status == ButlerStatus.requested || r.status == ButlerStatus.claimed;
+    final (String label, Color colour) = _statusOf(r);
+
+    return InkWell(
+      // Once approved it is an ordinary order, and the ordinary order screen is where it belongs —
+      // tracking, status and receipt all already work there.
+      onTap: r.orderId == null
+          ? null
+          : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => OrderDetailsScreen(
+                  orderId: r.orderId!,
+                  orderApi: widget.orderApi,
+                  storeApi: widget.storeApi,
+                  cart: widget.cart,
+                ),
+              )),
+      borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _iconChip(r, background: DeliveryColors.background),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  r.what,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // The frame puts a timestamp here. The status sentence carries the money as well
+                // as the moment, and on a list of four rows that is the more useful of the two.
+                Text(
+                  _lineFor(r),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12, color: DeliveryColors.faint, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                label,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: colour),
+              ),
+              if (cancellable)
+                InkWell(
+                  onTap: busy
+                      ? null
+                      : () => _run(r.id, () => widget.api.cancel(r.id), t.cancelled),
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(top: 2),
+                    child: Text(
+                      t.cancel,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.brand,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconChip(ButlerRequest r, {required Color background}) {
+    return Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      child: Icon(
+        r.mode == ButlerMode.buy ? Icons.shopping_cart_outlined : Icons.inventory_2_outlined,
+        size: 18,
+        color: DeliveryColors.brand,
+      ),
+    );
+  }
+
   String _lineFor(ButlerRequest r) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return switch (r.status) {
-      ButlerStatus.requested => DeliveryStrings.of(context).waitingForShopper(_money(r.deliveryFee)),
+      ButlerStatus.requested => t.waitingForShopper(_money(r.deliveryFee)),
       ButlerStatus.claimed => r.mode == ButlerMode.buy
-          ? DeliveryStrings.of(context).shopperIsOnIt
-          : DeliveryStrings.of(context).riderOnTheWayToCollect(_money(r.payableTotal)),
-      ButlerStatus.quoted =>
-        DeliveryStrings.of(context).goodsPlusFee(_money(r.goodsCost ?? 0), _money(r.deliveryFee), _money(r.payableTotal)),
-      ButlerStatus.approved => DeliveryStrings.of(context).agreedAt(_money(r.payableTotal)),
-      ButlerStatus.declined => DeliveryStrings.of(context).youDeclinedThisPrice,
-      ButlerStatus.cancelled => DeliveryStrings.of(context).cancelled,
-      ButlerStatus.expired => DeliveryStrings.of(context).nobodyPickedThisUp,
+          ? t.shopperIsOnIt
+          : t.riderOnTheWayToCollect(_money(r.payableTotal)),
+      ButlerStatus.quoted => t.goodsPlusFee(
+          _money(r.goodsCost ?? 0), _money(r.deliveryFee), _money(r.payableTotal)),
+      ButlerStatus.approved => t.agreedAt(_money(r.payableTotal)),
+      ButlerStatus.declined => t.youDeclinedThisPrice,
+      ButlerStatus.cancelled => t.cancelled,
+      ButlerStatus.expired => t.nobodyPickedThisUp,
     };
   }
 
   static String _money(double value) => value.toStringAsFixed(2);
 
-  Widget _statusChip(ButlerRequest r) {
-    final (String label, Color colour) = switch (r.status) {
-      ButlerStatus.requested => (DeliveryStrings.of(context).butlerStatusOpen, DeliveryColors.muted),
-      ButlerStatus.claimed => (DeliveryStrings.of(context).butlerStatusClaimed, DeliveryStoreState.busy.color),
-      ButlerStatus.quoted => (DeliveryStrings.of(context).butlerStatusYourCall, DeliveryColors.brand),
-      ButlerStatus.approved => (DeliveryStrings.of(context).butlerStatusAgreed, DeliveryStoreState.open.color),
-      ButlerStatus.declined => (DeliveryStrings.of(context).declined, DeliveryColors.muted),
-      ButlerStatus.cancelled => (DeliveryStrings.of(context).cancelled, DeliveryColors.muted),
-      ButlerStatus.expired => (DeliveryStrings.of(context).butlerStatusExpired, DeliveryColors.muted),
+  /// The design colour-codes the status word green for finished and rose for outstanding; the
+  /// states that are neither take the faint neutral rather than borrowing one of those meanings.
+  (String, Color) _statusOf(ButlerRequest r) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return switch (r.status) {
+      ButlerStatus.requested => (t.custStatusPending, DeliveryAccent.caution.color),
+      ButlerStatus.claimed => (t.butlerStatusClaimed, DeliveryAccent.caution.color),
+      ButlerStatus.quoted => (t.butlerStatusYourCall, DeliveryColors.brand),
+      ButlerStatus.approved => (t.butlerStatusAgreed, DeliveryAccent.positive.color),
+      ButlerStatus.declined => (t.declined, DeliveryColors.faint),
+      ButlerStatus.cancelled => (t.cancelled, DeliveryColors.faint),
+      ButlerStatus.expired => (t.butlerStatusExpired, DeliveryColors.faint),
     };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.sm, vertical: 3),
-      decoration: BoxDecoration(
-        color: colour.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-      ),
-      child: Text(label,
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: colour)),
-    );
   }
 }

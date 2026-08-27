@@ -111,30 +111,76 @@ class _Placeholder extends StatelessWidget {
   final String? label;
   final double? progress;
 
+  /// Below this the frame has no room for the caption under the glyph, and below [_barFloor] none
+  /// for the progress bar either.
+  ///
+  /// The 28px glyph plus a two-line 11px caption needs a little over 70; the redesign's merchant
+  /// row draws this in a 64px square, which is the size that found the bug. An overflowing
+  /// [Column] is stripes in debug and a silently clipped, un-scrollable box in release, so the
+  /// parts that do not fit are dropped deliberately rather than drawn and cut.
+  static const double _captionFloor = 72;
+  static const double _barFloor = 48;
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, color: DeliveryColors.muted, size: 28),
-          if (progress != null) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.sm),
-            SizedBox(
-              width: 64,
-              child: LinearProgressIndicator(value: progress, minHeight: 3),
-            ),
-          ],
-          if (label != null) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.xs),
-            Text(
-              label!,
-              style: const TextStyle(fontSize: 11, color: DeliveryColors.muted),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        // An unbounded height — the preview dialog's `fit: contain` image, a placeholder inside a
+        // scrollable — counts as plenty of room.
+        final bool bounded = constraints.maxHeight.isFinite;
+        final double room = bounded ? constraints.maxHeight : double.infinity;
+        final bool showBar = progress != null && room >= _barFloor;
+        final bool showCaption = label != null && room >= _captionFloor;
+
+        // The caption is the only thing that says *which* of the four states this is, so where
+        // there is no room to print it the sentence still reaches a pointer and a screen reader.
+        Widget glyph = Icon(
+          icon,
+          color: DeliveryColors.muted,
+          size: 28,
+          semanticLabel: showCaption ? null : label,
+        );
+        if (label != null && !showCaption) {
+          glyph = Tooltip(message: label!, child: glyph);
+        }
+
+        Widget? caption;
+        if (showCaption) {
+          caption = Text(
+            label!,
+            style: const TextStyle(fontSize: 11, color: DeliveryColors.muted),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          );
+          // Flexible only where the column has a bounded height to divide — in an unbounded one it
+          // is an assertion, not a layout. It is the backstop for the borderline frame that clears
+          // [_captionFloor] but whose caption wraps one line further than expected.
+          if (bounded) {
+            caption = Flexible(child: caption);
+          }
+        }
+
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              glyph,
+              if (showBar) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.sm),
+                SizedBox(
+                  // The bar is 64 wide, and a thumbnail can be narrower than that.
+                  width: constraints.maxWidth < 64 ? constraints.maxWidth : 64,
+                  child: LinearProgressIndicator(value: progress, minHeight: 3),
+                ),
+              ],
+              if (caption != null) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.xs),
+                caption,
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

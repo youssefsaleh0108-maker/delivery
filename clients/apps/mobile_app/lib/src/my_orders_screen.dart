@@ -10,6 +10,11 @@ import 'cart.dart';
 import 'order_details_screen.dart';
 
 /// The customer's orders, and live tracking for the one currently out for delivery.
+///
+/// Drawn in the redesign's customer language: the 56px white screen header every root tab carries,
+/// then a 24px list of white radius-16 cards — the same card, pill and row treatment as
+/// `customer-order-details` (node 3:542), so an order looks like itself in the list and on its own
+/// page.
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({
     super.key,
@@ -107,8 +112,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         title: Text(DeliveryStrings.of(context).cancelThisOrder),
         content: Text(DeliveryStrings.of(context).cancelBeforeAccepted),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(DeliveryStrings.of(context).keepIt)),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(DeliveryStrings.of(context).cancelOrder)),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(DeliveryStrings.of(context).keepIt)),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(DeliveryStrings.of(context).cancelOrder)),
         ],
       ),
     );
@@ -131,40 +140,53 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    return Container(
+      color: DeliveryColors.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SafeArea(bottom: false, child: YdScreenHeader(title: t.navOrders)),
+          Expanded(child: _body(t)),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(DeliveryStrings t) {
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(DeliverySpacing.lg),
-          child: Text('${DeliveryStrings.of(context).couldNotLoadOrders}\n$_error',
-              textAlign: TextAlign.center),
+      return YdEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: t.couldNotLoadOrders,
+        message: t.pullDownToTryAgain,
+        action: YdPillButton(
+          label: t.tryAgain,
+          expand: false,
+          size: YdPillButtonSize.compact,
+          onPressed: () => _refresh(),
         ),
       );
     }
     if (_loading && _orders.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
     }
     if (_orders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.receipt_long_outlined, size: 44, color: DeliveryColors.muted),
-            const SizedBox(height: DeliverySpacing.sm),
-            Text(DeliveryStrings.of(context).noOrdersYet, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(DeliveryStrings.of(context).browseAndPlaceFirst,
-                style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
+      return YdEmptyState(
+        icon: Icons.receipt_long_outlined,
+        title: t.noOrdersYet,
+        message: t.browseAndPlaceFirst,
       );
     }
 
     return RefreshIndicator(
+      color: DeliveryColors.brand,
       onRefresh: () => _refresh(),
       child: ListView.separated(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
+        padding: const EdgeInsets.all(DeliverySpacing.lg),
         itemCount: _orders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.sm),
+        separatorBuilder: (_, __) =>
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
         itemBuilder: (BuildContext context, int i) {
           final DeliveryOrder order = _orders[i];
           return _OrderCard(
@@ -191,68 +213,140 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      padding: EdgeInsets.zero,
-      child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                OrderStatusBadge(statusWire: order.status.wire),
-                const Spacer(),
-                Text(order.totalAmount.toStringAsFixed(2),
-                    style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: DeliverySpacing.sm),
-            for (final OrderLine line in order.items)
-              Text(DeliveryStrings.of(context).lineQuantity(line.qty, line.productName),
-                  style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: DeliverySpacing.xs),
-            Text(DeliveryStrings.of(context).orderRefWithAddress(order.shortId, order.deliveryAddress),
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+    final DeliveryStrings t = DeliveryStrings.of(context);
 
-            // The live tracking payoff: only meaningful once a rider actually has the food.
-            if (position != null) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.sm),
-              Container(
-                padding: const EdgeInsets.all(DeliverySpacing.sm),
-                decoration: BoxDecoration(
-                  color: DeliveryColors.brandSoft,
-                  borderRadius: BorderRadius.circular(DeliveryRadius.md),
-                ),
-                child: Row(
+    return YdCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    const Icon(Icons.two_wheeler, size: 18, color: DeliveryColors.brand),
-                    const SizedBox(width: DeliverySpacing.sm),
-                    Expanded(
-                      child: Text(
-                        DeliveryStrings.of(context).riderAtShort(
-                            position!.lat.toStringAsFixed(4),
-                            position!.lng.toStringAsFixed(4)),
-                        style: Theme.of(context).textTheme.bodySmall,
+                    Text(
+                      order.storeName ?? t.tabShop,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      t.orderRefWithAddress(order.shortId, order.deliveryAddress),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DeliveryColors.faint,
+                        height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-
-            if (onCancel != null) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.sm),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: OutlinedButton(onPressed: onCancel, child: Text(DeliveryStrings.of(context).cancel)),
+              const SizedBox(width: DeliverySpacing.sm),
+              CustomerStatusPill(
+                statusWire: order.status.wire,
+                label: order.status.labelIn(t),
               ),
             ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          for (final OrderLine line in order.items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                t.lineQuantity(line.qty, line.productName),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: DeliveryColors.muted,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          const SizedBox(height: DeliverySpacing.sm),
+          Row(
+            children: <Widget>[
+              Text(
+                t.total,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: DeliveryColors.faint,
+                  height: 1.3,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                order.totalAmount.toStringAsFixed(2),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryColors.ink,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+
+          // The live tracking payoff: only meaningful once a rider actually has the food.
+          if (position != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            Container(
+              padding: const EdgeInsetsDirectional.all(
+                  DeliverySpacing.md - DeliverySpacing.xs),
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              ),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.two_wheeler, size: 18, color: DeliveryColors.brand),
+                  const SizedBox(width: DeliverySpacing.sm),
+                  Expanded(
+                    child: Text(
+                      t.riderAtShort(
+                        position!.lat.toStringAsFixed(4),
+                        position!.lng.toStringAsFixed(4),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.ink,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
-        ),
-      ),
+
+          if (onCancel != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: YdPillButton.secondary(
+                label: t.cancel,
+                expand: false,
+                size: YdPillButtonSize.compact,
+                onPressed: onCancel,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

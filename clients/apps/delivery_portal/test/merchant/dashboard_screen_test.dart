@@ -144,14 +144,27 @@ void main() {
   testWidgets('leads with what needs doing, then the day', (WidgetTester tester) async {
     await pump(tester, _summary());
 
-    // The queue first: it is the only thing on the screen somebody has to act on.
-    expect(find.text(en.needsYouNow.toUpperCase()), findsOneWidget);
-    expect(find.text(en.toAccept.toUpperCase()), findsOneWidget);
+    // The redesign renamed the small-caps "TO ACCEPT" tile to the "Pending Orders" card the Figma
+    // frame draws, and dropped the letter-spaced upper case from every label — the tiles and the
+    // section headings are sentence case now. What the test is here for is unchanged: the count
+    // somebody has to act on is on the screen, next to the words that say what it is, and it is
+    // above the history rather than buried under it.
+    expect(find.text(en.merchPendingOrders), findsOneWidget);
+    expect(find.text(en.merchNewOrders), findsOneWidget);
     expect(find.text('3'), findsWidgets);
 
-    expect(find.text(en.ordersToday.toUpperCase()), findsOneWidget);
+    expect(find.text(en.needsYouNow), findsOneWidget);
+    expect(find.text(en.ordersToday), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('250.00'), findsOneWidget);
+
+    // The one ordering that still has to hold. The frame puts today's two figures above the
+    // pending card, both inside the first screenful; what must never happen is the thing needing
+    // action falling below a fortnight of history nobody has to do anything about.
+    expect(
+      tester.getTopLeft(find.text(en.merchPendingOrders)).dy,
+      lessThan(tester.getTopLeft(find.text(en.bestSellers)).dy),
+    );
   });
 
   testWidgets('says how today compares with yesterday', (WidgetTester tester) async {
@@ -196,14 +209,18 @@ void main() {
 
     // Four zero tiles read as "the screen is broken". One line reads as "you are up to date".
     expect(find.text(en.allCaughtUp), findsOneWidget);
-    expect(find.text(en.toAccept.toUpperCase()), findsNothing);
+    // Same guarantee against the redesign's wording: nothing on this screen announces a queue.
+    expect(find.text(en.merchNewOrders), findsNothing);
+    expect(find.text(en.needsYouNow), findsNothing);
   });
 
   testWidgets('the queue leads somewhere', (WidgetTester tester) async {
     bool went = false;
     await pump(tester, _summary(), onShowOrders: () => went = true);
 
-    await tester.tap(find.text(en.toAccept.toUpperCase()));
+    // The tile became the design's pending-orders card, and the whole card is the target now
+    // rather than the number inside it.
+    await tester.tap(find.text(en.merchPendingOrders));
     await tester.pumpAndSettle();
     expect(went, isTrue, reason: 'a count you cannot act on is decoration');
   });
@@ -213,7 +230,7 @@ void main() {
     await pump(tester, _summary());
 
     expect(find.text('150.00'), findsOneWidget);
-    expect(find.text(en.feesInWindow.toUpperCase()), findsOneWidget);
+    expect(find.text(en.feesInWindow), findsOneWidget);
     expect(find.text(en.feesInWindowNote('12.5')), findsOneWidget);
   });
 
@@ -224,13 +241,13 @@ void main() {
     await pump(tester, _summary());
 
     // A zero here is a line about a benefit they never received, which reads as one withheld.
-    expect(find.text(en.savedForYou.toUpperCase()), findsNothing);
+    expect(find.text(en.savedForYou), findsNothing);
   });
 
   testWidgets('tells the shop when an offer saved them money', (WidgetTester tester) async {
     await pump(tester, _summary(savedByOffers: 50));
 
-    expect(find.text(en.savedForYou.toUpperCase()), findsOneWidget);
+    expect(find.text(en.savedForYou), findsOneWidget);
     expect(find.text('50.00'), findsOneWidget);
   });
 
@@ -253,9 +270,9 @@ void main() {
       (WidgetTester tester) async {
     await pump(tester, _summary(), locale: const Locale('ar'));
 
-    expect(find.text(ar.needsYouNow.toUpperCase()), findsOneWidget);
-    expect(find.text(ar.ordersToday.toUpperCase()), findsOneWidget);
-    expect(find.text(ar.bestSellers.toUpperCase()), findsOneWidget);
+    expect(find.text(ar.needsYouNow), findsOneWidget);
+    expect(find.text(ar.ordersToday), findsOneWidget);
+    expect(find.text(ar.bestSellers), findsOneWidget);
     // The trap the shared display enums fell into: an English string left behind inside an
     // otherwise translated screen. The weekday initials come from Flutter's own localisations.
     expect(find.text(ar.upOnYesterday(50)), findsOneWidget);

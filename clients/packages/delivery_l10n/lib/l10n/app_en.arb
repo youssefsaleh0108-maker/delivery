@@ -1,6 +1,7 @@
 {
   "@@locale": "en",
   "appTitle": "YouDrop",
+  "navHome": "Home",
   "navShops": "Shops",
   "navBasket": "Basket",
   "navOrders": "Orders",
@@ -867,6 +868,15 @@
   },
   "drafts": "Drafts",
   "noPhoto": "No photo",
+  "photoCount": "{count, plural, =1{1 photo} other{{count} photos}}",
+  "@photoCount": {
+    "description": "Badge on a product thumbnail that carries more than one photo, and its label for assistive tech.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "archived": "Archived",
   "yourProducts": "Your products",
   "publish": "Publish",
@@ -1095,6 +1105,16 @@
   "jobsInFlight": "In flight",
   "savedByOffers": "Saved by offers",
   "earningsWindowNote": "Over the last {days} days, after the platform's {cut}% share of each delivery fee.",
+  "@earningsWindowNote": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "cut": {
+        "type": "String"
+      }
+    }
+  },
   "savedByOffersNote": "The platform waived its share on some of your deliveries, so you kept the whole fee.",
   "expectedNote": "What the work in flight is worth if it all completes. Not yet owed.",
   "yourFeeOnThis": "Your fee",
@@ -1144,7 +1164,21 @@
   "jobsToday": "Jobs today",
   "earnedToday": "Earned today",
   "upOnYesterday": "{percent}% up on yesterday",
+  "@upOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "downOnYesterday": "{percent}% down on yesterday",
+  "@downOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "sameAsYesterday": "Same as yesterday",
   "noneYesterday": "Nothing yesterday",
   "nothingYetToday": "Nothing yet today",
@@ -1155,6 +1189,13 @@
   "outForDelivery": "Out for delivery",
   "allCaughtUp": "Nothing waiting on you.",
   "lastDaysHeading": "Last {days} days",
+  "@lastDaysHeading": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "quietSoFar": "No trade in this period yet.",
   "noJobsSoFar": "No jobs in this period yet.",
   "barChartLegend": "Solid is delivered; pale is placed but not delivered.",
@@ -1163,32 +1204,6 @@
   "salesInWindow": "Sales",
   "feesInWindow": "Platform fees",
   "feesInWindowNote": "{cut}% of delivered sales.",
-  "bestSellers": "Best sellers",
-  "nothingSoldYet": "Nothing has sold in this period yet.",
-  "soldQty": "{qty} sold",
-  "savedForYou": "Saved by offers",
-  "savedForYouNote": "The platform waived its share on some of your orders.",
-  "@upOnYesterday": {
-    "placeholders": {
-      "percent": {
-        "type": "int"
-      }
-    }
-  },
-  "@downOnYesterday": {
-    "placeholders": {
-      "percent": {
-        "type": "int"
-      }
-    }
-  },
-  "@lastDaysHeading": {
-    "placeholders": {
-      "days": {
-        "type": "int"
-      }
-    }
-  },
   "@feesInWindowNote": {
     "placeholders": {
       "cut": {
@@ -1196,6 +1211,9 @@
       }
     }
   },
+  "bestSellers": "Best sellers",
+  "nothingSoldYet": "Nothing has sold in this period yet.",
+  "soldQty": "{qty} sold",
   "@soldQty": {
     "placeholders": {
       "qty": {
@@ -1203,18 +1221,17 @@
       }
     }
   },
-  "@earningsWindowNote": {
+  "savedForYou": "Saved by offers",
+  "savedForYouNote": "The platform waived its share on some of your orders.",
+  "navApplicants": "Applicants",
+  "waitingOnYou": "{count} waiting on you",
+  "@waitingOnYou": {
     "placeholders": {
-      "days": {
+      "count": {
         "type": "int"
-      },
-      "cut": {
-        "type": "String"
       }
     }
   },
-  "navApplicants": "Applicants",
-  "waitingOnYou": "{count} waiting on you",
   "everyoneWhoApplied": "Everyone who has applied to ride for you.",
   "waitingOnly": "Waiting only",
   "everyone": "Everyone",
@@ -1224,19 +1241,6 @@
   "addToMyFleet": "Add to my fleet",
   "turnDown": "Turn down",
   "turnDownName": "Turn down {name}",
-  "theyAreSentThisWordForWord": "They are sent this word for word. Say what would have to change.",
-  "riderAdded": "{name} is on your fleet. We have emailed them how to sign in.",
-  "applicantTurnedDown": "{name} has been told.",
-  "turnedDownBecause": "Turned down: {reason}",
-  "onYourFleetNow": "On your fleet. They can be sent work.",
-  "thatDidNotGoThrough": "That did not go through. Try again.",
-  "@waitingOnYou": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "@turnDownName": {
     "placeholders": {
       "name": {
@@ -1244,6 +1248,8 @@
       }
     }
   },
+  "theyAreSentThisWordForWord": "They are sent this word for word. Say what would have to change.",
+  "riderAdded": "{name} is on your fleet. We have emailed them how to sign in.",
   "@riderAdded": {
     "placeholders": {
       "name": {
@@ -1251,6 +1257,7 @@
       }
     }
   },
+  "applicantTurnedDown": "{name} has been told.",
   "@applicantTurnedDown": {
     "placeholders": {
       "name": {
@@ -1258,6 +1265,7 @@
       }
     }
   },
+  "turnedDownBecause": "Turned down: {reason}",
   "@turnedDownBecause": {
     "placeholders": {
       "reason": {
@@ -1265,6 +1273,8 @@
       }
     }
   },
+  "onYourFleetNow": "On your fleet. They can be sent work.",
+  "thatDidNotGoThrough": "That did not go through. Try again.",
   "wantToRideForACompany": "Want to ride for a delivery company?",
   "rideWithUs": "Ride with us",
   "whoWouldYouRideFor": "Who would you ride for?",
@@ -1287,8 +1297,6 @@
   "sendApplication": "Send application",
   "applicationSent": "Application sent",
   "companyWillBeInTouch": "{company} will read it and be in touch by email.",
-  "keepThisReference": "Keep this reference",
-  "done": "Done",
   "@companyWillBeInTouch": {
     "placeholders": {
       "company": {
@@ -1296,6 +1304,8 @@
       }
     }
   },
+  "keepThisReference": "Keep this reference",
+  "done": "Done",
   "paymentMethod": "Payment method",
   "cashOnDelivery": "Cash on delivery",
   "card": "Card",
@@ -1392,6 +1402,13 @@
   "applicationPending": "Application received",
   "weAreReadingIt": "We are reading your application. You will get an email as soon as there is a decision, and this screen keeps the status.",
   "companyIsReadingIt": "{company} is reading your application. You will get an email as soon as they decide.",
+  "@companyIsReadingIt": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  },
   "applicationStatus": "Status",
   "statusSubmitted": "Waiting to be read",
   "statusInReview": "Being read now",
@@ -1403,17 +1420,397 @@
   "whatHappensNext": "What happens next",
   "nextStepsPending": "Nothing to do for now. When you are approved this app becomes your shop or your job board — same sign-in, same passcode.",
   "couldNotCreateSignIn": "We could not set up your sign-in. Your application was still received.",
-  "@companyIsReadingIt": {
-    "placeholders": {
-      "company": {
-        "type": "String"
-      }
-    }
-  },
   "pendingBannerMerchant": "Your application is being reviewed. Set your shop up now — you can publish to the market once you are approved.",
   "pendingBannerRider": "Your application is being reviewed. Look around the board — you can take deliveries once you are approved.",
   "notWhilePending": "You can do this once your application is approved.",
   "viewApplication": "View application",
   "accountReadySignInInstead": "Your account is ready, but signing you in did not work. Close this and sign in with your email and the passcode you just chose.",
-  "dayByDay": "Day by day"
+  "dayByDay": "Day by day",
+  "authTagline": "Anything delivered, anywhere",
+  "authRoleCustomer": "Customer",
+  "authRoleCustomerBlurb": "Order and get deliveries",
+  "authRoleRider": "Rider",
+  "authRoleRiderBlurb": "Deliver and earn",
+  "authRoleMerchant": "Merchant",
+  "authRoleMerchantBlurb": "Sell and grow your business",
+  "authAlreadyHaveAnAccount": "Already have an account?",
+  "authDontHaveAnAccount": "Don't have an account?",
+  "authSignUp": "Sign up",
+  "authSignInSubtitle": "Please enter your credentials to log in.",
+  "authEmailOrPhone": "Email or phone number",
+  "authEmailOrPhoneHint": "e.g. name@domain.com or +961…",
+  "authPasscodeHint": "Your six-digit passcode",
+  "authForgotPassword": "Forgot password?",
+  "authUseTheKeypad": "Use the keypad",
+  "authOrContinueWith": "Or continue with",
+  "authComingSoon": "Soon",
+  "authShowPassword": "Show passcode",
+  "authHidePassword": "Hide passcode",
+  "authDeleteDigit": "Delete last digit",
+  "authCreateAccountSubtitle": "Start getting anything delivered anywhere.",
+  "authFullName": "Full name",
+  "authFullNameHint": "e.g. Sarah Jenkins",
+  "authEmailAddress": "Email address",
+  "authEmailHint": "e.g. sarah.j@gmail.com",
+  "authPhoneNumber": "Phone number",
+  "authPhoneHint": "70 123 456",
+  "authConfirmPassword": "Confirm passcode",
+  "authPasscodeKeepGoing": "Keep going",
+  "authPasscodeComplete": "Complete",
+  "authAgreeToTerms": "I agree to the terms and the privacy policy",
+  "authTermsPrefix": "By signing up, you agree to our ",
+  "authTermsOfService": "Terms of Service",
+  "authTermsAnd": " and ",
+  "authPrivacyPolicy": "Privacy Policy",
+  "authPleaseAcceptTheTerms": "Please accept the terms to continue.",
+  "authVerifyYourEmail": "Verify your email",
+  "authVerifyYourNumber": "Verify your number",
+  "authStep": "Step",
+  "authComplete": "complete",
+  "authNext": "Next",
+  "authGetStarted": "Get started",
+  "authSubmitApplication": "Submit application",
+  "authSendingApplication": "Sending your application…",
+  "authCouldNotSendApplication": "We could not send your application. Nothing was lost — try again.",
+  "authRiderIntroTitle": "Join as a rider",
+  "authRiderIntroBlurb": "Flexible hours, competitive pay, and easy navigation — start delivering with YouDrop in a few minutes.",
+  "authRiderBenefitHours": "Flexible hours",
+  "authRiderBenefitPay": "Competitive pay",
+  "authRiderBenefitNavigation": "Easy navigation",
+  "authWhatYouNeedToSignUp": "What you'll need to sign up",
+  "authNeedValidId": "Valid ID",
+  "authNeedDriversLicence": "Driving licence",
+  "authNeedVehicleDocuments": "Vehicle documents",
+  "authMerchantSignUp": "Merchant sign up",
+  "authMerchantIntroTitle": "Register your business",
+  "authMerchantIntroBlurb": "Reach more customers, manage products easily, and track performance in real time.",
+  "authWhatYouGet": "What you'll get",
+  "authMerchantBenefitReach": "Reach more customers through our delivery network",
+  "authMerchantBenefitManage": "Easy product management and order fulfilment",
+  "authMerchantBenefitAnalytics": "Real-time analytics to optimise your sales",
+  "authWhatYouNeed": "What you'll need",
+  "authNeedBusinessLicence": "Business licence",
+  "authNeedTaxCertificate": "Tax certificate",
+  "authNeedBankDetails": "Bank details",
+  "authPersonalInformation": "Personal information",
+  "authPersonalInformationBlurb": "Please fill in your primary details to establish your rider profile.",
+  "authDateOfBirth": "Date of birth",
+  "authDateOfBirthHint": "DD / MM / YYYY",
+  "authNationalId": "National ID number",
+  "authNationalIdHint": "As printed on your ID",
+  "authVehicleDetails": "Vehicle details",
+  "authVehicleDetailsBlurb": "Select your vehicle category and register its official details.",
+  "authVehicleType": "Vehicle type",
+  "authVehicleMotorcycle": "Motorcycle",
+  "authVehicleCar": "Car",
+  "authVehicleBicycle": "Bicycle",
+  "authVehicleVan": "Van",
+  "authVehicleModel": "Vehicle make / model",
+  "authVehicleModelHint": "e.g. Yamaha TMAX / Toyota Yaris",
+  "authPlateNumber": "Plate number",
+  "authPlateNumberHint": "e.g. 1234 ABC",
+  "authVehicleYear": "Vehicle year",
+  "authVehicleYearHint": "e.g. 2024",
+  "authSelectDeliveryZone": "Select delivery zone",
+  "authSelectDeliveryZoneBlurb": "Which parts of the city do you prefer to deliver in?",
+  "authMapComingSoon": "Coverage map coming soon",
+  "authPreferredArea": "Preferred area",
+  "authPreferredAreaHint": "e.g. Hamra, Achrafieh",
+  "authAvailableZones": "Available zones",
+  "authZonesComingSoonTitle": "Zones are not mapped yet",
+  "authZonesComingSoonBlurb": "Pickable delivery zones arrive with the coverage map. Until then, the area above is what we go by.",
+  "authBusinessInformation": "Business information",
+  "authBusinessInformationBlurb": "Tell us about your company and the contact person.",
+  "authBusinessShopName": "Business / shop name",
+  "authBusinessShopNameHint": "e.g. Rose Garden Pizzeria",
+  "authOwnerFullName": "Owner full name",
+  "authOwnerFullNameHint": "e.g. Jane Cooper",
+  "authBusinessType": "Business type",
+  "authBusinessTypeHint": "Choose one",
+  "authBusinessTypeRestaurant": "Restaurant",
+  "authBusinessTypeGrocery": "Grocery",
+  "authBusinessTypePharmacy": "Pharmacy",
+  "authBusinessTypeBakery": "Bakery",
+  "authBusinessTypeRetail": "Retail",
+  "authBusinessTypeOther": "Other",
+  "authContactEmail": "Contact email address",
+  "authReviewAndSubmit": "Review and submit",
+  "authReviewAndSubmitBlurb": "Check what we are about to send. You can go back and change any of it.",
+  "authDocuments": "Documents",
+  "authDocumentsBlurb": "The papers we will need before you can start.",
+  "authDocumentsComingSoonTitle": "Uploading opens shortly",
+  "authDocumentsComingSoonBlurb": "You can finish your application without it — we will ask for the papers by email before you start.",
+  "authBankDetails": "Bank details",
+  "authBankDetailsBlurb": "Where your payouts will go.",
+  "authBankComingSoonTitle": "Payout setup opens shortly",
+  "authBankComingSoonBlurb": "We never take bank details before a decision. You will set payouts up once you are approved.",
+  "authApplicationSubmitted": "Application submitted",
+  "authApplicationSubmittedBlurb": "We have your application and our operations team is reading it now.",
+  "authWhatToExpectNext": "What to expect next",
+  "authExpectVerification": "We check your details (1–3 days)",
+  "authExpectBackgroundCheck": "Background check",
+  "authExpectTrainingInvite": "Invitation to rider training",
+  "authWeWillNotifyYou": "We will let you know by email as soon as there is a decision.",
+  "authApplicationUnderReview": "Application under review",
+  "authApplicationUnderReviewBlurb": "Thank you. Your registration is in and our team is checking it over. This usually takes a day or two.",
+  "authExplorationModeActive": "Exploration mode is on",
+  "authExplorationModeBlurb": "While you wait you can set your products and menus up and look around. Nothing goes live until you are approved.",
+  "authApplicationChecklist": "Application checklist",
+  "authChecklistAccountCreated": "Account created",
+  "authChecklistDocuments": "Documents uploaded",
+  "authChecklistAudit": "Security and compliance check",
+  "authChecklistActivation": "Shop activated and published",
+  "authExploreDashboard": "Explore dashboard",
+  "custSeeAll": "See All",
+  "custShowLess": "Show Less",
+  "custAllCategories": "All Categories",
+  "custFilters": "Filters",
+  "custMyBasket": "My Basket",
+  "custPromoCode": "Promo Code",
+  "custApply": "Apply",
+  "custOrderSummary": "Order Summary",
+  "custDiscounts": "Discounts",
+  "custTotalAmount": "Total Amount",
+  "custProceedToCheckout": "Proceed to Checkout",
+  "custAddToBasket": "Add to Basket",
+  "custDeliveryTime": "Delivery Time",
+  "custMinOrderStat": "Min. Order",
+  "custRatingsCount": "{count, plural, =0{No ratings} =1{1 Rating} other{{count} Ratings}}",
+  "@custRatingsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "custShopsInCategory": "{count, plural, =0{No shops} =1{1 Shop} other{{count} Shops}}",
+  "@custShopsInCategory": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "custPeopleAlsoOrdered": "People Also Ordered",
+  "custSoon": "Soon",
+  "custIncreaseQuantity": "Increase quantity",
+  "custDecreaseQuantity": "Decrease quantity",
+  "custSearchInShop": "Search this shop",
+  "custShopSearchHint": "Search the menu",
+  "custButlerTitle": "YouDrop Butler",
+  "custChooseWhatYouNeed": "Choose what you need help with",
+  "custBuyAnything": "Buy Anything",
+  "custBuyAnythingBlurb": "We buy & deliver from anywhere",
+  "custSendAnything": "Send Anything",
+  "custSendAnythingBlurb": "Courier, pick up, or send items",
+  "custRecentTasks": "Recent tasks",
+  "custSearchTasksHint": "Search your errands",
+  "custNoTasksMatch": "No errands match that search",
+  "custStatusPending": "Pending",
+  "custWaitingOnYou": "Waiting on you",
+  "custApplePay": "Apple Pay",
+  "custOrderNotes": "Order Notes",
+  "custOrderNotesHint": "e.g. Leave package at the door, bell is not working...",
+  "custTotalPrice": "Total Price",
+  "custPlaceOrder": "Place Order",
+  "custOrderStatus": "Order Status",
+  "custOrderRef": "Order",
+  "custItemsOrdered": "Items Ordered",
+  "custLiveMap": "Live map",
+  "custAccountSettings": "Account Settings",
+  "custAppLanguage": "App Language",
+  "custMyAddresses": "My Addresses",
+  "custPaymentMethods": "Payment Methods",
+  "custOrderHistory": "Order History",
+  "custHelpSupport": "Help & Support",
+  "custLabelAddressAs": "Label Address As:",
+  "custLabelHome": "Home",
+  "custLabelWork": "Work",
+  "custLabelOther": "Other",
+  "merchTodaySummary": "Today's Summary",
+  "merchPendingOrders": "Pending Orders",
+  "merchNewOrders": "New Orders",
+  "merchView": "View",
+  "merchRecentOrders": "Recent Orders",
+  "merchViewAll": "View All",
+  "merchActive": "Active",
+  "merchInactive": "Inactive",
+  "merchPublishShop": "Publish your shop",
+  "merchShopHidden": "Your shop is hidden from the market.",
+  "merchOrderFlow": "Order Flow",
+  "merchManagerView": "Manager View",
+  "merchTabNew": "New",
+  "merchTabCompleted": "Completed",
+  "merchReject": "Reject",
+  "merchFlowStatus": "Flow Status",
+  "merchCustomerDetails": "Customer Details",
+  "merchItemsBreakdown": "Items Breakdown",
+  "merchSpecialInstructions": "Special Instructions",
+  "merchGrandTotal": "Grand Total",
+  "merchStepPickedUp": "Picked Up",
+  "merchNothingInThisList": "Nothing in this list.",
+  "merchOpenOrder": "Open order",
+  "merchbMenuItems": "Menu Items",
+  "merchbManageAvailability": "Manage availability",
+  "merchbSearchMenuItems": "Search menu items...",
+  "merchbAvailable": "Available",
+  "merchbOffShelf": "Off-shelf",
+  "merchbAddProduct": "Add Product",
+  "merchbAvailability": "Availability",
+  "merchbNoMatchingItems": "No matching items",
+  "merchbAddNewProduct": "Add New Product",
+  "merchbProductImage": "Product Image",
+  "merchbUploadImageCta": "Upload delicious food image",
+  "merchbUploadHint": "PNG, JPG up to 5MB",
+  "merchbVariantsOptions": "Variants & Options",
+  "merchbAddOption": "+ Add option",
+  "merchbChoicesCount": "{count, plural, =1{1 choice} other{{count} choices}}",
+  "@merchbChoicesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchbNoOptionsYet": "No options on this item yet",
+  "merchbOptionsReadOnly": "Shown as customers see them. Editing options arrives soon.",
+  "merchbSaveMenuItem": "Save Menu Item",
+  "merchbSoon": "Soon",
+  "merchbShopConfiguration": "Shop Configuration",
+  "merchbShopStatus": "Shop status",
+  "merchbBannerAndLogo": "Shop Banner & Logo",
+  "merchbChangeCover": "Change Cover",
+  "merchbChangeLogo": "Change Logo",
+  "merchbShopAddress": "Shop Address",
+  "merchbMapPreviewSoon": "Map preview",
+  "merchbOperatingDetails": "Operating Details",
+  "merchbSaveShopSettings": "Save Shop Settings",
+  "merchbHoursDaily": "Daily: {from} - {to}",
+  "@merchbHoursDaily": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "merchbHoursCustom": "Custom schedule",
+  "merchbHoursNone": "No hours set",
+  "merchbEditHours": "Edit opening hours",
+  "merchbDay": "Day",
+  "merchbTimeHint": "HH:mm",
+  "merchbDayMonday": "Monday",
+  "merchbDayTuesday": "Tuesday",
+  "merchbDayWednesday": "Wednesday",
+  "merchbDayThursday": "Thursday",
+  "merchbDayFriday": "Friday",
+  "merchbDaySaturday": "Saturday",
+  "merchbDaySunday": "Sunday",
+  "merchbAccountSettings": "Account Settings",
+  "merchbRoleOwner": "Owner",
+  "merchbAppLanguage": "App Language",
+  "merchbLangShortEn": "EN",
+  "merchbLangShortAr": "AR",
+  "merchbShopProfile": "Shop Profile",
+  "merchbPaymentBankDetails": "Payment & Bank details",
+  "merchbNotificationSettings": "Notification Settings",
+  "merchbShopAnalytics": "Shop Analytics",
+  "merchbLogOutAccount": "Log Out Account",
+  "riderComingSoon": "Coming soon",
+  "riderTabAvailable": "Available",
+  "riderTabActive": "Active",
+  "riderTabEarnings": "Earnings",
+  "riderSegmentDeliveries": "Deliveries",
+  "riderRegionZone": "Region zone",
+  "riderDeliveriesNearby": "{count, plural, =0{No deliveries nearby} =1{1 delivery nearby} other{{count} deliveries nearby}}",
+  "@riderDeliveriesNearby": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "riderOffersNearYou": "Offers near you",
+  "riderAcceptDelivery": "Accept delivery",
+  "riderMyActiveTasks": "My active tasks",
+  "riderActiveCount": "{count, plural, =0{None active} =1{1 active} other{{count} active}}",
+  "@riderActiveCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "riderOrderRef": "Order #{ref}",
+  "@riderOrderRef": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "riderMinutesAgo": "{minutes, plural, =0{Just now} =1{1 min ago} other{{minutes} min ago}}",
+  "@riderMinutesAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "riderHoursAgo": "{hours, plural, =1{1 hr ago} other{{hours} hrs ago}}",
+  "@riderHoursAgo": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "riderNavigate": "Navigate",
+  "riderViewDetails": "View details",
+  "riderStartNavigation": "Start navigation",
+  "riderYourPayout": "Your payout",
+  "riderRouteTimeline": "Route timeline",
+  "riderPickupAddress": "Pickup address",
+  "riderDeliveryAddress": "Delivery address",
+  "riderItemsToCollect": "Items to collect",
+  "riderItemLine": "{qty}x {name}",
+  "@riderItemLine": {
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "riderNoItemsListed": "This order has no itemised list.",
+  "riderDeliveryInstructions": "Delivery instructions",
+  "riderMyEarnings": "My earnings",
+  "riderPayout": "Payout",
+  "riderPeriodToday": "Today",
+  "riderPeriodWeekly": "Weekly",
+  "riderTotalEarnings": "Total earnings",
+  "riderEarningsDerived": "Added up from the delivery fees on your own completed deliveries.",
+  "riderHoursOnline": "Hours online",
+  "riderAcceptRate": "Accept rate",
+  "riderRating": "Rating",
+  "riderWeeklyOverview": "Weekly overview",
+  "riderTodaysDeliveries": "Today's deliveries",
+  "riderThisWeeksDeliveries": "This week's deliveries",
+  "riderNothingDeliveredYet": "Nothing delivered in this period yet.",
+  "riderCouldNotLoadEarnings": "Could not load your earnings",
+  "riderDriverSettings": "Driver settings",
+  "riderVehicleProfile": "Vehicle profile",
+  "riderActiveDuty": "Active duty (online)",
+  "riderAppLanguage": "App language",
+  "riderDocuments": "Documents & licences",
+  "riderBankDetails": "Bank account details",
+  "riderNotificationPreferences": "Notification preferences",
+  "riderHelpAndSupport": "Help & live chat support",
+  "riderErrandTry": "Try",
+  "riderErrandTo": "To",
+  "riderErrandCap": "Cap"
 }

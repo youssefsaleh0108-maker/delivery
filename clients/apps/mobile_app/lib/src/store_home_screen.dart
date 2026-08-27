@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
 import 'cart.dart';
+import 'categories_screen.dart';
 import 'delivery_address.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
+import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
 import 'settings_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
@@ -19,6 +21,10 @@ import 'store_state_mapping.dart';
 /// The order of the page is the order the questions get asked. Which kind of thing do I want
 /// (verticals), where have I been before (favourites), what is on offer, and only then the full
 /// list. A flat A-Z of every shop answers none of those.
+///
+/// Drawn to `customer-home` (Figma 3:12): a white header carrying the delivery address and the
+/// search field, a scrolling strip of category pills, and then the sections — each a Bold 18
+/// heading over a rail or a two-up grid of cards, on the 24px page gutter.
 class StoreHomeScreen extends StatefulWidget {
   const StoreHomeScreen({
     super.key,
@@ -61,6 +67,13 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   final ScrollController _scrollController = ScrollController();
 
   StoreFilters _filters = const StoreFilters();
+
+  /// Whether the refine row under the search field is showing.
+  ///
+  /// The design draws a single sliders glyph inside the search field and no filter row. The
+  /// filters behind that glyph are live features, so they are kept and the glyph is what opens
+  /// them — which is what a sliders icon beside a search box means anyway.
+  bool _filtersOpen = false;
 
   /// The main grid, loaded a page at a time as the customer scrolls. The rails above it are
   /// deliberately capped rather than paged — they are horizontal strips showing a handful of
@@ -162,6 +175,17 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     _reloadStoresOnly();
   }
 
+  /// The full directory, and back again with whatever was picked.
+  Future<void> _openCategories() async {
+    final StoreVertical? picked = await Navigator.of(context).push<StoreVertical>(
+      MaterialPageRoute<StoreVertical>(
+        builder: (BuildContext _) =>
+            CategoriesScreen(storeApi: widget.storeApi, chips: _chips),
+      ),
+    );
+    if (picked != null) _selectVertical(picked);
+  }
+
   /// Optimistic: the star fills immediately and is put back if the call fails. Both endpoints are
   /// idempotent, so a double tap cannot desynchronise anything.
   Future<void> _toggleFavorite(StoreCard store) async {
@@ -222,86 +246,333 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   String _chipLabel(StoreVertical vertical) =>
       _chipFor(vertical)?.name ?? vertical.labelIn(DeliveryStrings.of(context));
 
-  String? _chipImage(StoreVertical vertical) => _chipFor(vertical)?.imageUrl;
-
   /// Applied here rather than in the query: "has a promotion" is a property of the offers attached
   /// to a card, not a column the storefront query can filter on.
   List<StoreCard> get _visibleStores => _filters.offersOnly
       ? _stores.items.where((StoreCard s) => s.topOffer != null).toList()
       : _stores.items;
 
+  // ------------------------------------------------------------------------------------- layout
+
+  /// The page gutter every section in the design sits on.
+  static const double _gutter = DeliverySpacing.lg;
+
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
     return Scaffold(
       backgroundColor: DeliveryColors.background,
-      body: RefreshIndicator(
-        color: DeliveryColors.brand,
-        onRefresh: _load,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (ScrollNotification notification) {
-            if (shouldLoadMore(notification.metrics)) {
-              // Guarded inside PagedList: a scroll fires this many times per second and only the
-              // first one may start a request.
-              _stores.loadMore();
-            }
-            return false;
-          },
-          child: CustomScrollView(
-          controller: _scrollController,
-          slivers: <Widget>[
-            _appBar(),
-            SliverToBoxAdapter(child: _searchField()),
-            SliverToBoxAdapter(
-              child: ChipStrip<StoreVertical>(
-                values: _chipVerticals,
-                labelOf: _chipLabel,
-                iconOf: iconForVertical,
-                imageOf: _chipImage,
-                selected: _filters.vertical,
-                allLabel: DeliveryStrings.of(context).all,
-                // Picture above the label: on the home screen the artwork is what the eye
-                // navigates by. The store page keeps pills, where the text is the choice.
-                layout: ChipStripLayout.stacked,
-                onSelected: _selectVertical,
-              ),
-            ),
-            SliverToBoxAdapter(child: _filterBar()),
-            if (_stores.isLoadingFirstPage || _loadingRails)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
-              )
-            else if (_error != null)
-              SliverFillRemaining(hasScrollBody: false, child: _errorState())
-            else ...<Widget>[
-              // Banners sit above the offers rail: designed artwork the business chose to lead
-              // with, ahead of the mechanical list of discounts.
-              if (_banners.isNotEmpty) _bannerRail(),
-              if (_platformOffers.isNotEmpty) _offersRail(),
-              if (_favorites.isNotEmpty) ...<Widget>[
-                SliverToBoxAdapter(
-                  child: SectionHeader(title: DeliveryStrings.of(context).yourFavourites, subtitle: DeliveryStrings.of(context).starredShops),
-                ),
-                SliverToBoxAdapter(child: _favoritesRail()),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: DeliveryColors.brand,
+          onRefresh: _load,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification notification) {
+              if (shouldLoadMore(notification.metrics)) {
+                // Guarded inside PagedList: a scroll fires this many times per second and only the
+                // first one may start a request.
+                _stores.loadMore();
+              }
+              return false;
+            },
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: <Widget>[
+                SliverToBoxAdapter(child: _header()),
+                SliverToBoxAdapter(child: _categoryStrip()),
+                if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
+                if (_stores.isLoadingFirstPage || _loadingRails)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+                  )
+                else if (_error != null)
+                  SliverFillRemaining(hasScrollBody: false, child: _errorState())
+                else ...<Widget>[
+                  // Banners sit above the offers rail: designed artwork the business chose to lead
+                  // with, ahead of the mechanical list of discounts.
+                  if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
+                  if (_platformOffers.isNotEmpty) SliverToBoxAdapter(child: _offersRail()),
+                  if (_favorites.isNotEmpty)
+                    SliverToBoxAdapter(child: _featuredSection()),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.md - 4),
+                      child: YdSectionHeader(
+                        title: _filters.vertical?.labelIn(t) ?? t.allStores,
+                        // Plural-aware via ICU. Arabic has six plural categories, not two, so a
+                        // `count == 1 ? 'shop' : 'shops'` ternary cannot be translated correctly.
+                        subtitle: t.shopsDelivering(_visibleStores.length),
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  if (_visibleStores.isEmpty)
+                    SliverToBoxAdapter(child: _emptyState())
+                  else
+                    _storeGrid(),
+                  SliverToBoxAdapter(child: _gridFooter()),
+                ],
+                const SliverToBoxAdapter(child: SizedBox(height: DeliverySpacing.lg)),
               ],
-              SliverToBoxAdapter(
-                child: SectionHeader(
-                  title: _filters.vertical?.labelIn(DeliveryStrings.of(context)) ?? DeliveryStrings.of(context).allStores,
-                  // Plural-aware via ICU. Arabic has six plural categories, not two, so a
-                  // `count == 1 ? 'shop' : 'shops'` ternary cannot be translated correctly.
-                  subtitle: DeliveryStrings.of(context).shopsDelivering(_visibleStores.length),
-                ),
-              ),
-              if (_visibleStores.isEmpty)
-                SliverToBoxAdapter(child: _emptyState())
-              else
-                _storeGrid(),
-              SliverToBoxAdapter(child: _gridFooter()),
-            ],
-            const SliverToBoxAdapter(child: SizedBox(height: DeliverySpacing.xl)),
-          ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// The white `home-header`: the delivery address on one row, the search field under it.
+  Widget _header() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Container(
+      color: DeliveryColors.white,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.md - 4, _gutter, DeliverySpacing.md),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(child: _locationRow()),
+              // Alerts and settings are not drawn on this frame, and both are live: the bell
+              // carries an unread count that has to be visible from the tab the customer spends
+              // their time on, and settings is the only route to the language toggle. They sit in
+              // the header's end slot, in the design's 32px round-chip language.
+              _headerAction(
+                icon: Icons.notifications_outlined,
+                semanticLabel: t.alerts,
+                badgeCount: widget.inbox.unread,
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => NotificationsScreen(inbox: widget.inbox),
+                )),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              _headerAction(
+                icon: Icons.settings_outlined,
+                semanticLabel: t.settings,
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => SettingsScreen(
+                      locale: widget.locale, userId: widget.session.subject),
+                )),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md),
+          YdSearchField(
+            controller: _searchController,
+            hintText: t.searchShops,
+            onChanged: _onSearchChanged,
+            searchSemanticLabel: t.searchShops,
+            filterSemanticLabel: t.custFilters,
+            filterIcon: Icons.tune,
+            onFilterTap: () => setState(() => _filtersOpen = !_filtersOpen),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _locationRow() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return InkWell(
+      onTap: () => showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi),
+      borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.xs),
+        child: Row(
+          children: <Widget>[
+            const Icon(Icons.location_on_outlined, size: 20, color: DeliveryColors.brand),
+            const SizedBox(width: DeliverySpacing.sm),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(t.deliverTo,
+                      style: const TextStyle(
+                          fontSize: 12, color: DeliveryColors.faint, height: 1.25)),
+                  Text(
+                    widget.addresses.headerLabelOr(t.setDeliveryAddress),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: DeliveryColors.ink,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: DeliverySpacing.xs),
+            const Icon(Icons.keyboard_arrow_down, size: 16, color: DeliveryColors.ink),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _headerAction({
+    required IconData icon,
+    required String semanticLabel,
+    required VoidCallback onPressed,
+    int badgeCount = 0,
+  }) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          Material(
+            color: DeliveryColors.background,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onPressed,
+              child: SizedBox.square(
+                dimension: 32,
+                child: Icon(icon, size: 18, color: DeliveryColors.ink),
+              ),
+            ),
+          ),
+          if (badgeCount > 0)
+            PositionedDirectional(
+              top: -4,
+              end: -4,
+              child: Container(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: DeliveryColors.brand,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.white,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The horizontally scrolling pill strip. Ends in the door to the full directory — the design
+  /// gives the categories screen no other entrance.
+  Widget _categoryStrip() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<StoreVertical> verticals = _chipVerticals;
+
+    return SizedBox(
+      height: YdChip.minHeight + DeliverySpacing.xl,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            _gutter, DeliverySpacing.md, DeliverySpacing.md, DeliverySpacing.md),
+        children: <Widget>[
+          YdChip(
+            label: t.all,
+            icon: Icons.apps,
+            elevated: true,
+            selected: _filters.vertical == null,
+            onTap: () => _selectVertical(null),
+          ),
+          for (final StoreVertical vertical in verticals) ...<Widget>[
+            const SizedBox(width: 10),
+            YdChip(
+              label: _chipLabel(vertical),
+              icon: iconForVertical(vertical),
+              elevated: true,
+              selected: _filters.vertical == vertical,
+              onTap: () => _selectVertical(vertical),
+            ),
+          ],
+          const SizedBox(width: 10),
+          YdChip(
+            label: t.custSeeAll,
+            icon: Icons.grid_view_outlined,
+            elevated: true,
+            onTap: _openCategories,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The refine row the sliders glyph opens, in the same pill language as the strip above it.
+  Widget _filterRow() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return SizedBox(
+      height: YdChip.minHeight + DeliverySpacing.md,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            _gutter, 0, DeliverySpacing.md, DeliverySpacing.md),
+        children: <Widget>[
+          YdChip(
+            label: t.filterOffers,
+            icon: Icons.local_offer_outlined,
+            selected: _filters.offersOnly,
+            onTap: () => setState(
+                () => _filters = _filters.copyWith(offersOnly: !_filters.offersOnly)),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          YdChip(
+            label: t.filterUnder30,
+            icon: Icons.bolt_outlined,
+            selected: _filters.maxEtaMinutes != null,
+            onTap: () {
+              setState(() => _filters = _filters.maxEtaMinutes == null
+                  ? _filters.copyWith(maxEtaMinutes: 30)
+                  : _filters.copyWith(clearEta: true));
+              _reloadStoresOnly();
+            },
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          YdChip(
+            label: t.filterFreeDelivery,
+            icon: Icons.two_wheeler_outlined,
+            selected: _filters.maxDeliveryFee != null,
+            onTap: () {
+              setState(() => _filters = _filters.maxDeliveryFee == null
+                  ? _filters.copyWith(maxDeliveryFee: 0)
+                  : _filters.copyWith(clearFee: true));
+              _reloadStoresOnly();
+            },
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          YdChip(
+            label: t.filterHighlyRated,
+            icon: Icons.star_outline_rounded,
+            selected: _filters.minRating != null,
+            onTap: () {
+              setState(() => _filters = _filters.minRating == null
+                  ? _filters.copyWith(minRating: 4.5)
+                  : _filters.copyWith(clearRating: true));
+              _reloadStoresOnly();
+            },
+          ),
+          if (_filters.isActive) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.sm),
+            YdChip(
+              label: t.clear,
+              icon: Icons.close,
+              onTap: () {
+                setState(() => _filters = _filters.cleared());
+                _reloadStoresOnly();
+              },
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -336,228 +607,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         ),
       );
     }
-    if (!_stores.hasMore && _stores.items.length > 8) {
-      return const Padding(
-        padding: EdgeInsets.all(DeliverySpacing.lg),
-        child: Center(
-          child: Text("That's every shop delivering to you",
-              style: TextStyle(fontSize: 12.5, color: DeliveryColors.muted)),
-        ),
-      );
-    }
     return const SizedBox.shrink();
-  }
-
-  Widget _appBar() {
-    return SliverAppBar(
-      pinned: true,
-      backgroundColor: DeliveryColors.brand,
-      foregroundColor: DeliveryColors.white,
-      elevation: 0,
-      // The mark, not a back arrow — this is the root of the app. The title stays the delivery
-      // address, which is the one thing on this bar the customer needs to check and change.
-      leading: const Padding(
-        padding: EdgeInsets.only(left: DeliverySpacing.md),
-        child: Center(child: DeliveryLogo.mark(size: 26)),
-      ),
-      leadingWidth: 26 + DeliverySpacing.md + DeliverySpacing.sm,
-      titleSpacing: DeliverySpacing.sm,
-      title: InkWell(
-        onTap: () => showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi),
-        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(DeliveryStrings.of(context).deliverTo,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, height: 1.1)),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Flexible(
-                    child: Text(
-                      widget.addresses.headerLabelOr(DeliveryStrings.of(context).setDeliveryAddress),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700, height: 1.3),
-                    ),
-                  ),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-      // Ordered so settings sits at the very end of the bar and alerts just inside it. In Arabic
-      // the whole row mirrors, which is what should happen — settings stays at the end, and the
-      // end is the left.
-      actions: <Widget>[
-        // Alerts live here rather than in the bottom bar: notifications are something you glance
-        // at, not a place you navigate to, and the badge is visible from every tab this way.
-        IconButton(
-          tooltip: DeliveryStrings.of(context).alerts,
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => NotificationsScreen(inbox: widget.inbox),
-          )),
-          icon: Badge(
-            isLabelVisible: widget.inbox.unread > 0,
-            label: Text('${widget.inbox.unread}'),
-            backgroundColor: DeliveryColors.white,
-            textColor: DeliveryColors.brand,
-            child: const Icon(Icons.notifications_outlined),
-          ),
-        ),
-        // Settings, not Account. Pushed rather than a tab: it is somewhere you go, change one
-        // thing, and leave — which is what a route means and what a tab does not.
-        IconButton(
-          tooltip: DeliveryStrings.of(context).settings,
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => SettingsScreen(
-                locale: widget.locale, userId: widget.session.subject),
-          )),
-          icon: const Icon(Icons.settings_outlined),
-        ),
-      ],
-    );
-  }
-
-  Widget _searchField() {
-    return Container(
-      color: DeliveryColors.brand,
-      padding: const EdgeInsets.fromLTRB(
-          DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md),
-      // Fully rounded, and lifted off the header. A search box is the one control on this screen
-      // somebody is looking for before they know what they want, so it reads as an object sitting
-      // on the page rather than as a slot cut into the header.
-      child: Material(
-        color: DeliveryColors.white,
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-        elevation: 0,
-        child: TextField(
-          controller: _searchController,
-          onChanged: _onSearchChanged,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: DeliveryStrings.of(context).searchShops,
-            hintStyle: const TextStyle(color: DeliveryColors.muted, fontSize: 14.5),
-            prefixIcon: const Icon(Icons.search_rounded, color: DeliveryColors.muted, size: 21),
-            suffixIcon: _searchController.text.isEmpty
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () {
-                      _searchController.clear();
-                      _onSearchChanged('');
-                    },
-                  ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-              borderSide: BorderSide.none,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: DeliverySpacing.md, vertical: DeliverySpacing.sm + 5),
-            isDense: true,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _filterBar() {
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(
-            horizontal: DeliverySpacing.md, vertical: DeliverySpacing.sm),
-        children: <Widget>[
-          _filterChip(
-            label: DeliveryStrings.of(context).filterOffers,
-            icon: Icons.local_offer_rounded,
-            selected: _filters.offersOnly,
-            onTap: () => setState(
-                () => _filters = _filters.copyWith(offersOnly: !_filters.offersOnly)),
-          ),
-          _filterChip(
-            label: DeliveryStrings.of(context).filterUnder30,
-            icon: Icons.bolt_rounded,
-            selected: _filters.maxEtaMinutes != null,
-            onTap: () {
-              setState(() => _filters = _filters.maxEtaMinutes == null
-                  ? _filters.copyWith(maxEtaMinutes: 30)
-                  : _filters.copyWith(clearEta: true));
-              _reloadStoresOnly();
-            },
-          ),
-          _filterChip(
-            label: DeliveryStrings.of(context).filterFreeDelivery,
-            icon: Icons.delivery_dining_rounded,
-            selected: _filters.maxDeliveryFee != null,
-            onTap: () {
-              setState(() => _filters = _filters.maxDeliveryFee == null
-                  ? _filters.copyWith(maxDeliveryFee: 0)
-                  : _filters.copyWith(clearFee: true));
-              _reloadStoresOnly();
-            },
-          ),
-          _filterChip(
-            label: '4.5+',
-            icon: Icons.star_rounded,
-            selected: _filters.minRating != null,
-            onTap: () {
-              setState(() => _filters = _filters.minRating == null
-                  ? _filters.copyWith(minRating: 4.5)
-                  : _filters.copyWith(clearRating: true));
-              _reloadStoresOnly();
-            },
-          ),
-          if (_filters.isActive)
-            TextButton.icon(
-              onPressed: () {
-                setState(() => _filters = _filters.cleared());
-                _reloadStoresOnly();
-              },
-              icon: const Icon(Icons.close_rounded, size: 16),
-              label: Text(DeliveryStrings.of(context).clear),
-              style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _filterChip({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(end: DeliverySpacing.sm),
-      child: FilterChip(
-        selected: selected,
-        onSelected: (_) => onTap(),
-        avatar: Icon(icon,
-            size: 16, color: selected ? DeliveryColors.white : DeliveryColors.muted),
-        label: Text(label),
-        labelStyle: TextStyle(
-          color: selected ? DeliveryColors.white : DeliveryColors.ink,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-        backgroundColor: DeliveryColors.white,
-        selectedColor: DeliveryColors.brand,
-        checkmarkColor: DeliveryColors.white,
-        showCheckmark: false,
-        side: BorderSide(color: selected ? DeliveryColors.brand : DeliveryColors.border),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DeliveryRadius.pill)),
-      ),
-    );
   }
 
   /// The banner carousel: full-bleed artwork the Backoffice curates.
@@ -565,18 +615,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// A horizontally paged strip rather than an auto-rotating carousel. Auto-rotation moves the
   /// thing a customer is reading out from under them, and it steals the first tap.
   Widget _bannerRail() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.only(top: DeliverySpacing.md),
-        child: SizedBox(
-          height: 150,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.md),
-            itemCount: _banners.length,
-            separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.sm + 4),
-            itemBuilder: (BuildContext context, int i) => _bannerCard(_banners[i]),
-          ),
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: DeliverySpacing.sm),
+      child: SizedBox(
+        height: 150,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
+          itemCount: _banners.length,
+          separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
+          itemBuilder: (BuildContext context, int i) => _bannerCard(_banners[i]),
         ),
       ),
     );
@@ -617,19 +665,22 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
 
               // Keeps the caption legible over whatever the artwork happens to be.
-              const DecoratedBox(
+              DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: <Color>[Colors.transparent, Colors.black87],
-                    stops: <double>[0.45, 1],
+                    colors: <Color>[
+                      Colors.transparent,
+                      DeliveryColors.ink.withValues(alpha: 0.75),
+                    ],
+                    stops: const <double>[0.45, 1],
                   ),
                 ),
               ),
-              Positioned(
-                left: DeliverySpacing.md,
-                right: DeliverySpacing.md,
+              PositionedDirectional(
+                start: DeliverySpacing.md,
+                end: DeliverySpacing.md,
                 bottom: DeliverySpacing.md,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,9 +691,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                        color: DeliveryColors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
                     ),
@@ -652,8 +703,11 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                         banner.subtitle!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12.5, height: 1.3),
+                        style: TextStyle(
+                          color: DeliveryColors.white.withValues(alpha: 0.82),
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
                       ),
                     ],
                   ],
@@ -695,70 +749,113 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   }
 
   Widget _offersRail() {
-    return SliverToBoxAdapter(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              _gutter, DeliverySpacing.md, _gutter, DeliverySpacing.md - 4),
+          child: YdSectionHeader(
+              title: DeliveryStrings.of(context).offersForYou, fontSize: 18),
+        ),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
+            itemCount: _platformOffers.length,
+            separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
+            itemBuilder: (BuildContext context, int i) {
+              final Offer offer = _platformOffers[i];
+              return Container(
+                width: 258,
+                padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: <Color>[DeliveryColors.brand, DeliveryColors.brandDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text(
+                            offer.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: DeliveryColors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (offer.subtitle != null) ...<Widget>[
+                            const SizedBox(height: DeliverySpacing.xs),
+                            Text(
+                              offer.subtitle!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: DeliveryColors.white.withValues(alpha: 0.82),
+                                fontSize: 12,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.local_offer_outlined,
+                        color: DeliveryColors.white.withValues(alpha: 0.25), size: 40),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The `featured-section`: a Bold 18 heading with a text action, over a rail of 260px shop
+  /// cards. The shops on it are the customer's own starred ones.
+  Widget _featuredSection() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          SectionHeader(title: DeliveryStrings.of(context).offersForYou),
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.md - 4),
+            child: YdSectionHeader(
+              title: t.yourFavourites,
+              fontSize: 18,
+              actionLabel: t.custSeeAll,
+              // The favourites are shops, so "See All" means the shop list filtered to them —
+              // which is this screen's own grid with the starred ones at the top of it.
+              onAction: () => _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              ),
+            ),
+          ),
           SizedBox(
-            height: 96,
+            height: _shopCardHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.md),
-              itemCount: _platformOffers.length,
-              separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.sm + 4),
-              itemBuilder: (BuildContext context, int i) {
-                final Offer offer = _platformOffers[i];
-                return Container(
-                  width: 258,
-                  padding: const EdgeInsets.all(DeliverySpacing.md),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: <Color>[DeliveryColors.brand, DeliveryColors.brandDark],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(DeliveryRadius.lg),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            Text(
-                              offer.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: DeliveryColors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (offer.subtitle != null) ...<Widget>[
-                              const SizedBox(height: DeliverySpacing.xs),
-                              Text(
-                                offer.subtitle!,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 12.5,
-                                  height: 1.25,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.local_offer_rounded,
-                          color: Colors.white24, size: 40),
-                    ],
-                  ),
-                );
-              },
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
+              itemCount: _favorites.length,
+              separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
+              itemBuilder: (BuildContext context, int i) => _shopCard(_favorites[i]),
             ),
           ),
         ],
@@ -766,116 +863,260 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     );
   }
 
-  Widget _favoritesRail() {
-    return SizedBox(
-      height: 116,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.md),
-        itemCount: _favorites.length,
-        separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.sm + 4),
-        itemBuilder: (BuildContext context, int i) {
-          final StoreCard store = _favorites[i];
-          return StorefrontMiniCard(
-            name: store.name,
-            state: storeStateOf(store.availability),
-            etaLabel: store.etaLabel,
-            logoUrl: store.logoUrl,
-            rating: store.rating,
-            onTap: () => _openStore(store),
-          );
-        },
+  static const double _shopCoverHeight = 130;
+  static const double _shopCardHeight = 208;
+
+  /// `shop-card`: a 260px card, a 130px cover, then the name and the meta line.
+  Widget _shopCard(StoreCard store) {
+    return CoverCard(
+      width: 260,
+      onTap: () => _openStore(store),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          CustomerPhoto(
+            url: store.coverUrl,
+            width: double.infinity,
+            height: _shopCoverHeight,
+            icon: iconForVertical(store.vertical),
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  store.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: DeliverySpacing.sm),
+                _storeMeta(store),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  /// The meta line the design draws under a shop's name: rating, bullet, ETA, bullet, and the
+  /// delivery flag in green when it is free.
+  ///
+  /// [compact] drops the delivery flag. The two-up card is 171px wide — the width the frame itself
+  /// draws it at — and three values plus two separators do not fit there at 12px in either
+  /// language. The fee is one tap away on the shop page and is still on the wider carousel card;
+  /// an ellipsised ETA would have cost more than it saved.
+  Widget _storeMeta(StoreCard store, {bool compact = false}) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final DeliveryStoreState state = storeStateOf(store.availability);
+    final bool free = store.deliveryFee == 0;
+    final bool closed = state == DeliveryStoreState.closed;
+
+    return Row(
+      children: <Widget>[
+        if (store.rating != null) ...<Widget>[
+          Icon(Icons.star_rounded, size: 14, color: DeliveryAccent.caution.color),
+          const SizedBox(width: DeliverySpacing.xs),
+          Text(
+            store.rating!.toStringAsFixed(1),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: DeliveryColors.ink,
+            ),
+          ),
+          const _MetaBullet(),
+        ],
+        // A shut shop is the thing worth reading first; an ETA it will not honour is noise.
+        Flexible(
+          child: Text(
+            closed ? t.statusClosed : store.etaLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: closed ? FontWeight.w600 : FontWeight.w400,
+              color: closed ? DeliveryColors.faint : DeliveryColors.muted,
+            ),
+          ),
+        ),
+        if (!compact && !closed) ...<Widget>[
+          const _MetaBullet(),
+          Flexible(
+            child: Text(
+              free ? t.freeDelivery : store.deliveryFee.toStringAsFixed(2),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: free ? DeliveryAccent.positive.color : DeliveryColors.muted,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// The full shop list, in the design's two-up card.
+  ///
+  /// The frame draws `Popular Right Now` here — a two-up grid of *products* with a one-tap add.
+  /// There is no cross-shop product feed to fill it from (products are read per store), so the
+  /// grid holds what this screen actually browses, shops, in the same card geometry with the shop
+  /// meta line where the design puts the price row.
   Widget _storeGrid() {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.md),
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
       sliver: SliverGrid(
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          // A single column on a phone, two or more on a tablet or the web build, without a
-          // breakpoint table to maintain.
-          maxCrossAxisExtent: 460,
-          mainAxisSpacing: DeliverySpacing.md,
-          crossAxisSpacing: DeliverySpacing.md,
-          // Fixed height rather than an aspect ratio: the card's content is a fixed stack of
-          // rows, so a ratio would stretch the cover on wide screens and clip the text on narrow
-          // ones.
-          mainAxisExtent: 236,
+          // Two columns on a phone; more on a tablet or the web build, without a breakpoint table
+          // to maintain.
+          maxCrossAxisExtent: 230,
+          mainAxisSpacing: DeliverySpacing.md - 4,
+          crossAxisSpacing: DeliverySpacing.md - 4,
+          mainAxisExtent: _itemCardHeight,
         ),
         delegate: SliverChildBuilderDelegate(
-          (BuildContext context, int i) {
-            final StoreCard store = _visibleStores[i];
-            return StorefrontCard(
-              name: store.name,
-              tagline: store.tagline,
-              tags: store.tags,
-              state: storeStateOf(store.availability),
-              etaLabel: store.etaLabel,
-              feeLabel: store.feeLabel,
-              rating: store.rating,
-              ratingCount: store.ratingCount,
-              coverUrl: store.coverUrl,
-              logoUrl: store.logoUrl,
-              offerLabel: store.topOffer?.badgeLabel,
-              favorite: store.favorite,
-              onTap: () => _openStore(store),
-              onFavoriteToggled: () => _toggleFavorite(store),
-            );
-          },
+          (BuildContext context, int i) => _itemCard(_visibleStores[i]),
           childCount: _visibleStores.length,
         ),
       ),
     );
   }
 
-  Widget _emptyState() {
-    return Padding(
-      padding: const EdgeInsets.all(DeliverySpacing.xl),
+  static const double _itemCoverHeight = 100;
+  static const double _itemCardHeight = 192;
+
+  Widget _itemCard(StoreCard store) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return YdCard(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+      onTap: () => _openStore(store),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Container(
-            padding: const EdgeInsets.all(DeliverySpacing.md),
-            decoration: const BoxDecoration(
-                color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-            child: const Icon(Icons.storefront_rounded,
-                size: 32, color: DeliveryColors.brand),
+          Stack(
+            children: <Widget>[
+              CustomerPhoto(
+                url: store.coverUrl,
+                height: _itemCoverHeight,
+                width: double.infinity,
+                radius: DeliveryRadius.md,
+                icon: iconForVertical(store.vertical),
+              ),
+              if (store.topOffer != null)
+                PositionedDirectional(
+                  top: DeliverySpacing.sm,
+                  start: DeliverySpacing.sm,
+                  child: YdBadge.brand(label: store.topOffer!.badgeLabel, fontSize: 10),
+                ),
+              PositionedDirectional(
+                top: DeliverySpacing.xs,
+                end: DeliverySpacing.xs,
+                // Starring is a live feature the frame has no slot for; it goes where a favourite
+                // always goes, in the corner of the picture.
+                child: GestureDetector(
+                  onTap: () => _toggleFavorite(store),
+                  child: Semantics(
+                    button: true,
+                    label: store.favorite ? t.removeFromFavourites : t.addToFavourites,
+                    child: Container(
+                      padding: const EdgeInsetsDirectional.all(5),
+                      decoration: BoxDecoration(
+                        color: DeliveryColors.white.withValues(alpha: 0.85),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        store.favorite ? Icons.favorite : Icons.favorite_border,
+                        size: 14,
+                        color: DeliveryColors.brand,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: DeliverySpacing.md),
-          Text(DeliveryStrings.of(context).noShopsMatch,
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          const SizedBox(height: DeliverySpacing.xs),
+          const SizedBox(height: DeliverySpacing.sm),
           Text(
-            _filters.isActive
-                ? DeliveryStrings.of(context).tryClearingAFilter
-                : DeliveryStrings.of(context).nothingDeliveringHere,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: DeliveryColors.muted),
+            store.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.ink,
+              height: 1.25,
+            ),
           ),
+          const SizedBox(height: DeliverySpacing.sm),
+          _storeMeta(store, compact: true),
         ],
       ),
     );
   }
 
-  Widget _errorState() {
+  Widget _emptyState() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Padding(
-      padding: const EdgeInsets.all(DeliverySpacing.xl),
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.xl),
+      child: YdEmptyState(
+        icon: Icons.storefront,
+        title: t.noShopsMatch,
+        message: _filters.isActive ? t.tryClearingAFilter : t.nothingDeliveringHere,
+      ),
+    );
+  }
+
+  Widget _errorState() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.xl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          const Icon(Icons.cloud_off_rounded, size: 40, color: DeliveryColors.muted),
+          const Icon(Icons.cloud_off_rounded, size: 40, color: DeliveryColors.faint),
           const SizedBox(height: DeliverySpacing.md),
-          Text(DeliveryStrings.of(context).couldNotLoadStorefront,
-              style: TextStyle(fontWeight: FontWeight.w700)),
+          Text(t.couldNotLoadStorefront,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 16, color: DeliveryColors.ink)),
           const SizedBox(height: DeliverySpacing.xs),
           Text('$_error',
               textAlign: TextAlign.center,
               style: const TextStyle(color: DeliveryColors.muted, fontSize: 12)),
           const SizedBox(height: DeliverySpacing.md),
-          FilledButton(onPressed: _load, child: Text(DeliveryStrings.of(context).tryAgain)),
+          YdPillButton(
+            label: t.tryAgain,
+            onPressed: _load,
+            size: YdPillButtonSize.compact,
+            expand: false,
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// The faint bullet the design puts between meta values.
+class _MetaBullet extends StatelessWidget {
+  const _MetaBullet();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.sm - 2),
+      child: Text('•', style: TextStyle(fontSize: 12, color: DeliveryColors.faint)),
     );
   }
 }

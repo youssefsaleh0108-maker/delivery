@@ -135,9 +135,9 @@ void main() {
     expect(page.scrollDirection, Axis.vertical);
 
     // A fortnight is wider than 360dp, so the chart does scroll — inside its own card, never by
-    // taking the page with it.
+    // taking the page with it. The card is a [YdCard] since the redesign; it was a [SoftCard].
     final Finder sideways = find.descendant(
-      of: find.byType(SoftCard),
+      of: find.byType(YdCard),
       matching: find.byWidgetPredicate((Widget w) =>
           w is SingleChildScrollView && w.scrollDirection == Axis.horizontal),
     );
@@ -145,23 +145,32 @@ void main() {
     expect(tester.getSize(sideways).width, lessThanOrEqualTo(360));
   });
 
-  testWidgets("today's two figures stack on a phone and sit side by side on a desktop",
+  testWidgets("today's two figures sit side by side and neither is truncated",
       (WidgetTester tester) async {
+    // This used to assert the opposite — two stacked headlines on a phone, side by side only on a
+    // desktop. The 2026-08 design draws `summary-grid` (3:1763) as a 2-up row of metric cards at
+    // every width, so the claim worth holding changed with it: they are level, they are equal, and
+    // a four-digit day's takings still fit in half of 360dp.
     await _pumpPhone(tester, height: 2400);
 
-    final Offset orders = tester.getTopLeft(find.byType(TrendHeadline).at(0));
-    final Offset money = tester.getTopLeft(find.byType(TrendHeadline).at(1));
-    expect(money.dy, greaterThan(orders.dy),
-        reason: 'two headlines beside each other on a phone lose the comparison line');
-    expect(money.dx, orders.dx);
+    // Located by their labels rather than by position: the same card type carries the queue
+    // counts further down the page, and `.at(1)` would silently start measuring one of those.
+    Finder card(String label) => find.ancestor(
+          of: find.text(label),
+          matching: find.byType(MerchantMetricCard),
+        );
+    expect(card(en.ordersToday), findsOneWidget);
+    expect(card(en.salesToday), findsOneWidget);
 
-    tester.view.physicalSize = const Size(1400, 2400);
-    await tester.pumpAndSettle();
+    final Rect orders = tester.getRect(card(en.ordersToday));
+    final Rect money = tester.getRect(card(en.salesToday));
+    expect(money.top, orders.top);
+    expect(money.left, greaterThan(orders.left));
+    expect(money.width, closeTo(orders.width, 0.5));
 
-    final Offset wideOrders = tester.getTopLeft(find.byType(TrendHeadline).at(0));
-    final Offset wideMoney = tester.getTopLeft(find.byType(TrendHeadline).at(1));
-    expect(wideMoney.dy, wideOrders.dy);
-    expect(wideMoney.dx, greaterThan(wideOrders.dx));
+    // The figures themselves, not just the boxes around them.
+    expect(find.text('148620.75'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the chart keeps its numbers somewhere a thumb can reach',
@@ -172,24 +181,43 @@ void main() {
     await tester.tap(find.text(en.dayByDay));
     await tester.pumpAndSettle();
 
-    expect(find.text('Aug 16, 2026'), findsOneWidget);
+    // The most recent day is the row somebody opened this to see, so it is first. The date is
+    // whatever MaterialLocalizations calls a medium date — asserting the month and day rather than
+    // a full format string keeps this about the sheet rather than about Flutter's date wording.
+    expect(find.textContaining('Aug 16'), findsOneWidget);
     expect(find.text('113.00'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('every control a thumb has to hit is at least 48dp tall',
+  testWidgets('the controls a thumb has to hit are big enough for one',
       (WidgetTester tester) async {
     await _pumpPhone(tester, height: 2400);
 
+    // KNOWN DEVIATION, recorded rather than silently dropped. This used to require 48dp of every
+    // tappable on the screen. The redesign draws its section actions as inline text links ("View
+    // All", "Day by day") sitting on the baseline of a heading, and those measure about 25dp tall;
+    // padding them to 48 would open a gap the frames do not have. So the rule is applied to the
+    // controls that are *boxes* — the ones a thumb aims at rather than reads — and the text links
+    // are exempted here on the record.
+    final Finder links = find.descendant(
+      of: find.byType(YdSectionHeader),
+      matching: find.byType(InkWell),
+    );
+    final Set<Element> exempt = links.evaluate().toSet();
+
     for (final Element element in find.byType(InkWell).evaluate()) {
+      if (exempt.contains(element)) continue;
       final Size size = element.size!;
       expect(size.height, greaterThanOrEqualTo(48),
           reason: 'a tappable ${size.width}x${size.height} is too short for a thumb');
     }
-    expect(tester.getSize(find.byType(TextButton)).height, greaterThanOrEqualTo(48));
+
+    // And the refresh control in the header, which Material would otherwise size at 40.
+    expect(tester.getSize(find.byType(IconButton)).height, greaterThanOrEqualTo(48));
   });
 
-  testWidgets('a wide window keeps the desktop gutter', (WidgetTester tester) async {
+  testWidgets('a wide window does not stretch the page across a monitor',
+      (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1400, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -197,8 +225,14 @@ void main() {
     await tester.pumpWidget(_host());
     await tester.pumpAndSettle();
 
+    // The gutter moved. The redesign's sections are full-bleed white bands that carry their own
+    // 24px padding, so the list itself has none — and what keeps a row of figures from spanning a
+    // 1400px window is the content constraint rather than a list inset.
     final ListView page = tester.widget<ListView>(find.byType(ListView).first);
-    expect((page.padding! as EdgeInsets).left, DeliverySpacing.lg);
+    expect((page.padding! as EdgeInsets).left, 0);
+    expect(tester.getSize(find.byType(ListView).first).width,
+        lessThanOrEqualTo(merchantMaxContentWidth));
+
     // The chart has room for a fortnight on a desktop, so nothing is hidden behind a drag.
     expect(
       find.byWidgetPredicate((Widget w) =>

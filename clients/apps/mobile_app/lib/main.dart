@@ -17,7 +17,7 @@ import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
 import 'src/welcome_screen.dart';
-import 'src/merchant_home_screen.dart';
+import 'src/merchant_shell.dart';
 import 'src/rider_home_screen.dart';
 
 /// One codebase, two very different users.
@@ -103,6 +103,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
   late final StoreApi _storeApi = StoreApi(_dio);
   late final OrderApi _orderApi = OrderApi(_dio);
+
+  /// The shop owner's own catalogue — a different endpoint from the storefront a customer browses,
+  /// because a merchant sees their unpublished and archived products too.
+  late final CatalogApi _catalogApi = CatalogApi(_dio);
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
   late final NotificationApi _notificationApi = NotificationApi(_dio);
@@ -118,6 +122,16 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       DeviceTokenRegistrar(dio: _dio, issuer: _issuer);
 
   final BiometricLock _biometrics = BiometricLock();
+
+  /// Counts returns from the explore route, and is the pending screen's key. See
+  /// [_exploreAsCustomer] for why a status screen needs one.
+  int _pendingEpoch = 0;
+
+  /// The app's own navigator, so a callback held by a screen can push without a [BuildContext].
+  ///
+  /// One key, created once and never rebuilt: a GlobalKey that changed identity between frames
+  /// would detach and re-attach the whole navigator, losing every route on it.
+  final GlobalKey<NavigatorState> _navigator = GlobalKey<NavigatorState>();
 
   /// Whether a restored session is still behind the lock screen.
   ///
@@ -232,6 +246,21 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   bool _applyingAsPartner = false;
   PartnerKind? _partnerKind;
 
+  /// True when the fork was shown on the way in.
+  ///
+  /// Decides where Back from the application form goes: to the fork if they came through it, and
+  /// all the way out to the welcome screen if they did not. Sending somebody back to a screen they
+  /// never saw is worse than one extra tap.
+  bool _forkedByChoice = false;
+
+  /// Enters the partner application. A null [kind] shows the fork; a kind skips straight to that
+  /// application's intro, which is what the redesigned welcome screen's role cards do.
+  void _applyAs(PartnerKind? kind) => setState(() {
+        _applyingAsPartner = true;
+        _partnerKind = kind;
+        _forkedByChoice = kind == null;
+      });
+
   /// Adopts a session from either form. Shared so the two screens cannot drift on what "signed in"
   /// means — sign-up signs the new account in directly rather than sending them back to a login.
   void _adoptSession(AuthSession session) {
@@ -275,11 +304,69 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     });
   }
 
+  /// The shopping surface, for whoever is entitled to it.
+  ///
+  /// A method rather than a literal in the branch below because two places build it: the role
+  /// branch, which is the whole app for a customer, and [_exploreAsCustomer], which pushes it over
+  /// the pending screen for somebody whose application has not been decided yet.
+  ///
+  /// [onSignOut] is a parameter for the same reason — see [_exploreAsCustomer].
+  Widget _customerShell(AuthSession session, {Future<void> Function()? onSignOut}) {
+    return CustomerShell(
+      // Keyed by the account. Without it Flutter may reuse the previous session's State when
+      // one user signs out and another signs in, and the screen would keep the first
+      // person's basket, address and inbox — the same class of bug as the shared storage key.
+      key: ValueKey<String?>(session.subject),
+      storeApi: _storeApi,
+      orderApi: _orderApi,
+      offerApi: _offerApi,
+      notificationApi: _notificationApi,
+      butlerApi: _butlerApi,
+      zoneApi: _zoneApi,
+      session: session,
+      locale: _locale,
+      onSignOut: onSignOut ?? _signOut,
+    );
+  }
+
+  /// The pending screen's "Explore Dashboard", made real.
+  ///
+  /// Everybody who reaches that screen holds APPLICANT and nothing else — a rider or a shop owner
+  /// whose application has not been decided. There is no dashboard for them yet: the merchant and
+  /// rider services refuse a token without the role, so mounting either shell would be a screenful
+  /// of 403s dressed as a product. What they *do* have, from the moment the account exists, is the
+  /// shopping surface — so that is where the button goes, and it works.
+  ///
+  /// Pushed rather than swapped in, so the system back gesture (and iOS's edge swipe, which
+  /// [MaterialPageRoute] gives us on that platform) returns to the application status they were
+  /// looking at. Signing out from inside pops back to the root first: without that, the route
+  /// would still be sitting on the stack above a welcome screen belonging to nobody.
+  Future<void> _exploreAsCustomer(AuthSession session) async {
+    await _navigator.currentState?.push(MaterialPageRoute<void>(
+      builder: (BuildContext context) => _customerShell(
+        session,
+        onSignOut: () async {
+          _navigator.currentState?.popUntil((Route<dynamic> route) => route.isFirst);
+          await _signOut();
+        },
+      ),
+    ));
+    // Coming back re-asks the server where the application got to.
+    //
+    // Load-bearing, not a nicety. The pending screen's one button is "Check again" until an
+    // Explore Dashboard exists to put there, and wiring this callback takes that button's place —
+    // so without a re-check on the way back, giving somebody the dashboard would have quietly
+    // taken away their only way to find out they had been approved. Bumping the key rebuilds the
+    // screen's State, which is what re-runs `api.mine()`.
+    if (mounted) setState(() => _pendingEpoch++);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _locale,
       builder: (BuildContext context, _) => MaterialApp(
+      navigatorKey: _navigator,
       // onGenerateTitle rather than title: the app name shown in the OS task switcher is resolved
       // after the localisations are in place, so it follows the chosen language too.
       onGenerateTitle: (BuildContext context) => DeliveryStrings.of(context).appTitle,
@@ -335,7 +422,13 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   });
                   _adoptSession(session);
                 },
-                onClose: () => setState(() => _partnerKind = null),
+                onClose: () => setState(() {
+                  if (_forkedByChoice) {
+                    _partnerKind = null;
+                  } else {
+                    _applyingAsPartner = false;
+                  }
+                }),
               );
             }
             switch (_gate) {
@@ -363,10 +456,17 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   onGoogle: null,
                   onSignIn: () => setState(() => _gate = _Gate.signIn),
                   onSignUp: () => setState(() => _gate = _Gate.signUp),
-                  onJoinAsPartner: () => setState(() {
-                    _applyingAsPartner = true;
-                    _partnerKind = null;
-                  }),
+                  onJoinAsPartner: () => _applyAs(null),
+                  // The design's welcome frame asks the question the choice screen used to ask —
+                  // three role cards, one tap each — so a card that already says "rider" goes
+                  // straight to the rider intro instead of to a screen asking which one again.
+                  // The fork is still there for anything that arrives without a kind.
+                  onJoinAsRider: () => _applyAs(PartnerKind.rider),
+                  onJoinAsMerchant: () => _applyAs(PartnerKind.merchant),
+                  // Drives the AR/EN pill. Somebody who cannot read the welcome screen has to be
+                  // able to change the language *from* it — every other language control in the
+                  // app is behind a sign-in.
+                  locale: _locale,
                 );
             }
           }
@@ -398,10 +498,14 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               !session.hasRole(DeliveryRole.delivery) &&
               !session.hasRole(DeliveryRole.carrier)) {
             return PendingApplicationScreen(
+              // Bumped when the explore route pops, which re-creates the State and re-reads the
+              // application. See [_exploreAsCustomer].
+              key: ValueKey<int>(_pendingEpoch),
               api: _onboardingApi,
               session: session,
               onSignOut: _signOut,
               onApproved: () => _signOut(),
+              onExplore: () => _exploreAsCustomer(session),
             );
           }
 
@@ -418,33 +522,23 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               onSignOut: _signOut,
             );
           }
-          // A merchant gets their queue, not a basket. Before this the branch knew only about
+          // A merchant gets their shop, not a basket. Before this the branch knew only about
           // riders and treated everyone else as a shopper, so the person running the shop landed
-          // in the storefront with no way to see their own orders.
+          // in the storefront with no way to see their own orders; then it gave them a queue and
+          // nothing else. The redesign gives them the four-tab app — dashboard, queue, catalogue,
+          // settings — mounting the same screens the web portal runs.
           if (session.hasRole(DeliveryRole.merchant)) {
-            return MerchantHomeScreen(
+            return MerchantShell(
               orderApi: _orderApi,
+              storeApi: _storeApi,
+              catalogApi: _catalogApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,
               onSignOut: _signOut,
             );
           }
-          return CustomerShell(
-            // Keyed by the account. Without it Flutter may reuse the previous session's State when
-            // one user signs out and another signs in, and the screen would keep the first
-            // person's basket, address and inbox — the same class of bug as the shared storage key.
-            key: ValueKey<String?>(session.subject),
-            storeApi: _storeApi,
-            orderApi: _orderApi,
-            offerApi: _offerApi,
-            notificationApi: _notificationApi,
-            butlerApi: _butlerApi,
-            zoneApi: _zoneApi,
-            session: session,
-            locale: _locale,
-            onSignOut: _signOut,
-          );
+          return _customerShell(session);
         },
       ),
       ),

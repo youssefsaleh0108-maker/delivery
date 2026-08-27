@@ -71,6 +71,7 @@ class OnboardingApplication {
     required this.rejectionReason,
     required this.provisionedUserRef,
     required this.provisionedEntityId,
+    this.details = const <String, String>{},
   });
 
   final String id;
@@ -98,6 +99,19 @@ class OnboardingApplication {
   final String? provisionedUserRef;
   final String? provisionedEntityId;
 
+  /// The wizard's free-form answers — vehicle, work region, business type, and whatever else the
+  /// signup flow asked for. The server has carried this since the application form grew steps the
+  /// fixed columns above could not hold; it is only now read on this side.
+  ///
+  /// Flattened to strings, and deliberately so: a reviewer reads these, they are never computed
+  /// against. A nested object arrives as its JSON rather than being dropped, because a detail the
+  /// reviewer cannot see is worse than one they have to squint at.
+  ///
+  /// Defaults to empty rather than being required — the applicant's own receipt does not carry it
+  /// (it can hold bank details), and older applications predate the field entirely. Every reader
+  /// must therefore treat "no details" as ordinary, not as an error.
+  final Map<String, String> details;
+
   bool get emailVerified => emailVerifiedAt != null;
   bool get phoneVerified => phoneVerifiedAt != null;
 
@@ -122,7 +136,19 @@ class OnboardingApplication {
         rejectionReason: json['rejectionReason'] as String?,
         provisionedUserRef: json['provisionedUserRef'] as String?,
         provisionedEntityId: json['provisionedEntityId'] as String?,
+        details: _details(json['details']),
       );
+
+  /// Anything that is not a JSON object reads as no details at all, including the null the receipt
+  /// shape sends. Values are stringified rather than filtered, so an answer of `false` or `0`
+  /// survives instead of vanishing.
+  static Map<String, String> _details(dynamic value) {
+    if (value is! Map) return const <String, String>{};
+    return <String, String>{
+      for (final MapEntry<dynamic, dynamic> e in value.entries)
+        if (e.value != null) e.key.toString(): e.value.toString(),
+    };
+  }
 
   static DateTime? _time(dynamic value) =>
       value == null ? null : DateTime.tryParse(value as String)?.toLocal();

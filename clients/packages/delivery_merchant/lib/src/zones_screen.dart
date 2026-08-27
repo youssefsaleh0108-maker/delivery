@@ -13,9 +13,6 @@ const double _oneColumnBelow = 600;
 
 /// A control tall enough to hit with a thumb.
 ///
-/// The button themes are padded for a mouse, which lands a few px short of the 48 a touch target
-/// wants. Only the phone layout needs this — a pointer hits a 36px button fine.
-///
 /// A minimum rather than a fixed height. Android scales text system-wide, and at the larger
 /// settings "Stop delivering here" wraps to a second line; a fixed 48 clips it instead of growing.
 Widget _thumbSized(Widget child) =>
@@ -29,6 +26,11 @@ Widget _thumbSized(Widget child) =>
 /// anywhere else is refused at placement rather than accepted and then abandoned.
 ///
 /// That switch is consequential enough to be stated on screen rather than discovered.
+///
+/// The 2026-08 Figma redesign has no frame of its own for this page — `merchant-shop-config`
+/// (3:2039) covers the shop's single fee and minimum, not the per-area overrides. So it is drawn
+/// in that frame's language instead: the same screen header, the same bordered cards with a 32px
+/// icon tile, the same tinted alert banner and the same brand button at radius 12.
 ///
 /// Rendered by the web portal beside a nav rail and by the Android app on a 360dp phone. One
 /// widget: the shape changes with the width it is given, not with which app is asking.
@@ -136,7 +138,8 @@ class _ZonesScreenState extends State<ZonesScreen> {
       useSafeArea: true,
       backgroundColor: DeliveryColors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.lg)),
+        // The redesign's sheet top.
+        borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.sheet)),
       ),
       builder: (BuildContext context) =>
           _TermsForm(zone: zone, existing: existing, asSheet: true),
@@ -146,91 +149,107 @@ class _ZonesScreenState extends State<ZonesScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         // The width this widget was handed, not the window's: in the portal the rail has already
         // taken its share, and that is the room the rows actually get.
         final bool narrow = constraints.maxWidth < _oneColumnBelow;
-        final double gutter = narrow ? DeliverySpacing.md : DeliverySpacing.lg;
 
-        return FutureBuilder<_Data>(
-          future: _data,
-          builder: (BuildContext context, AsyncSnapshot<_Data> snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
-            }
-            if (snapshot.hasError || snapshot.data?.store == null) {
-              return _refreshable(
-                gutter: gutter,
-                children: <Widget>[
-                  const SizedBox(height: DeliverySpacing.xxl),
-                  Text(
-                    t.noShopYet,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ],
-              );
-            }
+        return Scaffold(
+          backgroundColor: DeliveryColors.background,
+          body: Column(
+            children: <Widget>[
+              YdScreenHeader(title: t.deliveryAreas, subtitle: t.whereYouDeliver),
+              Expanded(
+                child: FutureBuilder<_Data>(
+                  future: _data,
+                  builder: (BuildContext context, AsyncSnapshot<_Data> snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: DeliveryColors.brand),
+                      );
+                    }
+                    if (snapshot.hasError || snapshot.data?.store == null) {
+                      return _refreshable(children: <Widget>[
+                        const SizedBox(height: DeliverySpacing.xxl),
+                        YdEmptyState(
+                          icon: Icons.storefront_outlined,
+                          title: t.noShopYet,
+                          message: t.shopCreatedAutomatically,
+                        ),
+                      ]);
+                    }
 
-            final _Data data = snapshot.data!;
-            final Store store = data.store!;
-            final Map<String, ZoneCoverage> covered = <String, ZoneCoverage>{
-              for (final ZoneCoverage c in data.coverage) c.zoneId: c,
-            };
+                    final _Data data = snapshot.data!;
+                    final Store store = data.store!;
+                    final Map<String, ZoneCoverage> covered = <String, ZoneCoverage>{
+                      for (final ZoneCoverage c in data.coverage) c.zoneId: c,
+                    };
 
-            return _refreshable(
-              gutter: gutter,
-              children: <Widget>[
-                Text(
-                  t.deliveryAreas,
-                  style: narrow
-                      ? Theme.of(context).textTheme.titleLarge
-                      : Theme.of(context).textTheme.headlineMedium,
+                    return _refreshable(children: <Widget>[
+                      if (data.zones.isEmpty)
+                        _Banner(
+                          // Nothing for the merchant to do here until the platform defines areas.
+                          text: t.noAreasBlurb,
+                          accent: DeliveryAccent.info,
+                          icon: Icons.info_outline,
+                        )
+                      else ...<Widget>[
+                        if (covered.isEmpty)
+                          YdCard.bordered(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  t.flatFeeEverywhere,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: DeliveryColors.ink,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: DeliverySpacing.xs),
+                                Text(
+                                  t.flatFeeExplanation,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: DeliveryColors.muted,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          _Banner(
+                            // The consequence of having any coverage at all, said before it
+                            // surprises them.
+                            text: t.onlyTheseAreas,
+                            accent: DeliveryAccent.caution,
+                            icon: Icons.info_outline,
+                          ),
+                        const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                        Text(
+                          t.areasYouServe,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: DeliveryColors.ink,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                        for (final DeliveryZone zone in data.zones)
+                          _zoneRow(store, zone, covered[zone.id], t, narrow),
+                      ],
+                    ]);
+                  },
                 ),
-                const SizedBox(height: DeliverySpacing.xs),
-                Text(t.whereYouDeliver, style: Theme.of(context).textTheme.bodySmall),
-                const SizedBox(height: DeliverySpacing.lg),
-
-                if (data.zones.isEmpty)
-                  SoftCard(
-                    child: SoftNote(
-                      // Nothing for the merchant to do here until the platform defines areas.
-                      text: t.noAreasBlurb,
-                      accent: DeliveryAccent.info,
-                    ),
-                  )
-                else ...<Widget>[
-                  if (covered.isEmpty)
-                    SoftCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(t.flatFeeEverywhere,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                          const SizedBox(height: DeliverySpacing.xs),
-                          Text(t.flatFeeExplanation,
-                              style: const TextStyle(
-                                  fontSize: 13, color: DeliveryColors.muted, height: 1.35)),
-                        ],
-                      ),
-                    )
-                  else
-                    SoftNote(
-                      // The consequence of having any coverage at all, said before it surprises them.
-                      text: t.onlyTheseAreas,
-                      accent: DeliveryAccent.caution,
-                      icon: Icons.info_outline,
-                    ),
-                  const SizedBox(height: DeliverySpacing.lg),
-                  SectionLabel(t.areasYouServe),
-                  const SizedBox(height: DeliverySpacing.sm),
-                  for (final DeliveryZone zone in data.zones)
-                    _zoneRow(store, zone, covered[zone.id], t, narrow),
-                ],
-              ],
-            );
-          },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -238,14 +257,25 @@ class _ZonesScreenState extends State<ZonesScreen> {
 
   /// The page body. Always a scrollable, even when it holds one sentence, so the pull gesture is
   /// there on the states a phone most needs it on.
-  Widget _refreshable({required double gutter, required List<Widget> children}) {
+  Widget _refreshable({required List<Widget> children}) {
     return RefreshIndicator(
       onRefresh: _refresh,
       color: DeliveryColors.brand,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(gutter),
-        children: children,
+      child: Align(
+        alignment: AlignmentDirectional.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              DeliverySpacing.lg - DeliverySpacing.xs,
+              DeliverySpacing.lg - DeliverySpacing.xs,
+              DeliverySpacing.lg - DeliverySpacing.xs,
+              DeliverySpacing.lg - DeliverySpacing.xs + MediaQuery.paddingOf(context).bottom,
+            ),
+            children: children,
+          ),
+        ),
       ),
     );
   }
@@ -275,21 +305,48 @@ class _ZonesScreenState extends State<ZonesScreen> {
         ? null
         : () => _run(() => widget.api.dropCoverage(store.id, zone.id), t.saved);
 
+    // The frame's menu row: a 32px tile on the background token holding a 16px glyph, then the
+    // name over its detail line.
     final Widget heading = Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Icon(served ? Icons.check_circle_outline_rounded : Icons.radio_button_off_rounded,
-            size: 20, color: served ? DeliveryAccent.positive.color : DeliveryColors.muted),
-        const SizedBox(width: DeliverySpacing.sm),
+        Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: served ? DeliveryAccent.positive.tint : DeliveryColors.background,
+            borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+          ),
+          child: Icon(
+            served ? Icons.check_circle_outline_rounded : Icons.place_outlined,
+            size: 16,
+            color: served ? DeliveryAccent.positive.color : DeliveryColors.faint,
+          ),
+        ),
+        const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(zone.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-              if (detail.isNotEmpty)
-                Text(detail,
-                    style: const TextStyle(fontSize: 12.5, color: DeliveryColors.muted)),
+              Text(
+                zone.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryColors.ink,
+                  height: 1.25,
+                ),
+              ),
+              if (detail.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: const TextStyle(fontSize: 12, color: DeliveryColors.faint, height: 1.3),
+                ),
+              ],
             ],
           ),
         ),
@@ -297,19 +354,19 @@ class _ZonesScreenState extends State<ZonesScreen> {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
-      child: SoftCard(
-        accent: served ? DeliveryAccent.positive.color : null,
+      padding: const EdgeInsets.only(bottom: DeliverySpacing.md - DeliverySpacing.xs),
+      child: YdCard.bordered(
         child: narrow
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   heading,
-                  const SizedBox(height: DeliverySpacing.sm),
-                  _thumbSized(OutlinedButton.icon(
+                  const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                  _thumbSized(_WideButton(
+                    label: served ? t.edit : t.addAnArea,
+                    icon: served ? Icons.tune_rounded : Icons.add_rounded,
+                    primary: !served,
                     onPressed: edit,
-                    icon: Icon(served ? Icons.tune_rounded : Icons.add_rounded, size: 18),
-                    label: Text(served ? t.edit : t.addAnArea),
                   )),
                   if (served) ...<Widget>[
                     // Wider than the usual xs. Stacking full-width buttons puts a destructive
@@ -320,12 +377,11 @@ class _ZonesScreenState extends State<ZonesScreen> {
                     // does in a tooltip, and a tooltip on a phone is a control you have to press to
                     // find out what it was — which is the wrong way round for the one action here
                     // that throws away a price the shop set.
-                    _thumbSized(TextButton.icon(
+                    _thumbSized(_WideButton(
+                      label: t.stopDelivering,
+                      icon: Icons.close_rounded,
+                      destructive: true,
                       onPressed: drop,
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      label: Text(t.stopDelivering),
-                      style: TextButton.styleFrom(
-                          foregroundColor: DeliveryAccent.critical.color),
                     )),
                   ],
                 ],
@@ -333,16 +389,19 @@ class _ZonesScreenState extends State<ZonesScreen> {
             : Row(
                 children: <Widget>[
                   Expanded(child: heading),
-                  if (served)
+                  if (served) ...<Widget>[
                     IconButton(
                       tooltip: t.stopDelivering,
                       onPressed: drop,
-                      icon: const Icon(Icons.close_rounded, size: 18),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: DeliveryAccent.critical.color,
+                      ),
                     ),
-                  TextButton(
-                    onPressed: edit,
-                    child: Text(served ? t.edit : t.addAnArea),
-                  ),
+                    const SizedBox(width: DeliverySpacing.xs),
+                  ],
+                  _ChipButton(label: served ? t.edit : t.addAnArea, onPressed: edit),
                 ],
               ),
       ),
@@ -364,6 +423,167 @@ class _Terms {
   final double fee;
   final double? minOrder;
   final int etaExtra;
+}
+
+/// The redesign's alert banner: a 12% accent tint, a 1px line in the same accent at 28%, radius 12,
+/// a 16px glyph and Medium 12 copy.
+class _Banner extends StatelessWidget {
+  const _Banner({required this.text, required this.accent, required this.icon});
+
+  /// Already localised by the caller.
+  final String text;
+  final DeliveryAccent accent;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+      decoration: BoxDecoration(
+        color: accent.tint,
+        border: Border.all(color: accent.line),
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 16, color: accent.color),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: DeliveryColors.ink,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The frame's brand-tinted `Edit` chip, used here as the row's action.
+class _ChipButton extends StatelessWidget {
+  const _ChipButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.md);
+    return Semantics(
+      button: true,
+      child: Material(
+        color: DeliveryColors.brandSoft,
+        borderRadius: corners,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+              vertical: 6,
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: onPressed == null ? DeliveryColors.brandLine : DeliveryColors.brand,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The full-width action the phone layout stacks: radius 12, 12px padding, three dialects —
+/// filled brand, the quiet background-token fill, and the soft destructive tint.
+class _WideButton extends StatelessWidget {
+  const _WideButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.primary = false,
+    this.destructive = false,
+  });
+
+  /// Already localised by the caller.
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool primary;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onPressed != null;
+
+    late final Color background;
+    late final Color foreground;
+    Color? line;
+
+    if (destructive) {
+      background = DeliveryAccent.critical.tint;
+      foreground = DeliveryAccent.critical.color;
+      line = DeliveryAccent.critical.line;
+    } else if (primary) {
+      background = enabled ? DeliveryColors.brand : DeliveryColors.brandLine;
+      foreground = DeliveryColors.white;
+    } else {
+      background = DeliveryColors.background;
+      foreground = enabled ? DeliveryColors.muted : DeliveryColors.faint;
+    }
+
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.md);
+
+    return Semantics(
+      button: true,
+      child: Material(
+        color: background,
+        shape: RoundedRectangleBorder(
+          borderRadius: corners,
+          side: line == null ? BorderSide.none : BorderSide(color: line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(icon, size: 16, color: foreground),
+                const SizedBox(width: DeliverySpacing.sm),
+                Flexible(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: foreground,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// What this shop charges to reach one area.
@@ -413,53 +633,67 @@ class _TermsFormState extends State<_TermsForm> {
     return Form(
       key: _form,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          TextFormField(
-            controller: _fee,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(labelText: t.feeToHere),
-            validator: (String? v) {
-              final double? parsed = double.tryParse((v ?? '').trim());
-              if (parsed == null) return t.aNumber;
-              if (parsed < 0) return t.cannotBeNegative;
-              return null;
-            },
-          ),
-          const SizedBox(height: DeliverySpacing.sm),
-          TextFormField(
-            controller: _minOrder,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: t.minimumHere,
-              // Blank is meaningful, so it is spelled out rather than left to be guessed.
-              helperText: t.usesShopMinimum,
+          _Field(
+            label: t.feeToHere,
+            child: TextFormField(
+              controller: _fee,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              style: _valueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _boxDecoration(),
+              validator: (String? v) {
+                final double? parsed = double.tryParse((v ?? '').trim());
+                if (parsed == null) return t.aNumber;
+                if (parsed < 0) return t.cannotBeNegative;
+                return null;
+              },
             ),
-            validator: (String? v) {
-              if ((v ?? '').trim().isEmpty) return null;
-              final double? parsed = double.tryParse(v!.trim());
-              if (parsed == null) return t.aNumber;
-              if (parsed < 0) return t.cannotBeNegative;
-              return null;
-            },
           ),
-          const SizedBox(height: DeliverySpacing.sm),
-          TextFormField(
-            controller: _eta,
-            keyboardType: TextInputType.number,
-            // The last field, so the phone keyboard offers done rather than another next.
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _submit(),
-            decoration: InputDecoration(labelText: t.extraMinutes),
-            validator: (String? v) {
-              final int? parsed = int.tryParse((v ?? '').trim());
-              if (parsed == null) return t.aNumber;
-              if (parsed < 0) return t.cannotBeNegative;
-              return null;
-            },
+          const SizedBox(height: 14),
+          _Field(
+            label: t.minimumHere,
+            // Blank is meaningful, so it is spelled out rather than left to be guessed.
+            hint: t.usesShopMinimum,
+            child: TextFormField(
+              controller: _minOrder,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              style: _valueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _boxDecoration(),
+              validator: (String? v) {
+                if ((v ?? '').trim().isEmpty) return null;
+                final double? parsed = double.tryParse(v!.trim());
+                if (parsed == null) return t.aNumber;
+                if (parsed < 0) return t.cannotBeNegative;
+                return null;
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+          _Field(
+            label: t.extraMinutes,
+            child: TextFormField(
+              controller: _eta,
+              keyboardType: TextInputType.number,
+              // The last field, so the phone keyboard offers done rather than another next.
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _submit(),
+              style: _valueStyle,
+              cursorColor: DeliveryColors.brand,
+              decoration: _boxDecoration(),
+              validator: (String? v) {
+                final int? parsed = int.tryParse((v ?? '').trim());
+                if (parsed == null) return t.aNumber;
+                if (parsed < 0) return t.cannotBeNegative;
+                return null;
+              },
+            ),
           ),
         ],
       ),
@@ -472,21 +706,32 @@ class _TermsFormState extends State<_TermsForm> {
 
     if (!widget.asSheet) {
       return AlertDialog(
-        title: Text(widget.zone.name),
+        backgroundColor: DeliveryColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+        title: Text(
+          widget.zone.name,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+          ),
+        ),
         // Scrollable: three fields, each of which can grow a validation message, do not fit a
         // laptop window that also has a browser toolbar, and a dialog that cannot scroll overflows
         // rather than shrinking.
         scrollable: true,
-        content: _fields(t),
+        content: SizedBox(width: 360, child: _fields(t)),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
             child: Text(t.cancel),
           ),
-          FilledButton(
+          _WideButton(
+            label: t.save,
+            icon: Icons.check_rounded,
+            primary: true,
             onPressed: _submit,
-            style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
-            child: Text(t.save),
           ),
         ],
       );
@@ -499,8 +744,12 @@ class _TermsFormState extends State<_TermsForm> {
         // The sheet is already clear of the status bar; this is for the gesture bar under Save.
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(DeliverySpacing.md, DeliverySpacing.sm,
-              DeliverySpacing.md, DeliverySpacing.md),
+          padding: const EdgeInsets.fromLTRB(
+            DeliverySpacing.lg - DeliverySpacing.xs,
+            DeliverySpacing.sm,
+            DeliverySpacing.lg - DeliverySpacing.xs,
+            DeliverySpacing.lg - DeliverySpacing.xs,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -516,20 +765,100 @@ class _TermsFormState extends State<_TermsForm> {
                 ),
               ),
               const SizedBox(height: DeliverySpacing.md),
-              Text(widget.zone.name, style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                widget.zone.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryColors.ink,
+                ),
+              ),
               const SizedBox(height: DeliverySpacing.md),
               _fields(t),
               const SizedBox(height: DeliverySpacing.lg),
-              PrimaryAction(label: t.save, onPressed: _submit),
-              const SizedBox(height: DeliverySpacing.xs),
+              _WideButton(
+                label: t.save,
+                icon: Icons.check_rounded,
+                primary: true,
+                onPressed: _submit,
+              ),
+              const SizedBox(height: DeliverySpacing.sm),
               _thumbSized(TextButton(
                 onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
                 child: Text(t.cancel),
               )),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The redesign's input value: Regular 14 in ink.
+const TextStyle _valueStyle = TextStyle(
+  fontSize: 14,
+  color: DeliveryColors.ink,
+  height: 1.3,
+);
+
+/// The redesign's white bordered input box: radius 12, 12px padding all round.
+InputDecoration _boxDecoration() {
+  OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  return InputDecoration(
+    isDense: true,
+    filled: true,
+    fillColor: DeliveryColors.white,
+    contentPadding:
+        const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+    border: border(DeliveryColors.border),
+    enabledBorder: border(DeliveryColors.border),
+    focusedBorder: border(DeliveryColors.brand, 1.5),
+    errorBorder: border(DeliveryAccent.critical.color),
+    focusedErrorBorder: border(DeliveryAccent.critical.color, 1.5),
+    errorStyle: TextStyle(fontSize: 11, color: DeliveryAccent.critical.color),
+  );
+}
+
+/// A SemiBold 13 muted label over its field, with room for the one-line explanation the minimum
+/// field needs.
+class _Field extends StatelessWidget {
+  const _Field({required this.label, required this.child, this.hint});
+
+  final String label;
+  final String? hint;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: DeliveryColors.muted,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+        if (hint != null) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.xs),
+          Text(
+            hint!,
+            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.3),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -63,7 +63,7 @@ import 'app_localizations_en.dart';
 /// property.
 abstract class DeliveryStrings {
   DeliveryStrings(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class DeliveryStrings {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
-    Locale('en'),
+    Locale('en')
   ];
 
   /// No description provided for @appTitle.
@@ -103,6 +103,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'YouDrop'**
   String get appTitle;
+
+  /// No description provided for @navHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get navHome;
 
   /// No description provided for @navShops.
   ///
@@ -2323,6 +2329,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'No photo'**
   String get noPhoto;
+
+  /// Badge on a product thumbnail that carries more than one photo, and its label for assistive tech.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 photo} other{{count} photos}}'**
+  String photoCount(int count);
 
   /// No description provided for @archived.
   ///
@@ -4555,6 +4567,1872 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Day by day'**
   String get dayByDay;
+
+  /// No description provided for @authTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything delivered, anywhere'**
+  String get authTagline;
+
+  /// No description provided for @authRoleCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get authRoleCustomer;
+
+  /// No description provided for @authRoleCustomerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Order and get deliveries'**
+  String get authRoleCustomerBlurb;
+
+  /// No description provided for @authRoleRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get authRoleRider;
+
+  /// No description provided for @authRoleRiderBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver and earn'**
+  String get authRoleRiderBlurb;
+
+  /// No description provided for @authRoleMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant'**
+  String get authRoleMerchant;
+
+  /// No description provided for @authRoleMerchantBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell and grow your business'**
+  String get authRoleMerchantBlurb;
+
+  /// No description provided for @authAlreadyHaveAnAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get authAlreadyHaveAnAccount;
+
+  /// No description provided for @authDontHaveAnAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account?'**
+  String get authDontHaveAnAccount;
+
+  /// No description provided for @authSignUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign up'**
+  String get authSignUp;
+
+  /// No description provided for @authSignInSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your credentials to log in.'**
+  String get authSignInSubtitle;
+
+  /// No description provided for @authEmailOrPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or phone number'**
+  String get authEmailOrPhone;
+
+  /// No description provided for @authEmailOrPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. name@domain.com or +961…'**
+  String get authEmailOrPhoneHint;
+
+  /// No description provided for @authPasscodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your six-digit passcode'**
+  String get authPasscodeHint;
+
+  /// No description provided for @authForgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get authForgotPassword;
+
+  /// No description provided for @authUseTheKeypad.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the keypad'**
+  String get authUseTheKeypad;
+
+  /// No description provided for @authOrContinueWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Or continue with'**
+  String get authOrContinueWith;
+
+  /// No description provided for @authComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Soon'**
+  String get authComingSoon;
+
+  /// No description provided for @authShowPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show passcode'**
+  String get authShowPassword;
+
+  /// No description provided for @authHidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide passcode'**
+  String get authHidePassword;
+
+  /// No description provided for @authDeleteDigit.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete last digit'**
+  String get authDeleteDigit;
+
+  /// No description provided for @authCreateAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start getting anything delivered anywhere.'**
+  String get authCreateAccountSubtitle;
+
+  /// No description provided for @authFullName.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name'**
+  String get authFullName;
+
+  /// No description provided for @authFullNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Sarah Jenkins'**
+  String get authFullNameHint;
+
+  /// No description provided for @authEmailAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get authEmailAddress;
+
+  /// No description provided for @authEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. sarah.j@gmail.com'**
+  String get authEmailHint;
+
+  /// No description provided for @authPhoneNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get authPhoneNumber;
+
+  /// No description provided for @authPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'70 123 456'**
+  String get authPhoneHint;
+
+  /// No description provided for @authConfirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm passcode'**
+  String get authConfirmPassword;
+
+  /// No description provided for @authPasscodeKeepGoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep going'**
+  String get authPasscodeKeepGoing;
+
+  /// No description provided for @authPasscodeComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get authPasscodeComplete;
+
+  /// No description provided for @authAgreeToTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree to the terms and the privacy policy'**
+  String get authAgreeToTerms;
+
+  /// No description provided for @authTermsPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'By signing up, you agree to our '**
+  String get authTermsPrefix;
+
+  /// No description provided for @authTermsOfService.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get authTermsOfService;
+
+  /// No description provided for @authTermsAnd.
+  ///
+  /// In en, this message translates to:
+  /// **' and '**
+  String get authTermsAnd;
+
+  /// No description provided for @authPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get authPrivacyPolicy;
+
+  /// No description provided for @authPleaseAcceptTheTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Please accept the terms to continue.'**
+  String get authPleaseAcceptTheTerms;
+
+  /// No description provided for @authVerifyYourEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email'**
+  String get authVerifyYourEmail;
+
+  /// No description provided for @authVerifyYourNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your number'**
+  String get authVerifyYourNumber;
+
+  /// No description provided for @authStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get authStep;
+
+  /// No description provided for @authComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'complete'**
+  String get authComplete;
+
+  /// No description provided for @authNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get authNext;
+
+  /// No description provided for @authGetStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get authGetStarted;
+
+  /// No description provided for @authSubmitApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit application'**
+  String get authSubmitApplication;
+
+  /// No description provided for @authSendingApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending your application…'**
+  String get authSendingApplication;
+
+  /// No description provided for @authCouldNotSendApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not send your application. Nothing was lost — try again.'**
+  String get authCouldNotSendApplication;
+
+  /// No description provided for @authRiderIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join as a rider'**
+  String get authRiderIntroTitle;
+
+  /// No description provided for @authRiderIntroBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Flexible hours, competitive pay, and easy navigation — start delivering with YouDrop in a few minutes.'**
+  String get authRiderIntroBlurb;
+
+  /// No description provided for @authRiderBenefitHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Flexible hours'**
+  String get authRiderBenefitHours;
+
+  /// No description provided for @authRiderBenefitPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Competitive pay'**
+  String get authRiderBenefitPay;
+
+  /// No description provided for @authRiderBenefitNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Easy navigation'**
+  String get authRiderBenefitNavigation;
+
+  /// No description provided for @authWhatYouNeedToSignUp.
+  ///
+  /// In en, this message translates to:
+  /// **'What you\'ll need to sign up'**
+  String get authWhatYouNeedToSignUp;
+
+  /// No description provided for @authNeedValidId.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid ID'**
+  String get authNeedValidId;
+
+  /// No description provided for @authNeedDriversLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence'**
+  String get authNeedDriversLicence;
+
+  /// No description provided for @authNeedVehicleDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle documents'**
+  String get authNeedVehicleDocuments;
+
+  /// No description provided for @authMerchantSignUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant sign up'**
+  String get authMerchantSignUp;
+
+  /// No description provided for @authMerchantIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Register your business'**
+  String get authMerchantIntroTitle;
+
+  /// No description provided for @authMerchantIntroBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach more customers, manage products easily, and track performance in real time.'**
+  String get authMerchantIntroBlurb;
+
+  /// No description provided for @authWhatYouGet.
+  ///
+  /// In en, this message translates to:
+  /// **'What you\'ll get'**
+  String get authWhatYouGet;
+
+  /// No description provided for @authMerchantBenefitReach.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach more customers through our delivery network'**
+  String get authMerchantBenefitReach;
+
+  /// No description provided for @authMerchantBenefitManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Easy product management and order fulfilment'**
+  String get authMerchantBenefitManage;
+
+  /// No description provided for @authMerchantBenefitAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time analytics to optimise your sales'**
+  String get authMerchantBenefitAnalytics;
+
+  /// No description provided for @authWhatYouNeed.
+  ///
+  /// In en, this message translates to:
+  /// **'What you\'ll need'**
+  String get authWhatYouNeed;
+
+  /// No description provided for @authNeedBusinessLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Business licence'**
+  String get authNeedBusinessLicence;
+
+  /// No description provided for @authNeedTaxCertificate.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax certificate'**
+  String get authNeedTaxCertificate;
+
+  /// No description provided for @authNeedBankDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details'**
+  String get authNeedBankDetails;
+
+  /// No description provided for @authPersonalInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal information'**
+  String get authPersonalInformation;
+
+  /// No description provided for @authPersonalInformationBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill in your primary details to establish your rider profile.'**
+  String get authPersonalInformationBlurb;
+
+  /// No description provided for @authDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth'**
+  String get authDateOfBirth;
+
+  /// No description provided for @authDateOfBirthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DD / MM / YYYY'**
+  String get authDateOfBirthHint;
+
+  /// No description provided for @authNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID number'**
+  String get authNationalId;
+
+  /// No description provided for @authNationalIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'As printed on your ID'**
+  String get authNationalIdHint;
+
+  /// No description provided for @authVehicleDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle details'**
+  String get authVehicleDetails;
+
+  /// No description provided for @authVehicleDetailsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Select your vehicle category and register its official details.'**
+  String get authVehicleDetailsBlurb;
+
+  /// No description provided for @authVehicleType.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle type'**
+  String get authVehicleType;
+
+  /// No description provided for @authVehicleMotorcycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorcycle'**
+  String get authVehicleMotorcycle;
+
+  /// No description provided for @authVehicleCar.
+  ///
+  /// In en, this message translates to:
+  /// **'Car'**
+  String get authVehicleCar;
+
+  /// No description provided for @authVehicleBicycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bicycle'**
+  String get authVehicleBicycle;
+
+  /// No description provided for @authVehicleVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van'**
+  String get authVehicleVan;
+
+  /// No description provided for @authVehicleModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle make / model'**
+  String get authVehicleModel;
+
+  /// No description provided for @authVehicleModelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Yamaha TMAX / Toyota Yaris'**
+  String get authVehicleModelHint;
+
+  /// No description provided for @authPlateNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate number'**
+  String get authPlateNumber;
+
+  /// No description provided for @authPlateNumberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 1234 ABC'**
+  String get authPlateNumberHint;
+
+  /// No description provided for @authVehicleYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle year'**
+  String get authVehicleYear;
+
+  /// No description provided for @authVehicleYearHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 2024'**
+  String get authVehicleYearHint;
+
+  /// No description provided for @authSelectDeliveryZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Select delivery zone'**
+  String get authSelectDeliveryZone;
+
+  /// No description provided for @authSelectDeliveryZoneBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Which parts of the city do you prefer to deliver in?'**
+  String get authSelectDeliveryZoneBlurb;
+
+  /// No description provided for @authMapComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage map coming soon'**
+  String get authMapComingSoon;
+
+  /// No description provided for @authPreferredArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred area'**
+  String get authPreferredArea;
+
+  /// No description provided for @authPreferredAreaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Hamra, Achrafieh'**
+  String get authPreferredAreaHint;
+
+  /// No description provided for @authAvailableZones.
+  ///
+  /// In en, this message translates to:
+  /// **'Available zones'**
+  String get authAvailableZones;
+
+  /// No description provided for @authZonesComingSoonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Zones are not mapped yet'**
+  String get authZonesComingSoonTitle;
+
+  /// No description provided for @authZonesComingSoonBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickable delivery zones arrive with the coverage map. Until then, the area above is what we go by.'**
+  String get authZonesComingSoonBlurb;
+
+  /// No description provided for @authBusinessInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Business information'**
+  String get authBusinessInformation;
+
+  /// No description provided for @authBusinessInformationBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us about your company and the contact person.'**
+  String get authBusinessInformationBlurb;
+
+  /// No description provided for @authBusinessShopName.
+  ///
+  /// In en, this message translates to:
+  /// **'Business / shop name'**
+  String get authBusinessShopName;
+
+  /// No description provided for @authBusinessShopNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Rose Garden Pizzeria'**
+  String get authBusinessShopNameHint;
+
+  /// No description provided for @authOwnerFullName.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner full name'**
+  String get authOwnerFullName;
+
+  /// No description provided for @authOwnerFullNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Jane Cooper'**
+  String get authOwnerFullNameHint;
+
+  /// No description provided for @authBusinessType.
+  ///
+  /// In en, this message translates to:
+  /// **'Business type'**
+  String get authBusinessType;
+
+  /// No description provided for @authBusinessTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose one'**
+  String get authBusinessTypeHint;
+
+  /// No description provided for @authBusinessTypeRestaurant.
+  ///
+  /// In en, this message translates to:
+  /// **'Restaurant'**
+  String get authBusinessTypeRestaurant;
+
+  /// No description provided for @authBusinessTypeGrocery.
+  ///
+  /// In en, this message translates to:
+  /// **'Grocery'**
+  String get authBusinessTypeGrocery;
+
+  /// No description provided for @authBusinessTypePharmacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Pharmacy'**
+  String get authBusinessTypePharmacy;
+
+  /// No description provided for @authBusinessTypeBakery.
+  ///
+  /// In en, this message translates to:
+  /// **'Bakery'**
+  String get authBusinessTypeBakery;
+
+  /// No description provided for @authBusinessTypeRetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Retail'**
+  String get authBusinessTypeRetail;
+
+  /// No description provided for @authBusinessTypeOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get authBusinessTypeOther;
+
+  /// No description provided for @authContactEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact email address'**
+  String get authContactEmail;
+
+  /// No description provided for @authReviewAndSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and submit'**
+  String get authReviewAndSubmit;
+
+  /// No description provided for @authReviewAndSubmitBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Check what we are about to send. You can go back and change any of it.'**
+  String get authReviewAndSubmitBlurb;
+
+  /// No description provided for @authDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get authDocuments;
+
+  /// No description provided for @authDocumentsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'The papers we will need before you can start.'**
+  String get authDocumentsBlurb;
+
+  /// No description provided for @authDocumentsComingSoonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading opens shortly'**
+  String get authDocumentsComingSoonTitle;
+
+  /// No description provided for @authDocumentsComingSoonBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'You can finish your application without it — we will ask for the papers by email before you start.'**
+  String get authDocumentsComingSoonBlurb;
+
+  /// No description provided for @authBankDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details'**
+  String get authBankDetails;
+
+  /// No description provided for @authBankDetailsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Where your payouts will go.'**
+  String get authBankDetailsBlurb;
+
+  /// No description provided for @authBankComingSoonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout setup opens shortly'**
+  String get authBankComingSoonTitle;
+
+  /// No description provided for @authBankComingSoonBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'We never take bank details before a decision. You will set payouts up once you are approved.'**
+  String get authBankComingSoonBlurb;
+
+  /// No description provided for @authApplicationSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Application submitted'**
+  String get authApplicationSubmitted;
+
+  /// No description provided for @authApplicationSubmittedBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'We have your application and our operations team is reading it now.'**
+  String get authApplicationSubmittedBlurb;
+
+  /// No description provided for @authWhatToExpectNext.
+  ///
+  /// In en, this message translates to:
+  /// **'What to expect next'**
+  String get authWhatToExpectNext;
+
+  /// No description provided for @authExpectVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'We check your details (1–3 days)'**
+  String get authExpectVerification;
+
+  /// No description provided for @authExpectBackgroundCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Background check'**
+  String get authExpectBackgroundCheck;
+
+  /// No description provided for @authExpectTrainingInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation to rider training'**
+  String get authExpectTrainingInvite;
+
+  /// No description provided for @authWeWillNotifyYou.
+  ///
+  /// In en, this message translates to:
+  /// **'We will let you know by email as soon as there is a decision.'**
+  String get authWeWillNotifyYou;
+
+  /// No description provided for @authApplicationUnderReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Application under review'**
+  String get authApplicationUnderReview;
+
+  /// No description provided for @authApplicationUnderReviewBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you. Your registration is in and our team is checking it over. This usually takes a day or two.'**
+  String get authApplicationUnderReviewBlurb;
+
+  /// No description provided for @authExplorationModeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Exploration mode is on'**
+  String get authExplorationModeActive;
+
+  /// No description provided for @authExplorationModeBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'While you wait you can set your products and menus up and look around. Nothing goes live until you are approved.'**
+  String get authExplorationModeBlurb;
+
+  /// No description provided for @authApplicationChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Application checklist'**
+  String get authApplicationChecklist;
+
+  /// No description provided for @authChecklistAccountCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created'**
+  String get authChecklistAccountCreated;
+
+  /// No description provided for @authChecklistDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents uploaded'**
+  String get authChecklistDocuments;
+
+  /// No description provided for @authChecklistAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Security and compliance check'**
+  String get authChecklistAudit;
+
+  /// No description provided for @authChecklistActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop activated and published'**
+  String get authChecklistActivation;
+
+  /// No description provided for @authExploreDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore dashboard'**
+  String get authExploreDashboard;
+
+  /// No description provided for @custSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See All'**
+  String get custSeeAll;
+
+  /// No description provided for @custShowLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Less'**
+  String get custShowLess;
+
+  /// No description provided for @custAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All Categories'**
+  String get custAllCategories;
+
+  /// No description provided for @custFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get custFilters;
+
+  /// No description provided for @custMyBasket.
+  ///
+  /// In en, this message translates to:
+  /// **'My Basket'**
+  String get custMyBasket;
+
+  /// No description provided for @custPromoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo Code'**
+  String get custPromoCode;
+
+  /// No description provided for @custApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get custApply;
+
+  /// No description provided for @custOrderSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Summary'**
+  String get custOrderSummary;
+
+  /// No description provided for @custDiscounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Discounts'**
+  String get custDiscounts;
+
+  /// No description provided for @custTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Amount'**
+  String get custTotalAmount;
+
+  /// No description provided for @custProceedToCheckout.
+  ///
+  /// In en, this message translates to:
+  /// **'Proceed to Checkout'**
+  String get custProceedToCheckout;
+
+  /// No description provided for @custAddToBasket.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Basket'**
+  String get custAddToBasket;
+
+  /// No description provided for @custDeliveryTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Time'**
+  String get custDeliveryTime;
+
+  /// No description provided for @custMinOrderStat.
+  ///
+  /// In en, this message translates to:
+  /// **'Min. Order'**
+  String get custMinOrderStat;
+
+  /// No description provided for @custRatingsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No ratings} =1{1 Rating} other{{count} Ratings}}'**
+  String custRatingsCount(int count);
+
+  /// No description provided for @custShopsInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No shops} =1{1 Shop} other{{count} Shops}}'**
+  String custShopsInCategory(int count);
+
+  /// No description provided for @custPeopleAlsoOrdered.
+  ///
+  /// In en, this message translates to:
+  /// **'People Also Ordered'**
+  String get custPeopleAlsoOrdered;
+
+  /// No description provided for @custSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Soon'**
+  String get custSoon;
+
+  /// No description provided for @custIncreaseQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase quantity'**
+  String get custIncreaseQuantity;
+
+  /// No description provided for @custDecreaseQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease quantity'**
+  String get custDecreaseQuantity;
+
+  /// No description provided for @custSearchInShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this shop'**
+  String get custSearchInShop;
+
+  /// No description provided for @custShopSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the menu'**
+  String get custShopSearchHint;
+
+  /// No description provided for @custButlerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop Butler'**
+  String get custButlerTitle;
+
+  /// No description provided for @custChooseWhatYouNeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what you need help with'**
+  String get custChooseWhatYouNeed;
+
+  /// No description provided for @custBuyAnything.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy Anything'**
+  String get custBuyAnything;
+
+  /// No description provided for @custBuyAnythingBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'We buy & deliver from anywhere'**
+  String get custBuyAnythingBlurb;
+
+  /// No description provided for @custSendAnything.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Anything'**
+  String get custSendAnything;
+
+  /// No description provided for @custSendAnythingBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Courier, pick up, or send items'**
+  String get custSendAnythingBlurb;
+
+  /// No description provided for @custRecentTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent tasks'**
+  String get custRecentTasks;
+
+  /// No description provided for @custSearchTasksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search your errands'**
+  String get custSearchTasksHint;
+
+  /// No description provided for @custNoTasksMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No errands match that search'**
+  String get custNoTasksMatch;
+
+  /// No description provided for @custStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get custStatusPending;
+
+  /// No description provided for @custWaitingOnYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting on you'**
+  String get custWaitingOnYou;
+
+  /// No description provided for @custApplePay.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Pay'**
+  String get custApplePay;
+
+  /// No description provided for @custOrderNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Notes'**
+  String get custOrderNotes;
+
+  /// No description provided for @custOrderNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Leave package at the door, bell is not working...'**
+  String get custOrderNotesHint;
+
+  /// No description provided for @custTotalPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Price'**
+  String get custTotalPrice;
+
+  /// No description provided for @custPlaceOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Place Order'**
+  String get custPlaceOrder;
+
+  /// No description provided for @custOrderStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Status'**
+  String get custOrderStatus;
+
+  /// No description provided for @custOrderRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get custOrderRef;
+
+  /// No description provided for @custItemsOrdered.
+  ///
+  /// In en, this message translates to:
+  /// **'Items Ordered'**
+  String get custItemsOrdered;
+
+  /// No description provided for @custLiveMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Live map'**
+  String get custLiveMap;
+
+  /// No description provided for @custAccountSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get custAccountSettings;
+
+  /// No description provided for @custAppLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'App Language'**
+  String get custAppLanguage;
+
+  /// No description provided for @custMyAddresses.
+  ///
+  /// In en, this message translates to:
+  /// **'My Addresses'**
+  String get custMyAddresses;
+
+  /// No description provided for @custPaymentMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Methods'**
+  String get custPaymentMethods;
+
+  /// No description provided for @custOrderHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Order History'**
+  String get custOrderHistory;
+
+  /// No description provided for @custHelpSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get custHelpSupport;
+
+  /// No description provided for @custLabelAddressAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Label Address As:'**
+  String get custLabelAddressAs;
+
+  /// No description provided for @custLabelHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get custLabelHome;
+
+  /// No description provided for @custLabelWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get custLabelWork;
+
+  /// No description provided for @custLabelOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get custLabelOther;
+
+  /// No description provided for @merchTodaySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Summary'**
+  String get merchTodaySummary;
+
+  /// No description provided for @merchPendingOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Orders'**
+  String get merchPendingOrders;
+
+  /// No description provided for @merchNewOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'New Orders'**
+  String get merchNewOrders;
+
+  /// No description provided for @merchView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get merchView;
+
+  /// No description provided for @merchRecentOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Orders'**
+  String get merchRecentOrders;
+
+  /// No description provided for @merchViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View All'**
+  String get merchViewAll;
+
+  /// No description provided for @merchActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get merchActive;
+
+  /// No description provided for @merchInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get merchInactive;
+
+  /// No description provided for @merchPublishShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish your shop'**
+  String get merchPublishShop;
+
+  /// No description provided for @merchShopHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop is hidden from the market.'**
+  String get merchShopHidden;
+
+  /// No description provided for @merchOrderFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Flow'**
+  String get merchOrderFlow;
+
+  /// No description provided for @merchManagerView.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager View'**
+  String get merchManagerView;
+
+  /// No description provided for @merchTabNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get merchTabNew;
+
+  /// No description provided for @merchTabCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get merchTabCompleted;
+
+  /// No description provided for @merchReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get merchReject;
+
+  /// No description provided for @merchFlowStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Flow Status'**
+  String get merchFlowStatus;
+
+  /// No description provided for @merchCustomerDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Details'**
+  String get merchCustomerDetails;
+
+  /// No description provided for @merchItemsBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Items Breakdown'**
+  String get merchItemsBreakdown;
+
+  /// No description provided for @merchSpecialInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Special Instructions'**
+  String get merchSpecialInstructions;
+
+  /// No description provided for @merchGrandTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Grand Total'**
+  String get merchGrandTotal;
+
+  /// No description provided for @merchStepPickedUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked Up'**
+  String get merchStepPickedUp;
+
+  /// No description provided for @merchNothingInThisList.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in this list.'**
+  String get merchNothingInThisList;
+
+  /// No description provided for @merchOpenOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Open order'**
+  String get merchOpenOrder;
+
+  /// No description provided for @merchbMenuItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu Items'**
+  String get merchbMenuItems;
+
+  /// No description provided for @merchbManageAvailability.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage availability'**
+  String get merchbManageAvailability;
+
+  /// No description provided for @merchbSearchMenuItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Search menu items...'**
+  String get merchbSearchMenuItems;
+
+  /// No description provided for @merchbAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get merchbAvailable;
+
+  /// No description provided for @merchbOffShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Off-shelf'**
+  String get merchbOffShelf;
+
+  /// No description provided for @merchbAddProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Product'**
+  String get merchbAddProduct;
+
+  /// No description provided for @merchbAvailability.
+  ///
+  /// In en, this message translates to:
+  /// **'Availability'**
+  String get merchbAvailability;
+
+  /// No description provided for @merchbNoMatchingItems.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching items'**
+  String get merchbNoMatchingItems;
+
+  /// No description provided for @merchbAddNewProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Product'**
+  String get merchbAddNewProduct;
+
+  /// No description provided for @merchbProductImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Image'**
+  String get merchbProductImage;
+
+  /// No description provided for @merchbUploadImageCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload delicious food image'**
+  String get merchbUploadImageCta;
+
+  /// No description provided for @merchbUploadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'PNG, JPG up to 5MB'**
+  String get merchbUploadHint;
+
+  /// No description provided for @merchbVariantsOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Variants & Options'**
+  String get merchbVariantsOptions;
+
+  /// No description provided for @merchbAddOption.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Add option'**
+  String get merchbAddOption;
+
+  /// No description provided for @merchbChoicesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 choice} other{{count} choices}}'**
+  String merchbChoicesCount(int count);
+
+  /// No description provided for @merchbNoOptionsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No options on this item yet'**
+  String get merchbNoOptionsYet;
+
+  /// No description provided for @merchbOptionsReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown as customers see them. Editing options arrives soon.'**
+  String get merchbOptionsReadOnly;
+
+  /// No description provided for @merchbSaveMenuItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Menu Item'**
+  String get merchbSaveMenuItem;
+
+  /// No description provided for @merchbSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Soon'**
+  String get merchbSoon;
+
+  /// No description provided for @merchbShopConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop Configuration'**
+  String get merchbShopConfiguration;
+
+  /// No description provided for @merchbShopStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop status'**
+  String get merchbShopStatus;
+
+  /// No description provided for @merchbBannerAndLogo.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop Banner & Logo'**
+  String get merchbBannerAndLogo;
+
+  /// No description provided for @merchbChangeCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Cover'**
+  String get merchbChangeCover;
+
+  /// No description provided for @merchbChangeLogo.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Logo'**
+  String get merchbChangeLogo;
+
+  /// No description provided for @merchbShopAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop Address'**
+  String get merchbShopAddress;
+
+  /// No description provided for @merchbMapPreviewSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Map preview'**
+  String get merchbMapPreviewSoon;
+
+  /// No description provided for @merchbOperatingDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Operating Details'**
+  String get merchbOperatingDetails;
+
+  /// No description provided for @merchbSaveShopSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Shop Settings'**
+  String get merchbSaveShopSettings;
+
+  /// No description provided for @merchbHoursDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily: {from} - {to}'**
+  String merchbHoursDaily(String from, String to);
+
+  /// No description provided for @merchbHoursCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom schedule'**
+  String get merchbHoursCustom;
+
+  /// No description provided for @merchbHoursNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No hours set'**
+  String get merchbHoursNone;
+
+  /// No description provided for @merchbEditHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit opening hours'**
+  String get merchbEditHours;
+
+  /// No description provided for @merchbDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get merchbDay;
+
+  /// No description provided for @merchbTimeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HH:mm'**
+  String get merchbTimeHint;
+
+  /// No description provided for @merchbDayMonday.
+  ///
+  /// In en, this message translates to:
+  /// **'Monday'**
+  String get merchbDayMonday;
+
+  /// No description provided for @merchbDayTuesday.
+  ///
+  /// In en, this message translates to:
+  /// **'Tuesday'**
+  String get merchbDayTuesday;
+
+  /// No description provided for @merchbDayWednesday.
+  ///
+  /// In en, this message translates to:
+  /// **'Wednesday'**
+  String get merchbDayWednesday;
+
+  /// No description provided for @merchbDayThursday.
+  ///
+  /// In en, this message translates to:
+  /// **'Thursday'**
+  String get merchbDayThursday;
+
+  /// No description provided for @merchbDayFriday.
+  ///
+  /// In en, this message translates to:
+  /// **'Friday'**
+  String get merchbDayFriday;
+
+  /// No description provided for @merchbDaySaturday.
+  ///
+  /// In en, this message translates to:
+  /// **'Saturday'**
+  String get merchbDaySaturday;
+
+  /// No description provided for @merchbDaySunday.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunday'**
+  String get merchbDaySunday;
+
+  /// No description provided for @merchbAccountSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get merchbAccountSettings;
+
+  /// No description provided for @merchbRoleOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get merchbRoleOwner;
+
+  /// No description provided for @merchbAppLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'App Language'**
+  String get merchbAppLanguage;
+
+  /// No description provided for @merchbLangShortEn.
+  ///
+  /// In en, this message translates to:
+  /// **'EN'**
+  String get merchbLangShortEn;
+
+  /// No description provided for @merchbLangShortAr.
+  ///
+  /// In en, this message translates to:
+  /// **'AR'**
+  String get merchbLangShortAr;
+
+  /// No description provided for @merchbShopProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop Profile'**
+  String get merchbShopProfile;
+
+  /// No description provided for @merchbPaymentBankDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment & Bank details'**
+  String get merchbPaymentBankDetails;
+
+  /// No description provided for @merchbNotificationSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Settings'**
+  String get merchbNotificationSettings;
+
+  /// No description provided for @merchbShopAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop Analytics'**
+  String get merchbShopAnalytics;
+
+  /// No description provided for @merchbLogOutAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Out Account'**
+  String get merchbLogOutAccount;
+
+  /// No description provided for @riderComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get riderComingSoon;
+
+  /// No description provided for @riderTabAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get riderTabAvailable;
+
+  /// No description provided for @riderTabActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get riderTabActive;
+
+  /// No description provided for @riderTabEarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Earnings'**
+  String get riderTabEarnings;
+
+  /// No description provided for @riderSegmentDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries'**
+  String get riderSegmentDeliveries;
+
+  /// No description provided for @riderRegionZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Region zone'**
+  String get riderRegionZone;
+
+  /// No description provided for @riderDeliveriesNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No deliveries nearby} =1{1 delivery nearby} other{{count} deliveries nearby}}'**
+  String riderDeliveriesNearby(int count);
+
+  /// No description provided for @riderOffersNearYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers near you'**
+  String get riderOffersNearYou;
+
+  /// No description provided for @riderAcceptDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept delivery'**
+  String get riderAcceptDelivery;
+
+  /// No description provided for @riderMyActiveTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'My active tasks'**
+  String get riderMyActiveTasks;
+
+  /// No description provided for @riderActiveCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{None active} =1{1 active} other{{count} active}}'**
+  String riderActiveCount(int count);
+
+  /// No description provided for @riderOrderRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Order #{ref}'**
+  String riderOrderRef(String ref);
+
+  /// No description provided for @riderMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =0{Just now} =1{1 min ago} other{{minutes} min ago}}'**
+  String riderMinutesAgo(int minutes);
+
+  /// No description provided for @riderHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{1 hr ago} other{{hours} hrs ago}}'**
+  String riderHoursAgo(int hours);
+
+  /// No description provided for @riderNavigate.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate'**
+  String get riderNavigate;
+
+  /// No description provided for @riderViewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get riderViewDetails;
+
+  /// No description provided for @riderStartNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Start navigation'**
+  String get riderStartNavigation;
+
+  /// No description provided for @riderYourPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Your payout'**
+  String get riderYourPayout;
+
+  /// No description provided for @riderRouteTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Route timeline'**
+  String get riderRouteTimeline;
+
+  /// No description provided for @riderPickupAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup address'**
+  String get riderPickupAddress;
+
+  /// No description provided for @riderDeliveryAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery address'**
+  String get riderDeliveryAddress;
+
+  /// No description provided for @riderItemsToCollect.
+  ///
+  /// In en, this message translates to:
+  /// **'Items to collect'**
+  String get riderItemsToCollect;
+
+  /// No description provided for @riderItemLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{qty}x {name}'**
+  String riderItemLine(int qty, String name);
+
+  /// No description provided for @riderNoItemsListed.
+  ///
+  /// In en, this message translates to:
+  /// **'This order has no itemised list.'**
+  String get riderNoItemsListed;
+
+  /// No description provided for @riderDeliveryInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery instructions'**
+  String get riderDeliveryInstructions;
+
+  /// No description provided for @riderMyEarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'My earnings'**
+  String get riderMyEarnings;
+
+  /// No description provided for @riderPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout'**
+  String get riderPayout;
+
+  /// No description provided for @riderPeriodToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get riderPeriodToday;
+
+  /// No description provided for @riderPeriodWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get riderPeriodWeekly;
+
+  /// No description provided for @riderTotalEarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Total earnings'**
+  String get riderTotalEarnings;
+
+  /// No description provided for @riderEarningsDerived.
+  ///
+  /// In en, this message translates to:
+  /// **'Added up from the delivery fees on your own completed deliveries.'**
+  String get riderEarningsDerived;
+
+  /// No description provided for @riderHoursOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours online'**
+  String get riderHoursOnline;
+
+  /// No description provided for @riderAcceptRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept rate'**
+  String get riderAcceptRate;
+
+  /// No description provided for @riderRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get riderRating;
+
+  /// No description provided for @riderWeeklyOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly overview'**
+  String get riderWeeklyOverview;
+
+  /// No description provided for @riderTodaysDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s deliveries'**
+  String get riderTodaysDeliveries;
+
+  /// No description provided for @riderThisWeeksDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'This week\'s deliveries'**
+  String get riderThisWeeksDeliveries;
+
+  /// No description provided for @riderNothingDeliveredYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing delivered in this period yet.'**
+  String get riderNothingDeliveredYet;
+
+  /// No description provided for @riderCouldNotLoadEarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your earnings'**
+  String get riderCouldNotLoadEarnings;
+
+  /// No description provided for @riderDriverSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver settings'**
+  String get riderDriverSettings;
+
+  /// No description provided for @riderVehicleProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle profile'**
+  String get riderVehicleProfile;
+
+  /// No description provided for @riderActiveDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'Active duty (online)'**
+  String get riderActiveDuty;
+
+  /// No description provided for @riderAppLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'App language'**
+  String get riderAppLanguage;
+
+  /// No description provided for @riderDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents & licences'**
+  String get riderDocuments;
+
+  /// No description provided for @riderBankDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account details'**
+  String get riderBankDetails;
+
+  /// No description provided for @riderNotificationPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification preferences'**
+  String get riderNotificationPreferences;
+
+  /// No description provided for @riderHelpAndSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & live chat support'**
+  String get riderHelpAndSupport;
+
+  /// No description provided for @riderErrandTry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try'**
+  String get riderErrandTry;
+
+  /// No description provided for @riderErrandTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get riderErrandTo;
+
+  /// No description provided for @riderErrandCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Cap'**
+  String get riderErrandCap;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
@@ -4583,9 +6461,8 @@ DeliveryStrings lookupDeliveryStrings(Locale locale) {
   }
 
   throw FlutterError(
-    'DeliveryStrings.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'DeliveryStrings.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

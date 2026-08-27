@@ -166,12 +166,21 @@ void main() {
   }
 
   testWidgets('nothing scrolls sideways on a phone', (WidgetTester tester) async {
-    await pumpAt(tester, const Size(360, 640));
-    final Iterable<Scrollable> scrollables = tester.widgetList<Scrollable>(find.byType(Scrollable));
-    expect(scrollables, isNotEmpty);
-    for (final Scrollable s in scrollables) {
-      expect(s.axisDirection, anyOf(AxisDirection.down, AxisDirection.up),
-          reason: 'a horizontal scroller on a 360dp page hides half the row behind a gesture');
+    // Both widths and both scales: the tab strip that carries four translated labels and their
+    // counts is the widest thing on this page, and 1.3 is the scale this file has always run at on
+    // CI — it is where a strip that fits at 320dp stops fitting.
+    for (final Size size in <Size>[const Size(320, 640), const Size(360, 640)]) {
+      for (final double scale in <double>[1.0, 1.3]) {
+        await pumpAt(tester, size, textScale: scale);
+        final Iterable<Scrollable> scrollables =
+            tester.widgetList<Scrollable>(find.byType(Scrollable));
+        expect(scrollables, isNotEmpty, reason: '$size @ $scale');
+        for (final Scrollable s in scrollables) {
+          expect(s.axisDirection, anyOf(AxisDirection.down, AxisDirection.up),
+              reason: 'a horizontal scroller on a ${size.width}dp page hides half the row '
+                  'behind a gesture');
+        }
+      }
     }
   });
 
@@ -180,24 +189,49 @@ void main() {
     // One scroll view for the whole page, not a pinned block above a second one.
     expect(find.byType(CustomScrollView), findsOneWidget);
     expect(find.byType(RefreshIndicator), findsOneWidget);
+    // The four counter tiles are the four counted tabs now. Both they and the title band are
+    // inside that one scroll view rather than pinned above it, which is what this test has always
+    // meant by "scroll away with the header".
+    final Finder page = find.byType(CustomScrollView);
+    expect(find.descendant(of: page, matching: find.byType(MerchantScreenHeader)), findsOneWidget);
+    expect(find.descendant(of: page, matching: find.textContaining('New (')), findsOneWidget);
   });
 
   testWidgets('the wide portal keeps its pinned header', (WidgetTester tester) async {
     await pumpAt(tester, const Size(1280, 900));
     expect(find.byType(CustomScrollView), findsNothing);
     expect(find.byType(ListView), findsOneWidget);
-    // The toggle stays on the title line up here rather than taking a row of its own.
+    // The show-completed Switch this test used to count is gone, and not by accident: the redesign
+    // replaced one boolean with the four-bucket tab strip, which the phone and the portal now share
+    // — so "the toggle keeps its own shape up here" no longer has a subject to protect. What the
+    // toggle was *for* does: a day of delivered orders stays out of the way until it is asked for,
+    // and asking for it is one tap on either host. That is what is asserted instead.
     expect(find.byType(SwitchListTile), findsNothing);
-    expect(find.byType(Switch), findsOneWidget);
+    expect(find.textContaining('#dddddddd'), findsNothing, reason: 'DELIVERED, so not in New');
+    await tester.tap(find.textContaining('Completed'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('#dddddddd'), findsOneWidget);
+    // Still the pinned shape after the switch of buckets, not a different layout underneath.
+    expect(find.byType(CustomScrollView), findsNothing);
+    expect(find.byType(ListView), findsOneWidget);
   });
 
   testWidgets('every action button clears 48dp on a phone', (WidgetTester tester) async {
-    await pumpAt(tester, const Size(360, 640));
-    final Finder buttons = find.byWidgetPredicate(
-        (Widget w) => w is ElevatedButton || w is OutlinedButton);
-    expect(buttons, findsWidgets);
-    for (final Element e in buttons.evaluate()) {
-      expect(tester.getSize(find.byWidget(e.widget)).height, greaterThanOrEqualTo(48.0));
+    // Accept and Reject are MerchantActionButton now rather than Material's own buttons — the
+    // 48dp floor is the point, not which class draws it, so the predicate names both. Checked at
+    // 1.3 as well: a taller label must not be what finally pushes the button over the line.
+    for (final double scale in <double>[1.0, 1.3]) {
+      await pumpAt(tester, const Size(360, 640), textScale: scale);
+      final Finder buttons = find.byWidgetPredicate((Widget w) =>
+          w is MerchantActionButton ||
+          w is YdPillButton ||
+          w is ElevatedButton ||
+          w is OutlinedButton);
+      expect(buttons, findsWidgets);
+      for (final Element e in buttons.evaluate()) {
+        expect(tester.getSize(find.byWidget(e.widget)).height, greaterThanOrEqualTo(48.0),
+            reason: 'textScale $scale');
+      }
     }
   });
 

@@ -131,14 +131,16 @@ void main() {
       await tester.pumpAndSettle();
 
       final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
-      expect(find.text(ar.deliverTo), findsOneWidget);
+      // The redesigned sheet drops its "Deliver to" title — the question under it says the same
+      // thing at more length — so what is asserted here is what the sheet still draws.
       expect(find.text(ar.whereShouldWeBring), findsOneWidget);
+      expect(find.text(ar.address), findsOneWidget);
       expect(find.text(ar.deliverHere), findsOneWidget);
 
       // The actual regression: these were hardcoded English until this work, and the screen looked
       // perfectly fine to anyone testing in English.
       final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
-      expect(find.text(en.deliverTo), findsNothing);
+      expect(find.text(en.address), findsNothing);
       expect(find.text(en.deliverHere), findsNothing);
       expect(find.text(en.whereShouldWeBring), findsNothing);
     });
@@ -174,8 +176,9 @@ void main() {
       expect(find.text(ar.budgetCapOptional), findsOneWidget);
       expect(find.text(en.whatDoYouNeed), findsNothing);
 
-      // And the other mode's questions, which are a different set of strings entirely.
-      await tester.tap(find.text(ar.deliverYourStuff));
+      // And the other mode's questions, which are a different set of strings entirely. The mode is
+      // picked from a pair of cards now rather than a segmented control, so the label moved too.
+      await tester.tap(find.text(ar.custSendAnything));
       await tester.pumpAndSettle();
 
       expect(find.text(ar.whatAreWeMoving), findsOneWidget);
@@ -198,7 +201,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
-      expect(find.text(en.deliverTo), findsOneWidget);
+      expect(find.text(en.whereShouldWeBring), findsOneWidget);
       expect(Directionality.of(tester.element(find.byType(TextFormField).first)),
           TextDirection.ltr);
     });

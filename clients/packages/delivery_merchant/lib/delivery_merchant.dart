@@ -12,6 +12,12 @@ library;
 
 export 'src/dashboard_screen.dart';
 export 'src/delivery_screen.dart';
+export 'src/merchant_settings_screen.dart';
+// The order detail screen and, with it, the small parts the three merchant frames share —
+// `MerchantMetricCard`, `MerchantTileGrid`, `MerchantStatusTag`, `merchantMaxContentWidth` and the
+// rest. Exported because they are the package's own vocabulary: a host mounting these screens in
+// its own shell has to be able to name them, and so do the tests, without reaching into `src/`.
+export 'src/order_detail_screen.dart';
 export 'src/orders_screen.dart';
 export 'src/product_form_screen.dart';
 export 'src/product_list_screen.dart';

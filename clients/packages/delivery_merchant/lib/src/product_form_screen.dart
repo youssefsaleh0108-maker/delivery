@@ -1,3 +1,5 @@
+import 'dart:ui' show PathMetric;
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -6,13 +8,30 @@ import 'package:flutter/material.dart';
 
 /// Create or edit one product, and manage its images.
 ///
+/// Drawn to the 2026-08 Figma frame `merchant-add-product` (3:1964): a dashed upload dropzone under
+/// a SemiBold label, a stack of labelled white input boxes with Price and Category sharing a row,
+/// a bordered "Variants & Options" card, and one full-width brand button at the bottom.
+///
 /// Images can only be attached to a product that already exists, because the presign endpoint is
-/// scoped to a product id. On a new product the image section stays disabled until the first save —
-/// which is also what makes the ownership check on presign meaningful.
+/// scoped to a product id. On a new product the dropzone stays inert until the first save — which
+/// is also what makes the ownership check on presign meaningful.
 class ProductFormScreen extends StatefulWidget {
-  const ProductFormScreen({super.key, required this.api, this.existing});
+  const ProductFormScreen({
+    super.key,
+    required this.api,
+    this.storeApi,
+    this.existing,
+  });
 
   final CatalogApi api;
+
+  /// Reads the product's option groups for the design's variants card.
+  ///
+  /// Optional because the option read model lives on [StoreApi] rather than [CatalogApi], and not
+  /// every host has one to hand. Without it the card draws its empty state instead of pretending
+  /// the product has no options.
+  final StoreApi? storeApi;
+
   final Product? existing;
 
   @override
@@ -35,9 +54,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   /// Fetched once; the category tree does not change while a form is open.
   late final Future<List<Category>> _categories = widget.api.categories();
 
+  /// The option groups this product already has, as the customer app reads them. Null when there
+  /// is nothing to read them with — a new product, or a host that passed no [StoreApi].
+  late Future<List<OptionGroup>>? _options = _loadOptions();
+
   bool _saving = false;
   bool _uploading = false;
   bool _dirty = false;
+
+  Future<List<OptionGroup>>? _loadOptions() {
+    final Product? product = _product;
+    final StoreApi? store = widget.storeApi;
+    if (product == null || store == null) {
+      return null;
+    }
+    return store.productOptions(product.id);
+  }
 
   @override
   void dispose() {
@@ -71,6 +103,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _product = saved;
         _dirty = true;
         _saving = false;
+        // The first save is what gives the product an id, and therefore what makes its options
+        // readable at all.
+        _options ??= _loadOptions();
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -148,6 +183,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     final bool isNew = _product == null;
 
     return PopScope(
@@ -158,143 +194,591 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(isNew ? DeliveryStrings.of(context).newProduct : DeliveryStrings.of(context).editProduct)),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints.tightFor(width: double.infinity),
-            child: ListView(
-              padding: const EdgeInsets.all(DeliverySpacing.lg),
-              children: <Widget>[
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      TextFormField(
-                        controller: _name,
-                        decoration: InputDecoration(labelText: DeliveryStrings.of(context).nameLabel),
-                        maxLength: 200,
-                        validator: (String? value) =>
-                            (value == null || value.trim().isEmpty) ? DeliveryStrings.of(context).nameRequired : null,
-                      ),
-                      const SizedBox(height: DeliverySpacing.md),
-                      TextFormField(
-                        controller: _description,
-                        decoration: InputDecoration(labelText: DeliveryStrings.of(context).descriptionLabel),
-                        maxLines: 3,
-                        maxLength: 4000,
-                      ),
-                      const SizedBox(height: DeliverySpacing.md),
-                      TextFormField(
-                        controller: _price,
-                        decoration: InputDecoration(labelText: DeliveryStrings.of(context).priceLabel),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        validator: (String? value) {
-                          final double? parsed = double.tryParse((value ?? '').trim());
-                          if (parsed == null) return DeliveryStrings.of(context).enterANumber;
-                          // Mirrors the server's @DecimalMin("0.01").
-                          if (parsed < 0.01) return DeliveryStrings.of(context).priceMustBePositive;
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: DeliverySpacing.md),
-                      FutureBuilder<List<Category>>(
-                        future: _categories,
-                        builder: (BuildContext context,
-                            AsyncSnapshot<List<Category>> snapshot) {
-                          if (!snapshot.hasData) {
-                            return const LinearProgressIndicator();
-                          }
-                          final List<({Category category, int depth})> flat =
-                              Category.flatten(snapshot.data!);
-                          return DropdownButtonFormField<String>(
-                            initialValue: _categoryId,
-                            decoration: InputDecoration(labelText: DeliveryStrings.of(context).categoryLabel),
-                            items: <DropdownMenuItem<String>>[
-                              DropdownMenuItem<String>(
-                                  value: null, child: Text(DeliveryStrings.of(context).uncategorised)),
-                              for (final ({Category category, int depth}) entry in flat)
-                                DropdownMenuItem<String>(
-                                  value: entry.category.id,
-                                  child: Text(
-                                      '${'    ' * entry.depth}${entry.category.name}'),
-                                ),
-                            ],
-                            onChanged: (String? value) =>
-                                setState(() => _categoryId = value),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: DeliverySpacing.lg),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _saving ? null : _save,
-                          child: Text(_saving ? DeliveryStrings.of(context).saving : DeliveryStrings.of(context).save),
-                        ),
-                      ),
-                    ],
+        backgroundColor: DeliveryColors.background,
+        body: Column(
+          children: <Widget>[
+            YdScreenHeader(
+              title: isNew ? t.merchbAddNewProduct : t.editProduct,
+              onBack: () => Navigator.of(context).pop(_dirty),
+              backSemanticLabel: t.back,
+            ),
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.topCenter,
+                child: ConstrainedBox(
+                  // The frame is a phone column. On a portal pane it stays a column rather than
+                  // stretching a 12px-padded input box across a monitor.
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      padding: const EdgeInsets.all(DeliverySpacing.lg - DeliverySpacing.xs),
+                      children: <Widget>[
+                        _imageSection(t, isNew: isNew),
+                        const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                        _inputs(t),
+                        const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                        _variants(t),
+                        const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                        _saveButton(t, isNew: isNew),
+                        SizedBox(height: MediaQuery.paddingOf(context).bottom),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: DeliverySpacing.xl),
-                const Divider(),
-                const SizedBox(height: DeliverySpacing.md),
-                Text(DeliveryStrings.of(context).images, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: DeliverySpacing.xs),
-                Text(
-                  isNew
-                      ? DeliveryStrings.of(context).saveProductFirst
-                      : DeliveryStrings.of(context).needsAPhotoToPublish,
-                  style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------ image
+
+  Widget _imageSection(DeliveryStrings t, {required bool isNew}) {
+    final List<String> urls = _product?.imageUrls ?? const <String>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _SectionLabel(t.merchbProductImage),
+        const SizedBox(height: DeliverySpacing.sm),
+        _Dropzone(
+          cta: t.merchbUploadImageCta,
+          hint: t.merchbUploadHint,
+          busy: _uploading,
+          // Inert until the product exists — the presign endpoint is scoped to a product id.
+          onTap: isNew || _uploading ? null : _addImage,
+        ),
+        if (isNew) ...<Widget>[
+          // Why the dropzone is inert. Below the box rather than inside it: the frame's inner hint
+          // line is one line of file formats, and a two-line explanation there overflows the 130px
+          // the design gives the area.
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.saveProductFirst,
+            style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+          ),
+        ],
+        if (urls.isNotEmpty) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Wrap(
+            spacing: DeliverySpacing.sm,
+            runSpacing: DeliverySpacing.sm,
+            children: <Widget>[
+              for (int i = 0; i < urls.length; i++)
+                _ImageTile(
+                  url: urls[i],
+                  onRemove: i < _product!.imageRefs.length
+                      ? () => _removeImage(_product!.imageRefs[i])
+                      : null,
                 ),
-                const SizedBox(height: DeliverySpacing.md),
-                if (!isNew) _imageStrip(),
-              ],
+            ],
+          ),
+        ] else if (!isNew) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.needsAPhotoToPublish,
+            style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ----------------------------------------------------------------- inputs
+
+  Widget _inputs(DeliveryStrings t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _Labelled(
+          label: t.nameLabel,
+          child: TextFormField(
+            controller: _name,
+            maxLength: 200,
+            style: _valueStyle,
+            cursorColor: DeliveryColors.brand,
+            decoration: _boxDecoration(),
+            validator: (String? value) =>
+                (value == null || value.trim().isEmpty) ? t.nameRequired : null,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _Labelled(
+          label: t.descriptionLabel,
+          child: TextFormField(
+            controller: _description,
+            maxLines: 3,
+            maxLength: 4000,
+            style: _valueStyle,
+            cursorColor: DeliveryColors.brand,
+            decoration: _boxDecoration(),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: _Labelled(
+                label: t.priceLabel,
+                child: TextFormField(
+                  controller: _price,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: _valueStyle,
+                  cursorColor: DeliveryColors.brand,
+                  decoration: _boxDecoration(),
+                  validator: (String? value) {
+                    final double? parsed = double.tryParse((value ?? '').trim());
+                    if (parsed == null) return t.enterANumber;
+                    // Mirrors the server's @DecimalMin("0.01").
+                    if (parsed < 0.01) return t.priceMustBePositive;
+                    return null;
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(child: _categoryField(t)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _categoryField(DeliveryStrings t) {
+    return _Labelled(
+      label: t.categoryLabel,
+      child: FutureBuilder<List<Category>>(
+        future: _categories,
+        builder: (BuildContext context, AsyncSnapshot<List<Category>> snapshot) {
+          if (!snapshot.hasData) {
+            return Container(
+              height: 45,
+              alignment: AlignmentDirectional.centerStart,
+              padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+              decoration: BoxDecoration(
+                color: DeliveryColors.white,
+                border: Border.all(color: DeliveryColors.border),
+                borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              ),
+              child: const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+              ),
+            );
+          }
+          final List<({Category category, int depth})> flat = Category.flatten(snapshot.data!);
+          return DropdownButtonFormField<String>(
+            initialValue: _categoryId,
+            isExpanded: true,
+            style: _valueStyle,
+            icon: const Icon(Icons.expand_more, size: 16, color: DeliveryColors.ink),
+            decoration: _boxDecoration(),
+            items: <DropdownMenuItem<String>>[
+              DropdownMenuItem<String>(value: null, child: Text(t.uncategorised)),
+              for (final ({Category category, int depth}) entry in flat)
+                DropdownMenuItem<String>(
+                  value: entry.category.id,
+                  child: Text(
+                    '${'    ' * entry.depth}${entry.category.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (String? value) => setState(() => _categoryId = value),
+          );
+        },
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------- variants
+
+  /// The frame's "Variants & Options" card.
+  ///
+  /// Read-only, and deliberately so. The option groups exist and the customer app renders them, but
+  /// the Dart client wraps only the read (`StoreApi.productOptions`); the service's replace
+  /// endpoint has no client method yet, so "+ Add option" is drawn as the frame draws it and marked
+  /// as not yet working rather than wired to something invented.
+  Widget _variants(DeliveryStrings t) {
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t.merchbVariantsOptions,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              YdComingSoon.wrap(
+                label: t.merchbSoon,
+                child: Text(
+                  t.merchbAddOption,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.brand,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _optionRows(t),
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.merchbOptionsReadOnly,
+            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _optionRows(DeliveryStrings t) {
+    final Future<List<OptionGroup>>? options = _options;
+    if (options == null) {
+      return _emptyOptions(t);
+    }
+
+    return FutureBuilder<List<OptionGroup>>(
+      future: options,
+      builder: (BuildContext context, AsyncSnapshot<List<OptionGroup>> snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox(
+            height: 2,
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              color: DeliveryColors.brand,
+              backgroundColor: DeliveryColors.borderFaint,
+            ),
+          );
+        }
+        final List<OptionGroup> groups = snapshot.data ?? const <OptionGroup>[];
+        if (groups.isEmpty) {
+          return _emptyOptions(t);
+        }
+        return Column(
+          children: <Widget>[
+            for (int i = 0; i < groups.length; i++) ...<Widget>[
+              if (i > 0) const Divider(height: 1, color: DeliveryColors.border),
+              _OptionRow(group: groups[i], choicesLabel: t.merchbChoicesCount),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _emptyOptions(DeliveryStrings t) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
+        child: Text(
+          t.merchbNoOptionsYet,
+          style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.3),
+        ),
+      );
+
+  // ------------------------------------------------------------------- save
+
+  Widget _saveButton(DeliveryStrings t, {required bool isNew}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _saving ? null : _save,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: DeliveryColors.brand,
+          foregroundColor: DeliveryColors.white,
+          disabledBackgroundColor: DeliveryColors.brandLine,
+          disabledForegroundColor: DeliveryColors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          ),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        child: _saving
+            ? const SizedBox.square(
+                dimension: 19,
+                child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.white),
+              )
+            : Text(isNew ? t.merchbSaveMenuItem : t.saveChanges),
+      ),
+    );
+  }
+}
+
+/// The frame's input value text: Regular 14 in ink.
+const TextStyle _valueStyle = TextStyle(
+  fontSize: 14,
+  color: DeliveryColors.ink,
+  height: 1.3,
+);
+
+/// The frame's input box: white, 1px border, radius 12, 12px padding all round.
+///
+/// `counterText` is blanked because the frame draws no character counter; the `maxLength` limits
+/// still apply, they are simply not narrated at a length no menu item comes near.
+InputDecoration _boxDecoration() {
+  const EdgeInsetsGeometry padding = EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs);
+  OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  return InputDecoration(
+    isDense: true,
+    filled: true,
+    fillColor: DeliveryColors.white,
+    counterText: '',
+    contentPadding: padding,
+    border: border(DeliveryColors.border),
+    enabledBorder: border(DeliveryColors.border),
+    focusedBorder: border(DeliveryColors.brand, 1.5),
+    errorBorder: border(DeliveryAccent.critical.color),
+    focusedErrorBorder: border(DeliveryAccent.critical.color, 1.5),
+    hintStyle: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
+    errorStyle: TextStyle(fontSize: 11, color: DeliveryAccent.critical.color),
+  );
+}
+
+/// The SemiBold 14 ink label that heads a whole block on this frame.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: DeliveryColors.ink,
+        height: 1.25,
+      ),
+    );
+  }
+}
+
+/// A SemiBold 13 muted label six pixels above its field — the frame's `input-field` group.
+class _Labelled extends StatelessWidget {
+  const _Labelled({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: DeliveryColors.muted,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+/// The 130px dashed upload area.
+class _Dropzone extends StatelessWidget {
+  const _Dropzone({
+    required this.cta,
+    required this.hint,
+    required this.busy,
+    required this.onTap,
+  });
+
+  /// Already localised by the caller.
+  final String cta;
+  final String hint;
+
+  final bool busy;
+
+  /// Null draws the area at rest and refuses the tap — which is the state a product has before its
+  /// first save.
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onTap != null;
+
+    return Semantics(
+      button: enabled,
+      label: cta,
+      child: Material(
+        color: DeliveryColors.white,
+        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+          child: CustomPaint(
+            painter: const _DashedBorderPainter(
+              radius: DeliveryRadius.lg,
+              color: DeliveryColors.border,
+            ),
+            child: SizedBox(
+              height: 130,
+              width: double.infinity,
+              child: Padding(
+                padding: const EdgeInsets.all(DeliverySpacing.lg),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    if (busy)
+                      const SizedBox.square(
+                        dimension: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+                      )
+                    else
+                      Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: 28,
+                        color: enabled ? DeliveryColors.brand : DeliveryColors.faint,
+                      ),
+                    const SizedBox(height: 10),
+                    Text(
+                      cta,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: enabled ? DeliveryColors.brand : DeliveryColors.faint,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      hint,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: DeliveryColors.faint,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _imageStrip() {
-    final Product product = _product!;
-    return Wrap(
-      spacing: DeliverySpacing.sm,
-      runSpacing: DeliverySpacing.sm,
-      children: <Widget>[
-        for (int i = 0; i < product.imageUrls.length; i++)
-          _ImageTile(
-            url: product.imageUrls[i],
-            onRemove: i < product.imageRefs.length
-                ? () => _removeImage(product.imageRefs[i])
-                : null,
-          ),
-        InkWell(
-          onTap: _uploading ? null : _addImage,
-          borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          child: Container(
-            width: 104,
-            height: 104,
-            decoration: BoxDecoration(
-              color: DeliveryColors.brandSoft,
-              border: Border.all(color: DeliveryColors.brandLine, width: 1.5),
-              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+/// The frame's 2px dashed outline. Flutter has no dashed [BoxBorder], so the rounded rectangle is
+/// walked with [PathMetrics] and drawn in segments.
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.radius, required this.color});
+
+  final double radius;
+  final Color color;
+
+  /// The frame's 2px stroke, walked in 6-on / 5-off segments.
+  static const double _stroke = 2;
+  static const double _dash = 6;
+  static const double _gap = 5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Path path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius))
+            .deflate(_stroke / 2),
+      );
+    final Paint paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _stroke;
+
+    for (final PathMetric metric in path.computeMetrics()) {
+      double start = 0;
+      while (start < metric.length) {
+        final double end = (start + _dash).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(start, end), paint);
+        start = end + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) =>
+      old.color != color || old.radius != radius;
+}
+
+/// One option group on the variants card: its name and choices on one side, what it costs or how
+/// many answers it has on the other — exactly the two lines the frame draws.
+class _OptionRow extends StatelessWidget {
+  const _OptionRow({required this.group, required this.choicesLabel});
+
+  final OptionGroup group;
+
+  /// The localised "{count} choices" builder, passed in so this widget holds no strings.
+  final String Function(int) choicesLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final String names =
+        group.options.map((ProductOptionChoice o) => o.name).join(', ');
+    final String title = names.isEmpty ? group.name : '${group.name} ($names)';
+
+    // A group with one priced answer is an add-on, and the frame labels those with the price
+    // rather than the count — "+1.50" says more than "1 choice".
+    final String meta = group.options.length == 1 && group.options.first.priceDelta != 0
+        ? group.options.first.deltaLabel
+        : choicesLabel(group.options.length);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.3),
             ),
-            child: _uploading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Icon(Icons.add_a_photo_outlined, color: DeliveryColors.brand),
-                      SizedBox(height: DeliverySpacing.xs),
-                      Text(DeliveryStrings.of(context).addPhoto,
-                          style: TextStyle(color: DeliveryColors.brand, fontSize: 12)),
-                    ],
-                  ),
           ),
-        ),
-      ],
+          const SizedBox(width: DeliverySpacing.sm),
+          Text(
+            meta,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 12, color: DeliveryColors.faint, height: 1.3),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -325,9 +809,9 @@ class _ImageTile extends StatelessWidget {
           ),
         ),
         if (onRemove != null)
-          Positioned(
+          PositionedDirectional(
             top: 2,
-            right: 2,
+            end: 2,
             child: Material(
               color: DeliveryColors.white,
               shape: const CircleBorder(),

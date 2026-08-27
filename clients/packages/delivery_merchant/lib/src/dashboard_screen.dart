@@ -5,24 +5,46 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
-/// The shop's own page: how today is going, and what is waiting for them.
+import 'order_detail_screen.dart';
+
+/// The shop's own page — Figma `merchant-dashboard` (3:1742): how today is going, whether the shop
+/// is live, and what is waiting for them.
 ///
 /// The portal could already answer everything about one order and nothing about the shop. A
 /// merchant closing up wants to know whether it was a good day, and a merchant opening up wants to
 /// know what came in overnight — neither question survives a list of orders sorted by time.
 ///
 /// Ordered by urgency, not by importance. What needs accepting comes first because it is the only
-/// thing here somebody has to *do*; the money is underneath it, because a shop that reads its
-/// takings while an order sits unaccepted is a shop losing the next one.
+/// thing here somebody has to *do*; the money is beside it, because a shop that reads its takings
+/// while an order sits unaccepted is a shop losing the next one.
 ///
-/// Laid out for a phone as well as for a browser window, because since merchants started applying
-/// from the handset the phone is the only device some of them have. Every reflow below is one
-/// widget measuring the room it was given, not a phone build and a desktop build — two layouts of
-/// the same dashboard would disagree about a number within a release.
+/// The redesign draws four things: the header with the publish switch, today's two figures, the
+/// pending-orders card and a recent-orders feed. Everything the portal's dashboard already showed —
+/// the fortnight chart, the window totals, the best sellers — is kept underneath in the same visual
+/// language rather than dropped, because a figure a merchant used to be able to see and now cannot
+/// is a regression however clean the frame it left.
 class MerchantDashboardScreen extends StatefulWidget {
-  const MerchantDashboardScreen({super.key, required this.api, this.onShowOrders});
+  const MerchantDashboardScreen({
+    super.key,
+    required this.api,
+    this.storeApi,
+    this.pendingApproval = false,
+    this.onShowOrders,
+  });
 
   final OrderApi api;
+
+  /// Drives the header's publish switch and supplies the shop's name.
+  ///
+  /// Optional because the portal mounts this screen without one and has its own "My Shop" page
+  /// with the same controls; when it is null the header simply has no switch, rather than a switch
+  /// that cannot do anything.
+  final StoreApi? storeApi;
+
+  /// True while the application behind this account is still being decided. The server is what
+  /// refuses the committing act, but saying so up front beats letting somebody flip a switch and
+  /// discover the refusal from a snackbar.
+  final bool pendingApproval;
 
   /// Tapping the queue goes to the orders list. Numbers you cannot act on are decoration.
   final VoidCallback? onShowOrders;
@@ -37,18 +59,8 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   /// far more than the freshness is worth.
   static const Duration _pollInterval = Duration(seconds: 60);
 
-  /// Where the page's own gutter stops being generous and starts being expensive.
-  ///
-  /// The desktop gutter takes 48dp off a 360dp screen — an eighth of the width of every figure on
-  /// the page — to leave whitespace beside a card that is already floating on a tinted background.
-  static const double _roomForAGenerousGutter = 480;
-
-  /// What one [TrendHeadline] needs before the sentence under the number starts disappearing.
-  ///
-  /// The comparison is the entire reason that card is not just a number: "50% up on yesterday"
-  /// wants about 140dp of text plus the card's own padding, and below that it truncates to
-  /// "50% up on…", which is a fact turned back into a figure.
-  static const double _roomForAHeadline = 200;
+  /// How many orders the design's "Recent Orders" feed holds.
+  static const int _recentCount = 5;
 
   /// The narrowest a day's slice of the chart can be and still read as a bar with a letter under it.
   ///
@@ -64,6 +76,15 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   MerchantSummary? _summary;
   Object? _error;
 
+  /// The design's recent-orders feed. Loaded beside the summary and allowed to fail on its own:
+  /// the aggregate query and the order page are two calls, and losing the feed is no reason to
+  /// replace a working page of figures with an error.
+  List<DeliveryOrder> _recent = <DeliveryOrder>[];
+  bool _recentLoaded = false;
+
+  Store? _store;
+  bool _publishing = false;
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +99,14 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   }
 
   Future<void> _refresh({bool silent = false}) async {
+    await Future.wait<void>(<Future<void>>[
+      _refreshSummary(silent: silent),
+      _refreshRecent(),
+      _refreshStore(),
+    ]);
+  }
+
+  Future<void> _refreshSummary({bool silent = false}) async {
     try {
       final MerchantSummary summary = await widget.api.merchantSummary();
       if (!mounted) return;
@@ -93,26 +122,108 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     }
   }
 
+  Future<void> _refreshRecent() async {
+    try {
+      final Paged<DeliveryOrder> page =
+          await widget.api.forMerchant(size: _recentCount);
+      if (!mounted) return;
+      setState(() {
+        _recent = page.content;
+        _recentLoaded = true;
+      });
+    } catch (_) {
+      // The section disappears rather than showing an apology in the middle of a dashboard. The
+      // queue is one tap away and says the same thing at full length.
+      if (!mounted) return;
+      setState(() => _recentLoaded = false);
+    }
+  }
+
+  Future<void> _refreshStore() async {
+    final StoreApi? api = widget.storeApi;
+    if (api == null) return;
+    try {
+      // One page is plenty: this header names a single shop, and a merchant with several sees the
+      // first — the same shop "My Shop" edits.
+      final List<Store> mine = (await api.mine(size: 1)).content;
+      if (!mounted) return;
+      setState(() => _store = mine.isEmpty ? null : mine.first);
+    } catch (_) {
+      // No switch rather than a broken switch.
+    }
+  }
+
+  /// Whether the shop is on the storefront, read the same way "My Shop" reads it.
+  bool get _published {
+    final Store? store = _store;
+    if (store == null) return false;
+    return store.availability != StoreAvailability.closed || store.closesAt != null;
+  }
+
+  Future<void> _setPublished(bool value) async {
+    final StoreApi? api = widget.storeApi;
+    final Store? store = _store;
+    if (api == null || store == null) return;
+
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    setState(() => _publishing = true);
+    try {
+      final Store updated =
+          value ? await api.publish(store.id) : await api.suspend(store.id);
+      if (!mounted) return;
+      setState(() => _store = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(value ? t.yourShopIsLive : t.merchShopHidden)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // Surfaces the server's own explanation — "a store needs opening hours before it can be
+      // listed" is the whole reason publish fails, and hiding it leaves the merchant guessing.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_serverMessage(e)),
+        backgroundColor: DeliveryColors.brandDark,
+      ));
+      await _refreshStore();
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
+  static String _serverMessage(Object error) {
+    final RegExpMatch? detail =
+        RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(error.toString());
+    return detail?.group(1) ?? error.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.navDashboard),
-        actions: <Widget>[
-          IconButton(
-            onPressed: () => _refresh(),
-            icon: const Icon(Icons.refresh),
-            tooltip: t.refresh,
-          ),
-        ],
+      backgroundColor: DeliveryColors.background,
+      body: SafeArea(
+        bottom: false,
+        child: switch ((_summary, _error)) {
+          (null, final Object? e) when e != null => _failed(t, e),
+          (null, _) =>
+            const Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+          (final MerchantSummary s, _) => _body(s, t),
+        },
       ),
-      body: switch ((_summary, _error)) {
-        (null, final Object? e) when e != null => Center(child: Text('$e')),
-        (null, _) => const Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
-        (final MerchantSummary s, _) => _body(s, t),
-      },
+    );
+  }
+
+  Widget _failed(DeliveryStrings t, Object error) {
+    return YdEmptyState(
+      icon: Icons.cloud_off_rounded,
+      title: t.couldNotLoadOrdersShort,
+      message: _serverMessage(error),
+      action: YdPillButton.secondary(
+        label: t.tryAgain,
+        onPressed: () => _refresh(),
+        size: YdPillButtonSize.compact,
+        expand: false,
+      ),
     );
   }
 
@@ -120,126 +231,548 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     return RefreshIndicator(
       onRefresh: () => _refresh(),
       color: DeliveryColors.brand,
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final double gutter = constraints.maxWidth < _roomForAGenerousGutter
-              ? DeliverySpacing.md
-              : DeliverySpacing.lg;
-
-          return ListView(
-            padding: EdgeInsets.symmetric(
-                horizontal: gutter, vertical: DeliverySpacing.lg),
+      child: Align(
+        alignment: AlignmentDirectional.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: merchantMaxContentWidth),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
             children: <Widget>[
-              _queue(s, t),
-              const SizedBox(height: DeliverySpacing.lg),
-              _today(s, t),
-              const SizedBox(height: DeliverySpacing.lg),
-              _chart(s, t),
-              const SizedBox(height: DeliverySpacing.lg),
-              _window(s, t),
-              const SizedBox(height: DeliverySpacing.lg),
-              _bestSellers(s, t),
+              _header(t),
+              _summarySection(s, t),
+              _queueSection(s, t),
+              _recentSection(t),
+              _extras(s, t),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 
-  /// What is open right now. Not windowed: an order placed three weeks ago that nobody accepted is
-  /// exactly the thing a fortnight's window would hide.
-  Widget _queue(MerchantSummary s, DeliveryStrings t) {
-    if (s.awaitingYou == 0 && s.preparing == 0 && s.readyForPickup == 0 && s.onTheWay == 0) {
-      return SoftNote(text: t.allCaughtUp, accent: DeliveryAccent.positive, icon: Icons.check_circle_outline);
-    }
+  // ------------------------------------------------------------------ header
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  /// The white block the design opens with: who this is, whether they are live, and — when the
+  /// application is still being decided — why the switch will not move.
+  Widget _header(DeliveryStrings t) {
+    return Container(
+      color: DeliveryColors.white,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        DeliverySpacing.lg,
+        DeliverySpacing.md,
+        DeliverySpacing.lg,
+        DeliverySpacing.lg - DeliverySpacing.xs,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      t.welcomeBack,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: DeliveryColors.faint,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.xs),
+                    Text(
+                      // No shop, no invented name: the dashboard says what page this is instead.
+                      _store?.name ?? t.navDashboard,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              // The design's header carries only the switch. The explicit refresh is kept because
+              // it is what the portal has always had, and pull-to-refresh is a gesture a mouse has
+              // to discover.
+              IconButton(
+                onPressed: () => _refresh(),
+                icon: const Icon(Icons.refresh, size: 20),
+                color: DeliveryColors.muted,
+                tooltip: t.refresh,
+                // Material 3 sizes a bare IconButton at 40x40, which is under the 48dp a thumb
+                // needs. The glyph stays the design's 20px — only the hit box grows.
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              ),
+              if (widget.storeApi != null) _publishToggle(t),
+            ],
+          ),
+          if (widget.pendingApproval) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md),
+            _pendingBanner(t),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The 48×26 switch the design draws, wired to the real publish/suspend calls.
+  Widget _publishToggle(DeliveryStrings t) {
+    final bool on = _published;
+    final bool enabled = _store != null && !_publishing && !widget.pendingApproval;
+
+    return Semantics(
+      label: t.merchPublishShop,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            on ? t.merchActive : t.merchInactive,
+            maxLines: 1,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: DeliveryColors.faint,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          SizedBox(
+            width: 48,
+            height: 26,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: Switch(
+                value: on,
+                onChanged: enabled ? _setPublished : null,
+                activeThumbColor: DeliveryColors.white,
+                activeTrackColor: DeliveryColors.brand,
+                inactiveThumbColor: DeliveryColors.white,
+                inactiveTrackColor: DeliveryColors.border,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pendingBanner(DeliveryStrings t) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: DeliverySpacing.md,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: DeliveryAccent.caution.tint,
+        border: Border.all(color: DeliveryAccent.caution.color),
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(Icons.info_outline, size: 16, color: DeliveryAccent.caution.color),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Text(
+              t.pendingBannerMerchant,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: DeliveryAccent.caution.color,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- today
+
+  Widget _summarySection(MerchantSummary s, DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        DeliverySpacing.lg,
+        DeliverySpacing.lg - DeliverySpacing.xs,
+        DeliverySpacing.lg,
+        0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _sectionTitle(t.merchTodaySummary),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          MerchantTileGrid(tiles: <Widget>[
+            MerchantMetricCard.brand(
+              icon: Icons.receipt_long_outlined,
+              label: t.ordersToday,
+              value: '${s.today.orders}',
+              trend: _trend(s.today.orders, s.yesterday.orders, t),
+            ),
+            MerchantMetricCard.accent(
+              icon: Icons.payments_outlined,
+              label: t.salesToday,
+              value: merchantMoney(s.today.money),
+              accent: DeliveryAccent.positive,
+              trend: _trend(s.today.money, s.yesterday.money, t),
+            ),
+          ]),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _pendingCard(s, t),
+        ],
+      ),
+    );
+  }
+
+  /// The arrow and the words under one of today's figures.
+  ///
+  /// Kept as a [Row] of a [TrendDirection] glyph and the already-worded comparison so the two can
+  /// never disagree: the arrow is read from the same pair of numbers the sentence is.
+  ///
+  /// The colour comes from [TrendDirection] too, which paints a fall in [DeliveryColors.muted] and
+  /// never in red. A quiet Tuesday is not a fault, and a dashboard that shows alarm every time
+  /// trade dips is one people stop reading — red stays reserved for things that need doing.
+  Widget _trend(num today, num yesterday, DeliveryStrings t) {
+    final TrendDirection direction = TrendDirection.between(today, yesterday);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        SectionLabel(t.needsYouNow),
-        const SizedBox(height: DeliverySpacing.sm),
-        StatRow(tiles: <Widget>[
-          StatTile(
-            value: '${s.awaitingYou}',
-            label: t.toAccept,
-            icon: Icons.notifications_active_outlined,
-            // The only tile on this screen that turns amber, and only when it is not zero. A
-            // permanent warning colour stops being one.
-            accent: s.awaitingYou == 0 ? DeliveryAccent.positive : DeliveryAccent.caution,
-            onTap: widget.onShowOrders,
+        Icon(direction.icon, size: 14, color: direction.color),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            _compare(today, yesterday, t),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: direction.color,
+              height: 1.3,
+            ),
           ),
-          StatTile(
-            value: '${s.preparing}',
-            label: t.preparingNow,
-            icon: Icons.soup_kitchen_outlined,
-            accent: DeliveryAccent.neutral,
-            onTap: widget.onShowOrders,
-          ),
-          StatTile(
-            value: '${s.readyForPickup}',
-            label: t.readyForPickup,
-            icon: Icons.shopping_bag_outlined,
-            accent: DeliveryAccent.info,
-            onTap: widget.onShowOrders,
-          ),
-          StatTile(
-            value: '${s.onTheWay}',
-            label: t.outForDelivery,
-            icon: Icons.pedal_bike_rounded,
-            accent: DeliveryAccent.neutral,
-            onTap: widget.onShowOrders,
-          ),
-        ]),
+        ),
       ],
     );
   }
 
-  Widget _today(MerchantSummary s, DeliveryStrings t) {
-    final Widget orders = TrendHeadline(
-      value: '${s.today.orders}',
-      label: t.ordersToday,
-      icon: Icons.receipt_long_outlined,
-      direction: TrendDirection.between(s.today.orders, s.yesterday.orders),
-      comparison: _compare(s.today.orders, s.yesterday.orders, t),
-    );
-    final Widget money = TrendHeadline(
-      value: _money(s.today.money),
-      label: t.salesToday,
-      icon: Icons.payments_outlined,
-      direction: TrendDirection.between(s.today.money, s.yesterday.money),
-      comparison: _compare(s.today.money, s.yesterday.money, t),
-    );
+  /// The comparison, worded.
+  ///
+  /// A percentage against zero is not a percentage, so the two cases where yesterday was nothing
+  /// are worded rather than computed — "up 100%" from a standing start says less than "nothing
+  /// yesterday", and dividing by it says nothing at all: it puts `Infinity` or `NaN` on a
+  /// merchant's dashboard, which nothing downstream would ever have caught.
+  static String _compare(num today, num yesterday, DeliveryStrings t) {
+    if (today == 0 && yesterday == 0) return t.nothingYetToday;
+    if (yesterday == 0) return t.noneYesterday;
+    if (today == yesterday) return t.sameAsYesterday;
 
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        if (constraints.maxWidth < _roomForAHeadline * 2 + DeliverySpacing.sm) {
-          // Stacked rather than squeezed. Halving a phone's width gives each card about 150dp of
-          // text, which loses the comparison line first and the number second.
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              orders,
-              const SizedBox(height: DeliverySpacing.sm),
-              money,
-            ],
-          );
-        }
+    final double change = ((today - yesterday) / yesterday * 100).abs();
+    final int percent = change.round();
+    return today > yesterday ? t.upOnYesterday(percent) : t.downOnYesterday(percent);
+  }
 
-        // IntrinsicHeight, not CrossAxisAlignment.stretch alone. Inside a ListView the row's height
-        // is unbounded, and stretch against an unbounded constraint is an infinite height — which
-        // is not a cosmetic problem but a crash on first paint. This measures the taller card and
-        // matches it.
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Expanded(child: orders),
-              const SizedBox(width: DeliverySpacing.sm),
-              Expanded(child: money),
-            ],
+  /// "3 New Orders", with the one affordance on this screen that is a job rather than a fact.
+  Widget _pendingCard(MerchantSummary s, DeliveryStrings t) {
+    final bool anything = s.awaitingYou > 0;
+
+    return YdCard.bordered(
+      onTap: widget.onShowOrders,
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  t.merchPendingOrders,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: DeliveryColors.faint,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: <Widget>[
+                    Text(
+                      '${s.awaitingYou}',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        // Amber only while it is not zero. A permanent warning colour stops
+                        // being one.
+                        color: anything
+                            ? DeliveryAccent.caution.color
+                            : DeliveryAccent.positive.color,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(width: DeliverySpacing.xs + 2),
+                    Flexible(
+                      child: Text(
+                        anything ? t.merchNewOrders : t.allCaughtUp,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: anything
+                              ? DeliveryAccent.caution.color
+                              : DeliveryAccent.positive.color,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        );
-      },
+          if (widget.onShowOrders != null) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.sm),
+            Container(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: DeliveryAccent.caution.tint,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+              ),
+              child: Text(
+                t.merchView,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryAccent.caution.color,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------ queue
+
+  /// The rest of what is open right now. Not windowed: an order placed three weeks ago that nobody
+  /// accepted is exactly the thing a fortnight's window would hide.
+  ///
+  /// The design's own pending card covers "to accept"; these are the three states after it, which
+  /// the portal has always shown and which are the difference between a shop that knows it has
+  /// something on a bike and one that does not.
+  Widget _queueSection(MerchantSummary s, DeliveryStrings t) {
+    if (s.preparing == 0 && s.readyForPickup == 0 && s.onTheWay == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        DeliverySpacing.lg,
+        DeliverySpacing.lg,
+        DeliverySpacing.lg,
+        0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _sectionTitle(t.needsYouNow),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          MerchantTileGrid(tiles: <Widget>[
+            MerchantMetricCard.accent(
+              icon: Icons.soup_kitchen_outlined,
+              label: t.preparingNow,
+              value: '${s.preparing}',
+              accent: DeliveryAccent.caution,
+              onTap: widget.onShowOrders,
+            ),
+            MerchantMetricCard.accent(
+              icon: Icons.shopping_bag_outlined,
+              label: t.readyForPickup,
+              value: '${s.readyForPickup}',
+              accent: DeliveryAccent.info,
+              onTap: widget.onShowOrders,
+            ),
+            MerchantMetricCard.accent(
+              icon: Icons.two_wheeler,
+              label: t.outForDelivery,
+              value: '${s.onTheWay}',
+              accent: DeliveryAccent.info,
+              onTap: widget.onShowOrders,
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- recent
+
+  Widget _recentSection(DeliveryStrings t) {
+    if (!_recentLoaded || _recent.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          YdSectionHeader(
+            title: t.merchRecentOrders,
+            actionLabel: widget.onShowOrders == null ? null : t.merchViewAll,
+            onAction: widget.onShowOrders,
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          for (int i = 0; i < _recent.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _recentRow(_recent[i], t),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _recentRow(DeliveryOrder order, DeliveryStrings t) {
+    // The design's meta line names the customer. The order payload carries a customer id and no
+    // name, so it says what is actually known: how many lines, and what they came to.
+    final String meta = <String>[
+      t.itemCount(order.items.length),
+      merchantMoney(order.totalAmount),
+    ].join(' • ');
+
+    return YdCard.bordered(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => MerchantOrderDetailScreen(
+          api: widget.api,
+          order: order,
+          onChanged: (_) => _refresh(silent: true),
+        ),
+      )),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  '#${order.shortId}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: DeliverySpacing.xs),
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: DeliveryColors.faint,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+          MerchantStatusTag(status: order.status, label: order.status.labelIn(t)),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- extras
+
+  /// Everything the portal's dashboard showed that the phone frame does not draw, in the frame's
+  /// own card language.
+  Widget _extras(MerchantSummary s, DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        DeliverySpacing.lg,
+        0,
+        DeliverySpacing.lg,
+        DeliverySpacing.lg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _chart(s, t),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          MerchantTileGrid(tiles: <Widget>[
+            MerchantMetricCard.accent(
+              icon: Icons.receipt_long_outlined,
+              label: t.ordersInWindow,
+              value: '${s.window.orders}',
+              accent: DeliveryAccent.neutral,
+              footnote: t.lastDaysHeading(s.windowDays),
+            ),
+            MerchantMetricCard.accent(
+              icon: Icons.check_circle_outline,
+              label: t.deliveredInWindow,
+              value: '${s.window.delivered}',
+              accent: DeliveryAccent.positive,
+            ),
+            MerchantMetricCard.accent(
+              icon: Icons.payments_outlined,
+              label: t.salesInWindow,
+              value: merchantMoney(s.window.money),
+              accent: DeliveryAccent.positive,
+            ),
+            // Shown plainly rather than hidden. A shop that cannot see what the platform charges
+            // has to reconstruct it from a settlement statement, and one that has to do that stops
+            // trusting it.
+            MerchantMetricCard.accent(
+              icon: Icons.percent_rounded,
+              label: t.feesInWindow,
+              value: merchantMoney(s.platformFees),
+              accent: DeliveryAccent.info,
+              footnote: t.feesInWindowNote(s.commissionPercentage.toStringAsFixed(1)),
+            ),
+            // Only when there is something to say: a zero here is a line about a benefit they never
+            // got, which reads as one being withheld.
+            if (s.savedByOffers > 0)
+              MerchantMetricCard.accent(
+                icon: Icons.redeem_rounded,
+                label: t.savedForYou,
+                value: merchantMoney(s.savedByOffers),
+                accent: DeliveryAccent.positive,
+                footnote: t.savedForYouNote,
+              ),
+          ]),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          _bestSellers(s, t),
+        ],
+      ),
     );
   }
 
@@ -253,21 +786,19 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             ))
         .toList();
 
-    return SoftCard(
+    return YdCard.bordered(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SectionLabel(
-            t.lastDaysHeading(s.windowDays),
+          YdSectionHeader(
+            title: t.lastDaysHeading(s.windowDays),
             // Each bar carries its day's figures in a tooltip, which a mouse gets by hovering and a
             // finger is supposed to get by long-pressing. On a quiet day the bar is five pixels
             // tall, so there is nothing to press: the tooltip is a desktop affordance wearing a
             // touch gesture. This is the same numbers somewhere a thumb can land.
-            //
-            // Shown on the desktop too rather than only on a phone. One affordance both hosts have
-            // is one affordance that stays working; a narrow-only button is a control the people
-            // who maintain this screen never see.
-            trailing: s.days.isEmpty ? null : _dayByDayButton(s, t),
+            actionLabel: s.days.isEmpty ? null : t.dayByDay,
+            onAction: s.days.isEmpty ? null : () => _showDayByDay(s, t),
           ),
           const SizedBox(height: DeliverySpacing.md),
           LayoutBuilder(
@@ -275,7 +806,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
               final Widget chart = TrendChart(
                 points: points,
                 emptyLabel: t.quietSoFar,
-                formatMoney: _money,
+                formatMoney: merchantMoney,
               );
 
               final double natural = points.length * _roomForADay;
@@ -291,24 +822,11 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             },
           ),
           const SizedBox(height: DeliverySpacing.sm),
-          Text(t.barChartLegend, style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            t.barChartLegend,
+            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _dayByDayButton(MerchantSummary s, DeliveryStrings t) {
-    return TextButton.icon(
-      onPressed: () => _showDayByDay(s, t),
-      icon: const Icon(Icons.calendar_view_day_outlined, size: 16),
-      label: Text(t.dayByDay),
-      style: TextButton.styleFrom(
-        foregroundColor: DeliveryColors.brand,
-        // Held at 48 whatever the text metrics work out to. This is the tap target standing in for
-        // a chart whose own bars are under 20dp wide on a phone.
-        minimumSize: const Size(48, 48),
-        padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.sm),
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -319,6 +837,9 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: DeliveryColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.sheet)),
+      ),
       // isScrollControlled lets a fortnight of rows grow the sheet to the full height of the
       // window, and at full height the drag handle sits behind the status bar on a phone — the
       // one part of this the finger needs to reach.
@@ -332,51 +853,8 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     );
   }
 
-  Widget _window(MerchantSummary s, DeliveryStrings t) {
-    return StatRow(tiles: <Widget>[
-      StatTile(
-        value: '${s.window.orders}',
-        label: t.ordersInWindow,
-        icon: Icons.receipt_long_outlined,
-        accent: DeliveryAccent.neutral,
-        footnote: t.lastDaysHeading(s.windowDays),
-      ),
-      StatTile(
-        value: '${s.window.delivered}',
-        label: t.deliveredInWindow,
-        icon: Icons.check_circle_outline,
-        accent: DeliveryAccent.positive,
-      ),
-      StatTile(
-        value: _money(s.window.money),
-        label: t.salesInWindow,
-        icon: Icons.payments_outlined,
-        accent: DeliveryAccent.positive,
-      ),
-      // Shown plainly rather than hidden. A shop that cannot see what the platform charges has to
-      // reconstruct it from a settlement statement, and one that has to do that stops trusting it.
-      StatTile(
-        value: _money(s.platformFees),
-        label: t.feesInWindow,
-        icon: Icons.percent_rounded,
-        accent: DeliveryAccent.info,
-        footnote: t.feesInWindowNote(s.commissionPercentage.toStringAsFixed(1)),
-      ),
-      // Only when there is something to say: a zero here is a line about a benefit they never got,
-      // which reads as one being withheld.
-      if (s.savedByOffers > 0)
-        StatTile(
-          value: _money(s.savedByOffers),
-          label: t.savedForYou,
-          icon: Icons.redeem_rounded,
-          accent: DeliveryAccent.positive,
-          footnote: t.savedForYouNote,
-        ),
-    ]);
-  }
-
   Widget _bestSellers(MerchantSummary s, DeliveryStrings t) {
-    return SoftCard(
+    return YdCard.bordered(
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           // One line where the name still has room to be a name, two where it does not. Squeezing
@@ -385,12 +863,17 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
           final bool stacked = constraints.maxWidth < _roomForASellerLine;
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              SectionLabel(t.bestSellers),
+              YdSectionHeader(title: t.bestSellers),
               const SizedBox(height: DeliverySpacing.sm),
               if (s.topProducts.isEmpty)
-                Text(t.nothingSoldYet, style: Theme.of(context).textTheme.bodySmall)
+                Text(
+                  t.nothingSoldYet,
+                  style: const TextStyle(
+                      fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+                )
               else
                 for (final TopProduct product in s.topProducts)
                   Padding(
@@ -410,19 +893,28 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     return Row(
       children: <Widget>[
         Expanded(
-          child: Text(product.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          child: Text(
+            product.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600, color: DeliveryColors.ink),
+          ),
         ),
         const SizedBox(width: DeliverySpacing.sm),
-        Text(t.soldQty(product.qty), style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          t.soldQty(product.qty),
+          style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
+        ),
         const SizedBox(width: DeliverySpacing.md),
         SizedBox(
           width: 84,
-          child: Text(_money(product.revenue),
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontWeight: FontWeight.w700)),
+          child: Text(
+            merchantMoney(product.revenue),
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w700, color: DeliveryColors.ink),
+          ),
         ),
       ],
     );
@@ -431,40 +923,61 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   Widget _sellerStacked(TopProduct product, DeliveryStrings t) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Text(product.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          product.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w600, color: DeliveryColors.ink),
+        ),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            Text(t.soldQty(product.qty), style: Theme.of(context).textTheme.bodySmall),
-            const Spacer(),
+            // Both halves are flexible so that at Android's largest text setting the row shrinks
+            // instead of running off the card. At the default size neither is anywhere near its
+            // allowance, so the layout is unchanged.
+            Flexible(
+              child: Text(
+                t.soldQty(product.qty),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
+              ),
+            ),
+            const SizedBox(width: DeliverySpacing.sm),
             // No fixed column width down here: with the name on its own line the figure has the
-            // whole row to sit at the end of, and a 84dp box would only reintroduce the truncation
-            // this layout exists to avoid.
-            Text(_money(product.revenue),
-                style: const TextStyle(fontWeight: FontWeight.w700)),
+            // whole row to sit at the end of, and an 84dp box would only reintroduce the
+            // truncation this layout exists to avoid.
+            Flexible(
+              child: Text(
+                merchantMoney(product.revenue),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700, color: DeliveryColors.ink),
+              ),
+            ),
           ],
         ),
       ],
     );
   }
 
-  /// The comparison, worded.
-  ///
-  /// A percentage against zero is not a percentage, so the two cases where yesterday was nothing
-  /// are worded rather than computed — "up 100%" from a standing start says less than "nothing
-  /// yesterday", and dividing by it says nothing at all.
-  String _compare(num today, num yesterday, DeliveryStrings t) {
-    if (today == 0 && yesterday == 0) return t.nothingYetToday;
-    if (yesterday == 0) return t.noneYesterday;
-    if (today == yesterday) return t.sameAsYesterday;
-
-    final double change = ((today - yesterday) / yesterday * 100).abs();
-    final int percent = change.round();
-    return today > yesterday ? t.upOnYesterday(percent) : t.downOnYesterday(percent);
-  }
+  Widget _sectionTitle(String text) => Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.25,
+          ),
+        ),
+      );
 
   /// A weekday initial, which is all the axis has room for and all it needs: somebody reading a
   /// fortnight of bars is looking for the weekly shape, and the exact date is in the sheet behind
@@ -478,12 +991,6 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     return MaterialLocalizations.of(context).narrowWeekdays[day.weekday % 7];
   }
 }
-
-/// Two decimal places, in one place.
-///
-/// Not a currency format: the amounts arrive already in the store's own currency and the symbol
-/// belongs to the store, not to this screen.
-String _money(double amount) => amount.toStringAsFixed(2);
 
 /// The chart's figures as rows, for whoever cannot hover over a bar.
 ///
@@ -506,15 +1013,17 @@ class _DayByDaySheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding: const EdgeInsetsDirectional.fromSTEB(
             DeliverySpacing.lg, 0, DeliverySpacing.lg, DeliverySpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            SectionLabel(strings.lastDaysHeading(days.length)),
+            YdSectionHeader(title: strings.lastDaysHeading(days.length)),
+            const SizedBox(height: DeliverySpacing.sm),
             _heading(),
-            const Divider(height: DeliverySpacing.md, color: DeliveryColors.border),
+            const MerchantDivider(),
+            const SizedBox(height: DeliverySpacing.sm),
             // Flexible, so a fortnight scrolls and a slow week does not leave the sheet standing
             // half-empty at full height.
             Flexible(
@@ -528,7 +1037,7 @@ class _DayByDaySheet extends StatelessWidget {
                     date: dates.formatMediumDate(day.day),
                     orders: '${day.orders}',
                     delivered: '${day.delivered}',
-                    money: _money(day.money),
+                    money: merchantMoney(day.money),
                   );
                 },
               ),
@@ -540,9 +1049,8 @@ class _DayByDaySheet extends StatelessWidget {
   }
 
   Widget _heading() {
-    // Sentence case, not the small-caps this screen uses for section labels: "DELIVERED" with
-    // letter spacing is half again as wide as its own column on a phone, and a truncated column
-    // heading makes the numbers under it guesswork.
+    // Sentence case, not small caps: "DELIVERED" with letter spacing is half again as wide as its
+    // own column on a phone, and a truncated column heading makes the numbers under it guesswork.
     const TextStyle style = TextStyle(
         fontSize: 11, fontWeight: FontWeight.w700, color: DeliveryColors.muted);
 

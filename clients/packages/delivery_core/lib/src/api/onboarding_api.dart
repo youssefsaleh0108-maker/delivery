@@ -69,6 +69,10 @@ class OnboardingApi {
   ///
   /// [companyId] null means the second of those: no company is named, so the application is the
   /// platform's own to decide and lands in the backoffice queue rather than a company's.
+  ///
+  /// [details] is the signup wizard's free-form answers — vehicle, work region, date of birth —
+  /// the arbitrary object the server stores beside the fixed columns and a reviewer reads. See
+  /// [OnboardingApplication.details] for why it exists and why it is flattened on the way back.
   Future<String> applyAsRider({
     required String name,
     required String email,
@@ -77,6 +81,7 @@ class OnboardingApi {
     String? phone,
     String? phoneVerificationToken,
     String? notes,
+    Map<String, dynamic>? details,
   }) async {
     final Response<dynamic> response =
         await _dio.post<dynamic>('/api/onboarding/applications', data: <String, dynamic>{
@@ -90,6 +95,7 @@ class OnboardingApi {
       'phoneVerificationToken': phoneVerificationToken,
       'targetProviderId': companyId,
       'notes': notes,
+      'details': details,
     });
     return (response.data as Map<String, dynamic>)['reference'] as String;
   }
@@ -98,6 +104,9 @@ class OnboardingApi {
   ///
   /// No company is named and none may be: a shop is asking the platform for terms, and a merchant
   /// carrying a delivery company would turn up in that company's applicant list.
+  ///
+  /// [details] carries the wizard's free-form answers — business type and the like. See
+  /// [OnboardingApplication.details].
   Future<String> applyAsMerchant({
     required String businessName,
     required String contactName,
@@ -106,6 +115,7 @@ class OnboardingApi {
     String? phone,
     String? phoneVerificationToken,
     String? notes,
+    Map<String, dynamic>? details,
   }) async {
     final Response<dynamic> response =
         await _dio.post<dynamic>('/api/onboarding/applications', data: <String, dynamic>{
@@ -117,6 +127,7 @@ class OnboardingApi {
       'contactPhone': phone,
       'phoneVerificationToken': phoneVerificationToken,
       'notes': notes,
+      'details': details,
     });
     return (response.data as Map<String, dynamic>)['reference'] as String;
   }

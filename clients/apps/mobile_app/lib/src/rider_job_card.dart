@@ -3,13 +3,320 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
-/// One job on the rider's board: where it comes from, where it goes, what is owed at the door,
-/// and the one button that moves it on.
+/// The rider board's cards and the small parts they are assembled from.
 ///
-/// Its own file so it can be pumped on its own. The screen around it runs two periodic timers,
-/// which a widget test cannot settle — and the layout risk is all in here.
+/// Two cards live here because the 2026-08 Figma redesign draws two, and they are deliberately
+/// different shapes rather than one card in two states:
+///
+/// * [RiderJobCard] is the *offer* card (`offer-card`, frame 3:1163). It sells a job — payout
+///   first, then where it runs between, then one full-width button that takes it.
+/// * [RiderTaskCard] is the *task* card (`task-card`, frame 3:1255). It tracks a job already
+///   taken — status and age first, then the reference and the money, then the two stops as
+///   labelled fields, then a split action row.
+///
+/// The parts below ([RiderButton], [RiderRouteRow], [RiderTag], [RiderHairline]) are shared with
+/// the order-detail and earnings screens so that a rose button on one rider screen is the same
+/// object as a rose button on the next.
+///
+/// Everything reads its geometry from `tokens.dart`; the design's raw hexes map onto it exactly
+/// (`#e11d48` brand, `#10b981` positive, `#94a3b8` faint, `#fff1f2` brandSoft, and so on).
+
+/// How a [RiderButton] is painted. The redesign uses three fills and no others.
+enum RiderButtonStyle {
+  /// Brand fill, white label. The step-forward action.
+  filled,
+
+  /// The page background as a fill, muted label. The design's grey secondary
+  /// (`nav-btn`, `#f8fafc` on white).
+  soft,
+
+  /// Transparent with a 1px brand outline and a brand label (`secondary-cta`, `logout-btn`).
+  outlined,
+}
+
+/// The redesign's rider button: a **12px-radius rectangle**, not a pill.
+///
+/// Deliberately not [YdPillButton] — the customer surface's CTAs are fully rounded and the rider
+/// surface's are [DeliveryRadius.md]. They are different objects in the design and swapping one
+/// for the other is visible on every rider screen at once.
+///
+/// [trailing] carries the [YdComingSoon] chip on the affordances that have no backend yet, so an
+/// inert button still looks like the button the design drew.
+class RiderButton extends StatelessWidget {
+  const RiderButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.style = RiderButtonStyle.filled,
+    this.fontSize = 14,
+    this.fontWeight = FontWeight.w600,
+    this.verticalPadding = 12,
+    this.busy = false,
+    this.trailing,
+  });
+
+  final String label;
+
+  /// Null disables the button — which is also how an inert affordance is drawn.
+  final VoidCallback? onPressed;
+
+  final RiderButtonStyle style;
+  final double fontSize;
+  final FontWeight fontWeight;
+
+  /// The design's three button heights are expressed as vertical padding: 10 (split row),
+  /// 12 (accept), 14 (the tall CTAs).
+  final double verticalPadding;
+
+  final bool busy;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onPressed != null && !busy;
+
+    final Color background = switch (style) {
+      RiderButtonStyle.filled =>
+        enabled ? DeliveryColors.brand : DeliveryColors.brandLine,
+      RiderButtonStyle.soft => DeliveryColors.background,
+      RiderButtonStyle.outlined => Colors.transparent,
+    };
+    final Color foreground = switch (style) {
+      RiderButtonStyle.filled => DeliveryColors.white,
+      RiderButtonStyle.soft => DeliveryColors.muted,
+      RiderButtonStyle.outlined => DeliveryColors.brand,
+    };
+    final BorderSide side = style == RiderButtonStyle.outlined
+        ? const BorderSide(color: DeliveryColors.brand)
+        : BorderSide.none;
+
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.md);
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: Material(
+        color: background,
+        shape: RoundedRectangleBorder(borderRadius: corners, side: side),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          child: Padding(
+            padding: EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md,
+              vertical: verticalPadding,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                if (busy)
+                  SizedBox.square(
+                    dimension: fontSize + 2,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(foreground),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: fontWeight,
+                        color: foreground,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                if (trailing != null && !busy) ...<Widget>[
+                  const SizedBox(width: DeliverySpacing.sm),
+                  trailing!,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The neutral tag the offer card hangs off the end of its payout row
+/// (`distance-tag`: [DeliveryColors.background] fill, [DeliveryRadius.sm], 12px semibold muted).
+class RiderTag extends StatelessWidget {
+  const RiderTag({super.key, required this.label, this.color, this.background});
+
+  final String label;
+  final Color? color;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: DeliverySpacing.sm,
+        vertical: DeliverySpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: background ?? DeliveryColors.background,
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color ?? DeliveryColors.muted,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// The 1px rule the redesign puts between the sections of every multi-part card.
+class RiderHairline extends StatelessWidget {
+  const RiderHairline({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, thickness: 1, color: DeliveryColors.border);
+}
+
+/// One stop on a route: an 8px dot, a 10px gap, and a two-line text group.
+///
+/// The design draws two dialects of this and uses them in different places, so both are here:
+///
+/// * [RiderRouteRow] — title over detail (offer card): 13px semibold over 11px regular.
+/// * [RiderRouteRow.labelled] — caption over value (task card): 11px regular uppercase caption
+///   over a 14px semibold value.
+class RiderRouteRow extends StatelessWidget {
+  const RiderRouteRow({
+    super.key,
+    required this.dot,
+    required this.title,
+    this.detail,
+  })  : caption = null,
+        labelled = false;
+
+  const RiderRouteRow.labelled({
+    super.key,
+    required this.dot,
+    required String this.caption,
+    required this.title,
+  })  : detail = null,
+        labelled = true;
+
+  /// [DeliveryColors.brand] for a pickup, [DeliveryColors.ink] for a drop-off.
+  final Color dot;
+
+  final String title;
+  final String? detail;
+  final String? caption;
+  final bool labelled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (labelled)
+                Text(
+                  caption!.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: DeliveryColors.faint,
+                    height: 1.3,
+                  ),
+                ),
+              Text(
+                title,
+                maxLines: labelled ? 2 : 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: labelled ? 14 : 13,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryColors.ink,
+                  height: 1.3,
+                ),
+              ),
+              if (detail != null && detail!.isNotEmpty)
+                Text(
+                  detail!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: DeliveryColors.muted,
+                    height: 1.35,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The status chip's colour, taken from the one widget that owns the status→colour mapping.
+///
+/// [OrderStatusBadge] is the single place the platform decides what a status *means* in colour, and
+/// the rule is that the answer must not change between the rider app, the merchant queue and the
+/// back-office. This reads that decision back out rather than restating it, so the rider chip can
+/// wear the redesign's flat 8px shape ([YdStatusPill]) without forking the mapping — which is how
+/// "ON THE WAY" ends up blue here exactly as the design draws it.
+DeliveryStatusColor riderStatusColour(String wire) {
+  final Color colour = OrderStatusBadge.colorFor(wire);
+  return DeliveryStatusColor.values.firstWhere(
+    (DeliveryStatusColor s) => s.color == colour,
+    orElse: () => DeliveryStatusColor.offline,
+  );
+}
+
+/// How long ago something happened, in the rider's language.
+///
+/// The design puts a countdown ("10 mins left") beside the status chip. There is no delivery SLA
+/// anywhere in the data model, so a countdown here would be an invented number; the *age* of the
+/// job is real, is what a rider is actually judging, and fills the same slot.
+String? riderAgeLabel(DeliveryStrings t, DateTime? since) {
+  if (since == null) return null;
+  final Duration elapsed = DateTime.now().difference(since);
+  if (elapsed.isNegative) return null;
+  if (elapsed.inMinutes < 60) return t.riderMinutesAgo(elapsed.inMinutes);
+  return t.riderHoursAgo(elapsed.inHours);
+}
+
+/// An offer on the board: what it pays, where it runs between, and the button that takes it.
+///
+/// Figma `offer-card` (3:1188). Its own file so it can be pumped on its own — the screen around it
+/// runs two periodic timers, which a widget test cannot settle, and the layout risk is all in here.
 class RiderJobCard extends StatelessWidget {
-  const RiderJobCard({super.key, required this.order, required this.busy, required this.onAction});
+  const RiderJobCard({
+    super.key,
+    required this.order,
+    required this.busy,
+    required this.onAction,
+  });
 
   final DeliveryOrder order;
   final bool busy;
@@ -19,216 +326,220 @@ class RiderJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
-    // Cancel is not a step forward, and rendering it beside one as an equal-width button is how a
-    // rider taps it by accident. It goes below, as text.
+    // Server-supplied actions only — the rider is never offered a step the state machine would
+    // refuse, including CLAIM on an order another rider already took.
     final List<OrderAction> forward = order.availableActions
         .where((OrderAction a) => a != OrderAction.cancel)
         .toList();
-    final bool canCancel = order.availableActions.contains(OrderAction.cancel);
 
-    return SoftCard(
-      padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                OrderStatusBadge(statusWire: order.status.wire),
-                const Spacer(),
-                Text('#${order.shortId}',
-                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted)),
-              ],
-            ),
-            // Where it comes from, named. A rider heading out needs the shop before the street.
-            if (order.storeName != null && order.storeName!.isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.sm + 2),
-              _line(
-                icon: Icons.storefront_rounded,
-                tint: DeliveryAccent.info,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(t.pickUpFrom,
-                        style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
-                    Text(order.storeName!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: DeliveryColors.ink)),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: DeliverySpacing.sm),
-            // The largest thing on the card, on purpose: it is the one piece a rider re-reads at
-            // every junction.
-            _line(
-              icon: Icons.place_rounded,
-              tint: DeliveryAccent.critical,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(t.dropOffAt,
-                      style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
-                  Text(order.deliveryAddress,
-                      style: const TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                          color: DeliveryColors.ink)),
-                ],
-              ),
-            ),
-            const SizedBox(height: DeliverySpacing.sm + 2),
-            Wrap(
-              spacing: DeliverySpacing.sm,
-              runSpacing: DeliverySpacing.xs + 2,
-              children: <Widget>[
-                _chip(
-                  DeliveryAccent.neutral,
-                  Icons.shopping_bag_outlined,
-                  t.itemCountWithDot(
-                      order.items.fold<int>(0, (int a, OrderLine l) => a + l.qty)),
-                ),
-                // The one fact that changes what happens at the door. A rider who arrives thinking
-                // an order is prepaid either leaves without the money or has an argument on a
-                // doorstep — so it is a chip, in the colour that means "look at this", not a line
-                // of small print.
-                if (order.collectsCashOnDelivery)
-                  _chip(DeliveryAccent.caution, Icons.payments_rounded,
-                      t.collectCash(order.totalAmount.toStringAsFixed(2)))
-                else
-                  _chip(DeliveryAccent.positive, Icons.check_circle_outline_rounded, t.alreadyPaid),
-              ],
-            ),
-            if (order.contactPhone != null && order.contactPhone!.isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.sm),
-              Row(
-                children: <Widget>[
-                  const Icon(Icons.phone_rounded, size: 15, color: DeliveryColors.muted),
-                  const SizedBox(width: DeliverySpacing.xs + 2),
-                  Expanded(
-                    child: Text(order.contactPhone!,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: DeliveryColors.muted)),
-                  ),
-                ],
-              ),
-            ],
-            if (order.notes != null && order.notes!.isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.sm),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(DeliverySpacing.sm),
-                decoration: BoxDecoration(
-                  color: DeliveryColors.background,
-                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-                ),
-                child: Text(order.notes!,
-                    style: const TextStyle(
-                        fontSize: 12.5, color: DeliveryColors.muted, height: 1.35)),
-              ),
-            ],
-
-            // Server-supplied actions only - the rider is never offered a step the state machine
-            // would refuse, including CLAIM on an order another rider already took.
-            if (forward.isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.md),
-              for (final OrderAction action in forward)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: FilledButton.icon(
-                      onPressed: busy ? null : () => onAction(action),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: DeliveryColors.brand,
-                        foregroundColor: DeliveryColors.white,
-                        textStyle:
-                            const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(DeliveryRadius.md + 2),
-                        ),
-                      ),
-                      icon: Icon(_iconFor(action), size: 19),
-                      label: Text(action.labelIn(t)),
-                    ),
-                  ),
-                ),
-            ],
-            if (canCancel)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  onPressed: busy ? null : () => onAction(OrderAction.cancel),
-                  style: TextButton.styleFrom(
-                      foregroundColor: DeliveryAccent.critical.color,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(0, 36)),
-                  child: Text(OrderAction.cancel.labelIn(t)),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// An icon in its own tinted circle, beside its content. Used for the two things a rider
-  /// navigates by — the shop and the door.
-  Widget _line({required IconData icon, required DeliveryAccent tint, required Widget child}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Container(
-          width: 32,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: tint.tint, shape: BoxShape.circle),
-          child: Icon(icon, size: 17, color: tint.color),
-        ),
-        const SizedBox(width: DeliverySpacing.sm + 2),
-        Expanded(child: child),
-      ],
-    );
-  }
-
-  Widget _chip(DeliveryAccent accent, IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: DeliverySpacing.sm, vertical: DeliverySpacing.xs + 1),
-      decoration: BoxDecoration(
-        color: accent.tint,
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-        border: Border.all(color: accent.line),
-      ),
-      child: Row(
+    return YdCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 14, color: accent.color),
-          const SizedBox(width: DeliverySpacing.xs + 1),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: accent.color)),
+          // The payout, first and largest — it is the fact a rider decides on. It renders the
+          // order's delivery fee, which is the real money attached to this job.
+          Row(
+            children: <Widget>[
+              Text(
+                order.deliveryFee.toStringAsFixed(2),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryAccent.positive.color,
+                  height: 1.2,
+                ),
+              ),
+              const Spacer(),
+              // The design's slot for a neutral distance tag. There are no coordinates in the data
+              // model, so it carries the one fact that changes what happens at the door instead:
+              // a rider who arrives thinking an order is prepaid either leaves without the money or
+              // has an argument on a doorstep.
+              if (order.collectsCashOnDelivery)
+                RiderTag(
+                  label: t.collectCash(order.totalAmount.toStringAsFixed(2)),
+                  color: DeliveryAccent.caution.color,
+                  background: DeliveryAccent.caution.tint,
+                )
+              else
+                RiderTag(
+                  label: t.itemCountWithDot(
+                    order.items.fold<int>(0, (int a, OrderLine l) => a + l.qty),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          const RiderHairline(),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          if (order.storeName != null && order.storeName!.isNotEmpty) ...<Widget>[
+            RiderRouteRow(
+              dot: DeliveryColors.brand,
+              title: order.storeName!,
+              detail: t.pickUpFrom,
+            ),
+            const SizedBox(height: DeliverySpacing.sm),
+          ],
+          RiderRouteRow(
+            dot: DeliveryColors.ink,
+            title: order.deliveryAddress,
+            detail: order.contactPhone,
+          ),
+          if (order.notes != null && order.notes!.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(DeliverySpacing.sm),
+              decoration: BoxDecoration(
+                color: DeliveryColors.background,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+              ),
+              child: Text(
+                order.notes!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: DeliveryColors.muted,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+          for (final OrderAction action in forward) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            SizedBox(
+              width: double.infinity,
+              child: RiderButton(
+                // The board's headline action is a claim, and the design names it for what it does
+                // to the rider's day rather than for the transition it fires.
+                label: action == OrderAction.claim
+                    ? t.riderAcceptDelivery
+                    : action.labelIn(t),
+                busy: busy,
+                onPressed: busy ? null : () => onAction(action),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+}
 
-  IconData _iconFor(OrderAction action) => switch (action) {
-        OrderAction.claim => Icons.pan_tool_alt_rounded,
-        OrderAction.pickUp => Icons.shopping_bag_rounded,
-        OrderAction.deliver => Icons.check_circle_rounded,
-        OrderAction.accept => Icons.thumb_up_alt_rounded,
-        OrderAction.prepare => Icons.soup_kitchen_rounded,
-        OrderAction.ready => Icons.done_all_rounded,
-        OrderAction.cancel => Icons.close_rounded,
-      };
+/// A job the rider has already taken: how far along it is, how old, and the two ways on.
+///
+/// Figma `task-card` (3:1269). The step-forward action deliberately is *not* here — the design
+/// moves it onto the detail screen behind "View Details", so a rider cannot mark an order
+/// picked up by brushing a list they were scrolling.
+class RiderTaskCard extends StatelessWidget {
+  const RiderTaskCard({
+    super.key,
+    required this.order,
+    required this.onOpen,
+  });
+
+  final DeliveryOrder order;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final DeliveryStatusColor status = riderStatusColour(order.status.wire);
+    final String? age = riderAgeLabel(t, order.placedAt);
+
+    return YdCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              YdStatusPill(status: status, label: order.status.labelIn(t)),
+              const Spacer(),
+              if (age != null)
+                Text(
+                  age,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: status.color,
+                    height: 1.2,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t.riderOrderRef(order.shortId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              Text(
+                order.deliveryFee.toStringAsFixed(2),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryAccent.positive.color,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          const RiderHairline(),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          if (order.storeName != null && order.storeName!.isNotEmpty) ...<Widget>[
+            RiderRouteRow.labelled(
+              dot: DeliveryColors.brand,
+              caption: t.pickUpFrom,
+              title: order.storeName!,
+            ),
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          ],
+          RiderRouteRow.labelled(
+            dot: DeliveryColors.ink,
+            caption: t.dropOffAt,
+            title: order.deliveryAddress,
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Row(
+            children: <Widget>[
+              // Turn-by-turn needs coordinates and a routing engine, neither of which exists yet.
+              Expanded(
+                child: RiderButton(
+                  label: t.riderNavigate,
+                  style: RiderButtonStyle.soft,
+                  fontSize: 13,
+                  verticalPadding: 10,
+                  onPressed: null,
+                  trailing: YdComingSoon(label: t.riderComingSoon),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+              Expanded(
+                child: RiderButton(
+                  label: t.riderViewDetails,
+                  fontSize: 13,
+                  verticalPadding: 10,
+                  onPressed: onOpen,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

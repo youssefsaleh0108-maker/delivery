@@ -182,9 +182,20 @@ void main() {
         _apis(coverage: <Map<String, dynamic>>[_coverageRow('z1', 15)]);
     await _pumpPhone(tester, _host(a.zone, a.store), size: const Size(360, 1600));
 
-    // The wide layout's bare X carries its meaning in a tooltip, and a phone has no hover.
-    expect(find.widgetWithText(TextButton, 'Stop delivering here'), findsOneWidget);
+    // The wide layout's bare X carries its meaning in a tooltip, and a phone has no hover. The
+    // redesign draws the named version as its own tinted button rather than a Material TextButton,
+    // so this asserts on the label and its tap target instead of on a widget type.
+    expect(find.text('Stop delivering here'), findsOneWidget);
     expect(find.byType(IconButton), findsNothing);
+    expect(
+      tester
+          .getSize(find.ancestor(
+            of: find.text('Stop delivering here'),
+            matching: find.byType(InkWell),
+          ))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
   });
 
   testWidgets('terms are edited in a sheet on a phone, not a dialog under the keyboard',
@@ -192,7 +203,10 @@ void main() {
     final ({DeliveryZoneApi zone, StoreApi store, _StubAdapter adapter}) a = _apis();
     await _pumpPhone(tester, _host(a.zone, a.store), size: const Size(360, 1600));
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Add an area').first);
+    // "Add an area" and "Save" are the redesign's own buttons rather than Material's, so both are
+    // reached by their label. What the test is about — sheet, not dialog; fee sent; blank minimum
+    // meaning "use the shop's own" — is unchanged.
+    await tester.tap(find.text('Add an area').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsNothing);
@@ -200,7 +214,7 @@ void main() {
 
     // Fee, minimum, extra minutes — in that order, and the fee is the only required one.
     await tester.enterText(find.byType(TextFormField).first, '17.5');
-    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
     expect(a.adapter.writes.single, contains('"deliveryFee":17.5'));
@@ -214,11 +228,13 @@ void main() {
     await _pumpPhone(tester, _host(a.zone, a.store), size: const Size(1400, 900));
 
     final ListView list = tester.widget<ListView>(find.byType(ListView));
-    expect((list.padding! as EdgeInsets).left, DeliverySpacing.lg);
+    // 20, not 24: the redesign's merchant bodies run a 20px gutter. Still a gutter, which is what
+    // this line is here to catch — a page that starts hard against the edge of a monitor.
+    expect((list.padding! as EdgeInsets).left, DeliverySpacing.lg - DeliverySpacing.xs);
     // The compact X with its tooltip is the wide layout's, and it is still there.
     expect(find.byType(IconButton), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(tester.takeException(), isNull);

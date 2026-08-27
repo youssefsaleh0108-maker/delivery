@@ -11,13 +11,24 @@ import 'product_form_screen.dart';
 /// Reads `/api/products/mine`, which is scoped to the caller's `sub` server-side — the client never
 /// sends a merchant id, and could not widen the result if it tried.
 ///
+/// Drawn to the 2026-08 Figma frame `merchant-products` (3:1893): a white screen header over a
+/// white search band, a horizontally scrolling category strip, and one bordered row per product
+/// carrying a 64px photo, the name, the price in brand, and an availability switch with a state
+/// label under it. The switch is the design's whole point — availability is the thing a merchant
+/// changes twenty times a day, and it now takes one tap instead of a menu.
+///
 /// One widget, two hosts. The portal hands it most of a desktop beside its navigation rail; the
-/// Android app hands it 360dp and a gesture bar. What changes between them is the column count, the
-/// gutter, and whether the page can be pulled to refresh — see [_ProductListScreenState._phoneWidth].
+/// Android app hands it 360dp and a gesture bar. What changes between them is the column count and
+/// whether the page can be pulled to refresh — see [_ProductListScreenState._phoneWidth].
 class ProductListScreen extends StatefulWidget {
-  const ProductListScreen({super.key, required this.api});
+  const ProductListScreen({super.key, required this.api, this.storeApi});
 
   final CatalogApi api;
+
+  /// Only used to read a product's option groups on the form behind this screen — see
+  /// [ProductFormScreen.storeApi]. Optional so the hosts that have no [StoreApi] to hand keep
+  /// compiling; the form then draws the design's options card in its empty state.
+  final StoreApi? storeApi;
 
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
@@ -31,20 +42,36 @@ class _ProductListScreenState extends State<ProductListScreen> {
   /// and a phone in landscape is not a desktop.
   static const double _phoneWidth = 600;
 
-  /// The photo at the top of a card. Fixed, because it is the half of the card that carries no
-  /// text and so does not grow with the font setting.
-  static const double _cardImageHeight = 168;
+  /// The photo on a row, and the padding around it. 64 and 12, read off the frame — together they
+  /// set the row's floor height at 88 whatever the text does.
+  static const double _rowImage = 64;
+  static const double _rowPadding = 12;
 
-  /// Everything under that photo at the default text size: the name, the price, up to two lines of
-  /// description and the action row.
-  static const double _cardTextHeight = 204;
-
-  /// Room under the last card for the floating "New product" button to sit over nothing rather
-  /// than over the thing somebody was about to tap. An extended FAB is 56 high and Scaffold gives
-  /// it a 16 margin.
+  /// Room under the last row for the floating "Add Product" button to sit over nothing rather than
+  /// over the thing somebody was about to tap.
   static const double _fabClearance = 88;
 
   late Future<Paged<Product>> _products = widget.api.myProducts();
+
+  /// Fetched once; the category tree does not change while the screen is open. A failure here is
+  /// not fatal — the strip simply does not draw and the whole catalog stays visible.
+  late final Future<List<Category>> _categories = widget.api.categories();
+
+  final TextEditingController _search = TextEditingController();
+
+  /// Client-side, because `/api/products/mine` takes neither a query nor a category. That is
+  /// honest for a shop's own menu — it is one page of its own products, not the storefront index.
+  String _query = '';
+  String? _category;
+
+  /// Products whose availability switch is mid-flight, so a second tap cannot race the first.
+  final Set<String> _busy = <String>{};
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   void _reload() {
     // Block body, not an arrow: the arrow form returns the future from the closure, and setState
@@ -71,7 +98,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Future<void> _openForm([Product? existing]) async {
     final bool? saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => ProductFormScreen(api: widget.api, existing: existing),
+        builder: (_) => ProductFormScreen(
+          api: widget.api,
+          storeApi: widget.storeApi,
+          existing: existing,
+        ),
       ),
     );
     if (saved ?? false) {
@@ -79,47 +110,59 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
   }
 
-  Future<void> _publish(Product product) async {
+  /// The availability switch, in both directions.
+  ///
+  /// On is `publish` — the service refuses with 422 if the product has no photo yet, and that
+  /// reason is worth showing, because the fix (add a photo) is not otherwise obvious. Off is
+  /// `archive`, which is the only "not on the shelf" the service offers and is reversible by
+  /// publishing again — so the switch really is a switch, not a one-way door.
+  Future<void> _setAvailable(Product product, bool available) async {
+    if (_busy.contains(product.id)) {
+      return;
+    }
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    if (!available) {
+      // Kept from the previous screen. Taking a listing off the shelf is not destructive, but it
+      // does stop customers finding it, and a mis-tapped switch should not do that silently.
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: Text(t.archiveThisProduct),
+          content: Text(t.archiveConfirm(product.name)),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(t.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(t.archive),
+            ),
+          ],
+        ),
+      );
+      if (!(confirmed ?? false) || !mounted) {
+        return;
+      }
+    }
+
+    setState(() => _busy.add(product.id));
     try {
-      await widget.api.publish(product.id);
+      if (available) {
+        await widget.api.publish(product.id);
+      } else {
+        await widget.api.archive(product.id);
+      }
+      if (!mounted) return;
       _reload();
     } catch (e) {
       if (!mounted) return;
-      // The service returns 422 when a product has no image yet. Surfacing the reason beats a
-      // generic failure toast, since the fix (add a photo) is not obvious otherwise.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(_messageFor(e, fallback: DeliveryStrings.of(context).couldNotPublishProduct)),
+        content: Text(_messageFor(e, fallback: t.couldNotPublishProduct)),
       ));
-    }
-  }
-
-  Future<void> _archive(Product product) async {
-    // An AlertDialog and not a full-screen route even on a phone: it is two words and two buttons,
-    // and Material already sizes it to the viewport. A route would cost an animation and a back
-    // stack entry to ask one question.
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(DeliveryStrings.of(context).archiveThisProduct),
-        content: Text(
-          DeliveryStrings.of(context).archiveConfirm(product.name),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(DeliveryStrings.of(context).cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(DeliveryStrings.of(context).archive),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed ?? false) {
-      await widget.api.archive(product.id);
-      _reload();
+    } finally {
+      if (mounted) setState(() => _busy.remove(product.id));
     }
   }
 
@@ -131,115 +174,183 @@ class _ProductListScreenState extends State<ProductListScreen> {
       builder: (BuildContext context, BoxConstraints constraints) {
         final bool narrow = constraints.maxWidth < _phoneWidth;
 
-        // 24 a side on a 360dp phone spends a seventh of the screen on empty margin, and the photo
-        // the merchant is trying to judge would rather have it.
-        final double gutter = narrow ? DeliverySpacing.md : DeliverySpacing.lg;
-
         return Scaffold(
+          backgroundColor: DeliveryColors.background,
           // No AppBar. The host owns the framing: the portal already draws one above its rail, and
-          // a second bar on a 640dp-tall phone is a title, a title, and then two products. The page
-          // name and its refresh move into the content, which is where every other merchant page
-          // keeps them.
-          floatingActionButton: FloatingActionButton.extended(
+          // the design's own chrome — the 4-tab bar — belongs to whichever app is hosting this.
+          floatingActionButton: _AddProductButton(
+            label: t.merchbAddProduct,
             onPressed: () => _openForm(),
-            backgroundColor: DeliveryColors.brand,
-            foregroundColor: DeliveryColors.white,
-            icon: const Icon(Icons.add),
-            label: Text(t.newProduct),
           ),
-          body: FutureBuilder<Paged<Product>>(
-            future: _products,
-            builder: (BuildContext context, AsyncSnapshot<Paged<Product>> snapshot) {
-              final List<Product> products =
-                  snapshot.hasData ? snapshot.data!.content : const <Product>[];
-
-              // The header renders in every state, so the page does not lose its title and its
-              // refresh button exactly when a merchant is looking for them — while it loads, and
-              // when it failed to.
-              final Widget? placeholder = _placeholder(t, snapshot);
-
-              final Widget scroller = CustomScrollView(
-                // Always scrollable, or the pull-to-refresh below is dead on the two states where
-                // a merchant most wants to retry: nothing loaded, and nothing to show.
-                physics: narrow ? const AlwaysScrollableScrollPhysics() : null,
-                slivers: <Widget>[
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(gutter, gutter, gutter, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: Text(
-                                  t.myProducts,
-                                  style: Theme.of(context).textTheme.headlineMedium,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _reload,
-                                icon: const Icon(Icons.refresh),
-                                tooltip: t.refresh,
-                              ),
-                            ],
-                          ),
-                          if (products.isNotEmpty) ...<Widget>[
-                            const SizedBox(height: DeliverySpacing.md),
-                            _stats(t, products),
-                            const SizedBox(height: DeliverySpacing.lg),
-                            SectionLabel(t.yourProducts),
-                          ],
-                        ],
+          body: Column(
+            children: <Widget>[
+              YdScreenHeader(
+                title: t.merchbMenuItems,
+                subtitle: t.merchbManageAvailability,
+                // The refresh button only exists where there is no pull gesture to replace it.
+                // On a phone it would also centre the title, which the frame does not.
+                trailing: narrow
+                    ? null
+                    : IconButton(
+                        onPressed: _reload,
+                        icon: const Icon(Icons.refresh, size: 20),
+                        color: DeliveryColors.ink,
+                        tooltip: t.refresh,
                       ),
-                    ),
-                  ),
-                  if (placeholder != null)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: gutter),
-                        child: placeholder,
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: EdgeInsets.fromLTRB(
-                        gutter,
-                        0,
-                        gutter,
-                        // Clears the floating button, and then the gesture bar under it.
-                        // `paddingOf`, not `viewPaddingOf`: a host that already wrapped this in a
-                        // SafeArea has spent the inset, and this must not spend it twice.
-                        _fabClearance + MediaQuery.paddingOf(context).bottom,
-                      ),
-                      sliver: _grid(products, narrow: narrow),
-                    ),
-                ],
-              );
-
-              if (!narrow) {
-                return scroller;
-              }
-              // Pull to refresh, because the refresh button now scrolls away with the header and a
-              // thumb reaches for the gesture anyway.
-              return RefreshIndicator(
-                onRefresh: _refresh,
-                color: DeliveryColors.brand,
-                child: scroller,
-              );
-            },
+              ),
+              _searchBand(t),
+              _categoryStrip(),
+              Expanded(child: _list(t, narrow: narrow)),
+            ],
           ),
         );
       },
     );
   }
 
-  /// What goes where the grid would be when there is no grid to draw.
+  /// The design's white band under the header, holding the shared search field.
+  Widget _searchBand(DeliveryStrings t) {
+    return Container(
+      width: double.infinity,
+      color: DeliveryColors.white,
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: DeliverySpacing.lg,
+        vertical: DeliverySpacing.md - DeliverySpacing.xs,
+      ),
+      child: YdSearchField(
+        controller: _search,
+        hintText: t.merchbSearchMenuItems,
+        onChanged: (String value) => setState(() => _query = value.trim().toLowerCase()),
+      ),
+    );
+  }
+
+  /// The horizontally scrolling category chips, on the page background rather than on the header.
   ///
-  /// Null means there are products and the caller should draw them.
+  /// Drawn only once the taxonomy has loaded, and only when there is more than nothing to filter
+  /// by — a strip holding one "All" chip filters nothing and just eats 60px of a phone.
+  Widget _categoryStrip() {
+    return FutureBuilder<List<Category>>(
+      future: _categories,
+      builder: (BuildContext context, AsyncSnapshot<List<Category>> snapshot) {
+        final List<Category> roots = snapshot.data ?? const <Category>[];
+        if (roots.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final DeliveryStrings t = DeliveryStrings.of(context);
+
+        return SizedBox(
+          height: YdChip.minHeight + DeliverySpacing.lg,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              DeliverySpacing.lg,
+              DeliverySpacing.md - DeliverySpacing.xs,
+              DeliverySpacing.lg,
+              DeliverySpacing.md - DeliverySpacing.xs,
+            ),
+            children: <Widget>[
+              for (final ({String? id, String label}) chip in <({String? id, String label})>[
+                (id: null, label: t.all),
+                for (final Category category in roots) (id: category.id, label: category.name),
+              ]) ...<Widget>[
+                YdChip(
+                  label: chip.label,
+                  selected: _category == chip.id,
+                  elevated: true,
+                  onTap: () => setState(() => _category = chip.id),
+                ),
+                const SizedBox(width: 10),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _list(DeliveryStrings t, {required bool narrow}) {
+    return FutureBuilder<Paged<Product>>(
+      future: _products,
+      builder: (BuildContext context, AsyncSnapshot<Paged<Product>> snapshot) {
+        final Widget? placeholder = _placeholder(t, snapshot);
+        final List<Product> visible = placeholder != null
+            ? const <Product>[]
+            : _filter(snapshot.data!.content);
+
+        final Widget scroller = CustomScrollView(
+          // Always scrollable, or the pull-to-refresh below is dead on the two states where a
+          // merchant most wants to retry: nothing loaded, and nothing to show.
+          physics: narrow ? const AlwaysScrollableScrollPhysics() : null,
+          slivers: <Widget>[
+            if (placeholder != null)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.lg),
+                  child: placeholder,
+                ),
+              )
+            else if (visible.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: YdEmptyState(
+                  icon: Icons.search_off,
+                  title: t.merchbNoMatchingItems,
+                  action: TextButton(
+                    onPressed: () => setState(() {
+                      _search.clear();
+                      _query = '';
+                      _category = null;
+                    }),
+                    child: Text(t.clear),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  DeliverySpacing.lg,
+                  DeliverySpacing.lg,
+                  DeliverySpacing.lg,
+                  // Clears the floating button, and then the gesture bar under it. `paddingOf`,
+                  // not `viewPaddingOf`: a host that already wrapped this in a SafeArea has spent
+                  // the inset, and this must not spend it twice.
+                  _fabClearance + MediaQuery.paddingOf(context).bottom,
+                ),
+                sliver: _grid(visible, narrow: narrow),
+              ),
+          ],
+        );
+
+        if (!narrow) {
+          return scroller;
+        }
+        // Pull to refresh, because the refresh button is not drawn at this width.
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          color: DeliveryColors.brand,
+          child: scroller,
+        );
+      },
+    );
+  }
+
+  List<Product> _filter(List<Product> products) {
+    return products.where((Product p) {
+      if (_category != null && p.categoryId != _category) {
+        return false;
+      }
+      if (_query.isEmpty) {
+        return true;
+      }
+      return p.name.toLowerCase().contains(_query);
+    }).toList();
+  }
+
+  /// What goes where the list would be when there is no list to draw.
+  ///
+  /// Null means the request succeeded and the caller should filter and draw it.
   Widget? _placeholder(DeliveryStrings t, AsyncSnapshot<Paged<Product>> snapshot) {
     if (snapshot.connectionState != ConnectionState.done) {
       return const Center(
@@ -250,395 +361,426 @@ class _ProductListScreenState extends State<ProductListScreen> {
       );
     }
     if (snapshot.hasError) {
-      return _ErrorState(
+      return YdEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: t.somethingWentWrong,
         message: _messageFor(snapshot.error!, fallback: t.somethingWentWrong),
-        onRetry: _reload,
+        action: YdPillButton.secondary(
+          label: t.tryAgain,
+          onPressed: _reload,
+          size: YdPillButtonSize.compact,
+          expand: false,
+        ),
       );
     }
-    return snapshot.data!.content.isEmpty ? const _EmptyState() : null;
+    if (snapshot.data!.content.isEmpty) {
+      return YdEmptyState(
+        icon: Icons.storefront_outlined,
+        title: t.noProductsYet,
+        message: t.createYourFirstProduct,
+      );
+    }
+    return null;
   }
 
-  /// The top-line counts. [StatRow] reflows to whatever columns fit, so four tiles become two rows
-  /// of two on a phone without this screen having to say so.
-  Widget _stats(DeliveryStrings t, List<Product> products) {
-    final int live = products.where((Product p) => p.status == ProductStatus.active).length;
-    final int drafts = products.where((Product p) => p.status == ProductStatus.draft).length;
-    final int archived = products.where((Product p) => p.status == ProductStatus.archived).length;
-    final int noPicture = products.where((Product p) => p.imageUrls.isEmpty).length;
-
-    return StatRow(tiles: <Widget>[
-      StatTile(
-        value: '$live',
-        label: t.onSale,
-        icon: Icons.storefront_rounded,
-        accent: DeliveryAccent.positive,
-        footnote: t.productsTotal(products.length),
-      ),
-      StatTile(
-        value: '$drafts',
-        label: t.drafts,
-        icon: Icons.edit_note_rounded,
-        // A draft is only worth flagging if there is one: nobody needs an amber tile telling them
-        // they have no unfinished work.
-        accent: drafts == 0 ? DeliveryAccent.positive : DeliveryAccent.caution,
-      ),
-      StatTile(
-        value: '$noPicture',
-        label: t.noPhoto,
-        icon: Icons.image_not_supported_outlined,
-        accent: noPicture == 0 ? DeliveryAccent.positive : DeliveryAccent.critical,
-      ),
-      StatTile(
-        value: '$archived',
-        label: t.archived,
-        icon: Icons.inventory_2_outlined,
-        accent: DeliveryAccent.neutral,
-      ),
-    ]);
-  }
-
-  /// A grid, and full width, at every size — a product list is a visual scan ("which one is the
-  /// burger with the bad photo"), and that scan wants columns wherever there is room for them.
+  /// One column at phone width, exactly as the frame draws it; more columns wherever the window
+  /// has room, because a portal pane 1100px wide showing one 1100px-wide row is a waste of a desk.
   ///
-  /// One column below [_phoneWidth] rather than the two that `maxCrossAxisExtent` would still fit
-  /// on a 412dp phone: at two the card is ~184 wide, which leaves the Publish button about four
-  /// pixels of slack and none at all once the font setting is above 100%.
+  /// The row shape is identical either way — only how many sit side by side changes.
   Widget _grid(List<Product> products, {required bool narrow}) {
-    final double extent = _cardHeight(context);
+    final double extent = _rowHeight(context);
 
     return SliverGrid.builder(
       gridDelegate: narrow
           ? SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 1,
-              mainAxisSpacing: DeliverySpacing.md,
+              mainAxisSpacing: DeliverySpacing.md - DeliverySpacing.xs,
               mainAxisExtent: extent,
             )
           // maxCrossAxisExtent rather than a fixed column count: the rail can be collapsed and the
           // window resized, and this reflows without a breakpoint table to maintain.
           : SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 340,
-              mainAxisSpacing: DeliverySpacing.md,
-              crossAxisSpacing: DeliverySpacing.md,
-              // A fixed height, not an aspect ratio. Card content varies — some products have a
-              // description, some do not — and an aspect ratio would let one long name overflow
-              // every card in the row.
+              maxCrossAxisExtent: 420,
+              mainAxisSpacing: DeliverySpacing.md - DeliverySpacing.xs,
+              crossAxisSpacing: DeliverySpacing.md - DeliverySpacing.xs,
               mainAxisExtent: extent,
             ),
       itemCount: products.length,
-      itemBuilder: (BuildContext context, int index) => _ProductCard(
+      itemBuilder: (BuildContext context, int index) => _ProductRow(
         product: products[index],
+        busy: _busy.contains(products[index].id),
         onEdit: () => _openForm(products[index]),
-        onPublish: () => _publish(products[index]),
-        onArchive: () => _archive(products[index]),
+        onAvailability: (bool value) => _setAvailable(products[index], value),
       ),
     );
   }
 
-  /// How tall one card has to be, given the reader's font size.
+  /// How tall one row has to be, given the reader's font size.
   ///
   /// A grid cell has to be told its height, and a height in pixels is a promise about text that
-  /// only holds at 100%. Android's font setting goes to 200%, and somewhere around 130% the name,
-  /// price and description stop fitting the 372 the desktop was drawn at — at which point the fixed
-  /// extent clips the action row, which is the one part of the card that has to be tappable. Only
-  /// the text half scales; the photo is the same 168 whatever the font is.
-  double _cardHeight(BuildContext context) {
+  /// only holds at 100%. The frame's row is 88 — a 64px photo inside 12px padding — and the text
+  /// beside it (Bold 15 name over SemiBold 14 price) fits inside that until the font setting grows
+  /// it past the photo, which is the point where the row has to grow too.
+  double _rowHeight(BuildContext context) {
     // Measured off a real body size rather than `scale(1)`: Android 14's curve is non-linear, so
     // the factor at one pixel is not the factor at fourteen.
     final double factor = (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(1.0, 2.0);
-    return _cardImageHeight + _cardTextHeight * factor;
+    const double text = 15 * 1.25 + DeliverySpacing.xs + 14 * 1.25;
+    return <double>[
+      _rowImage + _rowPadding * 2,
+      text * factor + _rowPadding * 2,
+    ].reduce((double a, double b) => a > b ? a : b);
   }
 }
 
-class _ProductCard extends StatelessWidget {
-  const _ProductCard({
+/// One product, as the frame draws it: photo, name, price, availability.
+///
+/// The whole row opens the form — the design gives a row no edit affordance of its own, and the
+/// row itself is the largest target on the screen. The photo keeps its own tap, which opens the
+/// full-size preview rather than the editor.
+class _ProductRow extends StatelessWidget {
+  const _ProductRow({
     required this.product,
+    required this.busy,
     required this.onEdit,
-    required this.onPublish,
-    required this.onArchive,
+    required this.onAvailability,
   });
 
   final Product product;
+  final bool busy;
   final VoidCallback onEdit;
-  final VoidCallback onPublish;
-  final VoidCallback onArchive;
+  final ValueChanged<bool> onAvailability;
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool available = product.status == ProductStatus.active;
+
+    return YdCard.bordered(
+      padding: const EdgeInsets.all(_ProductListScreenState._rowPadding),
+      onTap: onEdit,
+      child: Row(
         children: <Widget>[
-          Stack(
-            children: <Widget>[
-              // The photo leads, because it is what a merchant checks. A DRAFT product with no
-              // image is the one that cannot be published, and at this size that is obvious at a
-              // glance instead of being an 84px square someone has to squint at.
-              DeliveryProductImage(
-                url: product.imageUrls.isEmpty ? null : product.imageUrls.first,
-                height: _ProductListScreenState._cardImageHeight,
-                width: double.infinity,
-                borderRadius: BorderRadius.zero,
-                onTap: product.imageUrls.isEmpty
-                    ? null
-                    : () => showProductImagePreview(
-                          context,
-                          urls: product.imageUrls,
-                          title: product.name,
-                        ),
-              ),
-              // Over the image rather than beside the title: whether a product is live is the
-              // second thing to know after what it looks like, and this keeps it on the same
-              // sweep of the eye.
-              //
-              // Directional, so the badge sits in the corner the reader's eye ends on — top-right
-              // in English, top-left in Arabic.
-              PositionedDirectional(
-                top: DeliverySpacing.sm,
-                end: DeliverySpacing.sm,
-                child: _statusBadge(context, product.status),
-              ),
-              if (product.imageUrls.length > 1)
-                PositionedDirectional(
-                  bottom: DeliverySpacing.sm,
-                  end: DeliverySpacing.sm,
-                  child: _PhotoCount(count: product.imageUrls.length),
+          if (product.imageUrls.isEmpty)
+            // [DeliveryProductImage]'s own empty state is an icon over the words "No photo", which
+            // needs about 66px of height and this row gives it 64 — and at that size the caption is
+            // barely readable anyway. So the thumbnail slot falls back to the glyph alone, with the
+            // same sentence attached as a semantic label and a tooltip.
+            Tooltip(
+              message: t.noPhoto,
+              child: Container(
+                width: _ProductListScreenState._rowImage,
+                height: _ProductListScreenState._rowImage,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: DeliveryColors.background,
+                  borderRadius: BorderRadius.circular(DeliveryRadius.md),
                 ),
-            ],
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(DeliverySpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 24,
+                  color: DeliveryColors.faint,
+                  semanticLabel: t.noPhoto,
+                ),
+              ),
+            )
+          else
+            SizedBox.square(
+              dimension: _ProductListScreenState._rowImage,
+              child: Stack(
                 children: <Widget>[
-                  Text(
-                    product.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: DeliverySpacing.xs),
-                  Text(
-                    product.price.toStringAsFixed(2),
-                    style: Theme.of(context).textTheme.titleLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (product.description != null && product.description!.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: DeliverySpacing.xs),
-                    Text(
-                      product.description!,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  Positioned.fill(
+                    child: DeliveryProductImage(
+                      url: product.imageUrls.first,
+                      borderRadius: BorderRadius.circular(DeliveryRadius.md),
+                      onTap: () => showProductImagePreview(
+                        context,
+                        urls: product.imageUrls,
+                        title: product.name,
+                      ),
                     ),
-                  ],
-                  const Spacer(),
-                  // One primary action plus an overflow menu, always exactly one line high.
-                  //
-                  // Three buttons in a Wrap was the obvious thing and it was wrong: at three
-                  // columns the card is ~250px, the buttons wrap onto a second and third line, and
-                  // the card overflows its grid extent. A wrapping action row cannot have a fixed
-                  // height, and a grid cell has to.
-                  //
-                  // The primary is whatever the product's state is waiting for — a DRAFT is
-                  // waiting to be published, anything else is only waiting to be edited.
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: product.status == ProductStatus.draft
-                            ? ElevatedButton(
-                                onPressed: onPublish,
-                                child: Text(
-                                  DeliveryStrings.of(context).publish,
-                                  // A label that cannot shrink is what tears a narrow card open at
-                                  // a large font setting.
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              )
-                            : OutlinedButton(
-                                onPressed: onEdit,
-                                child: Text(
-                                  DeliveryStrings.of(context).edit,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                      ),
-                      _OverflowMenu(
-                        product: product,
-                        onEdit: onEdit,
-                        onArchive: onArchive,
-                      ),
-                    ],
                   ),
+                  // The row shows one photo, and the preview behind it shows all of them — so a
+                  // product with several needs to say so, or the extra ones are invisible and the
+                  // merchant has no reason to tap. Carried over from the card grid this row
+                  // replaced; the design's 64px thumbnail has no room for a caption, so it is a
+                  // corner badge with the same sentence attached for assistive tech.
+                  if (product.imageUrls.length > 1)
+                    PositionedDirectional(
+                      end: 3,
+                      bottom: 3,
+                      child: _PhotoCountBadge(
+                        count: product.imageUrls.length,
+                        label: t.photoCount(product.imageUrls.length),
+                      ),
+                    ),
                 ],
               ),
             ),
+          const SizedBox(width: DeliverySpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: DeliverySpacing.xs),
+                Text(
+                  product.price.toStringAsFixed(2),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.brand,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.md),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _AvailabilitySwitch(
+                value: available,
+                busy: busy,
+                semanticLabel: t.merchbAvailability,
+                onChanged: onAvailability,
+              ),
+              const SizedBox(height: DeliverySpacing.xs),
+              Text(
+                _stateLabel(t, product.status),
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                  color: available ? DeliveryAccent.positive.color : DeliveryColors.faint,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// Maps catalog status onto the shared badge palette. DRAFT and ARCHIVED are both "not live", so
-  /// both use the neutral offline colour; ACTIVE reuses the delivered green for "good to go".
-  /// Takes the context: this is a StatelessWidget helper, so there is no `context` field to read.
-  Widget _statusBadge(BuildContext context, ProductStatus status) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    return switch (status) {
-      ProductStatus.draft =>
-        DeliveryStatusBadge(status: DeliveryStatusColor.placed, label: t.draft),
-      ProductStatus.active =>
-        DeliveryStatusBadge(status: DeliveryStatusColor.delivered, label: t.live),
-      ProductStatus.archived =>
-        DeliveryStatusBadge(status: DeliveryStatusColor.offline, label: t.archived),
-    };
-  }
+  /// The frame labels only two states, "Available" and "Off-shelf". The catalog has three, and the
+  /// third one matters: a DRAFT has never been published and usually cannot be, because it has no
+  /// photo yet. Collapsing it into "Off-shelf" would hide the one thing the merchant has to fix,
+  /// so the draft keeps its own word in the frame's colour and position.
+  String _stateLabel(DeliveryStrings t, ProductStatus status) => switch (status) {
+        ProductStatus.active => t.merchbAvailable,
+        ProductStatus.draft => t.draft,
+        ProductStatus.archived => t.merchbOffShelf,
+      };
 }
 
-/// The actions that are not the primary one.
+/// "This product has more than one photo", in the corner of a 64px thumbnail.
 ///
-/// A menu rather than more buttons, so the card's action row is a fixed height whatever the card's
-/// width — see the note at the call site. Hidden entirely when there is nothing left to offer, so
-/// an archived product does not get a menu with one disabled item in it.
-class _OverflowMenu extends StatelessWidget {
-  const _OverflowMenu({
-    required this.product,
-    required this.onEdit,
-    required this.onArchive,
-  });
-
-  final Product product;
-  final VoidCallback onEdit;
-  final VoidCallback onArchive;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool showEdit = product.status == ProductStatus.draft;
-    final bool showArchive = product.status != ProductStatus.archived;
-
-    if (!showEdit && !showArchive) {
-      return const SizedBox.shrink();
-    }
-
-    return PopupMenuButton<String>(
-      tooltip: DeliveryStrings.of(context).moreActions,
-      icon: const Icon(Icons.more_vert),
-      // The default is 40 and a thumb is not a mouse pointer. The menu is the only way to reach
-      // Archive, and on a phone it is also the only way to reach Edit on a draft.
-      iconSize: 24,
-      constraints: const BoxConstraints(minWidth: 48),
-      padding: const EdgeInsets.all(DeliverySpacing.sm + 4),
-      onSelected: (String value) => value == 'edit' ? onEdit() : onArchive(),
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        if (showEdit)
-          PopupMenuItem<String>(value: 'edit', child: Text(DeliveryStrings.of(context).edit)),
-        if (showArchive)
-          PopupMenuItem<String>(value: 'archive', child: Text(DeliveryStrings.of(context).archive)),
-      ],
-    );
-  }
-}
-
-/// "3 photos" over the corner of the image, so a card with more than one is discoverable.
-///
-/// Without it the preview looks like it shows everything there is, and the second photo — usually
-/// the one that reveals a bad listing — is never opened. It is a label and not a control: the whole
-/// photo above it opens the preview, which is a target no phone user can miss.
-class _PhotoCount extends StatelessWidget {
-  const _PhotoCount({required this.count});
+/// Deliberately tiny: it rides on top of the photo, and anything larger would cover the thing it
+/// is annotating. The count is the useful half, so the glyph is only there to say what the number
+/// counts; the whole sentence is on the tooltip and the semantic label.
+class _PhotoCountBadge extends StatelessWidget {
+  const _PhotoCountBadge({required this.count, required this.label});
 
   final int count;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: DeliverySpacing.sm, vertical: DeliverySpacing.xs / 2),
-      decoration: BoxDecoration(
-        color: DeliveryColors.ink.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(Icons.photo_library_outlined, size: 12, color: DeliveryColors.white),
-          const SizedBox(width: DeliverySpacing.xs),
-          Text('$count',
-              style: const TextStyle(fontSize: 11, color: DeliveryColors.white)),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  /// Already localised by the caller.
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        // Horizontal room of its own: the sentence below is two lines on a phone, and a centred
-        // Column will happily lay it out from edge to edge.
-        padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(DeliverySpacing.lg),
-              decoration: const BoxDecoration(
-                color: DeliveryColors.brandSoft,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.storefront_outlined, size: 40, color: DeliveryColors.brand),
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            // Ink at 70%, not a solid chip: the photo underneath still reads through it, which is
+            // what keeps a 26px badge from looking like a sticker somebody left on the picture.
+            color: DeliveryColors.ink.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(
+                  Icons.photo_library_outlined,
+                  size: 10,
+                  color: DeliveryColors.white,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  '$count',
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.white,
+                    height: 1.2,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: DeliverySpacing.md),
-            Text(
-              DeliveryStrings.of(context).noProductsYet,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: DeliverySpacing.xs),
-            Text(
-              DeliveryStrings.of(context).createYourFirstProduct,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
+/// The frame's 48x26 availability toggle.
+///
+/// Hand-drawn rather than a Material [Switch]: the platform switch is a fixed 52x32 in Material 3
+/// and scaling it distorts the thumb, while the row's whole rhythm — a 64px photo, a two-line text
+/// stack, and this — is set by the 26px height the design chose.
+class _AvailabilitySwitch extends StatelessWidget {
+  const _AvailabilitySwitch({
+    required this.value,
+    required this.busy,
+    required this.semanticLabel,
+    required this.onChanged,
+  });
 
-  final String message;
-  final VoidCallback onRetry;
+  final bool value;
+  final bool busy;
+
+  /// Already localised by the caller.
+  final String semanticLabel;
+
+  final ValueChanged<bool> onChanged;
+
+  static const double _width = 48;
+  static const double _height = 26;
+  static const double _thumb = 20;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium,
-              // The message carries a server sentence and a correlation id, which is several lines
-              // at 360dp and used to run off the side of it.
-              textAlign: TextAlign.center,
+    return Semantics(
+      toggled: value,
+      enabled: !busy,
+      label: semanticLabel,
+      child: InkWell(
+        onTap: busy ? null : () => onChanged(!value),
+        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          width: _width,
+          height: _height,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: value ? DeliveryColors.brand : DeliveryColors.border,
+            borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            // Directional, so the switch travels the way the reader reads.
+            alignment: value ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+            child: busy
+                ? const SizedBox.square(
+                    dimension: _thumb,
+                    child: Padding(
+                      padding: EdgeInsets.all(3),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: DeliveryColors.white,
+                      ),
+                    ),
+                  )
+                : Container(
+                    width: _thumb,
+                    height: _thumb,
+                    decoration: BoxDecoration(
+                      color: DeliveryColors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: YdCard.softShadow,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The frame's extended FAB: a brand pill with a plus, lifted by a brand-tinted shadow rather than
+/// the neutral one every other surface uses.
+///
+/// Not a [FloatingActionButton.extended], which is 56 tall — the frame's is 44, and next to a
+/// 64px product row the difference is the difference between a button and a landmark.
+class _AddProductButton extends StatelessWidget {
+  const _AddProductButton({required this.label, required this.onPressed});
+
+  /// Already localised by the caller.
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    // The frame says 28 on a 44-tall pill, which is fully rounded — so the pill token says it.
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.pill);
+
+    return Semantics(
+      button: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: corners,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: DeliveryColors.brand.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(height: DeliverySpacing.md),
-            OutlinedButton(onPressed: onRetry, child: Text(DeliveryStrings.of(context).tryAgain)),
           ],
+        ),
+        child: Material(
+          color: DeliveryColors.brand,
+          borderRadius: corners,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: DeliverySpacing.lg - DeliverySpacing.xs,
+                vertical: DeliverySpacing.md - DeliverySpacing.xs,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.add, size: 18, color: DeliveryColors.white),
+                  const SizedBox(width: DeliverySpacing.sm),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: DeliveryColors.white,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

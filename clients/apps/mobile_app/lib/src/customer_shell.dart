@@ -44,10 +44,6 @@ class CustomerShell extends StatefulWidget {
 }
 
 class _CustomerShellState extends State<CustomerShell> {
-  // The tabs, named. Both the IndexedStack and the bar below are ordered by these, and checkout
-  // jumps to Orders by number once an order is placed.
-  static const int _ordersTab = 3;
-
   /// One cart for the whole session, owned here so the badge and the basket screen cannot disagree.
   final Cart _cart = Cart();
 
@@ -71,7 +67,11 @@ class _CustomerShellState extends State<CustomerShell> {
   /// Browse tab, so the poll cannot live inside the notifications screen.
   late final NotificationInbox _inbox = NotificationInbox(widget.notificationApi);
 
-  int _index = 0;
+  int _index = CustomerNavBar.homeIndex;
+
+  /// Moves to a tab. The one place the index is written, so a screen that wants to send somebody
+  /// to Orders says so by name and cannot be broken by the order changing again.
+  void _open(int tab) => setState(() => _index = tab);
 
   /// Re-asks the server what this basket qualifies for, when the basket has actually changed.
   ///
@@ -105,6 +105,68 @@ class _CustomerShellState extends State<CustomerShell> {
     super.dispose();
   }
 
+  /// One destination, chosen by its index in [CustomerNavBar].
+  ///
+  /// A switch rather than a list literal so the compiler is the thing that notices when a tab is
+  /// added and this is not updated.
+  Widget _tabAt(int tab) {
+    switch (tab) {
+      case CustomerNavBar.homeIndex:
+        return StoreHomeScreen(
+          storeApi: widget.storeApi,
+          zoneApi: widget.zoneApi,
+          orderApi: widget.orderApi,
+          cart: _cart,
+          addresses: _addresses,
+          inbox: _inbox,
+          locale: widget.locale,
+          session: widget.session,
+          onSignOut: widget.onSignOut,
+        );
+      case CustomerNavBar.ordersIndex:
+        return MyOrdersScreen(
+          api: widget.orderApi,
+          storeApi: widget.storeApi,
+          cart: _cart,
+        );
+      case CustomerNavBar.butlerIndex:
+        return ButlerScreen(
+          addresses: _addresses,
+          zoneApi: widget.zoneApi,
+          api: widget.butlerApi,
+          orderApi: widget.orderApi,
+          storeApi: widget.storeApi,
+          cart: _cart,
+        );
+      case CustomerNavBar.basketIndex:
+        return CartScreen(
+          cart: _cart,
+          addresses: _addresses,
+          orderApi: widget.orderApi,
+          offerApi: widget.offerApi,
+          zoneApi: widget.zoneApi,
+          onOrderPlaced: () => _open(CustomerNavBar.ordersIndex),
+        );
+      case CustomerNavBar.accountIndex:
+        return AccountScreen(
+          session: widget.session,
+          zoneApi: widget.zoneApi,
+          addresses: _addresses,
+          onSignOut: widget.onSignOut,
+          // The merged Account Settings page: the redesign folds language, notifications and the
+          // route into order history into this one screen, and each of those needs something the
+          // shell owns rather than something the screen can reach on its own.
+          locale: widget.locale,
+          inbox: _inbox,
+          onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
+        );
+      default:
+        // Unreachable: the loop above is bounded by tabCount. Kept because a switch over an int
+        // has to be exhaustive somehow, and an empty box beats a crash if that ever stops holding.
+        return const SizedBox.shrink();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -112,58 +174,23 @@ class _CustomerShellState extends State<CustomerShell> {
       animation: Listenable.merge(<Listenable>[_cart, _inbox, _addresses]),
       builder: (BuildContext context, _) {
         return Scaffold(
+          // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight requests
+          // alive, so switching to the basket and back does not refetch the catalog.
+          //
+          // The order is the design's, and it is written down once in [CustomerNavBar]. The list
+          // below is built by index rather than as a literal so the two cannot drift: a stack whose
+          // third child is not Butler is a bar that opens the wrong screen, and nothing about the
+          // code would look wrong.
           body: IndexedStack(
             index: _index,
             children: <Widget>[
-              // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight
-              // requests alive, so switching to the basket and back does not refetch the catalog.
-              StoreHomeScreen(
-                storeApi: widget.storeApi,
-                zoneApi: widget.zoneApi,
-                orderApi: widget.orderApi,
-                cart: _cart,
-                addresses: _addresses,
-                inbox: _inbox,
-                locale: widget.locale,
-                session: widget.session,
-                onSignOut: widget.onSignOut,
-              ),
-              ButlerScreen(
-                addresses: _addresses,
-                zoneApi: widget.zoneApi,
-                api: widget.butlerApi,
-                orderApi: widget.orderApi,
-                storeApi: widget.storeApi,
-                cart: _cart,
-              ),
-              CartScreen(
-                cart: _cart,
-                addresses: _addresses,
-                orderApi: widget.orderApi,
-                offerApi: widget.offerApi,
-                zoneApi: widget.zoneApi,
-                onOrderPlaced: () => setState(() => _index = _ordersTab),
-              ),
-              MyOrdersScreen(
-                api: widget.orderApi,
-                storeApi: widget.storeApi,
-                cart: _cart,
-              ),
-              AccountScreen(
-                session: widget.session,
-                zoneApi: widget.zoneApi,
-                addresses: _addresses,
-                onSignOut: widget.onSignOut,
-              ),
+              for (int tab = 0; tab < CustomerNavBar.tabCount; tab++) _tabAt(tab),
             ],
           ),
-          // Not a NavigationBar: the basket is the one destination that has to be findable without
-          // looking, and five equal icons make it exactly as findable as Account. See
-          // [CustomerNavBar].
           bottomNavigationBar: CustomerNavBar(
             index: _index,
             basketCount: _cart.itemCount,
-            onSelected: (int i) => setState(() => _index = i),
+            onSelected: _open,
           ),
         );
       },

@@ -10,9 +10,18 @@ import 'delivery_address.dart';
 
 /// Review the basket and place the order.
 ///
+/// Laid out as the 2026-08 Figma redesign draws it (`customer-checkout`, node 3:471): a 56px white
+/// header, a 24px body of three stacked sections — saved addresses as radio cards, the payment
+/// strip, the order note — and a sticky white summary bar carrying the total on the start side and
+/// the pill CTA on the end.
+///
 /// The total shown here is computed from cached catalog prices, and the server recomputes it from
 /// the live catalog when the order is placed. They can legitimately differ if a merchant re-priced
 /// mid-session, so the confirmation shows the SERVER's total rather than the one on this screen.
+///
+/// The basket recap the previous layout carried is gone, as in the design: the Basket screen this
+/// is pushed from lists every line immediately before, and the money — the part that must not be a
+/// surprise — is in the sticky bar the whole time.
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({
     super.key,
@@ -35,13 +44,6 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  /// The sentinel the "add a new address" row carries.
-  ///
-  /// A dropdown value rather than a button beside the dropdown: adding an address is one of the
-  /// choices of where to deliver, and splitting it out makes a customer with no saved address hunt
-  /// for the control that does the only thing they can do.
-  static const String _addNew = '__add_new__';
-
   final GlobalKey<FormState> _form = GlobalKey<FormState>();
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _notes = TextEditingController();
@@ -103,7 +105,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
-  /// The address the dropdown currently names, or null when nothing is chosen yet.
+  /// The address the radio list currently names, or null when nothing is chosen yet.
   DeliveryAddress? get _address {
     final String? line = _addressLine;
     if (line == null) return null;
@@ -142,8 +144,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       //
       // Unchanged is the point. Checkout used to write this screen's notes field back onto the
       // saved address, so an order-specific "ring twice, they are expecting me" quietly replaced
-      // the door instructions the address had been carrying — and now that the dropdown shows those
-      // notes, it would replace them visibly.
+      // the door instructions the address had been carrying.
       await widget.addresses.select(address);
 
       final DeliveryOrder order = await widget.api.place(
@@ -181,252 +182,429 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List<CartLine> lines = widget.cart.lines;
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<CartLine> lines = widget.cart.lines;
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.checkout)),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(DeliverySpacing.md),
-          children: <Widget>[
-            _orderCard(context, t, lines),
-            const SizedBox(height: DeliverySpacing.md),
-            _addressCard(context, t),
-            const SizedBox(height: DeliverySpacing.md),
-            _paymentCard(context, t),
-            const SizedBox(height: DeliverySpacing.md),
-            Form(
-              key: _form,
-              child: Column(
-                children: <Widget>[
-                  TextFormField(
-                    controller: _phone,
-                    decoration: InputDecoration(
-                      labelText: t.contactPhoneOptional,
-                      prefixIcon: const Icon(Icons.phone_outlined),
-                    ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: DeliverySpacing.md),
-                  TextFormField(
-                    controller: _notes,
-                    decoration: InputDecoration(
-                      labelText: t.merchantNotesOptional,
-                      prefixIcon: const Icon(Icons.sticky_note_2_outlined),
-                    ),
-                    maxLines: 2,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: DeliverySpacing.xl),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _placing || lines.isEmpty ? null : _place,
-                child: Text(_placing
-                    ? t.placing
-                    : t.placeOrderWithTotal(widget.cart.total.toStringAsFixed(2))),
-              ),
-            ),
-            const SizedBox(height: DeliverySpacing.sm),
-          ],
-        ),
+      backgroundColor: DeliveryColors.background,
+      appBar: YdScreenHeader(
+        title: t.checkout,
+        onBack: () => Navigator.of(context).maybePop(),
+        backSemanticLabel: t.back,
       ),
-    );
-  }
-
-  Widget _orderCard(BuildContext context, DeliveryStrings t, List<CartLine> lines) {
-    return SoftCard(
-      padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(t.yourOrder, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: DeliverySpacing.sm),
-            for (final CartLine line in lines)
-              Padding(
-                padding: const EdgeInsets.only(bottom: DeliverySpacing.xs),
-                child: Row(
-                  children: <Widget>[
-                    // A multiplication sign, not the letter x: it needs no translating and reads
-                    // the same in both scripts.
-                    Text('${line.qty} × '),
-                    Expanded(
-                      child: Text(line.product.name,
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ),
-                    Text((line.product.price * line.qty).toStringAsFixed(2)),
-                  ],
-                ),
-              ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Column(
+        children: <Widget>[
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(DeliverySpacing.lg),
               children: <Widget>[
-                Text(t.total, style: Theme.of(context).textTheme.titleMedium),
-                Text(widget.cart.total.toStringAsFixed(2),
-                    style: Theme.of(context).textTheme.titleLarge),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Where it goes: picked from the addresses the customer has already saved.
-  ///
-  /// A dropdown rather than a text box. The address was already entered, with its area, in a sheet
-  /// that validates both — retyping it here produced a second, unvalidated copy that could name a
-  /// street in one area while carrying the zone id of another.
-  Widget _addressCard(BuildContext context, DeliveryStrings t) {
-    final List<DeliveryAddress> saved = widget.addresses.recents;
-    final DeliveryAddress? address = _address;
-
-    return SoftCard(
-      padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(t.deliverTo, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: DeliverySpacing.sm),
-            DropdownButtonFormField<String>(
-              initialValue: _addressLine,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: t.deliveryAddress,
-                hintText: t.chooseAnAddress,
-                prefixIcon: const Icon(Icons.place_outlined),
-              ),
-              items: <DropdownMenuItem<String>>[
-                for (final DeliveryAddress a in saved)
-                  DropdownMenuItem<String>(
-                    value: a.line,
-                    child: Text(a.display, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-                DropdownMenuItem<String>(
-                  value: _addNew,
-                  child: Row(
+                _addressSection(t),
+                const SizedBox(height: _sectionGap),
+                _paymentSection(t),
+                const SizedBox(height: _sectionGap),
+                Form(
+                  key: _form,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      const Icon(Icons.add_location_alt_outlined,
-                          size: 18, color: DeliveryColors.brand),
-                      const SizedBox(width: DeliverySpacing.sm),
-                      Flexible(
-                        child: Text(t.addANewAddress,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: DeliveryColors.brand, fontWeight: FontWeight.w600)),
+                      _notesSection(t),
+                      const SizedBox(height: _sectionGap),
+                      // Not drawn in the redesign, kept because the order carries it: a rider with
+                      // no number to ring has to guess at a closed door. Written in the design's
+                      // own section language rather than as a leftover Material field.
+                      _fieldSection(
+                        title: t.contactPhoneOptional,
+                        child: TextFormField(
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          style: _fieldTextStyle,
+                          decoration: _boxDecoration(t.contactPhoneOptional),
+                        ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: DeliverySpacing.sm),
               ],
-              onChanged: (String? value) {
-                if (value == _addNew) {
-                  // Leaves the previous choice in place while the sheet is open, so cancelling out
-                  // of it does not clear an address the customer had already picked.
-                  _addAddress();
-                  return;
-                }
-                _choose(value);
-              },
             ),
-            if (address != null && _detail(address).isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.sm),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Icon(Icons.map_outlined, size: 15, color: DeliveryColors.muted),
-                  const SizedBox(width: DeliverySpacing.xs + 2),
-                  Expanded(
-                    child: Text(_detail(address),
-                        style: const TextStyle(fontSize: 12.5, color: DeliveryColors.muted)),
+          ),
+          _summaryBar(t, lines),
+        ],
+      ),
+    );
+  }
+
+  /// 20px between top-level body sections, per the frame.
+  static const double _sectionGap = 20;
+
+  static const TextStyle _fieldTextStyle =
+      TextStyle(fontSize: 13, color: DeliveryColors.ink, height: 1.4);
+
+  /// The design's plain input box: white, 1px [DeliveryColors.border], radius 12, 12px padding,
+  /// 13px placeholder in [DeliveryColors.faint].
+  InputDecoration _boxDecoration(String hint) {
+    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: DeliveryColors.white,
+      hintText: hint,
+      hintStyle: const TextStyle(fontSize: 13, color: DeliveryColors.faint, height: 1.4),
+      contentPadding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+      border: border(DeliveryColors.border, 1),
+      enabledBorder: border(DeliveryColors.border, 1),
+      focusedBorder: border(DeliveryColors.brand, 1.5),
+      errorBorder: border(DeliveryAccent.critical.color, 1),
+      focusedErrorBorder: border(DeliveryAccent.critical.color, 1.5),
+    );
+  }
+
+  // ------------------------------------------------------------------ section 1: where it goes
+
+  Widget _addressSection(DeliveryStrings t) {
+    final List<DeliveryAddress> saved = widget.addresses.recents;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // Title row: heading on the start side, the add action on the end — the design's inline
+        // brand text link rather than a button, at SemiBold 13.
+        YdSectionHeader(
+          title: t.deliveryAddress,
+          fontSize: 15,
+          trailing: Semantics(
+            button: true,
+            child: InkWell(
+              onTap: _addAddress,
+              borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.all(DeliverySpacing.xs),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Icon(Icons.add_rounded, size: 14, color: DeliveryColors.brand),
+                    const SizedBox(width: 2),
+                    Text(
+                      t.addANewAddress,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.brand,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+        if (saved.isEmpty)
+          // Nothing saved yet: the one card is the way to make one, so it says so rather than
+          // showing an empty section with an action hidden in the title row.
+          YdCard(
+            onTap: _addAddress,
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.add_location_alt_outlined,
+                    size: 20, color: DeliveryColors.brand),
+                const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+                Expanded(
+                  child: Text(
+                    t.chooseAnAddress,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
                   ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (int i = 0; i < saved.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _addressCard(saved[i]),
+          ],
+      ],
+    );
+  }
+
+  /// One saved address as the design's radio card: 16px padding, radius 16, a 20px radio with a
+  /// 2px ring and a 10px dot when chosen, then a bold label over a 12px detail line.
+  Widget _addressCard(DeliveryAddress address) {
+    final bool selected = address.line == _addressLine;
+    final String detail = _detail(address);
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: YdCard(
+        onTap: () => _choose(address.line),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 20,
+              height: 20,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected ? DeliveryColors.brand : DeliveryColors.border,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: DeliveryColors.brand,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    address.label == null || address.label!.isEmpty
+                        ? address.line
+                        : address.label!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
+                  ),
+                  if (detail.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Text(
+                      detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DeliveryColors.muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// The area and door notes behind the chosen address, so what the dropdown row could not fit is
-  /// still visible before the order is placed.
+  /// The street, area and door notes behind an address — everything the bold label does not carry.
   String _detail(DeliveryAddress address) => <String>[
+        if (address.label != null && address.label!.isNotEmpty) address.line,
         if (address.zoneName != null && address.zoneName!.isNotEmpty) address.zoneName!,
         if (address.notes != null && address.notes!.isNotEmpty) address.notes!,
       ].join(' · ');
 
-  /// How it gets paid for.
+  // ------------------------------------------------------------------ section 2: how it is paid
+
+  /// The payment strip: two equal cards, Apple Pay first as drawn.
   ///
-  /// One method today, and shown as a chosen option rather than as a note at the bottom of the
-  /// screen: "cash on delivery" is something the customer needs before they commit, not a footnote
-  /// after they have.
-  Widget _paymentCard(BuildContext context, DeliveryStrings t) {
-    return SoftCard(
-      padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.md),
-        child: Column(
+  /// Apple Pay is rendered exactly as the design draws it and marked inert — no payment provider is
+  /// integrated, so selecting it would be a promise the platform cannot keep. Cash is the offered
+  /// method and stays selected.
+  Widget _paymentSection(DeliveryStrings t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          t.paymentMethod,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(t.paymentMethod, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: DeliverySpacing.sm),
+            Expanded(
+              child: YdComingSoon.wrap(
+                label: t.custSoon,
+                icon: Icons.schedule,
+                child: _payCard(
+                  icon: Icons.credit_card,
+                  label: t.custApplePay,
+                  selected: false,
+                  onTap: null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             for (final PaymentMethod method in PaymentMethod.offered)
-              _paymentTile(context, t, method),
+              Expanded(
+                child: _payCard(
+                  icon: method == PaymentMethod.cash
+                      ? Icons.attach_money_rounded
+                      : Icons.credit_card,
+                  label: method.labelIn(t),
+                  selected: _payment == method,
+                  onTap: () => setState(() => _payment = method),
+                ),
+              ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _payCard({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback? onTap,
+  }) {
+    final Color foreground = selected ? DeliveryColors.ink : DeliveryColors.muted;
+
+    return Semantics(
+      button: onTap != null,
+      selected: selected,
+      child: Material(
+        color: DeliveryColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          side: BorderSide(
+            color: selected ? DeliveryColors.brand : DeliveryColors.border,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding:
+                const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+            child: Row(
+              children: <Widget>[
+                Icon(icon, size: 18, color: foreground),
+                const SizedBox(width: DeliverySpacing.sm),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: foreground,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _paymentTile(BuildContext context, DeliveryStrings t, PaymentMethod method) {
-    final bool selected = _payment == method;
-    return InkWell(
-      borderRadius: BorderRadius.circular(DeliveryRadius.md),
-      onTap: () => setState(() => _payment = method),
-      child: Container(
-        padding: const EdgeInsets.all(DeliverySpacing.sm + 2),
-        decoration: BoxDecoration(
-          color: selected ? DeliveryColors.brandSoft : DeliveryColors.white,
-          borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          border: Border.all(color: selected ? DeliveryColors.brand : DeliveryColors.border),
+  // ------------------------------------------------------------------ section 3: the note
+
+  Widget _notesSection(DeliveryStrings t) {
+    return _fieldSection(
+      title: t.custOrderNotes,
+      child: TextFormField(
+        controller: _notes,
+        maxLines: 3,
+        minLines: 2,
+        style: _fieldTextStyle,
+        decoration: _boxDecoration(t.custOrderNotesHint),
+      ),
+    );
+  }
+
+  Widget _fieldSection({required String title, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.25,
+          ),
         ),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              method == PaymentMethod.cash
-                  ? Icons.payments_outlined
-                  : Icons.credit_card_outlined,
-              color: selected ? DeliveryColors.brand : DeliveryColors.muted,
-            ),
-            const SizedBox(width: DeliverySpacing.sm + 2),
-            Expanded(
-              child: Column(
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+        child,
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------------ the sticky summary
+
+  Widget _summaryBar(DeliveryStrings t, List<CartLine> lines) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(top: BorderSide(color: DeliveryColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(DeliverySpacing.lg),
+          child: Row(
+            children: <Widget>[
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Text(method.labelIn(t),
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
-                  const SizedBox(height: 1),
-                  Text(method.descriptionIn(t),
-                      style: const TextStyle(fontSize: 12, color: DeliveryColors.muted)),
+                  Text(
+                    t.custTotalPrice,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DeliveryColors.faint,
+                      height: 1.3,
+                    ),
+                  ),
+                  Text(
+                    widget.cart.total.toStringAsFixed(2),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.brand,
+                      height: 1.3,
+                    ),
+                  ),
                 ],
               ),
-            ),
-            Icon(
-              selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-              size: 20,
-              color: selected ? DeliveryColors.brand : DeliveryColors.muted,
-            ),
-          ],
+              const Spacer(),
+              YdPillButton(
+                label: t.custPlaceOrder,
+                expand: false,
+                busy: _placing,
+                onPressed: _placing || lines.isEmpty ? null : _place,
+              ),
+            ],
+          ),
         ),
       ),
     );

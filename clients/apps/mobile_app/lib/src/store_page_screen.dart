@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
 import 'cart.dart';
+import 'product_detail_screen.dart';
 import 'product_options_sheet.dart';
 import 'store_state_mapping.dart';
 
@@ -12,6 +15,9 @@ import 'store_state_mapping.dart';
 /// The four tabs are four different questions — what does this place sell, how is it organised,
 /// what is cheap right now, and what did I get last time. A single scrolling menu answers only the
 /// first, which is fine for a restaurant with twelve dishes and useless for a supermarket.
+///
+/// Drawn to `customer-shop` (Figma 3:224): a 200px cover with three glass controls floating on it,
+/// the three-stat strip under it, the underlined tab bar, and then the menu as full-width rows.
 class StorePageScreen extends StatefulWidget {
   const StorePageScreen({
     super.key,
@@ -38,11 +44,19 @@ class StorePageScreen extends StatefulWidget {
 }
 
 class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 4, vsync: this);
+  late final TabController _tabs = TabController(length: 4, vsync: this)
+    ..addListener(_rebuild);
 
   Store? _store;
   List<Aisle> _aisles = <Aisle>[];
   List<Offer> _offers = <Offer>[];
+
+  /// The in-shop search the hero's magnifier opens. Null when the field is closed; the shelf query
+  /// carries it, so this searches the whole catalogue of the shop rather than the loaded pages.
+  String? _search;
+  final TextEditingController _searchController = TextEditingController();
+  bool _searchOpen = false;
+  Timer? _searchDebounce;
 
   /// The shelf, a page at a time. A supermarket has thousands of lines; fetching them all to render
   /// the first dozen rows is the single biggest avoidable payload in the app.
@@ -51,6 +65,7 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     fetch: (int page, int size) => widget.storeApi.products(
       widget.storeId,
       categoryId: _selectedAisle,
+      search: _search,
       page: page,
       size: size,
     ),
@@ -77,6 +92,9 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _tabs.removeListener(_rebuild);
     _tabs.dispose();
     _products.removeListener(_rebuild);
     _products.dispose();
@@ -170,6 +188,27 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     _products.refresh();
   }
 
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      setState(() => _search = value.trim().isEmpty ? null : value.trim());
+      _products.refresh();
+    });
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen && _search != null) {
+        _search = null;
+        _searchController.clear();
+        _products.refresh();
+      }
+    });
+    // Searching is a question about the shelf, so it takes the reader there.
+    if (_searchOpen) _tabs.animateTo(0);
+  }
+
   /// Cached per product so re-tapping Add does not re-fetch a menu that cannot have changed
   /// while this screen is open.
   final Map<String, List<OptionGroup>> _optionGroups = <String, List<OptionGroup>>{};
@@ -202,7 +241,12 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       return;
     }
     if (!mounted) return;
-    final ConfiguredProduct? configured = await showProductOptionsSheet(
+    await _openDetail(product, groups);
+  }
+
+  /// The full product screen the redesign promotes the options sheet into.
+  Future<void> _openDetail(Product product, List<OptionGroup> groups) async {
+    final ConfiguredProduct? configured = await showProductDetail(
       context,
       api: widget.storeApi,
       product: product,
@@ -213,23 +257,55 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     }
   }
 
+  /// Opening a row rather than its add button: the detail screen is the frame's own destination
+  /// for a product, options or not.
+  Future<void> _openProduct(Product product) async {
+    if (widget.cart.conflictsWith(product)) {
+      await _askToSwitchStore(product);
+      return;
+    }
+    List<OptionGroup> groups = _optionGroups[product.id] ?? const <OptionGroup>[];
+    if (!_optionGroups.containsKey(product.id)) {
+      try {
+        groups = await widget.storeApi.productOptions(product.id);
+        _optionGroups[product.id] = groups;
+      } catch (_) {
+        _optionGroups[product.id] = const <OptionGroup>[];
+        groups = const <OptionGroup>[];
+      }
+    }
+    if (!mounted) return;
+    await _openDetail(product, groups);
+  }
+
   /// The one-store rule, explained at the moment of the tap rather than as a 422 at checkout.
   Future<void> _askToSwitchStore(Product product) async {
     final bool? discard = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: Text(DeliveryStrings.of(context).startNewBasket),
+        backgroundColor: DeliveryColors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+        title: Text(DeliveryStrings.of(context).startNewBasket,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
         content: Text(
           '${DeliveryStrings.of(context).basketFromShopReplace(widget.cart.store?.name ?? '')} '
           '${DeliveryStrings.of(context).basketFromAnotherShopSingle}',
+          style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4),
         ),
         actions: <Widget>[
           TextButton(
               onPressed: () => Navigator.of(context).pop(false),
+              style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
               child: Text(DeliveryStrings.of(context).keepIt)),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
+            style: FilledButton.styleFrom(
+              backgroundColor: DeliveryColors.brand,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.md)),
+            ),
             child: Text(DeliveryStrings.of(context).startHere),
           ),
         ],
@@ -258,6 +334,11 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     }
   }
 
+  // ------------------------------------------------------------------------------------- layout
+
+  static const double _gutter = DeliverySpacing.lg;
+  static const double _heroHeight = 200;
+
   @override
   Widget build(BuildContext context) {
     if (_loading && widget.preview == null) {
@@ -267,23 +348,22 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       );
     }
     if (_error != null && _store == null) {
+      final DeliveryStrings t = DeliveryStrings.of(context);
       return Scaffold(
-        appBar: AppBar(),
         backgroundColor: DeliveryColors.background,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(DeliverySpacing.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const Icon(Icons.cloud_off_rounded, size: 40, color: DeliveryColors.muted),
-                const SizedBox(height: DeliverySpacing.md),
-                Text(DeliveryStrings.of(context).couldNotLoadShop,
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: DeliverySpacing.md),
-                FilledButton(onPressed: _load, child: Text(DeliveryStrings.of(context).tryAgain)),
-              ],
-            ),
+        appBar: YdScreenHeader(
+          title: t.couldNotLoadShop,
+          onBack: () => Navigator.of(context).maybePop(),
+          backSemanticLabel: t.back,
+        ),
+        body: YdEmptyState(
+          icon: Icons.cloud_off,
+          title: t.couldNotLoadShop,
+          action: YdPillButton(
+            label: t.tryAgain,
+            onPressed: _load,
+            size: YdPillButtonSize.compact,
+            expand: false,
           ),
         ),
       );
@@ -295,28 +375,12 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
         animation: widget.cart,
         builder: (BuildContext context, _) => NestedScrollView(
           headerSliverBuilder: (BuildContext context, bool _) => <Widget>[
-            _header(),
+            _hero(),
+            SliverToBoxAdapter(child: _statStrip()),
+            if (_searchOpen) SliverToBoxAdapter(child: _searchBar()),
             SliverPersistentHeader(
               pinned: true,
-              delegate: _TabBarHeader(
-                TabBar(
-                  controller: _tabs,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: DeliveryColors.brand,
-                  unselectedLabelColor: DeliveryColors.muted,
-                  indicatorColor: DeliveryColors.brand,
-                  indicatorWeight: 3,
-                  labelStyle:
-                      const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                  tabs: <Widget>[
-                    Tab(text: DeliveryStrings.of(context).tabShop),
-                    Tab(text: DeliveryStrings.of(context).tabAislesCount(_aisles.length)),
-                    Tab(text: DeliveryStrings.of(context).tabOffersCount(_offers.length)),
-                    Tab(text: DeliveryStrings.of(context).tabBuyAgain),
-                  ],
-                ),
-              ),
+              delegate: _TabsHeader(child: _categoryTabs(), height: _tabsHeight),
             ),
           ],
           body: TabBarView(
@@ -337,6 +401,7 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
               builder: (BuildContext context, _) => StickyBasketBar(
                 itemCount: widget.cart.itemCount,
                 total: widget.cart.subtotal.toStringAsFixed(2),
+                label: DeliveryStrings.of(context).viewBasket,
                 blockedReason: widget.cart.meetsMinimum
                     ? null
                     : DeliveryStrings.of(context).addToReachMinimumShort(
@@ -347,98 +412,89 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     );
   }
 
-  Widget _header() {
+  /// The 200px cover: the photo, a 40% scrim so white type survives it, three glass controls, and
+  /// the shop's name pinned to the bottom.
+  Widget _hero() {
     final StoreCard card = _card;
     final Store? store = _store;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool favorite = store?.favorite ?? false;
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+
     return SliverAppBar(
-      expandedHeight: 232,
+      expandedHeight: _heroHeight,
       pinned: true,
       backgroundColor: DeliveryColors.brand,
       foregroundColor: DeliveryColors.white,
-      actions: <Widget>[
-        IconButton(
-          onPressed: _toggleFavorite,
-          tooltip: (store?.favorite ?? false) ? DeliveryStrings.of(context).removeFromFavourites : DeliveryStrings.of(context).addToFavourites,
-          icon: Icon(
-            (store?.favorite ?? false)
-                ? Icons.favorite_rounded
-                : Icons.favorite_border_rounded,
-          ),
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      titleSpacing: 0,
+      title: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
+        child: Row(
+          children: <Widget>[
+            GlassCircleButton(
+              icon: rtl ? Icons.chevron_right : Icons.chevron_left,
+              semanticLabel: t.back,
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+            const Spacer(),
+            GlassCircleButton(
+              icon: _searchOpen ? Icons.close : Icons.search,
+              semanticLabel: t.custSearchInShop,
+              onPressed: _toggleSearch,
+            ),
+            const SizedBox(width: DeliverySpacing.sm),
+            GlassCircleButton(
+              icon: favorite ? Icons.favorite : Icons.favorite_border,
+              semanticLabel: favorite ? t.removeFromFavourites : t.addToFavourites,
+              onPressed: _toggleFavorite,
+            ),
+          ],
         ),
-      ],
+      ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            if (card.coverUrl == null || card.coverUrl!.isEmpty)
-              StoreMonogram(name: card.name, radius: 0)
-            else
-              Image.network(card.coverUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => StoreMonogram(name: card.name, radius: 0)),
-            // Keeps the white title legible over whatever the cover happens to be.
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: <Color>[Colors.black54, Colors.transparent, Colors.black87],
-                  stops: <double>[0, 0.35, 1],
-                ),
-              ),
+            CustomerPhoto(
+              url: card.coverUrl,
+              height: _heroHeight,
+              icon: iconForVertical(card.vertical),
             ),
-            Positioned(
-              left: DeliverySpacing.md,
-              right: DeliverySpacing.md,
-              bottom: DeliverySpacing.md,
+            // Keeps the white title legible over whatever the cover happens to be.
+            DecoratedBox(
+              decoration: BoxDecoration(color: DeliveryColors.ink.withValues(alpha: 0.4)),
+            ),
+            PositionedDirectional(
+              start: _gutter,
+              end: _gutter,
+              bottom: _gutter,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: <Widget>[
-                      StoreAvatar(name: card.name, logoUrl: card.logoUrl, size: 54),
-                      const SizedBox(width: DeliverySpacing.sm + 4),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            StoreStatePill(state: storeStateOf(card.availability)),
-                            const SizedBox(height: DeliverySpacing.xs + 2),
-                            Text(
-                              card.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: DeliveryColors.white,
-                                fontSize: 23,
-                                fontWeight: FontWeight.w800,
-                                height: 1.15,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: DeliverySpacing.sm),
                   Text(
-                    <String>[
-                      if (card.tags.isNotEmpty) card.tags.join(' · '),
-                      card.etaLabel,
-                      card.feeLabel,
-                      if (card.minOrder > 0)
-                        DeliveryStrings.of(context)
-                            .minOrderLabel(card.minOrder.toStringAsFixed(2)),
-                      if (store?.closesAtLabel != null)
-                        DeliveryStrings.of(context).closesAtLabel(store!.closesAtLabel!),
-                    ].join('  •  '),
-                    maxLines: 2,
+                    card.name,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        color: Colors.white70, fontSize: 12.5, height: 1.35),
+                      color: DeliveryColors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: DeliverySpacing.xs),
+                  Text(
+                    _tagLine(card, store),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: DeliveryColors.white.withValues(alpha: 0.82),
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
                   ),
                 ],
               ),
@@ -449,8 +505,184 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     );
   }
 
+  /// "Italian • Gourmet Burgers • Pizza" — the shop's own tags, with its closing time appended
+  /// when it has one, because that is the fact a customer needs before they start filling a basket.
+  String _tagLine(StoreCard card, Store? store) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return <String>[
+      if (card.tags.isNotEmpty) card.tags.join(' • '),
+      if (card.tags.isEmpty && card.tagline != null) card.tagline!,
+      if (store?.closesAtLabel != null) t.closesAtLabel(store!.closesAtLabel!),
+    ].join(' • ');
+  }
+
+  /// The three-stat strip: rating, delivery time, minimum order, hairline-separated.
+  Widget _statStrip() {
+    final StoreCard card = _card;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final DeliveryStoreState state = storeStateOf(card.availability);
+
+    return Container(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.lg - DeliverySpacing.xs),
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(bottom: BorderSide(color: DeliveryColors.border)),
+      ),
+      child: Column(
+        children: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Expanded(
+                child: _stat(
+                  value: card.rating?.toStringAsFixed(1) ?? t.ratingNew,
+                  caption: t.custRatingsCount(card.ratingCount),
+                  leading: card.rating == null
+                      ? null
+                      : Icon(Icons.star_rounded,
+                          size: 14, color: DeliveryAccent.caution.color),
+                ),
+              ),
+              const _StatDivider(),
+              Expanded(child: _stat(value: card.etaLabel, caption: t.custDeliveryTime)),
+              const _StatDivider(),
+              Expanded(
+                child: _stat(
+                  value: card.minOrder > 0 ? card.minOrder.toStringAsFixed(2) : t.free,
+                  caption: t.custMinOrderStat,
+                ),
+              ),
+            ],
+          ),
+          // A shop that is not open is the one thing on this strip that changes what happens next.
+          if (state != DeliveryStoreState.open) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            StoreStatePill(state: state),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _stat({required String value, required String caption, Widget? leading}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            if (leading != null) ...<Widget>[
+              leading,
+              const SizedBox(width: DeliverySpacing.xs),
+            ],
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryColors.ink,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          caption,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.2),
+        ),
+      ],
+    );
+  }
+
+  Widget _searchBar() {
+    return Container(
+      color: DeliveryColors.white,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.md - 4, _gutter, DeliverySpacing.md - 4),
+      child: YdSearchField(
+        controller: _searchController,
+        autofocus: true,
+        hintText: DeliveryStrings.of(context).custShopSearchHint,
+        onChanged: _onSearchChanged,
+        searchSemanticLabel: DeliveryStrings.of(context).custSearchInShop,
+      ),
+    );
+  }
+
+  /// 12px padding, a 14px label, the 8px gap and the 3px bar — the frame's `category-tabs`.
+  static const double _tabsHeight = 52;
+
+  /// The design's underlined text tabs. Built by hand rather than through [TabBar] so the
+  /// indicator is the drawn 24x3 bar rather than a full-width label underline.
+  Widget _categoryTabs() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<String> labels = <String>[
+      t.tabShop,
+      t.tabAislesCount(_aisles.length),
+      t.tabOffersCount(_offers.length),
+      t.tabBuyAgain,
+    ];
+
+    return Container(
+      height: _tabsHeight,
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(bottom: BorderSide(color: DeliveryColors.border)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsetsDirectional.fromSTEB(_gutter, 0, DeliverySpacing.md, 0),
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.lg - DeliverySpacing.xs),
+        itemBuilder: (BuildContext context, int i) {
+          final bool active = _tabs.index == i;
+          return Semantics(
+            button: true,
+            selected: active,
+            child: InkWell(
+              onTap: () => _tabs.animateTo(i),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    labels[i],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: active ? DeliveryColors.brand : DeliveryColors.muted,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: DeliverySpacing.sm),
+                  Container(
+                    width: 24,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: active ? DeliveryColors.brand : Colors.transparent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _shopTab() {
-    if (_products.isEmpty) {
+    if (_products.isEmpty && _search == null && _selectedAisle == null) {
       return _empty(Icons.inventory_2_outlined, DeliveryStrings.of(context).nothingOnShelves);
     }
     return Column(
@@ -458,13 +690,28 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
         if (_aisles.isNotEmpty)
           Container(
             color: DeliveryColors.white,
-            child: ChipStrip<String>(
-              values: _aisles.map((Aisle a) => a.categoryId).toList(),
-              labelOf: (String id) =>
-                  _aisles.firstWhere((Aisle a) => a.categoryId == id).name,
-              selected: _selectedAisle,
-              allLabel: DeliveryStrings.of(context).everything,
-              onSelected: _selectAisle,
+            child: SizedBox(
+              height: YdChip.minHeight + DeliverySpacing.lg,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    _gutter, DeliverySpacing.md - 4, DeliverySpacing.md, DeliverySpacing.md - 4),
+                children: <Widget>[
+                  YdChip(
+                    label: DeliveryStrings.of(context).everything,
+                    selected: _selectedAisle == null,
+                    onTap: () => _selectAisle(null),
+                  ),
+                  for (final Aisle aisle in _aisles) ...<Widget>[
+                    const SizedBox(width: DeliverySpacing.sm),
+                    YdChip(
+                      label: aisle.name,
+                      selected: _selectedAisle == aisle.categoryId,
+                      onTap: () => _selectAisle(aisle.categoryId),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         Expanded(child: _pagedProductList(_products)),
@@ -489,26 +736,125 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
         return false;
       },
       child: ListView.separated(
-      padding: const EdgeInsets.only(bottom: DeliverySpacing.xxl),
-      // One extra row for the footer: a spinner, a retry, or nothing.
-      itemCount: products.length + 1,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: DeliveryColors.border),
-      itemBuilder: (BuildContext context, int i) {
-        if (i == products.length) {
-          return _listFooter(list);
-        }
-        final Product product = products[i];
-        return ShelfProductTile(
-          name: product.name,
-          description: product.description,
-          price: product.price.toStringAsFixed(2),
-          imageUrl: product.imageUrls.isEmpty ? null : product.imageUrls.first,
-          quantityInBasket: widget.cart.qtyOf(product.id),
-          enabled: _acceptsOrders,
-          onAdd: () => _add(product),
-          onRemove: () => widget.cart.removeProduct(product.id),
-        );
-      },
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            _gutter, _gutter, _gutter, DeliverySpacing.xxl),
+        // One extra row for the footer: a spinner, a retry, or nothing.
+        itemCount: products.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md),
+        itemBuilder: (BuildContext context, int i) {
+          if (i == products.length) {
+            return _listFooter(list);
+          }
+          return _productRow(products[i]);
+        },
+      ),
+    );
+  }
+
+  static const double _thumb = 80;
+
+  /// `product-row`: an 80px square thumbnail, the name, the truncated description, and the price
+  /// paired with the round add button.
+  Widget _productRow(Product product) {
+    final int inBasket = widget.cart.qtyOf(product.id);
+    final String? description = product.description;
+
+    return YdCard(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+      onTap: () => _openProduct(product),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          CustomerPhoto(
+            url: product.imageUrls.isEmpty ? null : product.imageUrls.first,
+            width: _thumb,
+            height: _thumb,
+            radius: DeliveryRadius.md,
+            icon: Icons.fastfood_outlined,
+          ),
+          const SizedBox(width: DeliverySpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  product.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                if (description != null && description.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: DeliverySpacing.xs),
+                  Text(
+                    description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DeliveryColors.muted,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: DeliverySpacing.xs),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        product.price.toStringAsFixed(2),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.brand,
+                        ),
+                      ),
+                    ),
+                    // How many are already in the basket, and the way back out again. The frame
+                    // draws a bare add button; a shelf you can only add to is a shelf you have to
+                    // leave to correct.
+                    if (inBasket > 0) ...<Widget>[
+                      Semantics(
+                        button: true,
+                        label: DeliveryStrings.of(context).remove,
+                        child: InkResponse(
+                          onTap: () => widget.cart.removeProduct(product.id),
+                          radius: 18,
+                          child: const Padding(
+                            padding: EdgeInsetsDirectional.all(DeliverySpacing.xs),
+                            child: Icon(Icons.remove_circle_outline,
+                                size: 18, color: DeliveryColors.muted),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: DeliverySpacing.xs),
+                      Text(
+                        '$inBasket',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: DeliveryColors.ink,
+                        ),
+                      ),
+                      const SizedBox(width: DeliverySpacing.sm),
+                    ],
+                    AddButton(
+                      onPressed: _acceptsOrders ? () => _add(product) : null,
+                      semanticLabel: DeliveryStrings.of(context).add,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -549,48 +895,38 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       return _empty(Icons.grid_view_rounded, DeliveryStrings.of(context).noAislesYet);
     }
     return GridView.builder(
-      padding: const EdgeInsets.all(DeliverySpacing.md),
+      padding: const EdgeInsetsDirectional.all(_gutter),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 220,
-        mainAxisSpacing: DeliverySpacing.sm + 4,
-        crossAxisSpacing: DeliverySpacing.sm + 4,
+        mainAxisSpacing: DeliverySpacing.md - 4,
+        crossAxisSpacing: DeliverySpacing.md - 4,
         mainAxisExtent: 92,
       ),
       itemCount: _aisles.length,
       itemBuilder: (BuildContext context, int i) {
         final Aisle aisle = _aisles[i];
-        return Material(
-          color: DeliveryColors.white,
-          borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(DeliveryRadius.md),
-            onTap: () {
-              _selectAisle(aisle.categoryId);
-              _tabs.animateTo(0);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(DeliverySpacing.md),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(DeliveryRadius.md),
-                border: Border.all(color: DeliveryColors.border),
+        return YdCard.bordered(
+          onTap: () {
+            _selectAisle(aisle.categoryId);
+            _tabs.animateTo(0);
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(
+                aisle.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    height: 1.25,
+                    color: DeliveryColors.ink),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  Text(
-                    aisle.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 14, height: 1.2),
-                  ),
-                  Text(DeliveryStrings.of(context).itemCount(aisle.productCount),
-                      style: const TextStyle(
-                          color: DeliveryColors.muted, fontSize: 12)),
-                ],
-              ),
-            ),
+              Text(DeliveryStrings.of(context).itemCount(aisle.productCount),
+                  style: const TextStyle(color: DeliveryColors.faint, fontSize: 11)),
+            ],
           ),
         );
       },
@@ -602,28 +938,24 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       return _empty(Icons.local_offer_outlined, DeliveryStrings.of(context).noOffersHere);
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(DeliverySpacing.md),
+      padding: const EdgeInsetsDirectional.all(_gutter),
       itemCount: _offers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.sm + 4),
+      separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md - 4),
       itemBuilder: (BuildContext context, int i) {
         final Offer offer = _offers[i];
-        return Container(
-          padding: const EdgeInsets.all(DeliverySpacing.md),
-          decoration: BoxDecoration(
-            color: DeliveryColors.white,
-            borderRadius: BorderRadius.circular(DeliveryRadius.md),
-            border: Border.all(color: DeliveryColors.brandLine),
-          ),
+        return YdCard(
           child: Row(
             children: <Widget>[
               Container(
-                padding: const EdgeInsets.all(DeliverySpacing.sm + 2),
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
                 decoration: const BoxDecoration(
                     color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-                child: const Icon(Icons.local_offer_rounded,
-                    color: DeliveryColors.brand, size: 20),
+                child: const Icon(Icons.local_offer_outlined,
+                    color: DeliveryColors.brand, size: 18),
               ),
-              const SizedBox(width: DeliverySpacing.md),
+              const SizedBox(width: DeliverySpacing.md - 4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -631,25 +963,28 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                   children: <Widget>[
                     Text(offer.title,
                         style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14.5)),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: DeliveryColors.ink)),
                     if (offer.subtitle != null) ...<Widget>[
                       const SizedBox(height: 2),
                       Text(offer.subtitle!,
                           style: const TextStyle(
-                              color: DeliveryColors.muted, fontSize: 12.5)),
+                              color: DeliveryColors.muted, fontSize: 12, height: 1.35)),
                     ],
                     if (offer.isPlatformWide) ...<Widget>[
-                      const SizedBox(height: DeliverySpacing.xs + 2),
+                      const SizedBox(height: DeliverySpacing.xs),
                       Text(DeliveryStrings.of(context).appliesEverywhere,
-                          style: TextStyle(
+                          style: const TextStyle(
                               color: DeliveryColors.brand,
                               fontSize: 11,
-                              fontWeight: FontWeight.w700)),
+                              fontWeight: FontWeight.w600)),
                     ],
                   ],
                 ),
               ),
-              OfferBadge(label: offer.badgeLabel),
+              const SizedBox(width: DeliverySpacing.sm),
+              YdBadge.brand(label: offer.badgeLabel, uppercase: false, fontSize: 12),
             ],
           ),
         );
@@ -668,47 +1003,37 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     return _pagedProductList(list);
   }
 
-  Widget _empty(IconData icon, String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(DeliverySpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(DeliverySpacing.md),
-              decoration: const BoxDecoration(
-                  color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-              child: Icon(icon, size: 28, color: DeliveryColors.brand),
-            ),
-            const SizedBox(height: DeliverySpacing.md),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: DeliveryColors.muted)),
-          ],
-        ),
-      ),
-    );
+  Widget _empty(IconData icon, String message) =>
+      YdEmptyState(icon: icon, title: message, padding: const EdgeInsets.all(DeliverySpacing.xl));
+}
+
+/// The 32px hairline the design puts between the shop's three stats.
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 32, color: DeliveryColors.border);
   }
 }
 
 /// Keeps the tab bar pinned under the collapsing header.
-class _TabBarHeader extends SliverPersistentHeaderDelegate {
-  _TabBarHeader(this.tabBar);
+class _TabsHeader extends SliverPersistentHeaderDelegate {
+  _TabsHeader({required this.child, required this.height});
 
-  final TabBar tabBar;
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
+  final Widget child;
+  final double height;
 
   @override
-  double get maxExtent => tabBar.preferredSize.height;
+  double get minExtent => height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(color: DeliveryColors.white, child: tabBar);
-  }
+  double get maxExtent => height;
 
   @override
-  bool shouldRebuild(_TabBarHeader oldDelegate) => oldDelegate.tabBar != tabBar;
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
+
+  @override
+  bool shouldRebuild(_TabsHeader oldDelegate) =>
+      oldDelegate.child != child || oldDelegate.height != height;
 }

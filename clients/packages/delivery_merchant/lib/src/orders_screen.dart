@@ -6,16 +6,19 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-/// The merchant's incoming order queue (Phase 2).
+import 'order_detail_screen.dart';
+
+/// The merchant's incoming order queue — Figma `merchant-orders` (3:1822), "Order Flow".
 ///
 /// Polls rather than holding a socket: Section 9 specifies WebSocket/STOMP for live order tracking,
 /// but that belongs to Order Tracking and the customer's map. A merchant queue refreshing every few
 /// seconds is indistinguishable in practice and avoids a second realtime transport for one screen.
 ///
-/// One widget, two hosts. The portal gives it a wide window next to a rail; the Android app gives
-/// it 360dp and a thumb. The difference is a layout branch rather than a second screen — a queue
-/// that accepts and cancels orders is exactly the page that must not exist in two versions, because
-/// the second one is where a state transition eventually goes missing.
+/// One widget, two hosts. The portal gives it most of a window; the phone gives it 402dp and a
+/// thumb. The redesign settles that with one column at the design's own measure, centred in
+/// whatever room the host has — a queue that accepts and rejects orders is exactly the page that
+/// must not exist in two versions, because the second one is where a state transition eventually
+/// goes missing.
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key, required this.api});
 
@@ -25,22 +28,54 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
+/// The four buckets the design's tab strip splits the queue into.
+///
+/// Derived from the order's own status rather than fetched per tab: the list is loaded once and
+/// counted client-side, so the numbers in the tabs and the rows underneath them can never disagree
+/// — which is what happens when four filtered requests come back at four different moments.
+///
+/// Nothing falls between the buckets. `PICKED_UP` sits with `ready` rather than in `completed`
+/// because the shop's part is done but the order is not, and an order that vanished from every tab
+/// the moment a rider took it would look to a merchant exactly like an order that was lost.
+enum _Bucket {
+  fresh(<OrderStatus>[OrderStatus.placed]),
+  preparing(<OrderStatus>[OrderStatus.accepted, OrderStatus.preparing]),
+  ready(<OrderStatus>[OrderStatus.ready, OrderStatus.pickedUp]),
+  completed(<OrderStatus>[OrderStatus.delivered, OrderStatus.cancelled]);
+
+  const _Bucket(this.statuses);
+
+  final List<OrderStatus> statuses;
+
+  bool holds(DeliveryOrder order) => statuses.contains(order.status);
+
+  String labelIn(DeliveryStrings t) => switch (this) {
+        _Bucket.fresh => t.merchTabNew,
+        _Bucket.preparing => t.stepPreparing,
+        _Bucket.ready => t.stepReady,
+        _Bucket.completed => t.merchTabCompleted,
+      };
+}
+
 class _OrdersScreenState extends State<OrdersScreen> {
   static const Duration _pollInterval = Duration(seconds: 5);
 
-  /// Under this width the header stacks and the cards go to one column.
+  /// Under this width the whole page scrolls instead of pinning its header.
   ///
-  /// 640 rather than a phone's 360: the point is not "is this a phone" but "does the title, the
-  /// completed-orders toggle and a refresh button still fit on one line", and in Arabic they stop
-  /// fitting well before a tablet.
+  /// 640 rather than a phone's 360: the question is not "is this a phone" but "is there room to
+  /// spend on a header that never moves", and there is not once the window is narrow enough that
+  /// the title band and the tab strip are a meaningful share of the height.
   static const double _narrowWidth = 640;
 
   /// Under this height a pinned header is not worth what it costs.
   ///
-  /// A phone turned sideways is wide and about 360dp tall. The title and the four counters take
-  /// roughly 280 of that, which leaves the list a single truncated row — so below this the header
-  /// scrolls away with everything else, whatever the width says.
+  /// A phone turned sideways is wide and about 360dp tall. The title band and the tab strip take
+  /// roughly a third of that, which leaves the queue a single truncated row — so below this the
+  /// header scrolls away with everything else, whatever the width says.
   static const double _shortHeight = 560;
+
+  /// The padding the design puts around the card list.
+  static const double _listPad = DeliverySpacing.md + DeliverySpacing.xs;
 
   Timer? _poll;
   List<DeliveryOrder> _orders = <DeliveryOrder>[];
@@ -48,9 +83,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   bool _loading = true;
   String? _busyOrderId;
 
-  /// Terminal orders are hidden by default: a merchant cares about what still needs work, and a
-  /// day's delivered orders would bury the two that don't.
-  bool _showCompleted = false;
+  _Bucket _bucket = _Bucket.fresh;
 
   @override
   void initState() {
@@ -87,6 +120,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Future<void> _act(DeliveryOrder order, OrderAction action) async {
     setState(() => _busyOrderId = order.id);
+    final DeliveryStrings t = DeliveryStrings.of(context);
     try {
       // Not translated: the reason is stored against the order and read by Backoffice staff and
       // support, not shown back to the merchant who triggered it.
@@ -95,11 +129,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
       await _refresh(silent: true);
     } on DioException catch (e) {
       if (!mounted) return;
-      // 422 means the order moved on since this list was drawn - someone else acted first.
+      // 422 means the order moved on since this list was drawn — someone else acted first.
       final String message = e.response?.statusCode == 422
-          ? DeliveryStrings.of(context).orderAlreadyMovedRefreshing
-          : DeliveryStrings.of(context)
-              .actionFailed(action.labelIn(DeliveryStrings.of(context)).toLowerCase());
+          ? t.orderAlreadyMovedRefreshing
+          : t.actionFailed(merchantActionLabel(action, t).toLowerCase());
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       await _refresh(silent: true);
     } finally {
@@ -107,442 +140,464 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
-  /// The four numbers a merchant opens this page to see.
-  ///
-  /// Counted from everything loaded, not from the filtered view: hiding completed orders should
-  /// change which rows are listed, not whether today's deliveries happened.
-  Widget _counters(DeliveryStrings t) {
-    int of(OrderStatus s) => _orders.where((DeliveryOrder o) => o.status == s).length;
-    final int waiting = of(OrderStatus.placed);
-    final int making = of(OrderStatus.preparing) + of(OrderStatus.accepted);
-    final int ready = of(OrderStatus.ready);
-    final int done = of(OrderStatus.delivered);
-
-    // StatRow already reflows to whatever columns fit, so four tiles become two rows of two on a
-    // phone without this screen having to say so.
-    return StatRow(tiles: <Widget>[
-      StatTile(
-        value: '$waiting',
-        label: t.columnToAccept,
-        icon: Icons.notifications_active_outlined,
-        // The only genuinely urgent one: a customer is waiting to hear back.
-        accent: waiting == 0 ? DeliveryAccent.positive : DeliveryAccent.caution,
+  void _open(DeliveryOrder order) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MerchantOrderDetailScreen(
+        api: widget.api,
+        order: order,
+        // The detail screen can move an order along too, so the queue behind it reloads rather
+        // than sitting on a status the merchant has just changed.
+        onChanged: (_) => _refresh(silent: true),
       ),
-      StatTile(
-        value: '$making',
-        label: t.columnPreparing,
-        icon: Icons.soup_kitchen_outlined,
-        accent: DeliveryAccent.info,
-      ),
-      StatTile(
-        value: '$ready',
-        label: t.columnAwaitingRider,
-        icon: Icons.pedal_bike_rounded,
-        accent: ready == 0 ? DeliveryAccent.positive : DeliveryAccent.neutral,
-      ),
-      StatTile(
-        value: '$done',
-        label: t.columnDelivered,
-        icon: Icons.check_circle_outline_rounded,
-        accent: DeliveryAccent.positive,
-      ),
-    ]);
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final List<DeliveryOrder> visible = _showCompleted
-        ? _orders
-        : _orders.where((DeliveryOrder o) => !o.status.isTerminal).toList();
+    final List<DeliveryOrder> visible =
+        _orders.where(_bucket.holds).toList(growable: false);
 
-    // Measured rather than asked of MediaQuery: the portal hands this widget the space left beside
-    // a navigation rail, which is narrower than the window, and a phone host may put it beside
-    // nothing at all.
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        final bool narrow = constraints.maxWidth < _narrowWidth;
-        final bool pageScrolls = narrow || constraints.maxHeight < _shortHeight;
-        final EdgeInsets pad =
-            EdgeInsets.all(narrow ? DeliverySpacing.md : DeliverySpacing.lg);
-        final Widget? placeholder = _placeholder(t, visible);
+    // The white bands run edge to edge, as the design draws them and as a hairline under a 1400px
+    // window has to; only the content column is held to the design's measure.
+    final Widget header = MerchantScreenHeader(
+      title: t.merchOrderFlow,
+      subtitle: t.merchManagerView,
+      // The design's header end is empty; the portal has always had an explicit refresh
+      // and losing it would leave a mouse with only a drag gesture to reload a live queue.
+      trailing: IconButton(
+        onPressed: () => _refresh(),
+        icon: const Icon(Icons.refresh, size: 20),
+        color: DeliveryColors.muted,
+        tooltip: t.refresh,
+      ),
+    );
 
-        // The wide shape the portal has always had: header pinned, only the list scrolls.
-        if (!pageScrolls) {
-          return Padding(
-            padding: pad,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return ColoredBox(
+      color: DeliveryColors.background,
+      // Measured rather than asked of MediaQuery: the portal hands this widget the space left
+      // beside a navigation rail, which is narrower than the window, and a phone host may put it
+      // beside nothing at all.
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          // On a phone the header and the counted tabs scroll away with the queue. Pinning them
+          // spends a third of a 640dp screen on a title the merchant has already read, and on a
+          // handset turned sideways it leaves the list a single truncated row.
+          final bool pageScrolls = constraints.maxWidth < _narrowWidth ||
+              constraints.maxHeight < _shortHeight;
+
+          if (!pageScrolls) {
+            // The wide shape the portal has always had: header pinned, only the list scrolls.
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                ..._header(t, narrow: narrow),
-                const SizedBox(height: DeliverySpacing.lg),
-                SectionLabel(t.liveOrders),
-                Expanded(child: placeholder ?? _list(visible, narrow: narrow)),
+                header,
+                _tabs(t),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => _refresh(),
+                    color: DeliveryColors.brand,
+                    child: _capped(_body(t, visible)),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return RefreshIndicator(
+            // Pull-to-refresh, since the refresh button now scrolls away with the header — and it
+            // is the gesture a thumb reaches for on a list that is supposed to be live anyway.
+            onRefresh: () => _refresh(),
+            color: DeliveryColors.brand,
+            child: CustomScrollView(
+              // One scroll view for the page, not a pinned block above a second one: two
+              // scrollables stacked is how a thumb ends up dragging the wrong one.
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: <Widget>[
+                SliverToBoxAdapter(child: header),
+                SliverToBoxAdapter(child: _tabs(t)),
+                _bodySliver(t, visible, constraints.maxWidth),
               ],
             ),
           );
-        }
-
-        return RefreshIndicator(
-          // Pull-to-refresh, since the refresh button now scrolls away with the header — and it is
-          // the gesture a thumb reaches for on a list that is supposed to be live anyway.
-          onRefresh: () => _refresh(),
-          color: DeliveryColors.brand,
-          child: CustomScrollView(
-            // Always scrollable, or the pull is dead on exactly the two states where a merchant
-            // most wants to retry: nothing loaded, and nothing to show.
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: <Widget>[
-              SliverPadding(
-                padding: pad.copyWith(bottom: 0),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      ..._header(t, narrow: narrow),
-                      const SizedBox(height: DeliverySpacing.lg),
-                      SectionLabel(t.liveOrders),
-                    ],
-                  ),
-                ),
-              ),
-              if (placeholder != null)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: pad.left),
-                    child: placeholder,
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(pad.left, 0, pad.right, pad.bottom),
-                  sliver: SliverList.separated(
-                    itemCount: visible.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.sm),
-                    itemBuilder: (BuildContext context, int i) =>
-                        _card(visible[i], narrow: narrow),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
-  /// Everything above the list: the title line, the poll note and the counters.
-  ///
-  /// A list rather than a Column so both layouts can place the same pieces — the wide one above a
-  /// scrolling list, the narrow one inside the page's own scroll.
-  List<Widget> _header(DeliveryStrings t, {required bool narrow}) {
-    return <Widget>[
-      Row(
-        children: <Widget>[
-          Expanded(
-            child: Row(
-              children: <Widget>[
-                // Flexible, not fixed: a headline that cannot shrink is what pushes a refresh
-                // button off the side of a 320dp screen.
-                Flexible(
-                  child: Text(
-                    t.navOrders,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (_loading) ...<Widget>[
-                  const SizedBox(width: DeliverySpacing.md),
-                  const SizedBox(
-                      width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
-              ],
-            ),
-          ),
-          // On a wide window the toggle sits on the title line where it always has. On a phone it
-          // gets its own row below, where the label itself is a tap target.
-          if (!narrow) ...<Widget>[
-            Text(t.showCompleted),
-            Switch(
-              value: _showCompleted,
-              activeThumbColor: DeliveryColors.brand,
-              onChanged: (bool v) => setState(() => _showCompleted = v),
-            ),
-          ],
-          IconButton(
-            onPressed: () => _refresh(),
-            icon: const Icon(Icons.refresh),
-            // A tooltip is a hover affordance on the web and a long-press one on Android, so it
-            // survives the move to a phone. It is not the only way to refresh either — see the
-            // pull-to-refresh on the narrow layout.
-            tooltip: t.refresh,
-          ),
-        ],
-      ),
-      Text(t.updatesEvery(_pollInterval.inSeconds),
-          style: Theme.of(context).textTheme.bodySmall),
-      if (narrow)
-        SwitchListTile(
-          value: _showCompleted,
-          onChanged: (bool v) => setState(() => _showCompleted = v),
-          activeThumbColor: DeliveryColors.brand,
-          contentPadding: EdgeInsets.zero,
-          title: Text(t.showCompleted, style: Theme.of(context).textTheme.bodyMedium),
-        ),
-      const SizedBox(height: DeliverySpacing.md),
-      _counters(t),
-    ];
-  }
-
-  /// What to show instead of a list, or null when there are orders to draw.
-  ///
-  /// Returned rather than rendered because the two layouts place it differently: the wide one fills
-  /// the space under a pinned header, the narrow one fills what is left of the page's scroll.
-  Widget? _placeholder(DeliveryStrings t, List<DeliveryOrder> visible) {
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text('${t.couldNotLoadOrdersShort}\n$_error', textAlign: TextAlign.center),
-            const SizedBox(height: DeliverySpacing.sm),
-            // A button, not just the message. On a phone the header may have been scrolled past,
-            // and a dead end that only says what went wrong is a dead end.
-            TextButton(onPressed: () => _refresh(), child: Text(t.tryAgain)),
-          ],
+  /// Holds the phone design at its own measure and centres it, so the same widget reads the same
+  /// way in 402dp of handset and in the portal's window.
+  Widget _capped(Widget child) => Align(
+        alignment: AlignmentDirectional.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: merchantMaxContentWidth),
+          child: child,
         ),
       );
-    }
-    if (_loading && _orders.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (visible.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.receipt_long_outlined, size: 40, color: DeliveryColors.muted),
-            const SizedBox(height: DeliverySpacing.sm),
-            Text(
-              _showCompleted ? t.noOrdersYetMerchant : t.noOrdersNeedingAttention,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
+
+  // -------------------------------------------------------------------- tabs
+
+  /// The design's tab strip — four pills, and the counts that used to be four tiles.
+  ///
+  /// A [Wrap] and not the horizontal scroller the frame implies. Four translated labels carrying
+  /// their counts are wider than 320dp, and a sideways scroller on a phone is the worst of the
+  /// three ways to handle that: it hides "Completed" off the edge with nothing to say so, it takes
+  /// a horizontal drag on top of the vertical one the queue already wants, and under a wide window
+  /// it is dead weight. Wrapping to a second run costs one line on the narrowest phone, is
+  /// invisible everywhere the strip fits, and cannot overflow.
+  Widget _tabs(DeliveryStrings t) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(bottom: BorderSide(color: DeliveryColors.border)),
+      ),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        DeliverySpacing.lg,
+        DeliverySpacing.md - DeliverySpacing.xs,
+        DeliverySpacing.lg,
+        DeliverySpacing.md - DeliverySpacing.xs,
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: <Widget>[
+          for (final _Bucket bucket in _Bucket.values) _tab(bucket, t),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(_Bucket bucket, DeliveryStrings t) {
+    final bool selected = bucket == _bucket;
+    // Counted from everything loaded, not from the tab in view: switching tabs changes which rows
+    // are listed, not whether today's orders happened.
+    final int count = _orders.where(bucket.holds).length;
+    // The design draws the count only where there is one — "New (3)", but a bare "Ready".
+    final String label =
+        count == 0 ? bucket.labelIn(t) : '${bucket.labelIn(t)} ($count)';
+
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.pill);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? DeliveryColors.brand : DeliveryColors.background,
+        shape: RoundedRectangleBorder(borderRadius: corners),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: selected ? null : () => setState(() => _bucket = bucket),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md,
+              vertical: DeliverySpacing.sm,
             ),
-          ],
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? DeliveryColors.white : DeliveryColors.muted,
+                height: 1.25,
+              ),
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------- body
+
+  /// The wide host's body: a list under a pinned header.
+  Widget _body(DeliveryStrings t, List<DeliveryOrder> visible) {
+    const EdgeInsetsGeometry pad = EdgeInsetsDirectional.all(_listPad);
+
+    final Widget? standIn = _standIn(t, visible);
+    if (standIn != null) {
+      // Always scrollable, or the pull is dead on exactly the two states where a merchant most
+      // wants to retry: nothing loaded, and nothing to show.
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: pad,
+        children: <Widget>[standIn],
+      );
+    }
+
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: pad,
+      itemCount: visible.length,
+      separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md),
+      itemBuilder: (BuildContext context, int i) => _card(visible[i]),
+    );
+  }
+
+  /// The same body as [_body], as a sliver, so the phone's header scrolls with it.
+  ///
+  /// Deliberately the same pieces rather than a second rendering of the queue: the two hosts differ
+  /// in what scrolls, and nothing else.
+  Widget _bodySliver(DeliveryStrings t, List<DeliveryOrder> visible, double width) {
+    // The design's measure, held here instead of in [_capped]: a sliver list centres itself with
+    // padding, and the white bands above it still run edge to edge.
+    final double side = width > merchantMaxContentWidth
+        ? (width - merchantMaxContentWidth) / 2
+        : 0;
+    final EdgeInsets pad =
+        EdgeInsets.fromLTRB(_listPad + side, _listPad, _listPad + side, _listPad);
+
+    final Widget? standIn = _standIn(t, visible);
+    if (standIn != null) {
+      return SliverPadding(padding: pad, sliver: SliverToBoxAdapter(child: standIn));
+    }
+
+    return SliverPadding(
+      padding: pad,
+      sliver: SliverList.separated(
+        itemCount: visible.length,
+        separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md),
+        itemBuilder: (BuildContext context, int i) => _card(visible[i]),
+      ),
+    );
+  }
+
+  Widget _card(DeliveryOrder order) => _OrderCard(
+        order: order,
+        busy: _busyOrderId == order.id,
+        onAction: (OrderAction a) => _act(order, a),
+        onOpen: () => _open(order),
+      );
+
+  /// What stands in for the list — loading, failed, or an empty bucket — or null when there are
+  /// rows to draw.
+  ///
+  /// Returned rather than rendered because the two layouts place it differently: one inside a
+  /// ListView, one inside the page's own scroll.
+  Widget? _standIn(DeliveryStrings t, List<DeliveryOrder> visible) {
+    final Widget? placeholder = _placeholder(t);
+    if (placeholder != null) return placeholder;
+    if (visible.isEmpty) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const SizedBox(height: DeliverySpacing.xl),
+          YdEmptyState(
+            icon: Icons.receipt_long_outlined,
+            title: _bucket == _Bucket.completed
+                ? t.noOrdersYetMerchant
+                : t.noOrdersNeedingAttention,
+            message: t.merchNothingInThisList,
+          ),
+        ],
       );
     }
     return null;
   }
 
-  Widget _list(List<DeliveryOrder> visible, {required bool narrow}) => ListView.separated(
-        itemCount: visible.length,
-        separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.sm),
-        itemBuilder: (BuildContext context, int i) => _card(visible[i], narrow: narrow),
+  /// What to show instead of the list, or null when the list can be drawn.
+  Widget? _placeholder(DeliveryStrings t) {
+    if (_error != null) {
+      return YdEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: t.couldNotLoadOrdersShort,
+        message: '$_error',
+        // A button, not just the message: the header may have scrolled past on a phone, and a
+        // dead end that only says what went wrong is a dead end.
+        action: YdPillButton.secondary(
+          label: t.tryAgain,
+          onPressed: () => _refresh(),
+          size: YdPillButtonSize.compact,
+          expand: false,
+        ),
       );
-
-  Widget _card(DeliveryOrder order, {required bool narrow}) => _OrderCard(
-        order: order,
-        busy: _busyOrderId == order.id,
-        compact: narrow,
-        onAction: (OrderAction a) => _act(order, a),
+    }
+    if (_loading && _orders.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(DeliverySpacing.xl),
+        child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
       );
+    }
+    return null;
+  }
 }
 
+/// One row of the queue — Figma `new-order-card` (3:1844) and `preparing-order-card` (3:1858).
+///
+/// The two are the same card with two differences the design is precise about: an order still
+/// waiting to be accepted is ringed in [DeliveryColors.brand], and the action row holds whatever
+/// the server says is possible rather than a fixed pair.
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
     required this.busy,
-    required this.compact,
     required this.onAction,
+    required this.onOpen,
   });
 
   final DeliveryOrder order;
   final bool busy;
-
-  /// One column, and buttons big enough for a thumb.
-  final bool compact;
-
   final void Function(OrderAction) onAction;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool isNew = order.status == OrderStatus.placed;
+    final String age = merchantTimeAgo(order.placedAt, t);
 
-    return SoftCard(
+    return YdCard.bordered(
+      onTap: onOpen,
+      borderColor: isNew ? DeliveryColors.brand : DeliveryColors.border,
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _headline(context, t),
-            // A waiver on this order is the merchant's own money, so it is said on the row rather
-            // than left to be noticed in a payout statement at the end of the month.
-            if (order.merchantFeeWaived || order.deliveryFeeWaived) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.xs),
-              Row(
-                children: <Widget>[
-                  const Icon(Icons.redeem_rounded, size: 15, color: DeliveryColors.brand),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      order.merchantFeeWaived
-                          ? t.noCommissionOnThisOrder
-                          : t.deliveryPaidByPlatform,
-                      style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: DeliveryColors.brand),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '#${order.shortId}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              if (age.isNotEmpty) ...<Widget>[
+                const SizedBox(width: DeliverySpacing.sm),
+                Text(
+                  age,
+                  maxLines: 1,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: DeliveryColors.faint,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          // The design leads this block with the customer's name. The order payload has a customer
+          // *id* and no name, so the state goes in that slot instead — which the tab strip only
+          // implies, and stops implying the moment somebody looks at "Completed" and cannot tell a
+          // delivered order from a cancelled one.
+          MerchantStatusTag(status: order.status, label: order.status.labelIn(t)),
+          const SizedBox(height: DeliverySpacing.xs),
+          Text(
+            order.items
+                .map((OrderLine line) => t.lineQuantity(line.qty, line.productName))
+                .join(', '),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              color: DeliveryColors.muted,
+              height: 1.4,
+            ),
+          ),
+          if (order.deliveryAddress.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Icon(Icons.place_outlined, size: 14, color: DeliveryColors.faint),
+                const SizedBox(width: DeliverySpacing.xs),
+                Expanded(
+                  child: Text(
+                    order.deliveryAddress,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DeliveryColors.faint,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                if (order.riderId != null) ...<Widget>[
+                  const SizedBox(width: DeliverySpacing.sm),
+                  const Icon(Icons.two_wheeler, size: 14, color: DeliveryColors.faint),
+                  const SizedBox(width: DeliverySpacing.xs),
+                  Text(
+                    t.riderAssigned,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DeliveryColors.faint,
+                      height: 1.35,
                     ),
                   ),
                 ],
-              ),
-            ],
-            const SizedBox(height: DeliverySpacing.sm),
-            for (final OrderLine line in order.items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(t.lineQuantity(line.qty, line.productName),
-                    style: Theme.of(context).textTheme.bodyMedium),
-              ),
-            const SizedBox(height: DeliverySpacing.sm),
-            _where(context, t),
-            if (order.notes != null && order.notes!.isNotEmpty) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.xs),
-              Text(t.noteWithText(order.notes!), style: Theme.of(context).textTheme.bodySmall),
-            ],
-
-            // Buttons come from availableActions, which the SERVICE computed. Rendering anything
-            // else would offer a merchant a transition the state machine would refuse.
-            if (order.availableActions.isNotEmpty) ...<Widget>[
-              const Divider(height: DeliverySpacing.lg),
-              // Wrap, not Row: three actions and a translated label overflow a 360dp card, and a
-              // Wrap also spaces its children symmetrically, which the trailing right-padding it
-              // replaces did not do in Arabic.
-              Wrap(
-                spacing: DeliverySpacing.sm,
-                runSpacing: DeliverySpacing.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: <Widget>[
-                  for (final OrderAction action in order.availableActions)
-                    action == OrderAction.cancel
-                        ? OutlinedButton(
-                            style: _touch,
-                            onPressed: busy ? null : () => onAction(action),
-                            child: Text(action.labelIn(t)))
-                        : ElevatedButton(
-                            style: _touch,
-                            onPressed: busy ? null : () => onAction(action),
-                            child: Text(action.labelIn(t))),
-                  if (busy)
-                    const SizedBox(
-                        width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
-              ),
-            ],
+              ],
+            ),
           ],
-        ),
-    );
-  }
-
-  /// Status, order id and total — the line the merchant scans down.
-  ///
-  /// Three pieces on one line only works while two of them can be measured and the third given
-  /// what is left. On a 320dp card there is nothing left: a translated status badge and a
-  /// four-figure total are both intrinsically sized and together they are wider than the card, so
-  /// the id's Expanded collapses to zero and the row overflows off the right edge — invisibly, in
-  /// a release build. Compact therefore gives the badge a line of its own, which also gives the
-  /// longer Arabic statuses room to be read rather than wrapped inside their own pill.
-  Widget _headline(BuildContext context, DeliveryStrings t) {
-    // The badge carries its own English label unless it is given one, which is how a translated
-    // screen ends up with an English status on every row.
-    final Widget badge =
-        OrderStatusBadge(statusWire: order.status.wire, label: order.status.labelIn(t));
-    final Widget id = Text('#${order.shortId}',
-        style: Theme.of(context).textTheme.titleMedium,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis);
-    // Never ellipsised and never flexible: a total cut to "123…" is worse than no total at all.
-    final Widget total = Text(order.totalAmount.toStringAsFixed(2),
-        style: Theme.of(context).textTheme.titleLarge, maxLines: 1);
-
-    if (!compact) {
-      // Expanded rather than a Spacer: the id is the part that can afford to be cut when a
-      // translated status badge and a four-figure total leave it nothing.
-      return Row(
-        children: <Widget>[
-          badge,
-          const SizedBox(width: DeliverySpacing.sm),
-          Expanded(child: id),
-          const SizedBox(width: DeliverySpacing.sm),
-          total,
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(child: id),
-            const SizedBox(width: DeliverySpacing.sm),
-            total,
+          // A waiver on this order is the merchant's own money, so it is said on the row rather
+          // than left to be noticed in a payout statement at the end of the month.
+          if (order.merchantFeeWaived || order.deliveryFeeWaived) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Row(
+              children: <Widget>[
+                const Icon(Icons.redeem_rounded, size: 14, color: DeliveryColors.brand),
+                const SizedBox(width: DeliverySpacing.xs),
+                Expanded(
+                  child: Text(
+                    order.merchantFeeWaived
+                        ? t.noCommissionOnThisOrder
+                        : t.deliveryPaidByPlatform,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: DeliveryColors.brand,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
-        ),
-        const SizedBox(height: DeliverySpacing.xs),
-        badge,
-      ],
-    );
-  }
-
-  /// Where it is going, and whether anybody is taking it.
-  ///
-  /// Side by side on a wide window. On a phone the rider note goes underneath instead: sharing the
-  /// line leaves the address about half a screen, and an address ellipsised at "12 Rue de…" tells a
-  /// merchant nothing they can act on.
-  Widget _where(BuildContext context, DeliveryStrings t) {
-    final Widget address = Row(
-      children: <Widget>[
-        const Icon(Icons.place_outlined, size: 16, color: DeliveryColors.muted),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(order.deliveryAddress,
-              style: Theme.of(context).textTheme.bodySmall,
-              maxLines: compact ? 2 : 1,
-              overflow: TextOverflow.ellipsis),
-        ),
-      ],
-    );
-
-    if (order.riderId == null) return address;
-
-    final Widget rider = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        const Icon(Icons.two_wheeler, size: 16, color: DeliveryColors.muted),
-        const SizedBox(width: 4),
-        Text(t.riderAssigned, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-
-    if (compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          address,
           const SizedBox(height: DeliverySpacing.xs),
-          rider,
+          Text(
+            merchantMoney(order.totalAmount),
+            maxLines: 1,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.brand,
+              height: 1.25,
+            ),
+          ),
+          // Buttons come from availableActions, which the SERVICE computed. Rendering anything
+          // else would offer a merchant a transition the state machine would refuse.
+          if (order.availableActions.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            const MerchantDivider(),
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            Row(
+              children: <Widget>[
+                for (int i = 0; i < order.availableActions.length; i++) ...<Widget>[
+                  if (i > 0) const SizedBox(width: DeliverySpacing.sm),
+                  Expanded(
+                    child: MerchantActionButton(
+                      label: merchantActionLabel(order.availableActions[i], t),
+                      onPressed:
+                          busy ? null : () => onAction(order.availableActions[i]),
+                      primary: order.availableActions[i] != OrderAction.cancel,
+                      busy: busy,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ],
-      );
-    }
-    return Row(children: <Widget>[Expanded(child: address), rider]);
+      ),
+    );
   }
-
-  /// 48dp minimum on a phone.
-  ///
-  /// Material's default button is 40 high. That is fine under a mouse and not fine for the control
-  /// that accepts or cancels somebody's dinner, tapped in a hurry behind a counter.
-  ButtonStyle? get _touch => compact
-      ? const ButtonStyle(minimumSize: WidgetStatePropertyAll<Size>(Size(64, 48)))
-      : null;
 }

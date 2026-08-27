@@ -1,6 +1,7 @@
 {
   "@@locale": "ar",
   "appTitle": "YouDrop",
+  "navHome": "الرئيسية",
   "navShops": "المتاجر",
   "navBasket": "السلة",
   "navOrders": "الطلبات",
@@ -447,6 +448,7 @@
   "productsTotal": "{count, plural, zero{لا منتجات} one{منتج واحد} two{منتجان} few{{count} منتجات} many{{count} منتجًا} other{{count} منتج}}",
   "drafts": "المسوّدات",
   "noPhoto": "لا صورة",
+  "photoCount": "{count, plural, zero{لا صور} one{صورة واحدة} two{صورتان} few{{count} صور} many{{count} صورة} other{{count} صورة}}",
   "archived": "مؤرشفة",
   "yourProducts": "منتجاتك",
   "publish": "نشر",
@@ -634,6 +636,16 @@
   "jobsInFlight": "قيد التنفيذ",
   "savedByOffers": "وُفّر بالعروض",
   "earningsWindowNote": "خلال آخر {days} يوماً، بعد حصة المنصة البالغة {cut}% من كل رسم توصيل.",
+  "@earningsWindowNote": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "cut": {
+        "type": "String"
+      }
+    }
+  },
   "savedByOffersNote": "تنازلت المنصة عن حصتها في بعض توصيلاتك، فاحتفظت بكامل الرسم.",
   "expectedNote": "قيمة العمل الجاري إن اكتمل كله. غير مستحق بعد.",
   "yourFeeOnThis": "رسمك",
@@ -683,7 +695,21 @@
   "jobsToday": "مهام اليوم",
   "earnedToday": "أرباح اليوم",
   "upOnYesterday": "أعلى بنسبة {percent}% عن أمس",
+  "@upOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "downOnYesterday": "أقل بنسبة {percent}% عن أمس",
+  "@downOnYesterday": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "sameAsYesterday": "مثل أمس",
   "noneYesterday": "لا شيء أمس",
   "nothingYetToday": "لا شيء اليوم حتى الآن",
@@ -694,6 +720,13 @@
   "outForDelivery": "في الطريق",
   "allCaughtUp": "لا شيء بانتظارك.",
   "lastDaysHeading": "آخر {days} يوماً",
+  "@lastDaysHeading": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "quietSoFar": "لا حركة في هذه الفترة بعد.",
   "noJobsSoFar": "لا مهام في هذه الفترة بعد.",
   "barChartLegend": "الغامق يعني ما تم تسليمه، والفاتح ما طُلب ولم يُسلَّم.",
@@ -702,32 +735,6 @@
   "salesInWindow": "المبيعات",
   "feesInWindow": "رسوم المنصة",
   "feesInWindowNote": "{cut}% من المبيعات المُسلَّمة.",
-  "bestSellers": "الأكثر مبيعاً",
-  "nothingSoldYet": "لم يُبَع شيء في هذه الفترة بعد.",
-  "soldQty": "{qty} مبيعاً",
-  "savedForYou": "وفّرته العروض",
-  "savedForYouNote": "تنازلت المنصة عن حصتها في بعض طلباتك.",
-  "@upOnYesterday": {
-    "placeholders": {
-      "percent": {
-        "type": "int"
-      }
-    }
-  },
-  "@downOnYesterday": {
-    "placeholders": {
-      "percent": {
-        "type": "int"
-      }
-    }
-  },
-  "@lastDaysHeading": {
-    "placeholders": {
-      "days": {
-        "type": "int"
-      }
-    }
-  },
   "@feesInWindowNote": {
     "placeholders": {
       "cut": {
@@ -735,6 +742,9 @@
       }
     }
   },
+  "bestSellers": "الأكثر مبيعاً",
+  "nothingSoldYet": "لم يُبَع شيء في هذه الفترة بعد.",
+  "soldQty": "{qty} مبيعاً",
   "@soldQty": {
     "placeholders": {
       "qty": {
@@ -742,18 +752,17 @@
       }
     }
   },
-  "@earningsWindowNote": {
+  "savedForYou": "وفّرته العروض",
+  "savedForYouNote": "تنازلت المنصة عن حصتها في بعض طلباتك.",
+  "navApplicants": "المتقدمون",
+  "waitingOnYou": "{count} بانتظار ردك",
+  "@waitingOnYou": {
     "placeholders": {
-      "days": {
+      "count": {
         "type": "int"
-      },
-      "cut": {
-        "type": "String"
       }
     }
   },
-  "navApplicants": "المتقدمون",
-  "waitingOnYou": "{count} بانتظار ردك",
   "everyoneWhoApplied": "كل من تقدّم للعمل معك.",
   "waitingOnly": "بانتظار الرد فقط",
   "everyone": "الجميع",
@@ -763,19 +772,6 @@
   "addToMyFleet": "أضِفه إلى أسطولي",
   "turnDown": "اعتذر",
   "turnDownName": "الاعتذار لـ {name}",
-  "theyAreSentThisWordForWord": "سيصله هذا النص حرفياً. اذكر ما الذي يجب أن يتغيّر.",
-  "riderAdded": "{name} أصبح ضمن أسطولك. أرسلنا له طريقة تسجيل الدخول.",
-  "applicantTurnedDown": "تم إبلاغ {name}.",
-  "turnedDownBecause": "تم الاعتذار: {reason}",
-  "onYourFleetNow": "ضمن أسطولك. يمكن إرسال المهام إليه.",
-  "thatDidNotGoThrough": "لم تتم العملية. حاول مرة أخرى.",
-  "@waitingOnYou": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "@turnDownName": {
     "placeholders": {
       "name": {
@@ -783,6 +779,8 @@
       }
     }
   },
+  "theyAreSentThisWordForWord": "سيصله هذا النص حرفياً. اذكر ما الذي يجب أن يتغيّر.",
+  "riderAdded": "{name} أصبح ضمن أسطولك. أرسلنا له طريقة تسجيل الدخول.",
   "@riderAdded": {
     "placeholders": {
       "name": {
@@ -790,6 +788,7 @@
       }
     }
   },
+  "applicantTurnedDown": "تم إبلاغ {name}.",
   "@applicantTurnedDown": {
     "placeholders": {
       "name": {
@@ -797,6 +796,7 @@
       }
     }
   },
+  "turnedDownBecause": "تم الاعتذار: {reason}",
   "@turnedDownBecause": {
     "placeholders": {
       "reason": {
@@ -804,6 +804,8 @@
       }
     }
   },
+  "onYourFleetNow": "ضمن أسطولك. يمكن إرسال المهام إليه.",
+  "thatDidNotGoThrough": "لم تتم العملية. حاول مرة أخرى.",
   "wantToRideForACompany": "تريد العمل مع شركة توصيل؟",
   "rideWithUs": "اعمل معنا",
   "whoWouldYouRideFor": "مع أي شركة تريد العمل؟",
@@ -826,8 +828,6 @@
   "sendApplication": "أرسل الطلب",
   "applicationSent": "تم إرسال الطلب",
   "companyWillBeInTouch": "ستقرأ {company} طلبك وتتواصل معك عبر البريد الإلكتروني.",
-  "keepThisReference": "احتفظ بهذا الرقم المرجعي",
-  "done": "تم",
   "@companyWillBeInTouch": {
     "placeholders": {
       "company": {
@@ -835,6 +835,8 @@
       }
     }
   },
+  "keepThisReference": "احتفظ بهذا الرقم المرجعي",
+  "done": "تم",
   "paymentMethod": "طريقة الدفع",
   "cashOnDelivery": "الدفع عند الاستلام",
   "card": "بطاقة",
@@ -931,6 +933,13 @@
   "applicationPending": "تم استلام طلبك",
   "weAreReadingIt": "نقرأ طلبك الآن. سنراسلك فور صدور القرار، وتبقى الحالة ظاهرة هنا.",
   "companyIsReadingIt": "{company} تقرأ طلبك. ستصلك رسالة فور اتخاذ القرار.",
+  "@companyIsReadingIt": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      }
+    }
+  },
   "applicationStatus": "الحالة",
   "statusSubmitted": "بانتظار المراجعة",
   "statusInReview": "قيد المراجعة الآن",
@@ -942,17 +951,321 @@
   "whatHappensNext": "ما الخطوة التالية",
   "nextStepsPending": "لا شيء عليك الآن. بعد الموافقة يصبح هذا التطبيق متجرك أو لوحة طلباتك — بنفس تسجيل الدخول ونفس رمز الدخول.",
   "couldNotCreateSignIn": "تعذّر إعداد تسجيل الدخول. طلبك استُلم على أي حال.",
-  "@companyIsReadingIt": {
-    "placeholders": {
-      "company": {
-        "type": "String"
-      }
-    }
-  },
   "pendingBannerMerchant": "طلبك قيد المراجعة. جهّز متجرك الآن — يمكنك النشر في السوق بعد الموافقة.",
   "pendingBannerRider": "طلبك قيد المراجعة. تصفّح لوحة الطلبات — يمكنك استلام التوصيلات بعد الموافقة.",
   "notWhilePending": "يمكنك فعل ذلك بعد الموافقة على طلبك.",
   "viewApplication": "عرض الطلب",
   "accountReadySignInInstead": "حسابك جاهز، لكن تعذّر تسجيل دخولك. أغلق هذه الشاشة وسجّل الدخول ببريدك ورمز الدخول الذي اخترته.",
-  "dayByDay": "يومًا بيوم"
+  "dayByDay": "يومًا بيوم",
+  "authTagline": "أي شيء يُوصَل، إلى أي مكان",
+  "authRoleCustomer": "زبون",
+  "authRoleCustomerBlurb": "اطلب واستلم توصيلاتك",
+  "authRoleRider": "سائق توصيل",
+  "authRoleRiderBlurb": "وصّل الطلبات واكسب",
+  "authRoleMerchant": "تاجر",
+  "authRoleMerchantBlurb": "بِع ونمِّ عملك",
+  "authAlreadyHaveAnAccount": "لديك حساب بالفعل؟",
+  "authDontHaveAnAccount": "ليس لديك حساب؟",
+  "authSignUp": "أنشئ حساباً",
+  "authSignInSubtitle": "أدخل بياناتك لتسجيل الدخول.",
+  "authEmailOrPhone": "البريد الإلكتروني أو رقم الهاتف",
+  "authEmailOrPhoneHint": "مثال: name@domain.com أو ‎+961…",
+  "authPasscodeHint": "رمزك المكوَّن من ستة أرقام",
+  "authForgotPassword": "نسيت كلمة المرور؟",
+  "authUseTheKeypad": "استخدم لوحة الأرقام",
+  "authOrContinueWith": "أو تابع باستخدام",
+  "authComingSoon": "قريباً",
+  "authShowPassword": "إظهار الرمز",
+  "authHidePassword": "إخفاء الرمز",
+  "authDeleteDigit": "حذف آخر رقم",
+  "authCreateAccountSubtitle": "ابدأ باستلام أي شيء إلى أي مكان.",
+  "authFullName": "الاسم الكامل",
+  "authFullNameHint": "مثال: سارة جنكينز",
+  "authEmailAddress": "البريد الإلكتروني",
+  "authEmailHint": "مثال: sarah.j@gmail.com",
+  "authPhoneNumber": "رقم الهاتف",
+  "authPhoneHint": "70 123 456",
+  "authConfirmPassword": "تأكيد الرمز",
+  "authPasscodeKeepGoing": "تابع",
+  "authPasscodeComplete": "مكتمل",
+  "authAgreeToTerms": "أوافق على الشروط وسياسة الخصوصية",
+  "authTermsPrefix": "بإنشائك حساباً فإنك توافق على ",
+  "authTermsOfService": "شروط الخدمة",
+  "authTermsAnd": " و",
+  "authPrivacyPolicy": "سياسة الخصوصية",
+  "authPleaseAcceptTheTerms": "يرجى الموافقة على الشروط للمتابعة.",
+  "authVerifyYourEmail": "تحقق من بريدك الإلكتروني",
+  "authVerifyYourNumber": "تحقق من رقمك",
+  "authStep": "الخطوة",
+  "authComplete": "مكتمل",
+  "authNext": "التالي",
+  "authGetStarted": "لنبدأ",
+  "authSubmitApplication": "إرسال الطلب",
+  "authSendingApplication": "جارٍ إرسال طلبك…",
+  "authCouldNotSendApplication": "تعذّر إرسال طلبك. لم يُفقد شيء — حاول مرة أخرى.",
+  "authRiderIntroTitle": "انضم كسائق توصيل",
+  "authRiderIntroBlurb": "ساعات مرنة، أجر تنافسي، وتنقّل سهل — ابدأ التوصيل مع يودروب خلال دقائق.",
+  "authRiderBenefitHours": "ساعات مرنة",
+  "authRiderBenefitPay": "أجر تنافسي",
+  "authRiderBenefitNavigation": "تنقّل سهل",
+  "authWhatYouNeedToSignUp": "ما تحتاجه للتسجيل",
+  "authNeedValidId": "هوية سارية",
+  "authNeedDriversLicence": "رخصة قيادة",
+  "authNeedVehicleDocuments": "أوراق المركبة",
+  "authMerchantSignUp": "تسجيل التاجر",
+  "authMerchantIntroTitle": "سجّل عملك",
+  "authMerchantIntroBlurb": "اصل إلى زبائن أكثر، أدر منتجاتك بسهولة، وتابع أداءك لحظة بلحظة.",
+  "authWhatYouGet": "ما ستحصل عليه",
+  "authMerchantBenefitReach": "الوصول إلى زبائن أكثر عبر شبكة التوصيل لدينا",
+  "authMerchantBenefitManage": "إدارة سهلة للمنتجات وتنفيذ الطلبات",
+  "authMerchantBenefitAnalytics": "تحليلات لحظية لتحسين مبيعاتك",
+  "authWhatYouNeed": "ما تحتاجه",
+  "authNeedBusinessLicence": "رخصة تجارية",
+  "authNeedTaxCertificate": "شهادة ضريبية",
+  "authNeedBankDetails": "بيانات الحساب المصرفي",
+  "authPersonalInformation": "المعلومات الشخصية",
+  "authPersonalInformationBlurb": "املأ بياناتك الأساسية لإنشاء ملفك كسائق توصيل.",
+  "authDateOfBirth": "تاريخ الميلاد",
+  "authDateOfBirthHint": "يوم / شهر / سنة",
+  "authNationalId": "رقم الهوية الوطنية",
+  "authNationalIdHint": "كما هو مطبوع على هويتك",
+  "authVehicleDetails": "تفاصيل المركبة",
+  "authVehicleDetailsBlurb": "اختر فئة مركبتك وسجّل بياناتها الرسمية.",
+  "authVehicleType": "نوع المركبة",
+  "authVehicleMotorcycle": "دراجة نارية",
+  "authVehicleCar": "سيارة",
+  "authVehicleBicycle": "دراجة هوائية",
+  "authVehicleVan": "شاحنة صغيرة",
+  "authVehicleModel": "ماركة المركبة / الطراز",
+  "authVehicleModelHint": "مثال: ياماها TMAX / تويوتا يارِس",
+  "authPlateNumber": "رقم اللوحة",
+  "authPlateNumberHint": "مثال: 1234 ABC",
+  "authVehicleYear": "سنة الصنع",
+  "authVehicleYearHint": "مثال: 2024",
+  "authSelectDeliveryZone": "اختر منطقة التوصيل",
+  "authSelectDeliveryZoneBlurb": "في أي مناطق من المدينة تفضّل التوصيل؟",
+  "authMapComingSoon": "خريطة التغطية قريباً",
+  "authPreferredArea": "المنطقة المفضّلة",
+  "authPreferredAreaHint": "مثال: الحمرا، الأشرفية",
+  "authAvailableZones": "المناطق المتاحة",
+  "authZonesComingSoonTitle": "لم تُرسَم المناطق بعد",
+  "authZonesComingSoonBlurb": "ستتوفّر المناطق القابلة للاختيار مع خريطة التغطية. حتى ذلك الحين نعتمد على المنطقة المذكورة أعلاه.",
+  "authBusinessInformation": "معلومات العمل",
+  "authBusinessInformationBlurb": "أخبرنا عن شركتك وعن الشخص المسؤول.",
+  "authBusinessShopName": "اسم العمل / المتجر",
+  "authBusinessShopNameHint": "مثال: مطعم روز غاردن",
+  "authOwnerFullName": "الاسم الكامل للمالك",
+  "authOwnerFullNameHint": "مثال: جين كوبر",
+  "authBusinessType": "نوع العمل",
+  "authBusinessTypeHint": "اختر واحداً",
+  "authBusinessTypeRestaurant": "مطعم",
+  "authBusinessTypeGrocery": "بقالة",
+  "authBusinessTypePharmacy": "صيدلية",
+  "authBusinessTypeBakery": "مخبز",
+  "authBusinessTypeRetail": "بيع بالتجزئة",
+  "authBusinessTypeOther": "أخرى",
+  "authContactEmail": "البريد الإلكتروني للتواصل",
+  "authReviewAndSubmit": "المراجعة والإرسال",
+  "authReviewAndSubmitBlurb": "راجع ما سنرسله. يمكنك العودة وتعديل أي شيء.",
+  "authDocuments": "المستندات",
+  "authDocumentsBlurb": "الأوراق التي سنحتاجها قبل أن تبدأ.",
+  "authDocumentsComingSoonTitle": "رفع المستندات سيتاح قريباً",
+  "authDocumentsComingSoonBlurb": "يمكنك إكمال طلبك من دونه — سنطلب الأوراق عبر البريد الإلكتروني قبل أن تبدأ.",
+  "authBankDetails": "بيانات الحساب المصرفي",
+  "authBankDetailsBlurb": "إلى أين ستُحوَّل أرباحك.",
+  "authBankComingSoonTitle": "إعداد التحويلات سيتاح قريباً",
+  "authBankComingSoonBlurb": "لا نأخذ بيانات الحساب المصرفي قبل صدور القرار. ستُعدّ التحويلات بعد الموافقة على طلبك.",
+  "authApplicationSubmitted": "تم إرسال الطلب",
+  "authApplicationSubmittedBlurb": "استلمنا طلبك وفريق العمليات لدينا يطّلع عليه الآن.",
+  "authWhatToExpectNext": "ما الذي سيحدث تالياً",
+  "authExpectVerification": "نتحقق من بياناتك (١–٣ أيام)",
+  "authExpectBackgroundCheck": "التحقق من الخلفية",
+  "authExpectTrainingInvite": "دعوة إلى تدريب السائقين",
+  "authWeWillNotifyYou": "سنعلمك عبر البريد الإلكتروني فور صدور القرار.",
+  "authApplicationUnderReview": "الطلب قيد المراجعة",
+  "authApplicationUnderReviewBlurb": "شكراً لك. وصلنا تسجيلك وفريقنا يراجعه الآن. عادةً ما يستغرق ذلك يوماً أو يومين.",
+  "authExplorationModeActive": "وضع الاستكشاف مُفعَّل",
+  "authExplorationModeBlurb": "بينما تنتظر، يمكنك إعداد منتجاتك وقوائمك والتجوّل في التطبيق. لن يُنشر شيء قبل الموافقة على طلبك.",
+  "authApplicationChecklist": "قائمة مراحل الطلب",
+  "authChecklistAccountCreated": "أُنشئ الحساب",
+  "authChecklistDocuments": "رفع المستندات",
+  "authChecklistAudit": "التدقيق الأمني والامتثال",
+  "authChecklistActivation": "تفعيل المتجر ونشره",
+  "authExploreDashboard": "استكشف لوحة التحكم",
+  "custSeeAll": "عرض الكل",
+  "custShowLess": "عرض أقل",
+  "custAllCategories": "كل الفئات",
+  "custFilters": "عوامل التصفية",
+  "custMyBasket": "سلّتي",
+  "custPromoCode": "رمز الخصم",
+  "custApply": "تطبيق",
+  "custOrderSummary": "ملخّص الطلب",
+  "custDiscounts": "الخصومات",
+  "custTotalAmount": "المبلغ الإجمالي",
+  "custProceedToCheckout": "المتابعة إلى الدفع",
+  "custAddToBasket": "أضف إلى السلة",
+  "custDeliveryTime": "وقت التوصيل",
+  "custMinOrderStat": "الحد الأدنى",
+  "custRatingsCount": "{count, plural, zero{لا تقييمات} one{تقييم واحد} two{تقييمان} few{{count} تقييمات} many{{count} تقييمًا} other{{count} تقييم}}",
+  "custShopsInCategory": "{count, plural, zero{لا متاجر} one{متجر واحد} two{متجران} few{{count} متاجر} many{{count} متجرًا} other{{count} متجر}}",
+  "custPeopleAlsoOrdered": "طلب الآخرون أيضًا",
+  "custSoon": "قريبًا",
+  "custIncreaseQuantity": "زيادة الكمية",
+  "custDecreaseQuantity": "إنقاص الكمية",
+  "custSearchInShop": "ابحث في هذا المتجر",
+  "custShopSearchHint": "ابحث في القائمة",
+  "custButlerTitle": "خدمة يودروب الشخصية",
+  "custChooseWhatYouNeed": "اختر ما تحتاج المساعدة فيه",
+  "custBuyAnything": "اشترِ أي شيء",
+  "custBuyAnythingBlurb": "نشتري ونوصّل من أي مكان",
+  "custSendAnything": "أرسل أي شيء",
+  "custSendAnythingBlurb": "توصيل واستلام وإرسال الأغراض",
+  "custRecentTasks": "المهام الأخيرة",
+  "custSearchTasksHint": "ابحث في مهامك",
+  "custNoTasksMatch": "لا توجد مهام تطابق هذا البحث",
+  "custStatusPending": "قيد الانتظار",
+  "custWaitingOnYou": "بانتظار ردّك",
+  "custApplePay": "أبل باي",
+  "custOrderNotes": "ملاحظات الطلب",
+  "custOrderNotesHint": "مثلًا: اترك الطلب عند الباب، الجرس لا يعمل...",
+  "custTotalPrice": "السعر الإجمالي",
+  "custPlaceOrder": "تأكيد الطلب",
+  "custOrderStatus": "حالة الطلب",
+  "custOrderRef": "طلب",
+  "custItemsOrdered": "الأصناف المطلوبة",
+  "custLiveMap": "الخريطة المباشرة",
+  "custAccountSettings": "إعدادات الحساب",
+  "custAppLanguage": "لغة التطبيق",
+  "custMyAddresses": "عناويني",
+  "custPaymentMethods": "طرق الدفع",
+  "custOrderHistory": "سجل الطلبات",
+  "custHelpSupport": "المساعدة والدعم",
+  "custLabelAddressAs": "سمِّ هذا العنوان:",
+  "custLabelHome": "المنزل",
+  "custLabelWork": "العمل",
+  "custLabelOther": "أخرى",
+  "merchTodaySummary": "ملخص اليوم",
+  "merchPendingOrders": "الطلبات المعلّقة",
+  "merchNewOrders": "طلبات جديدة",
+  "merchView": "عرض",
+  "merchRecentOrders": "أحدث الطلبات",
+  "merchViewAll": "عرض الكل",
+  "merchActive": "نشط",
+  "merchInactive": "غير نشط",
+  "merchPublishShop": "انشر متجرك",
+  "merchShopHidden": "تم إخفاء متجرك عن السوق.",
+  "merchOrderFlow": "مسار الطلبات",
+  "merchManagerView": "عرض المدير",
+  "merchTabNew": "جديد",
+  "merchTabCompleted": "مكتملة",
+  "merchReject": "رفض",
+  "merchFlowStatus": "حالة المسار",
+  "merchCustomerDetails": "بيانات العميل",
+  "merchItemsBreakdown": "تفاصيل الأصناف",
+  "merchSpecialInstructions": "تعليمات خاصة",
+  "merchGrandTotal": "الإجمالي الكلي",
+  "merchStepPickedUp": "تم الاستلام",
+  "merchNothingInThisList": "لا يوجد شيء في هذه القائمة.",
+  "merchOpenOrder": "فتح الطلب",
+  "merchbMenuItems": "أصناف القائمة",
+  "merchbManageAvailability": "إدارة التوفر",
+  "merchbSearchMenuItems": "ابحث في أصناف القائمة...",
+  "merchbAvailable": "متاح",
+  "merchbOffShelf": "خارج العرض",
+  "merchbAddProduct": "إضافة منتج",
+  "merchbAvailability": "التوفر",
+  "merchbNoMatchingItems": "لا توجد أصناف مطابقة",
+  "merchbAddNewProduct": "إضافة منتج جديد",
+  "merchbProductImage": "صورة المنتج",
+  "merchbUploadImageCta": "ارفع صورة شهية للطبق",
+  "merchbUploadHint": "PNG أو JPG بحجم أقصاه 5 ميغابايت",
+  "merchbVariantsOptions": "الخيارات والإضافات",
+  "merchbAddOption": "+ إضافة خيار",
+  "merchbChoicesCount": "{count, plural, =1{خيار واحد} =2{خياران} few{{count} خيارات} other{{count} خيار}}",
+  "merchbNoOptionsYet": "لا توجد خيارات على هذا الصنف بعد",
+  "merchbOptionsReadOnly": "تظهر كما يراها الزبون. تعديل الخيارات سيتوفر قريباً.",
+  "merchbSaveMenuItem": "حفظ الصنف",
+  "merchbSoon": "قريباً",
+  "merchbShopConfiguration": "إعدادات المتجر",
+  "merchbShopStatus": "حالة المتجر",
+  "merchbBannerAndLogo": "غلاف المتجر وشعاره",
+  "merchbChangeCover": "تغيير الغلاف",
+  "merchbChangeLogo": "تغيير الشعار",
+  "merchbShopAddress": "عنوان المتجر",
+  "merchbMapPreviewSoon": "معاينة الخريطة",
+  "merchbOperatingDetails": "تفاصيل التشغيل",
+  "merchbSaveShopSettings": "حفظ إعدادات المتجر",
+  "merchbHoursDaily": "يومياً: {from} - {to}",
+  "merchbHoursCustom": "جدول مخصص",
+  "merchbHoursNone": "لم تُحدَّد ساعات العمل",
+  "merchbEditHours": "تعديل ساعات العمل",
+  "merchbDay": "اليوم",
+  "merchbTimeHint": "ساعة:دقيقة",
+  "merchbDayMonday": "الاثنين",
+  "merchbDayTuesday": "الثلاثاء",
+  "merchbDayWednesday": "الأربعاء",
+  "merchbDayThursday": "الخميس",
+  "merchbDayFriday": "الجمعة",
+  "merchbDaySaturday": "السبت",
+  "merchbDaySunday": "الأحد",
+  "merchbAccountSettings": "إعدادات الحساب",
+  "merchbRoleOwner": "المالك",
+  "merchbAppLanguage": "لغة التطبيق",
+  "merchbLangShortEn": "EN",
+  "merchbLangShortAr": "AR",
+  "merchbShopProfile": "ملف المتجر",
+  "merchbPaymentBankDetails": "الدفع والحساب البنكي",
+  "merchbNotificationSettings": "إعدادات الإشعارات",
+  "merchbShopAnalytics": "تحليلات المتجر",
+  "merchbLogOutAccount": "تسجيل الخروج من الحساب",
+  "riderComingSoon": "قريباً",
+  "riderTabAvailable": "المتاحة",
+  "riderTabActive": "الجارية",
+  "riderTabEarnings": "الأرباح",
+  "riderSegmentDeliveries": "التوصيلات",
+  "riderRegionZone": "منطقة العمل",
+  "riderDeliveriesNearby": "{count, plural, zero{لا توجد توصيلات قريبة} one{توصيلة واحدة قريبة} two{توصيلتان قريبتان} few{{count} توصيلات قريبة} many{{count} توصيلة قريبة} other{{count} توصيلة قريبة}}",
+  "riderOffersNearYou": "عروض قريبة منك",
+  "riderAcceptDelivery": "قبول التوصيلة",
+  "riderMyActiveTasks": "مهامي الجارية",
+  "riderActiveCount": "{count, plural, zero{لا يوجد جارٍ} one{واحدة جارية} two{اثنتان جاريتان} few{{count} جارية} many{{count} جارية} other{{count} جارية}}",
+  "riderOrderRef": "طلب رقم {ref}",
+  "riderMinutesAgo": "{minutes, plural, zero{الآن} one{منذ دقيقة} two{منذ دقيقتين} few{منذ {minutes} دقائق} many{منذ {minutes} دقيقة} other{منذ {minutes} دقيقة}}",
+  "riderHoursAgo": "{hours, plural, zero{الآن} one{منذ ساعة} two{منذ ساعتين} few{منذ {hours} ساعات} many{منذ {hours} ساعة} other{منذ {hours} ساعة}}",
+  "riderNavigate": "الاتجاهات",
+  "riderViewDetails": "عرض التفاصيل",
+  "riderStartNavigation": "بدء التوجيه",
+  "riderYourPayout": "مستحقاتك",
+  "riderRouteTimeline": "مسار الرحلة",
+  "riderPickupAddress": "عنوان الاستلام",
+  "riderDeliveryAddress": "عنوان التسليم",
+  "riderItemsToCollect": "الأصناف المطلوب استلامها",
+  "riderItemLine": "{qty}× {name}",
+  "riderNoItemsListed": "لا توجد قائمة أصناف لهذا الطلب.",
+  "riderDeliveryInstructions": "تعليمات التسليم",
+  "riderMyEarnings": "أرباحي",
+  "riderPayout": "صرف المستحقات",
+  "riderPeriodToday": "اليوم",
+  "riderPeriodWeekly": "أسبوعي",
+  "riderTotalEarnings": "إجمالي الأرباح",
+  "riderEarningsDerived": "محسوبة من رسوم التوصيل على التوصيلات التي أكملتها بنفسك.",
+  "riderHoursOnline": "ساعات الاتصال",
+  "riderAcceptRate": "معدل القبول",
+  "riderRating": "التقييم",
+  "riderWeeklyOverview": "نظرة على الأسبوع",
+  "riderTodaysDeliveries": "توصيلات اليوم",
+  "riderThisWeeksDeliveries": "توصيلات هذا الأسبوع",
+  "riderNothingDeliveredYet": "لم تُسلَّم أي توصيلة في هذه الفترة بعد.",
+  "riderCouldNotLoadEarnings": "تعذّر تحميل أرباحك",
+  "riderDriverSettings": "إعدادات السائق",
+  "riderVehicleProfile": "بيانات المركبة",
+  "riderActiveDuty": "على رأس العمل (متصل)",
+  "riderAppLanguage": "لغة التطبيق",
+  "riderDocuments": "المستندات والرخص",
+  "riderBankDetails": "بيانات الحساب البنكي",
+  "riderNotificationPreferences": "تفضيلات الإشعارات",
+  "riderHelpAndSupport": "المساعدة والدعم المباشر",
+  "riderErrandTry": "جرّب",
+  "riderErrandTo": "إلى",
+  "riderErrandCap": "الحد الأقصى"
 }

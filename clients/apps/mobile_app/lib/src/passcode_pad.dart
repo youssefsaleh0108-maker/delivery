@@ -1,4 +1,5 @@
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
 /// A lock-screen passcode entry: filled dots and a 0–9 pad.
@@ -10,6 +11,12 @@ import 'package:flutter/material.dart';
 ///
 /// <p>Fixed length, and it submits itself on the last digit. A passcode with a confirm button is a
 /// password field wearing a costume; the length being known is the whole reason this shape works.
+///
+/// <p><strong>Restyled, not redrawn.</strong> The 2026-08 redesign draws no keypad on any frame —
+/// it puts a password field on the login screen, which the login screen now has. The pad survives
+/// as the returning user's unlock, so it is dressed in the parts the design *does* draw: the OTP
+/// cell's lit/unlit pair for the dots ([DeliveryColors.brand] against
+/// [DeliveryColors.borderFaint]), and the design's white-on-hairline surface for the keys.
 class PasscodePad extends StatelessWidget {
   const PasscodePad({
     super.key,
@@ -25,8 +32,8 @@ class PasscodePad extends StatelessWidget {
   ///
   /// <p>It is also the length every account's passcode must be, because this IS the Keycloak
   /// password — not a local unlock on top of one. Changing it here changes what a valid credential
-  /// is, so it lives as a constant that the sign-up screen reads too rather than as two numbers
-  /// that can drift.
+  /// is, so it lives as a constant that the sign-up and sign-in screens read too rather than as
+  /// numbers that can drift.
   static const int passcodeLength = 6;
 
   final String value;
@@ -41,6 +48,12 @@ class PasscodePad extends StatelessWidget {
   /// biometrics are both available and switched on. A phone lock screen puts it in exactly this
   /// corner, so a thumb already knows where to go.
   final VoidCallback? onFingerprint;
+
+  /// The sentinel the key grid uses for the fingerprint slot.
+  static const String _fingerprintKey = '⌾';
+
+  /// The sentinel the key grid uses for backspace.
+  static const String _backspaceKey = '⌫';
 
   void _press(String digit) {
     if (!enabled || value.length >= length) return;
@@ -58,32 +71,38 @@ class PasscodePad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         // The dots. Filled as you type, so the count is visible without the digits being.
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            for (int i = 0; i < length; i++)
-              Container(
-                width: 16,
-                height: 16,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: i < value.length
-                      ? DeliveryColors.brand
-                      : Colors.transparent,
-                  border: Border.all(
+        Semantics(
+          label: t.enterYourPasscode,
+          value: '${value.length}/$length',
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              for (int i = 0; i < length; i++)
+                Container(
+                  width: 14,
+                  height: 14,
+                  margin: const EdgeInsets.symmetric(horizontal: 7),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
                     color: i < value.length
                         ? DeliveryColors.brand
-                        : DeliveryColors.brandLine,
-                    width: 2,
+                        : DeliveryColors.white,
+                    border: Border.all(
+                      color: i < value.length
+                          ? DeliveryColors.brand
+                          : DeliveryColors.borderFaint,
+                      width: 2,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: DeliverySpacing.xl),
 
@@ -94,7 +113,7 @@ class PasscodePad extends StatelessWidget {
           // The blank keeps 0 centred under 8, which is where a thumb expects it. When biometrics
           // are on, that blank becomes the fingerprint key — the same corner a phone lock screen
           // uses, so nobody has to look for it.
-          <String>['⌾', '0', '⌫'],
+          <String>[_fingerprintKey, '0', _backspaceKey],
         ])
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
@@ -107,12 +126,19 @@ class PasscodePad extends StatelessWidget {
                     child: _Key(
                       // The fingerprint slot collapses back to a blank when there is nothing to
                       // unlock with, so the grid keeps its shape either way.
-                      label: key == '⌾' && onFingerprint == null ? '' : key,
+                      label: key == _fingerprintKey && onFingerprint == null
+                          ? ''
+                          : key,
                       enabled: enabled && key.isNotEmpty,
+                      semanticLabel: switch (key) {
+                        _backspaceKey => t.authDeleteDigit,
+                        _fingerprintKey => t.unlockWithFingerprint,
+                        _ => key,
+                      },
                       onTap: () {
-                        if (key == '⌫') {
+                        if (key == _backspaceKey) {
                           _backspace();
-                        } else if (key == '⌾') {
+                        } else if (key == _fingerprintKey) {
                           onFingerprint?.call();
                         } else {
                           _press(key);
@@ -129,48 +155,75 @@ class PasscodePad extends StatelessWidget {
 }
 
 class _Key extends StatelessWidget {
-  const _Key({required this.label, required this.enabled, required this.onTap});
+  const _Key({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+    required this.semanticLabel,
+  });
 
   final String label;
   final bool enabled;
   final VoidCallback onTap;
+  final String semanticLabel;
+
+  static const double _dimension = 72;
 
   @override
   Widget build(BuildContext context) {
     // An empty label still occupies its slot, so the grid does not collapse around the gap.
     if (label.isEmpty) {
-      return const SizedBox(width: 76, height: 76);
+      return const SizedBox(width: _dimension, height: _dimension);
     }
-    return SizedBox(
-      width: 76,
-      height: 76,
-      child: Material(
-        // Backspace and fingerprint are actions, not digits, so neither takes the filled circle.
-        color: label == '⌫' || label == '⌾'
-            ? Colors.transparent
-            : DeliveryColors.brandSoft,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: enabled ? onTap : null,
-          child: Center(
-            child: switch (label) {
-              '⌫' => Icon(Icons.backspace_outlined,
-                  color: enabled ? DeliveryColors.ink : DeliveryColors.muted),
-              // Brand red, and larger than a digit. It is the only key here that does something
-              // other than enter a character, and it should not read as a seventh number.
-              '⌾' => Icon(Icons.fingerprint,
-                  size: 38,
-                  color: enabled ? DeliveryColors.brand : DeliveryColors.muted),
-              _ => Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w500,
-                    color: enabled ? DeliveryColors.ink : DeliveryColors.muted,
-                  ),
+
+    // Backspace and fingerprint are actions, not digits, so neither takes the key surface.
+    final bool isAction = label == PasscodePad._backspaceKey ||
+        label == PasscodePad._fingerprintKey;
+
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: _dimension,
+        height: _dimension,
+        child: Material(
+          color: isAction ? Colors.transparent : DeliveryColors.white,
+          shape: isAction
+              ? const CircleBorder()
+              : const CircleBorder(
+                  side: BorderSide(color: DeliveryColors.borderFaint),
                 ),
-            },
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: enabled ? onTap : null,
+            child: Center(
+              child: switch (label) {
+                PasscodePad._backspaceKey => Icon(
+                    Icons.backspace_outlined,
+                    size: 24,
+                    color: enabled ? DeliveryColors.ink : DeliveryColors.faint,
+                  ),
+                // Brand red, and larger than a digit. It is the only key here that does something
+                // other than enter a character, and it should not read as a seventh number.
+                PasscodePad._fingerprintKey => Icon(
+                    Icons.fingerprint,
+                    size: 34,
+                    color:
+                        enabled ? DeliveryColors.brand : DeliveryColors.faint,
+                  ),
+                _ => Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w500,
+                      color:
+                          enabled ? DeliveryColors.ink : DeliveryColors.faint,
+                      height: 1.2,
+                    ),
+                  ),
+              },
+            ),
           ),
         ),
       ),

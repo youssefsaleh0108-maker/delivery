@@ -78,6 +78,22 @@ Widget _wrap(Widget child, Locale locale) => MaterialApp(
       home: child,
     );
 
+/// Any Latin letter. A string on an Arabic screen containing one is either untranslated copy or
+/// the merchant's own data — and the caller separates those by value.
+final RegExp _latin = RegExp('[A-Za-z]');
+
+/// Every string the screen is currently painting.
+///
+/// The named keys below are a spot-check; this is the net under them, so a literal added to the
+/// screen tomorrow cannot pass by simply not being one of the keys anybody thought to assert.
+List<String> _visibleText(WidgetTester tester, {required Set<String> ignoring}) {
+  return <String>[
+    for (final Text text in tester.widgetList<Text>(find.byType(Text)))
+      if (text.data case final String value)
+        if (value.trim().isNotEmpty && !ignoring.contains(value)) value,
+  ];
+}
+
 void main() {
   final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
   final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
@@ -91,14 +107,33 @@ void main() {
     await tester.pumpWidget(_wrap(ProductListScreen(api: _api()), const Locale('ar')));
     await tester.pumpAndSettle();
 
-    expect(find.text(ar.myProducts), findsOneWidget);
-    expect(find.text(ar.newProduct), findsOneWidget);
-    expect(find.text(ar.publish), findsWidgets);
+    // The 2026-08 redesign renamed what this screen calls itself — "My products" became the
+    // frame's "Menu Items" over a "Manage availability" subtitle, and the "New product" button
+    // became the "Add Product" pill. Same three pieces of chrome, new keys.
+    expect(find.text(ar.merchbMenuItems), findsOneWidget);
+    expect(find.text(ar.merchbManageAvailability), findsOneWidget);
+    expect(find.text(ar.merchbAddProduct), findsOneWidget);
+    // The per-row publish button is now the availability switch, which carries no text of its
+    // own — the row's translated word is the state label under it. The stub product is a DRAFT.
+    expect(find.text(ar.draft), findsWidgets);
+    // And the search band the redesign added, which is new surface for English to hide in.
+    expect(find.text(ar.merchbSearchMenuItems), findsOneWidget);
 
     // The regression: every one of these was a hardcoded English literal.
-    expect(find.text(en.myProducts), findsNothing);
-    expect(find.text(en.newProduct), findsNothing);
-    expect(find.text(en.publish), findsNothing);
+    expect(find.text(en.merchbMenuItems), findsNothing);
+    expect(find.text(en.merchbManageAvailability), findsNothing);
+    expect(find.text(en.merchbAddProduct), findsNothing);
+    expect(find.text(en.draft), findsNothing);
+    expect(find.text(en.merchbSearchMenuItems), findsNothing);
+
+    // Everything else on the screen, held to the same rule. The product's name and price are the
+    // merchant's own catalog data, not copy, so they are excluded by value rather than by shape.
+    final List<String> untranslated =
+        _visibleText(tester, ignoring: <String>{'Margherita', '12.50'})
+            .where(_latin.hasMatch)
+            .toList();
+    expect(untranslated, isEmpty,
+        reason: 'English left on the Arabic product list: $untranslated');
   });
 
   testWidgets('lays out right-to-left', (WidgetTester tester) async {
@@ -120,7 +155,8 @@ void main() {
     await tester.pumpWidget(_wrap(ProductListScreen(api: _api()), const Locale('en')));
     await tester.pumpAndSettle();
 
-    expect(find.text(en.myProducts), findsOneWidget);
+    expect(find.text(en.merchbMenuItems), findsOneWidget);
+    expect(find.text(ar.merchbMenuItems), findsNothing);
     expect(Directionality.of(tester.element(find.byType(ProductListScreen))), TextDirection.ltr);
   });
 

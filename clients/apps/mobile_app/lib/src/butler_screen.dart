@@ -22,6 +22,11 @@ import 'delivery_address.dart';
 /// The requests this creates are real. A shopper claims one, buys the goods, and reports what they
 /// cost; the customer approves that price and only then does an order — and a charge — exist. The
 /// list beside this form is where that answer is given.
+///
+/// Drawn to `butler-page` (Figma 20:4): the white header with its search box, the prompt, the two
+/// task cards, and the recent-tasks card. The frame draws no form — a task has to be described
+/// before anybody can be sent to do it — so the fields sit between the cards and the history, in
+/// the same bordered-card language as everything else on the page.
 class ButlerScreen extends StatefulWidget {
   const ButlerScreen({
     super.key,
@@ -63,6 +68,10 @@ class _ButlerScreenState extends State<ButlerScreen> {
   final TextEditingController _pickup = TextEditingController();
   final TextEditingController _recipient = TextEditingController();
 
+  /// The header's search box. There is no task-search endpoint; it filters the history below.
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
   ButlerMode _mode = ButlerMode.buy;
 
   /// The fee, fetched rather than assumed. The server sets it and the customer sees it before
@@ -74,6 +83,8 @@ class _ButlerScreenState extends State<ButlerScreen> {
   /// visible where its answer will eventually be needed.
   int _listVersion = 0;
 
+  static const double _gutter = DeliverySpacing.lg;
+
   @override
   void dispose() {
     _what.dispose();
@@ -81,6 +92,7 @@ class _ButlerScreenState extends State<ButlerScreen> {
     _budget.dispose();
     _pickup.dispose();
     _recipient.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -164,178 +176,90 @@ class _ButlerScreenState extends State<ButlerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
     return Scaffold(
       backgroundColor: DeliveryColors.background,
-      appBar: AppBar(
-        backgroundColor: DeliveryColors.brand,
-        foregroundColor: DeliveryColors.white,
-        elevation: 0,
-        title: Text(DeliveryStrings.of(context).butler, style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(DeliverySpacing.md),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(DeliverySpacing.md),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: <Color>[DeliveryColors.brand, DeliveryColors.brandDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(DeliveryRadius.lg),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                      _mode == ButlerMode.buy
-                          ? Icons.pedal_bike_rounded
-                          : Icons.local_shipping_rounded,
-                      color: Colors.white,
-                      size: 34),
-                  const SizedBox(width: DeliverySpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                            _mode == ButlerMode.buy
-                                ? DeliveryStrings.of(context).butlerTagline
-                                : DeliveryStrings.of(context).butlerMoveTagline,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16)),
-                        const SizedBox(height: 3),
-                        Text(
-                          _mode == ButlerMode.buy
-                              ? DeliveryStrings.of(context).butlerBlurb
-                              : DeliveryStrings.of(context).butlerMoveBlurb,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12.5, height: 1.3),
-                        ),
-                      ],
+            _header(),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                      _gutter, DeliverySpacing.md, _gutter, DeliverySpacing.lg),
+                  children: <Widget>[
+                    Text(
+                      t.custChooseWhatYouNeed,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.muted,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: DeliverySpacing.md),
-            _modeSelector(),
-            const SizedBox(height: DeliverySpacing.md),
-            if (_mode == ButlerMode.buy) ...<Widget>[
-              _field(
-                controller: _what,
-                label: DeliveryStrings.of(context).whatDoYouNeed,
-                hint: DeliveryStrings.of(context).buyHint,
-                icon: Icons.edit_note_rounded,
-                maxLines: 3,
-                validator: (String? v) => (v == null || v.trim().length < 8)
-                    ? DeliveryStrings.of(context).buyValidator
-                    : null,
-              ),
-              _field(
-                controller: _from,
-                label: DeliveryStrings.of(context).whereFromOptional,
-                hint: DeliveryStrings.of(context).whereFromHint,
-                icon: Icons.storefront_outlined,
-              ),
-              _field(
-                controller: _budget,
-                label: DeliveryStrings.of(context).budgetCapOptional,
-                hint: '30.00',
-                icon: Icons.payments_outlined,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (String? v) => (v == null || v.trim().isEmpty)
-                    ? null
-                    : (double.tryParse(v.trim()) == null ? DeliveryStrings.of(context).budgetValidator : null),
-              ),
-            ] else ...<Widget>[
-              _field(
-                controller: _what,
-                label: DeliveryStrings.of(context).whatAreWeMoving,
-                hint: DeliveryStrings.of(context).moveHint,
-                icon: Icons.inventory_2_outlined,
-                maxLines: 3,
-                validator: (String? v) => (v == null || v.trim().length < 8)
-                    ? DeliveryStrings.of(context).moveValidator
-                    : null,
-              ),
-              // Required, unlike the buy flow's optional "where from": a rider cannot collect
-              // something without being told where it is.
-              _field(
-                controller: _pickup,
-                label: DeliveryStrings.of(context).pickUpFrom,
-                hint: DeliveryStrings.of(context).pickUpHint,
-                icon: Icons.my_location_rounded,
-                maxLines: 2,
-                validator: (String? v) => (v == null || v.trim().length < 6)
-                    ? DeliveryStrings.of(context).pickUpValidator
-                    : null,
-              ),
-              _field(
-                controller: _recipient,
-                label: DeliveryStrings.of(context).whoReceivesItOptional,
-                hint: DeliveryStrings.of(context).receiverHint,
-                icon: Icons.person_outline_rounded,
-              ),
-            ],
-            const SizedBox(height: DeliverySpacing.sm),
-            _addressRow(),
-            const SizedBox(height: DeliverySpacing.lg),
-            SizedBox(
-              height: 50,
-              child: FilledButton(
-                onPressed: _submitting ? null : _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: DeliveryColors.brand,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(DeliveryRadius.md)),
+                    const SizedBox(height: DeliverySpacing.md),
+                    _modeRow(),
+                    const SizedBox(height: DeliverySpacing.md),
+                    _formCard(),
+                    const SizedBox(height: DeliverySpacing.md),
+                    ButlerRequestsList(
+                      api: widget.api,
+                      orderApi: widget.orderApi,
+                      storeApi: widget.storeApi,
+                      cart: widget.cart,
+                      version: _listVersion,
+                      query: _query,
+                    ),
+                    const SizedBox(height: DeliverySpacing.lg),
+                  ],
                 ),
-                child: _submitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.4, color: DeliveryColors.white),
-                      )
-                    : Text(
-                        _mode == ButlerMode.buy ? DeliveryStrings.of(context).requestAButler : DeliveryStrings.of(context).requestAPickup,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ),
-            const SizedBox(height: DeliverySpacing.sm),
-            // The fee, and — for a purchase — the plain fact that the goods price comes later. Said
-            // before submitting rather than discovered at approval time.
-            FutureBuilder<ButlerTerms>(
-              future: _terms,
-              builder: (BuildContext context, AsyncSnapshot<ButlerTerms> snapshot) {
-                final String fee = snapshot.hasData
-                    ? snapshot.data!.errandFee.toStringAsFixed(2)
-                    : '—';
-                return Text(
-                  _mode == ButlerMode.buy
-                      ? DeliveryStrings.of(context).errandFeeBuy(fee)
-                      : DeliveryStrings.of(context).errandFeeMove(fee),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 12, color: DeliveryColors.muted, height: 1.35),
-                );
-              },
-            ),
-            ButlerRequestsList(
-              api: widget.api,
-              orderApi: widget.orderApi,
-              storeApi: widget.storeApi,
-              cart: widget.cart,
-              version: _listVersion,
-            ),
-            const SizedBox(height: DeliverySpacing.xl),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The white `butler-header`: the centred title and, under it, the search box.
+  ///
+  /// The frame draws a back chip on the start side. Butler is a root tab in this app — there is
+  /// nothing behind it to go back to — so the slot is left empty and the title keeps its place.
+  Widget _header() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Container(
+      width: double.infinity,
+      color: DeliveryColors.white,
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.md - 4, _gutter, DeliverySpacing.md),
+      child: Column(
+        children: <Widget>[
+          SizedBox(
+            height: 32,
+            child: Center(
+              child: Text(
+                t.custButlerTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryColors.ink,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - 4),
+          YdSearchField(
+            controller: _search,
+            hintText: t.custSearchTasksHint,
+            onChanged: (String value) => setState(() => _query = value),
+            searchSemanticLabel: t.custSearchTasksHint,
+          ),
+        ],
       ),
     );
   }
@@ -344,30 +268,36 @@ class _ButlerScreenState extends State<ButlerScreen> {
   ///
   /// Not a dropdown: there are exactly two, and which one you are in changes the whole form — that
   /// should be visible without opening anything.
-  Widget _modeSelector() {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _modeCard(
-            mode: ButlerMode.buy,
-            icon: Icons.shopping_basket_outlined,
-            title: DeliveryStrings.of(context).buyMeSomething,
-            subtitle: DeliveryStrings.of(context).aShopperBuysIt,
+  Widget _modeRow() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: _modeCard(
+              mode: ButlerMode.buy,
+              icon: Icons.shopping_cart_outlined,
+              title: t.custBuyAnything,
+              subtitle: t.custBuyAnythingBlurb,
+            ),
           ),
-        ),
-        const SizedBox(width: DeliverySpacing.sm),
-        Expanded(
-          child: _modeCard(
-            mode: ButlerMode.send,
-            icon: Icons.local_shipping_outlined,
-            title: DeliveryStrings.of(context).deliverYourStuff,
-            subtitle: DeliveryStrings.of(context).youAlreadyHaveIt,
+          const SizedBox(width: DeliverySpacing.md - 4),
+          Expanded(
+            child: _modeCard(
+              mode: ButlerMode.send,
+              icon: Icons.inventory_2_outlined,
+              title: t.custSendAnything,
+              subtitle: t.custSendAnythingBlurb,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
+  /// `butler-card`: a 28px glyph over a Bold 15 title and an 11px caption. Selected takes the
+  /// brand tint and a brand hairline; the other stays white on the ordinary border.
   Widget _modeCard({
     required ButlerMode mode,
     required IconData icon,
@@ -375,89 +305,188 @@ class _ButlerScreenState extends State<ButlerScreen> {
     required String subtitle,
   }) {
     final bool selected = _mode == mode;
-    return Material(
-      color: selected ? DeliveryColors.brandSoft : DeliveryColors.white,
-      borderRadius: BorderRadius.circular(DeliveryRadius.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        onTap: () => _setMode(mode),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: DeliverySpacing.sm + 2, vertical: DeliverySpacing.md),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(DeliveryRadius.md),
-            border: Border.all(
-              color: selected ? DeliveryColors.brand : DeliveryColors.border,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(icon,
-                  size: 26,
-                  color: selected ? DeliveryColors.brand : DeliveryColors.muted),
-              const SizedBox(height: DeliverySpacing.xs + 2),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  color: selected ? DeliveryColors.brand : DeliveryColors.ink,
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.lg);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? DeliveryColors.brandSoft : DeliveryColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: corners,
+          side: BorderSide(
+              color: selected ? DeliveryColors.brand : DeliveryColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _setMode(mode),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: 28, color: DeliveryColors.brand),
+                const SizedBox(height: DeliverySpacing.sm),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 11.5, color: DeliveryColors.muted, height: 1.25),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                      fontSize: 11, color: DeliveryColors.muted, height: 1.3),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  /// What the errand is, where it comes from, and where it goes.
+  Widget _formCard() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (_mode == ButlerMode.buy) ...<Widget>[
+            _field(
+              controller: _what,
+              label: t.whatDoYouNeed,
+              hint: t.buyHint,
+              icon: Icons.edit_note_outlined,
+              maxLines: 3,
+              validator: (String? v) =>
+                  (v == null || v.trim().length < 8) ? t.buyValidator : null,
+            ),
+            _field(
+              controller: _from,
+              label: t.whereFromOptional,
+              hint: t.whereFromHint,
+              icon: Icons.storefront_outlined,
+            ),
+            _field(
+              controller: _budget,
+              label: t.budgetCapOptional,
+              hint: '30.00',
+              icon: Icons.payments_outlined,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (String? v) => (v == null || v.trim().isEmpty)
+                  ? null
+                  : (double.tryParse(v.trim()) == null ? t.budgetValidator : null),
+            ),
+          ] else ...<Widget>[
+            _field(
+              controller: _what,
+              label: t.whatAreWeMoving,
+              hint: t.moveHint,
+              icon: Icons.inventory_2_outlined,
+              maxLines: 3,
+              validator: (String? v) =>
+                  (v == null || v.trim().length < 8) ? t.moveValidator : null,
+            ),
+            // Required, unlike the buy flow's optional "where from": a rider cannot collect
+            // something without being told where it is.
+            _field(
+              controller: _pickup,
+              label: t.pickUpFrom,
+              hint: t.pickUpHint,
+              icon: Icons.my_location_outlined,
+              maxLines: 2,
+              validator: (String? v) =>
+                  (v == null || v.trim().length < 6) ? t.pickUpValidator : null,
+            ),
+            _field(
+              controller: _recipient,
+              label: t.whoReceivesItOptional,
+              hint: t.receiverHint,
+              icon: Icons.person_outline,
+            ),
+          ],
+          _addressRow(),
+          const SizedBox(height: DeliverySpacing.md),
+          YdPillButton(
+            label: _mode == ButlerMode.buy ? t.requestAButler : t.requestAPickup,
+            busy: _submitting,
+            onPressed: _submitting ? null : _submit,
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          // The fee, and — for a purchase — the plain fact that the goods price comes later. Said
+          // before submitting rather than discovered at approval time.
+          FutureBuilder<ButlerTerms>(
+            future: _terms,
+            builder: (BuildContext context, AsyncSnapshot<ButlerTerms> snapshot) {
+              final String fee =
+                  snapshot.hasData ? snapshot.data!.errandFee.toStringAsFixed(2) : '—';
+              return Text(
+                _mode == ButlerMode.buy ? t.errandFeeBuy(fee) : t.errandFeeMove(fee),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _addressRow() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Material(
-      color: DeliveryColors.white,
+      color: DeliveryColors.background,
       borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
         onTap: () async {
           await showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi);
           if (mounted) setState(() {});
         },
-        child: Container(
-          padding: const EdgeInsets.all(DeliverySpacing.md),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(DeliveryRadius.md),
-            border: Border.all(color: DeliveryColors.border),
-          ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
           child: Row(
             children: <Widget>[
-              const Icon(Icons.place_outlined, color: DeliveryColors.muted),
-              const SizedBox(width: DeliverySpacing.sm + 2),
+              const Icon(Icons.location_on_outlined, size: 20, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text(_mode == ButlerMode.buy ? DeliveryStrings.of(context).deliverTo : DeliveryStrings.of(context).dropOffAt,
+                    Text(_mode == ButlerMode.buy ? t.deliverTo : t.dropOffAt,
                         style: const TextStyle(
-                            fontSize: 11.5, color: DeliveryColors.muted)),
-                    Text(widget.addresses.headerLabelOr(DeliveryStrings.of(context).setDeliveryAddress),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14)),
+                            fontSize: 12, color: DeliveryColors.faint, height: 1.25)),
+                    Text(
+                      widget.addresses.headerLabelOr(t.setDeliveryAddress),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: DeliveryColors.ink,
+                        height: 1.3,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: DeliveryColors.muted),
+              Icon(
+                Directionality.of(context) == TextDirection.rtl
+                    ? Icons.chevron_left
+                    : Icons.chevron_right,
+                size: 18,
+                color: DeliveryColors.faint,
+              ),
             ],
           ),
         ),
@@ -475,17 +504,37 @@ class _ButlerScreenState extends State<ButlerScreen> {
     String? Function(String?)? validator,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: DeliverySpacing.md),
+      padding: const EdgeInsetsDirectional.only(bottom: DeliverySpacing.md),
       child: TextFormField(
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        style: const TextStyle(fontSize: 14, color: DeliveryColors.ink),
+        cursorColor: DeliveryColors.brand,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          prefixIcon: Icon(icon),
+          hintStyle: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
+          labelStyle: const TextStyle(fontSize: 14, color: DeliveryColors.muted),
+          floatingLabelStyle: const TextStyle(color: DeliveryColors.brand),
+          prefixIcon: Icon(icon, size: 18, color: DeliveryColors.faint),
           filled: true,
-          fillColor: DeliveryColors.white,
+          fillColor: DeliveryColors.background,
+          contentPadding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+              vertical: DeliverySpacing.md - DeliverySpacing.xs),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            borderSide: const BorderSide(color: DeliveryColors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            borderSide: const BorderSide(color: DeliveryColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            borderSide: const BorderSide(color: DeliveryColors.brand),
+          ),
         ),
         validator: validator,
       ),

@@ -6,12 +6,15 @@ import 'biometric_lock.dart';
 
 /// App settings — how the app behaves, as distinct from who you are.
 ///
-/// Split from the Account tab deliberately. An account page answers "who am I and where do I live";
-/// settings answer "how should this thing work". Language sits here because it is a property of the
-/// app, not of the person — the same account on two devices can reasonably read in two languages.
+/// The redesign merges these two questions on the customer surface, and that merged page is the
+/// customer's Account tab (`customer-settings`, node 3:686). This screen is what the *other*
+/// surfaces reach: a rider or a merchant has no account tab to merge it into, and both open it from
+/// the gear in their own header. It is drawn in the same visual language as the merged page — the
+/// white 56px header, the bordered language row with its EN/AR segmented toggle, and the radius-16
+/// menu rows — so the two are the same page in two places rather than two designs.
 ///
-/// Reached from the gear in the home app bar rather than from a tab: it is a place you visit
-/// rarely and leave, which is what a pushed route means and what a tab does not.
+/// Language sits here because it is a property of the app, not of the person — the same account on
+/// two devices can reasonably read in two languages.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.locale, this.userId});
 
@@ -87,82 +90,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final LocaleController locale = widget.locale;
+    final DeliveryStrings t = DeliveryStrings.of(context);
 
     return AnimatedBuilder(
-      animation: locale,
+      animation: widget.locale,
       builder: (BuildContext context, _) => Scaffold(
         backgroundColor: DeliveryColors.background,
-        appBar: AppBar(
-          backgroundColor: DeliveryColors.brand,
-          foregroundColor: DeliveryColors.white,
-          elevation: 0,
-          title: Text(DeliveryStrings.of(context).settings, style: const TextStyle(fontWeight: FontWeight.w800)),
+        appBar: YdScreenHeader(
+          title: t.settings,
+          onBack: () => Navigator.of(context).maybePop(),
+          backSemanticLabel: t.back,
         ),
         body: ListView(
-          padding: const EdgeInsets.all(DeliverySpacing.md),
+          padding: EdgeInsets.zero,
           children: <Widget>[
-            _card(DeliveryStrings.of(context).language, <Widget>[
-              // Radios, not a toggle. A toggle is fine when a control has an obvious on-state;
-              // a language does not — both options have to be readable by someone who cannot read
-              // the other one, which is why each row is written in its own script.
-              RadioGroup<String>(
-                groupValue: locale.isArabic ? 'ar' : 'en',
-                onChanged: (String? code) {
-                  if (code != null) locale.setLanguage(code);
-                },
-                child: Column(
-                  children: <Widget>[
-                    for (final ({String code, String label}) option
-                        in const <({String code, String label})>[
-                      (code: 'en', label: 'English'),
-                      (code: 'ar', label: 'العربية'),
-                    ])
-                      RadioListTile<String>(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        value: option.code,
-                        activeColor: DeliveryColors.brand,
-                        title: Text(option.label,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                      ),
+            AppLanguageRow(locale: widget.locale, label: t.custAppLanguage),
+            Padding(
+              padding: const EdgeInsets.all(DeliverySpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (widget.userId != null && _available && _enabled != null) ...<Widget>[
+                    YdListRow(
+                      icon: Icons.fingerprint,
+                      title: t.biometricUnlock,
+                      subtitle: t.fingerprintKeepsYourAccountClosed,
+                      trailing: _working
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Switch(
+                              value: _enabled!,
+                              activeThumbColor: DeliveryColors.white,
+                              activeTrackColor: DeliveryColors.brand,
+                              onChanged: _set,
+                            ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
                   ],
+                  // Nothing else is claimed here on purpose. A settings page padded with switches
+                  // that are not wired to anything is worse than a short one.
+                  Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: DeliverySpacing.xs),
+                    child: Text(
+                      t.appTitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DeliveryColors.faint,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The redesign's `language-selector` (node 3:703): a full-width white row with a 1px border all
+/// round, 20px padding, a 20px globe and a SemiBold 14 label on the start side, and a segmented
+/// EN/AR toggle on the end.
+///
+/// The toggle's track is the page background at radius 20 with 2px of padding; the chosen segment
+/// is a white radius-18 pill with the card shadow and a Bold 12 brand label, the other transparent
+/// with a SemiBold 12 muted one.
+///
+/// Each segment keeps its own script's abbreviation rather than being translated, so the option you
+/// cannot currently read is still the one you can point at. [label] arrives already localised.
+class AppLanguageRow extends StatelessWidget {
+  const AppLanguageRow({super.key, required this.locale, required this.label});
+
+  final LocaleController locale;
+
+  /// "App Language", already localised.
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: locale,
+      builder: (BuildContext context, _) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: DeliveryColors.white,
+          border: Border.fromBorderSide(BorderSide(color: DeliveryColors.border)),
+        ),
+        child: Row(
+          children: <Widget>[
+            const Icon(Icons.language, size: 20, color: DeliveryColors.brand),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryColors.ink,
+                  height: 1.25,
                 ),
               ),
-            ]),
-            // Here rather than on the Account tab, which is where it was and which only exists on
-            // the customer surface — so a merchant, a rider or an applicant could never reach it.
-            if (widget.userId != null && _available && _enabled != null) ...<Widget>[
-              const SizedBox(height: DeliverySpacing.md),
-              _card(DeliveryStrings.of(context).biometricUnlock, <Widget>[
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _enabled!,
-                  onChanged: _working ? null : _set,
-                  secondary: _working
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.fingerprint, color: DeliveryColors.brand),
-                  title: Text(DeliveryStrings.of(context).useFingerprintNextTime,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
-                  subtitle: Text(
-                      DeliveryStrings.of(context).fingerprintKeepsYourAccountClosed,
-                      style: const TextStyle(fontSize: 12.5)),
-                ),
-              ]),
-            ],
-            const SizedBox(height: DeliverySpacing.md),
-            // Nothing else is claimed here on purpose. A settings page padded with switches that
-            // are not wired to anything is worse than a short one.
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.xs),
-              child: Text(
-                DeliveryStrings.of(context).appTitle,
-                style: const TextStyle(
-                    fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+            ),
+            const SizedBox(width: DeliverySpacing.sm),
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: DeliveryColors.background,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  _segment(context, 'en', 'EN', !locale.isArabic),
+                  const SizedBox(width: DeliverySpacing.xs),
+                  _segment(context, 'ar', 'AR', locale.isArabic),
+                ],
               ),
             ),
           ],
@@ -171,26 +221,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _card(String title, List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.all(DeliverySpacing.md),
-      decoration: BoxDecoration(
-        color: DeliveryColors.white,
-        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
-        boxShadow: DeliveryShadows.card,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: DeliveryColors.muted)),
-          const SizedBox(height: DeliverySpacing.xs),
-          ...children,
-        ],
+  Widget _segment(BuildContext context, String code, String text, bool active) {
+    return Semantics(
+      button: true,
+      selected: active,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: active ? YdCard.softShadow : null,
+        ),
+        child: Material(
+          color: active ? DeliveryColors.white : Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: active ? null : () => locale.setLanguage(code),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: DeliverySpacing.md,
+                vertical: DeliverySpacing.sm - 2,
+              ),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  color: active ? DeliveryColors.brand : DeliveryColors.muted,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
