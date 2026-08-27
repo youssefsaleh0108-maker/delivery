@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -49,6 +50,7 @@ class TrackingServiceTest {
 
     private TrackingEventRepository events;
     private OrderParticipantsRepository participants;
+    private PresenceService presence;
     private StringRedisTemplate redis;
     private ValueOperations<String, String> values;
     private ObjectMapper objectMapper;
@@ -58,11 +60,12 @@ class TrackingServiceTest {
     void setUp() {
         events = mock(TrackingEventRepository.class);
         participants = mock(OrderParticipantsRepository.class);
+        presence = mock(PresenceService.class);
         redis = mock(StringRedisTemplate.class);
         values = mock(ValueOperations.class);
         objectMapper = new ObjectMapper()
                 .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        tracking = new TrackingService(events, participants, redis, objectMapper,
+        tracking = new TrackingService(events, participants, presence, redis, objectMapper,
                 Duration.ofSeconds(60));
 
         when(redis.opsForValue()).thenReturn(values);
@@ -157,6 +160,26 @@ class TrackingServiceTest {
         @Test
         void without_a_reported_accuracy_is_accepted() {
             assertThat(tracking.ping(ORDER, RIDER, 33.89, 35.50, null).accuracyM()).isNull();
+        }
+
+        /**
+         * A rider carrying an order is still a rider who is present. Counting only off-order pings
+         * would empty the on-duty roster of exactly the people who are working.
+         */
+        @Test
+        void also_counts_as_evidence_that_the_rider_is_still_present() {
+            tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f);
+
+            verify(presence).recordFix(RIDER, 33.89, 35.50, 5.0f);
+        }
+
+        /** A refused ping is not evidence of anything, least of all that the rider is on duty. */
+        @Test
+        void from_a_stranger_does_not_touch_presence() {
+            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", 33.89, 35.50, null))
+                    .isInstanceOf(TrackingService.TrackingNotFoundException.class);
+
+            verify(presence, never()).recordFix(anyString(), anyDouble(), anyDouble(), any());
         }
     }
 

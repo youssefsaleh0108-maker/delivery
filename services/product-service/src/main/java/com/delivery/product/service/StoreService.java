@@ -28,6 +28,7 @@ import com.delivery.product.api.dto.StoreDtos.OfferRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.domain.Category;
 import com.delivery.product.domain.CategoryRepository;
+import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreFavorite;
@@ -99,6 +100,86 @@ public class StoreService {
     public Page<StoreView> favoritesOf(String userId, Pageable pageable) {
         Instant now = clock.instant();
         return stores.findFavoritesOf(userId, pageable).map(s -> view(s, now));
+    }
+
+    // ---------------------------------------------------------------- near me
+
+    /**
+     * A store, how far away it is, and the time-dependent answers already worked out.
+     *
+     * <p>Extends {@link StoreView}'s reason for existing with one more field. The distance belongs
+     * on the view rather than being recomputed by the controller, so the number that orders the list
+     * and the number printed on the card are the same number and cannot drift apart.
+     */
+    public record NearbyStoreView(StoreView store, double distanceMetres) {
+    }
+
+    /**
+     * How much further than the requested radius the database is asked to look.
+     *
+     * <p>The database filters on the spheroid ({@code ST_DWithin}) and this service measures on a
+     * sphere (haversine); they differ by about 0.3%. Without the slack a shop sitting within the
+     * radius by haversine but a few metres outside it by the spheroid would be discarded before
+     * Java ever saw it — a shop missing from a "near me" list for a reason no one could observe. One
+     * percent comfortably covers the disagreement; the Java filter below is what actually decides.
+     */
+    private static final double RADIUS_SLACK = 1.01d;
+
+    /**
+     * Live stores near a point, nearest first.
+     *
+     * <p>The split of work between database and service is argued in
+     * {@link StoreRepository#findActiveIdsNear}: PostGIS narrows and caps using the GiST index, and
+     * this method computes the distance, filters to the radius the caller actually asked for, orders
+     * and pages. The short version is that the number a customer is shown should come from code the
+     * build can test, and the candidate set is small enough that where it is sorted does not matter.
+     *
+     * <p>Stores with no pin never appear. That is the behaviour V18's flat-fee shops need: a
+     * merchant who has not placed themselves on a map keeps trading exactly as before and is simply
+     * absent from this one rail, rather than being given a default position.
+     *
+     * @param maxCandidates the ceiling on rows read from the database, so a very large radius in a
+     *                      dense city cannot pull the whole table into memory. A caller who hits it
+     *                      gets the nearest {@code maxCandidates} shops, which is the right subset
+     *                      to lose the rest from.
+     */
+    @Transactional(readOnly = true)
+    public Page<NearbyStoreView> nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
+                                        Pageable pageable) {
+        List<UUID> candidateIds = stores.findActiveIdsNear(
+                centre.latitude().doubleValue(),
+                centre.longitude().doubleValue(),
+                radiusMetres * RADIUS_SLACK,
+                maxCandidates);
+
+        if (candidateIds.isEmpty()) {
+            return pageOf(List.of(), pageable);
+        }
+
+        Instant now = clock.instant();
+        List<NearbyStoreView> near = new ArrayList<>(candidateIds.size());
+
+        for (Store store : stores.findAllById(candidateIds)) {
+            GeoPoint location = store.location();
+            if (location == null) {
+                // Only reachable if the pin were cleared between the two queries. Skipped rather
+                // than defaulted: a store with no location has no distance, and inventing one would
+                // put it somewhere in the list on the strength of a made-up number.
+                continue;
+            }
+            double metres = centre.distanceMetresTo(location);
+            if (metres <= radiusMetres) {
+                near.add(new NearbyStoreView(view(store, now), metres));
+            }
+        }
+
+        // The database's ordering is discarded here, deliberately — findAllById does not preserve
+        // it anyway, and this is the ordering that ships. Ties break on the store id so a refresh
+        // does not reshuffle two shops in the same building.
+        near.sort(Comparator.comparingDouble(NearbyStoreView::distanceMetres)
+                .thenComparing(n -> n.store().store().getId()));
+
+        return pageOf(near, pageable);
     }
 
     /** The opening hours themselves, materialised inside the transaction for the same reason. */
@@ -340,6 +421,37 @@ public class StoreService {
         Store store = requireOwned(id, merchantId);
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
+        return view(store, clock.instant());
+    }
+
+    /**
+     * Moves the shop's pin.
+     *
+     * <p>Its own operation rather than a field on {@link #update}, for the reason set out on
+     * {@link Store#pinAt}: the profile form is saved whenever a merchant edits their tagline, and a
+     * nullable coordinate pair on that request would clear the pin every time a client that predates
+     * the field saved anything. Placing a shop on a map is a decision, and it gets its own call.
+     *
+     * <p>The coordinate has already been through {@link GeoPoint}'s rules by the time it arrives
+     * here, and the {@code stores} CHECK constraints added in V20 stand behind those.
+     */
+    @Transactional
+    public StoreView pin(UUID id, String merchantId, GeoPoint location) {
+        Store store = requireOwned(id, merchantId);
+        store.pinAt(location);
+        return view(store, clock.instant());
+    }
+
+    /**
+     * Takes the shop off the map.
+     *
+     * <p>The address text is kept. A merchant removing a wrong pin has not stopped having an
+     * address, and clearing both would quietly delete the only thing a rider has to go on.
+     */
+    @Transactional
+    public StoreView unpin(UUID id, String merchantId) {
+        Store store = requireOwned(id, merchantId);
+        store.clearPin();
         return view(store, clock.instant());
     }
 

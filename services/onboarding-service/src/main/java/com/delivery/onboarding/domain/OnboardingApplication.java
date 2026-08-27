@@ -160,6 +160,19 @@ public class OnboardingApplication {
     private String rejectionReason;
 
     /**
+     * What was outstanding among this application's documents when it was approved anyway.
+     *
+     * <p>Null means every live document was approved, or that there were none. A value —
+     * {@code "NATIONAL_ID=REJECTED, DRIVING_LICENCE=PENDING"} — means a reviewer knowingly went
+     * past it, which they are entitled to do: somebody holding the commercial registration on paper,
+     * or who knows a licence was refused for glare, should not have to fake a document approval to
+     * record the decision they have actually made. Machine-generated from enum names, so nothing
+     * applicant-supplied lands in this column.
+     */
+    @Column(name = "document_issue_override", length = 500)
+    private String documentIssueOverride;
+
+    /**
      * The account created for the applicant when they chose a passcode, before any decision.
      *
      * <p>Holds the APPLICANT role only, so it can sign in and see this application's status and
@@ -250,10 +263,25 @@ public class OnboardingApplication {
      *         overwrites a rejection is how somebody gets an account they were refused
      */
     public void approve(String decidedBy) {
+        approve(decidedBy, null);
+    }
+
+    /**
+     * Approves, recording what the reviewer went past among the documents.
+     *
+     * @param documentIssueOverride a summary of the live documents that were not approved, or null
+     *                              when there were none. Written down rather than merely allowed:
+     *                              the decision an auditor needs to see is not "approved", it is
+     *                              "approved while the licence was still refused", and those are
+     *                              two different decisions that a single status column cannot tell
+     *                              apart
+     */
+    public void approve(String decidedBy, String documentIssueOverride) {
         requireUndecided();
         this.status = Status.APPROVED;
         this.decidedAt = Instant.now();
         this.decidedBy = decidedBy;
+        this.documentIssueOverride = documentIssueOverride;
     }
 
     public void reject(String decidedBy, String reason) {
@@ -346,6 +374,11 @@ public class OnboardingApplication {
 
     public String getRejectionReason() {
         return rejectionReason;
+    }
+
+    /** Reviewer-facing. Null unless an approval went past an outstanding document. */
+    public String getDocumentIssueOverride() {
+        return documentIssueOverride;
     }
 
 

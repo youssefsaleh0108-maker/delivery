@@ -88,6 +88,28 @@ service_account_client accounting-service "Accounting Service service account" \
 # Declared rather than switching unmanagedAttributePolicy to ENABLED: this way the realm states
 # exactly what the platform stores about a person, and phoneNumber gets an E.164 check at the
 # identity layer instead of only in the SMS worker.
+#
+# ---- phoneNumber and phoneNumberVerified, and why neither is user-editable ----
+#
+# phoneNumberVerified is the flag that says a one-time code was sent to that number and answered.
+# onboarding-service sends and checks the code; the realm's job is to be the place the answer is
+# kept, and to make sure the only thing that can write it is something holding manage-users.
+#
+# Both attributes are `edit: ["admin"]` for that reason, and phoneNumber lost the "user" edit
+# permission it used to have. A pair where the number is self-service and the verified flag is not
+# is worse than no flag at all: the user changes the number through the account console, the flag
+# stays true because nothing cleared it, and every service downstream now believes a number nobody
+# ever proved. Keeping both on the admin API means the number and the proof move together, in one
+# call, made by the service that watched the code come back.
+#
+# The mobile app writes fcmToken through Keycloak's own /account endpoint by reading the whole
+# profile, changing one attribute and posting it back - so it does post phoneNumber too, unchanged.
+# Unchanged is the operative word: a read-only attribute submitted at its current value is not an
+# edit, so that path keeps working. An app that wanted to CHANGE the number would have to go
+# through onboarding-service and answer a code, which is the point.
+#
+# `view` still includes "user" on both, so a customer can see their own number and see that it is
+# confirmed. There is nothing private about showing somebody their own phone number.
 # ---------------------------------------------------------------------------------------------
 echo "==> Declaring contact attributes in the user profile"
 cat > /tmp/user-profile.json <<'PROFILE'
@@ -109,9 +131,13 @@ cat > /tmp/user-profile.json <<'PROFILE'
       "validations": { "length": { "max": 255 }, "person-name-prohibited-characters": {} },
       "required": { "roles": ["user"] }, "multivalued": false },
     { "name": "phoneNumber", "displayName": "Mobile number",
-      "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] },
+      "permissions": { "view": ["admin", "user"], "edit": ["admin"] },
       "validations": { "pattern": { "pattern": "^\\+[1-9]\\d{7,14}$",
                                     "error-message": "Must be an E.164 number, e.g. +15550100001" } },
+      "multivalued": false },
+    { "name": "phoneNumberVerified", "displayName": "Mobile number verified",
+      "permissions": { "view": ["admin", "user"], "edit": ["admin"] },
+      "validations": { "options": { "options": ["true", "false"] } },
       "multivalued": false },
     { "name": "fcmToken", "displayName": "Push device token",
       "permissions": { "view": ["admin"], "edit": ["admin", "user"] },
@@ -152,11 +178,16 @@ set_contact() {
     echo "    $username not found, skipping"
     return
   fi
+  # phoneNumberVerified true on the dev users, because these numbers are fixtures rather than
+  # things somebody typed - there is no code to answer for +15550100001. It has to be set for the
+  # phone_number_verified claim to appear at all: an absent attribute means an absent claim, and a
+  # service reading the claim must treat absent as NOT verified.
   $KCADM update "users/$user_id" -r "$REALM" \
     -s "attributes.phoneNumber=[\"$phone\"]" \
+    -s "attributes.phoneNumberVerified=[\"true\"]" \
     -s "attributes.fcmToken=[\"$token\"]" \
     -s "attributes.bankAccountRef=[\"$account\"]"
-  echo "    $username -> $phone / $account"
+  echo "    $username -> $phone (verified) / $account"
 }
 
 echo "==> Contact and settlement attributes on dev users"

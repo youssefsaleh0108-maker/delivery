@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.notifications.NotificationCommand;
+import com.delivery.notifications.link.NotificationLink;
+import com.delivery.notifications.link.NotificationLinkTarget;
 import com.delivery.notifications.service.NotificationDispatchService;
 import com.delivery.notifications.service.RecipientDirectory;
 
@@ -76,13 +78,23 @@ public class DirectNotificationController {
      * A caller that passed a token instead would have to have stored one, and storing device tokens
      * in two places is how they go stale in one of them.
      *
+     * <p>The optional link is what makes a direct push worth tapping. Nothing can derive it on this
+     * path — there is no order and no template, so the caller is the only thing that knows what its
+     * message is about. A chat push naming its conversation and an approval naming its application
+     * are the two that matter; without them both open the app's home screen and leave the user to
+     * go and find the thing they were just told about.
+     *
      * @param recipientId the Keycloak sub to reach
+     * @param linkTarget  ORDER, CONVERSATION, APPLICATION, EARNINGS or ACCOUNT; omit for no link
+     * @param linkId      which one — omitted for ACCOUNT, which takes none
      */
     public record DirectPushRequest(
             @NotBlank @Size(max = 64) String recipientId,
             @Size(max = 200) String subject,
             @NotBlank @Size(max = 2000) String body,
-            @NotBlank @Size(max = 64) String purpose) {
+            @NotBlank @Size(max = 64) String purpose,
+            @Size(max = 32) String linkTarget,
+            @Size(max = 128) String linkId) {
     }
 
     @PostMapping("/direct")
@@ -112,9 +124,20 @@ public class DirectNotificationController {
             return ResponseEntity.noContent().build();
         }
 
+        // A target the platform does not recognise, or an id that is not routable, yields no link
+        // rather than a 400. The push itself is the thing the caller asked for and it has already
+        // succeeded upstream — an approval must not fail because somebody sent a target with a typo
+        // in it. The message still arrives; it just opens the app rather than a screen.
+        NotificationLink link = NotificationLinkTarget.of(request.linkTarget())
+                .flatMap(target -> NotificationLink.of(target, request.linkId()))
+                .orElse(null);
+        if (link == null && request.linkTarget() != null && !request.linkTarget().isBlank()) {
+            log.warn("Ignoring an unroutable link on a direct push for {}", request.purpose());
+        }
+
         UUID id = dispatch.sendDirect(
                 NotificationCommand.CHANNEL_PUSH, device, request.recipientId(), request.subject(),
-                request.body(), request.purpose(), MDC.get("correlationId"));
+                request.body(), request.purpose(), MDC.get("correlationId"), link);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(Map.of("notificationId", id.toString()));
     }

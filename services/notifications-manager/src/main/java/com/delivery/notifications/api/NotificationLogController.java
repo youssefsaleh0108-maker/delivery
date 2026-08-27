@@ -68,7 +68,19 @@ public class NotificationLogController {
                 entry.getId(), entry.getOrderId(), entry.getChannel(), entry.getRecipient(),
                 entry.getEventType(), entry.getSubject(), entry.getBody(),
                 entry.getStatus().name(), entry.getProvider(), entry.getFailureReason(),
-                entry.getCreatedAt(), entry.getSentAt());
+                entry.getCreatedAt(), entry.getSentAt(), deepLink(entry));
+    }
+
+    /**
+     * Where this notification pointed, as the app saw it.
+     *
+     * <p>Rendered from the stored target and id rather than read back as a string, so support sees
+     * exactly what a tap would resolve to today. Shown on both views: "it opened the wrong screen"
+     * is a complaint a customer can make about their own notification, and unlike a failure reason
+     * a deep link leaks nothing — it is a route the customer is already entitled to visit.
+     */
+    private static String deepLink(NotificationLog entry) {
+        return entry.link().map(link -> link.canonical()).orElse(null);
     }
 
     /**
@@ -80,7 +92,7 @@ public class NotificationLogController {
                 entry.getId(), entry.getOrderId(), entry.getChannel(), null,
                 entry.getEventType(), entry.getSubject(), entry.getBody(),
                 entry.getStatus().name(), null, null,
-                entry.getCreatedAt(), entry.getSentAt());
+                entry.getCreatedAt(), entry.getSentAt(), deepLink(entry));
     }
 
     public record LogEntry(
@@ -95,6 +107,8 @@ public class NotificationLogController {
             String provider,
             String failureReason,
             Instant createdAt,
-            Instant sentAt) {
+            Instant sentAt,
+            // delivery://orders/… — a route for the app, never a URL with a hostname in it.
+            String deepLink) {
     }
 }

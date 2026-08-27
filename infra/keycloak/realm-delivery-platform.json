@@ -52,14 +52,68 @@
       "enabled": false,
       "trustEmail": true,
       "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
       "linkOnly": false,
+      "hideOnLoginPage": false,
       "firstBrokerLoginFlowAlias": "first broker login",
       "config": {
         "clientId": "$(env:GOOGLE_CLIENT_ID)",
         "clientSecret": "$(env:GOOGLE_CLIENT_SECRET)",
         "defaultScope": "openid profile email",
+        "prompt": "select_account",
         "syncMode": "IMPORT",
         "useJwksUrl": "true"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "username-from-email",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "template": "${CLAIM.email}",
+        "target": "LOCAL"
+      }
+    },
+    {
+      "name": "email",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "email",
+        "user.attribute": "email"
+      }
+    },
+    {
+      "name": "first-name",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "given_name",
+        "user.attribute": "firstName"
+      }
+    },
+    {
+      "name": "last-name",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "family_name",
+        "user.attribute": "lastName"
+      }
+    },
+    {
+      "name": "customer-role",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "oidc-hardcoded-role-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "role": "CUSTOMER"
       }
     }
   ],
@@ -85,7 +139,43 @@
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "com.delivery.app://logout##http://localhost:5012/*##http://127.0.0.1:5012/*"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "phone number",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phoneNumber",
+            "claim.name": "phone_number",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false",
+            "aggregate.attrs": "false"
+          }
+        },
+        {
+          "name": "phone number verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phoneNumberVerified",
+            "claim.name": "phone_number_verified",
+            "jsonType.label": "boolean",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false",
+            "aggregate.attrs": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "delivery-portal",
@@ -99,15 +189,52 @@
       "protocol": "openid-connect",
       "redirectUris": [
         "http://localhost:5010/*",
-        "http://127.0.0.1:5010/*"
+        "http://127.0.0.1:5010/*",
+        "https://portal-dev.youdrop.shop/*"
       ],
       "webOrigins": [
         "+"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5010/*##http://127.0.0.1:5010/*"
-      }
+        "post.logout.redirect.uris": "http://localhost:5010/*##http://127.0.0.1:5010/*##https://portal-dev.youdrop.shop/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "phone number",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phoneNumber",
+            "claim.name": "phone_number",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false",
+            "aggregate.attrs": "false"
+          }
+        },
+        {
+          "name": "phone number verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "phoneNumberVerified",
+            "claim.name": "phone_number_verified",
+            "jsonType.label": "boolean",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true",
+            "multivalued": "false",
+            "aggregate.attrs": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "backend-services",
@@ -172,7 +299,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"phoneNumber\",\"displayName\":\"Mobile number\",\"validations\":{\"pattern\":{\"pattern\":\"^\\\\+[1-9]\\\\d{7,14}$\",\"error-message\":\"Must be an E.164 number, e.g. +15550100001\"}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"fcmToken\",\"displayName\":\"Push device token\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"bankAccountRef\",\"displayName\":\"Settlement account\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes the platform keeps about a person\"}]}"
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"multivalued\":false},{\"name\":\"phoneNumber\",\"displayName\":\"Mobile number\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"pattern\":{\"pattern\":\"^\\\\+[1-9]\\\\d{7,14}$\",\"error-message\":\"Must be an E.164 number, e.g. +15550100001\"}},\"multivalued\":false},{\"name\":\"phoneNumberVerified\",\"displayName\":\"Mobile number verified\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"validations\":{\"options\":{\"options\":[\"true\",\"false\"]}},\"multivalued\":false},{\"name\":\"fcmToken\",\"displayName\":\"Push device token\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"bankAccountRef\",\"displayName\":\"Settlement account\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes the platform keeps about a person\"}]}"
           ]
         }
       }
@@ -262,6 +389,9 @@
         ],
         "bankAccountRef": [
           "ACC-CUSTOMER"
+        ],
+        "phoneNumberVerified": [
+          "true"
         ]
       }
     },
@@ -291,6 +421,9 @@
         ],
         "bankAccountRef": [
           "ACC-RIDER"
+        ],
+        "phoneNumberVerified": [
+          "true"
         ]
       }
     },
@@ -320,6 +453,9 @@
         ],
         "bankAccountRef": [
           "ACC-MERCHANT"
+        ],
+        "phoneNumberVerified": [
+          "true"
         ]
       }
     },
@@ -367,6 +503,9 @@
         ],
         "bankAccountRef": [
           "ACC-MERCHANT"
+        ],
+        "phoneNumberVerified": [
+          "true"
         ]
       }
     }

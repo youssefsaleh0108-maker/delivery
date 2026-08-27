@@ -20,6 +20,8 @@ import com.delivery.accounting.domain.AccountingTransaction.Leg;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
 import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.domain.CashFloatRepository;
+import com.delivery.accounting.domain.RiderLedgerEntry;
+import com.delivery.accounting.domain.RiderLedgerRepository;
 
 /**
  * Opens a settlement: works out who is owed what, records the legs, and asks the bank.
@@ -67,15 +69,18 @@ public class SettlementService {
 
     private final AccountingTransactionRepository transactions;
     private final CashFloatRepository floatEntries;
+    private final RiderLedgerRepository riderLedger;
     private final BankPostingPublisher postings;
     private final SettlementMode settlementMode;
     private final BigDecimal commissionPercentage;
     private final BigDecimal deliveryCommissionPercentage;
+    private final BigDecimal riderFeeSharePercentage;
     private final String platformAccount;
     private final String currency;
 
     public SettlementService(AccountingTransactionRepository transactions,
                              CashFloatRepository floatEntries,
+                             RiderLedgerRepository riderLedger,
                              BankPostingPublisher postings,
                              @Value("${delivery.ordering.commission-percentage:12.5}")
                              BigDecimal commissionPercentage,
@@ -84,6 +89,22 @@ public class SettlementService {
                              // than selling a merchant a customer.
                              @Value("${delivery.ordering.delivery-commission-percentage:10}")
                              BigDecimal deliveryCommissionPercentage,
+                             // What one of the PLATFORM'S OWN riders keeps of a delivery fee, as a
+                             // percentage of it.
+                             //
+                             // BLANK BY DEFAULT, AND THAT DEFAULT IS THE POINT. Nobody has told
+                             // this codebase what the platform pays its own riders — the commercial
+                             // arrangement genuinely is not encoded anywhere — so rather than pick
+                             // a plausible-looking number, a blank value means "pay them exactly
+                             // what an outside carrier would have been paid for the same job":
+                             // the fee less the platform's delivery commission. That is the one
+                             // split the platform HAS decided, mirrored rather than reinvented, and
+                             // it is defensible on its face — the platform takes the same cut for
+                             // the same work whoever performed it.
+                             //
+                             // Set it to a number to override. See riderShareOf() below.
+                             @Value("${delivery.rider-earnings.platform-fleet-fee-share-percentage:}")
+                             String riderFeeSharePercentage,
                              @Value("${delivery.accounting.platform-account:ACC-PLATFORM}")
                              String platformAccount,
                              @Value("${delivery.accounting.currency:USD}") String currency,
@@ -94,10 +115,15 @@ public class SettlementService {
                              SettlementMode settlementMode) {
         this.transactions = transactions;
         this.floatEntries = floatEntries;
+        this.riderLedger = riderLedger;
         this.postings = postings;
         this.settlementMode = settlementMode;
         this.commissionPercentage = commissionPercentage;
         this.deliveryCommissionPercentage = deliveryCommissionPercentage;
+        this.riderFeeSharePercentage =
+                (riderFeeSharePercentage == null || riderFeeSharePercentage.isBlank())
+                        ? null
+                        : new BigDecimal(riderFeeSharePercentage.trim());
         this.platformAccount = platformAccount;
         this.currency = currency;
     }
@@ -120,8 +146,10 @@ public class SettlementService {
      * delivery fee is not the merchant's revenue: it pays for the delivery. Splitting the total
      * would hand the shop the fee and then take a cut of it, which is wrong twice.
      *
-     * <p>The platform leg therefore carries commission <em>plus</em> the delivery fee, so the three
-     * legs still sum to the total exactly.
+     * <p>The platform leg is therefore whatever is left once the merchant, the carrier and the
+     * rider have been paid, so the legs still sum to the total exactly however the fee is split.
+     * Before riders earned per job that residue was commission <em>plus</em> the whole delivery fee
+     * on an own-fleet order; it is now commission plus whatever of the fee the rider did not keep.
      *
      * @param total          what the customer pays: goods plus delivery
      * @param merchantBase   the goods subtotal; commission is a percentage of this
@@ -130,23 +158,68 @@ public class SettlementService {
      * @return the legs created, empty if this order was already settled
      */
     /**
-     * Which fees the platform absorbed on this order, as decided when it was placed.
+     * What the platform absorbed on this order, as decided when it was placed.
      *
      * @param deliveryFee     what delivery COSTS — what the carrier is owed, whoever paid it
      * @param customerWaived  the customer was not charged the delivery fee; the platform absorbs it
      * @param merchantWaived  no commission is taken; the merchant keeps the whole goods amount
      * @param carrierWaived   no platform cut; the carrier keeps the whole delivery fee
+     * @param discount        money a promo code took off what the customer paid.
+     *                        <p>A promotion comes out of the platform's margin and never out of what
+     *                        somebody else is paid, which Order Manager states as part of the event
+     *                        contract: the merchant is still owed the whole {@code subtotal} and the
+     *                        carrier the whole {@code deliveryFee}. That falls out of the arithmetic
+     *                        on its own — the platform leg is the residue and simply goes negative,
+     *                        posting a PLATFORM_SUBSIDY. What does <em>not</em> fall out on its own
+     *                        is the sanity clamp on the merchant base: {@code totalAmount} is net of
+     *                        the discount, so on a well-discounted order the goods subtotal exceeds
+     *                        it, and clamping the base to the total would pay the merchant less than
+     *                        they sold — charging the shop for the platform's promotion. This is the
+     *                        figure that tells the clamp what the order was worth before the
+     *                        platform gave money away. Null on an order with no code, and on every
+     *                        event published before codes existed
      */
     public record Waivers(BigDecimal deliveryFee, boolean customerWaived, boolean merchantWaived,
-                          boolean carrierWaived) {
+                          boolean carrierWaived, BigDecimal discount) {
 
         /**
          * No offers, and no explicit fee — the shape of every event published before waivers
          * existed. The fee is then derived from the total exactly as it always was.
          */
         public static Waivers none() {
-            return new Waivers(null, false, false, false);
+            return new Waivers(null, false, false, false, null);
         }
+
+        /** The pre-promotions shape, kept so callers written before codes existed read unchanged. */
+        public Waivers(BigDecimal deliveryFee, boolean customerWaived, boolean merchantWaived,
+                       boolean carrierWaived) {
+            this(deliveryFee, customerWaived, merchantWaived, carrierWaived, null);
+        }
+
+        /** What the order was worth before the platform discounted it. */
+        BigDecimal grossOf(BigDecimal netTotal) {
+            return discount == null || discount.signum() <= 0
+                    ? netTotal
+                    : netTotal.add(discount);
+        }
+    }
+
+    /**
+     * The person who actually carried the order, and who employs them.
+     *
+     * <p>Null when the event does not name a rider, which is what every event looked like before
+     * the rider app had an Earnings screen. Settlement is unchanged in that case: the whole
+     * delivery fee stays where it went before, and no rider is credited for work nobody recorded.
+     *
+     * @param riderRef    the rider's Keycloak subject
+     * @param accountRef  where the platform pays them, from the account directory
+     * @param carrierRef  the delivery company they ride for; null on the platform's own fleet.
+     *                    A LABEL only — the fleet itself is decided by whether the order has a
+     *                    carrier account, which is the discriminator the settlement already turns
+     *                    on. Two facts that could disagree would eventually disagree
+     * @param customerRef who paid for the order, kept so a tip can be proved to come from them
+     */
+    public record Rider(String riderRef, String accountRef, String carrierRef, String customerRef) {
     }
 
     /** The pre-waiver signature, kept so existing callers and tests read unchanged. */
@@ -160,6 +233,7 @@ public class SettlementService {
                 carrierAccount, cashHolder, correlationId, Waivers.none());
     }
 
+    /** The pre-rider signature: settles exactly as it did before riders earned per job. */
     @Transactional
     public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
                                               BigDecimal merchantBase,
@@ -167,6 +241,23 @@ public class SettlementService {
                                               String carrierAccount,
                                               CashHolder cashHolder, String correlationId,
                                               Waivers waivers) {
+        return settle(orderId, total, merchantBase, customerAccount, merchantAccount,
+                carrierAccount, cashHolder, correlationId, waivers, null, null);
+    }
+
+    /**
+     * @param rider     who carried it, or null when the event does not say
+     * @param earnedAt  when it was delivered, for the rider's per-day statement. The row must land
+     *                  in the day the work happened, not the day a slow bus delivered the event
+     */
+    @Transactional
+    public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
+                                              BigDecimal merchantBase,
+                                              String customerAccount, String merchantAccount,
+                                              String carrierAccount,
+                                              CashHolder cashHolder, String correlationId,
+                                              Waivers waivers, Rider rider,
+                                              java.time.Instant earnedAt) {
 
         // At-least-once bus delivery means order.delivered can arrive twice. Settling twice would
         // really move money twice, so this check — backed by the unique constraint on
@@ -187,12 +278,20 @@ public class SettlementService {
         // nothing.
         BigDecimal goods = (merchantBase == null ? amount : merchantBase)
                 .setScale(2, RoundingMode.HALF_UP);
-        // Clamped: a base above the total would produce a merchant share the customer never paid
+        // Clamped: a base above what the order was worth would produce a merchant share nobody paid
         // for, and a negative one would invert the legs.
-        if (goods.signum() < 0 || goods.compareTo(amount) > 0) {
-            log.warn("Order {} has a merchant base of {} against a total of {}; using the total",
-                    orderId, goods, amount);
-            goods = amount;
+        //
+        // Compared against the GROSS, not against what the customer paid. A promo code comes off the
+        // total and never off the merchant's goods, so on a well-discounted order the subtotal is
+        // legitimately larger than the total — clamping to the total there would quietly pay the
+        // shop less than they sold, charging the merchant for the platform's own promotion. Adding
+        // the discount back is what tells the two cases apart: a real inconsistency in the event
+        // still trips the clamp, and a discounted order does not.
+        BigDecimal gross = waivers.grossOf(amount);
+        if (goods.signum() < 0 || goods.compareTo(gross) > 0) {
+            log.warn("Order {} has a merchant base of {} against a gross of {}; using the gross",
+                    orderId, goods, gross);
+            goods = gross;
         }
 
         // No commission at all when the merchant's fee was waived: they keep the whole goods amount
@@ -211,9 +310,13 @@ public class SettlementService {
         // for a waived delivery fee: the customer paid nothing towards it, so the subtraction gives
         // zero and a carrier who did the work would be paid nothing. What delivery costs and who
         // paid for it are two different facts.
+        // The fallback subtracts from the gross for the same reason the clamp compares against it:
+        // a discount comes off the total, not off the delivery. In practice the two are identical —
+        // an event old enough to omit the fee is older than promo codes — but a subtraction that is
+        // only right when a field happens to be absent is a trap for whoever reads it next.
         BigDecimal deliveryFee = waivers.deliveryFee() != null
                 ? waivers.deliveryFee().setScale(2, RoundingMode.HALF_UP)
-                : amount.subtract(goods);
+                : gross.subtract(goods);
 
         // When the platform's own riders carried the order there is no carrier account and the fee
         // stays with the platform, exactly as it did before delivery could be bought from anybody
@@ -222,11 +325,28 @@ public class SettlementService {
         // costs, and only the take rate on it ever was.
         BigDecimal carrierShare = BigDecimal.ZERO;
         if (carrierAccount != null && deliveryFee.signum() > 0) {
-            BigDecimal deliveryCut = waivers.carrierWaived()
-                    ? BigDecimal.ZERO
-                    : deliveryFee.multiply(deliveryCommissionPercentage)
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            carrierShare = deliveryFee.subtract(deliveryCut);
+            carrierShare = deliveryFee.subtract(deliveryCut(deliveryFee, waivers.carrierWaived()));
+        }
+
+        // What one of the PLATFORM'S OWN riders is paid for carrying it.
+        //
+        // Only when there is no carrier: a company's rider is paid by their company out of the
+        // PROVIDER_CREDIT above, and crediting them here as well would pay for one delivery twice.
+        // That is the difference between the two employment cases, and it is decided by the same
+        // null the carrier leg turns on rather than by a second flag that could disagree with it.
+        //
+        // Before this, the whole fee stayed with the platform on an own-fleet order because there
+        // was nobody else in the model to give it to. Paying a rider is therefore a genuine RE-SPLIT
+        // of the order total, not a new charge: the platform's leg below shrinks by exactly this
+        // amount and the legs still sum to what the customer paid.
+        //
+        // The account is required as well as the rider: account_ref is NOT NULL on the leg, and a
+        // rider the directory could not resolve would take the whole settlement down with a
+        // constraint violation rather than being quietly left unpaid in the reconciliation view.
+        BigDecimal riderShare = BigDecimal.ZERO;
+        if (carrierAccount == null && rider != null && rider.accountRef() != null
+                && deliveryFee.signum() > 0) {
+            riderShare = riderShareOf(deliveryFee, waivers.carrierWaived());
         }
 
         // Everything the customer paid that neither the merchant nor the carrier receives. Derived
@@ -237,7 +357,8 @@ public class SettlementService {
         // intended, not a fault: the platform is buying the order. It is also precisely what the
         // budget in FeeWaiverService exists to bound, and why the leg below is only posted when
         // there is something positive to post.
-        BigDecimal platformShare = amount.subtract(merchantShare).subtract(carrierShare);
+        BigDecimal platformShare =
+                amount.subtract(merchantShare).subtract(carrierShare).subtract(riderShare);
 
         List<AccountingTransaction> legs = new ArrayList<>();
         legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
@@ -247,6 +368,11 @@ public class SettlementService {
         if (carrierShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.PROVIDER_CREDIT, carrierAccount,
                     carrierShare, currency, Direction.CREDIT, correlationId));
+        }
+
+        if (riderShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, rider.accountRef(),
+                    riderShare, currency, Direction.CREDIT, correlationId));
         }
 
         // A zero-value posting (a fully-discounted order, or a rounding floor) must not be sent:
@@ -264,8 +390,18 @@ public class SettlementService {
 
         transactions.saveAll(legs);
         log.info("Settling order {}: total {} (goods {} + delivery {}) "
-                        + "= merchant {} + carrier {} + platform {}",
-                orderId, amount, goods, deliveryFee, merchantShare, carrierShare, platformShare);
+                        + "= merchant {} + carrier {} + rider {} + platform {}",
+                orderId, amount, goods, deliveryFee, merchantShare, carrierShare, riderShare,
+                platformShare);
+
+        // The rider's own ledger row, written in THIS transaction.
+        //
+        // Deliberately not deferred to a listener the way points are. Points are a separate reward
+        // scheme that can be adjusted by an operator if it drifts; this row is the balance the rider
+        // cashes out, so it must be exactly as true as the RIDER_CREDIT leg beside it. Two writes
+        // that can succeed independently are two numbers that will eventually disagree, and the
+        // disagreement is discovered by a rider being paid the wrong amount.
+        creditRider(orderId, rider, carrierAccount, carrierShare, riderShare, earnedAt);
 
         // The debit is asked for now; the credits wait until it has actually posted. Sequencing
         // them means the platform never credits a merchant for money it failed to collect — the
@@ -293,11 +429,26 @@ public class SettlementService {
      * @param total     what the customer pays: goods plus the errand fee
      * @param goodsCost what the rider spent out of pocket; zero when nothing was bought
      */
+    /** The pre-rider signature: settles exactly as it did before riders earned per job. */
     @Transactional
     public List<AccountingTransaction> settleErrand(UUID orderId, BigDecimal total,
                                                     BigDecimal goodsCost,
                                                     String customerAccount, String riderAccount,
                                                     CashHolder cashHolder, String correlationId) {
+        return settleErrand(orderId, total, goodsCost, customerAccount, riderAccount, cashHolder,
+                correlationId, null, null);
+    }
+
+    /**
+     * @param rider    who ran it, or null when the event does not say
+     * @param earnedAt when it was delivered, so the statement buckets it on the day it was worked
+     */
+    @Transactional
+    public List<AccountingTransaction> settleErrand(UUID orderId, BigDecimal total,
+                                                    BigDecimal goodsCost,
+                                                    String customerAccount, String riderAccount,
+                                                    CashHolder cashHolder, String correlationId,
+                                                    Rider rider, java.time.Instant earnedAt) {
 
         if (transactions.existsByOrderId(orderId)) {
             log.debug("Errand {} is already settled", orderId);
@@ -343,8 +494,129 @@ public class SettlementService {
         log.info("Settling errand {}: total {} (goods {} + fee {}) = rider {} + platform {}",
                 orderId, amount, goods, fee, riderShare, commission);
 
+        // The rider's own record, split into the two things the credit above is made of.
+        //
+        // The RIDER_CREDIT leg is one number, and showing it as "earnings" would flatter every
+        // Butler shift: most of it is the rider's own money coming back to them. So the goods go in
+        // as a REIMBURSEMENT and only the fee less commission counts as earned. Both are the
+        // platform's debt — the rider fronted the money on the platform's instruction, so a company
+        // that never saw that transaction cannot be asked to refund it, and an errand's ledger rows
+        // are PLATFORM-payable whoever the rider rides for.
+        creditErrandRider(orderId, rider, goods, riderShare.subtract(goods), earnedAt);
+
         openWithTheBank(legs);
         return legs;
+    }
+
+    /** Splits an errand's rider credit into reimbursement and earnings. See {@link #creditRider}. */
+    private void creditErrandRider(UUID orderId, Rider rider, BigDecimal goods,
+                                   BigDecimal earned, java.time.Instant earnedAt) {
+        if (rider == null || rider.riderRef() == null) {
+            return;
+        }
+        // Written one at a time and flushed one at a time: they carry different entry types, so a
+        // redelivery that duplicates one must not take the other down with it.
+        if (goods.signum() > 0) {
+            saveRiderRow(RiderLedgerEntry.reimbursement(rider.riderRef(), orderId, goods, currency,
+                    RiderLedgerEntry.Fleet.PLATFORM, null, earnedAt), orderId, rider.riderRef());
+        }
+        if (earned.signum() > 0) {
+            saveRiderRow(RiderLedgerEntry.jobEarning(rider.riderRef(), orderId, earned, currency,
+                            RiderLedgerEntry.Fleet.PLATFORM, null, rider.customerRef(), earnedAt),
+                    orderId, rider.riderRef());
+        }
+    }
+
+    private void saveRiderRow(RiderLedgerEntry entry, UUID orderId, String riderRef) {
+        try {
+            riderLedger.saveAndFlush(entry);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.debug("Rider {} already has a {} row for order {}; ignoring the redelivery",
+                    riderRef, entry.getEntryType(), orderId);
+        }
+    }
+
+    /**
+     * The platform's take on a delivery fee.
+     *
+     * <p>Extracted so the carrier case and the own-fleet case cannot drift apart. There is one
+     * decision about what the platform charges for finding a delivery job a rider, and it applies
+     * whoever the rider turns out to work for.
+     */
+    private BigDecimal deliveryCut(BigDecimal deliveryFee, boolean waived) {
+        return waived
+                ? BigDecimal.ZERO
+                : deliveryFee.multiply(deliveryCommissionPercentage)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * What one of the platform's own riders keeps of the delivery fee.
+     *
+     * <p><strong>The unconfigured answer mirrors the carrier arrangement.</strong> Nobody has told
+     * this codebase what the platform pays its own riders — it is a commercial term that exists in
+     * somebody's head and in no property file — so the honest default is the split the platform HAS
+     * already decided for exactly the same work: the fee less the platform's delivery commission,
+     * which is precisely what an outside carrier is paid a few lines above. Inventing a second,
+     * lower number would be the platform quietly deciding its own riders are worth less, on no
+     * authority, in a place nobody would look.
+     *
+     * <p>{@code delivery.rider-earnings.platform-fleet-fee-share-percentage} overrides it once
+     * somebody knows the real figure. Clamped to the fee, because a share above 100% would pay a
+     * rider money the customer never handed over and drive the platform leg negative for no reason
+     * a subsidy report could explain.
+     */
+    private BigDecimal riderShareOf(BigDecimal deliveryFee, boolean cutWaived) {
+        if (riderFeeSharePercentage == null) {
+            return deliveryFee.subtract(deliveryCut(deliveryFee, cutWaived));
+        }
+        BigDecimal share = deliveryFee.multiply(riderFeeSharePercentage)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return share.min(deliveryFee).max(BigDecimal.ZERO);
+    }
+
+    /**
+     * Writes the rider's own record of the job.
+     *
+     * <p>Two different rows for two different employment cases, and the difference is the reason
+     * this method exists rather than one unconditional insert.
+     *
+     * <p><strong>Platform fleet:</strong> the amount is the {@code RIDER_CREDIT} leg just written,
+     * and the platform owes it. It counts toward the balance and the rider can cash it out.
+     *
+     * <p><strong>A delivery company's rider:</strong> the platform owes them nothing — it paid
+     * their COMPANY for the job through {@code PROVIDER_CREDIT}, and what the company passes on is
+     * an employment contract the platform has never been shown. The row is written anyway, marked
+     * {@code PayableBy.CARRIER}, so the rider's app can show the work they did; the amount on it is
+     * what the platform paid the company for that job, because that is the only figure the platform
+     * can state truthfully. It is excluded from the balance by construction, so no amount of
+     * getting it wrong can cause the platform to pay it.
+     *
+     * <p>Tolerates the duplicate a redelivery causes rather than pre-checking it: an
+     * exists-then-insert has a window between the two, and the unique index is what actually
+     * guarantees this. The outer {@code existsByOrderId} guard means it should never fire; this is
+     * the second line of defence, not the first.
+     */
+    private void creditRider(UUID orderId, Rider rider, String carrierAccount,
+                             BigDecimal carrierShare, BigDecimal riderShare,
+                             java.time.Instant earnedAt) {
+        if (rider == null || rider.riderRef() == null) {
+            return;
+        }
+
+        boolean onCarrierFleet = carrierAccount != null;
+        BigDecimal amount = onCarrierFleet ? carrierShare : riderShare;
+        if (amount.signum() <= 0) {
+            // Nothing was earned: a zero delivery fee, or an own-fleet order with no fee at all.
+            // A zero row would say the rider worked for nothing, which is a different claim.
+            return;
+        }
+
+        saveRiderRow(RiderLedgerEntry.jobEarning(
+                rider.riderRef(), orderId, amount, currency,
+                onCarrierFleet ? RiderLedgerEntry.Fleet.CARRIER : RiderLedgerEntry.Fleet.PLATFORM,
+                onCarrierFleet ? rider.carrierRef() : null,
+                rider.customerRef(), earnedAt), orderId, rider.riderRef());
     }
 
     /**
@@ -406,10 +678,12 @@ public class SettlementService {
     public void releaseNextLeg(UUID orderId) {
         List<AccountingTransaction> legs = transactions.findByOrderIdOrderByCreatedAt(orderId);
 
-        // Both payee legs are listed, and an order only ever has one of them: a catalog order pays
-        // a merchant, an errand pays a rider. The missing one is skipped by the null check below,
-        // exactly as a zero-commission order's missing commission leg is. Leaving RIDER_CREDIT out
-        // of this list would debit the customer for an errand and then never pay anybody.
+        // Every payee leg an order can carry, in the order they must be released. An order need not
+        // have all of them: an errand pays a rider and no merchant, a catalog order carried by a
+        // company pays a merchant and a carrier, and one carried by the platform's own fleet now
+        // pays a merchant AND a rider. Missing legs are skipped by the null check below, exactly as
+        // a zero-commission order's missing commission leg is. Leaving RIDER_CREDIT out of this
+        // list would debit the customer for an errand and then never pay anybody.
         for (Leg next : List.of(Leg.MERCHANT_CREDIT, Leg.RIDER_CREDIT, Leg.PROVIDER_CREDIT,
                 Leg.PLATFORM_COMMISSION)) {
             AccountingTransaction leg = legs.stream()

@@ -9,7 +9,6 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 
-import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +21,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.platform.security.CurrentUser;
+import com.delivery.tracking.service.EtaService;
+import com.delivery.tracking.service.EtaService.EtaResult;
 import com.delivery.tracking.service.TrackingService;
 import com.delivery.tracking.service.TrackingService.Position;
 import com.delivery.tracking.service.TrackingService.TrackingNotFoundException;
@@ -33,9 +33,11 @@ import com.delivery.tracking.service.TrackingService.TrackingNotFoundException;
 public class TrackingController {
 
     private final TrackingService tracking;
+    private final EtaService eta;
 
-    public TrackingController(TrackingService tracking) {
+    public TrackingController(TrackingService tracking, EtaService eta) {
         this.tracking = tracking;
+        this.eta = eta;
     }
 
     /**
@@ -65,6 +67,27 @@ public class TrackingController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
+    /**
+     * How far the rider still has to go, and when they are expected.
+     *
+     * <p>Always 200 with a body, never 204, because the interesting cases here are the ones with no
+     * number in them. A screen that got an empty response could only show a spinner; a body saying
+     * {@code available: false, reason: NO_FIX} lets it say "waiting for the rider's first GPS fix",
+     * which is true and is what the customer wants to know. The reasons are enumerated in
+     * {@link EtaService.Reason}.
+     *
+     * <p>Authorisation is identical to the live position — customer, merchant or assigned rider, or
+     * backoffice — and is applied before any of those reasons can be observed.
+     *
+     * <p>{@code provider} is on every response, including the unavailable ones. Until a routing key
+     * is provisioned it reads {@code HAVERSINE_DEV}, which is the dev straight-line estimator, and
+     * a client is expected to show that number with rather less confidence than a routed one.
+     */
+    @GetMapping("/orders/{orderId}/eta")
+    public EtaResult eta(@PathVariable UUID orderId) {
+        return eta.estimateFor(orderId, CurrentUser.requireId(), isBackoffice());
+    }
+
     @GetMapping("/orders/{orderId}/history")
     public List<PositionResponse> history(@PathVariable UUID orderId) {
         return tracking.history(orderId, CurrentUser.requireId(), isBackoffice()).stream()
@@ -83,14 +106,7 @@ public class TrackingController {
 
     @ExceptionHandler(TrackingNotFoundException.class)
     public ProblemDetail onNotFound(TrackingNotFoundException e) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.NOT_FOUND, e.getMessage());
-        problem.setTitle("Tracking not found");
-        String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
-        if (correlationId != null) {
-            problem.setProperty("correlationId", correlationId);
-        }
-        return problem;
+        return TrackingProblems.of(HttpStatus.NOT_FOUND, "Tracking not found", e.getMessage());
     }
 
     public record PingRequest(

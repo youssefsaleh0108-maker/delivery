@@ -56,6 +56,42 @@ public class NotificationsRabbitConfiguration {
                 .with("order.#");
     }
 
+    /**
+     * Chat events, on their own queue rather than the order one.
+     *
+     * <p>A chat event carries no order snapshot, so sharing the queue above would mean
+     * {@code OrderEventListener} recognising and discarding it on every delivery — and one
+     * unparseable chat message queued in front of a backlog of order notifications would delay the
+     * ones a customer is actually waiting on.
+     */
+    @Bean
+    public Queue notificationsChatEventsQueue(
+            @Value("${delivery.notifications.chat-events-queue:notifications.chat-events}") String name) {
+        return QueueBuilder.durable(name)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(name + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue notificationsChatEventsDlq(
+            @Value("${delivery.notifications.chat-events-queue:notifications.chat-events}") String name) {
+        return QueueBuilder.durable(name + ".dlq").build();
+    }
+
+    /**
+     * {@code chat.#} — the same opt-in shape as {@code order.#}. App Notification publishes
+     * {@code chat.message_missed} today; a second chat event reaches this service without a change
+     * here, and whether it produces a message is decided by whether a template row exists for it.
+     */
+    @Bean
+    public Binding notificationsChatEventsBinding(Queue notificationsChatEventsQueue,
+                                                  TopicExchange deliveryEventsExchange) {
+        return BindingBuilder.bind(notificationsChatEventsQueue)
+                .to(deliveryEventsExchange)
+                .with("chat.#");
+    }
+
     @Bean
     public Queue notificationReceiptsQueue(
             @Value("${delivery.notifications.receipts-queue:notifications.receipts}") String name) {

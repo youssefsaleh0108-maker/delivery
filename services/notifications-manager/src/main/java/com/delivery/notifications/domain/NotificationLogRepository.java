@@ -33,6 +33,21 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
             UUID orderId, String eventType, String channel, String recipientId);
 
     /**
+     * The same guard for events the order id cannot dedupe.
+     *
+     * <p>An order carries many chat messages, so the check above would let the first missed message
+     * of an order produce a push and silently swallow every one after it. The caller supplies what
+     * makes two deliveries the same thing — for chat, the message id — and this asks about that
+     * instead. Backed by the partial unique index in V16.
+     *
+     * <p>The event type is deliberately not part of the key. The dedupe key already identifies one
+     * concrete thing that happened; including the type as well would let two event types about the
+     * same message each send their own push, which is the duplicate this exists to prevent.
+     */
+    boolean existsByDedupeKeyAndChannelAndRecipientId(
+            String dedupeKey, String channel, String recipientId);
+
+    /**
      * Delivery rates per channel and provider over a window.
      *
      * <p>The gate on Phase 6's vendor cutover: "monitor delivery rates before fully retiring the

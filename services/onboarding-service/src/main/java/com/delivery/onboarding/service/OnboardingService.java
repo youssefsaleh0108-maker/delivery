@@ -36,16 +36,19 @@ public class OnboardingService {
     private final RuntimeService runtime;
     private final TaskService tasks;
     private final KeycloakAdminClient keycloak;
+    private final ApplicantDocumentService documents;
 
     public OnboardingService(OnboardingApplicationRepository applications,
                              ApplicationIntake intake,
                              RuntimeService runtime, TaskService tasks,
-                             KeycloakAdminClient keycloak) {
+                             KeycloakAdminClient keycloak,
+                             ApplicantDocumentService documents) {
         this.applications = applications;
         this.intake = intake;
         this.runtime = runtime;
         this.tasks = tasks;
         this.keycloak = keycloak;
+        this.documents = documents;
     }
 
     /** Thrown when an application cannot be accepted or decided as asked. */
@@ -63,6 +66,21 @@ public class OnboardingService {
      */
     public static class NotYourCompanyException extends RuntimeException {
         public NotYourCompanyException(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Thrown when a signed-in caller has no application of their own.
+     *
+     * <p>404 rather than 422, because the applicant-facing endpoints address the application as
+     * {@code /applications/mine} — a caller with none is asking about a resource that is not there,
+     * not making a request that broke a rule. It also covers the approved merchant whose
+     * application was cleaned up: there is nothing here for them, and the app should be showing
+     * them their shop.
+     */
+    public static class NoApplicationException extends RuntimeException {
+        public NoApplicationException(String message) {
             super(message);
         }
     }
@@ -186,12 +204,74 @@ public class OnboardingService {
 
     @Transactional
     public OnboardingApplication approve(UUID id, String reviewer) {
+        return approve(id, reviewer, false);
+    }
+
+    /**
+     * Approves an application, which is a separate decision from its documents.
+     *
+     * <p>The two are kept apart on purpose. A reviewer may have the commercial registration on the
+     * desk in front of them, or know that a licence was refused for glare on the photograph and
+     * that the applicant is perfectly acceptable — refusing the approval outright would leave them
+     * only one way to record the decision they have actually made, which is to approve a document
+     * they have not verified. That is a worse record than an approval that says what was
+     * outstanding.
+     *
+     * <p>So it is possible, and it is not silent. With documents outstanding this refuses with 422
+     * and names them, and only goes ahead when the caller says explicitly that they know — at which
+     * point what was outstanding is written onto the application, permanently, next to who decided
+     * it.
+     *
+     * @param acknowledgeDocumentIssues the reviewer has seen the outstanding documents and means to
+     *                                  approve anyway
+     */
+    @Transactional
+    public OnboardingApplication approve(UUID id, String reviewer, boolean acknowledgeDocumentIssues) {
         OnboardingApplication application = require(id);
-        application.approve(reviewer);
+
+        String outstanding = documents.outstandingSummary(id);
+        if (outstanding != null && !acknowledgeDocumentIssues) {
+            throw new DocumentIssuesOutstandingException(
+                    "This application still has documents that were not approved (" + outstanding
+                            + "). Approve them, or confirm you mean to approve regardless.",
+                    outstanding);
+        }
+
+        application.approve(reviewer, outstanding);
         applications.save(application);
         completeReview(application, true);
-        log.info("{} approved application {}", reviewer, application.getReference());
+
+        if (outstanding == null) {
+            log.info("{} approved application {}", reviewer, application.getReference());
+        } else {
+            // WARN, and it names what was overridden. This is the line somebody goes looking for
+            // when a KYC decision is questioned months later.
+            log.warn("{} approved application {} over outstanding documents: {}",
+                    reviewer, application.getReference(), outstanding);
+        }
         return application;
+    }
+
+    /**
+     * Thrown when an approval would go past documents nobody accepted.
+     *
+     * <p>Its own type rather than a plain rule violation because the caller's next move is
+     * different: this is not "you cannot", it is "say that you mean it", and the portal has to be
+     * able to tell those apart to show a confirmation rather than an error.
+     */
+    public static class DocumentIssuesOutstandingException extends RuntimeException {
+
+        private final String outstanding;
+
+        public DocumentIssuesOutstandingException(String message, String outstanding) {
+            super(message);
+            this.outstanding = outstanding;
+        }
+
+        /** The machine-readable summary, e.g. {@code "NATIONAL_ID=REJECTED"}. */
+        public String getOutstanding() {
+            return outstanding;
+        }
     }
 
     /**

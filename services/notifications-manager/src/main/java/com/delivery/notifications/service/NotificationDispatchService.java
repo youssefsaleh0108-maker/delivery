@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -19,6 +20,8 @@ import com.delivery.notifications.domain.NotificationLog;
 import com.delivery.notifications.domain.NotificationLogRepository;
 import com.delivery.notifications.domain.NotificationTemplate;
 import com.delivery.notifications.domain.NotificationTemplateRepository;
+import com.delivery.notifications.link.NotificationLink;
+import com.delivery.notifications.link.NotificationLinkTarget;
 import com.delivery.platform.notifications.NotificationCommand;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -43,6 +46,7 @@ public class NotificationDispatchService {
 
     private final NotificationTemplateRepository templates;
     private final NotificationLogRepository logs;
+    private final NotificationPreferenceService preferences;
     private final RabbitTemplate rabbit;
     private final ObjectMapper objectMapper;
     private final String exchange;
@@ -51,12 +55,14 @@ public class NotificationDispatchService {
     public NotificationDispatchService(
             NotificationTemplateRepository templates,
             NotificationLogRepository logs,
+            NotificationPreferenceService preferences,
             RabbitTemplate rabbit,
             ObjectMapper objectMapper,
             @Value("${delivery.outbox.exchange:delivery.events}") String exchange,
             @Value("${delivery.notifications.default-locale:en}") String defaultLocale) {
         this.templates = templates;
         this.logs = logs;
+        this.preferences = preferences;
         this.rabbit = rabbit;
         this.objectMapper = objectMapper;
         this.exchange = exchange;
@@ -65,6 +71,11 @@ public class NotificationDispatchService {
 
     /**
      * Turns one domain event into zero or more notifications.
+     *
+     * <p>Three things can stop a template from producing one: no contact detail for its channel, the
+     * recipient having opted out of its category, and the event already having been notified. Only
+     * the third is a duplicate — the first two are the platform correctly deciding not to send, and
+     * neither writes a log row.
      *
      * @param eventType   e.g. {@code order.status_changed}
      * @param orderId     the order it concerns, for the log and for dedupe
@@ -76,6 +87,24 @@ public class NotificationDispatchService {
     public List<NotificationLog> dispatch(String eventType, UUID orderId, String recipientId,
                                           Map<String, String> contacts, Map<String, String> values,
                                           String correlationId) {
+        return dispatch(eventType, orderId, recipientId, contacts, values, correlationId, null);
+    }
+
+    /**
+     * As above, for an event the order id cannot identify on its own.
+     *
+     * <p>Every {@code order.*} event is unique per (order, type, channel, recipient), so the order
+     * is its own dedupe key and callers pass nothing. Chat is the case that broke that assumption:
+     * one order carries many messages, so deduplicating a missed chat message on its order would
+     * push for the rider's first message and stay silent for the rest of the conversation.
+     *
+     * @param dedupeKey what makes two deliveries the same notification — the chat message id, not
+     *                  the conversation and not the order. Null falls back to the order-based check
+     */
+    @Transactional
+    public List<NotificationLog> dispatch(String eventType, UUID orderId, String recipientId,
+                                          Map<String, String> contacts, Map<String, String> values,
+                                          String correlationId, String dedupeKey) {
 
         List<NotificationTemplate> matching = templates.findByEventTypeAndLocale(eventType, defaultLocale);
         if (matching.isEmpty()) {
@@ -97,10 +126,33 @@ public class NotificationDispatchService {
                 continue;
             }
 
-            // Outbox delivery is at-least-once, so the same event can arrive twice. Sending the
-            // customer two texts for one status change is annoying for in-app and billable for SMS.
-            if (logs.existsByOrderIdAndEventTypeAndChannelAndRecipientId(
-                    orderId, eventType, channel, recipientId)) {
+            // The user's own settings, consulted before anything is written or sent. Deliberately
+            // BEFORE the log row: a suppressed notification is one the platform decided not to
+            // create, and writing a row for it would put messages nobody sent into the delivery-rate
+            // report and into the customer's own /mine history. Support's question — "why did they
+            // not get it" — is answered by their preferences instead, which is what the backoffice
+            // read on NotificationPreferenceController exists for.
+            //
+            // A security- or account-critical category can never land here: allows() returns true
+            // for those before it reads a single row.
+            if (!preferences.allows(recipientId, eventType, channel)) {
+                log.debug("{} opted out of {} on {}", recipientId, eventType, channel);
+                continue;
+            }
+
+            // Delivery is at-least-once, so the same event can arrive twice. Sending the customer
+            // two texts for one status change is annoying for in-app and billable for SMS.
+            //
+            // Which question gets asked depends on what identifies this notification. For an order
+            // event the order does: one status change per order, type, channel and recipient. A
+            // caller that knows the order is not enough — chat, where one order carries a whole
+            // conversation — supplies its own key, and asking the order-based question for it would
+            // suppress every message after the first.
+            boolean alreadySent = dedupeKey != null
+                    ? logs.existsByDedupeKeyAndChannelAndRecipientId(dedupeKey, channel, recipientId)
+                    : logs.existsByOrderIdAndEventTypeAndChannelAndRecipientId(
+                            orderId, eventType, channel, recipientId);
+            if (alreadySent) {
                 log.debug("Already notified {} on {} for {} of {}",
                         recipientId, channel, eventType, orderId);
                 continue;
@@ -109,6 +161,8 @@ public class NotificationDispatchService {
             NotificationLog entry = new NotificationLog(
                     orderId, recipientId, channel, recipient, eventType,
                     template.renderSubject(values), template.renderBody(values), correlationId);
+            entry.pointAt(linkFor(template, orderId, values).orElse(null));
+            entry.dedupeOn(dedupeKey);
             logs.save(entry);
             created.add(entry);
 
@@ -122,6 +176,37 @@ public class NotificationDispatchService {
         }
 
         return created;
+    }
+
+    /**
+     * Where this notification should send the app.
+     *
+     * <p><strong>Derived rather than template-driven, wherever it can be.</strong> A notification
+     * carrying an order id is about that order — that is what made it exist — so every
+     * {@code order.*} template in V10 and V11 gets its order link with no data change and no row
+     * that could later disagree with the event it was rendered from. Backfilling {@code ORDER} into
+     * those eighteen rows would have recorded a fact the log row already holds, in a place a future
+     * insert can forget or contradict, and a template claiming ORDER for an event carrying no order
+     * would produce a link to nothing.
+     *
+     * <p>The template column is the escape hatch for what derivation cannot know: a chat message
+     * points at a conversation and an earnings notice at a statement, neither of which is the order
+     * that triggered it. Its id comes from the placeholder the target names, so those services need
+     * only put {@code conversationId} in the values map they already build.
+     */
+    private Optional<NotificationLink> linkFor(NotificationTemplate template, UUID orderId,
+                                              Map<String, String> values) {
+        NotificationLinkTarget declared = template.getLinkTarget();
+        if (declared != null) {
+            String id = declared.takesId() ? values.get(declared.idPlaceholder()) : null;
+            // A declared target with no usable id yields no link at all rather than a link to the
+            // listing screen: sending someone to "your conversations" when the message was about one
+            // of them is a worse answer than opening the app where it left off.
+            return NotificationLink.of(declared, id);
+        }
+        return orderId == null
+                ? Optional.empty()
+                : Optional.of(NotificationLink.toOrder(orderId));
     }
 
     /**
@@ -183,9 +268,35 @@ public class NotificationDispatchService {
     @Transactional
     public UUID sendDirect(String channel, String recipient, String recipientId, String subject,
                            String body, String purpose, String correlationId) {
+        return sendDirect(channel, recipient, recipientId, subject, body, purpose, correlationId,
+                null);
+    }
+
+    /**
+     * As above, pointing the recipient at a specific screen.
+     *
+     * <p>The link cannot be derived on this path the way it is for an order event: a direct send has
+     * no order and no template, so the only thing that knows where the message is about is the
+     * caller. A chat push naming its conversation and an approval naming the application are the two
+     * that matter — without this they would open the app's home screen and leave the user to find
+     * the thing themselves.
+     *
+     * <p><strong>Preferences are deliberately not consulted anywhere on this path.</strong> Direct
+     * sends are one-time codes, application decisions and account notices — the traffic that exists
+     * precisely because somebody is being told something they need to know rather than something
+     * they subscribed to. A caller that wants an opt-out-respecting send should raise a domain event
+     * and let a template handle it, where the category rules apply.
+     *
+     * @param link where a tap should land, or null for a message with no destination
+     */
+    @Transactional
+    public UUID sendDirect(String channel, String recipient, String recipientId, String subject,
+                           String body, String purpose, String correlationId,
+                           NotificationLink link) {
         NotificationLog entry = new NotificationLog(
                 null, recipientId == null || recipientId.isBlank() ? ANONYMOUS_RECIPIENT : recipientId,
                 channel, recipient, purpose, subject, body, correlationId);
+        entry.pointAt(link);
         logs.saveAndFlush(entry);
         send(entry);
         // The address is deliberately absent from this line. A one-time code is sent to prove an
@@ -208,6 +319,19 @@ public class NotificationDispatchService {
             if (entry.getOrderId() != null) {
                 metadata.put("orderId", entry.getOrderId().toString());
             }
+
+            // Where a tap should land: the typed pair (linkTarget, linkId) plus the canonical
+            // string under `deepLink`. Both, not one.
+            //
+            // The string is what the mobile app already routes on and what Push Connector has been
+            // synthesising for order pushes; writing it here means the connector's fallback stops
+            // firing and the link becomes something this service decided rather than something a
+            // connector guessed from an id it happened to recognise. The typed pair is for anything
+            // downstream that needs to BRANCH on the destination, so no consumer ends up splitting a
+            // link on slashes to work out that this was an order.
+            //
+            // Note there is no hostname in any of it, and that is the point — see NotificationLink.
+            entry.link().ifPresent(link -> link.writeTo(metadata));
 
             NotificationCommand command = new NotificationCommand(
                     entry.getId().toString(),

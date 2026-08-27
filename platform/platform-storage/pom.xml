@@ -8,7 +8,7 @@
        so it can move to its own repository without any further change. -->
   <groupId>com.delivery</groupId>
   <artifactId>platform-storage</artifactId>
-  <version>0.1.1</version>
+  <version>0.1.2</version>
   <packaging>jar</packaging>
   <name>Platform :: Object Storage</name>
   <description>Presigned MinIO uploads/downloads with role + ownership checks (Section 5)</description>
@@ -22,7 +22,7 @@
 
     <!-- The shared libraries, resolved from GitHub Packages. Bump deliberately:
          a platform library pinning another one still pins a released version. -->
-    <delivery.platform.version>0.1.1</delivery.platform.version>
+    <delivery.platform.version>0.1.2</delivery.platform.version>
 
     <minio.version>8.6.0</minio.version>
     <!-- Must match the OkHttp that ${minio.version} resolves — see the okhttp-jvm dependency for

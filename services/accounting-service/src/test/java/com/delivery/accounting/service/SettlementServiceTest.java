@@ -50,6 +50,8 @@ class SettlementServiceTest {
     private CashFloatRepository floatEntries;
     @Mock
     private BankPostingPublisher postings;
+    @Mock
+    private com.delivery.accounting.domain.RiderLedgerRepository riderLedger;
 
     private UUID orderId;
 
@@ -63,8 +65,11 @@ class SettlementServiceTest {
     }
 
     private SettlementService serviceAt(String commissionPercentage) {
-        return new SettlementService(transactions, floatEntries, postings,
-                new BigDecimal(commissionPercentage), new BigDecimal("10"), PLATFORM, "USD",
+        return new SettlementService(transactions, floatEntries, riderLedger, postings,
+                new BigDecimal(commissionPercentage), new BigDecimal("10"),
+                // Blank: a platform rider's share of the delivery fee mirrors what an outside
+                // carrier would have been paid, which is the shipped default.
+                "", PLATFORM, "USD",
                 // BANK explicitly: everything below asserts the bank path — legs opening PENDING,
                 // the posting sequence, the compensation on a refusal. Under LEDGER_ONLY every leg
                 // is terminal at birth and none of it would run.

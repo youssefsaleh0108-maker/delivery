@@ -1,6 +1,7 @@
 package com.delivery.notifications.domain;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -9,6 +10,9 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
+import com.delivery.notifications.link.NotificationLink;
+import com.delivery.notifications.link.NotificationLinkTarget;
 
 /**
  * One notification the platform decided to send.
@@ -98,6 +102,40 @@ public class NotificationLog {
 
     @Column(name = "dlr_received_at")
     private Instant dlrReceivedAt;
+
+    /**
+     * Where the notification told the app to go, stored as the typed pair rather than the rendered
+     * string.
+     *
+     * <p>Kept on the row because the link is part of what the customer received: "it opened the
+     * wrong screen" cannot be answered by recomputing the link from today's rules. Stored as target
+     * and id rather than as {@code delivery://orders/…} so the record survives a change to how the
+     * string is composed — the scheme is a rendering decision, the destination is the fact.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "link_target", length = 32)
+    private NotificationLinkTarget linkTarget;
+
+    @Column(name = "link_id", length = 128)
+    private String linkId;
+
+    /**
+     * What makes this notification the same notification on a redelivery, when the order is not
+     * enough to say so.
+     *
+     * <p>Null for order events, and that is the common case: an {@code order.status_changed} is
+     * unique per (order, type, channel, recipient), so the order id already answers "have we sent
+     * this". A chat notification is not — one order carries many messages, and deduplicating on the
+     * order would send the customer a push for the rider's first message and silence for every one
+     * after it. So the caller that knows what "the same" means supplies a key; here that is the
+     * chat message id.
+     *
+     * <p>Deliberately a free-form string rather than a second uuid column. The next caller with the
+     * same problem will have some other kind of id, and a column typed to today's example would
+     * push the one after that into inventing a uuid to fit.
+     */
+    @Column(name = "dedupe_key", length = 128)
+    private String dedupeKey;
 
     protected NotificationLog() {
         // for JPA
@@ -239,5 +277,46 @@ public class NotificationLog {
 
     public Instant getDlrReceivedAt() {
         return dlrReceivedAt;
+    }
+
+    /**
+     * Records where this notification points.
+     *
+     * <p>A setter rather than a constructor parameter because the link is optional and derived: a
+     * fifth positional argument that is null for most callers is the kind of signature people get
+     * wrong. Null clears it, which is what a caller with nothing to point at should pass.
+     */
+    public void pointAt(NotificationLink link) {
+        this.linkTarget = link == null ? null : link.target();
+        this.linkId = link == null ? null : link.id();
+    }
+
+    /** Empty when this notification has no screen to open — most email and SMS. */
+    public Optional<NotificationLink> link() {
+        return linkTarget == null
+                ? Optional.empty()
+                : NotificationLink.of(linkTarget, linkId);
+    }
+
+    /**
+     * Records what makes this notification unique, for callers the order id cannot speak for.
+     *
+     * <p>A setter for the same reason {@link #pointAt} is one: it is null on every order-event path
+     * and only the two or three callers that need it should have to think about it.
+     */
+    public void dedupeOn(String key) {
+        this.dedupeKey = key;
+    }
+
+    public String getDedupeKey() {
+        return dedupeKey;
+    }
+
+    public NotificationLinkTarget getLinkTarget() {
+        return linkTarget;
+    }
+
+    public String getLinkId() {
+        return linkId;
     }
 }

@@ -48,6 +48,8 @@ class SettlementWaiverTest {
     private CashFloatRepository floatEntries;
     @Mock
     private BankPostingPublisher postings;
+    @Mock
+    private com.delivery.accounting.domain.RiderLedgerRepository riderLedger;
 
     private UUID orderId;
 
@@ -58,8 +60,8 @@ class SettlementWaiverTest {
 
     private SettlementService service() {
         // 12.5% on goods, 10% of the delivery fee — the platform's real rates.
-        return new SettlementService(transactions, floatEntries, postings,
-                new BigDecimal("12.5"), new BigDecimal("10"), PLATFORM, "USD",
+        return new SettlementService(transactions, floatEntries, riderLedger, postings,
+                new BigDecimal("12.5"), new BigDecimal("10"), "", PLATFORM, "USD",
                 // BANK: these assert the leg arithmetic as it reaches the bank path.
                 SettlementService.SettlementMode.BANK);
     }
@@ -250,6 +252,85 @@ class SettlementWaiverTest {
             assertThat(amountOf(legs, Leg.PROVIDER_CREDIT)).isEqualByComparingTo("2.50");
             assertThat(amountOf(legs, Leg.PLATFORM_SUBSIDY)).isEqualByComparingTo("2.50");
             assertBalances(legs, "40.00");
+        }
+    }
+
+    /**
+     * A promo code, which is the platform buying the order out of its own margin.
+     *
+     * <p>Order Manager states the rule on the event itself: {@code totalAmount} is already net of
+     * the discount, the merchant is still owed the whole {@code subtotal} and the carrier the whole
+     * {@code deliveryFee}. Nothing here should be paid a penny less because the platform ran a
+     * promotion.
+     *
+     * <p>The case that actually broke is the last one. A discount big enough to take the total below
+     * the goods subtotal made the merchant base look impossible, and the sanity clamp reduced it to
+     * the total — silently charging the shop for the platform's own offer, on the discounts most
+     * worth running.
+     */
+    @Nested
+    @DisplayName("a promo code the customer typed")
+    class PromoDiscount {
+
+        private List<AccountingTransaction> settleDiscounted(String total, String goods,
+                                                             String fee, String discount) {
+            when(transactions.existsByOrderId(any())).thenReturn(false);
+            return service().settle(orderId, new BigDecimal(total), new BigDecimal(goods),
+                    CUSTOMER, MERCHANT, CARRIER, null, "corr-1",
+                    new SettlementService.Waivers(new BigDecimal(fee), false, false, false,
+                            new BigDecimal(discount)));
+        }
+
+        @Test
+        @DisplayName("comes out of the platform's share, not the merchant's")
+        void the_merchant_is_paid_on_the_full_subtotal() {
+            // Goods 40, delivery 2.50, five off: the customer pays 37.50.
+            List<AccountingTransaction> legs = settleDiscounted("37.50", "40.00", "2.50", "5.00");
+
+            // 12.5% of 40 is 5.00, so the shop keeps 35.00 — exactly what an undiscounted order
+            // would have paid them.
+            assertThat(amountOf(legs, Leg.MERCHANT_CREDIT)).isEqualByComparingTo("35.00");
+            assertThat(amountOf(legs, Leg.PROVIDER_CREDIT)).isEqualByComparingTo("2.25");
+            assertBalances(legs, "37.50");
+        }
+
+        @Test
+        @DisplayName("shrinks the platform leg by exactly what it gave away")
+        void the_platform_absorbs_it() {
+            List<AccountingTransaction> legs = settleDiscounted("37.50", "40.00", "2.50", "5.00");
+
+            // Undiscounted this order leaves the platform 5.25 (see the Unchanged case below).
+            // Five pounds off leaves 0.25.
+            assertThat(amountOf(legs, Leg.PLATFORM_COMMISSION)).isEqualByComparingTo("0.25");
+            assertThat(amountOf(legs, Leg.PLATFORM_SUBSIDY)).isNull();
+        }
+
+        @Test
+        @DisplayName("larger than the platform's margin is posted as a subsidy, and still balances")
+        void a_discount_beyond_the_margin_is_paid_in() {
+            // Ten off a 42.50 order: the platform's 5.25 margin cannot cover it.
+            List<AccountingTransaction> legs = settleDiscounted("32.50", "40.00", "2.50", "10.00");
+
+            assertThat(amountOf(legs, Leg.MERCHANT_CREDIT)).isEqualByComparingTo("35.00");
+            assertThat(amountOf(legs, Leg.PROVIDER_CREDIT)).isEqualByComparingTo("2.25");
+            assertThat(amountOf(legs, Leg.PLATFORM_SUBSIDY)).isEqualByComparingTo("4.75");
+            assertBalances(legs, "32.50");
+        }
+
+        @Test
+        @DisplayName("that takes the total below the goods still pays the shop what they sold")
+        void the_merchant_base_is_not_clamped_to_a_discounted_total() {
+            // Twenty off: the customer pays 22.50 for 40.00 of goods. The subtotal is legitimately
+            // larger than the total, which is exactly the shape the clamp used to mistake for a
+            // malformed event.
+            List<AccountingTransaction> legs = settleDiscounted("22.50", "40.00", "2.50", "20.00");
+
+            assertThat(amountOf(legs, Leg.MERCHANT_CREDIT))
+                    .as("the shop sold 40.00 of goods and is owed 35.00 of it, discount or not")
+                    .isEqualByComparingTo("35.00");
+            assertThat(amountOf(legs, Leg.PROVIDER_CREDIT)).isEqualByComparingTo("2.25");
+            assertThat(amountOf(legs, Leg.PLATFORM_SUBSIDY)).isEqualByComparingTo("14.75");
+            assertBalances(legs, "22.50");
         }
     }
 

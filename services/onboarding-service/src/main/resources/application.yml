@@ -78,6 +78,33 @@ camunda:
         historyTimeToLive: P180D
 
 delivery:
+  storage:
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9010}
+      public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9010}
+      # From Vault in a deployment, same as every other service that stores objects. The
+      # StorageAutoConfiguration is conditional on access-key being set, so a deployment that
+      # forgets it does not get a half-working uploader — it gets a service that will not start.
+      access-key: ${MINIO_ACCESS_KEY:delivery}
+      secret-key: ${MINIO_SECRET_KEY:delivery123}
+      # Short on purpose. Every one of these grants access to somebody's identity papers, so the
+      # window in which a leaked URL is worth anything is measured in minutes.
+      presign-ttl: 10m
+      max-upload-size-bytes: 10485760
+      # The platform's list is named for images and is shared by every purpose, so PDF has to be
+      # added here for the documents step to work at all — a commercial registration arrives as a
+      # PDF far more often than as a photograph.
+      #
+      # Note what is NOT on this list: image/svg+xml. SVG is script, and these objects are served
+      # from the MinIO origin by presigned URL; an SVG "scan of a licence" would run in that origin
+      # with the reviewer's session for it. The list is an allow-list precisely so that adding a
+      # type is a decision somebody makes on purpose.
+      allowed-image-content-types:
+        - image/jpeg
+        - image/png
+        - image/webp
+        - application/pdf
+
   security:
     permit-all:
       - /actuator/health
@@ -125,6 +152,25 @@ delivery:
       # And the ceiling for a whole day. Past this, an address is being used as a target rather
       # than being verified.
       daily-cap: ${VERIFICATION_DAILY_CAP:8}
+
+    documents:
+      # What the wizard's documents step accepts. Narrower than the storage list above is allowed;
+      # wider is not, because StorageService checks its own list too and would refuse afterwards
+      # with a message the applicant cannot act on.
+      allowed-content-types: image/jpeg,image/png,image/webp,application/pdf
+
+    payout:
+      # Which PayoutAccountVerifier is in charge.
+      #
+      # DEV_CHECKSUM_ONLY is the only implementation that exists. It runs the ISO 7064 mod-97 check
+      # and contacts no bank, because the platform has no payment-processor account to contact one
+      # with — so no payout account here has been confirmed to exist or to belong to the applicant
+      # named on it, and every row is stamped CHECKSUM_ONLY to keep that visible.
+      #
+      # When a processor is signed: add its verifier, set this to its name, and the rows that were
+      # only ever arithmetic-checked are one query away (verified_by = 'DEV_CHECKSUM_ONLY').
+      # An unknown name here fails startup rather than falling back — see PayoutVerifierRegistry.
+      verifier: ${PAYOUT_VERIFIER:DEV_CHECKSUM_ONLY}
 
   keycloak:
     base-url: ${KEYCLOAK_INTERNAL_URL:http://localhost:8180}

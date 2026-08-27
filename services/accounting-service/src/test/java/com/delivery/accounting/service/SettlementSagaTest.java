@@ -342,6 +342,57 @@ class SettlementSagaTest {
     }
 
     @Nested
+    @DisplayName("a refused rider credit on a basket does NOT refund either")
+    class RiderCreditRefused {
+
+        /**
+         * A catalog order carried by the platform's own rider: debit, merchant, rider, commission.
+         * The rider leg is a share of the delivery fee, not the payee — the shop is the payee.
+         */
+        private List<AccountingTransaction> withARider() {
+            return new ArrayList<>(List.of(
+                    leg(Leg.CUSTOMER_DEBIT, CUSTOMER_ACCOUNT, "42.50", Direction.DEBIT),
+                    leg(Leg.MERCHANT_CREDIT, MERCHANT_ACCOUNT, "35.00", Direction.CREDIT),
+                    leg(Leg.RIDER_CREDIT, "ACC-RIDER", "2.25", Direction.CREDIT),
+                    leg(Leg.PLATFORM_COMMISSION, PLATFORM_ACCOUNT, "5.25", Direction.CREDIT)));
+        }
+
+        @Test
+        void the_customer_is_not_refunded_because_the_merchant_was_already_paid() {
+            // Same reasoning as the commission branch, and the distinction that makes it right:
+            // the shop is the payee here, and it has been paid. Clawing the customer's money back
+            // to fix a shortfall owed to the platform's own rider would leave a merchant paid out
+            // of nothing, to solve a debt the platform can settle next week.
+            List<AccountingTransaction> legs = withARider();
+            legs.get(0).markPosted("debit-ref");
+            legs.get(1).markPosted("merchant-ref");
+            given(legs);
+
+            failPermanently(legs.get(2), "ACCOUNT_FROZEN");
+
+            assertThat(refundRaised()).isNull();
+            assertThat(legs.get(2).getStatus()).isEqualTo(Status.FAILED);
+        }
+
+        @Test
+        void but_on_an_errand_the_rider_IS_the_payee_and_the_customer_is_refunded() {
+            // No merchant leg, so there is nobody else who was paid: the platform is holding money
+            // it cannot pass on, which is exactly the case the refund exists for.
+            List<AccountingTransaction> errand = new ArrayList<>(List.of(
+                    leg(Leg.CUSTOMER_DEBIT, CUSTOMER_ACCOUNT, "30.00", Direction.DEBIT),
+                    leg(Leg.RIDER_CREDIT, "ACC-RIDER", "29.37", Direction.CREDIT),
+                    leg(Leg.PLATFORM_COMMISSION, PLATFORM_ACCOUNT, "0.63", Direction.CREDIT)));
+            errand.get(0).markPosted("debit-ref");
+            given(errand);
+
+            failPermanently(errand.get(1), "ACCOUNT_FROZEN");
+
+            assertThat(refundRaised()).isNotNull();
+            assertThat(refundRaised().getAmount()).isEqualByComparingTo("30.00");
+        }
+    }
+
+    @Nested
     @DisplayName("a retryable failure is not a failure")
     class Retryable {
 

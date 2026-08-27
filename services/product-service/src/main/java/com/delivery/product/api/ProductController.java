@@ -26,6 +26,7 @@ import com.delivery.platform.security.CurrentUser;
 import com.delivery.product.api.dto.CatalogDtos.PageResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
+import com.delivery.product.api.dto.GeoDtos.CrossSellResponse;
 import com.delivery.product.api.dto.OptionDtos.ChosenOptionResponse;
 import com.delivery.product.api.dto.OptionDtos.OptionGroupRequest;
 import com.delivery.product.api.dto.OptionDtos.OptionGroupResponse;
@@ -37,6 +38,7 @@ import com.delivery.product.service.ProductOptionService;
 import com.delivery.product.service.ProductOptionService.PricedSelection;
 import com.delivery.product.domain.Product;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
 
 /**
@@ -51,15 +53,25 @@ import com.delivery.product.service.ProductImageService;
 @RequestMapping("/api/products")
 public class ProductController {
 
+    /**
+     * The most suggestions one cross-sell request may ask for.
+     *
+     * <p>A rail shows four to six. Bounded so a caller cannot turn a recommendation endpoint into a
+     * way to page a shop's whole shelf in one call, sorted by something that looks like popularity.
+     */
+    private static final int MAX_CROSS_SELL = 20;
+
     private final CatalogService catalog;
     private final ProductImageService images;
     private final ProductOptionService optionService;
+    private final CrossSellService crossSell;
 
     public ProductController(CatalogService catalog, ProductImageService images,
-                             ProductOptionService optionService) {
+                             ProductOptionService optionService, CrossSellService crossSell) {
         this.catalog = catalog;
         this.images = images;
         this.optionService = optionService;
+        this.crossSell = crossSell;
     }
 
     /** Customer-facing browse. ACTIVE products only, from every merchant. */
@@ -95,6 +107,39 @@ public class ProductController {
         // The viewer id is passed in so the service can decide whether a DRAFT is visible; an
         // anonymous-but-authenticated customer simply won't match the owner.
         return toResponse(catalog.read(id, CurrentUser.id().orElse(null)));
+    }
+
+    /**
+     * The "People Also Ordered" rail.
+     *
+     * <p>Named for what it computes. This counts how often two products shared a <em>delivered</em>
+     * basket — item co-occurrence — and it is not collaborative filtering: there is no model of who
+     * the caller is, no similarity between shoppers, and no attempt at one. Calling the path
+     * {@code /recommendations} would have implied all three.
+     *
+     * <p>Every item carries a {@code basis} saying how it was arrived at, and clients should not
+     * ignore it. {@code BOUGHT_TOGETHER} comes with a real count of delivered baskets;
+     * {@code SAME_AISLE} is fill from the same shop with no count, because nothing was measured.
+     * Until the delivered-basket projection has accumulated data — it cannot be backfilled, see
+     * {@link com.delivery.product.service.CrossSellService} — every item will be the latter.
+     *
+     * <p>Open to any authenticated caller, like the rest of browsing. It returns nothing the store's
+     * own product list does not already return.
+     */
+    @GetMapping("/{id}/bought-together")
+    public List<CrossSellResponse> boughtTogether(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "8") int limit) {
+
+        // Read through the same path as any other product view, so a DRAFT or archived product 404s
+        // for a customer rather than quietly seeding a rail from a shelf they may not see.
+        Product product = catalog.read(id, CurrentUser.id().orElse(null));
+
+        return crossSell.boughtTogetherWith(product, Math.min(Math.max(limit, 1), MAX_CROSS_SELL))
+                .stream()
+                .map(s -> new CrossSellResponse(
+                        toResponse(s.product()), s.basis(), s.ordersTogether()))
+                .toList();
     }
 
     @PostMapping

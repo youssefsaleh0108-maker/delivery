@@ -98,6 +98,34 @@ delivery:
     # just like a fetch, and getting this wrong looks like a silent connection failure.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
 
+  # Customer <-> rider chat, scoped to one order. Most of these are policy rather than tuning, which
+  # is why they are gathered here instead of scattered through @Value annotations - see
+  # ChatProperties for the reasoning behind each number.
+  chat:
+    # How long after DELIVERY the conversation keeps accepting messages. Two hours: long enough for
+    # the "you left it at the wrong door" conversation, which starts when the customer unpacks the
+    # bag rather than when they take it; short enough that it expires inside the rider's shift
+    # instead of leaving a customer a private line to a courier who is eleven jobs away. A cancelled
+    # order closes immediately and that is not configurable - there is no delivery to ask about.
+    close-after-delivery: ${CHAT_CLOSE_AFTER_DELIVERY:2h}
+    # Refused above this, never truncated: shortening a message changes what the sender said.
+    max-message-length: 1000
+    history-page-size: 100
+    push-preview:
+      # Whether the push that chases an offline recipient carries a snippet of the message. On,
+      # because "you have a message" is not something a customer on a doorstep can act on without
+      # unlocking their phone. The cost is real and deliberate: the snippet crosses a third-party
+      # push service and lands on a lock screen. Set false for a contentless nudge.
+      enabled: ${CHAT_PUSH_PREVIEW:true}
+      # Well under PushPreparer's 240-character body cap and FCM's 4KB payload limit, so no message
+      # can be composed long enough to get its own notification rejected.
+      max-length: 120
+    # Whether support may read a transcript. On, and audited to chat_transcript_access on every
+    # read - see ChatBackofficeController for why granting it beats the alternative, which is the
+    # same read happening through a psql prompt with no record.
+    backoffice-transcript-access: ${CHAT_BACKOFFICE_READ:true}
+    order-events-queue: app-notification.order-events
+
 management:
   endpoints:
     web:

@@ -72,6 +72,36 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Delivery area already exists", e.getMessage());
     }
 
+    /**
+     * A coordinate outside its range, half a pin, or (0, 0).
+     *
+     * <p>400 rather than 422: the value is malformed as a coordinate at all, not a well-formed one
+     * that breaks a business rule. The message is the value object's own — it explains which rule
+     * was broken, including why Null Island is refused, which is otherwise a baffling rejection.
+     */
+    @ExceptionHandler(com.delivery.product.domain.GeoPoint.InvalidCoordinateException.class)
+    public ProblemDetail onInvalidCoordinate(
+            com.delivery.product.domain.GeoPoint.InvalidCoordinateException e) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid location", e.getMessage());
+    }
+
+    /**
+     * The geocoder could not answer.
+     *
+     * <p>503 and never an empty result. An address picker handed an empty list concludes the street
+     * does not exist and tells the customer so; the failure has to arrive as a failure so the client
+     * can offer a retry instead of a denial.
+     *
+     * <p>The message is passed through because it is written to be safe — it names the provider and
+     * the condition, never a credential and never the query, which for a reverse lookup would be
+     * somebody's exact location.
+     */
+    @ExceptionHandler(com.delivery.product.geocoding.GeocodingException.class)
+    public ProblemDetail onGeocodingFailure(com.delivery.product.geocoding.GeocodingException e) {
+        log.warn("Geocoding request could not be served: {}", e.getMessage());
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Geocoding unavailable", e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail onValidationFailure(MethodArgumentNotValidException e) {
         ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed",

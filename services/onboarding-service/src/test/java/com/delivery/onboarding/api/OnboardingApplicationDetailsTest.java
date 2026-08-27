@@ -14,10 +14,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.delivery.onboarding.client.PlatformClient;
+import com.delivery.onboarding.domain.ApplicantDocument;
+import com.delivery.onboarding.domain.DocumentKind;
+import com.delivery.onboarding.domain.Iban;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplication.Kind;
+import com.delivery.onboarding.domain.PayoutDetails;
+import com.delivery.onboarding.service.ApplicantDocumentService;
 import com.delivery.onboarding.service.CustomerSignUpService;
 import com.delivery.onboarding.service.OnboardingService;
+import com.delivery.onboarding.service.PayoutDetailsService;
 import com.delivery.onboarding.service.VerificationService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,12 +58,18 @@ class OnboardingApplicationDetailsTest {
     private OnboardingService onboarding;
     private MockMvc mvc;
 
+    private ApplicantDocumentService documents;
+    private PayoutDetailsService payouts;
+
     @BeforeEach
     void setUp() {
         onboarding = mock(OnboardingService.class);
+        documents = mock(ApplicantDocumentService.class);
+        payouts = mock(PayoutDetailsService.class);
         mvc = MockMvcBuilders.standaloneSetup(new OnboardingController(
                         onboarding, mock(VerificationService.class),
-                        mock(PlatformClient.class), mock(CustomerSignUpService.class)))
+                        mock(PlatformClient.class), mock(CustomerSignUpService.class),
+                        documents, payouts))
                 .build();
     }
 
@@ -140,6 +152,88 @@ class OnboardingApplicationDetailsTest {
                             .content(requestBody(WIZARD_DETAILS)))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.details").doesNotExist());
+        }
+    }
+
+    /**
+     * The same guarantee as {@code the_unauthenticated_receipt_does_not_leak_them}, extended to the
+     * two things the redesigned wizards added after the {@code details} column: uploaded documents
+     * and payout details.
+     *
+     * <p>Worth its own block because the reasoning is the same but the stakes are higher. The
+     * reference is 160 random bits handed to one person — and then, in practice, forwarded: pasted
+     * into a support thread, screenshotted, kept in a browser history. Everything the receipt
+     * carries is readable by whoever ends up holding it, which is why the receipt is a fixed record
+     * with no room in it for a bank account, a national id, or a URL that opens one.
+     */
+    @Nested
+    @DisplayName("the unauthenticated receipt")
+    class Receipt {
+
+        @Test
+        @DisplayName("carries no documents, no matter what was uploaded against the application")
+        void carries_no_documents() throws Exception {
+            OnboardingApplication application = application(WIZARD_DETAILS);
+            when(onboarding.byReference("ref-1")).thenReturn(java.util.Optional.of(application));
+
+            ApplicantDocument licence = new ApplicantDocument(application.getId(),
+                    DocumentKind.DRIVING_LICENCE, UUID.randomUUID(),
+                    "applications/" + application.getId() + "/scan.jpg", "image/jpeg");
+            when(documents.liveFor(application.getId())).thenReturn(java.util.List.of(licence));
+
+            mvc.perform(get("/api/onboarding/applications/by-reference/{reference}", "ref-1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.documents").doesNotExist())
+                    // Above all: nothing that would open the object. A presigned URL in a receipt
+                    // that gets forwarded is somebody's driving licence in a chat thread.
+                    .andExpect(jsonPath("$..viewUrl").doesNotExist())
+                    .andExpect(jsonPath("$..objectKey").doesNotExist());
+
+            // And the receipt does not even ask: an endpoint that loaded documents in order to
+            // leave them out is one careless field away from putting them back in.
+            verifyNoInteractions(documents);
+        }
+
+        @Test
+        @DisplayName("carries no payout details, masked or otherwise")
+        void carries_no_payout_details() throws Exception {
+            OnboardingApplication application = application(WIZARD_DETAILS);
+            when(onboarding.byReference("ref-2")).thenReturn(java.util.Optional.of(application));
+            when(payouts.forApplication(application.getId())).thenReturn(java.util.Optional.of(
+                    new PayoutDetails(application.getId(), "Sam Salem",
+                            Iban.parse("EG380019000500000000263180002"))));
+
+            mvc.perform(get("/api/onboarding/applications/by-reference/{reference}", "ref-2"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.payout").doesNotExist())
+                    .andExpect(jsonPath("$.iban").doesNotExist())
+                    .andExpect(jsonPath("$..iban").doesNotExist())
+                    .andExpect(jsonPath("$..maskedIban").doesNotExist())
+                    .andExpect(jsonPath("$..accountHolder").doesNotExist());
+
+            verifyNoInteractions(payouts);
+        }
+
+        /**
+         * The whole-body assertion, in case a field is added later that none of the paths above
+         * happen to name. The receipt is a closed set: reference, status, business name, kind, when
+         * it was submitted, and why it was refused.
+         */
+        @Test
+        @DisplayName("is a closed set of six fields, so nothing new leaks into it by accident")
+        void is_a_closed_set_of_fields() throws Exception {
+            OnboardingApplication application = application(WIZARD_DETAILS);
+            when(onboarding.byReference("ref-3")).thenReturn(java.util.Optional.of(application));
+
+            String body = mvc.perform(
+                            get("/api/onboarding/applications/by-reference/{reference}", "ref-3"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(JSON.readTree(body).fieldNames())
+                    .toIterable()
+                    .containsExactlyInAnyOrder("reference", "status", "businessName", "kind",
+                            "submittedAt", "rejectionReason");
         }
     }
 

@@ -17,10 +17,15 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.delivery.notifications.domain.NotificationCategory;
 import com.delivery.notifications.domain.NotificationLog;
 import com.delivery.notifications.domain.NotificationLogRepository;
+import com.delivery.notifications.domain.NotificationPreference;
+import com.delivery.notifications.domain.NotificationPreferenceRepository;
 import com.delivery.notifications.domain.NotificationTemplate;
 import com.delivery.notifications.domain.NotificationTemplateRepository;
+import com.delivery.notifications.link.NotificationLink;
+import com.delivery.notifications.link.NotificationLinkTarget;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +46,12 @@ import static org.mockito.Mockito.when;
  * deliver a message the platform has no record of — unauditable, and unaccounted spend. And the
  * per-channel routing keys are what stop one stuck channel blocking the others; collapsing them into
  * a shared queue would reintroduce head-of-line blocking across SMS, email and push at once.
+ *
+ * <p>Two more since the redesign. A user who silenced a category must stop receiving it, and a user
+ * who silenced everything must still be told their password changed — the second is the one that
+ * matters, because getting it wrong hands an attacker a way to work unobserved. And a deep link
+ * must arrive at the worker exactly as it was decided here: a link reshaped in transit sends the
+ * customer to the wrong screen at the one moment they are actively trying to get somewhere.
  */
 class NotificationDispatchServiceTest {
 
@@ -49,21 +60,28 @@ class NotificationDispatchServiceTest {
 
     private NotificationTemplateRepository templates;
     private NotificationLogRepository logs;
+    private NotificationPreferenceService preferences;
     private RabbitTemplate rabbit;
+    private ObjectMapper objectMapper;
     private NotificationDispatchService dispatch;
 
     @BeforeEach
     void setUp() {
         templates = mock(NotificationTemplateRepository.class);
         logs = mock(NotificationLogRepository.class);
+        preferences = mock(NotificationPreferenceService.class);
         rabbit = mock(RabbitTemplate.class);
         // The command carries an Instant, so the mapper needs the time module — the same one Spring
         // Boot auto-configures. A bare ObjectMapper fails to serialise and the send is swallowed by
         // the service's catch-all, which would make every assertion here fail for the wrong reason.
-        ObjectMapper objectMapper = new ObjectMapper()
+        objectMapper = new ObjectMapper()
                 .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         dispatch = new NotificationDispatchService(
-                templates, logs, rabbit, objectMapper, "delivery.events", "en");
+                templates, logs, preferences, rabbit, objectMapper, "delivery.events", "en");
+
+        // Everything below is about who hears what, not about opt-outs; the preference cases have
+        // their own nested class and override this.
+        when(preferences.allows(anyString(), anyString(), anyString())).thenReturn(true);
 
         when(templates.findByEventTypeAndLocale(anyString(), anyString())).thenReturn(List.of());
         when(logs.existsByOrderIdAndEventTypeAndChannelAndRecipientId(any(), anyString(),
@@ -91,16 +109,22 @@ class NotificationDispatchServiceTest {
     }
 
     private NotificationTemplate template(String channel, String subject, String body) {
+        return template("order.status_changed", channel, subject, body, null);
+    }
+
+    private NotificationTemplate template(String eventType, String channel, String subject,
+                                          String body, NotificationLinkTarget linkTarget) {
         try {
             var constructor = NotificationTemplate.class.getDeclaredConstructor();
             constructor.setAccessible(true);
             NotificationTemplate template = constructor.newInstance();
             set(template, "id", UUID.randomUUID());
-            set(template, "eventType", "order.status_changed");
+            set(template, "eventType", eventType);
             set(template, "channel", channel);
             set(template, "locale", "en");
             set(template, "subjectTemplate", subject);
             set(template, "bodyTemplate", body);
+            set(template, "linkTarget", linkTarget);
             return template;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
@@ -122,6 +146,16 @@ class NotificationDispatchServiceTest {
     private List<NotificationLog> dispatchTo(Map<String, String> contacts) {
         return dispatch.dispatch("order.status_changed", ORDER, CUSTOMER, contacts,
                 Map.of("status", "on its way"), "corr-1");
+    }
+
+    /** The command as the worker will read it: the JSON that actually crossed the bus. */
+    private Map<String, String> metadataOf(Message message) throws Exception {
+        com.fasterxml.jackson.databind.JsonNode json = new ObjectMapper()
+                .readTree(new String(message.getBody(), java.nio.charset.StandardCharsets.UTF_8));
+        Map<String, String> metadata = new java.util.LinkedHashMap<>();
+        json.path("metadata").fields()
+                .forEachRemaining(field -> metadata.put(field.getKey(), field.getValue().asText()));
+        return metadata;
     }
 
     private List<Message> published() {
@@ -347,6 +381,224 @@ class NotificationDispatchServiceTest {
 
             assertThat(created).hasSize(1);
             verify(logs).save(any(NotificationLog.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("telling the app where the notification points")
+    class Linking {
+
+        /**
+         * The property the mobile app depends on: what dispatch decided is what the worker receives.
+         * Anything that reshapes the link in transit — a connector guessing, a serialiser dropping a
+         * key — sends the customer to the wrong screen, and the notification is the one moment they
+         * are actively trying to get somewhere.
+         */
+        @Test
+        void a_link_reaches_the_worker_exactly_as_it_was_decided() throws Exception {
+            templatesFor(template("PUSH", "s", "body"));
+
+            NotificationLink expected = NotificationLink.toOrder(ORDER);
+            dispatchTo(Map.of("PUSH", "device-token"));
+            commit();
+
+            Map<String, String> metadata = metadataOf(published().get(0));
+
+            assertThat(metadata).containsEntry("linkTarget", "ORDER")
+                    .containsEntry("linkId", ORDER.toString())
+                    .containsEntry("deepLink", expected.canonical());
+            assertThat(NotificationLink.fromMetadata(metadata)).contains(expected);
+        }
+
+        /**
+         * A hostname baked into a notification is wrong the moment the environment moves, and every
+         * message already in a device tray keeps pointing at the old one. This is the assertion that
+         * stops somebody "helpfully" turning the link into an https URL later.
+         */
+        @Test
+        void the_link_names_a_route_and_never_a_server() throws Exception {
+            templatesFor(template("PUSH", "s", "body"));
+
+            dispatchTo(Map.of("PUSH", "device-token"));
+            commit();
+
+            String link = metadataOf(published().get(0)).get("deepLink");
+
+            assertThat(link).startsWith("delivery://")
+                    .doesNotContain("http")
+                    .doesNotContain(".com")
+                    .doesNotContain("localhost");
+        }
+
+        /** Every order notification is about its order, with no template row saying so. */
+        @Test
+        void an_order_notification_points_at_its_order_without_being_told_to() {
+            templatesFor(template("EMAIL", "s", "body"));
+
+            NotificationLog entry = dispatchTo(Map.of("EMAIL", "sam@example.test")).get(0);
+
+            assertThat(entry.link()).contains(NotificationLink.toOrder(ORDER));
+        }
+
+        /** A chat message is about the conversation, not the order that happens to carry it. */
+        @Test
+        void a_template_can_point_somewhere_other_than_the_order() {
+            templatesFor(template("order.status_changed", "PUSH", "s", "body",
+                    NotificationLinkTarget.CONVERSATION));
+
+            List<NotificationLog> created = dispatch.dispatch(
+                    "order.status_changed", ORDER, CUSTOMER, Map.of("PUSH", "device-token"),
+                    Map.of("conversationId", "c-77"), "corr-1");
+
+            assertThat(created.get(0).link())
+                    .contains(new NotificationLink(NotificationLinkTarget.CONVERSATION, "c-77"));
+        }
+
+        /**
+         * Opening "your conversations" when the message was about one of them is a worse answer than
+         * opening the app where the user left off, so a target with no usable id yields no link.
+         */
+        @Test
+        void a_declared_target_with_no_id_produces_no_link_rather_than_a_partial_one() {
+            templatesFor(template("order.status_changed", "PUSH", "s", "body",
+                    NotificationLinkTarget.CONVERSATION));
+
+            assertThat(dispatchTo(Map.of("PUSH", "device-token")).get(0).link()).isEmpty();
+        }
+
+        /**
+         * Ids arrive from event payloads, which carry customer-influenced data. A slash in one would
+         * change which route the app resolves — a link claiming to open an order and not doing so.
+         */
+        @Test
+        void an_id_that_would_change_the_route_is_refused_rather_than_escaped() {
+            assertThat(NotificationLink.of(NotificationLinkTarget.ORDER, "../account")).isEmpty();
+            assertThat(NotificationLink.of(NotificationLinkTarget.ORDER, "abc def")).isEmpty();
+        }
+
+        /** A direct send has no order and no template, so only its caller knows where it points. */
+        @Test
+        void a_direct_send_carries_the_link_its_caller_supplied() throws Exception {
+            NotificationLink link =
+                    new NotificationLink(NotificationLinkTarget.APPLICATION, "app-42");
+
+            dispatch.sendDirect("PUSH", "device-token", "rider-sub", "Approved", "body",
+                    "onboarding.decision", "corr-1", link);
+
+            assertThat(NotificationLink.fromMetadata(metadataOf(published().get(0))))
+                    .contains(link);
+        }
+    }
+
+    @Nested
+    @DisplayName("respecting what the user asked for")
+    class Preferences {
+
+        /** A user who turned a category off must stop receiving it — that is the whole feature. */
+        @Test
+        void a_category_the_user_turned_off_is_not_dispatched() {
+            templatesFor(template("PUSH", "s", "body"));
+            when(preferences.allows(CUSTOMER, "order.status_changed", "PUSH")).thenReturn(false);
+
+            assertThat(dispatchTo(Map.of("PUSH", "device-token"))).isEmpty();
+
+            verify(logs, never()).save(any());
+            commit();
+            verify(rabbit, never()).send(anyString(), anyString(), any(Message.class));
+        }
+
+        /** Silencing push must not silence email: the choice is per channel or it is not a choice. */
+        @Test
+        void a_channel_the_user_turned_off_does_not_suppress_the_others() {
+            templatesFor(template("EMAIL", "s", "body"), template("PUSH", "s", "body"));
+            when(preferences.allows(CUSTOMER, "order.status_changed", "PUSH")).thenReturn(false);
+
+            List<NotificationLog> created =
+                    dispatchTo(Map.of("EMAIL", "sam@example.test", "PUSH", "device-token"));
+
+            assertThat(created).hasSize(1);
+            assertThat(created.get(0).getChannel()).isEqualTo("EMAIL");
+        }
+
+        /**
+         * A settings toggle must never swallow a security notice.
+         *
+         * <p>Run against the REAL preference service rather than the mock, because the guarantee is
+         * not "dispatch asks and is told yes" — it is that an account-critical category never
+         * reaches the table at all. The repository here is rigged to answer "off" to every question
+         * it is asked, and the assertion that it was never asked one is the point: no row, no cache
+         * and no query result exists on this path that could make the message disappear.
+         */
+        @Test
+        void an_account_critical_message_is_sent_even_when_every_stored_preference_says_no() {
+            NotificationPreferenceRepository stored =
+                    mock(NotificationPreferenceRepository.class);
+            when(stored.findByRecipientIdAndCategoryAndChannel(anyString(), any(), anyString()))
+                    .thenAnswer(call -> java.util.Optional.of(new NotificationPreference(
+                            CUSTOMER, call.getArgument(1), call.getArgument(2), false)));
+
+            NotificationDispatchService withRealPreferences = new NotificationDispatchService(
+                    templates, logs, new NotificationPreferenceService(stored), rabbit,
+                    objectMapper, "delivery.events", "en");
+
+            when(templates.findByEventTypeAndLocale("account.password_changed", "en"))
+                    .thenReturn(List.of(template("account.password_changed", "EMAIL",
+                            "Your password changed", "body", null)));
+
+            List<NotificationLog> created = withRealPreferences.dispatch(
+                    "account.password_changed", null, CUSTOMER,
+                    Map.of("EMAIL", "sam@example.test"), Map.of(), "corr-1");
+
+            assertThat(created).hasSize(1);
+            verify(stored, never())
+                    .findByRecipientIdAndCategoryAndChannel(anyString(), any(), anyString());
+        }
+
+        /**
+         * The same service, the same rigged repository, an ordinary category — proving the test
+         * above passes because ACCOUNT is exempt and not because the wiring silently ignores
+         * preferences altogether.
+         */
+        @Test
+        void the_same_wiring_does_honour_an_opt_out_on_an_ordinary_category() {
+            NotificationPreferenceRepository stored =
+                    mock(NotificationPreferenceRepository.class);
+            when(stored.findByRecipientIdAndCategoryAndChannel(anyString(), any(), anyString()))
+                    .thenAnswer(call -> java.util.Optional.of(new NotificationPreference(
+                            CUSTOMER, call.getArgument(1), call.getArgument(2), false)));
+
+            NotificationDispatchService withRealPreferences = new NotificationDispatchService(
+                    templates, logs, new NotificationPreferenceService(stored), rabbit,
+                    objectMapper, "delivery.events", "en");
+
+            templatesFor(template("EMAIL", "s", "body"));
+
+            assertThat(withRealPreferences.dispatch("order.status_changed", ORDER, CUSTOMER,
+                    Map.of("EMAIL", "sam@example.test"), Map.of(), "corr-1")).isEmpty();
+        }
+
+        /**
+         * The other half of the same guarantee, at the level that actually enforces it: the category
+         * rule itself. A future edit that made ACCOUNT suppressible would fail here even if every
+         * caller still looked correct.
+         */
+        @Test
+        void the_account_category_is_the_one_no_preference_can_reach() {
+            assertThat(NotificationCategory.ACCOUNT.alwaysDelivered()).isTrue();
+            assertThat(NotificationCategory.forEventType("account.password_changed"))
+                    .isEqualTo(NotificationCategory.ACCOUNT);
+            assertThat(NotificationCategory.forEventType("onboarding.verification"))
+                    .isEqualTo(NotificationCategory.ACCOUNT);
+        }
+
+        /** One-time codes and application decisions are told, not offered. */
+        @Test
+        void a_direct_send_never_asks_about_preferences() {
+            dispatch.sendDirect("EMAIL", "applicant@example.test", "Your code", "123456",
+                    "onboarding.verification", "corr-1");
+
+            verify(preferences, never()).allows(anyString(), anyString(), anyString());
+            verify(rabbit).send(anyString(), eq("notification.dispatch.email"), any(Message.class));
         }
     }
 

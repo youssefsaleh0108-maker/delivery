@@ -79,6 +79,71 @@ delivery:
   catalog:
     max-images-per-product: 8
 
+    cross-sell:
+      # How many delivered baskets must contain both products before the "People Also Ordered" rail
+      # will claim they go together. One is an anecdote; presenting it as a pattern would be a claim
+      # about a population made from a single stranger's shopping trip. Raise it once there is
+      # volume — the rail falls back to same-shelf suggestions, clearly labelled as such, either way.
+      min-orders-together: 2
+
+  geocoding:
+    # Which geocoder answers. NOMINATIM is free and keyless and is what runs today; MAPBOX is
+    # written, has never made a successful call, and refuses everything until somebody provisions a
+    # token. Read at every call rather than captured at startup, so a Config Server change plus
+    # /actuator/busrefresh switches it without a redeploy.
+    provider: ${GEOCODING_PROVIDER:NOMINATIM}
+
+    cache:
+      # A street does not move and the underlying OSM data changes on a scale of months, so a short
+      # TTL would spend the rate budget re-confirming answers that were never going to differ.
+      ttl: 30d
+      # Housekeeping only. Nothing sweeps automatically — see GeocodeCache#evictStale for why an
+      # @Scheduled sweep would run once per replica.
+      evict-after: 180d
+
+    nominatim:
+      base-url: https://nominatim.openstreetmap.org
+
+      # DELIBERATELY EMPTY, AND THE SERVICE REFUSES TO GEOCODE UNTIL IT IS SET.
+      #
+      # Nominatim's usage policy requires a User-Agent identifying the application, with a contact
+      # behind it, and blocks applications that omit one. That contact belongs to whoever runs this
+      # deployment, not to this repository, so shipping a plausible default here would put somebody
+      # else's name on the operator's traffic. Set it to something like:
+      #
+      #   YouDrop/1.0 (ops@example.com)
+      #
+      # See NominatimGeocodingProvider for the rest of the policy and which parts are enforced here.
+      user-agent: ${NOMINATIM_USER_AGENT:}
+
+      # Optional. Biases the language of returned labels, e.g. "ar,en".
+      accept-language: ${NOMINATIM_ACCEPT_LANGUAGE:}
+
+      # The policy's absolute maximum for the public endpoint is one request per second. Enforced by
+      # MinIntervalRateLimiter in front of every call, including the ones that fail — a failed
+      # request costs the endpoint the same as a successful one.
+      #
+      # This bounds ONE JVM. The policy's limit is per application, so more than one replica pointed
+      # at the public endpoint exceeds it. The cache is what keeps real traffic far below the limit.
+      min-interval: 1s
+
+      # Bounds how long an address lookup can hold a request thread. The default RestClient factory
+      # has none at all, and this is on an interactive path: an outage with no read timeout parks a
+      # servlet thread per attempt until the pool is gone and the rest of the catalog stops
+      # answering too.
+      timeout: 5s
+
+    mapbox:
+      base-url: https://api.mapbox.com
+      # No token, and no default. It comes from Vault through the Config Server like every other
+      # vendor credential on this platform. Until it is set, selecting MAPBOX makes every geocoding
+      # request fail loudly rather than half-work.
+      access-token: ${MAPBOX_ACCESS_TOKEN:}
+      # Optional ISO 3166-1 alpha-2 bias, e.g. "lb". Markedly better matches for a bare street name
+      # in a single-market marketplace.
+      country: ${MAPBOX_COUNTRY:}
+      timeout: 5s
+
 management:
   endpoints:
     web:

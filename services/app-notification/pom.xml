@@ -25,7 +25,7 @@
 
     <!-- The shared libraries, resolved from GitHub Packages. Bump deliberately:
          nothing rebuilds this service when the platform changes any more. -->
-    <delivery.platform.version>0.1.1</delivery.platform.version>
+    <delivery.platform.version>0.1.2</delivery.platform.version>
 
     <!-- Container image coordinates; override per environment in CI. -->
     <image.registry>docker.io</image.registry>
@@ -94,6 +94,14 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <!-- Bean validation on the chat request bodies. Not transitive through starter-web since Boot
+         2.3, so a @Valid without this is silently ignored - the annotations compile, the constraints
+         never run, and an oversized body reaches the service. The service validates again anyway
+         (see ChatMessageText), but a check that looks present and is not is worse than no check. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

@@ -1,5 +1,8 @@
 package com.delivery.tracking.service;
 
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -51,14 +54,21 @@ public class TrackingPartitionMaintenance {
     private final JdbcTemplate jdbc;
     private final int retentionDays;
     private final int createAheadDays;
+    private final int dutyEventRetentionDays;
 
     public TrackingPartitionMaintenance(
             JdbcTemplate jdbc,
             @Value("${delivery.tracking.raw-ping-retention-days:30}") int retentionDays,
-            @Value("${delivery.tracking.partition-create-ahead-days:7}") int createAheadDays) {
+            @Value("${delivery.tracking.partition-create-ahead-days:7}") int createAheadDays,
+            // Far longer than the raw pings, because the two answer different questions and cost
+            // wildly different amounts. A shift log is a few rows per rider per day and gets asked
+            // about by payroll months later; a day of GPS samples is millions of rows and stops
+            // being interesting within weeks.
+            @Value("${delivery.tracking.duty-event-retention-days:400}") int dutyEventRetentionDays) {
         this.jdbc = jdbc;
         this.retentionDays = retentionDays;
         this.createAheadDays = createAheadDays;
+        this.dutyEventRetentionDays = dutyEventRetentionDays;
     }
 
     /**
@@ -84,10 +94,13 @@ public class TrackingPartitionMaintenance {
             int created = createAhead();
             int rolledUp = rollUpExpired();
             int dropped = dropExpired();
+            int dutyEventsRemoved = expireDutyEvents();
 
-            if (created > 0 || dropped > 0) {
+            if (created > 0 || dropped > 0 || dutyEventsRemoved > 0) {
                 log.info("Tracking partitions: {} created, {} days rolled up, {} dropped "
-                        + "(retention {} days)", created, rolledUp, dropped, retentionDays);
+                                + "(retention {} days); {} duty events expired (retention {} days)",
+                        created, rolledUp, dropped, retentionDays,
+                        dutyEventsRemoved, dutyEventRetentionDays);
             }
         } catch (Exception e) {
             // Never propagate out of a scheduled method: an exception here cancels all future runs
@@ -160,6 +173,31 @@ public class TrackingPartitionMaintenance {
             dropped++;
         }
         return dropped;
+    }
+
+    /**
+     * Retires old duty transitions.
+     *
+     * <p>A plain {@code DELETE} rather than another partition, and that is the whole point of
+     * putting it here: {@code rider_duty_events} grows per shift boundary, not per ping — a few
+     * rows per rider per day against millions for the GPS samples above — so a day's worth is a
+     * short indexed delete rather than the long transaction and vacuum problem that made
+     * {@code DROP TABLE} the only sane option for {@code tracking_events}. Daily partitions for a
+     * table this size would be ceremony with a maintenance cost and no payoff.
+     *
+     * <p>The other two tables added alongside it, {@code rider_presence} and
+     * {@code carrier_membership}, appear nowhere in this class on purpose: both are one row per
+     * person updated in place, so they are bounded by headcount and there is nothing to expire.
+     *
+     * <p>The cutoff is computed in Java and bound as a timestamp rather than expressed as SQL
+     * interval arithmetic over a bound number. Same reason the partition names above are built from
+     * {@code LocalDate}: it keeps the parameter a plain value the driver can type unambiguously,
+     * instead of relying on Postgres to infer what {@code ? * interval} was meant to be.
+     */
+    private int expireDutyEvents() {
+        Instant cutoff = Instant.now().minus(Duration.ofDays(dutyEventRetentionDays));
+        return jdbc.update("DELETE FROM rider_duty_events WHERE occurred_at < ?",
+                Timestamp.from(cutoff));
     }
 
     /**

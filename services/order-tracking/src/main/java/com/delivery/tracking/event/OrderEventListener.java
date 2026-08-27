@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.tracking.domain.OrderParticipants;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
+import com.delivery.tracking.route.GeoPoint;
+import com.delivery.tracking.service.PresenceService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,10 +35,14 @@ public class OrderEventListener {
     private static final Logger log = LoggerFactory.getLogger(OrderEventListener.class);
 
     private final OrderParticipantsRepository participants;
+    private final PresenceService presence;
     private final ObjectMapper objectMapper;
 
-    public OrderEventListener(OrderParticipantsRepository participants, ObjectMapper objectMapper) {
+    public OrderEventListener(OrderParticipantsRepository participants,
+                              PresenceService presence,
+                              ObjectMapper objectMapper) {
         this.participants = participants;
+        this.presence = presence;
         this.objectMapper = objectMapper;
     }
 
@@ -69,10 +75,26 @@ public class OrderEventListener {
                 return;
             }
 
-            participants.findById(orderId).ifPresentOrElse(
-                    existing -> existing.apply(riderId, status),
-                    () -> participants.save(new OrderParticipants(
+            UUID carrierId = uuidOrNull(node, "deliveryProviderId");
+            GeoPoint pickup = pointOrNull(node, "pickupLat", "pickupLng");
+            GeoPoint dropoff = pointOrNull(node, "dropoffLat", "dropoffLng");
+
+            OrderParticipants order = participants.findById(orderId)
+                    .map(existing -> {
+                        existing.apply(riderId, status);
+                        return existing;
+                    })
+                    .orElseGet(() -> participants.save(new OrderParticipants(
                             orderId, customerId, merchantId, riderId, status)));
+            order.applyRoute(carrierId, pickup, dropoff);
+
+            // Which fleet a rider carries for, inferred from an order that names both. The weakest
+            // of the two sources this service has - see CarrierMembership.Source - and the only one
+            // that exists until a membership event does, which is why the inference is made here
+            // rather than left as a gap the carrier console falls into.
+            if (riderId != null && carrierId != null) {
+                presence.learnCarrier(riderId, carrierId);
+            }
 
             log.debug("Projection updated: order {} status {} rider {}", orderId, status, riderId);
 
@@ -85,6 +107,53 @@ public class OrderEventListener {
             if (correlationId != null) {
                 MDC.remove(CORRELATION_MDC_KEY);
             }
+        }
+    }
+
+    /**
+     * A UUID field, or null if it is absent, null or unparseable.
+     *
+     * <p>Unparseable is treated as absent rather than as a reason to reject the whole message. The
+     * carrier id is a nice-to-have on this projection; the customer and rider ids that authorise
+     * the tracking read path are not, and dropping an event because one optional field was
+     * malformed would blind the map to protect a console filter.
+     */
+    private static UUID uuidOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.asText());
+        } catch (IllegalArgumentException e) {
+            log.warn("Ignoring unparseable {} on an order event", field);
+            return null;
+        }
+    }
+
+    /**
+     * A coordinate pair, or null if the event does not carry one.
+     *
+     * <p>Order Manager does not publish these yet - it sends a postal address and no lat/lng - so
+     * today this is always null and the ETA endpoint says NO_DESTINATION. The projection is written
+     * to accept them now so that the day the contract lands, no consumer change is needed. The
+     * requested field names are pickupLat/pickupLng/dropoffLat/dropoffLng on the order snapshot.
+     *
+     * <p>Out-of-range values are dropped rather than stored. A message is untrusted input, and a
+     * transposed pair would otherwise be projected, pass the database CHECK on each column
+     * individually, and produce an ETA to the wrong hemisphere with no error anywhere.
+     */
+    private static GeoPoint pointOrNull(JsonNode node, String latField, String lngField) {
+        JsonNode lat = node.path(latField);
+        JsonNode lng = node.path(lngField);
+        if (!lat.isNumber() || !lng.isNumber()) {
+            return null;
+        }
+        try {
+            return GeoPoint.of(lat.asDouble(), lng.asDouble()).orElse(null);
+        } catch (IllegalArgumentException e) {
+            log.warn("Ignoring out-of-range {}/{} on an order event", latField, lngField);
+            return null;
         }
     }
 

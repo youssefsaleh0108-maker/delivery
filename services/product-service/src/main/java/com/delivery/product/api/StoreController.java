@@ -32,6 +32,8 @@ import com.delivery.product.api.dto.CatalogDtos.PageResponse;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
+import com.delivery.product.api.dto.GeoDtos.LocationRequest;
+import com.delivery.product.api.dto.GeoDtos.NearbyStoreResponse;
 import com.delivery.product.api.dto.StoreDtos.AisleResponse;
 import com.delivery.product.api.dto.StoreDtos.BusyRequest;
 import com.delivery.product.api.dto.StoreDtos.CommercialsRequest;
@@ -44,6 +46,7 @@ import com.delivery.product.api.dto.StoreDtos.ReviewResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreCardResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
+import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreOffer;
@@ -65,6 +68,35 @@ import com.delivery.product.service.StoreService.StoreView;
 @RestController
 @RequestMapping("/api/stores")
 public class StoreController {
+
+    /**
+     * The furthest "near me" will look: 50 km.
+     *
+     * <p>Not a performance number. Past this a proximity search has stopped being one — nobody is
+     * choosing a restaurant fifty kilometres away on the strength of it being nearby — and an
+     * uncapped radius would turn this endpoint into a way to page the entire store table sorted by
+     * distance from an arbitrary point.
+     */
+    static final int MAX_NEARBY_RADIUS_METRES = 50_000;
+
+    /**
+     * The tightest circle worth asking for: 50 m.
+     *
+     * <p>A floor rather than an assertion about anything. Below this the radius is smaller than the
+     * error in a hand-dropped pin, so a zero or negative value is a client bug rather than a
+     * meaningful request, and answering it with an empty list forever would be an unhelpful way to
+     * say so.
+     */
+    static final int MIN_NEARBY_RADIUS_METRES = 50;
+
+    /**
+     * The ceiling on rows read from the database for one nearby search.
+     *
+     * <p>The radius alone is not a bound: in a dense city a 50 km circle is every shop on the
+     * platform. This caps what a single request can pull into memory to sort, and a caller who hits
+     * it gets the nearest 500 — which is the right subset to lose the rest from.
+     */
+    static final int MAX_NEARBY_CANDIDATES = 500;
 
     private final StoreService storeService;
     private final CatalogService catalog;
@@ -107,6 +139,59 @@ public class StoreController {
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
 
         return PageResponse.of(page.map(v -> toCard(v, starred, offersByStore)));
+    }
+
+    /**
+     * Live shops near a point, nearest first.
+     *
+     * <p>Open to any authenticated caller, exactly like {@link #browse} — a customer with no role
+     * still needs to find the shops around them, and this returns nothing browsing does not already
+     * return.
+     *
+     * <p>Deliberately not open to an unauthenticated one, though. A point is where somebody is
+     * standing, and an endpoint that answers this to anyone is a free proximity oracle over the
+     * whole store network; no signed-out client needs one.
+     *
+     * <p>Shops with no pin do not appear, and that is not a gap to be filled in later with a guess.
+     * A merchant who has not placed themselves on a map has not told us where they are — and since
+     * delivery is still priced by area (V18), nothing else about them changes.
+     *
+     * @param radiusMetres clamped into range rather than refused, which is the opposite of how the
+     *                     coordinate is treated and deliberately so. A coordinate outside its range
+     *                     is meaningless and there is no sensible answer to give; a radius of a
+     *                     million metres is a client asking for "everything around here", and the
+     *                     widest circle this endpoint supports genuinely answers that. Nothing
+     *                     returned is untrue either way — every shop in the response really is
+     *                     within the radius it was measured against.
+     */
+    @GetMapping("/nearby")
+    public PageResponse<NearbyStoreResponse> nearby(
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude,
+            @RequestParam(defaultValue = "5000") int radiusMetres,
+            @PageableDefault(size = 20) Pageable pageable) {
+
+        // Built here rather than passed on as two loose numbers, so an out-of-range or (0, 0)
+        // coordinate is refused before it reaches the database — with the same message a merchant
+        // saving a pin would get.
+        GeoPoint centre = new GeoPoint(latitude, longitude);
+
+        int radius = Math.min(Math.max(radiusMetres, MIN_NEARBY_RADIUS_METRES),
+                MAX_NEARBY_RADIUS_METRES);
+
+        Page<StoreService.NearbyStoreView> page =
+                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, pageable);
+
+        Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
+        Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
+
+        return PageResponse.of(page.map(near -> new NearbyStoreResponse(
+                toCard(near.store(), starred, offersByStore),
+                near.store().store().getLatitude(),
+                near.store().store().getLongitude(),
+                // Whole metres. The pin this is measured from was dropped by hand on a map, so a
+                // decimal place would be precision the number does not have.
+                Math.round(near.distanceMetres()))));
     }
 
     /**
@@ -225,6 +310,33 @@ public class StoreController {
     @PreAuthorize("hasRole('MERCHANT')")
     public StoreResponse update(@PathVariable UUID id, @Valid @RequestBody StoreRequest request) {
         return toResponse(storeService.update(id, CurrentUser.requireId(), request), Set.of());
+    }
+
+    /**
+     * Drops or moves the shop's map pin.
+     *
+     * <p>Separate from {@link #update} on purpose, and the reason is a failure mode rather than
+     * tidiness: the profile form is saved every time a merchant edits their tagline, so a nullable
+     * coordinate pair on {@code StoreRequest} would silently clear the pin on every save made by a
+     * client that does not know the fields exist — which is every client today. Moving a shop is its
+     * own decision and gets its own call.
+     *
+     * <p>MERCHANT, and the service then checks this merchant owns this store. Role alone would let
+     * any merchant move any shop on the map.
+     */
+    @PutMapping("/{id}/location")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public StoreResponse setLocation(@PathVariable UUID id,
+                                     @Valid @RequestBody LocationRequest request) {
+        GeoPoint location = new GeoPoint(request.latitude(), request.longitude());
+        return toResponse(storeService.pin(id, CurrentUser.requireId(), location), Set.of());
+    }
+
+    /** Takes the shop off the map. The address text is kept — only the pin goes. */
+    @DeleteMapping("/{id}/location")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public StoreResponse clearLocation(@PathVariable UUID id) {
+        return toResponse(storeService.unpin(id, CurrentUser.requireId()), Set.of());
     }
 
     @PutMapping("/{id}/commercials")
@@ -434,6 +546,8 @@ public class StoreController {
                 images.resolveUrl(store.getLogoRef()),
                 images.resolveUrl(store.getCoverRef()),
                 store.getAddress(),
+                store.getLatitude(),
+                store.getLongitude(),
                 starred.contains(store.getId()),
                 storeService.liveOffersFor(store.getId()).stream()
                         .map(StoreController::toOffer).toList(),

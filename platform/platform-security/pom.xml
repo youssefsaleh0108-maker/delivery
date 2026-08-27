@@ -8,7 +8,7 @@
        so it can move to its own repository without any further change. -->
   <groupId>com.delivery</groupId>
   <artifactId>platform-security</artifactId>
-  <version>0.1.1</version>
+  <version>0.1.2</version>
   <packaging>jar</packaging>
   <name>Platform :: Security</name>
   <description>Keycloak JWT -&gt; Spring Security authorities, for both servlet and reactive services (Section 3)</description>

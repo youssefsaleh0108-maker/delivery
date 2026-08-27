@@ -79,6 +79,52 @@ delivery:
     # single dropped ping does not push every watcher through to Postgres.
     location-cache-ttl: 60s
 
+    presence:
+      # How long after the last fix a rider still counts as present. Past this they read as STALE,
+      # not ON_DUTY: a phone that died cannot tell us it died, so silence has to be what changes the
+      # answer. Two minutes is many missed pings — comfortably past a tunnel or a lift, well short
+      # of a flat battery going unnoticed.
+      ttl: 120s
+      # How often a rider's last-known fix is written through to Postgres. The Redis snapshot is
+      # updated on every ping regardless; this only throttles the durable copy, which nothing needs
+      # accurate to the second. See RiderPresenceRepository#touchIfDue for the trade.
+      persist-interval: 30s
+
+    eta:
+      # Beyond this the last fix is too old to measure a remaining distance from, and the ETA
+      # reports STALE_FIX rather than a number. Generous next to the seconds between pings, because
+      # a customer would rather see a slightly aged estimate than have it blink out under a bridge.
+      max-fix-age: 5m
+
+    routing:
+      # Which provider computes ETAs. HAVERSINE_DEV is the dev implementation: a straight line at
+      # the average speed below, with no idea that roads exist. It is the default because the
+      # alternatives need an account nobody has bought yet, and because it is honest about itself —
+      # its name is returned on every ETA response so no screen can mistake it for a routed answer.
+      #
+      # Set to OSRM once a routing host exists, or MAPBOX once a token is in Vault. Neither will
+      # engage without its configuration below; the service logs loudly and stays on the dev
+      # provider rather than silently answering nothing.
+      provider: ${TRACKING_ROUTING_PROVIDER:HAVERSINE_DEV}
+      # Effective door-to-door speed for the dev provider, including junctions and handovers — not
+      # a vehicle's top speed. The one number here worth tuning against observed delivery times.
+      average-speed-kmh: 18
+      osrm:
+        # Deliberately empty. The public demo server is rate-limited, carries no availability
+        # guarantee, and would ship every customer's address to a volunteer's box; a self-hosted
+        # OSRM from an OSM extract is the intended shape. No default that half-works.
+        base-url: ${OSRM_BASE_URL:}
+        profile: driving
+      mapbox:
+        base-url: https://api.mapbox.com
+        # access-token comes from Vault at secret/order-tracking, never from here. Mapbox
+        # authenticates by query parameter, so nothing in MapboxRouteProvider ever logs a URI.
+        profile: mapbox/driving-traffic
+
+    # Shift boundaries are kept far longer than raw GPS: payroll and late disputes ask about them
+    # months later, and the table is a few rows per rider per day rather than millions.
+    duty-event-retention-days: 400
+
 management:
   endpoints:
     web:

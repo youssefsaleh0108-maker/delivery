@@ -59,6 +59,16 @@ public final class StoreDtos {
             String logoUrl,
             String coverUrl,
             String address,
+            /**
+             * The map pin, or null when the merchant has not dropped one.
+             *
+             * <p>Both null together or both set together — the store enforces that, and V20's CHECK
+             * constraints stand behind it — so a client can test either one and trust the other.
+             * Null is the normal state for a shop that trades by delivery area alone; it means "no
+             * map for this one", not "an error occurred".
+             */
+            BigDecimal latitude,
+            BigDecimal longitude,
             boolean favorite,
             List<OfferResponse> offers,
             Store.Status status,

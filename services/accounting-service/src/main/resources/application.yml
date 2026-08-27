@@ -75,6 +75,33 @@ delivery:
     # parameter an engineer changes through a commit, not a Backoffice screen (Section 6).
     commission-percentage: 12.5
 
+  rider-earnings:
+    # What one of the PLATFORM'S OWN riders keeps of a delivery fee, as a percentage of it.
+    #
+    # DELIBERATELY BLANK. Nobody has told this codebase what the platform pays its own riders, and
+    # picking a plausible number here would be the platform quietly setting its own riders' pay in
+    # a config file. Blank means "pay them exactly what an outside carrier would have been paid for
+    # the same job" — the fee less delivery-commission-percentage below — which mirrors the one
+    # split the platform HAS decided instead of inventing a second one. Set it to a number once
+    # somebody knows the real figure.
+    platform-fleet-fee-share-percentage:
+    # Below this a cash-out is refused: nothing pays automatically, so a queue of small requests
+    # costs more operator time than the requests are worth.
+    minimum-cash-out: 5.00
+    # The fat-finger guard on a tip typed into a phone, not a policy about generosity.
+    maximum-tip: 100.00
+    # Cash the rider is still carrying reduces what they can take out. Turning this off means the
+    # platform will hand a rider money while they are holding more of the platform's.
+    offset-cash-float: true
+    # "Today" is a local-calendar question. The API takes a zone per request; this is the fallback.
+    zone: UTC
+
+  rider-payout:
+    # Which provider actually moves the money. MANUAL is the only one that exists: an operator pays
+    # outside this system and records the reference. Naming a provider that is not on the classpath
+    # fails startup rather than silently falling back — see RiderPayoutProviders.
+    provider: MANUAL
+
   accounting:
     order-events-queue: accounting.order-events
     results-queue: accounting.posting-results

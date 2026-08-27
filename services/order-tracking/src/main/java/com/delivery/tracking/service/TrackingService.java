@@ -37,17 +37,20 @@ public class TrackingService {
 
     private final TrackingEventRepository events;
     private final OrderParticipantsRepository participants;
+    private final PresenceService presence;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final Duration cacheTtl;
 
     public TrackingService(TrackingEventRepository events,
                            OrderParticipantsRepository participants,
+                           PresenceService presence,
                            StringRedisTemplate redis,
                            ObjectMapper objectMapper,
                            @Value("${delivery.tracking.location-cache-ttl:60s}") Duration cacheTtl) {
         this.events = events;
         this.participants = participants;
+        this.presence = presence;
         this.redis = redis;
         this.objectMapper = objectMapper;
         this.cacheTtl = cacheTtl;
@@ -70,6 +73,12 @@ public class TrackingService {
         }
 
         events.save(new TrackingEvent(orderId, riderId, lat, lng, accuracyM));
+
+        // A ping on an order is evidence that this rider's phone is alive, so it counts as presence
+        // too. Without this a rider would drop off the on-duty roster the moment they picked
+        // something up — the roster would show only the riders with nothing to do, which is exactly
+        // backwards for a dispatcher watching a fleet.
+        presence.recordFix(riderId, lat, lng, accuracyM);
 
         Position position = new Position(orderId, riderId, lat, lng, accuracyM, Instant.now());
         cache(position);

@@ -6,8 +6,12 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
+import com.delivery.notifications.link.NotificationLinkTarget;
 
 /**
  * A message body per event type, channel and locale.
@@ -36,6 +40,19 @@ public class NotificationTemplate {
 
     @Column(name = "body_template", nullable = false, columnDefinition = "text")
     private String bodyTemplate;
+
+    /**
+     * What kind of screen this message is about, or null to derive it from the notification.
+     *
+     * <p>Null is the ordinary case. An order notification points at its order, and the order id is
+     * already on the log row — so recording ORDER on every order template as well would be storing
+     * a fact the platform already holds, in a second place that can contradict it. This column is
+     * for the messages the derivation cannot know about: a chat message points at a conversation
+     * and an earnings notice at a statement, neither of which is the order that triggered it.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "link_target", length = 32)
+    private NotificationLinkTarget linkTarget;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
@@ -83,5 +100,10 @@ public class NotificationTemplate {
 
     public String getLocale() {
         return locale;
+    }
+
+    /** Null when the link should be derived from the notification rather than declared here. */
+    public NotificationLinkTarget getLinkTarget() {
+        return linkTarget;
     }
 }

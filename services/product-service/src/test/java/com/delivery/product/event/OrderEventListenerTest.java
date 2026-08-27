@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.MDC;
 
+import com.delivery.product.domain.DeliveredOrderLine;
+import com.delivery.product.domain.DeliveredOrderLineRepository;
 import com.delivery.product.domain.ReviewableOrder;
 import com.delivery.product.domain.ReviewableOrderRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,12 +39,14 @@ class OrderEventListenerTest {
     private static final UUID STORE = UUID.randomUUID();
 
     private ReviewableOrderRepository reviewableOrders;
+    private DeliveredOrderLineRepository deliveredLines;
     private OrderEventListener listener;
 
     @BeforeEach
     void setUp() {
         reviewableOrders = mock(ReviewableOrderRepository.class);
-        listener = new OrderEventListener(reviewableOrders, new ObjectMapper());
+        deliveredLines = mock(DeliveredOrderLineRepository.class);
+        listener = new OrderEventListener(reviewableOrders, deliveredLines, new ObjectMapper());
         MDC.clear();
     }
 
@@ -102,6 +106,131 @@ class OrderEventListenerTest {
             verify(reviewableOrders, org.mockito.Mockito.times(2)).save(captor.capture());
             assertThat(captor.getAllValues()).extracting(ReviewableOrder::getOrderId)
                     .containsExactly(ORDER, ORDER);
+        }
+    }
+
+    /**
+     * The basket, kept so the cross-sell rail has something real to count.
+     *
+     * <p>Everything asserted here exists to protect one property: a number this platform publishes
+     * as "people also ordered this" must be a count of baskets that were genuinely handed over.
+     */
+    @Nested
+    @DisplayName("the delivered basket")
+    class Basket {
+
+        private static String eventWithItems(String items) {
+            return """
+                    {"orderId":"%s","storeId":"%s","customerId":"customer-sub",
+                     "status":"DELIVERED","items":[%s]}
+                    """.formatted(ORDER, STORE, items);
+        }
+
+        private static String line(UUID productId, int qty) {
+            return """
+                    {"productId":"%s","productName":"Something","unitPrice":9.50,"qty":%d}
+                    """.formatted(productId, qty);
+        }
+
+        private java.util.List<DeliveredOrderLine> savedLines() {
+            ArgumentCaptor<DeliveredOrderLine> captor =
+                    ArgumentCaptor.forClass(DeliveredOrderLine.class);
+            verify(deliveredLines, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+            return captor.getAllValues();
+        }
+
+        @Test
+        void keeps_every_line_of_a_delivered_order() {
+            UUID hummus = UUID.randomUUID();
+            UUID bread = UUID.randomUUID();
+
+            deliver(eventWithItems(line(hummus, 1) + "," + line(bread, 2)));
+
+            assertThat(savedLines()).extracting(DeliveredOrderLine::getProductId)
+                    .containsExactlyInAnyOrder(hummus, bread);
+        }
+
+        /** The shop is denormalised onto the line so cross-sell can be scoped without a join. */
+        @Test
+        void records_which_shop_the_basket_came_from() {
+            deliver(eventWithItems(line(UUID.randomUUID(), 1)));
+
+            assertThat(savedLines()).allSatisfy(
+                    saved -> assertThat(saved.getStoreId()).isEqualTo(STORE));
+        }
+
+        /**
+         * The whole reason the row is keyed on the order rather than given a surrogate id. Double
+         * counting a basket would inflate a number this service publishes as evidence.
+         */
+        @Test
+        void is_written_under_the_order_id_so_a_redelivery_cannot_count_it_twice() {
+            UUID hummus = UUID.randomUUID();
+
+            deliver(eventWithItems(line(hummus, 1)));
+            deliver(eventWithItems(line(hummus, 1)));
+
+            assertThat(savedLines()).allSatisfy(saved -> {
+                assertThat(saved.getOrderId()).isEqualTo(ORDER);
+                assertThat(saved.getProductId()).isEqualTo(hummus);
+            });
+        }
+
+        /**
+         * An errand's "items" are free text a customer typed, not catalog rows. The part of a basket
+         * that is catalogued is still worth counting.
+         */
+        @Test
+        void skips_a_line_with_no_catalog_product_without_losing_the_rest() {
+            UUID real = UUID.randomUUID();
+
+            deliver(eventWithItems(
+                    "{\"productName\":\"whatever the shop has\",\"qty\":1},"
+                            + line(real, 1)));
+
+            assertThat(savedLines()).extracting(DeliveredOrderLine::getProductId)
+                    .containsExactly(real);
+        }
+
+        @Test
+        void skips_a_line_whose_product_id_is_not_a_uuid_without_losing_the_rest() {
+            UUID real = UUID.randomUUID();
+
+            deliver(eventWithItems(
+                    "{\"productId\":\"not-a-uuid\",\"qty\":1}," + line(real, 1)));
+
+            assertThat(savedLines()).extracting(DeliveredOrderLine::getProductId)
+                    .containsExactly(real);
+        }
+
+        /**
+         * The column is NOT NULL with CHECK (qty > 0), and the rail counts baskets rather than
+         * units — so losing a whole line over a field nothing reads would be the wrong trade.
+         */
+        @Test
+        void normalises_a_missing_or_nonsensical_quantity_rather_than_dropping_the_line() {
+            UUID product = UUID.randomUUID();
+
+            deliver(eventWithItems("{\"productId\":\"" + product + "\",\"qty\":0}"));
+
+            assertThat(savedLines()).singleElement()
+                    .satisfies(saved -> assertThat(saved.getQty()).isEqualTo(1));
+        }
+
+        /** A basket that was never handed over is not evidence that two things go together. */
+        @Test
+        void a_cancelled_order_contributes_nothing() {
+            listener.onOrderEvent(eventWithItems(line(UUID.randomUUID(), 1)),
+                    "order.cancelled", "order.cancelled", "corr-1");
+
+            verify(deliveredLines, never()).save(any());
+        }
+
+        @Test
+        void an_order_with_no_items_is_not_an_error() {
+            assertThatCode(() -> deliver(eventWithItems(""))).doesNotThrowAnyException();
+
+            verify(deliveredLines, never()).save(any());
         }
     }
 

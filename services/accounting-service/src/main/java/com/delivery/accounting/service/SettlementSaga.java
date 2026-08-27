@@ -168,6 +168,28 @@ public class SettlementSaga {
             return;
         }
 
+        // A rider's share of the delivery fee on an order that ALSO pays a merchant.
+        //
+        // Not the payee failing, and treated like the commission case rather than the merchant one.
+        // Because the legs are sequenced, reaching here means the customer was debited and the shop
+        // was paid: the order succeeded for both of them. Refunding the customer now would claw
+        // back money from an order that worked, leaving the merchant paid out of nothing — to fix a
+        // shortfall owed to the platform's own rider, who is the one party it can pay next week.
+        // The rider is not left to chance: the leg sits FAILED in the reconciliation view, and it
+        // is the platform's own debt to settle.
+        //
+        // An ERRAND is the opposite case and falls through to the refund below, because there the
+        // rider IS the payee — no merchant leg exists — and the platform really is holding money it
+        // cannot pass on.
+        boolean supplementaryRiderCredit = failed.getLeg() == Leg.RIDER_CREDIT
+                && all.stream().anyMatch(t -> t.getLeg() == Leg.MERCHANT_CREDIT);
+        if (supplementaryRiderCredit) {
+            log.error("Rider not paid for order {}: {}. Customer and merchant are settled "
+                    + "correctly; this is the platform's own debt to its rider to re-post.",
+                    failed.getOrderId(), failed.getFailureReason());
+            return;
+        }
+
         // The payee credit failed after the debit posted — the merchant on a basket, the rider on
         // an errand. Either way the platform is holding money it cannot pass on, so refund the
         // customer for whatever was actually collected.
