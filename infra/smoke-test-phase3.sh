@@ -197,10 +197,24 @@ ORDER=$(curl -s -X POST "$GW/api/orders" -H "Authorization: Bearer $CUSTOMER" \
 check 'order placed'                     'yes' "$([ -n "$ORDER" ] && [ "$ORDER" != null ] && echo yes || echo no)"
 
 LOG_URL="$GW/api/notification-log/orders/$ORDER"
-wait_for 45 "[ \"\$(curl -s '$LOG_URL' -H 'Authorization: Bearer $BACKOFFICE' | jq 'length')\" -ge 5 ]" || true
+
+# Whether the merchant's seeded placeholder token is suppressed, which decides whether a push row
+# for this order SHOULD exist. See smoke-test-push.sh for the full reasoning: a suppressed address
+# is the platform deciding not to send, and asserting a row against that fails correct behaviour.
+SUPPRESSED_SEED=$(PGPASSWORD="${POSTGRES_PASSWORD:-}" psql -h postgres -U delivery -d delivery -At \
+  -c "select count(*) from notification.suppressed_address where channel = 'PUSH' and address like 'dev-fcm-token-%';" 2>/dev/null || echo 0)
+ACTIVE_PUSH=$(curl -s "$PUSH_CONNECTOR/api/connector/status" | jq -r '.activeProvider')
+if [ "$ACTIVE_PUSH" = "FIREBASE" ] && [ "${SUPPRESSED_SEED:-0}" -gt 0 ]; then
+  EXPECT_PUSH=0
+else
+  EXPECT_PUSH=1
+fi
+# Four rows always (customer email+in-app, merchant email+in-app); the merchant push is the fifth.
+EXPECT_ROWS=$(( 4 + EXPECT_PUSH ))
+wait_for 45 "[ \"\$(curl -s '$LOG_URL' -H 'Authorization: Bearer $BACKOFFICE' | jq 'length')\" -ge $EXPECT_ROWS ]" || true
 LOG=$(curl -s "$LOG_URL" -H "Authorization: Bearer $BACKOFFICE")
 
-check 'notifications were logged'        'yes' "$(echo "$LOG" | jq 'length >= 5' | sed 's/true/yes/;s/false/no/')"
+check 'notifications were logged'        'yes' "$(echo "$LOG" | jq --argjson n "$EXPECT_ROWS" 'length >= $n' | sed 's/true/yes/;s/false/no/')"
 # Which channels fire is a data question - these rows exist because template rows exist, not
 # because the manager has an if-statement per channel.
 check 'customer got an in-app message'   'yes' \
@@ -212,7 +226,7 @@ check 'merchant got its own in-app copy' 'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.eventType=="order.placed.merchant" and .channel=="IN_APP")]|length>0' | sed 's/true/yes/;s/false/no/')"
 check 'merchant got its own email'       'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.eventType=="order.placed.merchant" and .channel=="EMAIL")]|length>0' | sed 's/true/yes/;s/false/no/')"
-check 'merchant got a push'              'yes' \
+check 'merchant got a push'              "$([ "$EXPECT_PUSH" = 1 ] && echo yes || echo no)" \
   "$(echo "$LOG" | jq '[.[]|select(.eventType=="order.placed.merchant" and .channel=="PUSH")]|length>0' | sed 's/true/yes/;s/false/no/')"
 # The customer is not pushed about placing their own order - they are looking at the screen.
 check 'no customer push on order.placed' '0' \
@@ -248,7 +262,7 @@ fi
 
 check 'email records the provider used'  'SMTP' \
   "$(echo "$LOG" | jq -r '[.[]|select(.channel=="EMAIL")][0].provider')"
-check 'push records the provider used'   "$PUSH_PROVIDER" \
+check 'push records the provider used'   "$([ "$EXPECT_PUSH" = 1 ] && echo "$PUSH_PROVIDER" || echo null)" \
   "$(echo "$LOG" | jq -r '[.[]|select(.channel=="PUSH")][0].provider')"
 check 'a provider message id came back'  'yes' \
   "$(echo "$LOG" | jq '[.[]|select(.channel=="EMAIL")][0].status=="SENT"' | sed 's/true/yes/;s/false/no/')"

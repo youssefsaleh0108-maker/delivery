@@ -98,6 +98,27 @@ if [ "$PROVIDER" != "FIREBASE" ]; then
   echo '        at secret/push-connector to address real devices.'
 fi
 
+# Whether the seeded placeholder tokens have been SUPPRESSED, which flips what "correct" means.
+#
+# Under Firebase the seeded dev-fcm-token-* strings are rejected as malformed, and since address
+# suppression landed, one rejection is enough: the dispatcher stops addressing that token, and the
+# CORRECT outcome for every later event is NO push row at all — a suppressed address is a decision
+# not to send, not a failure to. Asserting "one row per template" against that state would fail the
+# platform for doing exactly what suppression exists to do. So each per-template check expects
+# EXPECT_PUSH rows: 1 while the seeded tokens are live, 0 once they are suppressed. A real device
+# token from a signed-in phone is never a placeholder and never lands in the 0 branch.
+export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+SUPPRESSED_SEED=$(psql -h postgres -U delivery -d delivery -At \
+  -c "select count(*) from notification.suppressed_address where channel = 'PUSH' and address like 'dev-fcm-token-%';" 2>/dev/null || echo 0)
+if [ "$PROVIDER" = "FIREBASE" ] && [ "${SUPPRESSED_SEED:-0}" -gt 0 ]; then
+  EXPECT_PUSH=0
+  echo "        $SUPPRESSED_SEED seeded placeholder token(s) are suppressed: the correct outcome"
+  echo '        below is NO push row per event, and that is what is asserted. Sign an account in'
+  echo '        on a real phone to see rows reach SENT.'
+else
+  EXPECT_PUSH=1
+fi
+
 echo
 echo '=== 2. One order, start to finish ==============================================='
 
@@ -117,8 +138,8 @@ ORDER=$(curl -s -X POST "$GW/api/orders" -H "Authorization: Bearer $CUSTOMER" \
 check 'order placed' 'yes' "$([ "$ORDER" != null ] && echo yes || echo no)"
 
 # The merchant is told there is work. The only push that fires with no rider involved.
-wait_for 45 "[ \"\$(pushes_for $ORDER order.placed.merchant)\" -ge 1 ]" || true
-check 'merchant pushed: new order' '1' "$(pushes_for "$ORDER" order.placed.merchant)"
+wait_for $(( 45 * EXPECT_PUSH + 1 )) "[ \"\$(pushes_for $ORDER order.placed.merchant)\" -ge 1 ]" || true
+check 'merchant pushed: new order' "$EXPECT_PUSH" "$(pushes_for "$ORDER" order.placed.merchant)"
 
 check 'merchant accepts'   '200' "$(status POST "/api/orders/$ORDER/accept" "$MERCHANT")"
 check 'merchant prepares'  '200' "$(status POST "/api/orders/$ORDER/prepare" "$MERCHANT")"
@@ -126,16 +147,16 @@ check 'merchant marks ready' '200' "$(status POST "/api/orders/$ORDER/ready" "$M
 check 'rider claims it'    '200' "$(status POST "/api/orders/$ORDER/claim" "$RIDER")"
 
 # One event, two audiences: the customer is told who is coming, the rider what they took on.
-wait_for 45 "[ \"\$(pushes_for $ORDER order.rider_assigned)\" -ge 1 ]" || true
-check 'customer pushed: rider assigned' '1' "$(pushes_for "$ORDER" order.rider_assigned)"
-wait_for 30 "[ \"\$(pushes_for $ORDER order.rider_assigned.rider)\" -ge 1 ]" || true
-check 'rider pushed: you took this one' '1' "$(pushes_for "$ORDER" order.rider_assigned.rider)"
+wait_for $(( 45 * EXPECT_PUSH + 1 )) "[ \"\$(pushes_for $ORDER order.rider_assigned)\" -ge 1 ]" || true
+check 'customer pushed: rider assigned' "$EXPECT_PUSH" "$(pushes_for "$ORDER" order.rider_assigned)"
+wait_for $(( 30 * EXPECT_PUSH + 1 )) "[ \"\$(pushes_for $ORDER order.rider_assigned.rider)\" -ge 1 ]" || true
+check 'rider pushed: you took this one' "$EXPECT_PUSH" "$(pushes_for "$ORDER" order.rider_assigned.rider)"
 
 check 'rider picks up' '200' "$(status POST "/api/orders/$ORDER/pick-up" "$RIDER")"
 check 'rider delivers' '200' "$(status POST "/api/orders/$ORDER/deliver" "$RIDER")"
 
-wait_for 45 "[ \"\$(pushes_for $ORDER order.delivered)\" -ge 1 ]" || true
-check 'customer pushed: delivered' '1' "$(pushes_for "$ORDER" order.delivered)"
+wait_for $(( 45 * EXPECT_PUSH + 1 )) "[ \"\$(pushes_for $ORDER order.delivered)\" -ge 1 ]" || true
+check 'customer pushed: delivered' "$EXPECT_PUSH" "$(pushes_for "$ORDER" order.delivered)"
 
 echo
 echo '=== 3. The cancellation push ===================================================='
@@ -151,8 +172,8 @@ check 'second order placed' 'yes' "$([ "$ORDER2" != null ] && echo yes || echo n
 check 'customer cancels' '200' \
   "$(status POST "/api/orders/$ORDER2/cancel" "$CUSTOMER" '{"reason":"push suite"}')"
 
-wait_for 45 "[ \"\$(pushes_for $ORDER2 order.cancelled.merchant)\" -ge 1 ]" || true
-check 'merchant pushed: cancelled' '1' "$(pushes_for "$ORDER2" order.cancelled.merchant)"
+wait_for $(( 45 * EXPECT_PUSH + 1 )) "[ \"\$(pushes_for $ORDER2 order.cancelled.merchant)\" -ge 1 ]" || true
+check 'merchant pushed: cancelled' "$EXPECT_PUSH" "$(pushes_for "$ORDER2" order.cancelled.merchant)"
 
 echo
 echo '=== 4. Every push was accepted by the provider =================================='
@@ -161,7 +182,7 @@ MINE=$(printf '%s\n%s\n' "$(pushes_of "$ORDER")" "$(pushes_of "$ORDER2")" | jq -
 
 # Six, not five. The five templates fire once each, and order.placed.merchant fires twice —
 # once per order — because the second order is placed before it is cancelled.
-check 'six pushes across the two orders' '6' "$(echo "$MINE" | jq 'length')"
+check 'six pushes across the two orders' "$(( EXPECT_PUSH * 6 ))" "$(echo "$MINE" | jq 'length')"
 check 'none left PENDING'  '0' "$(echo "$MINE" | jq '[.[]|select(.status=="PENDING")]|length')"
 # Provider-aware, because "failed" means different things in the two modes.
 #
