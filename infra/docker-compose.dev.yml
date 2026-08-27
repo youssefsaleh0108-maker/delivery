@@ -468,6 +468,9 @@ services:
       KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
       # Presigned image URLs are signed for this host, so it must be reachable by the CLIENT.
       MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9010}
+      # Nominatim's usage policy requires a User-Agent identifying the application; the geocoder
+      # refuses to call at all while this is empty rather than borrow an identity. Set in .env.
+      NOMINATIM_USER_AGENT: ${NOMINATIM_USER_AGENT:-}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
