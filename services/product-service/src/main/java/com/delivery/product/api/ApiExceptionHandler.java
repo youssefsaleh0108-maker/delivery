@@ -102,6 +102,18 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "Geocoding unavailable", e.getMessage());
     }
 
+    /**
+     * A missing or unparseable query parameter is the caller's mistake, and telling them so is the
+     * whole fix. These were falling through to the catch-all 500 — noticed when a reverse-geocode
+     * call spelled the parameters {@code lat}/{@code lng} and got "Internal error" back, which
+     * reads as our fault and sends the caller debugging the wrong side of the wire.
+     */
+    @ExceptionHandler({org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    public ProblemDetail onBadParameter(Exception e) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad request", e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail onValidationFailure(MethodArgumentNotValidException e) {
         ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed",
