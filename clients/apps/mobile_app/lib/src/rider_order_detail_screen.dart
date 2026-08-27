@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'rider_chat_screen.dart';
 import 'rider_job_card.dart';
 
 /// Everything about one job, on one screen — Figma `rider-order-detail` (3:1344).
@@ -12,14 +15,19 @@ import 'rider_job_card.dart';
 /// a card in a scrolling list. This screen takes both: the card in the Active tab now only opens
 /// this, and the committing act happens here, once, with the whole order in front of you.
 ///
-/// It performs no API calls of its own. [onAction] is the *same* wiring the board already used —
-/// claim / pick-up / deliver go through the screen that owns the refresh timer and the error
-/// messages, and this screen pops when one lands.
+/// The committing acts perform no API calls of their own. [onAction] is the *same* wiring the
+/// board already used — claim / pick-up / deliver go through the screen that owns the refresh
+/// timer and the error messages, and this screen pops when one lands. What this screen *does*
+/// call for itself is read-only and new: the tracking API's ETA, refreshed on a slow timer, and
+/// the chat conversation behind the header's chat button.
 class RiderOrderDetailScreen extends StatefulWidget {
   const RiderOrderDetailScreen({
     super.key,
     required this.order,
     required this.onAction,
+    this.trackingApi,
+    this.chatApi,
+    this.socket,
   });
 
   final DeliveryOrder order;
@@ -27,12 +35,109 @@ class RiderOrderDetailScreen extends StatefulWidget {
   /// Completes when the action has been sent and the board refreshed.
   final Future<void> Function(OrderAction) onAction;
 
+  /// The ETA half of the tracking service. Null draws the route card exactly as before — no panel
+  /// at all, never a fabricated number.
+  final TrackingApi? trackingApi;
+
+  /// The order chat and its live socket. Null keeps the header without a chat button, which is
+  /// how it looked before the backend existed.
+  final ChatApi? chatApi;
+  final UserQueueSocket? socket;
+
   @override
   State<RiderOrderDetailScreen> createState() => _RiderOrderDetailScreenState();
 }
 
 class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
+  /// How often the ETA re-asks. Slower than the board's 5s on purpose: the estimate moves at the
+  /// speed of the 10s ping, and this screen holds one order, not a fleet.
+  static const Duration _etaInterval = Duration(seconds: 30);
+
   bool _busy = false;
+
+  /// The tracking API's last answer. Null until it has answered once — the panel renders nothing
+  /// rather than a spinner or an invented figure.
+  OrderEta? _eta;
+  Timer? _etaTimer;
+
+  /// The conversation behind the chat button, and its badge. Null while the server has not
+  /// answered, and null for good on an order with no conversation (one opens when a rider is
+  /// assigned; a 404 here is an order that never got that far or is not this rider's).
+  ChatConversation? _conversation;
+  int _unread = 0;
+  StreamSubscription<ChatFrame>? _chatLive;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.trackingApi != null && !widget.order.status.isTerminal) {
+      unawaited(_loadEta());
+      _etaTimer = Timer.periodic(_etaInterval, (_) => _loadEta());
+    }
+    if (widget.chatApi != null) {
+      unawaited(_loadConversation());
+      final UserQueueSocket? socket = widget.socket;
+      if (socket != null) {
+        // A message arriving while this screen is up bumps the badge live. The durable count is
+        // re-read whenever the conversation reloads.
+        _chatLive = ChatApi.live(socket).listen((ChatFrame frame) {
+          if (!mounted || frame.orderId != widget.order.id) return;
+          setState(() => _unread++);
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _etaTimer?.cancel();
+    _chatLive?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadEta() async {
+    final TrackingApi? tracking = widget.trackingApi;
+    if (tracking == null) return;
+    try {
+      final OrderEta eta = await tracking.eta(widget.order.id);
+      if (!mounted) return;
+      setState(() => _eta = eta);
+    } catch (_) {
+      // The panel keeps the last honest answer; the timer retries.
+    }
+  }
+
+  Future<void> _loadConversation() async {
+    final ChatApi? chat = widget.chatApi;
+    if (chat == null) return;
+    try {
+      final ChatConversation conversation =
+          await chat.conversationForOrder(widget.order.id);
+      if (!mounted) return;
+      setState(() {
+        _conversation = conversation;
+        _unread = conversation.unread;
+      });
+    } catch (_) {
+      // 404: no conversation on this order (yet). The button simply is not drawn.
+    }
+  }
+
+  Future<void> _openChat() async {
+    final ChatConversation? conversation = _conversation;
+    final ChatApi? chat = widget.chatApi;
+    if (conversation == null || chat == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RiderChatScreen(
+        api: chat,
+        socket: widget.socket,
+        conversation: conversation,
+        orderShortId: widget.order.shortId,
+      ),
+    ));
+    // The chat screen marked the thread read; re-ask rather than assume.
+    await _loadConversation();
+  }
 
   Future<void> _run(OrderAction action) async {
     setState(() => _busy = true);
@@ -155,9 +260,9 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
 
   /// The design's `back-header`: 20/12 padding, a chevron and a 16px bold title.
   ///
-  /// The circular chat button the design puts on the right is not drawn — there is no messaging
-  /// between rider and customer anywhere in the platform, and a button that opens nothing is worse
-  /// than a header with room in it.
+  /// The circular chat button the design puts on the right is real now — drawn once the order has
+  /// a conversation (the server opens one when a rider is assigned), with the unread count on its
+  /// shoulder. Until then the header keeps its room, exactly as it did before chat existed.
   Widget _header(BuildContext context, DeliveryStrings t, DeliveryOrder order) {
     return Container(
       width: double.infinity,
@@ -188,7 +293,68 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
               ),
             ),
           ),
+          if (_conversation != null) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.sm),
+            _chatButton(t),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// The header's circular chat button with its unread badge.
+  Widget _chatButton(DeliveryStrings t) {
+    return Semantics(
+      button: true,
+      label: t.riderChatTitle,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _openChat,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: DeliveryColors.brandSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.chat_bubble_outline_rounded,
+                    size: 18, color: DeliveryColors.brand),
+              ),
+              if (_unread > 0)
+                PositionedDirectional(
+                  top: 0,
+                  end: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: DeliveryColors.brand,
+                      borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+                    ),
+                    child: Text(
+                      '$_unread',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.white,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -276,8 +442,99 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
             name: order.deliveryAddress,
             detail: order.contactPhone,
           ),
+          if (_eta != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md),
+            const RiderHairline(),
+            const SizedBox(height: DeliverySpacing.md),
+            _etaPanel(t, _eta!),
+          ],
         ],
       ),
+    );
+  }
+
+  /// The ETA block at the foot of the route card: the tracking API's answer, rendered as far as
+  /// it goes and no further.
+  ///
+  /// Available: which leg, then distance and expected arrival, then who computed it — with the
+  /// straight-line caveat when the dev estimator did. Unavailable: the server's reason, in the
+  /// design's muted caption style, never a spinner and never a number the server did not send.
+  Widget _etaPanel(DeliveryStrings t, OrderEta eta) {
+    final List<Widget> lines = <Widget>[
+      Text(
+        t.riderEtaCaption.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: DeliveryColors.faint,
+          height: 1.3,
+        ),
+      ),
+      const SizedBox(height: DeliverySpacing.xs),
+    ];
+
+    if (!eta.available) {
+      lines.add(Text(
+        riderEtaReasonLabel(t, eta.reason ?? EtaUnavailableReason.unknown),
+        style: const TextStyle(
+          fontSize: 12,
+          color: DeliveryColors.muted,
+          height: 1.4,
+        ),
+      ));
+    } else {
+      final List<String> facts = <String>[
+        if (eta.remainingMetres != null)
+          t.riderEtaAway(riderDistanceLabel(t, eta.remainingMetres!)),
+        if (eta.estimatedArrival != null)
+          t.riderEtaArrivingAt(
+            MaterialLocalizations.of(context).formatTimeOfDay(
+              TimeOfDay.fromDateTime(eta.estimatedArrival!),
+              alwaysUse24HourFormat:
+                  MediaQuery.of(context).alwaysUse24HourFormat,
+            ),
+          ),
+      ];
+      if (eta.leg != null) {
+        lines.add(Text(
+          riderEtaLegLabel(t, eta.leg!),
+          style: const TextStyle(
+            fontSize: 12,
+            color: DeliveryColors.muted,
+            height: 1.4,
+          ),
+        ));
+      }
+      if (facts.isNotEmpty) {
+        lines.add(Text(
+          facts.join(' · '),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.3,
+          ),
+        ));
+      }
+      lines.add(const SizedBox(height: 2));
+      lines.add(Text(
+        // Which provider computed it — and, for the dev straight-line estimator, that the
+        // number knows nothing about roads.
+        eta.isStraightLine
+            ? '${t.riderEtaComputedBy(eta.provider)} — ${t.etaStraightLineNote}'
+            : t.riderEtaComputedBy(eta.provider),
+        style: const TextStyle(
+          fontSize: 11,
+          color: DeliveryColors.faint,
+          height: 1.4,
+        ),
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: lines,
     );
   }
 

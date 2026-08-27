@@ -13,6 +13,7 @@ import 'backoffice/dashboard_screen.dart';
 import 'backoffice/offers_screen.dart';
 import 'backoffice/onboarding_screen.dart';
 import 'backoffice/overview_screen.dart';
+import 'backoffice/promotions_screen.dart';
 import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
 import 'backoffice/riders_screen.dart';
@@ -49,6 +50,9 @@ class PortalApis {
     required this.banner,
     required this.offer,
     required this.onboarding,
+    required this.tracking,
+    required this.promo,
+    required this.documents,
   });
 
   final CatalogApi catalog;
@@ -63,6 +67,9 @@ class PortalApis {
   final BannerApi banner;
   final OfferApi offer;
   final OnboardingApi onboarding;
+  final TrackingApi tracking;
+  final PromoApi promo;
+  final DocumentsApi documents;
 }
 
 /// One destination in a rail.
@@ -247,16 +254,22 @@ class PortalArea {
         icon: Icons.description_outlined,
         selectedIcon: Icons.description,
         label: (DeliveryStrings t) => t.navApplicants,
-        build: (PortalApis a, _, __, ___) =>
-            ApplicantsScreen(api: a.onboarding, providerApi: a.provider),
+        build: (PortalApis a, _, __, ___) => ApplicantsScreen(
+          api: a.onboarding,
+          providerApi: a.provider,
+          documentsApi: a.documents,
+        ),
       ),
       // Last, per the design and for the same reason the Backoffice's is: the least-used page here.
       PortalDestination(
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings,
         label: (DeliveryStrings t) => t.navSettings,
-        build: (PortalApis a, LocaleController locale, _, __) =>
-            CarrierSettingsScreen(api: a.provider, locale: locale),
+        build: (PortalApis a, LocaleController locale, _, __) => CarrierSettingsScreen(
+          api: a.provider,
+          locale: locale,
+          documentsApi: a.documents,
+        ),
       ),
     ],
   );
@@ -315,7 +328,8 @@ class PortalArea {
         icon: Icons.how_to_reg_outlined,
         selectedIcon: Icons.how_to_reg,
         label: (DeliveryStrings t) => t.navOnboarding,
-        build: (PortalApis a, _, __, ___) => OnboardingScreen(api: a.onboarding),
+        build: (PortalApis a, _, __, ___) =>
+            OnboardingScreen(api: a.onboarding, documentsApi: a.documents),
       ),
       // Beside Finance: who carries orders is an operating question, and the money split that
       // follows from it is right next door.
@@ -334,7 +348,11 @@ class PortalArea {
         icon: Icons.person_outline,
         selectedIcon: Icons.person,
         label: (DeliveryStrings _) => 'Riders',
-        build: (PortalApis a, _, __, ___) => RidersScreen(api: a.provider),
+        build: (PortalApis a, _, __, ___) => RidersScreen(
+          api: a.provider,
+          trackingApi: a.tracking,
+          orderApi: a.order,
+        ),
       ),
       PortalDestination(
         icon: Icons.map_outlined,
@@ -354,6 +372,17 @@ class PortalArea {
         selectedIcon: Icons.redeem,
         label: (DeliveryStrings t) => t.navOffers,
         build: (PortalApis a, _, __, ___) => OffersScreen(api: a.offer),
+      ),
+      // Beside Offers, because the two are the same act — the platform giving money away — done
+      // through two mechanisms: a waiver the customer sees applied, and a code they type.
+      //
+      // An inline English label rather than a [DeliveryStrings] key — the console screens are
+      // English-only in this wave, matching the Riders entry above.
+      PortalDestination(
+        icon: Icons.sell_outlined,
+        selectedIcon: Icons.sell,
+        label: (DeliveryStrings _) => 'Promo Codes',
+        build: (PortalApis a, _, __, ___) => PromotionsScreen(api: a.promo),
       ),
       // Last, and deliberately so: the least-used and most consequential page here.
       PortalDestination(

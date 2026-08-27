@@ -5,8 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'application_documents_step.dart';
 import 'one_time_code.dart';
 import 'passcode_pad.dart';
+import 'payout_details_step.dart';
 
 /// Applying to sell or to deliver, from inside the app and before having an account.
 ///
@@ -93,6 +95,7 @@ class PartnerApplicationScreen extends StatefulWidget {
   const PartnerApplicationScreen({
     super.key,
     required this.api,
+    required this.documentsApi,
     required this.kind,
     required this.authService,
     required this.onSignedIn,
@@ -100,6 +103,12 @@ class PartnerApplicationScreen extends StatefulWidget {
   });
 
   final OnboardingApi api;
+
+  /// Where the collected documents and bank details go once the account exists. The server only
+  /// takes them from a signed-in applicant, so the wizard holds everything until after
+  /// [_PartnerApplicationScreenState._finishAccount] has produced a session.
+  final DocumentsApi documentsApi;
+
   final PartnerKind kind;
 
   /// Applying now ends in a session: the applicant chose a passcode on the first step and is
@@ -137,6 +146,13 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   // Merchant-only.
   _BusinessType? _businessType;
+  final TextEditingController _accountHolder = TextEditingController();
+  final TextEditingController _iban = TextEditingController();
+
+  /// Files picked on the documents step, held until the account exists — the server only takes a
+  /// document from a signed-in applicant, and there is no applicant until [_finishAccount].
+  final Map<ApplicantDocumentKind, PickedDocument> _pickedDocs =
+      <ApplicantDocumentKind, PickedDocument>{};
 
   late Future<List<HiringCompany>> _companies = widget.api.hiringCompanies();
 
@@ -166,12 +182,27 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// sign-in for one application — so a later failure must retry the sign-in alone.
   bool _accountCreated = false;
 
+  /// The session, from the moment sign-in succeeds. Kept rather than handed straight to
+  /// [PartnerApplicationScreen.onSignedIn] because the documents and bank details still have to
+  /// travel on it first — and because a failure in that last stretch needs a "carry on anyway"
+  /// that can still deliver the session.
+  AuthSession? _session;
+
+  /// Which late send failed after the account existed, in the applicant's language. Null when
+  /// nothing has failed. The application and account are safe by then — this only decides the
+  /// wording and whether the skip action shows.
+  String? _collateralError;
+
+  /// True once the bank details have been PUT, so a retry does not send them twice. (The PUT is
+  /// idempotent anyway; this is about not re-reporting a step that already succeeded.)
+  bool _payoutSent = false;
+
   bool get _isRider => widget.kind == PartnerKind.rider;
 
   List<TextEditingController> get _allControllers => <TextEditingController>[
         _name, _business, _email, _emailCode, _phone, _phoneCode, _notes,
         _passcode, _dateOfBirth, _nationalId, _vehicleModel, _plate,
-        _vehicleYear, _preferredArea,
+        _vehicleYear, _preferredArea, _accountHolder, _iban,
       ];
 
   @override
@@ -199,9 +230,19 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   /// Whether the current step has everything it needs.
   ///
-  /// Only the first step gates: the rest collect answers the server treats as optional, and a
-  /// wizard that refuses to advance over an optional field is a wizard nobody finishes.
+  /// Only the first step gates — plus the merchant's bank step, and only when something was
+  /// typed there: the rest collect answers the server treats as optional, and a wizard that
+  /// refuses to advance over an optional field is a wizard nobody finishes. The bank step is
+  /// different because a half-answer or an IBAN that fails its own check digits must not travel;
+  /// leaving both fields empty remains a deliberate skip.
   bool get _stepComplete {
+    if (!_isRider && _step == 2) {
+      return PayoutDetailsStep.complete(
+        DeliveryStrings.of(context),
+        accountHolder: _accountHolder.text,
+        iban: _iban.text,
+      );
+    }
     if (_step != 0) return true;
     final bool identity = _name.text.trim().isNotEmpty &&
         _email.text.trim().contains('@') &&
@@ -435,6 +476,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _collateralError = null;
     });
     try {
       if (!_accountCreated) {
@@ -444,9 +486,8 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         );
         _accountCreated = true;
       }
-      final AuthSession session = await widget.authService
+      _session ??= await widget.authService
           .signInWithPassword(_verifiedEmail!, _passcode.text);
-      widget.onSignedIn(session);
     } catch (e, stack) {
       // Without this the cause never leaves the device: the screen says one sentence, and a
       // Keycloak refusal and a network failure look identical in it.
@@ -454,15 +495,77 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       debugPrintStack(stackTrace: stack, label: 'applicant-sign-in');
       if (!mounted) return;
       setState(() {
+        _busy = false;
         // Two genuinely different situations, and telling them apart is the difference between
         // "try again" and "stop typing, you already have an account".
         _error = _accountCreated
             ? '${t.accountReadySignInInstead} ${_messageFrom(e)}'
             : '${t.couldNotCreateSignIn} ${_messageFrom(e)}';
       });
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      return;
     }
+
+    // Signed in: the shared Dio now carries the applicant's token, so the documents and bank
+    // details collected during the wizard can finally travel. Only what succeeds is forgotten;
+    // anything that fails stays queued for the retry.
+    final AuthSession session = _session!;
+    final String? failure = await _sendCollateral(t);
+    if (!mounted) return;
+    if (failure != null) {
+      setState(() {
+        _busy = false;
+        _collateralError = failure;
+        _error = failure;
+      });
+      return;
+    }
+    setState(() => _busy = false);
+    widget.onSignedIn(session);
+  }
+
+  /// Uploads the picked documents and PUTs the bank details, now that a token exists.
+  ///
+  /// Returns the sentence to show when something failed, or null when everything landed. Each
+  /// document that lands is removed from [_pickedDocs] and the payout marked sent, so a retry only
+  /// repeats what actually failed. A failure here never blocks the session — the pending screen
+  /// can upload and correct all of it — which is why the caller also offers a skip.
+  Future<String?> _sendCollateral(DeliveryStrings t) async {
+    bool documentFailed = false;
+    for (final MapEntry<ApplicantDocumentKind, PickedDocument> entry
+        in List<MapEntry<ApplicantDocumentKind, PickedDocument>>.of(
+            _pickedDocs.entries)) {
+      try {
+        await widget.documentsApi.upload(
+          kind: entry.key,
+          bytes: entry.value.bytes,
+          contentType: entry.value.contentType,
+        );
+        _pickedDocs.remove(entry.key);
+      } catch (e, stack) {
+        debugPrint('APPLICANT DOCUMENT UPLOAD FAILED (${entry.key.wire}): $e');
+        debugPrintStack(stackTrace: stack, label: 'applicant-document');
+        documentFailed = true;
+      }
+    }
+    if (documentFailed) return t.wizCouldNotSendDocuments;
+
+    final bool hasPayout = _accountHolder.text.trim().isNotEmpty &&
+        _iban.text.trim().isNotEmpty;
+    if (hasPayout && !_payoutSent) {
+      try {
+        // As typed, spaces and all — the server normalises and runs its own mod-97 check.
+        await widget.documentsApi.setMyPayout(
+          accountHolder: _accountHolder.text.trim(),
+          iban: _iban.text.trim(),
+        );
+        _payoutSent = true;
+      } catch (e, stack) {
+        debugPrint('APPLICANT PAYOUT SAVE FAILED: $e');
+        debugPrintStack(stackTrace: stack, label: 'applicant-payout');
+        return t.wizCouldNotSendPayout;
+      }
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------- the screen
@@ -526,7 +629,9 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                           ..._verificationBody(t),
                         ] else
                           ..._finishingBody(t),
-                        if (_error != null) ...<Widget>[
+                        // Suppressed when it would repeat the finishing body's own sentence —
+                        // a collateral failure is already fully described up there.
+                        if (_error != null && _error != _collateralError) ...<Widget>[
                           const SizedBox(height: DeliverySpacing.md),
                           AuthErrorNote(message: _error!),
                         ],
@@ -594,17 +699,34 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         );
       case _Phase.finishing:
         // Only reachable after a failure — success leaves this screen entirely.
-        return _error == null
-            ? const SizedBox.shrink()
-            : AuthPrimaryButton(
-                label: t.tryAgain,
-                busy: _busy,
-                onPressed: _busy
-                    ? null
-                    : _reference == null
-                        ? _send
-                        : _finishAccount,
-              );
+        if (_error == null) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            AuthPrimaryButton(
+              label: t.tryAgain,
+              busy: _busy,
+              onPressed: _busy
+                  ? null
+                  : _reference == null
+                      ? _send
+                      : _finishAccount,
+            ),
+            // Only when the failure is a document or the bank details: the application and the
+            // account are already in, the pending screen can send both again, so nobody is held
+            // hostage here by a flaky upload.
+            if (_collateralError != null && _session != null) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.sm),
+              Center(
+                child: TextButton(
+                  onPressed:
+                      _busy ? null : () => widget.onSignedIn(_session!),
+                  child: Text(t.skipThis),
+                ),
+              ),
+            ],
+          ],
+        );
     }
   }
 
@@ -1029,19 +1151,19 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         SoftNote(text: t.guestApplicationExplainer, icon: Icons.person_outline),
       ];
 
-  // ---------------------------------------------------------------- steps with no backend yet
+  // ---------------------------------------------------------------- documents and bank
 
   List<Widget> _documentsStep(DeliveryStrings t) => <Widget>[
-        YdCard.bordered(
-          child: YdEmptyState(
-            icon: Icons.upload_file_outlined,
-            title: t.authDocumentsComingSoonTitle,
-            message: t.authDocumentsComingSoonBlurb,
-            action: YdComingSoon(label: t.authComingSoon, icon: Icons.schedule),
-          ),
+        ApplicationDocumentsStep(
+          kinds: expectedDocumentKinds(rider: _isRider),
+          picked: _pickedDocs,
+          enabled: !_busy,
+          onPicked: (ApplicantDocumentKind kind, PickedDocument document) =>
+              setState(() => _pickedDocs[kind] = document),
+          onRemoved: (ApplicantDocumentKind kind) =>
+              setState(() => _pickedDocs.remove(kind)),
         ),
         const SizedBox(height: DeliverySpacing.lg),
-        // The one real thing this step can do while the upload pipeline is being built.
         AuthField(
           label: _isRider
               ? t.anythingWeShouldKnowRider
@@ -1056,13 +1178,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       ];
 
   List<Widget> _bankStep(DeliveryStrings t) => <Widget>[
-        YdCard.bordered(
-          child: YdEmptyState(
-            icon: Icons.account_balance_outlined,
-            title: t.authBankComingSoonTitle,
-            message: t.authBankComingSoonBlurb,
-            action: YdComingSoon(label: t.authComingSoon, icon: Icons.schedule),
-          ),
+        PayoutDetailsStep(
+          accountHolder: _accountHolder,
+          iban: _iban,
+          enabled: !_busy,
         ),
       ];
 
@@ -1137,9 +1256,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           YdEmptyState(
             icon: Icons.error_outline,
             title: t.thatDidNotGoThrough,
-            message: _reference == null
-                ? t.authCouldNotSendApplication
-                : t.couldNotCreateSignIn,
+            message: _collateralError ??
+                (_reference == null
+                    ? t.authCouldNotSendApplication
+                    : t.couldNotCreateSignIn),
           ),
         const SizedBox(height: DeliverySpacing.md),
         if (_error == null)

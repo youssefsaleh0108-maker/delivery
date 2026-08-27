@@ -296,13 +296,19 @@
 
       <!-- ------------------------------------------------------------ documents -->
       <!--
-        Drawn as designed, and inert.
+        Drawn as designed, and still inert — deliberately.
 
-        There is no document store behind this yet — no upload endpoint, no per-document state, no
-        reviewer screen that shows a file. Rather than a Choose File button that opens a picker and
-        then drops what it is given, every row is shown in its empty state with the button disabled
-        and the reason said once, at the top. The accepted state is in register.css, ready for the
-        day the pipeline lands.
+        The upload pipeline now exists server-side (presign → PUT to storage → confirm, on
+        /api/onboarding/applications/mine/documents), but every applicant-side document endpoint is
+        keyed on the caller's token: the service resolves the application from the signed-in
+        APPLICANT account, never from a reference in the URL, precisely so that a forwarded
+        reference cannot attach papers to somebody else's KYC file. This page is anonymous by
+        design — the documents step sits BEFORE the application even exists, and this origin has no
+        OAuth client: config.js carries only the API base, there is no Keycloak issuer configured
+        for the website, and the platform's allowed-client-ids list names only the mobile app, the
+        portal and the onboarding service. No applicant token can ever exist here, so the rows stay
+        in their empty state with the buttons disabled and the reason said once, at the top. The
+        accepted state is in register.css, ready for the day this page gains a signed-in applicant.
       -->
       <section class="wstep" data-step="documents" hidden>
         <p class="w-note">

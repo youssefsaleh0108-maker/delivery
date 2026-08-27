@@ -74,12 +74,40 @@ Map<String, dynamic> _applicant({
       'provisionedEntityId': null,
     };
 
+Map<String, dynamic> _document({
+  String id = 'd1',
+  String kind = 'NATIONAL_ID',
+  String status = 'PENDING',
+  String? rejectionReason,
+}) =>
+    <String, dynamic>{
+      'id': id,
+      'kind': kind,
+      'status': status,
+      'rejectionReason': rejectionReason,
+      'reviewerNote': null,
+      'uploadedAt': '2026-08-16T10:00:00Z',
+      'reviewedAt': null,
+      'reviewedBy': null,
+      'superseded': false,
+      'viewUrl': 'http://files/$id',
+    };
+
 late _StubAdapter _adapter;
 
-({OnboardingApi onboarding, DeliveryProviderApi provider}) _apis({
+({OnboardingApi onboarding, DeliveryProviderApi provider, DocumentsApi documents}) _apis({
   List<Map<String, dynamic>>? applicants,
+  List<Map<String, dynamic>>? documents,
 }) {
   _adapter = _StubAdapter(<String, Object>{
+    // Written out in full: the adapter matches the longest key a path contains, and a truncated
+    // documents key would lose to the applicants-list key inside its own path.
+    '/applications/for-company/p1/a1/documents/d1/approve': _document(status: 'APPROVED'),
+    '/applications/for-company/p1/a1/documents/d1/reject':
+        _document(status: 'REJECTED', rejectionReason: 'Too blurred'),
+    '/applications/for-company/p1/a1/documents': documents ?? <Map<String, dynamic>>[],
+    '/applications/for-company/p1/a2/documents': <Map<String, dynamic>>[],
+    '/applications/for-company/p1/a3/documents': <Map<String, dynamic>>[],
     '/applications/for-company/p1/a1/approve': _applicant(status: 'PROVISIONED'),
     '/applications/for-company/p1/a1/reject':
         _applicant(status: 'REJECTED', rejectionReason: 'No licence'),
@@ -95,7 +123,11 @@ late _StubAdapter _adapter;
     },
   });
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = _adapter;
-  return (onboarding: OnboardingApi(dio), provider: DeliveryProviderApi(dio));
+  return (
+    onboarding: OnboardingApi(dio),
+    provider: DeliveryProviderApi(dio),
+    documents: DocumentsApi(dio),
+  );
 }
 
 Widget _wrap(Widget child) => MaterialApp(
@@ -112,14 +144,19 @@ Widget _wrap(Widget child) => MaterialApp(
     );
 
 Future<void> pump(
-    WidgetTester tester, ({OnboardingApi onboarding, DeliveryProviderApi provider}) apis,
+    WidgetTester tester,
+    ({OnboardingApi onboarding, DeliveryProviderApi provider, DocumentsApi documents}) apis,
     {double width = 1180}) async {
   tester.view.physicalSize = Size(width, 2000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(_wrap(
-    ApplicantsScreen(api: apis.onboarding, providerApi: apis.provider),
+    ApplicantsScreen(
+      api: apis.onboarding,
+      providerApi: apis.provider,
+      documentsApi: apis.documents,
+    ),
   ));
   await tester.pumpAndSettle();
 }
@@ -138,10 +175,10 @@ void main() {
     expect(find.text('2 Applications Left'), findsOneWidget);
   });
 
-  testWidgets('the checklist shows the checks that exist and marks the one that does not',
+  testWidgets('the checklist shows the checks that exist and is honest about no uploads',
       (WidgetTester tester) async {
-    // The design's three documents have no pipeline behind them. Two rows are replaced by
-    // verifications the application really carries; the third is drawn and chipped.
+    // The first two rows are the verifications the application itself carries. The papers row is
+    // real now — and for an applicant who uploaded nothing, it says so instead of inventing one.
     await pump(tester, _apis());
 
     expect(find.text('Onboarding documentation check'.toUpperCase()), findsOneWidget);
@@ -150,7 +187,53 @@ void main() {
     expect(find.text('Phone number verified'), findsOneWidget);
     expect(find.text('Pending Verification'), findsOneWidget);
     expect(find.text('Identity, vehicle and background documents'), findsOneWidget);
-    expect(find.byType(ConsoleComingSoonChip), findsOneWidget);
+    expect(find.text('Not uploaded'), findsOneWidget);
+    expect(find.byType(ConsoleComingSoonChip), findsNothing);
+  });
+
+  testWidgets('uploaded papers are reviewed in place', (WidgetTester tester) async {
+    await pump(tester, _apis(documents: <Map<String, dynamic>>[
+      _document(id: 'd1'),
+      _document(id: 'd2', kind: 'DRIVING_LICENCE', status: 'APPROVED'),
+    ]));
+
+    // Each paper by its human name, with its own verdict badge.
+    expect(find.text('National ID'), findsOneWidget);
+    expect(find.text('Driving licence'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Approve this document'));
+    await tester.pumpAndSettle();
+
+    expect(
+      _adapter.calls.any((String c) =>
+          c.contains('POST') && c.contains('/p1/a1/documents/d1/approve')),
+      isTrue,
+    );
+  });
+
+  testWidgets('refusing a paper cannot happen without the reason the applicant reads',
+      (WidgetTester tester) async {
+    await pump(tester, _apis(documents: <Map<String, dynamic>>[_document(id: 'd1')]));
+
+    await tester.tap(find.byTooltip('Refuse this document'));
+    await tester.pumpAndSettle();
+
+    final Finder confirm = find.widgetWithText(ConsoleSoftButton, 'Refuse document');
+    expect(tester.widget<ConsoleSoftButton>(confirm).onPressed, isNull);
+
+    await tester.enterText(
+      find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+      'The photo is too blurred to read',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+
+    expect(
+      _adapter.calls.any((String c) =>
+          c.contains('POST') && c.contains('/p1/a1/documents/d1/reject')),
+      isTrue,
+    );
   });
 
   testWidgets('approving still creates the account and the fleet place',

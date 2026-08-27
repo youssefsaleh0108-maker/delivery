@@ -55,9 +55,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _pricing = false;
   String? _priceError;
 
+  /// What the cross-sell endpoint suggested next to this product. Null until it answers; empty
+  /// when it answered with nothing — the rail is simply not drawn in either quiet case.
+  List<BoughtTogetherSuggestion>? _suggestions;
+
+  /// True while a suggestion's own option groups are being fetched before it opens.
+  bool _openingSuggestion = false;
+
   @override
   void initState() {
     super.initState();
+    _loadSuggestions();
     // Pre-tick the defaults, so the common case is one tap.
     for (final OptionGroup group in widget.groups) {
       final List<String> defaults = group.options
@@ -76,6 +84,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void dispose() {
     _gallery.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSuggestions() async {
+    try {
+      final List<BoughtTogetherSuggestion> suggestions =
+          await widget.api.boughtTogether(widget.product.id);
+      if (!mounted) return;
+      setState(() => _suggestions = suggestions);
+    } catch (_) {
+      // No rail. The suggestions are decoration on a page that works without them, and an error
+      // banner over a shelf would be louder than the feature.
+    }
+  }
+
+  /// Opens a suggested product exactly the way the shelf opens one — its own option groups
+  /// fetched first, so a product with required options cannot be added half-configured. The
+  /// nested page's answer is popped straight through to whoever opened this one.
+  Future<void> _openSuggestion(Product product) async {
+    if (_openingSuggestion) return;
+    setState(() => _openingSuggestion = true);
+    List<OptionGroup> groups;
+    try {
+      groups = await widget.api.productOptions(product.id);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _openingSuggestion = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(DeliveryStrings.of(context).couldNotReachTheServer)));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _openingSuggestion = false);
+    final ConfiguredProduct? configured =
+        await Navigator.of(context).push<ConfiguredProduct>(
+      MaterialPageRoute<ConfiguredProduct>(
+        builder: (_) =>
+            ProductDetailScreen(api: widget.api, product: product, groups: groups),
+      ),
+    );
+    if (configured != null && mounted) {
+      Navigator.of(context).pop(configured);
+    }
   }
 
   List<String> get _allChosen =>
@@ -473,35 +524,47 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// "People Also Ordered" — drawn as designed, and inert.
+  /// The cross-sell rail, wired to what the backend honestly computes: item co-occurrence in
+  /// delivered baskets, padded with same-shelf items when the counts run out.
   ///
-  /// There is no cross-sell service behind it, and a recommendation rail filled with arbitrary
-  /// products would be a lie told in the shape of a feature. The slots are shown empty and the
-  /// section is marked.
+  /// The section title says which of those it is showing — "Often bought together" only when at
+  /// least one row was actually counted from baskets, the same-shelf title when everything is
+  /// fill — and a row shows its count only when the server sent one. Nothing is drawn at all
+  /// until the endpoint answers, and nothing when it answers empty: an empty recommendation rail
+  /// is not a feature.
   Widget _relatedProducts() {
+    final List<BoughtTogetherSuggestion>? suggestions = _suggestions;
+    if (suggestions == null || suggestions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    final bool anyCounted = suggestions
+        .any((BoughtTogetherSuggestion s) => s.basis == CrossSellBasis.boughtTogether);
+    final bool allSameShelf = suggestions
+        .every((BoughtTogetherSuggestion s) => s.basis == CrossSellBasis.sameAisle);
+    final String title = anyCounted
+        ? t.crossSellBoughtTogether
+        : allSameShelf
+            ? t.crossSellSameShelf
+            : t.crossSellYouMightAlsoLike;
+
     return Padding(
       padding: const EdgeInsetsDirectional.all(DeliverySpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          YdSectionHeader(
-            title: DeliveryStrings.of(context).custPeopleAlsoOrdered,
-            trailing: YdComingSoon(
-              label: DeliveryStrings.of(context).custSoon,
-              icon: Icons.schedule,
-            ),
-          ),
+          YdSectionHeader(title: title),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-          IgnorePointer(
-            child: Opacity(
-              opacity: 0.55,
-              child: Row(
-                children: <Widget>[
-                  Expanded(child: _relatedPlaceholder()),
+          SizedBox(
+            height: 64,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: suggestions.length,
+              separatorBuilder: (_, __) =>
                   const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
-                  Expanded(child: _relatedPlaceholder()),
-                ],
-              ),
+              itemBuilder: (BuildContext context, int i) =>
+                  _suggestionCard(t, suggestions[i]),
             ),
           ),
         ],
@@ -509,45 +572,89 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _relatedPlaceholder() {
-    return Container(
-      padding: const EdgeInsetsDirectional.all(DeliverySpacing.sm),
-      decoration: BoxDecoration(
+  /// One suggestion in the frame's related-card geometry: the 48px photo tile, the name over the
+  /// price, and — only for a counted pair — how many baskets held both.
+  Widget _suggestionCard(DeliveryStrings t, BoughtTogetherSuggestion suggestion) {
+    final Product product = suggestion.product;
+
+    return Semantics(
+      button: true,
+      child: Material(
         color: DeliveryColors.white,
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: DeliveryColors.background,
-              borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-            ),
-            child: const Icon(Icons.image_outlined, size: 18, color: DeliveryColors.faint),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _openingSuggestion ? null : () => _openSuggestion(product),
+          child: Container(
+            width: 200,
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.sm),
+            child: Row(
               children: <Widget>[
-                Container(height: 8, decoration: _barDecoration),
-                const SizedBox(height: DeliverySpacing.xs + 2),
-                Container(width: 36, height: 8, decoration: _barDecoration),
+                CustomerPhoto(
+                  url: product.imageUrls.isEmpty ? null : product.imageUrls.first,
+                  width: 48,
+                  height: 48,
+                  radius: DeliveryRadius.sm,
+                  icon: Icons.fastfood_outlined,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        product.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: DeliveryColors.ink,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: <Widget>[
+                          Text(
+                            product.price.toStringAsFixed(2),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: DeliveryColors.brand,
+                              height: 1.2,
+                            ),
+                          ),
+                          // The count exists only on rows counted from delivered baskets.
+                          // A same-shelf row claims no popularity, so none is rendered.
+                          if (suggestion.ordersTogether != null) ...<Widget>[
+                            const SizedBox(width: DeliverySpacing.sm),
+                            Flexible(
+                              child: Text(
+                                t.crossSellTogetherCount(suggestion.ordersTogether!),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: DeliveryColors.faint,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
-
-  static final BoxDecoration _barDecoration = BoxDecoration(
-    color: DeliveryColors.background,
-    borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-  );
 }
 
 // ---------------------------------------------------------------------------------------------

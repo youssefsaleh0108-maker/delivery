@@ -3579,4 +3579,497 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get riderErrandCap => 'الحد الأقصى';
+
+  @override
+  String get etaWaitingFirstFix => 'بانتظار أول إشارة GPS من السائق';
+
+  @override
+  String get etaPositionOutOfDate => 'موقع السائق غير محدَّث';
+
+  @override
+  String get etaNoMapPoint => 'لا توجد نقطة على الخريطة للقياس إليها';
+
+  @override
+  String get etaRouteServiceDown => 'خدمة المسارات لم تستجب';
+
+  @override
+  String get etaNothingOnItsWay => 'لا يوجد شيء في الطريق';
+
+  @override
+  String get etaUnavailable => 'لا يتوفر تقدير للوصول';
+
+  @override
+  String get etaHeadingToShop => 'في الطريق إلى المتجر';
+
+  @override
+  String get etaOnTheWayToYou => 'في الطريق إليك';
+
+  @override
+  String get etaStraightLineNote =>
+      'تقدير تقريبي — يُقاس بخط مستقيم لا عبر الطرقات';
+
+  @override
+  String get dutyOnDuty => 'على رأس العمل';
+
+  @override
+  String get dutyOffDuty => 'خارج الدوام';
+
+  @override
+  String get presenceSignalLost => 'انقطعت الإشارة';
+
+  @override
+  String get promoApplied => 'تم تطبيق الرمز';
+
+  @override
+  String get promoUnknownCode => 'الرمز غير معروف';
+
+  @override
+  String get promoNotActive => 'هذا الرمز لم يعد متاحاً';
+
+  @override
+  String get promoNotStarted => 'لا يمكن استخدام هذا الرمز بعد';
+
+  @override
+  String get promoExpired => 'انتهت صلاحية هذا الرمز';
+
+  @override
+  String get promoBelowMinimum => 'سلّتك أقل من الحد الأدنى لهذا الرمز';
+
+  @override
+  String get promoFullyRedeemed => 'استُنفد هذا الرمز بالكامل';
+
+  @override
+  String get promoAlreadyUsed => 'سبق أن استخدمت هذا الرمز';
+
+  @override
+  String get promoWorthNothing => 'لا قيمة لهذا الرمز على هذا الطلب';
+
+  @override
+  String get promoDidNotApply => 'لم يُطبَّق هذا الرمز';
+
+  @override
+  String get paymentWallet => 'المحفظة';
+
+  @override
+  String get paymentTestModeNote =>
+      'دفعة تجريبية — لا يُحوَّل أي مال حقيقي في هذه النسخة';
+
+  @override
+  String get cashOutRequested => 'مطلوب';
+
+  @override
+  String get cashOutPaid => 'مدفوع';
+
+  @override
+  String get cashOutRefused => 'مرفوض';
+
+  @override
+  String get paidByPlatform => 'تدفعها المنصة';
+
+  @override
+  String get paidByYourCompany => 'تدفعها شركتك';
+
+  @override
+  String get paidElsewhere => 'تُدفع خارج المنصة';
+
+  @override
+  String get tipCashAtDoor => 'نقداً عند الباب';
+
+  @override
+  String get tipOnline => 'عبر الإنترنت';
+
+  @override
+  String get docNationalId => 'الهوية الوطنية';
+
+  @override
+  String get docDrivingLicence => 'رخصة القيادة';
+
+  @override
+  String get docVehicleRegistration => 'أوراق المركبة';
+
+  @override
+  String get docCommercialRegistration => 'السجل التجاري';
+
+  @override
+  String get docWaitingReview => 'بانتظار المراجعة';
+
+  @override
+  String get docApproved => 'مقبول';
+
+  @override
+  String get docRefused => 'مرفوض';
+
+  @override
+  String get payoutFormatChecked => 'تم التحقق من الصيغة';
+
+  @override
+  String get payoutVerified => 'موثَّق';
+
+  @override
+  String get payoutFailedVerification => 'فشل التوثيق';
+
+  @override
+  String get notifCatOrderUpdates => 'تحديثات الطلبات';
+
+  @override
+  String get notifCatChat => 'المحادثات';
+
+  @override
+  String get notifCatPromotions => 'العروض الترويجية';
+
+  @override
+  String get notifCatAccount => 'الحساب والأمان';
+
+  @override
+  String get notifChannelPush => 'إشعارات فورية';
+
+  @override
+  String get notifChannelInApp => 'داخل التطبيق';
+
+  @override
+  String get notifChannelEmail => 'البريد الإلكتروني';
+
+  @override
+  String get notifChannelSms => 'رسائل نصية';
+
+  @override
+  String get chatRoleCustomer => 'الزبون';
+
+  @override
+  String get chatRoleRider => 'السائق';
+
+  @override
+  String get crossSellBoughtTogether => 'يُشترى معاً غالباً';
+
+  @override
+  String get crossSellSameShelf => 'من الرف نفسه';
+
+  @override
+  String get crossSellYouMightAlsoLike => 'قد يعجبك أيضاً';
+
+  @override
+  String get ratingNewRider => 'جديد';
+
+  @override
+  String get custTestPayment => 'دفعة تجريبية';
+
+  @override
+  String get custPaymentDeclined => 'رُفض الدفع ولم يُقدَّم طلبك.';
+
+  @override
+  String get custPromoRemove => 'إزالة الرمز';
+
+  @override
+  String get custPromoChecking => 'جارٍ التحقق من الرمز…';
+
+  @override
+  String get promoCouldNotCheck => 'تعذّر التحقق من الرمز';
+
+  @override
+  String get etaMinShort => 'دقيقة';
+
+  @override
+  String get etaArriving => 'الوصول المتوقع';
+
+  @override
+  String get etaRemaining => 'المتبقي';
+
+  @override
+  String get custChatWithRider => 'مراسلة السائق';
+
+  @override
+  String get chatTypeMessage => 'اكتب رسالة…';
+
+  @override
+  String get chatSend => 'إرسال';
+
+  @override
+  String get chatClosed => 'أُغلقت هذه المحادثة';
+
+  @override
+  String get chatNoMessagesYet => 'لا رسائل بعد';
+
+  @override
+  String get chatCouldNotSend => 'تعذّر إرسال رسالتك';
+
+  @override
+  String get couldNotLoadChat => 'تعذّر تحميل المحادثة';
+
+  @override
+  String get custRateYourRider => 'قيّم السائق';
+
+  @override
+  String get custHowWasDelivery => 'كيف كانت تجربة التوصيل؟';
+
+  @override
+  String get custAddCommentOptional => 'أضف تعليقاً (اختياري)';
+
+  @override
+  String get custSubmitRating => 'إرسال التقييم';
+
+  @override
+  String get custThanksForRating => 'شكراً لتقييمك السائق';
+
+  @override
+  String get custAlreadyRatedDelivery => 'لقد قيّمت هذا التوصيل';
+
+  @override
+  String get custCouldNotSendRating => 'تعذّر إرسال تقييمك';
+
+  @override
+  String ratingStars(Object n) {
+    return '$n نجوم';
+  }
+
+  @override
+  String get searchForAPlace => 'ابحث عن مكان…';
+
+  @override
+  String get noPlacesFound => 'لم يُعثر على أماكن';
+
+  @override
+  String get couldNotSearchPlaces => 'تعذّر البحث الآن';
+
+  @override
+  String get addressPinnedOnMap => 'محدَّد على الخريطة';
+
+  @override
+  String get notifPreferences => 'تفضيلات الإشعارات';
+
+  @override
+  String get notifPrefsBlurb => 'اختر كيف نتواصل معك، موضوعاً بموضوع';
+
+  @override
+  String get notifAlwaysOn =>
+      'مفعَّل دائماً — لا يمكن إيقاف رسائل الحساب والأمان';
+
+  @override
+  String get couldNotLoadPreferences => 'تعذّر تحميل تفضيلاتك';
+
+  @override
+  String get couldNotSaveThatChange => 'تعذّر حفظ هذا التغيير';
+
+  @override
+  String crossSellTogetherCount(Object count) {
+    return '$count× معاً';
+  }
+
+  @override
+  String riderBalanceLine(Object balance, Object available) {
+    return 'الرصيد $balance · المتاح للسحب $available';
+  }
+
+  @override
+  String riderEarningsBreakdown(Object earnings, Object tips) {
+    return '$earnings أجرة توصيل · $tips إكراميات';
+  }
+
+  @override
+  String get riderCashOutTitle => 'سحب الرصيد';
+
+  @override
+  String get riderCashOutAvailable => 'المتاح للسحب';
+
+  @override
+  String riderCashOutMinimum(Object amount) {
+    return 'الحد الأدنى $amount';
+  }
+
+  @override
+  String get riderCashOutManualNote =>
+      'تُسلَّم الدفعات يدوياً من فريق المنصة — لا يُحوَّل شيء تلقائياً.';
+
+  @override
+  String get riderCashOutRequest => 'طلب سحب';
+
+  @override
+  String get riderCashOutAmountLabel => 'المبلغ';
+
+  @override
+  String get riderCashOutAlreadyOpen => 'هناك طلب سحب قيد المعالجة بالفعل.';
+
+  @override
+  String get riderCashOutFailed => 'تعذّر طلب السحب.';
+
+  @override
+  String riderCashOutOpenLine(Object amount) {
+    return '$amount مطلوبة — بانتظار التسليم';
+  }
+
+  @override
+  String get riderCashOutLastRefused => 'رُفض طلب السحب الأخير.';
+
+  @override
+  String get riderCashOutHistory => 'الطلبات الأخيرة';
+
+  @override
+  String riderTipLine(Object tip) {
+    return '+$tip إكرامية';
+  }
+
+  @override
+  String riderReimbursedLine(Object amount) {
+    return '+$amount مستردّة';
+  }
+
+  @override
+  String riderLastSeen(Object when) {
+    return 'آخر ظهور $when';
+  }
+
+  @override
+  String get riderDutyChangeFailed => 'تعذّر تحديث حالة الدوام.';
+
+  @override
+  String get riderDutyNotYetDeclared => 'لم تبدأ الدوام بعد.';
+
+  @override
+  String get riderEtaCaption => 'الوقت المتوقع للوصول';
+
+  @override
+  String riderEtaAway(Object distance) {
+    return 'على بُعد $distance';
+  }
+
+  @override
+  String riderEtaArrivingAt(Object time) {
+    return 'الوصول نحو $time';
+  }
+
+  @override
+  String riderKmUnit(Object km) {
+    return '$km كم';
+  }
+
+  @override
+  String riderMetreUnit(Object m) {
+    return '$m م';
+  }
+
+  @override
+  String riderEtaComputedBy(Object provider) {
+    return 'التقدير من $provider';
+  }
+
+  @override
+  String get riderChatTitle => 'محادثة الزبون';
+
+  @override
+  String get riderChatHint => 'اكتب رسالة…';
+
+  @override
+  String get riderChatSend => 'إرسال';
+
+  @override
+  String get riderChatClosed => 'أُغلقت هذه المحادثة.';
+
+  @override
+  String get riderChatEmpty => 'لا رسائل بعد.';
+
+  @override
+  String get riderChatCouldNotLoad => 'تعذّر تحميل المحادثة';
+
+  @override
+  String get riderChatSendFailed => 'لم تُرسَل الرسالة.';
+
+  @override
+  String get riderChatReconnecting => 'جارٍ إعادة الاتصال…';
+
+  @override
+  String get wizDocsIntro =>
+      'صور واضحة أو ملفات PDF. يمكنك استبدال أي مستند حتى صدور القرار.';
+
+  @override
+  String get wizDocFileTypes => 'صور وملفات PDF';
+
+  @override
+  String get wizDocAdd => 'إضافة';
+
+  @override
+  String get wizDocReplace => 'استبدال';
+
+  @override
+  String get wizDocRemove => 'إزالة';
+
+  @override
+  String get wizDocReadyToSend => 'جاهز للإرسال';
+
+  @override
+  String get wizDocNotAddedYet => 'لم يُضف بعد';
+
+  @override
+  String get wizDocSentOnSubmit => 'تُرسَل مستنداتك عند تقديم الطلب.';
+
+  @override
+  String get wizDocTooLarge => 'حجم الملف كبير جداً';
+
+  @override
+  String get wizDocUploadFailed => 'لم يكتمل الرفع';
+
+  @override
+  String get wizDocUploading => 'جارٍ الرفع…';
+
+  @override
+  String get wizDocCouldNotLoad => 'تعذّر تحميل مستنداتك';
+
+  @override
+  String get wizDocsPendingTitle => 'مستنداتك';
+
+  @override
+  String get wizDocsPendingBlurb =>
+      'يمكن استبدال أي مستند مرفوض وستتم مراجعته من جديد.';
+
+  @override
+  String get wizDocsNoneYet => 'لم يُرفع أي مستند بعد';
+
+  @override
+  String get wizCouldNotSendDocuments =>
+      'تم استلام طلبك، لكن أحد المستندات لم يُرسل.';
+
+  @override
+  String get wizPayoutAccountHolder => 'اسم صاحب الحساب';
+
+  @override
+  String get wizPayoutAccountHolderHint => 'الاسم كما هو مسجَّل لدى البنك';
+
+  @override
+  String get wizPayoutIban => 'رقم الحساب الدولي (IBAN)';
+
+  @override
+  String get wizPayoutIbanHint => 'يبدأ برمز الدولة، مثل …SA';
+
+  @override
+  String get wizPayoutIbanInvalid =>
+      'رقم الآيبان غير صحيح — الأرجح أن رقماً خاطئ أو رقمين متبادلان';
+
+  @override
+  String get wizPayoutIbanFormat =>
+      'يبدأ رقم الآيبان بحرفين لرمز الدولة يليهما رقما تحقق';
+
+  @override
+  String get wizPayoutIbanBounds => 'يتكوّن رقم الآيبان من 15 إلى 34 خانة';
+
+  @override
+  String wizPayoutIbanLength(Object country, Object expected) {
+    return 'رقم الآيبان لدولة $country يتكوّن من $expected خانة';
+  }
+
+  @override
+  String get wizPayoutCouldNotSave => 'تعذّر حفظ البيانات البنكية';
+
+  @override
+  String get wizPayoutCouldNotLoad => 'تعذّر تحميل بياناتك البنكية';
+
+  @override
+  String get wizPayoutSave => 'حفظ البيانات البنكية';
+
+  @override
+  String get wizPayoutChange => 'تغيير';
+
+  @override
+  String get wizPayoutSentOnSubmit => 'تُرسَل بياناتك البنكية عند تقديم الطلب.';
+
+  @override
+  String get wizCouldNotSendPayout =>
+      'تم استلام طلبك، لكن البيانات البنكية لم تُرسل.';
 }

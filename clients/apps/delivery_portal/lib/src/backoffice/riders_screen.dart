@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:flutter/material.dart';
 
 import '../shell/shell.dart';
 
-/// Every rider on the platform, and who they ride for.
+/// Every rider on the platform, who they ride for, and — now that the tracking service reports it —
+/// whether they are actually on the road.
 ///
 /// Drawn as `backoffice-riders` (Figma 3:3088). New as a screen: riders existed only inside the
 /// carriers page, as chips on a card, which meant the only way to answer "who rides for us" was to
@@ -15,13 +18,27 @@ import '../shell/shell.dart';
 /// joins them. That is N+1 requests, bounded by the number of carriers, and it is the only path
 /// there is; a joined endpoint would be the right fix and is not this screen's to write.
 ///
-/// What the design draws and the platform cannot answer is listed under the table rather than
-/// invented: a rider's presence, the region they work, what they have carried today, and what
-/// customers think of them are all unbuilt. None of them is guessed at here.
+/// Presence and ratings are real now. The Status column renders what the presence roster reports —
+/// on duty, signal lost, off duty — and "Unknown" only for a rider who has never declared duty at
+/// all, which is a different fact from "offline". The Rating column renders the customer average
+/// where one exists and "New" where nobody has rated the rider yet, never a zero. What still has no
+/// source — a rider's work region and their deliveries today — stays empty and says so under the
+/// table rather than being invented.
 class RidersScreen extends StatefulWidget {
-  const RidersScreen({super.key, required this.api});
+  const RidersScreen({
+    super.key,
+    required this.api,
+    required this.trackingApi,
+    required this.orderApi,
+  });
 
   final DeliveryProviderApi api;
+
+  /// The presence roster — the Online/Offline dots and the last-seen times.
+  final TrackingApi trackingApi;
+
+  /// Rider standings, one lookup per rider; there is no batch endpoint.
+  final OrderApi orderApi;
 
   @override
   State<RidersScreen> createState() => _RidersScreenState();
@@ -37,7 +54,23 @@ class _RiderRow {
 }
 
 class _RidersScreenState extends State<RidersScreen> {
+  /// Riders go on and off duty while the console sits open, so presence refreshes itself. Only
+  /// presence: the carrier join and the ratings move on human timescales and reload on demand.
+  static const Duration _presencePoll = Duration(seconds: 30);
+
   late Future<List<_RiderRow>> _roster = _load();
+  Timer? _poll;
+
+  /// What the tracking service last said, keyed by rider ref. Null until the first answer; a
+  /// rider absent from it has never declared duty or pinged.
+  Map<String, RiderPresence>? _presence;
+
+  /// True when the roster call itself failed — every pill then reads "Unknown" honestly.
+  bool _presenceDown = false;
+
+  /// Customer standings, keyed by rider ref. A missing key means the lookup failed or has not
+  /// landed; a present standing with a null average means genuinely unrated.
+  Map<String, RiderStanding> _standings = <String, RiderStanding>{};
 
   final TextEditingController _search = TextEditingController();
   String _query = '';
@@ -46,16 +79,29 @@ class _RidersScreenState extends State<RidersScreen> {
   String? _carrierId;
 
   @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(_presencePoll, (_) => _refreshPresence());
+  }
+
+  @override
   void dispose() {
+    _poll?.cancel();
     _search.dispose();
     super.dispose();
   }
 
-  /// The register, then a roster per carrier.
+  /// The register, then a roster per carrier — and, alongside, presence for everyone and a
+  /// standing per rider found.
   ///
   /// A carrier whose roster fails to load contributes nothing rather than failing the page: one
-  /// unreachable roster must not hide every other rider on the platform.
+  /// unreachable roster must not hide every other rider on the platform. The same holds for the
+  /// tracking service and the ratings — each degrades to its own column, never to the table.
   Future<List<_RiderRow>> _load() async {
+    // Fired first and not awaited yet: presence is one request for the whole fleet and can land
+    // while the per-carrier rosters are still being joined.
+    final Future<void> presenceDone = _refreshPresence();
+
     final Paged<DeliveryProviderInfo> page = await widget.api.all(size: 50);
 
     // The in-house fleet is skipped deliberately: membership in it is opt-in, so its roster is
@@ -76,15 +122,65 @@ class _RidersScreenState extends State<RidersScreen> {
       }),
     );
 
-    return <_RiderRow>[
-      for (final List<_RiderRow> rows in perCarrier) ...rows,
+    final List<_RiderRow> rows = <_RiderRow>[
+      for (final List<_RiderRow> perOne in perCarrier) ...perOne,
     ]..sort((_RiderRow a, _RiderRow b) {
         final int byCarrier = a.carrier.name.compareTo(b.carrier.name);
         return byCarrier != 0 ? byCarrier : a.ref.compareTo(b.ref);
       });
+
+    unawaited(_loadStandings(rows));
+    await presenceDone;
+    return rows;
   }
 
-  void _reload() => setState(() => _roster = _load());
+  /// One presence request for the whole fleet. Failure marks the column down rather than the page.
+  Future<void> _refreshPresence() async {
+    try {
+      final List<RiderPresence> roster =
+          await widget.trackingApi.roster(onDutyOnly: false);
+      if (!mounted) return;
+      setState(() {
+        _presence = <String, RiderPresence>{
+          for (final RiderPresence p in roster) p.riderId: p,
+        };
+        _presenceDown = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _presenceDown = true);
+    }
+  }
+
+  /// One standing per rider, concurrently. A failed lookup leaves its cell empty — never a zero,
+  /// and never "New", which is a claim about the rider rather than about the request.
+  Future<void> _loadStandings(List<_RiderRow> rows) async {
+    final List<MapEntry<String, RiderStanding>?> found =
+        await Future.wait<MapEntry<String, RiderStanding>?>(
+      rows.map((_RiderRow r) async {
+        try {
+          return MapEntry<String, RiderStanding>(
+              r.ref, await widget.orderApi.riderRating(r.ref));
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      _standings = <String, RiderStanding>{
+        for (final MapEntry<String, RiderStanding>? e in found)
+          if (e != null) e.key: e.value,
+      };
+    });
+  }
+
+  void _reload() {
+    setState(() {
+      _roster = _load();
+      _standings = <String, RiderStanding>{};
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,8 +328,8 @@ class _RidersScreenState extends State<RidersScreen> {
       columns: const <ConsoleColumn>[
         ConsoleColumn(label: 'Rider Name', flex: 1),
         ConsoleColumn(label: 'Carrier Partner', width: 180),
-        ConsoleColumn(label: 'Status', width: 120),
-        ConsoleColumn(label: 'Region', width: 140),
+        ConsoleColumn(label: 'Status', width: 140),
+        ConsoleColumn(label: 'Region', width: 120),
         ConsoleColumn(label: 'Deliveries Today', width: 130),
         ConsoleColumn(label: 'Rating', width: 100, alignRight: true),
       ],
@@ -257,12 +353,10 @@ class _RidersScreenState extends State<RidersScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: ConsoleText.cellMuted,
               ),
-              // Not "Offline". Nothing reports rider presence yet, and painting every rider red
-              // would be a fact about the platform dressed up as a fact about the rider.
-              ConsoleStatusPill.status(DeliveryStatusColor.offline, label: 'Unknown'),
+              _statusCell(r),
               const ConsoleNoValue(tooltip: 'Riders carry no work region yet'),
               const ConsoleNoValue(tooltip: 'No per-rider delivery count yet'),
-              const ConsoleNoValue(tooltip: 'Riders are not rated yet'),
+              _ratingCell(r),
             ],
           ),
       ],
@@ -289,11 +383,85 @@ class _RidersScreenState extends State<RidersScreen> {
         ),
       ),
       footer: const ConsoleInertNote(
-        text: 'Presence, work region, daily deliveries and ratings are not reported by any '
-            'service yet. Riders shown are those assigned to a carrier; the in-house fleet is '
-            'everyone else and cannot be listed.',
+        text: 'Work region and daily deliveries are not reported by any service yet. Riders '
+            'shown are those assigned to a carrier; the in-house fleet is everyone else and '
+            'cannot be listed.',
       ),
     );
+  }
+
+  /// The presence pill and, when there has ever been a fix, how long ago it was.
+  ///
+  /// Four honest states, three from the tracking service and one from its absence:
+  /// * On duty (emerald) — declared on duty and pinging.
+  /// * Signal lost (amber) — declared on duty, then went quiet. Exactly who a dispatcher needs to
+  ///   see, which is why the roster does not hide them.
+  /// * Off duty (grey) — declared off duty.
+  /// * Unknown — never declared duty at all, or the tracking service did not answer. Not
+  ///   "Offline": that would be a fact about the platform dressed up as a fact about the rider.
+  Widget _statusCell(_RiderRow r) {
+    if (_presenceDown || _presence == null) {
+      return const Tooltip(
+        message: 'The tracking service did not answer',
+        child: ConsoleStatusPill(label: 'Unknown'),
+      );
+    }
+
+    final RiderPresence? p = _presence![r.ref];
+    if (p == null) {
+      return const Tooltip(
+        message: 'This rider has never gone on duty',
+        child: ConsoleStatusPill(label: 'Unknown'),
+      );
+    }
+
+    final (String label, DeliveryAccent accent) = switch (p.state) {
+      PresenceState.onDuty => ('On duty', DeliveryAccent.positive),
+      PresenceState.stale => ('Signal lost', DeliveryAccent.caution),
+      PresenceState.offDuty => ('Off duty', DeliveryAccent.neutral),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        ConsoleStatusPill(label: label, accent: accent),
+        if (p.lastSeenAt != null) ...<Widget>[
+          const SizedBox(height: 2),
+          Text('seen ${_ago(p.lastSeenAt!)}', style: ConsoleText.meta),
+        ],
+      ],
+    );
+  }
+
+  /// The customer average where one exists; "New" for a rider nobody has rated — never a zero,
+  /// because a zero shown as a score is a lie about somebody's livelihood.
+  Widget _ratingCell(_RiderRow r) {
+    final RiderStanding? standing = _standings[r.ref];
+    if (standing == null) {
+      return const ConsoleNoValue(tooltip: 'No rating loaded for this rider');
+    }
+    if (!standing.isRated) {
+      return const Tooltip(
+        message: 'Nobody has rated this rider yet',
+        child: Text('New', style: ConsoleText.cellMuted),
+      );
+    }
+    return Tooltip(
+      message: '${standing.ratings} rating${standing.ratings == 1 ? '' : 's'}',
+      child: Text(
+        '★ ${standing.average!.toStringAsFixed(1)}',
+        style: ConsoleText.cellStrong,
+      ),
+    );
+  }
+
+  static String _ago(DateTime at) {
+    final Duration d = DateTime.now().difference(at);
+    if (d.inSeconds < 60) return 'just now';
+    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
   }
 
   static String _shortRef(String ref) => ref.length <= 14 ? ref : '${ref.substring(0, 12)}…';

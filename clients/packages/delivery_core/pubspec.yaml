@@ -24,6 +24,10 @@ dependencies:
 
   firebase_messaging: ^15.1.5
   dio: ^5.7.0
+  # The one realtime socket (STOMP over WebSocket on /ws/notifications). Chosen because it is the
+  # only WebSocket client that works identically on mobile, desktop and web — the auth travels in
+  # the STOMP CONNECT frame, so no platform needs upgrade-request headers.
+  web_socket_channel: ^3.0.0
   # The translated labels for the display enums. delivery_l10n depends on nothing local, so
   # this cannot cycle.
   delivery_l10n:

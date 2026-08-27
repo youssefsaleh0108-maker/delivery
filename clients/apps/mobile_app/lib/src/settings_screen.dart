@@ -1,8 +1,10 @@
+import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
 import 'biometric_lock.dart';
+import 'notifications_screen.dart' show NotificationPrefsScreen;
 
 /// App settings — how the app behaves, as distinct from who you are.
 ///
@@ -16,13 +18,17 @@ import 'biometric_lock.dart';
 /// Language sits here because it is a property of the app, not of the person — the same account on
 /// two devices can reasonably read in two languages.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.locale, this.userId});
+  const SettingsScreen({super.key, required this.locale, this.userId, this.prefsApi});
 
   final LocaleController locale;
 
   /// Whose fingerprint setting this is. Null on a surface with no session, in which case the
   /// unlock section is not offered at all — there would be nothing to lock.
   final String? userId;
+
+  /// The per-category notification grid behind the preferences row. Optional so surfaces that
+  /// have not been handed one keep compiling; the row is simply not drawn — never drawn dead.
+  final NotificationPrefsApi? prefsApi;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -129,6 +135,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
                   ],
+                  // The notification grid, when this surface was handed the API for it. A row
+                  // that opened a screen full of dead switches would be worse than no row.
+                  if (widget.prefsApi != null) ...<Widget>[
+                    YdListRow(
+                      icon: Icons.notifications_none_rounded,
+                      title: t.notifPreferences,
+                      subtitle: t.notifPrefsBlurb,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => NotificationPrefsScreen(api: widget.prefsApi!),
+                      )),
+                    ),
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                  ],
+                  // The payment methods the platform actually has: cash, which moves real money,
+                  // and the dev-provider card entry, labelled as the test payment it is. Nothing
+                  // here is managed — the method is chosen per order at checkout — so the rows
+                  // state facts rather than pretending to be a wallet.
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                        start: DeliverySpacing.xs,
+                        bottom: DeliverySpacing.sm,
+                        top: DeliverySpacing.xs),
+                    child: Text(
+                      t.custPaymentMethods,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.muted,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  YdListRow(
+                    icon: Icons.attach_money_rounded,
+                    title: t.cashOnDelivery,
+                    trailing: const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                  YdListRow(
+                    icon: Icons.credit_card,
+                    title: t.card,
+                    subtitle: t.paymentTestModeNote,
+                    trailing: YdBadge.brand(
+                        label: t.custTestPayment, uppercase: false, fontSize: 11),
+                  ),
+                  const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
                   // Nothing else is claimed here on purpose. A settings page padded with switches
                   // that are not wired to anything is worse than a short one.
                   Padding(

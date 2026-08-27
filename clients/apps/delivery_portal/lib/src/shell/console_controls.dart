@@ -619,7 +619,10 @@ class _Column extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DeliverySpacing.sm),
-        Text(bar.label, style: ConsoleText.meta),
+        // Pinned to exactly one font-size of height: the chart's frame budgets 20px under the
+        // tallest bar for gap plus label, and a font whose default line box runs taller than its
+        // size — which varies by renderer — overflowed that budget by 3px.
+        Text(bar.label, style: ConsoleText.meta.copyWith(height: 1.0)),
       ],
     );
   }

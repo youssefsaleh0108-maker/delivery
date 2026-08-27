@@ -1812,5 +1812,234 @@
   "riderHelpAndSupport": "Help & live chat support",
   "riderErrandTry": "Try",
   "riderErrandTo": "To",
-  "riderErrandCap": "Cap"
+  "riderErrandCap": "Cap",
+  "etaWaitingFirstFix": "Waiting for the rider's first GPS fix",
+  "etaPositionOutOfDate": "The rider's position is out of date",
+  "etaNoMapPoint": "No map point to measure to",
+  "etaRouteServiceDown": "The route service did not answer",
+  "etaNothingOnItsWay": "Nothing is on its way",
+  "etaUnavailable": "No estimate available",
+  "etaHeadingToShop": "Heading to the shop",
+  "etaOnTheWayToYou": "On the way to you",
+  "etaStraightLineNote": "Rough estimate — measured in a straight line, not by road",
+  "dutyOnDuty": "On duty",
+  "dutyOffDuty": "Off duty",
+  "presenceSignalLost": "Signal lost",
+  "promoApplied": "The code was applied",
+  "promoUnknownCode": "That code was not recognised",
+  "promoNotActive": "That code is no longer available",
+  "promoNotStarted": "That code cannot be used yet",
+  "promoExpired": "That code has expired",
+  "promoBelowMinimum": "Your basket is below the minimum for that code",
+  "promoFullyRedeemed": "That code has been fully redeemed",
+  "promoAlreadyUsed": "You have already used that code",
+  "promoWorthNothing": "That code is worth nothing on this order",
+  "promoDidNotApply": "That code did not apply",
+  "paymentWallet": "Wallet",
+  "paymentTestModeNote": "Test payment — no real money moves in this build",
+  "cashOutRequested": "Requested",
+  "cashOutPaid": "Paid",
+  "cashOutRefused": "Refused",
+  "paidByPlatform": "Paid by the platform",
+  "paidByYourCompany": "Paid by your company",
+  "paidElsewhere": "Paid elsewhere",
+  "tipCashAtDoor": "Cash at the door",
+  "tipOnline": "Online",
+  "docNationalId": "National ID",
+  "docDrivingLicence": "Driving licence",
+  "docVehicleRegistration": "Vehicle registration",
+  "docCommercialRegistration": "Commercial registration",
+  "docWaitingReview": "Waiting for review",
+  "docApproved": "Approved",
+  "docRefused": "Refused",
+  "payoutFormatChecked": "Format checked",
+  "payoutVerified": "Verified",
+  "payoutFailedVerification": "Failed verification",
+  "notifCatOrderUpdates": "Order updates",
+  "notifCatChat": "Chat",
+  "notifCatPromotions": "Promotions",
+  "notifCatAccount": "Account and security",
+  "notifChannelPush": "Push",
+  "notifChannelInApp": "In-app",
+  "notifChannelEmail": "Email",
+  "notifChannelSms": "SMS",
+  "chatRoleCustomer": "Customer",
+  "chatRoleRider": "Rider",
+  "crossSellBoughtTogether": "Often bought together",
+  "crossSellSameShelf": "From the same shelf",
+  "crossSellYouMightAlsoLike": "You might also like",
+  "ratingNewRider": "New",
+  "custTestPayment": "Test payment",
+  "custPaymentDeclined": "The payment was declined and your order was not placed.",
+  "custPromoRemove": "Remove the code",
+  "custPromoChecking": "Checking the code…",
+  "promoCouldNotCheck": "Could not check the code",
+  "etaMinShort": "min",
+  "etaArriving": "Expected arrival",
+  "etaRemaining": "Remaining",
+  "custChatWithRider": "Message the rider",
+  "chatTypeMessage": "Type a message…",
+  "chatSend": "Send",
+  "chatClosed": "This conversation is closed",
+  "chatNoMessagesYet": "No messages yet",
+  "chatCouldNotSend": "Could not send your message",
+  "couldNotLoadChat": "Could not load the conversation",
+  "custRateYourRider": "Rate your rider",
+  "custHowWasDelivery": "How was your delivery?",
+  "custAddCommentOptional": "Add a comment (optional)",
+  "custSubmitRating": "Submit rating",
+  "custThanksForRating": "Thanks for rating your rider",
+  "custAlreadyRatedDelivery": "You rated this delivery",
+  "custCouldNotSendRating": "Could not send your rating",
+  "ratingStars": "{n} stars",
+  "@ratingStars": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "searchForAPlace": "Search for a place…",
+  "noPlacesFound": "No places found",
+  "couldNotSearchPlaces": "Could not search just now",
+  "addressPinnedOnMap": "Pinned on the map",
+  "notifPreferences": "Notification preferences",
+  "notifPrefsBlurb": "Choose how we reach you, topic by topic",
+  "notifAlwaysOn": "Always on — account and security messages cannot be switched off",
+  "couldNotLoadPreferences": "Could not load your preferences",
+  "couldNotSaveThatChange": "Could not save that change",
+  "crossSellTogetherCount": "{count}× together",
+  "@crossSellTogetherCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "riderBalanceLine": "Balance {balance} · available for cash-out {available}",
+  "@riderBalanceLine": {
+    "placeholders": {
+      "balance": {},
+      "available": {}
+    }
+  },
+  "riderEarningsBreakdown": "{earnings} delivery pay · {tips} tips",
+  "@riderEarningsBreakdown": {
+    "placeholders": {
+      "earnings": {},
+      "tips": {}
+    }
+  },
+  "riderCashOutTitle": "Cash out",
+  "riderCashOutAvailable": "Available to cash out",
+  "riderCashOutMinimum": "Minimum {amount}",
+  "@riderCashOutMinimum": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "riderCashOutManualNote": "Payouts are handed over by the platform team — nothing transfers automatically.",
+  "riderCashOutRequest": "Request cash-out",
+  "riderCashOutAmountLabel": "Amount",
+  "riderCashOutAlreadyOpen": "A cash-out request is already on its way.",
+  "riderCashOutFailed": "The cash-out could not be requested.",
+  "riderCashOutOpenLine": "{amount} requested — waiting on the payout",
+  "@riderCashOutOpenLine": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "riderCashOutLastRefused": "Your last cash-out was refused.",
+  "riderCashOutHistory": "Recent requests",
+  "riderTipLine": "+{tip} tip",
+  "@riderTipLine": {
+    "placeholders": {
+      "tip": {}
+    }
+  },
+  "riderReimbursedLine": "+{amount} reimbursed",
+  "@riderReimbursedLine": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "riderLastSeen": "Last seen {when}",
+  "@riderLastSeen": {
+    "placeholders": {
+      "when": {}
+    }
+  },
+  "riderDutyChangeFailed": "Could not update your duty state.",
+  "riderDutyNotYetDeclared": "You have not gone on duty yet.",
+  "riderEtaCaption": "Live ETA",
+  "riderEtaAway": "{distance} away",
+  "@riderEtaAway": {
+    "placeholders": {
+      "distance": {}
+    }
+  },
+  "riderEtaArrivingAt": "arriving about {time}",
+  "@riderEtaArrivingAt": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "riderKmUnit": "{km} km",
+  "@riderKmUnit": {
+    "placeholders": {
+      "km": {}
+    }
+  },
+  "riderMetreUnit": "{m} m",
+  "@riderMetreUnit": {
+    "placeholders": {
+      "m": {}
+    }
+  },
+  "riderEtaComputedBy": "Estimated by {provider}",
+  "@riderEtaComputedBy": {
+    "placeholders": {
+      "provider": {}
+    }
+  },
+  "riderChatTitle": "Customer chat",
+  "riderChatHint": "Type a message…",
+  "riderChatSend": "Send",
+  "riderChatClosed": "This conversation has closed.",
+  "riderChatEmpty": "No messages yet.",
+  "riderChatCouldNotLoad": "Could not load the conversation",
+  "riderChatSendFailed": "The message was not sent.",
+  "riderChatReconnecting": "Reconnecting…",
+  "wizDocsIntro": "Clear photos or PDFs. You can replace any document until a decision is made.",
+  "wizDocFileTypes": "Photos and PDFs",
+  "wizDocAdd": "Add",
+  "wizDocReplace": "Replace",
+  "wizDocRemove": "Remove",
+  "wizDocReadyToSend": "Ready to send",
+  "wizDocNotAddedYet": "Not added yet",
+  "wizDocSentOnSubmit": "Your documents are sent when you submit the application.",
+  "wizDocTooLarge": "That file is too large",
+  "wizDocUploadFailed": "The upload did not go through",
+  "wizDocUploading": "Uploading…",
+  "wizDocCouldNotLoad": "Could not load your documents",
+  "wizDocsPendingTitle": "Your documents",
+  "wizDocsPendingBlurb": "A refused document can be replaced and will be reviewed again.",
+  "wizDocsNoneYet": "Nothing uploaded yet",
+  "wizCouldNotSendDocuments": "Your application is in, but a document did not go through.",
+  "wizPayoutAccountHolder": "Account holder",
+  "wizPayoutAccountHolderHint": "The name exactly as the bank has it",
+  "wizPayoutIban": "IBAN",
+  "wizPayoutIbanHint": "Starts with the country code, e.g. SA…",
+  "wizPayoutIbanInvalid": "That IBAN does not check out — a digit is probably wrong or two are swapped",
+  "wizPayoutIbanFormat": "An IBAN starts with two letters for the country and two check digits",
+  "wizPayoutIbanBounds": "An IBAN is between 15 and 34 characters",
+  "wizPayoutIbanLength": "An IBAN for {country} is {expected} characters",
+  "@wizPayoutIbanLength": {
+    "placeholders": {
+      "country": {},
+      "expected": {}
+    }
+  },
+  "wizPayoutCouldNotSave": "The bank details could not be saved",
+  "wizPayoutCouldNotLoad": "Could not load your bank details",
+  "wizPayoutSave": "Save bank details",
+  "wizPayoutChange": "Change",
+  "wizPayoutSentOnSubmit": "Your bank details are sent when you submit the application.",
+  "wizCouldNotSendPayout": "Your application is in, but the bank details did not go through."
 }

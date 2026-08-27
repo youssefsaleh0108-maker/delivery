@@ -15,6 +15,7 @@ library;
 
 export 'console_chrome.dart';
 export 'console_drawer.dart';
+export 'external_link.dart';
 export 'console_filter_tabs.dart';
 export 'console_identity.dart';
 export 'console_kpi_card.dart';

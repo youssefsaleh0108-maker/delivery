@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../models/catalog_models.dart';
 import '../models/order_models.dart';
 import '../models/provider_models.dart';
+import '../models/rating_models.dart';
 import '../models/summary_models.dart';
 
 /// Client for the Order Manager and Order Tracking APIs (Phase 2).
@@ -28,10 +29,28 @@ class OrderApi {
     /// the shop's flat fee rather than refusing them.
     String? deliveryZoneId,
 
-    /// How the customer intends to pay. Cash is the only method the app offers, and also what the
-    /// server assumes when this is absent — sent explicitly all the same, so the order records a
-    /// choice the customer actually made rather than a default nobody saw.
+    /// How the customer intends to pay. Cash is what the server assumes when this is absent —
+    /// sent explicitly all the same, so the order records a choice the customer actually made
+    /// rather than a default nobody saw. Non-cash methods need [paymentInstrumentToken] and
+    /// authorise against whatever provider is configured — the DEV one until a real credential
+    /// exists, which the offering screen must label as a test payment.
     PaymentMethod paymentMethod = PaymentMethod.cash,
+
+    /// A promo code, exactly as the customer typed it. The code and nothing else — what it is
+    /// worth is decided server-side against the server's own subtotal, and comes back on the
+    /// order as `discountAmount` and the canonical `promoCode`.
+    String? promoCode,
+
+    /// The payment processor's opaque handle for a card or wallet, minted by its own SDK on the
+    /// customer's device. Null on a cash order. Never a card number — the platform stays out of
+    /// PCI scope by never seeing one.
+    String? paymentInstrumentToken,
+
+    /// The map pin for [deliveryAddress], as the address picker resolved it. Both or neither —
+    /// the server drops half a pair rather than route to the wrong hemisphere. Without a pin the
+    /// order is placed and delivered exactly as before; what it does not get is a live ETA.
+    double? deliveryLatitude,
+    double? deliveryLongitude,
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '/api/orders',
@@ -49,6 +68,13 @@ class OrderApi {
         if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         'paymentMethod': paymentMethod.wire,
+        if (promoCode != null && promoCode.isNotEmpty) 'promoCode': promoCode,
+        if (paymentInstrumentToken != null && paymentInstrumentToken.isNotEmpty)
+          'paymentInstrumentToken': paymentInstrumentToken,
+        if (deliveryLatitude != null && deliveryLongitude != null) ...<String, dynamic>{
+          'deliveryLatitude': deliveryLatitude,
+          'deliveryLongitude': deliveryLongitude,
+        },
       },
     );
     return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
@@ -162,6 +188,66 @@ class OrderApi {
     return (response.data as List<dynamic>)
         .map((dynamic e) => RiderPosition.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  // ---------------------------------------------------------------- rider ratings
+
+  /// Rates the rider on a delivered order. CUSTOMER only; the service then decides whether this
+  /// order was the caller's, delivered, and not already rated — 409 when it was.
+  ///
+  /// [stars] is 1–5; [text] is optional and stripped of markup server-side.
+  Future<RiderRatingEntry> rateRider(String orderId, int stars, {String? text}) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/orders/$orderId/rating',
+      data: <String, dynamic>{
+        'score': stars,
+        if (text != null && text.isNotEmpty) 'comment': text,
+      },
+    );
+    return RiderRatingEntry.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// What the caller left on their own order, or null when they have not rated it — how the
+  /// screen knows to show stars already given rather than offer to rate again.
+  Future<RiderRatingEntry?> orderRating(String orderId) async {
+    try {
+      final Response<dynamic> response =
+          await _dio.get<dynamic>('/api/orders/$orderId/rating');
+      return RiderRatingEntry.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  /// A rider's aggregate — the number next to their name on a tracking screen. Open to any
+  /// authenticated caller; carries no comments and no individual scores.
+  ///
+  /// Render [RiderStanding.average] null as "new", never as zero.
+  Future<RiderStanding> riderRating(String riderId) async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/riders/$riderId/rating');
+    return RiderStanding.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// A rider's own standing, addressed by their token rather than an id they would have to know
+  /// the spelling of. DELIVERY only.
+  Future<RiderStanding> myRiderRating() async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/riders/me/rating');
+    return RiderStanding.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// The written comments about a rider. BACKOFFICE only — free text about a named individual is
+  /// not part of the public score.
+  Future<Paged<RiderRatingComment>> riderRatingComments(String riderId,
+      {int page = 0, int size = 20}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/riders/$riderId/rating/comments',
+      queryParameters: <String, dynamic>{'page': page, 'size': size},
+    );
+    return Paged<RiderRatingComment>.fromJson(
+        response.data as Map<String, dynamic>, RiderRatingComment.fromJson);
   }
 
   // ---------------------------------------------------------------- internals

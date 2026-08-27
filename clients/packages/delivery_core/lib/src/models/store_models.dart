@@ -231,6 +231,8 @@ class Store {
     this.logoUrl,
     this.coverUrl,
     this.address,
+    this.latitude,
+    this.longitude,
     this.favorite = false,
     this.offers = const <Offer>[],
   });
@@ -255,8 +257,18 @@ class Store {
   final String? logoUrl;
   final String? coverUrl;
   final String? address;
+
+  /// The map pin, or null when the merchant has not dropped one. Both null together or both set
+  /// together — the server enforces it, so testing either is enough. Null is the normal state for
+  /// a shop trading by delivery area alone: "no map for this one", not an error.
+  final double? latitude;
+  final double? longitude;
+
   final bool favorite;
   final List<Offer> offers;
+
+  /// Whether there is a pin to draw or to measure "near me" from.
+  bool get hasPin => latitude != null && longitude != null;
 
   String get etaLabel => '$etaMinMinutes-$etaMaxMinutes min';
 
@@ -332,6 +344,8 @@ class Store {
         logoUrl: json['logoUrl'] as String?,
         coverUrl: json['coverUrl'] as String?,
         address: json['address'] as String?,
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
         favorite: json['favorite'] as bool? ?? false,
         offers: (json['offers'] as List<dynamic>? ?? <dynamic>[])
             .map((dynamic o) => Offer.fromJson(o as Map<String, dynamic>))

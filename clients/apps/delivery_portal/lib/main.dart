@@ -104,6 +104,9 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     banner: BannerApi(_dio),
     offer: OfferApi(_dio),
     onboarding: OnboardingApi(_dio),
+    tracking: TrackingApi(_dio),
+    promo: PromoApi(_dio),
+    documents: DocumentsApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

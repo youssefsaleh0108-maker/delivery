@@ -1,6 +1,7 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_portal/src/backoffice/onboarding_screen.dart';
+import 'package:delivery_portal/src/shell/console_controls.dart';
 import 'package:delivery_portal/src/shell/shell.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -56,19 +57,46 @@ String _application({
  "rejectionReason":${rejectionReason == null ? 'null' : '"$rejectionReason"'},
  "provisionedUserRef":null,"provisionedEntityId":null}''';
 
+String _document({
+  required String id,
+  String kind = 'NATIONAL_ID',
+  String status = 'PENDING',
+  String? rejectionReason,
+}) =>
+    '''
+{"id":"$id","kind":"$kind","status":"$status",
+ "rejectionReason":${rejectionReason == null ? 'null' : '"$rejectionReason"'},
+ "reviewerNote":null,"uploadedAt":"2026-08-20T09:00:00Z","reviewedAt":null,
+ "reviewedBy":null,"superseded":false,"viewUrl":"http://files/doc-$id"}''';
+
 void main() {
   late _FakeAdapter adapter;
   late OnboardingApi api;
+  late DocumentsApi documentsApi;
 
   /// The waiting queue. Set per test before [pump].
   late String queueJson;
+
+  /// What `/applications/{id}/documents` answers. Empty unless a test uploads something.
+  late String documentsJson;
 
   setUp(() {
     queueJson = '''
 [${_application(id: 'a1', name: 'Rose & Crust Pizzeria', details: '{"businessType":"Pizza & Italian","vehicleType":"Van"}')},
  ${_application(id: 'a2', name: 'Waffle Wonder', emailVerifiedAt: null)}]''';
+    documentsJson = '[]';
 
     adapter = _FakeAdapter((RequestOptions options) {
+      // Document verdicts first: their paths also end in /approve and /reject, and answering them
+      // with an application would be a shape lie.
+      if (options.path.contains('/documents/') && options.path.endsWith('/approve')) {
+        return _json(_document(id: 'd1', status: 'APPROVED'));
+      }
+      if (options.path.contains('/documents/') && options.path.endsWith('/reject')) {
+        return _json(
+            _document(id: 'd1', status: 'REJECTED', rejectionReason: 'Too blurred'));
+      }
+      if (options.path.endsWith('/documents')) return _json(documentsJson);
       if (options.path.endsWith('/approve')) {
         return _json(_application(id: 'a1', name: 'Rose & Crust Pizzeria', status: 'APPROVED'));
       }
@@ -85,8 +113,10 @@ void main() {
       return _json(queueJson);
     });
 
-    api = OnboardingApi(
-        Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
+    final Dio dio =
+        Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
+    api = OnboardingApi(dio);
+    documentsApi = DocumentsApi(dio);
   });
 
   Future<void> pump(WidgetTester tester, {Size size = const Size(1500, 1200)}) async {
@@ -96,7 +126,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
-      home: Scaffold(body: OnboardingScreen(api: api)),
+      home: Scaffold(body: OnboardingScreen(api: api, documentsApi: documentsApi)),
     ));
     await tester.pumpAndSettle();
   }
@@ -192,6 +222,65 @@ void main() {
 
       expect(find.text('FROM THEIR APPLICATION'), findsNothing);
       expect(find.text('APPLICANT'), findsOneWidget);
+    });
+
+    testWidgets('reviews the uploaded papers one by one', (WidgetTester tester) async {
+      documentsJson = '[${_document(id: 'd1')}, ${_document(id: 'd2', kind: 'DRIVING_LICENCE', status: 'APPROVED')}]';
+      await pump(tester);
+
+      await tester.tap(find.text('Rose & Crust Pizzeria'));
+      await tester.pumpAndSettle();
+
+      // Each paper by its human name, with its own verdict badge — the pill language elsewhere on
+      // the page says 'Waiting' too, so the badge type is what disambiguates.
+      expect(find.text('National ID'), findsOneWidget);
+      expect(find.text('Driving licence'), findsOneWidget);
+      expect(find.widgetWithText(ConsoleSmallBadge, 'Waiting'), findsOneWidget);
+      expect(find.widgetWithText(ConsoleSmallBadge, 'Approved'), findsOneWidget);
+
+      // Approving the pending one goes to the document endpoint, not the application's.
+      await tester.tap(find.byTooltip('Approve this document'));
+      await tester.pumpAndSettle();
+      expect(
+        adapter.calls.any((String c) =>
+            c.contains('POST') && c.contains('/a1/documents/d1/approve')),
+        isTrue,
+      );
+    });
+
+    testWidgets('refusing a paper requires the reason the applicant will read',
+        (WidgetTester tester) async {
+      documentsJson = '[${_document(id: 'd1')}]';
+      await pump(tester);
+
+      await tester.tap(find.text('Rose & Crust Pizzeria'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Refuse this document'));
+      await tester.pumpAndSettle();
+
+      // Dead until something is typed — the reason is the only way the applicant learns what to
+      // upload instead.
+      final Finder confirm = find.widgetWithText(ConsoleButton, 'Refuse document');
+      expect(tester.widget<ConsoleButton>(confirm.hitTestable()).onPressed, isNull);
+
+      await tester.enterText(
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+        'The photo is too blurred to read',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(confirm.hitTestable());
+      await tester.pumpAndSettle();
+
+      expect(
+        adapter.bodies.any((Object? b) =>
+            b is Map && b['reason'] == 'The photo is too blurred to read'),
+        isTrue,
+      );
+      expect(
+        adapter.calls.any((String c) =>
+            c.contains('POST') && c.contains('/a1/documents/d1/reject')),
+        isTrue,
+      );
     });
 
     testWidgets('warns before an unverified address is approved',

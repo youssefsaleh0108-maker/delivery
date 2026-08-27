@@ -3,7 +3,9 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'application_documents_step.dart';
 import 'one_time_code.dart';
+import 'payout_details_step.dart';
 
 /// What an applicant sees between sending an application and somebody deciding.
 ///
@@ -21,12 +23,15 @@ import 'one_time_code.dart';
 /// they can ride.
 ///
 /// <p>Every state on both is read from the application rather than illustrated. Nothing is ticked
-/// because the design ticks it: document upload has no pipeline in this wave, so its line is locked
-/// on both screens rather than shown as done.
+/// because the design ticks it: the documents line follows what the reviewer has actually decided,
+/// and both screens now carry the applicant's real documents and bank details — replaceable and
+/// correctable for as long as the application is undecided, because this screen is exactly where
+/// somebody stuck on a refused photograph goes to get unstuck.
 class PendingApplicationScreen extends StatefulWidget {
   const PendingApplicationScreen({
     super.key,
     required this.api,
+    required this.documentsApi,
     required this.session,
     required this.onSignOut,
     required this.onApproved,
@@ -34,6 +39,11 @@ class PendingApplicationScreen extends StatefulWidget {
   });
 
   final OnboardingApi api;
+
+  /// The applicant's own documents and bank details — readable here, and writable for as long as
+  /// the application is undecided, because this screen is where a refused document gets replaced.
+  final DocumentsApi documentsApi;
+
   final AuthSession session;
   final Future<void> Function() onSignOut;
 
@@ -77,8 +87,25 @@ enum _Mark {
 class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
   late Future<OnboardingApplication?> _application = widget.api.mine();
 
+  /// Fetched lazily, only once an application is known to exist — the endpoints 404 for anybody
+  /// without one, and an eagerly-fired future nobody ever listens to is an unhandled error.
+  Future<List<ApplicantDocument>>? _documents;
+  Future<PayoutDetails?>? _payout;
+
   void _refresh() {
-    setState(() => _application = widget.api.mine());
+    setState(() {
+      _application = widget.api.mine();
+      _documents = null;
+      _payout = null;
+    });
+  }
+
+  void _reloadDocuments() {
+    setState(() => _documents = widget.documentsApi.myDocuments());
+  }
+
+  void _reloadPayout() {
+    setState(() => _payout = widget.documentsApi.myPayout());
   }
 
   String _statusLabel(DeliveryStrings t, OnboardingStatus status) =>
@@ -90,6 +117,113 @@ class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
         OnboardingStatus.provisioned => t.statusProvisioned,
         OnboardingStatus.failed => t.statusFailed,
       };
+
+  /// What the papers this kind of applicant is expected to produce are — riders one list,
+  /// everybody else the registered-business list, mirroring the service's `DocumentKind`.
+  List<ApplicantDocumentKind> _expectedKinds(OnboardingApplication a) =>
+      expectedDocumentKinds(rider: a.kind == OnboardingKind.rider);
+
+  /// How the checklist's documents line stands, read from the real documents rather than
+  /// illustrated. No data (still loading, or the fetch failed) renders as locked — the state the
+  /// line was born with — rather than as a claim.
+  _Mark _documentsMark(
+      List<ApplicantDocument>? documents, List<ApplicantDocumentKind> expected) {
+    if (documents == null || documents.isEmpty) return _Mark.locked;
+    if (documents.any((ApplicantDocument d) =>
+        d.status == ApplicantDocumentStatus.rejected)) {
+      return _Mark.failed;
+    }
+    final Set<ApplicantDocumentKind> approved = <ApplicantDocumentKind>{
+      for (final ApplicantDocument d in documents)
+        if (d.status == ApplicantDocumentStatus.approved && d.kind != null)
+          d.kind!,
+    };
+    if (expected.every(approved.contains)) return _Mark.done;
+    return _Mark.current;
+  }
+
+  /// The documents card, with its own loading and failed states so the rest of the screen never
+  /// waits on it. [onBrand] flips the spinner to white for the rider's brand-filled surface.
+  Widget _documentsSection(DeliveryStrings t, OnboardingApplication a,
+      AsyncSnapshot<List<ApplicantDocument>> snapshot,
+      {bool onBrand = false}) {
+    if (snapshot.connectionState != ConnectionState.done) {
+      return Padding(
+        padding: const EdgeInsets.all(DeliverySpacing.lg),
+        child: Center(
+            child: CircularProgressIndicator(
+                color: onBrand ? DeliveryColors.white : DeliveryColors.brand)),
+      );
+    }
+    if (snapshot.hasError) {
+      return YdCard.bordered(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(t.wizDocCouldNotLoad,
+                style: const TextStyle(
+                    fontSize: 13, color: DeliveryColors.muted)),
+            const SizedBox(height: DeliverySpacing.sm),
+            OutlinedButton(
+              onPressed: _reloadDocuments,
+              child: Text(t.tryAgain),
+            ),
+          ],
+        ),
+      );
+    }
+    return ApplicantDocumentsCard(
+      api: widget.documentsApi,
+      documents: snapshot.data ?? const <ApplicantDocument>[],
+      kinds: _expectedKinds(a),
+      canUpload: !a.status.isDecided,
+      onChanged: _reloadDocuments,
+    );
+  }
+
+  /// The bank-details card, same contract.
+  Widget _payoutSection(DeliveryStrings t, OnboardingApplication a,
+      {bool onBrand = false}) {
+    _payout ??= widget.documentsApi.myPayout();
+    return FutureBuilder<PayoutDetails?>(
+      future: _payout,
+      builder:
+          (BuildContext context, AsyncSnapshot<PayoutDetails?> snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Padding(
+            padding: const EdgeInsets.all(DeliverySpacing.lg),
+            child: Center(
+                child: CircularProgressIndicator(
+                    color:
+                        onBrand ? DeliveryColors.white : DeliveryColors.brand)),
+          );
+        }
+        if (snapshot.hasError) {
+          return YdCard.bordered(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(t.wizPayoutCouldNotLoad,
+                    style: const TextStyle(
+                        fontSize: 13, color: DeliveryColors.muted)),
+                const SizedBox(height: DeliverySpacing.sm),
+                OutlinedButton(
+                  onPressed: _reloadPayout,
+                  child: Text(t.tryAgain),
+                ),
+              ],
+            ),
+          );
+        }
+        return PayoutDetailsCard(
+          api: widget.documentsApi,
+          payout: snapshot.data,
+          canEdit: !a.status.isDecided,
+          onChanged: _reloadPayout,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,52 +317,83 @@ class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
                         const SizedBox(height: DeliverySpacing.lg),
                         _ExplorationNote(),
                         const SizedBox(height: DeliverySpacing.lg),
-                        YdCard.bordered(
-                          radius: 20,
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                t.authApplicationChecklist,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: DeliveryColors.ink,
-                                  height: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: DeliverySpacing.md),
-                              _ChecklistLine(
-                                label: t.authChecklistAccountCreated,
-                                mark: _Mark.done,
-                              ),
-                              // Locked, not ticked: there is no upload pipeline in this wave, so
-                              // nothing has been received and the screen must not say it has.
-                              _ChecklistLine(
-                                label: t.authChecklistDocuments,
-                                mark: _Mark.locked,
-                              ),
-                              _ChecklistLine(
-                                label: t.authChecklistAudit,
-                                mark: broken
-                                    ? _Mark.failed
-                                    : decided
-                                        ? _Mark.done
-                                        : _Mark.current,
-                              ),
-                              _ChecklistLine(
-                                label: t.authChecklistActivation,
-                                mark: _Mark.locked,
-                              ),
-                            ],
-                          ),
-                        ),
+                        Builder(builder: (BuildContext context) {
+                          _documents ??= widget.documentsApi.myDocuments();
+                          return FutureBuilder<List<ApplicantDocument>>(
+                            future: _documents,
+                            builder: (BuildContext context,
+                                AsyncSnapshot<List<ApplicantDocument>>
+                                    snapshot) {
+                              final List<ApplicantDocument>? docs =
+                                  snapshot.connectionState ==
+                                              ConnectionState.done &&
+                                          !snapshot.hasError
+                                      ? snapshot.data
+                                      : null;
+                              return Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: <Widget>[
+                                  YdCard.bordered(
+                                    radius: 20,
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                          t.authApplicationChecklist,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: DeliveryColors.ink,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                        const SizedBox(
+                                            height: DeliverySpacing.md),
+                                        _ChecklistLine(
+                                          label:
+                                              t.authChecklistAccountCreated,
+                                          mark: _Mark.done,
+                                        ),
+                                        // Read from the real documents now that a pipeline
+                                        // exists — done only once every expected paper is
+                                        // approved, failed the moment one is refused.
+                                        _ChecklistLine(
+                                          label: t.authChecklistDocuments,
+                                          mark: _documentsMark(
+                                              docs, _expectedKinds(a)),
+                                        ),
+                                        _ChecklistLine(
+                                          label: t.authChecklistAudit,
+                                          mark: broken
+                                              ? _Mark.failed
+                                              : decided
+                                                  ? _Mark.done
+                                                  : _Mark.current,
+                                        ),
+                                        _ChecklistLine(
+                                          label: t.authChecklistActivation,
+                                          mark: _Mark.locked,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: DeliverySpacing.md),
+                                  _StatusCard(
+                                    statusLabel: _statusLabel(t, a.status),
+                                    reference: a.reference,
+                                  ),
+                                  const SizedBox(height: DeliverySpacing.md),
+                                  _documentsSection(t, a, snapshot),
+                                ],
+                              );
+                            },
+                          );
+                        }),
                         const SizedBox(height: DeliverySpacing.md),
-                        _StatusCard(
-                          statusLabel: _statusLabel(t, a.status),
-                          reference: a.reference,
-                        ),
+                        _payoutSection(t, a),
                       ],
                     ),
                   ),
@@ -390,6 +555,23 @@ class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: DeliverySpacing.md),
+                        // The verification the timeline's first line talks about is these
+                        // documents. The cards are the light surface's own — white holds up on
+                        // the brand fill — and Replace stays live until somebody decides.
+                        Builder(builder: (BuildContext context) {
+                          _documents ??= widget.documentsApi.myDocuments();
+                          return FutureBuilder<List<ApplicantDocument>>(
+                            future: _documents,
+                            builder: (BuildContext context,
+                                    AsyncSnapshot<List<ApplicantDocument>>
+                                        snapshot) =>
+                                _documentsSection(t, a, snapshot,
+                                    onBrand: true),
+                          );
+                        }),
+                        const SizedBox(height: DeliverySpacing.md),
+                        _payoutSection(t, a, onBrand: true),
                       ],
                     ),
                   ),

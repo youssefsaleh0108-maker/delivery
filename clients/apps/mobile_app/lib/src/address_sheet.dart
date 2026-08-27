@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -17,7 +19,7 @@ import 'delivery_address.dart';
 /// nowhere to put a coordinate, so a pin that moves and changes nothing would be a control that
 /// lies. The typed line and the area picker are what actually decide where an order goes.
 Future<void> showAddressSheet(BuildContext context, DeliveryAddressStore store,
-    {DeliveryZoneApi? zoneApi}) {
+    {DeliveryZoneApi? zoneApi, GeocodingApi? geocodingApi}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -25,18 +27,24 @@ Future<void> showAddressSheet(BuildContext context, DeliveryAddressStore store,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.sheet)),
     ),
-    builder: (BuildContext context) => _AddressSheet(store: store, zoneApi: zoneApi),
+    builder: (BuildContext context) =>
+        _AddressSheet(store: store, zoneApi: zoneApi, geocodingApi: geocodingApi),
   );
 }
 
 class _AddressSheet extends StatefulWidget {
-  const _AddressSheet({required this.store, this.zoneApi});
+  const _AddressSheet({required this.store, this.zoneApi, this.geocodingApi});
 
   final DeliveryAddressStore store;
 
   /// Optional so the sheet still works with no areas configured, and so a test can pump it
   /// without a server.
   final DeliveryZoneApi? zoneApi;
+
+  /// The place search behind the field above the typed line. Optional like [zoneApi]: without it
+  /// the sheet is exactly what it was — a typed line and an area — and nothing pretends to
+  /// search.
+  final GeocodingApi? geocodingApi;
 
   @override
   State<_AddressSheet> createState() => _AddressSheetState();
@@ -65,14 +73,113 @@ class _AddressSheetState extends State<_AddressSheet> {
   /// exactly what the design's "Other" chip implies and what the label already was.
   _LabelChoice _labelChoice = _LabelChoice.other;
 
+  // ------------------------------------------------------------------ the place search
+
+  final TextEditingController _search = TextEditingController();
+  Timer? _searchDebounce;
+  List<PlaceCandidate> _candidates = <PlaceCandidate>[];
+  bool _searching = false;
+  bool _searchFailed = false;
+
+  /// The last query the server actually answered, so "no places found" is only ever said about a
+  /// question that was asked — not flashed at a query still waiting out its debounce.
+  String? _answeredQuery;
+
+  /// The pin the picker dropped, travelling with the saved address and then with the order.
+  ///
+  /// Kept when the customer edits the line afterwards — adding a flat number does not move the
+  /// building — and removable through the chip's close affordance when the pin genuinely no
+  /// longer describes the address.
+  double? _lat;
+  double? _lng;
+
+  /// The reverse geocoder's town or district for the picked point, when it knows one. Purely a
+  /// caption under the pin chip.
+  String? _locality;
+
   @override
   void initState() {
     super.initState();
     // In initState rather than a field initialiser: `widget` is not available while fields are
     // being initialised.
     _zoneId = widget.store.selected?.zoneId;
+    _lat = widget.store.selected?.latitude;
+    _lng = widget.store.selected?.longitude;
     _loadZones();
   }
+
+  void _onSearchTyped(String text) {
+    _searchDebounce?.cancel();
+    if (text.trim().isEmpty) {
+      setState(() {
+        _candidates = <PlaceCandidate>[];
+        _searching = false;
+        _searchFailed = false;
+      });
+      return;
+    }
+    // Under three characters the server answers with an empty list without spending geocoding
+    // budget, so firing per pause is safe by design.
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () => _runSearch(text.trim()));
+  }
+
+  Future<void> _runSearch(String text) async {
+    final GeocodingApi? api = widget.geocodingApi;
+    if (api == null || !mounted) return;
+    setState(() {
+      _searching = true;
+      _searchFailed = false;
+    });
+    try {
+      final PlaceSearchResult result = await api.searchPlaces(text);
+      if (!mounted || _search.text.trim() != text) return;
+      setState(() {
+        _candidates = result.results;
+        _searching = false;
+        _answeredQuery = text;
+      });
+    } catch (_) {
+      if (!mounted || _search.text.trim() != text) return;
+      setState(() {
+        _searching = false;
+        _searchFailed = true;
+        _candidates = <PlaceCandidate>[];
+      });
+    }
+  }
+
+  /// Takes a candidate: the line fills with its label, the pin is kept, and the reverse geocoder
+  /// is asked what neighbourhood the point is in — a caption, never a blocker.
+  void _pickCandidate(PlaceCandidate candidate) {
+    setState(() {
+      _line.text = candidate.label;
+      _lat = candidate.latitude;
+      _lng = candidate.longitude;
+      _locality = null;
+      _candidates = <PlaceCandidate>[];
+      _search.clear();
+    });
+    final GeocodingApi? api = widget.geocodingApi;
+    if (api == null) return;
+    unawaited(api.reverse(candidate.latitude, candidate.longitude).then(
+      (ReverseGeocodeResult? reverse) {
+        if (!mounted || reverse == null) return;
+        // Only if the pin has not moved since the question was asked.
+        if (_lat == candidate.latitude && _lng == candidate.longitude) {
+          setState(() => _locality = reverse.locality);
+        }
+      },
+      onError: (Object _) {
+        // The caption stays empty. A pin without a named district is still a pin.
+      },
+    ));
+  }
+
+  void _clearPin() => setState(() {
+        _lat = null;
+        _lng = null;
+        _locality = null;
+      });
 
   /// Lights the chip that matches an already-saved label, so re-opening the sheet on "Home" does
   /// not present it as a custom label nobody chose.
@@ -111,6 +218,8 @@ class _AddressSheetState extends State<_AddressSheet> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _search.dispose();
     _line.dispose();
     _label.dispose();
     _notes.dispose();
@@ -129,6 +238,10 @@ class _AddressSheetState extends State<_AddressSheet> {
       zoneId: zone?.id,
       // Stored alongside the id so the address still reads correctly if the area is later retired.
       zoneName: zone?.name,
+      // The picker's pin, when one was dropped. It travels with the order at placement so the
+      // tracking service has a point to measure the rider's ETA against.
+      latitude: _lat,
+      longitude: _lng,
     ));
     if (mounted) Navigator.of(context).pop();
   }
@@ -195,6 +308,11 @@ class _AddressSheetState extends State<_AddressSheet> {
                   const SizedBox(height: DeliverySpacing.md),
                 ],
 
+                if (widget.geocodingApi != null) ...<Widget>[
+                  _searchSection(t),
+                  const SizedBox(height: DeliverySpacing.md),
+                ],
+
                 _field(
                   label: t.address,
                   child: TextFormField(
@@ -207,6 +325,13 @@ class _AddressSheetState extends State<_AddressSheet> {
                         (v == null || v.trim().length < 5) ? t.addressTooShort : null,
                   ),
                 ),
+
+                // The pin the picker dropped, named and removable. Only ever shown when real
+                // coordinates exist — an address typed by hand has no chip and no pretence.
+                if (_lat != null && _lng != null) ...<Widget>[
+                  const SizedBox(height: DeliverySpacing.sm),
+                  _pinChip(t),
+                ],
 
                 // The area, directly under the street. It is part of the address rather than a
                 // setting — and it is what decides whether a shop will come at all, and for how
@@ -295,6 +420,154 @@ class _AddressSheetState extends State<_AddressSheet> {
       focusedBorder: border(DeliveryColors.brand, 1.5),
       errorBorder: border(DeliveryAccent.critical.color, 1),
       focusedErrorBorder: border(DeliveryAccent.critical.color, 1.5),
+    );
+  }
+
+  // ------------------------------------------------------------------ the search section
+
+  /// The place search: the design's input shape with a magnifier, the candidate rows under it,
+  /// and one quiet line for the empty and failed answers.
+  Widget _searchSection(DeliveryStrings t) {
+    final String query = _search.text.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TextField(
+          controller: _search,
+          onChanged: _onSearchTyped,
+          textInputAction: TextInputAction.search,
+          style: _inputStyle,
+          decoration: _boxDecoration(t.searchForAPlace).copyWith(
+            prefixIcon: const Icon(Icons.search_rounded,
+                size: 18, color: DeliveryColors.faint),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 40, minHeight: 20),
+            suffixIcon: _searching
+                ? const Padding(
+                    padding: EdgeInsetsDirectional.all(12),
+                    child: SizedBox.square(
+                      dimension: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: DeliveryColors.brand),
+                    ),
+                  )
+                : null,
+          ),
+        ),
+        if (_candidates.isNotEmpty) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          Container(
+            decoration: BoxDecoration(
+              color: DeliveryColors.white,
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              border: Border.all(color: DeliveryColors.borderFaint),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: <Widget>[
+                for (int i = 0; i < _candidates.length; i++) ...<Widget>[
+                  if (i > 0)
+                    const Divider(height: 1, thickness: 1, color: DeliveryColors.borderFaint),
+                  _candidateRow(_candidates[i]),
+                ],
+              ],
+            ),
+          ),
+        ] else if (!_searching && _searchFailed) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.couldNotSearchPlaces,
+            style: const TextStyle(
+                fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+          ),
+        ] else if (!_searching && query.length >= 3 && query == _answeredQuery) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          Text(
+            t.noPlacesFound,
+            style: const TextStyle(
+                fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _candidateRow(PlaceCandidate candidate) {
+    return InkWell(
+      onTap: () => _pickCandidate(candidate),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+            vertical: DeliverySpacing.sm + 2),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              // A near match is presented as a guess, exactly as the provider called it.
+              candidate.confident ? Icons.place_rounded : Icons.place_outlined,
+              size: 16,
+              color: DeliveryColors.brand,
+            ),
+            const SizedBox(width: DeliverySpacing.sm),
+            Expanded(
+              child: Text(
+                // Provider text rendered as text, never as markup.
+                candidate.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13, color: DeliveryColors.ink, height: 1.35),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The brand-tinted "Pinned on the map" chip, with the reverse geocoder's district as its
+  /// caption when one came back, and the close affordance that drops the pin.
+  Widget _pinChip(DeliveryStrings t) {
+    return Row(
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.sm + 2, vertical: DeliverySpacing.xs + 2),
+          decoration: BoxDecoration(
+            color: DeliveryColors.brandSoft,
+            borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.push_pin_outlined, size: 12, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.xs),
+              Flexible(
+                child: Text(
+                  _locality == null || _locality!.isEmpty
+                      ? t.addressPinnedOnMap
+                      : '${t.addressPinnedOnMap} · $_locality',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.brand,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.xs),
+              InkWell(
+                borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+                onTap: _clearPin,
+                child: const Icon(Icons.close_rounded,
+                    size: 12, color: DeliveryColors.brand),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' as intl;
 
 import 'cart.dart';
 import 'order_tracking_panel.dart';
+import 'rate_rider_sheet.dart';
 import 'store_page_screen.dart';
 
 /// One order, in full — the 2026-08 Figma redesign's `customer-order-details` (node 3:542).
@@ -29,6 +30,8 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.storeApi,
     required this.cart,
     required this.orderId,
+    this.trackingApi,
+    this.chatApi,
     this.preview,
   });
 
@@ -36,6 +39,14 @@ class OrderDetailsScreen extends StatefulWidget {
   final StoreApi storeApi;
   final Cart cart;
   final String orderId;
+
+  /// The ETA endpoint, handed through to the tracking panel. Optional so call sites that have
+  /// not been wired yet keep compiling; the panel then shows what it always showed.
+  final TrackingApi? trackingApi;
+
+  /// The order conversation, handed through to the tracking panel's message entry. Optional for
+  /// the same reason.
+  final ChatApi? chatApi;
 
   /// The row that was tapped, so the page renders immediately instead of flashing a spinner over
   /// information the list already had.
@@ -54,6 +65,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   bool _loading = true;
   bool _reordering = false;
+
+  /// The stars this customer already left, when they have. Null with [_ratingKnown] false means
+  /// the question has not been answered yet, and nothing about rating is drawn — a "rate" button
+  /// that flashes and turns into "already rated" is the screen guessing out loud.
+  RiderRatingEntry? _rating;
+  bool _ratingKnown = false;
 
   @override
   void initState() {
@@ -75,6 +92,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       // holding it up, and a failure in either leaves the order itself perfectly readable.
       _loadStore(order);
       _loadThumbnails(order);
+      _loadRating(order);
     } catch (_) {
       // The error state is the absence of an order, not a stored exception — nothing on this
       // screen distinguishes one failure from another, so keeping the object would be pretence.
@@ -113,6 +131,37 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     } catch (_) {
       // No thumbnails; the lines still render.
     }
+  }
+
+  /// Asks whether this delivery was already rated — only for a delivered order with a rider,
+  /// because those are the only ones the server accepts a rating on.
+  Future<void> _loadRating(DeliveryOrder order) async {
+    if (order.status.wire != 'DELIVERED' || order.riderId == null) return;
+    try {
+      final RiderRatingEntry? rating = await widget.orderApi.orderRating(order.id);
+      if (!mounted) return;
+      setState(() {
+        _rating = rating;
+        _ratingKnown = true;
+      });
+    } catch (_) {
+      // Unanswered stays unanswered: no rating affordance is drawn rather than one that may
+      // contradict the server.
+    }
+  }
+
+  Future<void> _rate() async {
+    final RiderRatingEntry? entry = await showRateRiderSheet(
+      context,
+      api: widget.orderApi,
+      orderId: widget.orderId,
+    );
+    if (entry == null || !mounted) return;
+    setState(() {
+      _rating = entry;
+      _ratingKnown = true;
+    });
+    _say(DeliveryStrings.of(context).custThanksForRating);
   }
 
   /// Puts the whole order back in the basket.
@@ -236,7 +285,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 children: <Widget>[
                   _statusCard(t, order),
                   // Live tracking, which draws nothing once the order is finished.
-                  OrderTrackingPanel(api: widget.orderApi, order: order),
+                  OrderTrackingPanel(
+                    api: widget.orderApi,
+                    order: order,
+                    trackingApi: widget.trackingApi,
+                    chatApi: widget.chatApi,
+                  ),
+                  // After delivery, the rating takes the tracking panel's slot: the sheet once,
+                  // the stars already given after that.
+                  if (_ratingKnown)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                          start: DeliverySpacing.lg,
+                          end: DeliverySpacing.lg,
+                          top: DeliverySpacing.lg),
+                      child: _ratingCard(t),
+                    ),
                   _itemsBox(t, order),
                   Padding(
                     padding: const EdgeInsetsDirectional.symmetric(
@@ -436,6 +500,106 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ------------------------------------------------------------------ the rating
+
+  /// One card, two states: the invitation to rate, or the stars already given. Drawn only once
+  /// the server has answered whether a rating exists.
+  Widget _ratingCard(DeliveryStrings t) {
+    final RiderRatingEntry? rating = _rating;
+
+    if (rating == null) {
+      return YdCard(
+        onTap: _rate,
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.star_outline_rounded,
+                  size: 20, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    t.custRateYourRider,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.custHowWasDelivery,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: DeliveryColors.muted,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Directionality.of(context) == TextDirection.rtl
+                  ? Icons.chevron_left_rounded
+                  : Icons.chevron_right_rounded,
+              size: 18,
+              color: DeliveryColors.muted,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return YdCard(
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              t.custAlreadyRatedDelivery,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.ink,
+                height: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Semantics(
+            label: t.ratingStars(rating.score),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                for (int star = 1; star <= 5; star++)
+                  Icon(
+                    star <= rating.score
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 18,
+                    color: star <= rating.score
+                        ? DeliveryAccent.caution.color
+                        : DeliveryColors.border,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -651,6 +815,34 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 : t.setByStoreCharged(order.storeName ?? ''),
             override: order.deliveryFeeCharged == 0 ? t.free : null,
           ),
+          // The promo code's line, only on orders that carried one — null means no code, which
+          // is not the same receipt as a code worth zero.
+          if (order.discountAmount != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Row(
+              children: <Widget>[
+                Text(
+                  order.promoCode ?? t.custDiscounts,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: DeliveryColors.muted,
+                    height: 1.3,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '-${order.discountAmount!.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryAccent.positive.color,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const Padding(
             padding: EdgeInsets.symmetric(vertical: DeliverySpacing.md - DeliverySpacing.xs),
             child: Divider(height: 1, thickness: 1, color: DeliveryColors.border),
@@ -666,7 +858,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               const SizedBox(width: DeliverySpacing.xs + 2),
               Expanded(
                 child: Text(
-                  order.paymentMethod.labelIn(t),
+                  // Non-cash means the DEV provider held nothing real, and the receipt says so —
+                  // a dev authorisation must never read as a live charge.
+                  order.paymentMethod.needsProvider
+                      ? '${order.paymentMethod == PaymentMethod.wallet ? t.paymentWallet : order.paymentMethod.labelIn(t)} · ${t.custTestPayment}'
+                      : order.paymentMethod.labelIn(t),
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

@@ -46,12 +46,19 @@ extension PaymentMethodLabel on PaymentMethod {
   String labelIn(DeliveryStrings t) => switch (this) {
         PaymentMethod.cash => t.cashOnDelivery,
         PaymentMethod.card => t.card,
+        // No translation exists for the wallet yet; the English fallback is honest until the
+        // surface that offers it ships its key. It only appears in dev builds today.
+        PaymentMethod.wallet => label,
       };
 
   /// The one-line explanation shown under the method at checkout.
+  ///
+  /// The card and wallet sentences here describe the *default* state — the surface that offers
+  /// dev-provider test payments replaces them with its own "test payment" wording.
   String descriptionIn(DeliveryStrings t) => switch (this) {
         PaymentMethod.cash => t.payTheRiderWhenItArrives,
         PaymentMethod.card => t.cardNotAvailableYet,
+        PaymentMethod.wallet => t.cardNotAvailableYet,
       };
 }
 

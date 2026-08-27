@@ -109,6 +109,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final CatalogApi _catalogApi = CatalogApi(_dio);
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
+
+  /// The applicant's documents and payout details — the wizard sends them right after the account
+  /// exists, and the pending screen reads and corrects them while the application waits.
+  late final DocumentsApi _documentsApi = DocumentsApi(_dio);
   late final NotificationApi _notificationApi = NotificationApi(_dio);
   late final ButlerApi _butlerApi = ButlerApi(_dio);
   /// The area list the address sheet offers. Nullable nowhere: a deployment with no areas
@@ -411,6 +415,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               }
               return PartnerApplicationScreen(
                 api: _onboardingApi,
+                documentsApi: _documentsApi,
                 kind: _partnerKind!,
                 authService: _authService,
                 onSignedIn: (AuthSession session) {
@@ -502,6 +507,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               // application. See [_exploreAsCustomer].
               key: ValueKey<int>(_pendingEpoch),
               api: _onboardingApi,
+              documentsApi: _documentsApi,
               session: session,
               onSignOut: _signOut,
               onApproved: () => _signOut(),

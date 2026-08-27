@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
+import '../models/geo_models.dart';
 import '../models/store_models.dart';
 
 /// Typed client for the storefront half of the Product Service.
@@ -49,6 +50,35 @@ class StoreApi {
       page: page,
       size: size,
     );
+  }
+
+  /// Live shops near a point, nearest first.
+  ///
+  /// Shops with no pin do not appear — a merchant who has not placed themselves on a map has not
+  /// told us where they are, and that gap is not filled with a guess. [NearbyStore.distanceMetres]
+  /// is straight-line, not driven; say "away", not "drive".
+  ///
+  /// [radiusMetres] is clamped into range server-side rather than refused — a million metres is a
+  /// legitimate "everything around here".
+  Future<Paged<NearbyStore>> nearby(
+    double lat,
+    double lng, {
+    int radiusMetres = 5000,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/stores/nearby',
+      queryParameters: <String, dynamic>{
+        'latitude': lat,
+        'longitude': lng,
+        'radiusMetres': radiusMetres,
+        'page': page,
+        'size': size,
+      },
+    );
+    return Paged<NearbyStore>.fromJson(
+        response.data as Map<String, dynamic>, NearbyStore.fromJson);
   }
 
   Future<Paged<StoreCard>> favorites({int page = 0, int size = 20}) async {
@@ -157,6 +187,25 @@ class StoreApi {
     return PricedSelection.fromJson(response.data as Map<String, dynamic>);
   }
 
+  // ---------------------------------------------------------------- cross-sell
+
+  /// The "People Also Ordered" rail, named for what the backend honestly computes: how often two
+  /// products shared a *delivered* basket. Not collaborative filtering — there is no model of who
+  /// the caller is.
+  ///
+  /// Respect [BoughtTogetherSuggestion.basis]: only [CrossSellBasis.boughtTogether] rows carry a
+  /// measured count; [CrossSellBasis.sameAisle] is same-shop fill and claims nothing. Until the
+  /// delivered-basket projection accumulates data, every row is the latter.
+  Future<List<BoughtTogetherSuggestion>> boughtTogether(String productId, {int limit = 8}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/products/$productId/bought-together',
+      queryParameters: <String, dynamic>{'limit': limit},
+    );
+    return (response.data as List<dynamic>)
+        .map((dynamic e) => BoughtTogetherSuggestion.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   // ---------------------------------------------------------------- favourites
 
   /// Both calls are idempotent server-side, so a double tap is harmless and the UI can update
@@ -197,6 +246,28 @@ class StoreApi {
         'address': address,
       },
     );
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Drops or moves the shop's map pin.
+  ///
+  /// Its own call rather than fields on the profile form, mirroring the server's reasoning: the
+  /// profile is saved on every tagline edit, and a nullable coordinate pair there would silently
+  /// clear the pin on every save by a client that does not know the fields exist. Moving a shop is
+  /// its own decision.
+  Future<Store> setPin(String storeId, {required double lat, required double lng}) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/stores/$storeId/location',
+      data: <String, dynamic>{'latitude': lat, 'longitude': lng},
+    );
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Takes the shop off the map. The address text is kept — only the pin goes, and with it the
+  /// shop's appearance in [nearby].
+  Future<Store> clearPin(String storeId) async {
+    final Response<dynamic> response =
+        await _dio.delete<dynamic>('/api/stores/$storeId/location');
     return Store.fromJson(response.data as Map<String, dynamic>);
   }
 

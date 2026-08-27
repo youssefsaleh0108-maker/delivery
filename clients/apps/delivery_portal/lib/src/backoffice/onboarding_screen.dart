@@ -5,6 +5,7 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../shell/console_controls.dart';
 import '../shell/shell.dart';
 
 /// Who is asking to join, and the decision.
@@ -23,10 +24,17 @@ import '../shell/shell.dart';
 /// the decision itself moved off the row and into a drawer. A row is scanned; a decision that is
 /// sent to a person verbatim is read. Keeping both on the same surface made the table either too
 /// tall to scan or too terse to decide from.
+///
+/// The drawer now also carries the applicant's uploaded papers, reviewed one by one: the document
+/// pipeline exists, and each document is approved with a click or refused with a typed reason the
+/// applicant is shown verbatim — the same asymmetry as the application decision itself, for the
+/// same cause: a refusal nobody can see the reason for produces the same photograph uploaded again
+/// unchanged.
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key, required this.api});
+  const OnboardingScreen({super.key, required this.api, required this.documentsApi});
 
   final OnboardingApi api;
+  final DocumentsApi documentsApi;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -368,6 +376,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       badge: ConsoleStatusPill(label: a.status.label, accent: _accentOf(a.status)),
       builder: (BuildContext drawerContext) => _ApplicationDetail(
         application: a,
+        documents: _ReviewerDocuments(
+          load: () => widget.documentsApi.applicationDocuments(a.id),
+          approve: (String documentId) =>
+              widget.documentsApi.approveDocument(a.id, documentId),
+          reject: (String documentId, String reason) =>
+              widget.documentsApi.rejectDocument(a.id, documentId, reason: reason),
+        ),
         onApprove: () {
           Navigator.of(drawerContext).pop();
           _approve(a);
@@ -469,11 +484,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class _ApplicationDetail extends StatelessWidget {
   const _ApplicationDetail({
     required this.application,
+    required this.documents,
     required this.onApprove,
     required this.onDecline,
   });
 
   final OnboardingApplication application;
+  final _ReviewerDocuments documents;
   final VoidCallback onApprove;
   final VoidCallback onDecline;
 
@@ -544,6 +561,16 @@ class _ApplicationDetail extends StatelessWidget {
               ],
             ),
           ),
+
+        // The applicant's uploaded papers, decided one by one. Live for every application — a
+        // reviewer reading a decided record still needs to see what the decision rested on.
+        ConsoleDrawerSection(
+          title: 'Documents',
+          child: _DocumentReviewList(
+            documents: documents,
+            readOnly: a.status.isDecided,
+          ),
+        ),
 
         if ((a.notes ?? '').isNotEmpty)
           ConsoleDrawerSection(
@@ -622,6 +649,308 @@ class _ApplicationDetail extends StatelessWidget {
         .trim();
     if (spaced.isEmpty) return key;
     return spaced[0].toUpperCase() + spaced.substring(1);
+  }
+}
+
+/// The document endpoints for one application, bundled so the list widget stays ignorant of ids.
+class _ReviewerDocuments {
+  const _ReviewerDocuments({
+    required this.load,
+    required this.approve,
+    required this.reject,
+  });
+
+  final Future<List<ReviewedDocument>> Function() load;
+  final Future<ReviewedDocument> Function(String documentId) approve;
+  final Future<ReviewedDocument> Function(String documentId, String reason) reject;
+}
+
+/// The papers on one application, each with its own verdict.
+///
+/// Loads itself when the drawer opens rather than making the row click wait on a second request —
+/// a reviewer reads the applicant block first anyway. Each decision refreshes only this list; the
+/// application row outside carries no document state to go stale.
+class _DocumentReviewList extends StatefulWidget {
+  const _DocumentReviewList({required this.documents, required this.readOnly});
+
+  final _ReviewerDocuments documents;
+
+  /// True on a decided application: the record stays readable, the verdict buttons go — deciding
+  /// a document under an application that is already answered would change nothing for anybody.
+  final bool readOnly;
+
+  @override
+  State<_DocumentReviewList> createState() => _DocumentReviewListState();
+}
+
+class _DocumentReviewListState extends State<_DocumentReviewList> {
+  late Future<List<ReviewedDocument>> _docs = widget.documents.load();
+  String? _busyId;
+
+  void _reload() => setState(() => _docs = widget.documents.load());
+
+  Future<void> _approve(ReviewedDocument doc) async {
+    setState(() => _busyId = doc.id);
+    try {
+      await widget.documents.approve(doc.id);
+      _reload();
+    } catch (e) {
+      _tell(_documentError(e));
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
+  Future<void> _reject(ReviewedDocument doc) async {
+    final String? reason = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) =>
+          _DocumentReasonDialog(documentLabel: _labelOf(doc)),
+    );
+    if (reason == null || reason.trim().isEmpty || !mounted) return;
+
+    setState(() => _busyId = doc.id);
+    try {
+      await widget.documents.reject(doc.id, reason.trim());
+      _reload();
+    } catch (e) {
+      _tell(_documentError(e));
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
+  void _tell(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: DeliveryAccent.critical.color,
+    ));
+  }
+
+  static String _documentError(Object e) {
+    if (e is DioException) {
+      final Object? body = e.response?.data;
+      if (body is Map) {
+        if (body['message'] is String) return body['message'] as String;
+        if (body['detail'] is String) return body['detail'] as String;
+      }
+    }
+    return 'That did not go through. Try again.';
+  }
+
+  /// The typed kind's label, or the server's own spelling for a kind this build does not know —
+  /// never a guess.
+  static String _labelOf(ReviewedDocument doc) => doc.kind?.label ?? doc.kindWire;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<ReviewedDocument>>(
+      future: _docs,
+      builder: (BuildContext context, AsyncSnapshot<List<ReviewedDocument>> snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: DeliverySpacing.md),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: DeliveryColors.brand),
+              ),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return Row(
+            children: <Widget>[
+              const Expanded(
+                child: Text('Could not load the documents.', style: ConsoleText.meta),
+              ),
+              ConsoleButton(
+                label: 'Try again',
+                tone: ConsoleButtonTone.outlined,
+                onPressed: _reload,
+              ),
+            ],
+          );
+        }
+
+        final List<ReviewedDocument> docs = snapshot.data ?? const <ReviewedDocument>[];
+        if (docs.isEmpty) {
+          // Nothing was uploaded, and that is a fact worth a sentence: older applications
+          // predate the document step entirely.
+          return const Text(
+            'No documents uploaded. Applications taken before the document step existed '
+            'carry none.',
+            style: ConsoleText.meta,
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (int i = 0; i < docs.length; i++) _row(docs[i], last: i == docs.length - 1),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _row(ReviewedDocument doc, {required bool last}) {
+    final bool busy = _busyId == doc.id;
+    final bool decidable =
+        !widget.readOnly && !doc.superseded && doc.status == ApplicantDocumentStatus.pending;
+
+    final (String badge, DeliveryAccent accent) = doc.superseded
+        ? ('Replaced', DeliveryAccent.neutral)
+        : switch (doc.status) {
+            ApplicantDocumentStatus.pending => ('Waiting', DeliveryAccent.caution),
+            ApplicantDocumentStatus.approved => ('Approved', DeliveryAccent.positive),
+            ApplicantDocumentStatus.rejected => ('Refused', DeliveryAccent.critical),
+          };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
+      decoration: BoxDecoration(
+        border: last
+            ? null
+            : const Border(bottom: BorderSide(color: DeliveryColors.border)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(_labelOf(doc),
+                    overflow: TextOverflow.ellipsis, style: ConsoleText.cell),
+                if (doc.status == ApplicantDocumentStatus.rejected &&
+                    (doc.rejectionReason ?? '').isNotEmpty)
+                  Text(doc.rejectionReason!,
+                      overflow: TextOverflow.ellipsis, style: ConsoleText.meta),
+              ],
+            ),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          ConsoleSmallBadge(label: badge, accent: accent),
+          const SizedBox(width: DeliverySpacing.sm),
+          // The paper itself, in a new tab. Absent when storage could not sign a URL — a dead
+          // button would promise a file this drawer cannot show.
+          if (doc.viewUrl != null) ...<Widget>[
+            ConsoleRowAction(
+              icon: Icons.open_in_new,
+              tooltip: 'Open the document',
+              onPressed: () => openExternalLink(doc.viewUrl!),
+            ),
+            const SizedBox(width: DeliverySpacing.xs),
+          ],
+          if (decidable) ...<Widget>[
+            ConsoleRowAction(
+              icon: Icons.check,
+              tooltip: 'Approve this document',
+              onPressed: busy ? null : () => _approve(doc),
+            ),
+            const SizedBox(width: DeliverySpacing.xs),
+            ConsoleRowAction(
+              icon: Icons.close,
+              tooltip: 'Refuse this document',
+              destructive: true,
+              onPressed: busy ? null : () => _reject(doc),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Refusing one document, with the reason typed out — the applicant is shown it verbatim, and it
+/// is the only way they learn what to upload instead.
+class _DocumentReasonDialog extends StatefulWidget {
+  const _DocumentReasonDialog({required this.documentLabel});
+
+  final String documentLabel;
+
+  @override
+  State<_DocumentReasonDialog> createState() => _DocumentReasonDialogState();
+}
+
+class _DocumentReasonDialogState extends State<_DocumentReasonDialog> {
+  final TextEditingController _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: DeliveryColors.white,
+      surfaceTintColor: DeliveryColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+      title: Text('Refuse ${widget.documentLabel}', style: ConsoleText.cardTitle),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'The applicant is shown this word for word. Say what is wrong with the document '
+              'and what to upload instead.',
+              style: ConsoleText.pageSubtitle,
+            ),
+            const SizedBox(height: DeliverySpacing.md),
+            TextField(
+              controller: _reason,
+              maxLines: 3,
+              maxLength: 500,
+              autofocus: true,
+              style: ConsoleText.cell,
+              cursorColor: DeliveryColors.brand,
+              decoration: InputDecoration(
+                hintText: 'The photo is too blurred to read the expiry date',
+                hintStyle: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
+                filled: true,
+                fillColor: DeliveryColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.brand),
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        ConsoleButton(
+          label: 'Cancel',
+          tone: ConsoleButtonTone.outlined,
+          onPressed: () => Navigator.pop(context),
+        ),
+        ConsoleButton(
+          label: 'Refuse document',
+          tone: ConsoleButtonTone.solid,
+          onPressed: _reason.text.trim().isEmpty
+              ? null
+              : () => Navigator.pop(context, _reason.text.trim()),
+        ),
+      ],
+    );
   }
 }
 

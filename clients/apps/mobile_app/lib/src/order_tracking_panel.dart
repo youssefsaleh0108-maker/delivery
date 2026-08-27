@@ -6,31 +6,47 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'customer_chat_screen.dart';
+import 'delivery_address.dart' show custEtaLegLabel, custEtaReasonLabel;
 import 'order_details_screen.dart' show CustomerStatusPill;
 
 /// Live tracking for an order in flight, drawn as the redesign's `customer-order-tracking`
 /// (node 3:619): a 520px map canvas with the tracking sheet — rounded 24 at the top, lifted by the
 /// heavier sheet shadow — sitting under it.
 ///
-/// **The map canvas is a styled placeholder, deliberately.** A tile layer needs a reachable tile
-/// server and an API key, and this deployment can rely on neither. More decisively, nothing in the
-/// system has coordinates for a store or a delivery address: addresses are free text and
-/// `stores.latitude` is null throughout. So the canvas is painted as the surface the design sizes
-/// it at, marked as not-yet-live, and the rider's *actual* recorded track is drawn on top of it
-/// when there is one. Everything shown is real; the three drawn map pins are not, and are not
-/// reproduced. When stores and addresses gain coordinates, this is the widget that gains a
-/// basemap, a destination marker and a genuine ETA.
+/// **The map canvas is still a styled placeholder — but the data on it is real now.** A tile
+/// layer needs a reachable tile server and an API key, and this deployment has neither, so the
+/// canvas stays the marked not-yet-live surface the design sizes it at. What changed with the
+/// tracking backend: the rider's recorded fixes are drawn on it as before, and the remaining
+/// distance and ETA the tracking service computes are drawn over it and into the sheet's
+/// headline. When the server says no estimate exists, its reason is shown instead — a number is
+/// never invented.
 ///
-/// The design's rider card — avatar, name, rating, message and call buttons — is not drawn either.
-/// The wire carries a `riderId` and nothing else about the person, and inventing a name, a face or
-/// a score would be fabrication. The message and call buttons are omitted outright: there is no
-/// in-app chat, and putting a rider's phone number in front of a customer is a decision the owner
-/// has not made. The slot carries the real fixes instead.
+/// The design's rider card — avatar, name, rating, call button — is still not drawn. The wire
+/// carries a `riderId` and nothing else about the person, and inventing a name, a face or a
+/// score would be fabrication. The *message* button is real now: it opens the customer's side of
+/// the order conversation once a rider is assigned. The call button stays omitted — putting a
+/// rider's phone number in front of a customer is a decision the owner has not made.
 class OrderTrackingPanel extends StatefulWidget {
-  const OrderTrackingPanel({super.key, required this.api, required this.order});
+  const OrderTrackingPanel({
+    super.key,
+    required this.api,
+    required this.order,
+    this.trackingApi,
+    this.chatApi,
+  });
 
   final OrderApi api;
   final DeliveryOrder order;
+
+  /// The ETA endpoint. Optional so the panel still builds where the shell has not been handed
+  /// one; the headline then stays the status sentence it was. Never used to invent a number —
+  /// when the server says no estimate exists, the reason is shown instead.
+  final TrackingApi? trackingApi;
+
+  /// The order conversation. Optional for the same reason; without it there is no chat entry at
+  /// all rather than a dead button.
+  final ChatApi? chatApi;
 
   @override
   State<OrderTrackingPanel> createState() => _OrderTrackingPanelState();
@@ -47,6 +63,10 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
   List<RiderPosition> _trail = <RiderPosition>[];
   RiderPosition? _latest;
   bool _loaded = false;
+
+  /// The server's last answer about when the rider is expected. Null until the first answer —
+  /// and always rendered exactly as sent: a number when it has one, its reason when it does not.
+  OrderEta? _eta;
 
   bool get _isLive =>
       widget.order.status.wire != 'DELIVERED' && widget.order.status.wire != 'CANCELLED';
@@ -84,7 +104,25 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
       // replacing the order page with an error.
       if (mounted) setState(() => _loaded = true);
     }
+    await _refreshEta();
   }
+
+  Future<void> _refreshEta() async {
+    final TrackingApi? api = widget.trackingApi;
+    if (api == null) return;
+    try {
+      final OrderEta eta = await api.eta(widget.order.id);
+      if (!mounted) return;
+      setState(() => _eta = eta);
+    } catch (_) {
+      // The last answer stays on screen; the next poll replaces it. An unreachable ETA endpoint
+      // must not take the tracking page down with it.
+    }
+  }
+
+  /// Whole minutes to show for the remaining travel, never below one — "0 min" reads as arrived,
+  /// which the server did not say.
+  static int _minutesOf(int seconds) => seconds <= 0 ? 1 : (seconds / 60).ceil();
 
   /// Straight-line metres between two fixes, by the haversine formula.
   static double _metresBetween(RiderPosition a, RiderPosition b) {
@@ -174,6 +212,40 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                 ),
               ),
             ),
+          // The real numbers, on the map surface: how far the rider still has to go and when
+          // they are expected — drawn only when the tracking service actually sent them.
+          if (_eta case final OrderEta eta when eta.available)
+            PositionedDirectional(
+              bottom: DeliverySpacing.md,
+              start: DeliverySpacing.lg,
+              child: Container(
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: DeliverySpacing.sm + 2,
+                  vertical: DeliverySpacing.xs + 2,
+                ),
+                decoration: BoxDecoration(
+                  color: DeliveryColors.white,
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  boxShadow: YdCard.softShadow,
+                ),
+                child: Text(
+                  <String>[
+                    if (eta.remainingMetres != null)
+                      eta.remainingMetres! >= 1000
+                          ? t.distanceKm((eta.remainingMetres! / 1000).toStringAsFixed(1))
+                          : t.distanceM(eta.remainingMetres!.round().toString()),
+                    if (eta.remainingSeconds != null)
+                      '${_minutesOf(eta.remainingSeconds!)} ${t.etaMinShort}',
+                  ].join(' · '),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.ink,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
           // The basemap itself is the part that does not exist yet, and says so in the design's
           // own chip language rather than by drawing streets nobody can navigate by.
           PositionedDirectional(
@@ -214,6 +286,33 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
 
   // ------------------------------------------------------------------ the sheet over it
 
+  /// The big line: minutes when the server sent them, the order's status when it did not.
+  String _headline(DeliveryStrings t) {
+    final OrderEta? eta = _eta;
+    if (eta != null && eta.available && eta.remainingSeconds != null) {
+      return '${_minutesOf(eta.remainingSeconds!)} ${t.etaMinShort}';
+    }
+    return widget.order.status.labelIn(t);
+  }
+
+  /// The quiet line under it: the journey leg and arrival time behind a live estimate, the
+  /// server's reason when there is none, and the panel's old sentence before the first answer.
+  String _subline(DeliveryStrings t) {
+    final OrderEta? eta = _eta;
+    if (eta != null && eta.available) {
+      final List<String> parts = <String>[
+        if (eta.leg != null) custEtaLegLabel(t, eta.leg!),
+        if (eta.estimatedArrival != null)
+          '${t.etaArriving} ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(eta.estimatedArrival!))}',
+      ];
+      if (parts.isNotEmpty) return parts.join(' · ');
+    }
+    if (eta != null && !eta.available && eta.reason != null) {
+      return custEtaReasonLabel(t, eta.reason!);
+    }
+    return _afterPickup ? t.waitingForRider : t.locationAfterPickup;
+  }
+
   Widget _sheet(DeliveryStrings t) {
     return Container(
       width: double.infinity,
@@ -252,11 +351,12 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    // The design's headline is an ETA. Nothing in the platform computes one — no
-                    // coordinates, no route — so the headline says what is true instead: where the
-                    // order has got to.
+                    // The design's headline is an ETA, and now there is one to show — when the
+                    // tracking service sent a number. When it declined, the headline stays the
+                    // status and the reason is said quietly underneath; a number is never
+                    // invented.
                     Text(
-                      widget.order.status.labelIn(t),
+                      _headline(t),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -268,7 +368,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _afterPickup ? t.waitingForRider : t.locationAfterPickup,
+                      _subline(t),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -277,6 +377,21 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                         height: 1.35,
                       ),
                     ),
+                    // The dev estimator knows nothing about roads; its number is shown with
+                    // exactly that much confidence.
+                    if (_eta?.available == true && _eta!.isStraightLine) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        t.etaStraightLineNote,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: DeliveryColors.faint,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -325,7 +440,67 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
               ],
             ),
           ],
+          // The design's rider-card slot ends in a message action, and now the customer's side
+          // of the conversation exists. Only with a rider to talk to: the conversation opens
+          // server-side when one is assigned, so a button before that would 404.
+          if (widget.chatApi != null && widget.order.riderId != null) ...<Widget>[
+            const SizedBox(height: 20),
+            const Divider(height: 1, thickness: 1, color: DeliveryColors.border),
+            const SizedBox(height: 20),
+            _chatEntry(t),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// The "Message the rider" row: the tinted 40px chat disc, the label, and the direction-aware
+  /// chevron, opening the customer's side of the order conversation.
+  Widget _chatEntry(DeliveryStrings t) {
+    return Semantics(
+      button: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => CustomerChatScreen(
+            api: widget.chatApi!,
+            orderId: widget.order.id,
+          ),
+        )),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.chat_bubble_outline_rounded,
+                  size: 18, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Text(
+                t.custChatWithRider,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryColors.ink,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            Icon(
+              Directionality.of(context) == TextDirection.rtl
+                  ? Icons.chevron_left_rounded
+                  : Icons.chevron_right_rounded,
+              size: 18,
+              color: DeliveryColors.muted,
+            ),
+          ],
+        ),
       ),
     );
   }

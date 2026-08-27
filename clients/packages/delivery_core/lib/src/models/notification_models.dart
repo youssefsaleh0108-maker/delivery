@@ -142,3 +142,130 @@ class ConnectorAuditEntry {
         changedAt: InAppNotification._date(json['changedAt']) ?? DateTime.now(),
       );
 }
+
+// --------------------------------------------------------------------- notification preferences
+
+/// One of the four buckets a notification belongs to, mirroring `NotificationCategory`.
+enum NotificationCategory {
+  /// Progress on an order the user placed, is preparing, or is delivering.
+  orderUpdates('ORDER_UPDATES', 'Order updates'),
+
+  /// Messages between a customer, a rider and a merchant.
+  chat('CHAT', 'Chat'),
+
+  /// Marketing. Off unless the user turns it on — consent is not implied by signing up.
+  promotions('PROMOTIONS', 'Promotions'),
+
+  /// Security and account integrity. Always delivered; no preference can suppress it, and the
+  /// server sends its rows locked.
+  account('ACCOUNT', 'Account and security');
+
+  const NotificationCategory(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  /// Null for a category this build does not know — the row still renders from its wire string.
+  static NotificationCategory? fromWire(String? value) {
+    for (final NotificationCategory c in NotificationCategory.values) {
+      if (c.wire == value) return c;
+    }
+    return null;
+  }
+}
+
+/// How a notification reaches somebody, mirroring `NotificationCommand`'s channel constants.
+///
+/// Ordered as the settings screen reads them — the channels that interrupt someone first, because
+/// those are the ones a user opening the screen is usually looking for.
+enum NotificationChannel {
+  push('PUSH', 'Push'),
+  inApp('IN_APP', 'In-app'),
+  email('EMAIL', 'Email'),
+  sms('SMS', 'SMS');
+
+  const NotificationChannel(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  /// Null for a channel this build does not know.
+  static NotificationChannel? fromWire(String? value) {
+    for (final NotificationChannel c in NotificationChannel.values) {
+      if (c.wire == value) return c;
+    }
+    return null;
+  }
+}
+
+/// One cell of the settings grid, mirroring `NotificationPreferenceService.Setting`.
+///
+/// The server returns the complete grid with defaults filled in, so a client never invents a
+/// default of its own.
+class NotificationPreference {
+  const NotificationPreference({
+    required this.categoryWire,
+    required this.channelWire,
+    required this.enabled,
+    required this.locked,
+    required this.userChosen,
+    this.category,
+    this.channel,
+  });
+
+  /// The typed pair, or null for a value this build does not know. The wire strings below are
+  /// always present and are what [NotificationPrefsApi.update] sends back.
+  final NotificationCategory? category;
+  final NotificationChannel? channel;
+
+  final String categoryWire;
+  final String channelWire;
+
+  final bool enabled;
+
+  /// The toggle must render disabled: the server refuses to turn this off (account-critical
+  /// messages). [enabled] stays true on locked rows.
+  final bool locked;
+
+  /// Whether this value is the user's own choice rather than the default — how a screen can say
+  /// "you turned this off" instead of guessing.
+  final bool userChosen;
+
+  factory NotificationPreference.fromJson(Map<String, dynamic> json) => NotificationPreference(
+        category: NotificationCategory.fromWire(json['category'] as String?),
+        channel: NotificationChannel.fromWire(json['channel'] as String?),
+        categoryWire: json['category'] as String? ?? '',
+        channelWire: json['channel'] as String? ?? '',
+        enabled: json['enabled'] as bool? ?? false,
+        locked: json['locked'] as bool? ?? false,
+        userChosen: json['userChosen'] as bool? ?? false,
+      );
+}
+
+/// One change the user made on the settings screen — only what was touched, never the whole grid.
+///
+/// Partial on purpose, mirroring the server's `PreferenceUpdate`: two devices open on the settings
+/// screen must not have the second save silently revert the first.
+class NotificationPreferenceChange {
+  const NotificationPreferenceChange({
+    required this.category,
+    required this.channel,
+    required this.enabled,
+  });
+
+  NotificationPreferenceChange.of(
+      NotificationCategory category, NotificationChannel channel, {required bool enabled})
+      : this(category: category.wire, channel: channel.wire, enabled: enabled);
+
+  /// Wire strings rather than enums, so a row that arrived with an unknown category can still be
+  /// toggled back exactly as it was named.
+  final String category;
+  final String channel;
+  final bool enabled;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'category': category,
+        'channel': channel,
+        'enabled': enabled,
+      };
+}

@@ -3575,4 +3575,503 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get riderErrandCap => 'Cap';
+
+  @override
+  String get etaWaitingFirstFix => 'Waiting for the rider\'s first GPS fix';
+
+  @override
+  String get etaPositionOutOfDate => 'The rider\'s position is out of date';
+
+  @override
+  String get etaNoMapPoint => 'No map point to measure to';
+
+  @override
+  String get etaRouteServiceDown => 'The route service did not answer';
+
+  @override
+  String get etaNothingOnItsWay => 'Nothing is on its way';
+
+  @override
+  String get etaUnavailable => 'No estimate available';
+
+  @override
+  String get etaHeadingToShop => 'Heading to the shop';
+
+  @override
+  String get etaOnTheWayToYou => 'On the way to you';
+
+  @override
+  String get etaStraightLineNote =>
+      'Rough estimate — measured in a straight line, not by road';
+
+  @override
+  String get dutyOnDuty => 'On duty';
+
+  @override
+  String get dutyOffDuty => 'Off duty';
+
+  @override
+  String get presenceSignalLost => 'Signal lost';
+
+  @override
+  String get promoApplied => 'The code was applied';
+
+  @override
+  String get promoUnknownCode => 'That code was not recognised';
+
+  @override
+  String get promoNotActive => 'That code is no longer available';
+
+  @override
+  String get promoNotStarted => 'That code cannot be used yet';
+
+  @override
+  String get promoExpired => 'That code has expired';
+
+  @override
+  String get promoBelowMinimum =>
+      'Your basket is below the minimum for that code';
+
+  @override
+  String get promoFullyRedeemed => 'That code has been fully redeemed';
+
+  @override
+  String get promoAlreadyUsed => 'You have already used that code';
+
+  @override
+  String get promoWorthNothing => 'That code is worth nothing on this order';
+
+  @override
+  String get promoDidNotApply => 'That code did not apply';
+
+  @override
+  String get paymentWallet => 'Wallet';
+
+  @override
+  String get paymentTestModeNote =>
+      'Test payment — no real money moves in this build';
+
+  @override
+  String get cashOutRequested => 'Requested';
+
+  @override
+  String get cashOutPaid => 'Paid';
+
+  @override
+  String get cashOutRefused => 'Refused';
+
+  @override
+  String get paidByPlatform => 'Paid by the platform';
+
+  @override
+  String get paidByYourCompany => 'Paid by your company';
+
+  @override
+  String get paidElsewhere => 'Paid elsewhere';
+
+  @override
+  String get tipCashAtDoor => 'Cash at the door';
+
+  @override
+  String get tipOnline => 'Online';
+
+  @override
+  String get docNationalId => 'National ID';
+
+  @override
+  String get docDrivingLicence => 'Driving licence';
+
+  @override
+  String get docVehicleRegistration => 'Vehicle registration';
+
+  @override
+  String get docCommercialRegistration => 'Commercial registration';
+
+  @override
+  String get docWaitingReview => 'Waiting for review';
+
+  @override
+  String get docApproved => 'Approved';
+
+  @override
+  String get docRefused => 'Refused';
+
+  @override
+  String get payoutFormatChecked => 'Format checked';
+
+  @override
+  String get payoutVerified => 'Verified';
+
+  @override
+  String get payoutFailedVerification => 'Failed verification';
+
+  @override
+  String get notifCatOrderUpdates => 'Order updates';
+
+  @override
+  String get notifCatChat => 'Chat';
+
+  @override
+  String get notifCatPromotions => 'Promotions';
+
+  @override
+  String get notifCatAccount => 'Account and security';
+
+  @override
+  String get notifChannelPush => 'Push';
+
+  @override
+  String get notifChannelInApp => 'In-app';
+
+  @override
+  String get notifChannelEmail => 'Email';
+
+  @override
+  String get notifChannelSms => 'SMS';
+
+  @override
+  String get chatRoleCustomer => 'Customer';
+
+  @override
+  String get chatRoleRider => 'Rider';
+
+  @override
+  String get crossSellBoughtTogether => 'Often bought together';
+
+  @override
+  String get crossSellSameShelf => 'From the same shelf';
+
+  @override
+  String get crossSellYouMightAlsoLike => 'You might also like';
+
+  @override
+  String get ratingNewRider => 'New';
+
+  @override
+  String get custTestPayment => 'Test payment';
+
+  @override
+  String get custPaymentDeclined =>
+      'The payment was declined and your order was not placed.';
+
+  @override
+  String get custPromoRemove => 'Remove the code';
+
+  @override
+  String get custPromoChecking => 'Checking the code…';
+
+  @override
+  String get promoCouldNotCheck => 'Could not check the code';
+
+  @override
+  String get etaMinShort => 'min';
+
+  @override
+  String get etaArriving => 'Expected arrival';
+
+  @override
+  String get etaRemaining => 'Remaining';
+
+  @override
+  String get custChatWithRider => 'Message the rider';
+
+  @override
+  String get chatTypeMessage => 'Type a message…';
+
+  @override
+  String get chatSend => 'Send';
+
+  @override
+  String get chatClosed => 'This conversation is closed';
+
+  @override
+  String get chatNoMessagesYet => 'No messages yet';
+
+  @override
+  String get chatCouldNotSend => 'Could not send your message';
+
+  @override
+  String get couldNotLoadChat => 'Could not load the conversation';
+
+  @override
+  String get custRateYourRider => 'Rate your rider';
+
+  @override
+  String get custHowWasDelivery => 'How was your delivery?';
+
+  @override
+  String get custAddCommentOptional => 'Add a comment (optional)';
+
+  @override
+  String get custSubmitRating => 'Submit rating';
+
+  @override
+  String get custThanksForRating => 'Thanks for rating your rider';
+
+  @override
+  String get custAlreadyRatedDelivery => 'You rated this delivery';
+
+  @override
+  String get custCouldNotSendRating => 'Could not send your rating';
+
+  @override
+  String ratingStars(Object n) {
+    return '$n stars';
+  }
+
+  @override
+  String get searchForAPlace => 'Search for a place…';
+
+  @override
+  String get noPlacesFound => 'No places found';
+
+  @override
+  String get couldNotSearchPlaces => 'Could not search just now';
+
+  @override
+  String get addressPinnedOnMap => 'Pinned on the map';
+
+  @override
+  String get notifPreferences => 'Notification preferences';
+
+  @override
+  String get notifPrefsBlurb => 'Choose how we reach you, topic by topic';
+
+  @override
+  String get notifAlwaysOn =>
+      'Always on — account and security messages cannot be switched off';
+
+  @override
+  String get couldNotLoadPreferences => 'Could not load your preferences';
+
+  @override
+  String get couldNotSaveThatChange => 'Could not save that change';
+
+  @override
+  String crossSellTogetherCount(Object count) {
+    return '$count× together';
+  }
+
+  @override
+  String riderBalanceLine(Object balance, Object available) {
+    return 'Balance $balance · available for cash-out $available';
+  }
+
+  @override
+  String riderEarningsBreakdown(Object earnings, Object tips) {
+    return '$earnings delivery pay · $tips tips';
+  }
+
+  @override
+  String get riderCashOutTitle => 'Cash out';
+
+  @override
+  String get riderCashOutAvailable => 'Available to cash out';
+
+  @override
+  String riderCashOutMinimum(Object amount) {
+    return 'Minimum $amount';
+  }
+
+  @override
+  String get riderCashOutManualNote =>
+      'Payouts are handed over by the platform team — nothing transfers automatically.';
+
+  @override
+  String get riderCashOutRequest => 'Request cash-out';
+
+  @override
+  String get riderCashOutAmountLabel => 'Amount';
+
+  @override
+  String get riderCashOutAlreadyOpen =>
+      'A cash-out request is already on its way.';
+
+  @override
+  String get riderCashOutFailed => 'The cash-out could not be requested.';
+
+  @override
+  String riderCashOutOpenLine(Object amount) {
+    return '$amount requested — waiting on the payout';
+  }
+
+  @override
+  String get riderCashOutLastRefused => 'Your last cash-out was refused.';
+
+  @override
+  String get riderCashOutHistory => 'Recent requests';
+
+  @override
+  String riderTipLine(Object tip) {
+    return '+$tip tip';
+  }
+
+  @override
+  String riderReimbursedLine(Object amount) {
+    return '+$amount reimbursed';
+  }
+
+  @override
+  String riderLastSeen(Object when) {
+    return 'Last seen $when';
+  }
+
+  @override
+  String get riderDutyChangeFailed => 'Could not update your duty state.';
+
+  @override
+  String get riderDutyNotYetDeclared => 'You have not gone on duty yet.';
+
+  @override
+  String get riderEtaCaption => 'Live ETA';
+
+  @override
+  String riderEtaAway(Object distance) {
+    return '$distance away';
+  }
+
+  @override
+  String riderEtaArrivingAt(Object time) {
+    return 'arriving about $time';
+  }
+
+  @override
+  String riderKmUnit(Object km) {
+    return '$km km';
+  }
+
+  @override
+  String riderMetreUnit(Object m) {
+    return '$m m';
+  }
+
+  @override
+  String riderEtaComputedBy(Object provider) {
+    return 'Estimated by $provider';
+  }
+
+  @override
+  String get riderChatTitle => 'Customer chat';
+
+  @override
+  String get riderChatHint => 'Type a message…';
+
+  @override
+  String get riderChatSend => 'Send';
+
+  @override
+  String get riderChatClosed => 'This conversation has closed.';
+
+  @override
+  String get riderChatEmpty => 'No messages yet.';
+
+  @override
+  String get riderChatCouldNotLoad => 'Could not load the conversation';
+
+  @override
+  String get riderChatSendFailed => 'The message was not sent.';
+
+  @override
+  String get riderChatReconnecting => 'Reconnecting…';
+
+  @override
+  String get wizDocsIntro =>
+      'Clear photos or PDFs. You can replace any document until a decision is made.';
+
+  @override
+  String get wizDocFileTypes => 'Photos and PDFs';
+
+  @override
+  String get wizDocAdd => 'Add';
+
+  @override
+  String get wizDocReplace => 'Replace';
+
+  @override
+  String get wizDocRemove => 'Remove';
+
+  @override
+  String get wizDocReadyToSend => 'Ready to send';
+
+  @override
+  String get wizDocNotAddedYet => 'Not added yet';
+
+  @override
+  String get wizDocSentOnSubmit =>
+      'Your documents are sent when you submit the application.';
+
+  @override
+  String get wizDocTooLarge => 'That file is too large';
+
+  @override
+  String get wizDocUploadFailed => 'The upload did not go through';
+
+  @override
+  String get wizDocUploading => 'Uploading…';
+
+  @override
+  String get wizDocCouldNotLoad => 'Could not load your documents';
+
+  @override
+  String get wizDocsPendingTitle => 'Your documents';
+
+  @override
+  String get wizDocsPendingBlurb =>
+      'A refused document can be replaced and will be reviewed again.';
+
+  @override
+  String get wizDocsNoneYet => 'Nothing uploaded yet';
+
+  @override
+  String get wizCouldNotSendDocuments =>
+      'Your application is in, but a document did not go through.';
+
+  @override
+  String get wizPayoutAccountHolder => 'Account holder';
+
+  @override
+  String get wizPayoutAccountHolderHint =>
+      'The name exactly as the bank has it';
+
+  @override
+  String get wizPayoutIban => 'IBAN';
+
+  @override
+  String get wizPayoutIbanHint => 'Starts with the country code, e.g. SA…';
+
+  @override
+  String get wizPayoutIbanInvalid =>
+      'That IBAN does not check out — a digit is probably wrong or two are swapped';
+
+  @override
+  String get wizPayoutIbanFormat =>
+      'An IBAN starts with two letters for the country and two check digits';
+
+  @override
+  String get wizPayoutIbanBounds => 'An IBAN is between 15 and 34 characters';
+
+  @override
+  String wizPayoutIbanLength(Object country, Object expected) {
+    return 'An IBAN for $country is $expected characters';
+  }
+
+  @override
+  String get wizPayoutCouldNotSave => 'The bank details could not be saved';
+
+  @override
+  String get wizPayoutCouldNotLoad => 'Could not load your bank details';
+
+  @override
+  String get wizPayoutSave => 'Save bank details';
+
+  @override
+  String get wizPayoutChange => 'Change';
+
+  @override
+  String get wizPayoutSentOnSubmit =>
+      'Your bank details are sent when you submit the application.';
+
+  @override
+  String get wizCouldNotSendPayout =>
+      'Your application is in, but the bank details did not go through.';
 }

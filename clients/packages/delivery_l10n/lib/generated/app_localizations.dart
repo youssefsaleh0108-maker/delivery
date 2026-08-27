@@ -6433,6 +6433,912 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Cap'**
   String get riderErrandCap;
+
+  /// No description provided for @etaWaitingFirstFix.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the rider\'s first GPS fix'**
+  String get etaWaitingFirstFix;
+
+  /// No description provided for @etaPositionOutOfDate.
+  ///
+  /// In en, this message translates to:
+  /// **'The rider\'s position is out of date'**
+  String get etaPositionOutOfDate;
+
+  /// No description provided for @etaNoMapPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'No map point to measure to'**
+  String get etaNoMapPoint;
+
+  /// No description provided for @etaRouteServiceDown.
+  ///
+  /// In en, this message translates to:
+  /// **'The route service did not answer'**
+  String get etaRouteServiceDown;
+
+  /// No description provided for @etaNothingOnItsWay.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is on its way'**
+  String get etaNothingOnItsWay;
+
+  /// No description provided for @etaUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No estimate available'**
+  String get etaUnavailable;
+
+  /// No description provided for @etaHeadingToShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Heading to the shop'**
+  String get etaHeadingToShop;
+
+  /// No description provided for @etaOnTheWayToYou.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way to you'**
+  String get etaOnTheWayToYou;
+
+  /// No description provided for @etaStraightLineNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Rough estimate — measured in a straight line, not by road'**
+  String get etaStraightLineNote;
+
+  /// No description provided for @dutyOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'On duty'**
+  String get dutyOnDuty;
+
+  /// No description provided for @dutyOffDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'Off duty'**
+  String get dutyOffDuty;
+
+  /// No description provided for @presenceSignalLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal lost'**
+  String get presenceSignalLost;
+
+  /// No description provided for @promoApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'The code was applied'**
+  String get promoApplied;
+
+  /// No description provided for @promoUnknownCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That code was not recognised'**
+  String get promoUnknownCode;
+
+  /// No description provided for @promoNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'That code is no longer available'**
+  String get promoNotActive;
+
+  /// No description provided for @promoNotStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'That code cannot be used yet'**
+  String get promoNotStarted;
+
+  /// No description provided for @promoExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'That code has expired'**
+  String get promoExpired;
+
+  /// No description provided for @promoBelowMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'Your basket is below the minimum for that code'**
+  String get promoBelowMinimum;
+
+  /// No description provided for @promoFullyRedeemed.
+  ///
+  /// In en, this message translates to:
+  /// **'That code has been fully redeemed'**
+  String get promoFullyRedeemed;
+
+  /// No description provided for @promoAlreadyUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'You have already used that code'**
+  String get promoAlreadyUsed;
+
+  /// No description provided for @promoWorthNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'That code is worth nothing on this order'**
+  String get promoWorthNothing;
+
+  /// No description provided for @promoDidNotApply.
+  ///
+  /// In en, this message translates to:
+  /// **'That code did not apply'**
+  String get promoDidNotApply;
+
+  /// No description provided for @paymentWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get paymentWallet;
+
+  /// No description provided for @paymentTestModeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Test payment — no real money moves in this build'**
+  String get paymentTestModeNote;
+
+  /// No description provided for @cashOutRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested'**
+  String get cashOutRequested;
+
+  /// No description provided for @cashOutPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get cashOutPaid;
+
+  /// No description provided for @cashOutRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get cashOutRefused;
+
+  /// No description provided for @paidByPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid by the platform'**
+  String get paidByPlatform;
+
+  /// No description provided for @paidByYourCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid by your company'**
+  String get paidByYourCompany;
+
+  /// No description provided for @paidElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid elsewhere'**
+  String get paidElsewhere;
+
+  /// No description provided for @tipCashAtDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash at the door'**
+  String get tipCashAtDoor;
+
+  /// No description provided for @tipOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get tipOnline;
+
+  /// No description provided for @docNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get docNationalId;
+
+  /// No description provided for @docDrivingLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence'**
+  String get docDrivingLicence;
+
+  /// No description provided for @docVehicleRegistration.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle registration'**
+  String get docVehicleRegistration;
+
+  /// No description provided for @docCommercialRegistration.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial registration'**
+  String get docCommercialRegistration;
+
+  /// No description provided for @docWaitingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for review'**
+  String get docWaitingReview;
+
+  /// No description provided for @docApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get docApproved;
+
+  /// No description provided for @docRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get docRefused;
+
+  /// No description provided for @payoutFormatChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Format checked'**
+  String get payoutFormatChecked;
+
+  /// No description provided for @payoutVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get payoutVerified;
+
+  /// No description provided for @payoutFailedVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed verification'**
+  String get payoutFailedVerification;
+
+  /// No description provided for @notifCatOrderUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Order updates'**
+  String get notifCatOrderUpdates;
+
+  /// No description provided for @notifCatChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get notifCatChat;
+
+  /// No description provided for @notifCatPromotions.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotions'**
+  String get notifCatPromotions;
+
+  /// No description provided for @notifCatAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account and security'**
+  String get notifCatAccount;
+
+  /// No description provided for @notifChannelPush.
+  ///
+  /// In en, this message translates to:
+  /// **'Push'**
+  String get notifChannelPush;
+
+  /// No description provided for @notifChannelInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app'**
+  String get notifChannelInApp;
+
+  /// No description provided for @notifChannelEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get notifChannelEmail;
+
+  /// No description provided for @notifChannelSms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS'**
+  String get notifChannelSms;
+
+  /// No description provided for @chatRoleCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get chatRoleCustomer;
+
+  /// No description provided for @chatRoleRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get chatRoleRider;
+
+  /// No description provided for @crossSellBoughtTogether.
+  ///
+  /// In en, this message translates to:
+  /// **'Often bought together'**
+  String get crossSellBoughtTogether;
+
+  /// No description provided for @crossSellSameShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'From the same shelf'**
+  String get crossSellSameShelf;
+
+  /// No description provided for @crossSellYouMightAlsoLike.
+  ///
+  /// In en, this message translates to:
+  /// **'You might also like'**
+  String get crossSellYouMightAlsoLike;
+
+  /// No description provided for @ratingNewRider.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get ratingNewRider;
+
+  /// No description provided for @custTestPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Test payment'**
+  String get custTestPayment;
+
+  /// No description provided for @custPaymentDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment was declined and your order was not placed.'**
+  String get custPaymentDeclined;
+
+  /// No description provided for @custPromoRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the code'**
+  String get custPromoRemove;
+
+  /// No description provided for @custPromoChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the code…'**
+  String get custPromoChecking;
+
+  /// No description provided for @promoCouldNotCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check the code'**
+  String get promoCouldNotCheck;
+
+  /// No description provided for @etaMinShort.
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get etaMinShort;
+
+  /// No description provided for @etaArriving.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected arrival'**
+  String get etaArriving;
+
+  /// No description provided for @etaRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get etaRemaining;
+
+  /// No description provided for @custChatWithRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the rider'**
+  String get custChatWithRider;
+
+  /// No description provided for @chatTypeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message…'**
+  String get chatTypeMessage;
+
+  /// No description provided for @chatSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get chatSend;
+
+  /// No description provided for @chatClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is closed'**
+  String get chatClosed;
+
+  /// No description provided for @chatNoMessagesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet'**
+  String get chatNoMessagesYet;
+
+  /// No description provided for @chatCouldNotSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send your message'**
+  String get chatCouldNotSend;
+
+  /// No description provided for @couldNotLoadChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the conversation'**
+  String get couldNotLoadChat;
+
+  /// No description provided for @custRateYourRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate your rider'**
+  String get custRateYourRider;
+
+  /// No description provided for @custHowWasDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'How was your delivery?'**
+  String get custHowWasDelivery;
+
+  /// No description provided for @custAddCommentOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a comment (optional)'**
+  String get custAddCommentOptional;
+
+  /// No description provided for @custSubmitRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit rating'**
+  String get custSubmitRating;
+
+  /// No description provided for @custThanksForRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for rating your rider'**
+  String get custThanksForRating;
+
+  /// No description provided for @custAlreadyRatedDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'You rated this delivery'**
+  String get custAlreadyRatedDelivery;
+
+  /// No description provided for @custCouldNotSendRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send your rating'**
+  String get custCouldNotSendRating;
+
+  /// No description provided for @ratingStars.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} stars'**
+  String ratingStars(Object n);
+
+  /// No description provided for @searchForAPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for a place…'**
+  String get searchForAPlace;
+
+  /// No description provided for @noPlacesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No places found'**
+  String get noPlacesFound;
+
+  /// No description provided for @couldNotSearchPlaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not search just now'**
+  String get couldNotSearchPlaces;
+
+  /// No description provided for @addressPinnedOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned on the map'**
+  String get addressPinnedOnMap;
+
+  /// No description provided for @notifPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification preferences'**
+  String get notifPreferences;
+
+  /// No description provided for @notifPrefsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how we reach you, topic by topic'**
+  String get notifPrefsBlurb;
+
+  /// No description provided for @notifAlwaysOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Always on — account and security messages cannot be switched off'**
+  String get notifAlwaysOn;
+
+  /// No description provided for @couldNotLoadPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your preferences'**
+  String get couldNotLoadPreferences;
+
+  /// No description provided for @couldNotSaveThatChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save that change'**
+  String get couldNotSaveThatChange;
+
+  /// No description provided for @crossSellTogetherCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}× together'**
+  String crossSellTogetherCount(Object count);
+
+  /// No description provided for @riderBalanceLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance {balance} · available for cash-out {available}'**
+  String riderBalanceLine(Object balance, Object available);
+
+  /// No description provided for @riderEarningsBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{earnings} delivery pay · {tips} tips'**
+  String riderEarningsBreakdown(Object earnings, Object tips);
+
+  /// No description provided for @riderCashOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash out'**
+  String get riderCashOutTitle;
+
+  /// No description provided for @riderCashOutAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available to cash out'**
+  String get riderCashOutAvailable;
+
+  /// No description provided for @riderCashOutMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum {amount}'**
+  String riderCashOutMinimum(Object amount);
+
+  /// No description provided for @riderCashOutManualNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Payouts are handed over by the platform team — nothing transfers automatically.'**
+  String get riderCashOutManualNote;
+
+  /// No description provided for @riderCashOutRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Request cash-out'**
+  String get riderCashOutRequest;
+
+  /// No description provided for @riderCashOutAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get riderCashOutAmountLabel;
+
+  /// No description provided for @riderCashOutAlreadyOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'A cash-out request is already on its way.'**
+  String get riderCashOutAlreadyOpen;
+
+  /// No description provided for @riderCashOutFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The cash-out could not be requested.'**
+  String get riderCashOutFailed;
+
+  /// No description provided for @riderCashOutOpenLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} requested — waiting on the payout'**
+  String riderCashOutOpenLine(Object amount);
+
+  /// No description provided for @riderCashOutLastRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Your last cash-out was refused.'**
+  String get riderCashOutLastRefused;
+
+  /// No description provided for @riderCashOutHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent requests'**
+  String get riderCashOutHistory;
+
+  /// No description provided for @riderTipLine.
+  ///
+  /// In en, this message translates to:
+  /// **'+{tip} tip'**
+  String riderTipLine(Object tip);
+
+  /// No description provided for @riderReimbursedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'+{amount} reimbursed'**
+  String riderReimbursedLine(Object amount);
+
+  /// No description provided for @riderLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen {when}'**
+  String riderLastSeen(Object when);
+
+  /// No description provided for @riderDutyChangeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update your duty state.'**
+  String get riderDutyChangeFailed;
+
+  /// No description provided for @riderDutyNotYetDeclared.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not gone on duty yet.'**
+  String get riderDutyNotYetDeclared;
+
+  /// No description provided for @riderEtaCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Live ETA'**
+  String get riderEtaCaption;
+
+  /// No description provided for @riderEtaAway.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} away'**
+  String riderEtaAway(Object distance);
+
+  /// No description provided for @riderEtaArrivingAt.
+  ///
+  /// In en, this message translates to:
+  /// **'arriving about {time}'**
+  String riderEtaArrivingAt(Object time);
+
+  /// No description provided for @riderKmUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km'**
+  String riderKmUnit(Object km);
+
+  /// No description provided for @riderMetreUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'{m} m'**
+  String riderMetreUnit(Object m);
+
+  /// No description provided for @riderEtaComputedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated by {provider}'**
+  String riderEtaComputedBy(Object provider);
+
+  /// No description provided for @riderChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer chat'**
+  String get riderChatTitle;
+
+  /// No description provided for @riderChatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message…'**
+  String get riderChatHint;
+
+  /// No description provided for @riderChatSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get riderChatSend;
+
+  /// No description provided for @riderChatClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation has closed.'**
+  String get riderChatClosed;
+
+  /// No description provided for @riderChatEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet.'**
+  String get riderChatEmpty;
+
+  /// No description provided for @riderChatCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the conversation'**
+  String get riderChatCouldNotLoad;
+
+  /// No description provided for @riderChatSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The message was not sent.'**
+  String get riderChatSendFailed;
+
+  /// No description provided for @riderChatReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting…'**
+  String get riderChatReconnecting;
+
+  /// No description provided for @wizDocsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear photos or PDFs. You can replace any document until a decision is made.'**
+  String get wizDocsIntro;
+
+  /// No description provided for @wizDocFileTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos and PDFs'**
+  String get wizDocFileTypes;
+
+  /// No description provided for @wizDocAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get wizDocAdd;
+
+  /// No description provided for @wizDocReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get wizDocReplace;
+
+  /// No description provided for @wizDocRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get wizDocRemove;
+
+  /// No description provided for @wizDocReadyToSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to send'**
+  String get wizDocReadyToSend;
+
+  /// No description provided for @wizDocNotAddedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not added yet'**
+  String get wizDocNotAddedYet;
+
+  /// No description provided for @wizDocSentOnSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Your documents are sent when you submit the application.'**
+  String get wizDocSentOnSubmit;
+
+  /// No description provided for @wizDocTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is too large'**
+  String get wizDocTooLarge;
+
+  /// No description provided for @wizDocUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The upload did not go through'**
+  String get wizDocUploadFailed;
+
+  /// No description provided for @wizDocUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading…'**
+  String get wizDocUploading;
+
+  /// No description provided for @wizDocCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your documents'**
+  String get wizDocCouldNotLoad;
+
+  /// No description provided for @wizDocsPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your documents'**
+  String get wizDocsPendingTitle;
+
+  /// No description provided for @wizDocsPendingBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'A refused document can be replaced and will be reviewed again.'**
+  String get wizDocsPendingBlurb;
+
+  /// No description provided for @wizDocsNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing uploaded yet'**
+  String get wizDocsNoneYet;
+
+  /// No description provided for @wizCouldNotSendDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is in, but a document did not go through.'**
+  String get wizCouldNotSendDocuments;
+
+  /// No description provided for @wizPayoutAccountHolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Account holder'**
+  String get wizPayoutAccountHolder;
+
+  /// No description provided for @wizPayoutAccountHolderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The name exactly as the bank has it'**
+  String get wizPayoutAccountHolderHint;
+
+  /// No description provided for @wizPayoutIban.
+  ///
+  /// In en, this message translates to:
+  /// **'IBAN'**
+  String get wizPayoutIban;
+
+  /// No description provided for @wizPayoutIbanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts with the country code, e.g. SA…'**
+  String get wizPayoutIbanHint;
+
+  /// No description provided for @wizPayoutIbanInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'That IBAN does not check out — a digit is probably wrong or two are swapped'**
+  String get wizPayoutIbanInvalid;
+
+  /// No description provided for @wizPayoutIbanFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'An IBAN starts with two letters for the country and two check digits'**
+  String get wizPayoutIbanFormat;
+
+  /// No description provided for @wizPayoutIbanBounds.
+  ///
+  /// In en, this message translates to:
+  /// **'An IBAN is between 15 and 34 characters'**
+  String get wizPayoutIbanBounds;
+
+  /// No description provided for @wizPayoutIbanLength.
+  ///
+  /// In en, this message translates to:
+  /// **'An IBAN for {country} is {expected} characters'**
+  String wizPayoutIbanLength(Object country, Object expected);
+
+  /// No description provided for @wizPayoutCouldNotSave.
+  ///
+  /// In en, this message translates to:
+  /// **'The bank details could not be saved'**
+  String get wizPayoutCouldNotSave;
+
+  /// No description provided for @wizPayoutCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your bank details'**
+  String get wizPayoutCouldNotLoad;
+
+  /// No description provided for @wizPayoutSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save bank details'**
+  String get wizPayoutSave;
+
+  /// No description provided for @wizPayoutChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get wizPayoutChange;
+
+  /// No description provided for @wizPayoutSentOnSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Your bank details are sent when you submit the application.'**
+  String get wizPayoutSentOnSubmit;
+
+  /// No description provided for @wizCouldNotSendPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is in, but the bank details did not go through.'**
+  String get wizCouldNotSendPayout;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

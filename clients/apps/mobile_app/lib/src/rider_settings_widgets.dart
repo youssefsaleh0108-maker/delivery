@@ -1,3 +1,4 @@
+import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
@@ -135,6 +136,7 @@ class RiderSettingRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.trailing,
+    this.subtitle,
     this.tint = DeliveryColors.background,
     this.iconColour = DeliveryColors.ink,
     this.onTap,
@@ -142,6 +144,11 @@ class RiderSettingRow extends StatelessWidget {
 
   final IconData icon;
   final String label;
+
+  /// A muted 11px second line under the label — the duty row's "last seen" fact. Null draws the
+  /// single-line row every other caller has always had.
+  final String? subtitle;
+
   final Widget trailing;
   final Color tint;
   final Color iconColour;
@@ -162,16 +169,35 @@ class RiderSettingRow extends StatelessWidget {
           ),
           const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
           Expanded(
-            child: Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: DeliveryColors.ink,
-                height: 1.3,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: DeliveryColors.muted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: DeliverySpacing.sm),
@@ -192,44 +218,117 @@ class RiderSettingRow extends StatelessWidget {
   }
 }
 
-/// `availability-card`: the online/offline switch.
+/// `availability-card`: the online/offline switch, wired to the presence API.
 ///
-/// Inert. Whether a rider is on duty is a presence fact the platform does not keep — orders are
-/// offered to every approved rider on the board and claimed by whoever gets there first — so a
-/// switch here would change nothing about which jobs the rider is shown. It is drawn on, as the
-/// design draws it, and labelled.
+/// A view, not a caller: the screen that owns the timers and the simulated GPS fix
+/// (`rider_home_screen.dart`) owns the presence too, and hands this card the server's last answer.
+/// The switch renders what the rider *declared* and the tag beside it what the platform *believes*
+/// — a rider who declared duty and then went quiet is [PresenceState.stale], and the card says
+/// "signal lost" instead of showing them as available for work they will not receive.
 class RiderDutyToggleCard extends StatelessWidget {
-  const RiderDutyToggleCard({super.key});
+  const RiderDutyToggleCard({
+    super.key,
+    this.wired = false,
+    this.presence,
+    this.busy = false,
+    this.onChanged,
+  });
+
+  /// Whether a presence API was handed to the shell at all. False keeps the pre-wiring inert
+  /// rendering, chip and all, rather than a switch that would silently do nothing.
+  final bool wired;
+
+  /// The server's last answer. Null while it has not answered yet — also the answer a rider who
+  /// has never declared duty gets (a 204, not an invented OFF_DUTY).
+  final RiderPresence? presence;
+
+  /// True while a declaration is in flight; the switch refuses input rather than lying about
+  /// where it will land.
+  final bool busy;
+
+  /// Called with the state the rider asked for. The card never assumes the tap worked — the
+  /// owner re-renders it with whatever the server said.
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+
+    if (!wired) {
+      return RiderSettingRow(
+        icon: Icons.power_settings_new_rounded,
+        tint: DeliveryColors.brandSoft,
+        iconColour: DeliveryColors.brand,
+        label: t.riderActiveDuty,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            YdComingSoon(label: t.riderComingSoon),
+            const SizedBox(width: DeliverySpacing.sm),
+            IgnorePointer(
+              child: ExcludeSemantics(
+                child: Switch.adaptive(
+                  value: true,
+                  onChanged: (_) {},
+                  activeThumbColor: DeliveryColors.white,
+                  activeTrackColor: DeliveryColors.brand,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bool declaredOn = presence?.dutyState == DutyState.onDuty;
+    final bool stale = presence?.state == PresenceState.stale;
 
     return RiderSettingRow(
       icon: Icons.power_settings_new_rounded,
       tint: DeliveryColors.brandSoft,
       iconColour: DeliveryColors.brand,
       label: t.riderActiveDuty,
+      subtitle: _subtitle(context, t),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          YdComingSoon(label: t.riderComingSoon),
-          const SizedBox(width: DeliverySpacing.sm),
-          // Rendered in the design's on-state and unreachable: IgnorePointer rather than a null
-          // callback, so it keeps the painted-on look instead of greying out.
-          IgnorePointer(
-            child: ExcludeSemantics(
-              child: Switch.adaptive(
-                value: true,
-                onChanged: (_) {},
-                activeThumbColor: DeliveryColors.white,
-                activeTrackColor: DeliveryColors.brand,
-              ),
+          if (stale)
+            RiderTag(
+              label: t.presenceSignalLost,
+              color: DeliveryAccent.caution.color,
+              background: DeliveryAccent.caution.tint,
+            )
+          else if (presence != null)
+            RiderTag(
+              label: declaredOn ? t.dutyOnDuty : t.dutyOffDuty,
+              color: declaredOn
+                  ? DeliveryAccent.positive.color
+                  : DeliveryColors.muted,
+              background: declaredOn
+                  ? DeliveryAccent.positive.tint
+                  : DeliveryColors.background,
             ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Switch.adaptive(
+            value: declaredOn,
+            onChanged:
+                busy || onChanged == null ? null : (bool on) => onChanged!(on),
+            activeThumbColor: DeliveryColors.white,
+            activeTrackColor: DeliveryColors.brand,
           ),
         ],
       ),
     );
+  }
+
+  /// The last-seen line: when the platform last heard from this device, or the honest sentence
+  /// for a rider it has never heard from at all.
+  String? _subtitle(BuildContext context, DeliveryStrings t) {
+    if (presence == null) return t.riderDutyNotYetDeclared;
+    final DateTime? seen = presence!.lastSeenAt;
+    if (seen == null) return null;
+    final String? age = riderAgeLabel(t, seen);
+    return age == null ? null : t.riderLastSeen(age);
   }
 }
 

@@ -22,15 +22,24 @@ import '../shell/shell.dart';
 /// rider's account and puts them on this company's fleet, so they can be offered work immediately.
 ///
 /// The design draws a three-row document checklist per applicant — national ID, vehicle papers,
-/// background check — with Approved / Uploaded / Pending states. There is no document pipeline on
-/// this platform. Two of the three rows are replaced by verifications that genuinely exist and are
-/// carried on the application (the email address and the phone number were proved to reach the
-/// applicant, or were not), and the third is drawn with a Coming-soon chip where its badge goes.
+/// background check — with Approved / Uploaded / Pending states. The document pipeline behind that
+/// checklist exists now: the first two rows stay the verifications the application itself carries
+/// (the email address and the phone number were proved to reach the applicant, or were not), and
+/// under them come the applicant's actual uploaded papers, each reviewable in place — approved
+/// with a click, or refused with a typed reason the applicant is shown verbatim.
 class ApplicantsScreen extends StatefulWidget {
-  const ApplicantsScreen({super.key, required this.api, required this.providerApi});
+  const ApplicantsScreen({
+    super.key,
+    required this.api,
+    required this.providerApi,
+    required this.documentsApi,
+  });
 
   final OnboardingApi api;
   final DeliveryProviderApi providerApi;
+
+  /// The per-document review endpoints, scoped to this company's own applicants server-side.
+  final DocumentsApi documentsApi;
 
   @override
   State<ApplicantsScreen> createState() => _ApplicantsScreenState();
@@ -63,6 +72,12 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
     super.dispose();
   }
 
+  /// Documents per application id. A missing key is still loading or failed — the checklist then
+  /// says "could not load" rather than claiming there are none.
+  final Map<String, List<ReviewedDocument>> _documents = <String, List<ReviewedDocument>>{};
+  final Set<String> _documentsFailed = <String>{};
+  String? _busyDocumentId;
+
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     try {
@@ -77,6 +92,7 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
         _error = null;
         _loading = false;
       });
+      unawaited(_loadDocuments(loaded));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -85,6 +101,79 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
       });
     }
   }
+
+  /// One documents request per card, concurrently. Bounded by the queue, which is human-sized;
+  /// a failed one marks its own card and hides nobody else's papers.
+  Future<void> _loadDocuments(List<OnboardingApplication> applications) async {
+    await Future.wait<void>(applications.map((OnboardingApplication a) async {
+      try {
+        final List<ReviewedDocument> docs =
+            await widget.documentsApi.companyApplicantDocuments(_providerId!, a.id);
+        if (!mounted) return;
+        setState(() {
+          _documents[a.id] = docs;
+          _documentsFailed.remove(a.id);
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          if (!_documents.containsKey(a.id)) _documentsFailed.add(a.id);
+        });
+      }
+    }));
+  }
+
+  Future<void> _reloadDocumentsFor(OnboardingApplication a) async {
+    try {
+      final List<ReviewedDocument> docs =
+          await widget.documentsApi.companyApplicantDocuments(_providerId!, a.id);
+      if (!mounted) return;
+      setState(() {
+        _documents[a.id] = docs;
+        _documentsFailed.remove(a.id);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _documentsFailed.add(a.id));
+    }
+  }
+
+  Future<void> _approveDocument(OnboardingApplication a, ReviewedDocument doc) async {
+    setState(() => _busyDocumentId = doc.id);
+    try {
+      await widget.documentsApi
+          .approveCompanyApplicantDocument(_providerId!, a.id, doc.id);
+      await _reloadDocumentsFor(a);
+    } catch (e) {
+      if (mounted) _tell(_messageFrom(e, DeliveryStrings.of(context)), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyDocumentId = null);
+    }
+  }
+
+  Future<void> _rejectDocument(OnboardingApplication a, ReviewedDocument doc) async {
+    final String? reason = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) =>
+          _DocumentReasonDialog(documentLabel: _docLabel(doc)),
+    );
+    if (reason == null || reason.trim().isEmpty || !mounted) return;
+
+    setState(() => _busyDocumentId = doc.id);
+    try {
+      await widget.documentsApi.rejectCompanyApplicantDocument(
+          _providerId!, a.id, doc.id,
+          reason: reason.trim());
+      await _reloadDocumentsFor(a);
+    } catch (e) {
+      if (mounted) _tell(_messageFrom(e, DeliveryStrings.of(context)), bad: true);
+    } finally {
+      if (mounted) setState(() => _busyDocumentId = null);
+    }
+  }
+
+  /// The typed kind's label, or the server's own spelling for a kind this build does not know.
+  static String _docLabel(ReviewedDocument doc) => doc.kind?.label ?? doc.kindWire;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +347,7 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
         children: <Widget>[
           _cardTop(a),
           const SizedBox(height: ConsoleMetrics.kpiGap),
-          _documents(a),
+          _checklist(a),
           if ((a.notes ?? '').isNotEmpty) ...<Widget>[
             const SizedBox(height: ConsoleMetrics.kpiGap),
             Text(a.notes!, style: ConsoleText.body.copyWith(color: DeliveryColors.muted)),
@@ -317,8 +406,11 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
     );
   }
 
-  /// The design's `docs-list` (3:3782), with the two checks this platform actually performs.
-  Widget _documents(OnboardingApplication a) {
+  /// The design's `docs-list` (3:3782): the two checks the application itself carries, then the
+  /// applicant's actual uploaded papers, each decided in place.
+  Widget _checklist(OnboardingApplication a) {
+    final List<Widget> uploaded = _uploadedRows(a);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -339,6 +431,7 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
         _DocRow(
           label: 'Phone number verified',
           done: a.phoneVerified,
+          last: uploaded.isEmpty,
           badge: a.contactPhone == null
               ? const ConsoleSmallBadge(label: 'Not given', accent: DeliveryAccent.neutral)
               : a.phoneVerified
@@ -346,13 +439,116 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
                   : const ConsoleSmallBadge(
                       label: 'Pending Verification', accent: DeliveryAccent.caution),
         ),
-        const _DocRow(
+        ...uploaded,
+      ],
+    );
+  }
+
+  /// The applicant's uploaded papers, one checklist row each — or one honest row about why there
+  /// are none to show: still loading, could not be loaded, or genuinely nothing uploaded yet.
+  List<Widget> _uploadedRows(OnboardingApplication a) {
+    if (_documentsFailed.contains(a.id)) {
+      return <Widget>[
+        _DocRow(
+          label: 'Uploaded documents could not be loaded',
+          done: false,
+          last: true,
+          badge: ConsoleRowAction(
+            icon: Icons.refresh,
+            tooltip: 'Try again',
+            onPressed: () => _reloadDocumentsFor(a),
+          ),
+        ),
+      ];
+    }
+
+    final List<ReviewedDocument>? docs = _documents[a.id];
+    if (docs == null) {
+      return const <Widget>[
+        _DocRow(
+          label: 'Loading uploaded documents…',
+          done: false,
+          last: true,
+          badge: SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+          ),
+        ),
+      ];
+    }
+    if (docs.isEmpty) {
+      // Nothing was uploaded, and that is a fact worth a row: older applications predate the
+      // document step entirely.
+      return const <Widget>[
+        _DocRow(
           label: 'Identity, vehicle and background documents',
           done: false,
-          badge: ConsoleComingSoonChip(),
           last: true,
+          badge: ConsoleSmallBadge(label: 'Not uploaded', accent: DeliveryAccent.neutral),
         ),
-      ],
+      ];
+    }
+
+    return <Widget>[
+      for (int i = 0; i < docs.length; i++)
+        _documentRow(a, docs[i], last: i == docs.length - 1),
+    ];
+  }
+
+  /// One uploaded paper: its verdict badge, the file itself, and — while the application is still
+  /// open and the document undecided — the approve and refuse actions.
+  Widget _documentRow(OnboardingApplication a, ReviewedDocument doc, {required bool last}) {
+    final bool busy = _busyDocumentId == doc.id;
+    final bool decidable = !a.status.isDecided &&
+        !doc.superseded &&
+        doc.status == ApplicantDocumentStatus.pending;
+
+    // 'Waiting', not the verification rows' longer 'Pending Verification': this row also carries
+    // up to three actions, and the two labels say the same thing.
+    final (String badge, DeliveryAccent accent) = doc.superseded
+        ? ('Replaced', DeliveryAccent.neutral)
+        : switch (doc.status) {
+            ApplicantDocumentStatus.pending => ('Waiting', DeliveryAccent.caution),
+            ApplicantDocumentStatus.approved => ('Approved', DeliveryAccent.positive),
+            ApplicantDocumentStatus.rejected => ('Refused', DeliveryAccent.critical),
+          };
+
+    return _DocRow(
+      label: _docLabel(doc),
+      done: !doc.superseded && doc.status == ApplicantDocumentStatus.approved,
+      last: last,
+      badge: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          ConsoleSmallBadge(label: badge, accent: accent),
+          // The paper itself, in a new tab. Absent when storage could not sign a URL — a dead
+          // button would promise a file this card cannot show.
+          if (doc.viewUrl != null) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.xs),
+            ConsoleRowAction(
+              icon: Icons.open_in_new,
+              tooltip: 'Open the document',
+              onPressed: () => openExternalLink(doc.viewUrl!),
+            ),
+          ],
+          if (decidable) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.xs),
+            ConsoleRowAction(
+              icon: Icons.check,
+              tooltip: 'Approve this document',
+              onPressed: busy ? null : () => _approveDocument(a, doc),
+            ),
+            const SizedBox(width: DeliverySpacing.xs),
+            ConsoleRowAction(
+              icon: Icons.close,
+              tooltip: 'Refuse this document',
+              destructive: true,
+              onPressed: busy ? null : () => _rejectDocument(a, doc),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -580,6 +776,102 @@ class _CallButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Refusing one document, with the reason typed out — the applicant is shown it verbatim, and it
+/// is the only way they learn what to upload instead.
+class _DocumentReasonDialog extends StatefulWidget {
+  const _DocumentReasonDialog({required this.documentLabel});
+
+  final String documentLabel;
+
+  @override
+  State<_DocumentReasonDialog> createState() => _DocumentReasonDialogState();
+}
+
+class _DocumentReasonDialogState extends State<_DocumentReasonDialog> {
+  final TextEditingController _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    return AlertDialog(
+      backgroundColor: DeliveryColors.white,
+      surfaceTintColor: DeliveryColors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+      ),
+      title: Text('Refuse ${widget.documentLabel}', style: ConsoleText.cardTitle),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'The applicant is shown this word for word. Say what is wrong with the document '
+              'and what to upload instead.',
+              style: ConsoleText.pageSubtitle,
+            ),
+            const SizedBox(height: DeliverySpacing.md),
+            TextField(
+              controller: _reason,
+              maxLines: 3,
+              maxLength: 500,
+              autofocus: true,
+              style: ConsoleText.cell,
+              cursorColor: DeliveryColors.brand,
+              decoration: InputDecoration(
+                hintText: 'The photo is too blurred to read the expiry date',
+                hintStyle: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
+                filled: true,
+                fillColor: DeliveryColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  borderSide: const BorderSide(color: DeliveryColors.brand),
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            t.cancel,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: DeliveryColors.muted,
+            ),
+          ),
+        ),
+        ConsoleSoftButton(
+          label: 'Refuse document',
+          onPressed: _reason.text.trim().isEmpty
+              ? null
+              : () => Navigator.pop(context, _reason.text.trim()),
+        ),
+      ],
     );
   }
 }

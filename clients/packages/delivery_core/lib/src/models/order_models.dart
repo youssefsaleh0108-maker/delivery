@@ -64,17 +64,20 @@ enum OrderAction {
 
 /// How an order is paid for, mirroring `com.delivery.order.domain.Payment.Method`.
 ///
-/// Only [cash] is offered at checkout. The server knows about CARD too, but no payment provider is
-/// integrated — a CARD order parks at AUTHORIZATION_PENDING and never becomes money — so putting it
-/// in front of a customer would be selling a way to pay that does not work. It stays in this enum
-/// because the server can still return it (an order placed through another channel), and an app
-/// that could not parse its own order list would be the worse failure.
+/// [cash] is the only method that moves real money today. [card] and [wallet] are fully wired —
+/// authorised at checkout, refused if declined, captured on delivery — but against the DEV payment
+/// provider, because no real processor credential is configured. A screen offering them in a dev
+/// build must label them as test payments; presenting one as a live card charge would be a lie.
 enum PaymentMethod {
   /// Collected by the rider at the door. Nothing is owed until the order arrives.
   cash('CASH', 'Cash on delivery'),
 
-  /// Authorised at checkout, captured on delivery. Not offered — see the class note.
-  card('CARD', 'Card');
+  /// Authorised at checkout via an opaque instrument token, captured on delivery. The platform
+  /// never sees a card number.
+  card('CARD', 'Card'),
+
+  /// A stored balance, on the same authorise-then-capture lifecycle as a card.
+  wallet('WALLET', 'Wallet');
 
   const PaymentMethod(this.wire, this.label);
 
@@ -88,7 +91,12 @@ enum PaymentMethod {
         orElse: () => PaymentMethod.cash,
       );
 
-  /// What the customer can pick at checkout today.
+  /// Whether the money passes through a payment provider — the methods that need an instrument
+  /// token at placement, and the ones to label as test payments while the provider is the dev one.
+  bool get needsProvider => this != cash;
+
+  /// What every build can offer without qualification. [card] and [wallet] are additionally
+  /// offerable where the build has decided to show dev-provider test payments, labelled as such.
   static const List<PaymentMethod> offered = <PaymentMethod>[PaymentMethod.cash];
 }
 
@@ -155,10 +163,13 @@ class DeliveryOrder {
     this.deliveryFeeWaived = false,
     this.merchantFeeWaived = false,
     this.carrierFeeWaived = false,
+    this.discountAmount,
+    this.promoCode,
     this.storeId,
     this.storeName,
     this.paymentMethod = PaymentMethod.cash,
     this.paymentStatus = PaymentStatus.due,
+    this.paidAt,
     required this.contactPhone,
     required this.notes,
     required this.items,
@@ -200,6 +211,14 @@ class DeliveryOrder {
   /// No platform cut was taken from the delivery company's fee.
   final bool carrierFeeWaived;
 
+  /// The Discounts line: what a promo code took off. Null when no code applied — distinct from
+  /// zero, which the server never sends for an order without a code.
+  final double? discountAmount;
+
+  /// The canonical stored code behind [discountAmount], never the string the customer typed. Null
+  /// when no code applied.
+  final String? promoCode;
+
   final String? storeId;
   final String? storeName;
 
@@ -209,6 +228,9 @@ class DeliveryOrder {
   /// Where that payment has got to. What the rider needs is the pair: a CASH order still DUE is
   /// money to collect at the door, and one already COLLECTED is not.
   final PaymentStatus paymentStatus;
+
+  /// When the money actually moved. Null until it has.
+  final DateTime? paidAt;
 
   final String deliveryAddress;
   final String? contactPhone;
@@ -254,10 +276,13 @@ class DeliveryOrder {
         deliveryFeeWaived: json['deliveryFeeWaived'] as bool? ?? false,
         merchantFeeWaived: json['merchantFeeWaived'] as bool? ?? false,
         carrierFeeWaived: json['carrierFeeWaived'] as bool? ?? false,
+        discountAmount: (json['discountAmount'] as num?)?.toDouble(),
+        promoCode: json['promoCode'] as String?,
         storeId: json['storeId'] as String?,
         storeName: json['storeName'] as String?,
         paymentMethod: PaymentMethod.fromWire(json['paymentMethod'] as String?),
         paymentStatus: PaymentStatus.fromWire(json['paymentStatus'] as String?),
+        paidAt: _parseTime(json['paidAt']),
         deliveryAddress: json['deliveryAddress'] as String? ?? '',
         contactPhone: json['contactPhone'] as String?,
         notes: json['notes'] as String?,

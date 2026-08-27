@@ -169,17 +169,40 @@ void main() {
 
     expect(find.text('Payment method'), findsOneWidget);
     expect(find.text('Cash on delivery'), findsOneWidget);
-    // Chosen, not merely listed. An unselected sole option is a decision the customer has to make
-    // for no reason.
+    // Chosen, not merely asked about. Cash is the default because it is the one method that
+    // moves real money.
     expect(isSelected(tester, 'Cash on delivery'), isTrue);
-    // The design draws Apple Pay beside it and there is no provider behind it, so it is present,
-    // marked, and inert — never a card the customer can pick and then not be charged through.
-    expect(find.text('Apple Pay'), findsOneWidget);
-    // The chip uppercases its label — it is a note about the control, not another control.
-    expect(find.text('SOON'), findsWidgets);
-    expect(isSelected(tester, 'Apple Pay'), isFalse);
-    // The one method that has no provider behind it must not be offered as a real choice.
-    expect(find.text('Card'), findsNothing);
+    // Card and wallet are selectable now — they authorise against the DEV provider — and each
+    // says out loud that it is a test payment, so a dev authorisation can never be mistaken for
+    // a live charge.
+    expect(find.text('Card'), findsOneWidget);
+    expect(find.text('Wallet'), findsOneWidget);
+    expect(find.text('Test payment'), findsNWidgets(2));
+    expect(isSelected(tester, 'Card'), isFalse);
+    expect(isSelected(tester, 'Wallet'), isFalse);
+    // The Apple Pay placeholder and its coming-soon chip are gone with the wiring.
+    expect(find.text('Apple Pay'), findsNothing);
+  });
+
+  testWidgets('picking the card sends the method, the dev token, and the fuller warning',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
+    final DeliveryAddressStore addresses = await storeWithAddresses();
+    await pumpCheckout(
+        tester, dio: recorder.dio, addresses: addresses, cart: cartWithOneItem());
+
+    await tester.tap(find.text('Card'));
+    await tester.pumpAndSettle();
+    // Choosing a test method puts the fuller sentence under the strip.
+    expect(find.text('Test payment — no real money moves in this build'), findsOneWidget);
+
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+
+    final Map<String, dynamic> body = recorder.sent.single.data as Map<String, dynamic>;
+    expect(body['paymentMethod'], 'CARD');
+    // The DEV provider ignores the token by design; the contract still carries one.
+    expect(body['paymentInstrumentToken'], isNotEmpty);
   });
 
   testWidgets('placing sends the picked address, its area, and CASH',

@@ -3,6 +3,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'delivery_address.dart'
+    show custNotifCategoryLabel, custNotifChannelLabel;
 import 'notification_inbox.dart';
 
 /// The in-app inbox (Section 7), in the redesign's customer language.
@@ -201,6 +203,224 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (eventType.startsWith('order.rider_assigned')) return Icons.two_wheeler;
     if (eventType.startsWith('order.placed')) return Icons.receipt_long_outlined;
     return Icons.notifications_outlined;
+  }
+}
+
+/// The per-category notification matrix (Section 7's preference grid), wired to the
+/// Notifications Manager.
+///
+/// The server sends the complete grid — every category on every channel, defaults filled in — so
+/// this screen invents nothing. Each toggle saves only itself, and the row is re-rendered from
+/// the grid the server sends back rather than from the optimistic tap: a locked account-critical
+/// cell comes back still on, and that is the truth to show.
+class NotificationPrefsScreen extends StatefulWidget {
+  const NotificationPrefsScreen({super.key, required this.api});
+
+  final NotificationPrefsApi api;
+
+  @override
+  State<NotificationPrefsScreen> createState() => _NotificationPrefsScreenState();
+}
+
+class _NotificationPrefsScreenState extends State<NotificationPrefsScreen> {
+  List<NotificationPreference>? _grid;
+  bool _loading = true;
+
+  /// The `category|channel` cells with a save in flight, so exactly those switches sit disabled.
+  final Set<String> _saving = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final List<NotificationPreference> grid = await widget.api.mine();
+      if (!mounted) return;
+      setState(() {
+        _grid = grid;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggle(NotificationPreference pref, bool enabled) async {
+    final String cell = '${pref.categoryWire}|${pref.channelWire}';
+    setState(() => _saving.add(cell));
+    try {
+      // Wire strings, not enums: a row that arrived with a category this build does not know can
+      // still be toggled back exactly as it was named.
+      final List<NotificationPreference> grid =
+          await widget.api.update(<NotificationPreferenceChange>[
+        NotificationPreferenceChange(
+            category: pref.categoryWire, channel: pref.channelWire, enabled: enabled),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _grid = grid;
+        _saving.remove(cell);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving.remove(cell));
+      // The switch never moved — the grid on screen is still the server's last answer — so the
+      // sentence is the only thing that needs saying.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).couldNotSaveThatChange)));
+    }
+  }
+
+  /// The category wires in render order: the known categories in their declared order first,
+  /// then anything this build does not know, in arrival order — sent by the server, so shown.
+  List<String> _categoryOrder(List<NotificationPreference> grid) {
+    final List<String> order = <String>[
+      for (final NotificationCategory c in NotificationCategory.values)
+        if (grid.any((NotificationPreference p) => p.categoryWire == c.wire)) c.wire,
+    ];
+    for (final NotificationPreference p in grid) {
+      if (!order.contains(p.categoryWire)) order.add(p.categoryWire);
+    }
+    return order;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      appBar: YdScreenHeader(
+        title: t.notifPreferences,
+        onBack: () => Navigator.of(context).maybePop(),
+        backSemanticLabel: t.back,
+      ),
+      body: _prefsBody(t),
+    );
+  }
+
+  Widget _prefsBody(DeliveryStrings t) {
+    final List<NotificationPreference>? grid = _grid;
+    if (_loading && grid == null) {
+      return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
+    }
+    if (grid == null) {
+      return YdEmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: t.couldNotLoadPreferences,
+        action: YdPillButton(
+          label: t.tryAgain,
+          expand: false,
+          size: YdPillButtonSize.compact,
+          onPressed: _load,
+        ),
+      );
+    }
+
+    final List<String> categories = _categoryOrder(grid);
+    return ListView(
+      padding: const EdgeInsets.all(DeliverySpacing.lg),
+      children: <Widget>[
+        Text(
+          t.notifPrefsBlurb,
+          style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.4),
+        ),
+        for (final String category in categories) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md),
+          _categoryCard(
+            t,
+            grid
+                .where((NotificationPreference p) => p.categoryWire == category)
+                .toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// One category as a white radius-16 card: the bold title, the always-on note when every cell
+  /// is locked, and a switch row per channel.
+  Widget _categoryCard(DeliveryStrings t, List<NotificationPreference> rows) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    // Channels in the enum's declared order — the interrupting ones first, which is what
+    // somebody opening this screen is usually looking for. Unknown channels go last, still shown.
+    rows.sort((NotificationPreference a, NotificationPreference b) =>
+        (a.channel?.index ?? NotificationChannel.values.length)
+            .compareTo(b.channel?.index ?? NotificationChannel.values.length));
+    final bool allLocked = rows.every((NotificationPreference p) => p.locked);
+
+    return YdCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            custNotifCategoryLabel(t, rows.first),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.ink,
+              height: 1.25,
+            ),
+          ),
+          if (allLocked) ...<Widget>[
+            const SizedBox(height: 2),
+            Text(
+              t.notifAlwaysOn,
+              style: const TextStyle(
+                fontSize: 11,
+                color: DeliveryColors.muted,
+                height: 1.35,
+              ),
+            ),
+          ],
+          const SizedBox(height: DeliverySpacing.sm),
+          for (final NotificationPreference pref in rows) _channelRow(t, pref),
+        ],
+      ),
+    );
+  }
+
+  Widget _channelRow(DeliveryStrings t, NotificationPreference pref) {
+    final bool saving = _saving.contains('${pref.categoryWire}|${pref.channelWire}');
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            custNotifChannelLabel(t, pref.channel, pref.channelWire),
+            style: const TextStyle(
+              fontSize: 13,
+              color: DeliveryColors.ink,
+              height: 1.3,
+            ),
+          ),
+        ),
+        if (saving)
+          const Padding(
+            padding: EdgeInsetsDirectional.symmetric(
+                horizontal: DeliverySpacing.md, vertical: DeliverySpacing.md),
+            child: SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+            ),
+          )
+        else
+          Switch(
+            value: pref.enabled,
+            activeThumbColor: DeliveryColors.white,
+            activeTrackColor: DeliveryColors.brand,
+            // Locked cells render disabled: the server refuses to turn account-critical
+            // messages off, and a switch that snaps back is worse than one that says so.
+            onChanged:
+                pref.locked ? null : (bool enabled) => _toggle(pref, enabled),
+          ),
+      ],
+    );
   }
 }
 

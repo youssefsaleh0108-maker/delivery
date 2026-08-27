@@ -60,11 +60,31 @@ final String _providersJson = '''
 void main() {
   late _FakeAdapter adapter;
   late DeliveryProviderApi api;
+  late TrackingApi trackingApi;
+  late OrderApi orderApi;
 
   /// Rosters by provider id. Replaced per test.
   late Map<String, String> rosters;
 
+  /// What the tracking roster answers. `[]` — nobody has ever declared duty — unless a test says
+  /// otherwise; 'boom' takes the whole presence column down.
+  late String presenceJson;
+
+  /// Standings by rider ref. A rider missing from it gets a 404, which the screen must render as
+  /// "nothing loaded", never as a score.
+  late Map<String, String> standings;
+
   _FakeAdapter build() => _FakeAdapter((RequestOptions options) {
+        if (options.path.contains('/tracking/riders/roster')) {
+          if (presenceJson == 'boom') throw StateError('tracking is down');
+          return _json(presenceJson);
+        }
+        if (options.path.endsWith('/rating')) {
+          for (final MapEntry<String, String> e in standings.entries) {
+            if (options.path.contains(e.key)) return _json(e.value);
+          }
+          return ResponseBody.fromString('{}', 404);
+        }
         for (final MapEntry<String, String> e in rosters.entries) {
           if (options.path.contains('/${e.key}/riders')) {
             if (e.value == 'boom') throw StateError('that roster is down');
@@ -75,14 +95,23 @@ void main() {
         return _json(_providersJson);
       });
 
+  void wire() {
+    adapter = build();
+    final Dio dio =
+        Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
+    api = DeliveryProviderApi(dio);
+    trackingApi = TrackingApi(dio);
+    orderApi = OrderApi(dio);
+  }
+
   setUp(() {
     rosters = <String, String>{
       'p1': '{"providerId":"p1","riders":["rider-1111-2222-3333","rider-4444-5555-6666"]}',
       'p2': '{"providerId":"p2","riders":["rider-7777-8888-9999"]}',
     };
-    adapter = build();
-    api = DeliveryProviderApi(
-        Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
+    presenceJson = '[]';
+    standings = <String, String>{};
+    wire();
   });
 
   Future<void> pump(WidgetTester tester, {Size size = const Size(1500, 1100)}) async {
@@ -92,7 +121,9 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
-      home: Scaffold(body: RidersScreen(api: api)),
+      home: Scaffold(
+        body: RidersScreen(api: api, trackingApi: trackingApi, orderApi: orderApi),
+      ),
     ));
     await tester.pumpAndSettle();
   }
@@ -120,9 +151,7 @@ void main() {
   testWidgets('one unreachable roster does not lose the other riders',
       (WidgetTester tester) async {
     rosters['p1'] = 'boom';
-    adapter = build();
-    api = DeliveryProviderApi(
-        Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
+    wire();
     await pump(tester);
 
     expect(find.text('Falcon Express Delivery'), findsOneWidget);
@@ -149,6 +178,16 @@ void main() {
       expect(find.text('Offline'), findsNothing);
     });
 
+    testWidgets('and a failed rating lookup is an empty cell, never a zero',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      // Every standing lookup 404s in this configuration; the column stays empty rather than
+      // painting anybody's livelihood as 0.0.
+      expect(find.textContaining('★'), findsNothing);
+      expect(find.text('New'), findsNothing);
+    });
+
     testWidgets('and the region filter is drawn, marked, and does nothing',
         (WidgetTester tester) async {
       await pump(tester);
@@ -164,6 +203,58 @@ void main() {
         findsOneWidget,
       );
     });
+  });
+
+  group('what the tracking service now reports', () {
+    testWidgets('renders roster states with last-seen, and "Unknown" only for the undeclared',
+        (WidgetTester tester) async {
+      final String seen = DateTime.now()
+          .toUtc()
+          .subtract(const Duration(minutes: 5))
+          .toIso8601String();
+      presenceJson = '''
+[{"riderId":"rider-1111-2222-3333","carrierId":"p1","dutyState":"ON_DUTY","state":"ON_DUTY",
+  "lastSeenAt":"$seen","lat":33.89,"lng":35.5},
+ {"riderId":"rider-4444-5555-6666","carrierId":"p1","dutyState":"ON_DUTY","state":"STALE",
+  "lastSeenAt":"$seen"}]''';
+      wire();
+      await pump(tester);
+
+      expect(find.text('On duty'), findsOneWidget);
+      // Declared on duty and went quiet: exactly who a dispatcher needs to see.
+      expect(find.text('Signal lost'), findsOneWidget);
+      expect(find.textContaining('seen '), findsNWidgets(2));
+      // The third rider has never declared duty at all — Unknown, still not "Offline".
+      expect(find.text('Unknown'), findsOneWidget);
+    });
+
+    testWidgets('a tracking outage reads "Unknown" for everyone, not "Off duty"',
+        (WidgetTester tester) async {
+      presenceJson = 'boom';
+      wire();
+      await pump(tester);
+
+      // A fact about the platform, not about the riders — the column degrades, the page stays.
+      expect(find.text('Unknown'), findsNWidgets(3));
+      expect(find.text('Off duty'), findsNothing);
+    });
+  });
+
+  testWidgets('renders the rating where one exists and "New" where nobody has rated',
+      (WidgetTester tester) async {
+    standings = <String, String>{
+      'rider-1111-2222-3333':
+          '{"riderId":"rider-1111-2222-3333","average":4.7,"ratings":12,"stars":{}}',
+      'rider-4444-5555-6666':
+          '{"riderId":"rider-4444-5555-6666","average":null,"ratings":0,"stars":{}}',
+    };
+    wire();
+    await pump(tester);
+
+    expect(find.text('★ 4.7'), findsOneWidget);
+    // Unrated is "New", never a zero. The third rider's lookup 404s and stays an empty cell.
+    expect(find.text('New'), findsOneWidget);
+    expect(find.textContaining('0.0'), findsNothing);
   });
 
   testWidgets('narrows the roster to one carrier', (WidgetTester tester) async {
@@ -195,9 +286,7 @@ void main() {
   testWidgets('says where the riders it cannot show have gone',
       (WidgetTester tester) async {
     rosters = <String, String>{};
-    adapter = build();
-    api = DeliveryProviderApi(
-        Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
+    wire();
     await pump(tester);
 
     // An empty table here does not mean an empty platform, and saying so is the difference

@@ -29,6 +29,8 @@ class CheckoutScreen extends StatefulWidget {
     required this.cart,
     required this.addresses,
     this.zoneApi,
+    this.geocodingApi,
+    this.promo,
   });
 
   final OrderApi api;
@@ -38,6 +40,16 @@ class CheckoutScreen extends StatefulWidget {
   /// Passed straight through to the address sheet so the area picker appears when a new address is
   /// added from here. Optional so a test can pump this screen without a server.
   final DeliveryZoneApi? zoneApi;
+
+  /// Passed straight through to the address sheet for the place search. Optional for the same
+  /// reason as [zoneApi].
+  final GeocodingApi? geocodingApi;
+
+  /// The promo quote the basket validated, carried here so the code travels with the order and
+  /// the sticky bar can show the same advisory total the basket showed. Only ever a VALID quote —
+  /// the basket does not hand over a refused one. The discount that is billed is recomputed by
+  /// the server at placement.
+  final PromoQuote? promo;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -54,9 +66,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// so an index would quietly come to mean a different address.
   String? _addressLine;
 
-  /// Cash, and only cash — see [PaymentMethod.offered]. Held in state rather than assumed so that
-  /// adding a second method is a change to that list and not to this screen.
+  /// Cash by default — the one method that moves real money. Card and wallet are selectable too,
+  /// authorising against the DEV payment provider, and the strip labels them as test payments so
+  /// nobody mistakes a dev authorisation for a charge.
   PaymentMethod _payment = PaymentMethod.cash;
+
+  /// What the checkout strip offers, in the design's order: cash first, then the two dev-provider
+  /// test methods.
+  static const List<PaymentMethod> _methods = <PaymentMethod>[
+    PaymentMethod.cash,
+    PaymentMethod.card,
+    PaymentMethod.wallet,
+  ];
+
+  /// The opaque instrument handle a real processor's SDK would mint on the device. The DEV
+  /// provider deliberately never reads it, so a fixed marker is the honest value — there is no
+  /// card to tokenise.
+  static const String _devInstrumentToken = 'dev-test-instrument';
 
   bool _placing = false;
 
@@ -119,7 +145,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _addAddress() async {
-    await showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi);
+    await showAddressSheet(context, widget.addresses,
+        zoneApi: widget.zoneApi, geocodingApi: widget.geocodingApi);
     // The listener has already taken the sheet's answer; this only repaints if it saved nothing.
     if (mounted) setState(() {});
   }
@@ -156,6 +183,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         contactPhone: _phone.text.trim(),
         notes: notes,
         paymentMethod: _payment,
+        // The canonical code the server quoted, never raw field text. The discount is recomputed
+        // at placement against the basket the server priced itself.
+        promoCode: widget.promo?.code,
+        // Non-cash goes to the DEV provider, which ignores the token by design — there is no
+        // card SDK to mint a real one. A decline comes back as a 402 and the order is not placed.
+        paymentInstrumentToken:
+            _payment.needsProvider ? _devInstrumentToken : null,
+        // The pin from the place picker, when the address has one. This is what gives the
+        // tracking service a real point to measure the rider's ETA against.
+        deliveryLatitude: address.latitude,
+        deliveryLongitude: address.longitude,
       );
       widget.cart.clear();
       if (!mounted) return;
@@ -173,6 +211,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? (e.response!.data as Map<String, dynamic>)['detail'] as String?
                 : null) ??
             t.itemNoLongerAvailable,
+        // 402: the payment provider said no and the placement rolled back — there is no order.
+        // The provider's own sentence names the reason when it sent one.
+        402 => (e.response?.data is Map<String, dynamic>
+                ? (e.response!.data as Map<String, dynamic>)['detail'] as String?
+                : null) ??
+            t.custPaymentDeclined,
         400 => t.checkDeliveryDetails,
         _ => t.couldNotPlaceOrder,
       };
@@ -422,11 +466,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   // ------------------------------------------------------------------ section 2: how it is paid
 
-  /// The payment strip: two equal cards, Apple Pay first as drawn.
+  /// The payment strip: equal cards in the design's geometry, cash first.
   ///
-  /// Apple Pay is rendered exactly as the design draws it and marked inert — no payment provider is
-  /// integrated, so selecting it would be a promise the platform cannot keep. Cash is the offered
-  /// method and stays selected.
+  /// Card and wallet are selectable and authorise against the DEV payment provider — no real
+  /// money moves — so each carries a "Test payment" caption, and choosing one puts the fuller
+  /// sentence under the strip. Presenting a dev authorisation as a live charge would be a lie
+  /// told in the shape of a feature; presenting it as a test payment is exactly what a tester
+  /// needs.
   Widget _paymentSection(DeliveryStrings t) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -444,32 +490,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Expanded(
-              child: YdComingSoon.wrap(
-                label: t.custSoon,
-                icon: Icons.schedule,
-                child: _payCard(
-                  icon: Icons.credit_card,
-                  label: t.custApplePay,
-                  selected: false,
-                  onTap: null,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            for (final PaymentMethod method in PaymentMethod.offered)
+            for (int i = 0; i < _methods.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: 10),
               Expanded(
                 child: _payCard(
-                  icon: method == PaymentMethod.cash
-                      ? Icons.attach_money_rounded
-                      : Icons.credit_card,
-                  label: method.labelIn(t),
-                  selected: _payment == method,
-                  onTap: () => setState(() => _payment = method),
+                  icon: switch (_methods[i]) {
+                    PaymentMethod.cash => Icons.attach_money_rounded,
+                    PaymentMethod.card => Icons.credit_card,
+                    PaymentMethod.wallet => Icons.account_balance_wallet_outlined,
+                  },
+                  label: _methods[i] == PaymentMethod.wallet
+                      ? t.paymentWallet
+                      : _methods[i].labelIn(t),
+                  // The honesty caption: the dev provider moves no money, and the card says so.
+                  caption: _methods[i].needsProvider ? t.custTestPayment : null,
+                  selected: _payment == _methods[i],
+                  onTap: () => setState(() => _payment = _methods[i]),
                 ),
               ),
+            ],
           ],
         ),
+        if (_payment.needsProvider) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Icon(Icons.science_outlined, size: 14, color: DeliveryColors.muted),
+              const SizedBox(width: DeliverySpacing.xs + 2),
+              Expanded(
+                child: Text(
+                  t.paymentTestModeNote,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: DeliveryColors.muted,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -479,6 +540,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required String label,
     required bool selected,
     required VoidCallback? onTap,
+    String? caption,
   }) {
     final Color foreground = selected ? DeliveryColors.ink : DeliveryColors.muted;
 
@@ -500,20 +562,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             padding:
                 const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Icon(icon, size: 18, color: foreground),
                 const SizedBox(width: DeliverySpacing.sm),
                 Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: foreground,
-                      height: 1.2,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: foreground,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (caption != null) ...<Widget>[
+                        const SizedBox(height: 2),
+                        Text(
+                          caption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: DeliveryColors.faint,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -561,6 +644,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ------------------------------------------------------------------ the sticky summary
 
   Widget _summaryBar(DeliveryStrings t, List<CartLine> lines) {
+    // The same advisory number the basket showed: the validated code's quote off the cached
+    // total. The server recomputes at placement and the confirmation shows ITS total.
+    final double promoDiscount = widget.promo?.valid == true ? widget.promo!.discount : 0;
+    final double payable = (widget.cart.total - promoDiscount)
+        .clamp(0, double.infinity)
+        .toDouble();
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -586,7 +676,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   Text(
-                    widget.cart.total.toStringAsFixed(2),
+                    payable.toStringAsFixed(2),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,

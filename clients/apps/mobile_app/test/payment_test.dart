@@ -59,11 +59,22 @@ void main() {
     });
 
     test('a method the client has never heard of does not crash the order list', () {
-      final DeliveryOrder order =
-          DeliveryOrder.fromJson(orderJson(method: 'WALLET', status: 'SOMETHING_NEW'));
+      // WALLET stopped being the example the day it became a real method; the test's point —
+      // an unknown wire falls back to cash rather than crashing — needs a wire that stays
+      // unknown.
+      final DeliveryOrder order = DeliveryOrder.fromJson(
+          orderJson(method: 'BARTER_GOATS', status: 'SOMETHING_NEW'));
 
       expect(order.paymentMethod, PaymentMethod.cash);
       expect(order.paymentStatus, PaymentStatus.due);
+    });
+
+    test('a wallet order parses as the wallet method it is', () {
+      final DeliveryOrder order = DeliveryOrder.fromJson(orderJson(method: 'WALLET'));
+
+      expect(order.paymentMethod, PaymentMethod.wallet);
+      // Never cash at the door: a wallet order is not money for a rider to collect.
+      expect(order.collectsCashOnDelivery, isFalse);
     });
 
     test('only cash is offered at checkout', () {

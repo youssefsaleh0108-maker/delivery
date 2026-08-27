@@ -35,12 +35,32 @@ class RiderHomeScreen extends StatefulWidget {
     required this.butlerApi,
     required this.session,
     required this.locale,
+    this.trackingApi,
+    this.moneyApi,
+    this.chatApi,
+    this.socket,
     this.pendingApproval = false,
     required this.onSignOut,
   });
 
   final OrderApi api;
   final ButlerApi butlerApi;
+
+  /// The presence half of the tracking service: the duty toggle and the between-jobs ping.
+  ///
+  /// Nullable so a shell that has not been handed one keeps the pre-wiring rendering — the duty
+  /// switch stays visibly inert rather than becoming a control that silently does nothing.
+  final TrackingApi? trackingApi;
+
+  /// The accounting ledger behind the Earnings tab. Null keeps the tab on its old derived-from-
+  /// orders numbers, labelled as derived.
+  final RiderMoneyApi? moneyApi;
+
+  /// The order chat, and the socket its live half rides on. Both null keeps the order-detail
+  /// header exactly as it was — no chat button at all.
+  final ChatApi? chatApi;
+  final UserQueueSocket? socket;
+
   final AuthSession session;
 
   /// Passed through to Settings, which is a tab of its own now.
@@ -79,6 +99,13 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   bool _loading = true;
   String? _busyId;
 
+  /// The presence API's last answer, rendered by the duty toggle. Null while the server has not
+  /// answered yet — which is also its honest answer for a rider who never declared duty (a 204).
+  RiderPresence? _presence;
+
+  /// True while a duty declaration is in flight; the switch refuses input meanwhile.
+  bool _dutyBusy = false;
+
   /// Simulated position, walked slightly on each ping.
   ///
   /// Real GPS needs a location plugin and a runtime permission prompt, which is a Phase 5 concern.
@@ -92,6 +119,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     _refresh();
     _refreshTimer = Timer.periodic(_refreshInterval, (_) => _refresh(silent: true));
     _pingTimer = Timer.periodic(_pingInterval, (_) => _pingActiveDeliveries());
+    unawaited(_loadPresence());
   }
 
   @override
@@ -125,7 +153,8 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   Future<void> _pingActiveDeliveries() async {
     final List<DeliveryOrder> inTransit =
         _assigned.where((DeliveryOrder o) => o.status == OrderStatus.pickedUp).toList();
-    if (inTransit.isEmpty) return;
+    final bool onDuty = _presence?.dutyState == DutyState.onDuty;
+    if (inTransit.isEmpty && !onDuty) return;
 
     // Drift by roughly a street's width so the customer's view visibly changes.
     _lat += (_random.nextDouble() - 0.5) * 0.002;
@@ -137,6 +166,61 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       } catch (_) {
         // A dropped ping is replaced by the next one; never surface it to the rider.
       }
+    }
+
+    // The order-less ping: what keeps a rider *between* jobs believed on the roster. Only while
+    // they declared duty — an off-duty rider's phone reports nothing.
+    final TrackingApi? tracking = widget.trackingApi;
+    if (tracking != null && onDuty) {
+      try {
+        await tracking.ping(_lat, _lng, accuracyM: 8);
+      } catch (_) {
+        // Same policy as the order ping: the next fix replaces a dropped one.
+      }
+    }
+    // Re-ask what the platform now believes, so "last seen" moves and a STALE verdict shows up
+    // without waiting for the settings tab to be reopened. Cheap for a rider who never declared
+    // duty too: the server answers 204 and the toggle keeps its resting state.
+    if (tracking != null) {
+      await _loadPresence();
+    }
+  }
+
+  // ------------------------------------------------------------------ presence
+
+  Future<void> _loadPresence() async {
+    final TrackingApi? tracking = widget.trackingApi;
+    if (tracking == null) return;
+    try {
+      final RiderPresence? presence = await tracking.myPresence();
+      if (!mounted) return;
+      setState(() => _presence = presence);
+    } catch (_) {
+      // The toggle keeps rendering the last answer; the next poll retries.
+    }
+  }
+
+  /// Declares duty and renders the *server's* answer — which can come back STALE when the phone
+  /// has not produced a believable fix yet. The switch must never show a state the platform does
+  /// not hold.
+  Future<void> _setDuty(bool on) async {
+    final TrackingApi? tracking = widget.trackingApi;
+    if (tracking == null || _dutyBusy) return;
+    setState(() => _dutyBusy = true);
+    try {
+      final RiderPresence result =
+          await tracking.setDuty(on ? DutyState.onDuty : DutyState.offDuty);
+      if (!mounted) return;
+      setState(() => _presence = result);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(DeliveryStrings.of(context).riderDutyChangeFailed)),
+      );
+      // Whatever the server holds now is what the toggle should show.
+      await _loadPresence();
+    } finally {
+      if (mounted) setState(() => _dutyBusy = false);
     }
   }
 
@@ -176,6 +260,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       builder: (_) => RiderOrderDetailScreen(
         order: order,
         onAction: (OrderAction action) => _act(order, action),
+        trackingApi: widget.trackingApi,
+        chatApi: widget.chatApi,
+        socket: widget.socket,
       ),
     ));
   }
@@ -191,7 +278,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         child: switch (_tab) {
           0 => _availableTab(t),
           1 => _activeTab(t),
-          2 => RiderEarningsScreen(api: widget.api),
+          2 => RiderEarningsScreen(api: widget.api, moneyApi: widget.moneyApi),
           _ => _settingsTab(t),
         },
       ),
@@ -483,7 +570,12 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
               children: <Widget>[
                 RiderProfileCard(name: widget.session.displayName),
                 const SizedBox(height: DeliverySpacing.md),
-                const RiderDutyToggleCard(),
+                RiderDutyToggleCard(
+                  wired: widget.trackingApi != null,
+                  presence: _presence,
+                  busy: _dutyBusy,
+                  onChanged: _setDuty,
+                ),
                 const SizedBox(height: DeliverySpacing.md),
                 // The language itself is set on the shared settings screen, which is also where
                 // fingerprint unlock lives. Two places to change one setting is one too many, so
