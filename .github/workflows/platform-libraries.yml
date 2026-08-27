@@ -27,8 +27,14 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # The five modules by name. `-pl platform` never worked — the aggregator has no module named
+      # "platform", only platform/platform-*, so every run of this workflow since it was written
+      # failed at reactor selection and nobody was watching a lane that had never once been green.
       - name: Build platform libraries
-        run: mvn -B -pl platform -amd verify
+        run: >-
+          mvn -B -pl
+          platform/platform-security,platform/platform-observability,platform/platform-outbox,platform/platform-notifications,platform/platform-storage
+          -amd verify
 
       - name: Verify every service still compiles against them
         run: mvn -B verify
