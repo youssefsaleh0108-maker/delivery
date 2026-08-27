@@ -147,8 +147,37 @@ http:
 
     # ------------------------------------------------------------------ notifications-manager (8104)
     notification-log:
-      rule: PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`)
+      rule: PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`) || PathPrefix(`/api/notification-preferences`)
       service: notifications-manager
+      entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
+    # ------------------------------------------------- the coming-soon backend (added 2026-08-27)
+    # Five new prefixes from the feature build. Grouped here rather than scattered so the next
+    # person adding an endpoint sees the rule in one place: a controller prefix that is not routed
+    # here does not exist as far as a phone is concerned — the mobile app found that out with
+    # product images, and these five would have 404'd identically.
+    geocoding:
+      rule: PathPrefix(`/api/geocoding`)
+      service: product-service
+      entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
+    chat:
+      rule: PathPrefix(`/api/chat`)
+      service: app-notification
+      entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
+    rider-money:
+      rule: PathPrefix(`/api/rider`)
+      service: accounting-service
+      entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
+    promotions:
+      rule: PathPrefix(`/api/promotions`)
+      service: order-manager
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
