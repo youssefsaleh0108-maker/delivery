@@ -144,7 +144,10 @@ class _CatalogCard extends StatelessWidget {
           Stack(
             children: <Widget>[
               DeliveryProductImage(
-                url: product.imageUrls.isEmpty ? null : product.imageUrls.first,
+                // The 320px derivative, not the merchant original - the same swap the merchant
+                // portal made on its product rows. The tap below still opens the full-size
+                // gallery, which is what a merchant checking their own photo wants to see.
+                url: product.listImageUrl,
                 height: 168,
                 width: double.infinity,
                 borderRadius: BorderRadius.zero,
