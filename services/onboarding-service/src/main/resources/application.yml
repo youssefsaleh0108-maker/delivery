@@ -105,27 +105,6 @@ delivery:
         - image/webp
         - application/pdf
 
-  onboarding:
-    # Who gets in without a human deciding.
-    #
-    # The platform was built so every application waits for a reviewer. These turn that off per
-    # kind, because growth and review pull against each other: a rider who applies on Friday
-    # evening and is approved on Monday morning has usually signed up with somebody else by then.
-    #
-    # What is given up is real. With one of these on, the only thing between a stranger and a live
-    # account is a verified email address — nobody reads the plate, nobody reads the commercial
-    # registration. The papers are still collected and still visible in the backoffice; they are
-    # simply no longer a gate. Approvals are recorded against system:auto-approval with whatever
-    # was outstanding written beside them, so the record says so plainly.
-    #
-    # Set per kind because the risks are not equal: a rider who is nobody wastes a delivery, a
-    # merchant who is nobody takes money for food that never existed, and a carrier signs for a
-    # fleet and a payout account.
-    auto-approve:
-      rider: ${AUTO_APPROVE_RIDER:false}
-      merchant: ${AUTO_APPROVE_MERCHANT:false}
-      carrier: ${AUTO_APPROVE_CARRIER:false}
-
   security:
     permit-all:
       - /actuator/health
@@ -171,6 +150,26 @@ delivery:
       - /api/onboarding/password-reset/confirm
 
   onboarding:
+    # Who gets in without a human deciding.
+    #
+    # The platform was built so every application waits for a reviewer. These turn that off per
+    # kind, because growth and review pull against each other: a rider who applies on Friday
+    # evening and is approved on Monday morning has usually signed up with somebody else by then.
+    #
+    # What is given up is real. With one of these on, the only thing between a stranger and a live
+    # account is a verified email address — nobody reads the plate, nobody reads the commercial
+    # registration. The papers are still collected and still visible in the backoffice; they are
+    # simply no longer a gate. Approvals are recorded against system:auto-approval with whatever
+    # was outstanding written beside them, so the record says so plainly.
+    #
+    # Per kind because the risks are not equal: a rider who is nobody wastes a delivery, a merchant
+    # who is nobody takes money for food that never existed, and a carrier signs for a fleet and a
+    # payout account.
+    auto-approve:
+      rider: ${AUTO_APPROVE_RIDER:false}
+      merchant: ${AUTO_APPROVE_MERCHANT:false}
+      carrier: ${AUTO_APPROVE_CARRIER:false}
+
     verification:
       # How long before the same address can be sent another code. Short enough not to punish
       # somebody whose first message went to spam, long enough that this is not a way to send
