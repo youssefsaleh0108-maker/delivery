@@ -311,7 +311,8 @@ class _CartScreenState extends State<CartScreen> {
       child: Row(
         children: <Widget>[
           CustomerPhoto(
-            url: line.product.imageUrls.isEmpty ? null : line.product.imageUrls.first,
+            // A 64px basket thumbnail — a list surface, so the derivative.
+            url: line.product.listImageUrl,
             width: _thumb,
             height: _thumb,
             radius: 10,

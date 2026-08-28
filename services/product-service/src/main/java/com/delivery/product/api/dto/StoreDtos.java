@@ -56,8 +56,25 @@ public final class StoreDtos {
             Store.Availability availability,
             /** Wall-clock closing time for the window the store is currently in; null when closed. */
             LocalTime closesAt,
+            /** Full-size logo. For the shop header, where it is drawn as a large badge. */
             String logoUrl,
+            /**
+             * Full-size cover. <strong>For the hero</strong> — the shop page draws this full-bleed
+             * behind its header, which is the one place the whole photo is worth its bytes.
+             */
             String coverUrl,
+            /**
+             * The logo at 320 px on the long edge. For any list-sized use. Falls back to
+             * {@link #logoUrl()} when no derivative exists, and is null only when
+             * {@code logoUrl} is.
+             */
+            String logoThumbUrl,
+            /**
+             * The cover at 320 px on the long edge. <strong>For list surfaces</strong> — the
+             * storefront grid and the favourites rail. Falls back to {@link #coverUrl()} when no
+             * derivative exists, and is null only when {@code coverUrl} is.
+             */
+            String coverThumbUrl,
             String address,
             /**
              * The map pin, or null when the merchant has not dropped one.
@@ -90,8 +107,23 @@ public final class StoreDtos {
             int etaMinMinutes,
             int etaMaxMinutes,
             Store.Availability availability,
+            /** Full-size logo, kept for clients already reading it. */
             String logoUrl,
+            /**
+             * Full-size cover, kept for clients already reading it.
+             *
+             * <p>A card is a list surface, so {@link #coverThumbUrl()} is what a grid should draw.
+             * This one is still the right choice when a card's picture is being promoted into a
+             * hero — the shop page opens from a card and reuses it behind its header.
+             */
             String coverUrl,
+            /** The logo at 320 px on the long edge; falls back to {@link #logoUrl()}. */
+            String logoThumbUrl,
+            /**
+             * The cover at 320 px on the long edge. <strong>What a storefront grid should
+             * draw.</strong> Falls back to {@link #coverUrl()} when no derivative exists.
+             */
+            String coverThumbUrl,
             boolean favorite,
             /** The single best promotion, for the ribbon on the card. Null when there is none. */
             OfferResponse topOffer) {

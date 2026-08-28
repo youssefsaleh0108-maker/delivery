@@ -1,5 +1,6 @@
 package com.delivery.product.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,10 +39,30 @@ import com.delivery.product.service.CatalogService.ProductNotFoundException;
 @Service
 public class ProductImageService {
 
+    /**
+     * One image, at both the sizes a client might want it.
+     *
+     * <p>{@code thumb} is never null when {@code full} is not: when no derivative exists — every
+     * image uploaded before thumbnailing did, and any whose generation failed — it holds the
+     * full-size URL. See {@link #resolveImages} for why that fallback lives here.
+     */
+    public record ImageUrl(String full, String thumb) {
+
+        /** Null-tolerant readers, for the store slots where "no artwork" is a normal state. */
+        public static String fullOf(ImageUrl url) {
+            return url == null ? null : url.full();
+        }
+
+        public static String thumbOf(ImageUrl url) {
+            return url == null ? null : url.thumb();
+        }
+    }
+
     private final ProductRepository products;
     private final StorageService storage;
     private final FileMetadataRepository files;
     private final OutboxRecorder outbox;
+    private final ThumbnailService thumbnails;
     private final int maxImagesPerProduct;
 
     public ProductImageService(
@@ -49,12 +70,14 @@ public class ProductImageService {
             StorageService storage,
             FileMetadataRepository files,
             OutboxRecorder outbox,
+            ThumbnailService thumbnails,
             @org.springframework.beans.factory.annotation.Value(
                     "${delivery.catalog.max-images-per-product:8}") int maxImagesPerProduct) {
         this.products = products;
         this.storage = storage;
         this.files = files;
         this.outbox = outbox;
+        this.thumbnails = thumbnails;
         this.maxImagesPerProduct = maxImagesPerProduct;
     }
 
@@ -79,11 +102,16 @@ public class ProductImageService {
      * <p>The ownership check runs twice by design: {@code confirmUpload} verifies the <em>file</em>
      * belongs to the caller, and {@code requireOwned} verifies the <em>product</em> does. Skipping
      * the second would let a merchant staple their own image onto a competitor's listing.
+     *
+     * <p>The list-sized derivative is produced here, once, rather than on every read. It cannot
+     * fail this call — see {@link ThumbnailService#createFor}.
      */
     @Transactional
     public Product confirmImage(UUID productId, String merchantId, UUID fileId) {
         Product product = requireOwned(productId, merchantId);
         FileMetadata metadata = storage.confirmUpload(fileId, merchantId);
+
+        thumbnails.createFor(metadata);
 
         product.addImage(metadata.getObjectKey());
         outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
@@ -100,7 +128,14 @@ public class ProductImageService {
                     "Product " + productId + " has no image " + objectKey);
         }
 
-        files.findByBucketAndObjectKey(FilePurpose.PRODUCT_IMAGE.bucket(), objectKey)
+        String bucket = FilePurpose.PRODUCT_IMAGE.bucket();
+        files.findByBucketAndObjectKey(bucket, objectKey)
+                .ifPresent(metadata -> storage.softDelete(metadata.getId(), merchantId));
+        // The derivative goes with its original. It is unreachable once the original's metadata is
+        // gone — resolveImages only ever offers a thumbnail beside a full-size URL — but leaving
+        // the row and the object behind would make every later orphan sweep wrong about what it
+        // had collected.
+        files.findByBucketAndObjectKey(bucket, Thumbnailer.thumbKeyFor(objectKey))
                 .ifPresent(metadata -> storage.softDelete(metadata.getId(), merchantId));
 
         outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
@@ -109,45 +144,74 @@ public class ProductImageService {
     }
 
     /**
-     * Turns a single optional object key into a URL, for a store's logo or cover.
+     * Turns a single optional object key into a full-size URL, for artwork that has only one size
+     * — a banner, or a category tile.
      *
      * <p>Returns null rather than throwing when the key is absent or its upload was never
-     * confirmed: a store without artwork is a normal state, and the clients render a generated
-     * monogram tile in its place.
+     * confirmed: artwork nobody has uploaded yet is a normal state, and the clients render a
+     * generated tile in its place. Callers that draw the same picture at two sizes want
+     * {@link #resolveImage} instead.
      */
     @Transactional(readOnly = true)
     public String resolveUrl(String objectKey) {
+        return ImageUrl.fullOf(resolveImage(objectKey));
+    }
+
+    /** The single-key form of {@link #resolveImages}. Null when there is no artwork to show. */
+    @Transactional(readOnly = true)
+    public ImageUrl resolveImage(String objectKey) {
         if (objectKey == null || objectKey.isBlank()) {
             return null;
         }
-        List<String> resolved = resolveUrls(List.of(objectKey));
+        List<ImageUrl> resolved = resolveImages(List.of(objectKey));
         return resolved.isEmpty() ? null : resolved.get(0);
     }
 
     /**
-     * Turns stored object keys into URLs a client can load.
+     * Turns stored object keys into the URLs a client can load, full-size and list-sized.
      *
      * <p>Batched into one repository call rather than one per key: a catalog page of 20 products
-     * with 4 images each is 80 lookups if done naively.
+     * with 4 images each is 80 lookups if done naively. Originals and derivatives are fetched
+     * together in that same call, so adding thumbnails costs no extra round trip — only a longer
+     * {@code IN} list.
+     *
+     * <p><strong>The missing-thumbnail fallback lives here, on the server, and not in the
+     * clients.</strong> Only this service can answer whether a derivative actually exists: the key
+     * is a pure function of the original's, so a client could certainly guess the URL, but a
+     * guessed URL for an image uploaded before thumbnailing existed — or one whose generation
+     * failed — is a 404 and a broken tile, and the client would have to load the image to find
+     * out. Deciding it here also means the several apps already in the wild get the right picture
+     * without shipping a release. The clients still degrade if the field is absent altogether, but
+     * that is a guard against an old server, not a second copy of this rule.
      */
     @Transactional(readOnly = true)
-    public List<String> resolveUrls(List<String> objectKeys) {
+    public List<ImageUrl> resolveImages(List<String> objectKeys) {
         if (objectKeys.isEmpty()) {
             return List.of();
         }
 
-        Map<String, FileMetadata> byKey = files.findByObjectKeyIn(objectKeys).stream()
+        List<String> wanted = new ArrayList<>(objectKeys.size() * 2);
+        wanted.addAll(objectKeys);
+        objectKeys.forEach(key -> wanted.add(Thumbnailer.thumbKeyFor(key)));
+
+        Map<String, FileMetadata> byKey = files.findByObjectKeyIn(wanted).stream()
                 .filter(metadata -> metadata.getStatus() == FileMetadata.Status.UPLOADED)
                 .collect(Collectors.toMap(FileMetadata::getObjectKey, Function.identity(),
                         (first, second) -> first));
 
         // Preserve the product's display order, and drop keys whose metadata is missing or not yet
         // confirmed rather than emitting a URL that would 404 in the client.
-        return objectKeys.stream()
-                .map(byKey::get)
-                .filter(java.util.Objects::nonNull)
-                .map(storage::readUrl)
-                .toList();
+        List<ImageUrl> resolved = new ArrayList<>(objectKeys.size());
+        for (String key : objectKeys) {
+            FileMetadata original = byKey.get(key);
+            if (original == null) {
+                continue;
+            }
+            String full = storage.readUrl(original);
+            FileMetadata thumb = byKey.get(Thumbnailer.thumbKeyFor(key));
+            resolved.add(new ImageUrl(full, thumb == null ? full : storage.readUrl(thumb)));
+        }
+        return resolved;
     }
 
     private Product requireOwned(UUID productId, String merchantId) {

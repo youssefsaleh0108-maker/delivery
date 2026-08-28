@@ -40,6 +40,7 @@ import com.delivery.product.domain.Product;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.ProductImageService.ImageUrl;
 
 /**
  * The catalog API.
@@ -227,6 +228,9 @@ public class ProductController {
 
     private ProductResponse toResponse(Product product) {
         List<String> refs = product.getImageRefs();
+        // One resolve, two lists: full-size for the hero, list-sized for the rows. Splitting this
+        // into two calls would double the metadata lookups on the browse path for nothing.
+        List<ImageUrl> resolved = images.resolveImages(refs);
         return new ProductResponse(
                 product.getId(),
                 product.getMerchantId(),
@@ -236,7 +240,8 @@ public class ProductController {
                 product.getPrice(),
                 product.getCategoryId(),
                 refs,
-                images.resolveUrls(refs),
+                resolved.stream().map(ImageUrl::full).toList(),
+                resolved.stream().map(ImageUrl::thumb).toList(),
                 product.getStatus(),
                 product.getCreatedAt(),
                 product.getUpdatedAt());

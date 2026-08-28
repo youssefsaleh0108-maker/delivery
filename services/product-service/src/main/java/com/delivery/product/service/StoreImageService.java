@@ -43,10 +43,13 @@ public class StoreImageService {
 
     private final StoreRepository stores;
     private final StorageService storage;
+    private final ThumbnailService thumbnails;
 
-    public StoreImageService(StoreRepository stores, StorageService storage) {
+    public StoreImageService(StoreRepository stores, StorageService storage,
+                             ThumbnailService thumbnails) {
         this.stores = stores;
         this.storage = storage;
+        this.thumbnails = thumbnails;
     }
 
     @Transactional
@@ -63,11 +66,18 @@ public class StoreImageService {
      * verifies the <em>file</em> belongs to the caller and {@code requireOwned} verifies the
      * <em>store</em> does. Dropping the second would let a merchant put their logo on a
      * competitor's shopfront.
+     *
+     * <p>A cover earns its derivative more than anything else on the platform: the home screen
+     * draws a grid of them at 100–130 dp and the shop page draws the same object full-bleed as a
+     * hero, so without one the grid pays hero-sized bytes per card. Same call as
+     * {@link ProductImageService#confirmImage}, and it cannot fail this one either.
      */
     @Transactional
     public Store confirm(UUID storeId, String merchantId, Slot slot, UUID fileId) {
         Store store = requireOwned(storeId, merchantId);
         FileMetadata metadata = storage.confirmUpload(fileId, merchantId);
+
+        thumbnails.createFor(metadata);
 
         applySlot(store, slot, metadata.getObjectKey());
         return store;

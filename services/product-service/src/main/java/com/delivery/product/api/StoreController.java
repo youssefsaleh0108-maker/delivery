@@ -53,6 +53,7 @@ import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
 import com.delivery.product.service.StoreService;
@@ -505,6 +506,10 @@ public class StoreController {
                                      Map<UUID, List<StoreOffer>> offersByStore) {
         Store store = v.store();
         List<StoreOffer> storeOffers = offersByStore.getOrDefault(store.getId(), List.of());
+        // Both sizes come out of one lookup per slot, so the storefront grid costs exactly the
+        // metadata queries it did before.
+        ImageUrl logo = images.resolveImage(store.getLogoRef());
+        ImageUrl cover = images.resolveImage(store.getCoverRef());
         return new StoreCardResponse(
                 store.getId(),
                 store.getSlug(),
@@ -519,14 +524,18 @@ public class StoreController {
                 store.getEtaMinMinutes(),
                 store.getEtaMaxMinutes(),
                 v.availability(),
-                images.resolveUrl(store.getLogoRef()),
-                images.resolveUrl(store.getCoverRef()),
+                ImageUrl.fullOf(logo),
+                ImageUrl.fullOf(cover),
+                ImageUrl.thumbOf(logo),
+                ImageUrl.thumbOf(cover),
                 starred.contains(store.getId()),
                 storeOffers.isEmpty() ? null : toOffer(storeOffers.get(0)));
     }
 
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
         Store store = v.store();
+        ImageUrl logo = images.resolveImage(store.getLogoRef());
+        ImageUrl cover = images.resolveImage(store.getCoverRef());
         return new StoreResponse(
                 store.getId(),
                 store.getSlug(),
@@ -543,8 +552,10 @@ public class StoreController {
                 store.getEtaMaxMinutes(),
                 v.availability(),
                 v.closesAt(),
-                images.resolveUrl(store.getLogoRef()),
-                images.resolveUrl(store.getCoverRef()),
+                ImageUrl.fullOf(logo),
+                ImageUrl.fullOf(cover),
+                ImageUrl.thumbOf(logo),
+                ImageUrl.thumbOf(cover),
                 store.getAddress(),
                 store.getLatitude(),
                 store.getLongitude(),
@@ -569,6 +580,8 @@ public class StoreController {
 
     private ProductResponse toProduct(Product product) {
         List<String> refs = product.getImageRefs();
+        // This is the shop page's product list — the screen the whole derivative exists for.
+        List<ImageUrl> resolved = images.resolveImages(refs);
         return new ProductResponse(
                 product.getId(),
                 product.getMerchantId(),
@@ -578,7 +591,8 @@ public class StoreController {
                 product.getPrice(),
                 product.getCategoryId(),
                 refs,
-                images.resolveUrls(refs),
+                resolved.stream().map(ImageUrl::full).toList(),
+                resolved.stream().map(ImageUrl::thumb).toList(),
                 product.getStatus(),
                 product.getCreatedAt(),
                 product.getUpdatedAt());

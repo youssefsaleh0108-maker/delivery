@@ -140,6 +140,8 @@ class StoreCard {
     this.etaMaxMinutes = 40,
     this.logoUrl,
     this.coverUrl,
+    this.logoThumbUrl,
+    this.coverThumbUrl,
     this.favorite = false,
     this.topOffer,
   });
@@ -158,9 +160,22 @@ class StoreCard {
   final int etaMaxMinutes;
   final StoreAvailability availability;
   final String? logoUrl;
+
+  /// The full-size cover. For a hero: the shop page draws this full-bleed behind its header.
   final String? coverUrl;
+
+  /// The logo at 320px on the long edge. Null only when [logoUrl] is.
+  final String? logoThumbUrl;
+
+  /// The cover at 320px on the long edge. Null only when [coverUrl] is.
+  final String? coverThumbUrl;
   final bool favorite;
   final Offer? topOffer;
+
+  /// The cover a card in a grid should load — small if the server has one, the original if not.
+  String? get listCoverUrl => coverThumbUrl ?? coverUrl;
+
+  String? get listLogoUrl => logoThumbUrl ?? logoUrl;
 
   String get etaLabel => '$etaMinMinutes-$etaMaxMinutes min';
 
@@ -183,6 +198,8 @@ class StoreCard {
         etaMaxMinutes: etaMaxMinutes,
         logoUrl: logoUrl,
         coverUrl: coverUrl,
+        logoThumbUrl: logoThumbUrl,
+        coverThumbUrl: coverThumbUrl,
         favorite: favorite ?? this.favorite,
         topOffer: topOffer,
       );
@@ -203,6 +220,8 @@ class StoreCard {
         availability: StoreAvailability.fromWire(json['availability'] as String?),
         logoUrl: json['logoUrl'] as String?,
         coverUrl: json['coverUrl'] as String?,
+        logoThumbUrl: json['logoThumbUrl'] as String?,
+        coverThumbUrl: json['coverThumbUrl'] as String?,
         favorite: json['favorite'] as bool? ?? false,
         topOffer: json['topOffer'] == null
             ? null
@@ -230,6 +249,8 @@ class Store {
     this.closesAt,
     this.logoUrl,
     this.coverUrl,
+    this.logoThumbUrl,
+    this.coverThumbUrl,
     this.address,
     this.latitude,
     this.longitude,
@@ -255,7 +276,16 @@ class Store {
   /// Wall-clock closing time, "HH:mm:ss" as the server sends it. Null when shut.
   final String? closesAt;
   final String? logoUrl;
+
+  /// The full-size cover, for the shop page's own hero.
   final String? coverUrl;
+
+  /// The logo at 320px on the long edge. Null only when [logoUrl] is.
+  final String? logoThumbUrl;
+
+  /// The cover at 320px on the long edge, for anywhere this store appears as a card rather than
+  /// as a page. Null only when [coverUrl] is.
+  final String? coverThumbUrl;
   final String? address;
 
   /// The map pin, or null when the merchant has not dropped one. Both null together or both set
@@ -269,6 +299,11 @@ class Store {
 
   /// Whether there is a pin to draw or to measure "near me" from.
   bool get hasPin => latitude != null && longitude != null;
+
+  /// The cover to load when this store is drawn as a card rather than as its own page.
+  String? get listCoverUrl => coverThumbUrl ?? coverUrl;
+
+  String? get listLogoUrl => logoThumbUrl ?? logoUrl;
 
   String get etaLabel => '$etaMinMinutes-$etaMaxMinutes min';
 
@@ -298,6 +333,8 @@ class Store {
         etaMaxMinutes: etaMaxMinutes,
         logoUrl: logoUrl,
         coverUrl: coverUrl,
+        logoThumbUrl: logoThumbUrl,
+        coverThumbUrl: coverThumbUrl,
         favorite: favorite,
         topOffer: offers.isEmpty ? null : offers.first,
       );
@@ -320,6 +357,8 @@ class Store {
         closesAt: closesAt,
         logoUrl: logoUrl,
         coverUrl: coverUrl,
+        logoThumbUrl: logoThumbUrl,
+        coverThumbUrl: coverThumbUrl,
         address: address,
         favorite: favorite ?? this.favorite,
         offers: offers,
@@ -343,6 +382,8 @@ class Store {
         closesAt: json['closesAt'] as String?,
         logoUrl: json['logoUrl'] as String?,
         coverUrl: json['coverUrl'] as String?,
+        logoThumbUrl: json['logoThumbUrl'] as String?,
+        coverThumbUrl: json['coverThumbUrl'] as String?,
         address: json['address'] as String?,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),

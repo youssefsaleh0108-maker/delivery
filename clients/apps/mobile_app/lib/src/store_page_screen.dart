@@ -458,6 +458,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
           fit: StackFit.expand,
           children: <Widget>[
             CustomerPhoto(
+              // The full-size cover, deliberately. This is a hero — full-bleed behind the header —
+              // and the one place on the shop page where the whole photo is worth its bytes.
               url: card.coverUrl,
               height: _heroHeight,
               icon: iconForVertical(card.vertical),
@@ -766,7 +768,11 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           CustomerPhoto(
-            url: product.imageUrls.isEmpty ? null : product.imageUrls.first,
+            // The 320px derivative, not the merchant's original. This row is the screen that was
+            // measured: three photos at 631 KB, 575 KB and 410 KB, 2.0-2.9s each, all of them
+            // arriving to fill an 80dp square. Falls back to the full-size URL by itself when a
+            // product has no derivative.
+            url: product.listImageUrl,
             width: _thumb,
             height: _thumb,
             radius: DeliveryRadius.md,

@@ -49,7 +49,26 @@ public final class CatalogDtos {
             BigDecimal price,
             UUID categoryId,
             List<String> imageRefs,
+            /**
+             * Full-size images, in display order. <strong>For detail surfaces</strong> — the
+             * product hero and its gallery, where the photo is drawn at 280 dp full-bleed.
+             *
+             * <p>Unchanged in meaning and unchanged in name: clients already in the wild read this
+             * field and know nothing about {@link #imageThumbUrls()}.
+             */
             List<String> imageUrls,
+            /**
+             * The same images at 320 px on the long edge. <strong>For list surfaces</strong> —
+             * shop-page product rows, basket lines, the merchant's product list, related-product
+             * tiles — anywhere the photo is drawn at 80 dp or less.
+             *
+             * <p>Index-aligned with {@link #imageUrls()} and always the same length, so
+             * {@code imageThumbUrls[i]} is always the small form of {@code imageUrls[i]}. An entry
+             * repeats the full-size URL when no derivative exists, which is the case for every
+             * image uploaded before thumbnailing and for any whose generation failed — so a client
+             * can use this list unconditionally and never render a broken tile.
+             */
+            List<String> imageThumbUrls,
             Product.Status status,
             Instant createdAt,
             Instant updatedAt) {

@@ -491,7 +491,10 @@ class _ProductRow extends StatelessWidget {
                 children: <Widget>[
                   Positioned.fill(
                     child: DeliveryProductImage(
-                      url: product.imageUrls.first,
+                      // The 64px row thumbnail gets the derivative; the preview it opens gets the
+                      // full-size images, because that is where a merchant is checking whether the
+                      // photo they uploaded is any good.
+                      url: product.listImageUrl,
                       borderRadius: BorderRadius.circular(DeliveryRadius.md),
                       onTap: () => showProductImagePreview(
                         context,

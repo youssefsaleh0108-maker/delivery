@@ -234,6 +234,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// 280px full-bleed photo with a single translucent back button, per the frame. No scrim: the
   /// shop hero has one, this one deliberately does not.
   Widget _hero() {
+    // Full-size, and staying full-size: a 280px full-bleed photo is exactly what the original was
+    // uploaded for, and the 320px derivative would be visibly soft here.
     final List<String> images = widget.product.imageUrls;
     return SizedBox(
       height: _heroHeight,
@@ -591,7 +593,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Row(
               children: <Widget>[
                 CustomerPhoto(
-                  url: product.imageUrls.isEmpty ? null : product.imageUrls.first,
+                  // A 48px tile in a horizontal rail: a list surface, so the derivative.
+                  url: product.listImageUrl,
                   width: 48,
                   height: 48,
                   radius: DeliveryRadius.sm,

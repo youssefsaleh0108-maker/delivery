@@ -36,6 +36,7 @@ class Product {
     this.categoryId,
     this.imageRefs = const <String>[],
     this.imageUrls = const <String>[],
+    this.imageThumbUrls = const <String>[],
   });
 
   final String id;
@@ -52,10 +53,37 @@ class Product {
   /// Object keys, used when removing an image.
   final List<String> imageRefs;
 
-  /// Loadable URLs for the same images, in the same order, resolved by the service.
+  /// Full-size loadable URLs for the same images, in the same order, resolved by the service.
+  ///
+  /// For detail surfaces — the product hero and its gallery. On a list row these are the reason a
+  /// customer watches a placeholder for two seconds: they are the merchant's original upload,
+  /// several hundred kilobytes each, drawn into an 80dp square.
   final List<String> imageUrls;
 
+  /// The same images at 320px on the long edge, index-aligned with [imageUrls].
+  ///
+  /// For list surfaces. The service repeats the full-size URL here for any image that has no
+  /// derivative, so an entry is never a dead link — see [listImageUrl]. Empty only when talking to
+  /// a server that predates thumbnailing.
+  final List<String> imageThumbUrls;
+
   final ProductStatus status;
+
+  /// The photo a list row should load: small if there is one, the original if not.
+  ///
+  /// The server already substitutes the full-size URL per image when a derivative is missing. The
+  /// fallback repeated here catches the other case — the field absent from the response
+  /// altogether, which is what an older service returns — so an app built against this model
+  /// cannot end up with a row that has no picture at all.
+  String? get listImageUrl {
+    if (imageThumbUrls.isNotEmpty) {
+      return imageThumbUrls.first;
+    }
+    return imageUrls.isEmpty ? null : imageUrls.first;
+  }
+
+  /// The photo a hero or gallery should load: always the original.
+  String? get heroImageUrl => imageUrls.isEmpty ? null : imageUrls.first;
 
   factory Product.fromJson(Map<String, dynamic> json) => Product(
         id: json['id'] as String,
@@ -67,6 +95,8 @@ class Product {
         categoryId: json['categoryId'] as String?,
         imageRefs: (json['imageRefs'] as List<dynamic>? ?? <dynamic>[]).cast<String>(),
         imageUrls: (json['imageUrls'] as List<dynamic>? ?? <dynamic>[]).cast<String>(),
+        imageThumbUrls:
+            (json['imageThumbUrls'] as List<dynamic>? ?? <dynamic>[]).cast<String>(),
         status: ProductStatus.fromWire(json['status'] as String?),
       );
 

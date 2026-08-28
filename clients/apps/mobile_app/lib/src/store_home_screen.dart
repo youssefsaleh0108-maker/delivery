@@ -883,7 +883,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           CustomerPhoto(
-            url: store.coverUrl,
+            // A 130px cover in a horizontally scrolling rail — a list surface, and one that loads
+            // several covers at once. The derivative, falling back to the full-size URL itself.
+            url: store.listCoverUrl,
             width: double.infinity,
             height: _shopCoverHeight,
             icon: iconForVertical(store.vertical),
@@ -1016,7 +1018,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           Stack(
             children: <Widget>[
               CustomerPhoto(
-                url: store.coverUrl,
+                // The storefront grid: a 100px cover, once per shop, for every shop on screen.
+                url: store.listCoverUrl,
                 height: _itemCoverHeight,
                 width: double.infinity,
                 radius: DeliveryRadius.md,
