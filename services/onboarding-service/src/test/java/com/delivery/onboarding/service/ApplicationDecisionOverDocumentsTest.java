@@ -46,7 +46,11 @@ class ApplicationDecisionOverDocumentsTest {
         documents = mock(ApplicantDocumentService.class);
         onboarding = new OnboardingService(applications, mock(ApplicationIntake.class),
                 mock(RuntimeService.class), mock(TaskService.class),
-                mock(KeycloakAdminClient.class), documents);
+                mock(KeycloakAdminClient.class), documents,
+                // Manual review: this suite is about a HUMAN deciding over outstanding documents,
+                // and an automatic approval on submission would decide the application before
+                // any of these tests reached their assertion.
+                new AutoApprovalPolicy(false, false, false));
 
         application = new OnboardingApplication(Kind.RIDER, "Sam Salem", "Sam Salem",
                 "sam@example.test", Instant.now(), null, null, null, null, null);

@@ -37,18 +37,29 @@ public class OnboardingService {
     private final TaskService tasks;
     private final KeycloakAdminClient keycloak;
     private final ApplicantDocumentService documents;
+    private final AutoApprovalPolicy autoApproval;
 
     public OnboardingService(OnboardingApplicationRepository applications,
                              ApplicationIntake intake,
                              RuntimeService runtime, TaskService tasks,
                              KeycloakAdminClient keycloak,
-                             ApplicantDocumentService documents) {
+                             ApplicantDocumentService documents,
+                             AutoApprovalPolicy autoApproval) {
         this.applications = applications;
         this.intake = intake;
         this.runtime = runtime;
         this.tasks = tasks;
         this.keycloak = keycloak;
         this.documents = documents;
+        this.autoApproval = autoApproval;
+
+        if (!autoApproval.automaticKinds().isEmpty()) {
+            // At WARN, on purpose. This is the platform telling its operator that nobody is reading
+            // applications for these kinds — a thing worth noticing in a log somebody skims, and
+            // worth being able to point at when the question is asked later.
+            log.warn("Auto-approval is ON for {}: these applications are approved on submission "
+                    + "with no human review", autoApproval.automaticKinds());
+        }
     }
 
     /** Thrown when an application cannot be accepted or decided as asked. */
@@ -136,7 +147,44 @@ public class OnboardingService {
 
         log.info("Application {} submitted: {} as {}",
                 application.getReference(), application.getBusinessName(), kind);
+
+        if (autoApproval.isAutomatic(kind)) {
+            return autoApprove(application);
+        }
         return application;
+    }
+
+    /**
+     * Approves an application the policy says nobody needs to look at.
+     *
+     * <p>Deliberately the SAME path a reviewer takes — {@link #approve(UUID, String, boolean)} —
+     * rather than a shortcut that sets the status directly. Everything downstream of an approval
+     * hangs off that method: the role grant, the APPLICANT revoke, the process completion, the
+     * decision notification. A second way to approve would be a second place for all of it to be
+     * forgotten, and the first person to notice would be an approved merchant who cannot publish.
+     *
+     * <p>Document issues are acknowledged, because with auto-approval on there has by definition
+     * been no review — the papers usually have not even been uploaded yet, since the wizard sends
+     * them after the account exists. That acknowledgement is not silent: what was outstanding is
+     * written onto the application beside {@code system:auto-approval}, so the record says plainly
+     * that nothing was checked and by what.
+     *
+     * <p>A failure here leaves the application SUBMITTED, which is exactly right: it lands in the
+     * reviewer's queue and a human can decide it. The applicant is not lost, and the platform has
+     * not half-approved anybody.
+     */
+    private OnboardingApplication autoApprove(OnboardingApplication application) {
+        try {
+            OnboardingApplication approved = approve(
+                    application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true);
+            log.info("Application {} auto-approved on submission ({} policy is automatic)",
+                    approved.getReference(), application.getKind());
+            return approved;
+        } catch (RuntimeException e) {
+            log.error("Auto-approval failed for {}; it stays in the review queue",
+                    application.getReference(), e);
+            return application;
+        }
     }
 
     // ---------------------------------------------------------------- reviewing

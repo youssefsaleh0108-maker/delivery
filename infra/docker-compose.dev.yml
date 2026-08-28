@@ -949,6 +949,13 @@ services:
       # Where one-time codes and decision emails are handed off. Without it the default is
       # localhost, which inside a container is this service talking to itself.
       NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
+      # Who is let in without a reviewer ever seeing the application. Off unless .env says
+      # otherwise, so the safe behaviour is the one you get by forgetting; the service logs a WARN
+      # naming the kinds whenever any of these is on, because "nobody is reading applications" is
+      # worth seeing in a log somebody skims. See AutoApprovalPolicy for exactly what is given up.
+      AUTO_APPROVE_RIDER: ${AUTO_APPROVE_RIDER:-false}
+      AUTO_APPROVE_MERCHANT: ${AUTO_APPROVE_MERCHANT:-false}
+      AUTO_APPROVE_CARRIER: ${AUTO_APPROVE_CARRIER:-false}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
       OTEL_SDK_DISABLED: "true"
