@@ -147,10 +147,6 @@ public class OnboardingService {
 
         log.info("Application {} submitted: {} as {}",
                 application.getReference(), application.getBusinessName(), kind);
-
-        if (autoApproval.isAutomatic(kind)) {
-            return autoApprove(application);
-        }
         return application;
     }
 
@@ -177,7 +173,7 @@ public class OnboardingService {
         try {
             OnboardingApplication approved = approve(
                     application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true);
-            log.info("Application {} auto-approved on submission ({} policy is automatic)",
+            log.info("Application {} auto-approved once its sign-in existed ({} is automatic)",
                     approved.getReference(), application.getKind());
             return approved;
         } catch (RuntimeException e) {
@@ -357,6 +353,24 @@ public class OnboardingService {
         application.applicantAccountCreated(userRef);
         applications.save(application);
         log.info("Applicant account created for application {}", application.getReference());
+
+        // Auto-approval fires HERE, not at submission, and the difference is the whole feature
+        // working.
+        //
+        // Approving at submit time meant the decision landed before this account existed, so
+        // ProvisionAccount took its no-applicant branch and created a partner account with a
+        // password nobody had been told. The applicant then arrived at this method to choose the
+        // passcode they had just typed, and Keycloak refused a second account on the same address —
+        // leaving them approved, provisioned, and unable to sign in. Every status field said
+        // success.
+        //
+        // Approving once the account exists takes the other branch: the role is granted to the
+        // account they are already holding a passcode for, and APPLICANT is revoked. An application
+        // whose applicant never chooses a passcode simply stays in the queue, which is the honest
+        // outcome — there is nobody to approve yet.
+        if (autoApproval.isAutomatic(application.getKind()) && !application.isDecided()) {
+            autoApprove(application);
+        }
     }
 
     /** What a signed-in applicant is shown about their own application. */
