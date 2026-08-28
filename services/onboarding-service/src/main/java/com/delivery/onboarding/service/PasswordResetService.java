@@ -53,7 +53,7 @@ public class PasswordResetService {
             verifications.requestPasswordReset(email, () -> {
                 try {
                     return keycloak.findUserIdByEmail(
-                            VerificationService.normalise(Channel.EMAIL, email)).isPresent();
+                            verifications.normalise(Channel.EMAIL, email)).isPresent();
                 } catch (Exception e) {
                     log.error("Could not look an account up for a password reset", e);
                     return false;

@@ -54,7 +54,7 @@ class PasswordResetServiceTest {
         platform = mock(PlatformClient.class);
         keycloak = mock(KeycloakAdminClient.class);
         verificationService = new VerificationService(
-                verifications, platform, Duration.ofSeconds(60), 8);
+                verifications, platform, Duration.ofSeconds(60), 8, "+961");
         service = new PasswordResetService(verificationService, keycloak);
 
         when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))

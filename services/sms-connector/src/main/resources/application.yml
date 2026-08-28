@@ -34,15 +34,29 @@ spring:
         max-concurrency: 8
 
   # Used only by the dev-passthrough provider. Real vendors are reached over HTTPS, not SMTP.
+  #
+  # Parameterised exactly like email-connector's block, and for a reason worth recording: auth and
+  # starttls were hardcoded false here while the same two settings were configurable next door. As
+  # long as the relay was a local Mailpit that was invisible. The moment the platform was pointed
+  # at a real relay, every dev SMS failed on "must issue a STARTTLS command first" — with
+  # SMTP_AUTH=true and SMTP_STARTTLS=true sitting in the environment, set and silently ignored.
   mail:
     host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:1025}
+    # From the environment here rather than from Vault: this relay is only ever used to deliver a
+    # dev passthrough message to a test inbox, and compose already passes SMTP_PASSWORD in. The
+    # email connector, which sends to real people, takes its password from Vault instead.
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: false
+          auth: ${SMTP_AUTH:false}
           starttls:
-            enable: false
+            enable: ${SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
 
   security:
     oauth2:

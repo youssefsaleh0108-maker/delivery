@@ -214,6 +214,15 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// wording and whether the skip action shows.
   String? _collateralError;
 
+  /// Whether that failure is one an applicant may walk away from.
+  ///
+  /// Bank details are: the payout step accepts both fields empty, so failing to send them is the
+  /// same position as never having typed them. **Documents are not.** Identity is asked of every
+  /// applicant and a rider's licence and vehicle papers are the point of the review, so offering
+  /// "skip this" beside a failed document told people a required paper was optional — and it is
+  /// the retry, not the skip, that gets their application looked at.
+  bool _collateralSkippable = false;
+
   /// True once the bank details have been PUT, so a retry does not send them twice. (The PUT is
   /// idempotent anyway; this is about not re-reporting a step that already succeeded.)
   bool _payoutSent = false;
@@ -505,6 +514,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       _busy = true;
       _error = null;
       _collateralError = null;
+      _collateralSkippable = false;
     });
     try {
       if (!_accountCreated) {
@@ -537,13 +547,14 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     // details collected during the wizard can finally travel. Only what succeeds is forgotten;
     // anything that fails stays queued for the retry.
     final AuthSession session = _session!;
-    final String? failure = await _sendCollateral(t);
+    final _CollateralFailure? failure = await _sendCollateral(t);
     if (!mounted) return;
     if (failure != null) {
       setState(() {
         _busy = false;
-        _collateralError = failure;
-        _error = failure;
+        _collateralError = failure.message;
+        _collateralSkippable = failure.skippable;
+        _error = failure.message;
       });
       return;
     }
@@ -553,11 +564,12 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   /// Uploads the picked documents and PUTs the bank details, now that a token exists.
   ///
-  /// Returns the sentence to show when something failed, or null when everything landed. Each
-  /// document that lands is removed from [_pickedDocs] and the payout marked sent, so a retry only
-  /// repeats what actually failed. A failure here never blocks the session — the pending screen
-  /// can upload and correct all of it — which is why the caller also offers a skip.
-  Future<String?> _sendCollateral(DeliveryStrings t) async {
+  /// Returns what failed, or null when everything landed. Each document that lands is removed from
+  /// [_pickedDocs] and the payout marked sent, so a retry only repeats what actually failed.
+  ///
+  /// Neither failure blocks the session — the pending screen can upload and correct all of it — but
+  /// only one of them may be walked past here. See [_collateralSkippable].
+  Future<_CollateralFailure?> _sendCollateral(DeliveryStrings t) async {
     bool documentFailed = false;
     for (final MapEntry<ApplicantDocumentKind, PickedDocument> entry
         in List<MapEntry<ApplicantDocumentKind, PickedDocument>>.of(
@@ -575,7 +587,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         documentFailed = true;
       }
     }
-    if (documentFailed) return t.wizCouldNotSendDocuments;
+    // Not skippable: these are the papers the application is judged on.
+    if (documentFailed) {
+      return _CollateralFailure(t.wizCouldNotSendDocuments, skippable: false);
+    }
 
     final bool hasPayout = _accountHolder.text.trim().isNotEmpty &&
         _iban.text.trim().isNotEmpty;
@@ -590,7 +605,9 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       } catch (e, stack) {
         debugPrint('APPLICANT PAYOUT SAVE FAILED: $e');
         debugPrintStack(stackTrace: stack, label: 'applicant-payout');
-        return t.wizCouldNotSendPayout;
+        // Skippable: the payout step accepts both fields empty, so failing to send them leaves the
+        // applicant exactly where leaving them blank would have.
+        return _CollateralFailure(t.wizCouldNotSendPayout, skippable: true);
       }
     }
     return null;
@@ -740,10 +757,12 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                       ? _send
                       : _finishAccount,
             ),
-            // Only when the failure is a document or the bank details: the application and the
-            // account are already in, the pending screen can send both again, so nobody is held
-            // hostage here by a flaky upload.
-            if (_collateralError != null && _session != null) ...<Widget>[
+            // Only for a failure the applicant may actually walk away from — the bank details,
+            // which the payout step lets them leave blank anyway. A failed document does not get a
+            // skip: offering one beside a required paper says it was optional. See
+            // [_collateralSkippable]. Either way the account exists and the pending screen can
+            // send everything again, so nobody is held hostage by a flaky upload.
+            if (_collateralError != null && _collateralSkippable && _session != null) ...<Widget>[
               const SizedBox(height: DeliverySpacing.sm),
               Center(
                 child: TextButton(
@@ -1972,4 +1991,20 @@ class _ReviewRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A late send that failed after the account already existed, and whether it may be walked past.
+///
+/// The distinction is the whole reason this type exists rather than a bare string: both failures
+/// leave the applicant signed in with an application on file, but only one of them is genuinely
+/// optional. Bank details may be left blank at the payout step, so failing to send them is no
+/// worse than never typing them. A document is what the application is judged on.
+class _CollateralFailure {
+  const _CollateralFailure(this.message, {required this.skippable});
+
+  /// The sentence to show, already in the applicant's language.
+  final String message;
+
+  /// Whether to offer "skip this" beside the retry.
+  final bool skippable;
 }

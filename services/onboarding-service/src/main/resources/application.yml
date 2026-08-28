@@ -171,6 +171,16 @@ delivery:
       carrier: ${AUTO_APPROVE_CARRIER:false}
 
     verification:
+      # The country a phone number belongs to when the person typing it did not say.
+      #
+      # Almost nobody types their own country's code, so a number arrives as 71423308 or 071423308
+      # and has to be made into +96171423308 before it can be sent. Guessing wrong does not fail
+      # safely — it sends somebody's one-time code to a real number in another country — so this is
+      # configuration rather than a constant, and an unusable value stops the service at startup.
+      #
+      # Set it to the market this deployment serves: +961 Lebanon, +966 Saudi Arabia. A number
+      # typed with a + or with 00 is taken as written and this is not consulted.
+      default-dial-code: ${VERIFICATION_DEFAULT_DIAL_CODE:+961}
       # How long before the same address can be sent another code. Short enough not to punish
       # somebody whose first message went to spam, long enough that this is not a way to send
       # somebody a message every second.

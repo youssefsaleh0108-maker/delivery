@@ -46,7 +46,7 @@ class VerificationServiceTest {
     void setUp() {
         verifications = mock(ContactVerificationRepository.class);
         platform = mock(PlatformClient.class);
-        service = new VerificationService(verifications, platform, Duration.ofSeconds(60), 8);
+        service = new VerificationService(verifications, platform, Duration.ofSeconds(60), 8, "+961");
 
         when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))
                 .thenReturn(Optional.empty());
@@ -75,57 +75,129 @@ class VerificationServiceTest {
          */
         @Test
         void email_case_and_padding_collapse_to_one_destination() {
-            assertThat(VerificationService.normalise(Channel.EMAIL, "  Sam@Example.COM "))
+            assertThat(service.normalise(Channel.EMAIL, "  Sam@Example.COM "))
                     .isEqualTo("sam@example.com");
         }
 
         @Test
         void phone_punctuation_is_stripped_so_one_number_is_one_destination() {
-            assertThat(VerificationService.normalise(Channel.PHONE, "+961 (3) 123-456"))
+            assertThat(service.normalise(Channel.PHONE, "+961 (3) 123-456"))
                     .isEqualTo("+9613123456");
-            assertThat(VerificationService.normalise(Channel.PHONE, "+961.3.123.456"))
+            assertThat(service.normalise(Channel.PHONE, "+961.3.123.456"))
                     .isEqualTo("+9613123456");
         }
 
         @Test
         void prose_is_refused_on_both_channels() {
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.EMAIL, "not an address"))
+            assertThatThrownBy(() -> service.normalise(Channel.EMAIL, "not an address"))
                     .isInstanceOf(VerificationException.class)
                     .hasMessageContaining("email address");
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.PHONE, "call me"))
+            assertThatThrownBy(() -> service.normalise(Channel.PHONE, "call me"))
                     .isInstanceOf(VerificationException.class)
                     .hasMessageContaining("phone number");
         }
 
         @Test
         void an_email_without_a_dotted_domain_is_refused() {
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.EMAIL, "sam@localhost"))
+            assertThatThrownBy(() -> service.normalise(Channel.EMAIL, "sam@localhost"))
                     .isInstanceOf(VerificationException.class);
         }
 
         @Test
         void a_blank_destination_is_refused_rather_than_sent_to() {
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.EMAIL, "   "))
+            assertThatThrownBy(() -> service.normalise(Channel.EMAIL, "   "))
                     .isInstanceOf(VerificationException.class);
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.PHONE, null))
+            assertThatThrownBy(() -> service.normalise(Channel.PHONE, null))
                     .isInstanceOf(VerificationException.class);
         }
 
-        /** Real numbering plans vary; the check rejects prose without rejecting real numbers. */
+        /** Real numbering plans vary; the check rejects prose and absurd lengths, nothing else. */
         @Test
-        void plausible_phone_lengths_are_accepted_and_absurd_ones_are_not() {
-            assertThat(VerificationService.normalise(Channel.PHONE, "1234567")).isEqualTo("1234567");
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.PHONE, "123456"))
+        void absurd_phone_lengths_are_refused() {
+            // Longer than E.164 allows, and no dialling code can rescue it.
+            assertThatThrownBy(() -> service.normalise(Channel.PHONE, "1".repeat(16)))
                     .isInstanceOf(VerificationException.class);
-            assertThatThrownBy(() -> VerificationService.normalise(Channel.PHONE, "1".repeat(16)))
+            assertThatThrownBy(() -> service.normalise(Channel.PHONE, "+" + "1".repeat(16)))
                     .isInstanceOf(VerificationException.class);
+            assertThatThrownBy(() -> service.normalise(Channel.PHONE, "+12"))
+                    .isInstanceOf(VerificationException.class);
+        }
+
+        /**
+         * The bug this pattern exists for.
+         *
+         * <p>A Beirut applicant types the number the way they say it, with no country code. This
+         * service used to accept that verbatim, answer 200 and issue a code; the SMS connector
+         * requires E.164, refused it, and dead-lettered the message. The applicant sat on the verify
+         * screen waiting for an SMS that could never be sent, and nothing on any status field said
+         * so. Every spelling below has to come out as one sendable number.
+         */
+        @Test
+        void a_national_number_gains_the_default_dialling_code() {
+            assertThat(service.normalise(Channel.PHONE, "71423308")).isEqualTo("+96171423308");
+            // The trunk prefix is not a digit of the number.
+            assertThat(service.normalise(Channel.PHONE, "071423308")).isEqualTo("+96171423308");
+            // 00 is how most of the world writes the plus.
+            assertThat(service.normalise(Channel.PHONE, "0096171423308")).isEqualTo("+96171423308");
+            // Already international: taken as written, the default ignored.
+            assertThat(service.normalise(Channel.PHONE, "+96171423308")).isEqualTo("+96171423308");
+            // However it was typed, it is one destination — which is what the rate limit counts on.
+            assertThat(service.normalise(Channel.PHONE, "071 423 308")).isEqualTo("+96171423308");
+        }
+
+        /** A deployment serving another market gets that market's numbers, not Lebanon's. */
+        @Test
+        void the_default_dialling_code_is_configurable() {
+            VerificationService saudi = new VerificationService(
+                    verifications, platform, Duration.ofSeconds(60), 8, "+966");
+            assertThat(saudi.normalise(Channel.PHONE, "512345678")).isEqualTo("+966512345678");
+            assertThat(saudi.normalise(Channel.PHONE, "0512345678")).isEqualTo("+966512345678");
+            // A number that already says which country it is stays in that country.
+            assertThat(saudi.normalise(Channel.PHONE, "+96171423308")).isEqualTo("+96171423308");
+        }
+
+        /**
+         * A dialling code that cannot work makes every national number unsendable, and the failure
+         * is invisible from this service — so it stops the service instead of the signups.
+         */
+        @Test
+        void an_unusable_default_dialling_code_refuses_to_start() {
+            for (String bad : java.util.List.of("961", "+", "", "lebanon", "+0")) {
+                assertThatThrownBy(() -> new VerificationService(
+                        verifications, platform, Duration.ofSeconds(60), 8, bad))
+                        .as("dial code \"%s\"", bad)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("default-dial-code");
+            }
+        }
+
+        /**
+         * The coupling that broke, pinned in place.
+         *
+         * <p>This is {@code SmsPreparer}'s own pattern, copied. If either side is loosened again,
+         * the numbers this service hands over stop being ones the connector will send — and the
+         * only symptom is a code that never arrives.
+         */
+        @Test
+        void phone_numbers_are_normalised_to_what_the_sms_connector_accepts() {
+            java.util.regex.Pattern connectorRule =
+                    java.util.regex.Pattern.compile("^\\+[1-9]\\d{7,14}$");
+            for (String typed : java.util.List.of(
+                    "71423308", "071423308", "0096171423308", "+96171423308", "03 123 456",
+                    "+961 3 123 456", "(03) 123-456")) {
+                String normalised = service.normalise(Channel.PHONE, typed);
+                assertThat(connectorRule.matcher(normalised).matches())
+                        .as("\"%s\" normalised to \"%s\", which the SMS connector would refuse",
+                                typed, normalised)
+                        .isTrue();
+            }
         }
 
         @Test
         void the_quiet_form_reports_failure_without_throwing() {
-            assertThat(VerificationService.normaliseQuietly(Channel.EMAIL, "Sam@Example.com"))
+            assertThat(service.normaliseQuietly(Channel.EMAIL, "Sam@Example.com"))
                     .contains("sam@example.com");
-            assertThat(VerificationService.normaliseQuietly(Channel.EMAIL, "rubbish")).isEmpty();
+            assertThat(service.normaliseQuietly(Channel.EMAIL, "rubbish")).isEmpty();
         }
     }
 

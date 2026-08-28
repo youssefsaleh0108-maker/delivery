@@ -477,7 +477,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -523,7 +530,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -562,7 +576,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -611,7 +632,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -648,7 +676,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -685,7 +720,14 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -740,7 +782,14 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-no-reply@mydelivery.local}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       mailpit:
         condition: service_healthy
@@ -773,7 +822,14 @@ services:
       CONNECTOR_SETTINGS_URL: http://connector-settings:8109
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -822,7 +878,14 @@ services:
       SMS_TEST_INBOX: ${SMS_TEST_INBOX:-sms-test-inbox@dev.local}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       mailpit:
         condition: service_healthy
@@ -863,7 +926,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -907,7 +977,14 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy
@@ -943,8 +1020,16 @@ services:
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       # This account can create users and register delivery companies, which makes it the most
       # powerful credential in the stack. From Vault in a deployment, never from a compose file.
+      #
+      # It used to carry `:-onboarding-service-dev-secret` as a fallback, and this deployment ran on
+      # that fallback for its whole life because the variable was never set. The literal is in a
+      # PUBLIC repository and Keycloak answers on the public internet, so anyone who read the file
+      # could mint a token holding BACKOFFICE, manage-users and view-realm against the live realm —
+      # the comment above was already true, which is exactly why the default should never have
+      # existed. `:?` now stops the stack instead: a missing secret is a deployment that does not
+      # start, rather than one silently running as an administrator anybody can impersonate.
       KEYCLOAK_CLIENT_ID: onboarding-service
-      KEYCLOAK_CLIENT_SECRET: ${ONBOARDING_CLIENT_SECRET:-onboarding-service-dev-secret}
+      KEYCLOAK_CLIENT_SECRET: ${ONBOARDING_CLIENT_SECRET:?set it in infra/.env — see infra/rotate-onboarding-secret.sh to mint one}
       ORDER_MANAGER_URL: http://order-manager:8101
       # Where one-time codes and decision emails are handed off. Without it the default is
       # localhost, which inside a container is this service talking to itself.
@@ -958,7 +1043,14 @@ services:
       AUTO_APPROVE_CARRIER: ${AUTO_APPROVE_CARRIER:-false}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
+      #
+      # BOTH are needed, and having only the first is why the flooding carried on regardless:
+      # OTEL_SDK_DISABLED is read by the OpenTelemetry SDK's own autoconfiguration, while the
+      # exporter actually running here is Spring Boot's, which reads management.otlp.tracing and
+      # defaults to http://localhost:4318 — inside the container, nothing listens. The result was
+      # an ERROR every thirteen seconds in every service: noise that hides real errors.
       OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
     depends_on:
       config-server:
         condition: service_healthy

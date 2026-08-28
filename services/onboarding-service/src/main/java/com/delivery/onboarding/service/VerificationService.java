@@ -43,23 +43,51 @@ public class VerificationService {
     /** Deliberately permissive: the relay is the real authority on whether an address exists. */
     private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$");
 
-    /** E.164-ish. Enough to reject prose, not so strict that it rejects real numbering plans. */
-    private static final Pattern PHONE = Pattern.compile("^\\+?[0-9]{7,15}$");
+    /**
+     * E.164, and deliberately the SAME rule the SMS connector enforces: a leading +, a non-zero
+     * country digit, then up to 14 more.
+     *
+     * <p>It used to be {@code ^\+?[0-9]{7,15}$} — the plus optional — and that one character cost
+     * every applicant who typed a national number their verification code. This service accepted
+     * {@code 71423308}, answered 200, issued a code and handed it on; {@code SmsPreparer} requires
+     * the plus, refused it, and dead-lettered the message. Nothing failed anywhere the applicant
+     * could see: they sat on the verify screen waiting for an SMS that was never sendable.
+     *
+     * <p>So the two rules have to agree, and the number a person actually types has to be turned
+     * into one that satisfies both — see {@link #toE164}. If that ever drifts again, the symptom is
+     * silent, which is why {@code phone_numbers_are_normalised_to_what_the_sms_connector_accepts}
+     * asserts this pattern against the connector's own spelling of it.
+     */
+    private static final Pattern PHONE = Pattern.compile("^\\+[1-9]\\d{7,14}$");
+
+    /** What a configured dialling code may look like: a plus and one to three digits. */
+    private static final Pattern DIAL_CODE = Pattern.compile("^\\+[1-9]\\d{0,3}$");
 
     private final ContactVerificationRepository verifications;
     private final PlatformClient platform;
     private final Duration resendCooldown;
     private final int dailyCap;
+    private final String defaultDialCode;
 
     public VerificationService(
             ContactVerificationRepository verifications,
             PlatformClient platform,
             @Value("${delivery.onboarding.verification.resend-cooldown:60s}") Duration resendCooldown,
-            @Value("${delivery.onboarding.verification.daily-cap:8}") int dailyCap) {
+            @Value("${delivery.onboarding.verification.daily-cap:8}") int dailyCap,
+            @Value("${delivery.onboarding.verification.default-dial-code:+961}") String defaultDialCode) {
         this.verifications = verifications;
         this.platform = platform;
         this.resendCooldown = resendCooldown;
         this.dailyCap = dailyCap;
+        String code = defaultDialCode == null ? "" : defaultDialCode.trim();
+        if (!DIAL_CODE.matcher(code).matches()) {
+            // Refused at startup rather than at the first signup. A bad value here makes every
+            // national number unsendable, and that failure is invisible from this service.
+            throw new IllegalStateException(
+                    "delivery.onboarding.verification.default-dial-code is not a dialling code: \""
+                            + code + "\". Give a plus and up to four digits, e.g. +961 or +966.");
+        }
+        this.defaultDialCode = code;
     }
 
     /** Thrown when a code cannot be sent or checked as asked. Carries wording an applicant can act on. */
@@ -331,7 +359,7 @@ public class VerificationService {
      * same inbox — which defeats the rate limit, since a determined sender only has to vary the
      * capitalisation to start again from zero.
      */
-    public static String normalise(Channel channel, String raw) {
+    public String normalise(Channel channel, String raw) {
         if (raw == null || raw.isBlank()) {
             throw new VerificationException("Enter " + (channel == Channel.EMAIL
                     ? "an email address" : "a phone number"));
@@ -346,17 +374,53 @@ public class VerificationService {
             return value;
         }
 
+        return toE164(value);
+    }
+
+    /**
+     * The number as the SMS connector needs it, from the number as a person writes it.
+     *
+     * <p>People type their own country's numbers the way they say them out loud — {@code 71 423 308}
+     * in Beirut, {@code 05x xxx xxxx} in Riyadh — and almost nobody types a {@code +}. Refusing all
+     * of that would be technically correct and useless, so each accepted spelling is converted:
+     *
+     * <ul>
+     *   <li>{@code +961...} — already international, kept as it stands.</li>
+     *   <li>{@code 00961...} — the other way of writing a plus, in most of the world.</li>
+     *   <li>{@code 071...} — a national number with a trunk prefix. The leading zero is not part of
+     *       the number; it is dropped and the default dialling code goes on.</li>
+     *   <li>{@code 71...} — a bare national number, which just takes the default dialling code.</li>
+     * </ul>
+     *
+     * <p>The default matters and is configurable for a reason: the platform's screens are currently
+     * written for two countries at once, and guessing wrong sends somebody's code to a stranger in
+     * another one. Whatever comes out is checked against {@link #PHONE} before it can be stored or
+     * sent, so a number that cannot be made valid is refused HERE — where the applicant is looking
+     * at the field and can fix it — rather than accepted and quietly dropped downstream.
+     */
+    private String toE164(String raw) {
         // Spaces, dashes and brackets are how people write phone numbers and none of them are part
         // of the number. Stripped so the same phone typed two ways is one destination.
-        value = value.replaceAll("[\\s()\\-.]", "");
+        String value = raw.replaceAll("[\\s()\\-.]", "");
+
+        if (value.startsWith("00")) {
+            value = "+" + value.substring(2);
+        } else if (!value.startsWith("+")) {
+            // A single leading zero is a national trunk prefix, not a digit of the number.
+            String national = value.startsWith("0") ? value.substring(1) : value;
+            value = defaultDialCode + national;
+        }
+
         if (!PHONE.matcher(value).matches()) {
-            throw new VerificationException("That does not look like a phone number");
+            throw new VerificationException(
+                    "That does not look like a phone number. Include the country code, "
+                            + "for example " + defaultDialCode + "71123456.");
         }
         return value;
     }
 
     /** For the API layer, which needs the normalised form to echo back to the form. */
-    public static Optional<String> normaliseQuietly(Channel channel, String raw) {
+    public Optional<String> normaliseQuietly(Channel channel, String raw) {
         try {
             return Optional.of(normalise(channel, raw));
         } catch (VerificationException e) {

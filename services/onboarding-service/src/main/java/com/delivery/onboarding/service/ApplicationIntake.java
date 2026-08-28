@@ -67,8 +67,8 @@ public class ApplicationIntake {
 
         OnboardingApplication application = new OnboardingApplication(
                 kind, businessName.trim(), contactName.trim(),
-                VerificationService.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
-                phone == null ? null : VerificationService.normalise(Channel.PHONE, phone),
+                verifications.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
+                phone == null ? null : verifications.normalise(Channel.PHONE, phone),
                 phoneVerifiedAt, notes, details, targetProviderId);
 
         try {

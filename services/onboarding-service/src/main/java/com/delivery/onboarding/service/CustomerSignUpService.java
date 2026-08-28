@@ -57,7 +57,7 @@ public class CustomerSignUpService {
 
         verifications.consume(verificationToken, Channel.EMAIL, email);
 
-        String normalised = VerificationService.normalise(Channel.EMAIL, email);
+        String normalised = verifications.normalise(Channel.EMAIL, email);
         String sub = keycloak.createCustomer(normalised, firstName, lastName, password);
 
         log.info("Customer {} signed up", normalised);
