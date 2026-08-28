@@ -27,6 +27,7 @@ import com.delivery.platform.notifications.DeliveryOutcome;
 import com.delivery.platform.notifications.NotificationCommand;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -303,6 +304,78 @@ class SmtpEmailClientTest {
                     .when(mailSender).send(any(MimeMessage.class));
 
             assertThat(client.send(command()).retryable()).isTrue();
+        }
+    }
+
+    /**
+     * Which sender address the configuration produces.
+     *
+     * <p>A regression guard for an outage. {@code delivery.email.from} was set to the friendly form
+     * — a display name around the address — and the display name was then applied a second time,
+     * producing {@code YouDrop <YouDrop <a@b>>}. Every outbound message failed on a parse error, and
+     * because nothing about the error names a setting, the visible symptom was verification codes
+     * not arriving. Both forms have to work, and anything that works in neither has to stop the
+     * service rather than be discovered one undelivered code at a time.
+     */
+    @Nested
+    @DisplayName("the sender address")
+    class SenderAddress {
+
+        private SmtpEmailClient clientFrom(String from, String fromName) {
+            return new SmtpEmailClient(mailSender, new EmailHtmlLayout("YouDrop", "#C41D4E"),
+                    from, fromName);
+        }
+
+        private String fromHeaderOf(SmtpEmailClient subject) throws Exception {
+            subject.send(command());
+            return captureSent().getFrom()[0].toString();
+        }
+
+        @Test
+        void a_bare_address_gains_the_configured_display_name() throws Exception {
+            assertThat(fromHeaderOf(clientFrom("hello@youdrop.shop", "YouDrop")))
+                    .isEqualTo("YouDrop <hello@youdrop.shop>");
+        }
+
+        /** The form that caused the outage: already named, so it is used as it stands. */
+        @Test
+        void an_address_that_already_carries_a_name_is_not_wrapped_again() throws Exception {
+            assertThat(fromHeaderOf(clientFrom("YouDrop <hello@youdrop.shop>", "YouDrop")))
+                    .isEqualTo("YouDrop <hello@youdrop.shop>");
+        }
+
+        /** The address decides; a differing from-name does not override a name already given. */
+        @Test
+        void the_name_on_the_address_wins_over_the_separate_setting() throws Exception {
+            assertThat(fromHeaderOf(clientFrom("Support <hello@youdrop.shop>", "YouDrop")))
+                    .isEqualTo("Support <hello@youdrop.shop>");
+        }
+
+        @Test
+        void surrounding_whitespace_does_not_change_the_address() throws Exception {
+            assertThat(fromHeaderOf(clientFrom("  hello@youdrop.shop  ", "YouDrop")))
+                    .isEqualTo("YouDrop <hello@youdrop.shop>");
+        }
+
+        /** No display name configured is legitimate — the address goes out on its own. */
+        @Test
+        void a_blank_display_name_leaves_the_address_bare() throws Exception {
+            assertThat(fromHeaderOf(clientFrom("hello@youdrop.shop", "  ")))
+                    .isEqualTo("hello@youdrop.shop");
+        }
+
+        /**
+         * Refused at construction, not at send. The message has to name the setting, because the
+         * whole point is that the previous failure did not.
+         */
+        @Test
+        void an_unusable_address_stops_the_service_rather_than_the_mail() {
+            for (String unusable : List.of("YouDrop <YouDrop <a@b.com>>", "not an address", "")) {
+                assertThatThrownBy(() -> clientFrom(unusable, "YouDrop"))
+                        .as("from = \"%s\"", unusable)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("delivery.email.from");
+            }
         }
     }
 }

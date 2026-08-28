@@ -1,7 +1,10 @@
 package com.delivery.connector.email.provider;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 
+import jakarta.mail.internet.AddressException;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 
 import org.eclipse.angus.mail.smtp.SMTPAddressFailedException;
@@ -37,8 +40,7 @@ public class SmtpEmailClient implements ProviderClient {
 
     private final JavaMailSender mailSender;
     private final EmailHtmlLayout layout;
-    private final String from;
-    private final String fromName;
+    private final InternetAddress from;
 
     public SmtpEmailClient(JavaMailSender mailSender,
                            EmailHtmlLayout layout,
@@ -46,8 +48,41 @@ public class SmtpEmailClient implements ProviderClient {
                            @Value("${delivery.email.from-name:YouDrop}") String fromName) {
         this.mailSender = mailSender;
         this.layout = layout;
-        this.from = from;
-        this.fromName = fromName;
+        this.from = resolveFrom(from, fromName);
+    }
+
+    /**
+     * The From header, settled once at startup rather than rebuilt per message.
+     *
+     * <p>{@code delivery.email.from} may be given either way round — a bare address, or a full
+     * mailbox that already carries a display name. Wrapping the second form in a display name again
+     * yields {@code YouDrop <YouDrop <a@b.com>>}, which is not an address, and nothing notices until
+     * send time: <em>every</em> notification then fails on a JavaMail parse error that says nothing
+     * about which setting caused it. That is not hypothetical — configuring the friendly form took
+     * all outbound email down, and the only signal was verification codes silently not arriving.
+     *
+     * <p>So a bad value stops the service here, with a message naming the setting and both accepted
+     * forms. A connector that cannot address a message has nothing useful to do, and a container
+     * that will not start is far easier to diagnose than one that runs while discarding mail.
+     */
+    private static InternetAddress resolveFrom(String from, String fromName) {
+        String configured = from == null ? "" : from.trim();
+        try {
+            // Lenient parse, then validate: strict mode rejects a bare address, which is the form
+            // most deployments use and the one every default here is written in.
+            InternetAddress address = new InternetAddress(configured, false);
+            address.validate();
+            if (address.getPersonal() == null && fromName != null && !fromName.isBlank()) {
+                address.setPersonal(fromName, StandardCharsets.UTF_8.name());
+            }
+            return address;
+        } catch (AddressException | UnsupportedEncodingException e) {
+            throw new IllegalStateException(
+                    "delivery.email.from is not a usable sender address: \"" + configured + "\". "
+                            + "Give either a bare address (you@example.com) or a full mailbox "
+                            + "(YouDrop <you@example.com>) — not a display name around one that "
+                            + "already has one.", e);
+        }
     }
 
     @Override
@@ -65,10 +100,9 @@ public class SmtpEmailClient implements ProviderClient {
             MimeMessageHelper helper =
                     new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
 
-            // A display name, so the message arrives from YouDrop rather than from a bare
-            // no-reply address. UnsupportedEncodingException is the only reason this overload
-            // throws, and the encoding is a constant.
-            helper.setFrom(from, fromName);
+            // Carries the display name, so the message arrives from YouDrop rather than from a
+            // bare no-reply address. Already parsed and validated at startup — see resolveFrom.
+            helper.setFrom(from);
             helper.setTo(command.recipient());
             helper.setSubject(command.subject() == null ? "" : command.subject());
             // The HTML alternative interpolates NOTHING unescaped — see EmailHtmlLayout. That is
