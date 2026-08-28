@@ -146,7 +146,13 @@
 
 .w-top-right { display: flex; align-items: center; gap: 8px; }
 
-/* The language pill. Drawn as designed and inert — see the chip beside it. */
+/*
+  The language pill, which now switches the language.
+
+  It was drawn as designed and inert, with a "Coming soon" chip beside it saying so. Both the chip
+  and its stylesheet rule are gone: the control works, and a note explaining that it does not would
+  now be the thing disagreeing with reality.
+*/
 .w-lang {
   display: inline-flex;
   align-items: center;
@@ -158,29 +164,10 @@
   font-weight: 600;
   color: var(--muted);
   background: transparent;
-  cursor: default;
+  cursor: pointer;
 }
-
-/*
-  Coming soon.
-
-  Small, grey and next to the thing it is about. An affordance the design draws but no backend can
-  answer for yet is better shown greyed with a word of explanation than quietly deleted: deleting it
-  makes the page disagree with the design, and leaving it live makes it disagree with reality.
-*/
-.w-soon {
-  display: inline-block;
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
+.w-lang:hover { border-color: var(--brand); color: var(--brand); }
+.w-lang:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* ------------------------------------------------------------------ the form column */
 
@@ -259,7 +246,7 @@
 }
 .w-label .req { color: var(--brand); font-weight: 400; }
 .w-label .w-optional {
-  margin-left: 2px;
+  margin-inline-start: 2px;
   font-size: 12px;
   font-weight: 500;
   color: var(--faint);
@@ -304,12 +291,15 @@
 /* The chevron is the design's 18px lucide glyph, inlined as a data URI so the select keeps being a
    real <select> — a native menu on a phone is worth more than a custom one. */
 .wizard select {
-  padding-right: 44px;
+  padding-inline-end: 44px;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18' fill='none'%3E%3Cpath d='M4.5 6.75L9 11.25L13.5 6.75' stroke='%23475569' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 16px center;
   cursor: pointer;
 }
+/* background-position has no logical form, so the one property that cannot mirror itself is told
+   to. The padding above already reserved the space on the correct side. */
+[dir="rtl"] .wizard select { background-position: left 16px center; }
 
 /* ------------------------------------------------------------------ what are you applying as */
 
@@ -402,8 +392,6 @@
   font-size: 13px;
   color: var(--muted);
 }
-.w-note .w-soon { margin-right: 6px; vertical-align: middle; }
-
 .w-uploads { display: flex; flex-direction: column; gap: 12px; }
 
 .w-upload {
@@ -812,3 +800,60 @@
   .w-upload { flex-wrap: wrap; }
   .w-actions { flex-direction: column-reverse; }
 }
+
+/* ------------------------------------------------------------------ Arabic */
+
+/*
+  What `dir="rtl"` does not do by itself.
+
+  Almost everything on this page already mirrors for nothing, because almost everything is a flex
+  row or a grid and both flow from the inline start. The stepper, the two panels, the field rows,
+  the upload rows, the chips and the receipt's numbered list all turn around on their own. What is
+  below is the short list of places that could not: a background image with no logical form, an
+  arrow that means "forwards", tracking that was tuned for Latin, and the handful of values that are
+  never Arabic no matter what language the page is in.
+
+  THE BRAND PANEL MIRRORS, and that is a decision rather than an accident of `display: flex`. It is
+  not decoration parked on the left; it is the half of the screen that says who is asking and why,
+  read before the form and then left behind. In Arabic that half belongs where reading starts, which
+  is the right. Pinning it to the left with `order` would leave an Arabic reader crossing the whole
+  viewport to find the context and coming back for the first field — the layout's meaning inverted
+  in order to keep its pixels still.
+*/
+
+/*
+  Tracking, for the same reason site.css resets it: negative letter-spacing pulls Latin display type
+  together and, on a joined script, pulls the letters of a word into each other. That rule is
+  `html[lang="ar"] *` and it loses to this file's own `.w-brand-copy h1` and friends — site.css is
+  loaded first and the two weigh the same — so it is said again here, at a weight that wins.
+*/
+html[lang="ar"] .wizard *,
+html[lang="ar"] .w-receipt * { letter-spacing: normal; }
+
+/* Except the two runs of Latin characters that are read one glyph at a time rather than as words. */
+html[lang="ar"] .wizard .w-code input { letter-spacing: .35em; }
+html[lang="ar"] .wizard-done .reference { letter-spacing: .04em; }
+
+/* The Continue arrow means "onwards", and onwards is leftwards here. Only this glyph flips: the
+   tick on a verified line and the document leaf in an upload row have no direction to be wrong. */
+[dir="rtl"] .w-arrow { transform: scaleX(-1); }
+
+/*
+  Values that are never Arabic — an address, a phone number, a count, a six-digit code, a passcode.
+
+  Left in an RTL field they are still rendered left to right by the bidi algorithm, but the cursor
+  starts at the wrong end and leading punctuation (the + of a country code, the @ of an address)
+  jumps to the far side of the value as it is typed. Giving the field its own direction fixes both;
+  `text-align: right` keeps it sitting against the same edge as everything around it.
+*/
+[dir="rtl"] .wizard input[type="email"],
+[dir="rtl"] .wizard input[type="tel"],
+[dir="rtl"] .wizard input[type="number"],
+[dir="rtl"] .w-receipt input[type="password"] { direction: ltr; text-align: right; }
+
+/* The code box is centred by design and stays centred; it only needs the direction. */
+[dir="rtl"] .wizard .w-code input { direction: ltr; text-align: center; }
+
+/* The reference is a key, not a sentence. Its own direction so the hyphenated parts cannot be
+   reordered around it, against the card's edge so it still lines up with the block above. */
+[dir="rtl"] .wizard-done .reference { direction: ltr; text-align: right; }

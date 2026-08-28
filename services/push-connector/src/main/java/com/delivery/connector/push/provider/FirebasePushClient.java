@@ -17,6 +17,8 @@ import com.delivery.platform.notifications.ProviderClient;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
@@ -80,6 +82,24 @@ public class FirebasePushClient implements ProviderClient {
                             .setTitle(command.subject() == null ? "Delivery" : command.subject())
                             .setBody(command.body())
                             .build())
+                    // The Android channel, named by the sender.
+                    //
+                    // Without it every push lands on fcm_fallback_notification_channel — one
+                    // undifferentiated bucket, which is what a real handset showed. Android's
+                    // per-channel controls are how somebody silences promotions while keeping "your
+                    // rider is outside", so a single fallback channel makes the preference grid this
+                    // platform enforces server-side unrepresentable on the device.
+                    //
+                    // The id comes from the category Notifications Manager already resolved, so the
+                    // channel cannot disagree with the rules that decided to send at all. An unknown
+                    // or absent category falls back to order updates rather than inventing a channel
+                    // the app has not created — Android silently drops a notification whose channel
+                    // does not exist, which would be worse than the wrong bucket.
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setNotification(AndroidNotification.builder()
+                                    .setChannelId(channelFor(data.get("category")))
+                                    .build())
+                            .build())
                     .putAllData(data)
                     .build();
 
@@ -93,6 +113,35 @@ public class FirebasePushClient implements ProviderClient {
             return DeliveryOutcome.transientFailure(NAME, e.getMessage());
         }
     }
+
+    /**
+     * The Android notification channel for a category.
+     *
+     * <p>These ids are a CONTRACT with the mobile app: it creates channels with exactly these ids at
+     * startup, and Android drops a notification addressed to a channel that does not exist. Renaming
+     * one here without shipping an app that creates it means silent, total loss of that category on
+     * every device — so the ids are constants with this comment on them rather than a string built
+     * from the enum name.
+     */
+    private static String channelFor(String category) {
+        if (category == null) {
+            return CHANNEL_ORDERS;
+        }
+        return switch (category) {
+            case "CHAT" -> CHANNEL_CHAT;
+            case "PROMOTIONS" -> CHANNEL_PROMOTIONS;
+            case "ACCOUNT" -> CHANNEL_ACCOUNT;
+            // ORDER_UPDATES and anything this connector has not been taught about. Order updates is
+            // the safe default: it is the category a delivery app exists to deliver, and a message
+            // arriving in the wrong bucket beats one that never arrives.
+            default -> CHANNEL_ORDERS;
+        };
+    }
+
+    static final String CHANNEL_ORDERS = "youdrop_order_updates";
+    static final String CHANNEL_CHAT = "youdrop_chat";
+    static final String CHANNEL_PROMOTIONS = "youdrop_promotions";
+    static final String CHANNEL_ACCOUNT = "youdrop_account";
 
     private FirebaseMessaging messaging() throws Exception {
         FirebaseMessaging existing = messaging.get();

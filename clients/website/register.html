@@ -54,7 +54,7 @@
     <div class="w-brand-foot">
       <!-- The applicant's own company, as typed on the first step. Empty until they type it. -->
       <span id="brand-company">Carrier Partner Application</span>
-      <small>© 2026 YouDrop Technologies Inc.</small>
+      <small data-t="brand-copyright">© 2026 YouDrop Technologies Inc.</small>
     </div>
   </aside>
 
@@ -65,17 +65,27 @@
       <p class="w-top-note">
         <!-- The same destination the site's own footer signs people in at. One portal now serves
              shops and delivery companies alike, so there is nothing left to choose between. -->
-        Already registered? <a href="https://portal-dev.youdrop.shop">Sign in</a>
+        <span data-t="signin-note">Already registered?</span>
+        <a href="https://portal-dev.youdrop.shop" data-t="signin-link">Sign in</a>
       </p>
       <div class="w-top-right">
-        <span class="w-lang" aria-disabled="true">
+        <!--
+          The language switch, and it is the marketing site's switch: same `youdrop-lang` key in
+          localStorage, same data-t convention, same dictionary-in-the-script design. See the note
+          at the head of register.js. A reader who chose Arabic on the landing page and clicked
+          through to apply arrives here already in Arabic, which is the only reason to share a key.
+
+          "AR / EN" is the control's own name and stays in Latin in both languages, exactly as the
+          masthead's does on index.html. The aria-label is the part that gets translated.
+        -->
+        <button class="w-lang" type="button" data-lang-toggle aria-pressed="false"
+                data-t-aria="lang-aria" aria-label="Language">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M14.6672 8C14.6672 11.6822 11.6822 14.6672 8 14.6672M14.6672 8C14.6672 4.31781 11.6822 1.3328 8 1.3328M14.6672 8H1.3328M8 14.6672C4.31781 14.6672 1.3328 11.6822 1.3328 8M8 14.6672C6.28802 12.8696 5.33312 10.4824 5.33312 8C5.33312 5.51763 6.28802 3.13038 8 1.3328M8 14.6672C9.71198 12.8696 10.6669 10.4824 10.6669 8C10.6669 5.51763 9.71198 3.13038 8 1.3328M8 1.3328C4.31781 1.3328 1.3328 4.31781 1.3328 8"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          AR / EN
-        </span>
-        <span class="w-soon">Coming soon</span>
+          <span>AR / EN</span>
+        </button>
       </div>
     </div>
 
@@ -94,6 +104,12 @@
         documents are uploaded to storage. Nor does it offer an address to write to instead: this
         site publishes no contact address, and inventing one here would send applications into a
         mailbox nobody reads.
+      -->
+      <!--
+        No data-t on this one, and it is the only paragraph on the page that could not carry it:
+        the reader it is written for has no script, so there is nothing to translate it with. It
+        stays in the language the document ships in, which is the same bargain the whole page makes
+        without JavaScript.
       -->
       <noscript>
         <p class="form-error w-noscript">
@@ -124,48 +140,54 @@
       <!-- ------------------------------------------------------------ business -->
       <section class="wstep" data-step="business">
         <fieldset class="w-kinds">
-          <legend>What are you applying as?</legend>
+          <legend data-t="kinds-legend">What are you applying as?</legend>
           <label class="w-kind">
             <input type="radio" name="kind" value="MERCHANT" checked>
             <span>
-              <b>A shop</b>
-              <small>Put your menu in front of the city and let us find the rider</small>
+              <b data-t="kind-shop">A shop</b>
+              <small data-t="kind-shop-note">Put your menu in front of the city and let us find the rider</small>
             </span>
           </label>
           <label class="w-kind">
             <input type="radio" name="kind" value="CARRIER">
             <span>
-              <b>A delivery company</b>
-              <small>Bring your fleet onto the platform and get work routed to you</small>
+              <b data-t="kind-carrier">A delivery company</b>
+              <small data-t="kind-carrier-note">Bring your fleet onto the platform and get work routed to you</small>
             </span>
           </label>
         </fieldset>
 
+        <!-- No data-t on #business-label, #contact-label or #notes-label: register.js owns their
+             text, because it changes with the kind of applicant. It writes them in whichever
+             language is current. Same for every heading and lede on this page. -->
         <div class="w-field">
           <label class="w-label" for="businessName">
             <span id="business-label">Shop name</span><span class="req">*</span>
           </label>
           <input id="businessName" type="text" required maxlength="200" autocomplete="organization"
-                 placeholder="e.g. FastFlow Logistics">
+                 data-t-placeholder="business-hint" placeholder="e.g. FastFlow Logistics">
         </div>
 
         <!-- Carrier only. A shop's application has never carried a CR number and the reviewer does
              not ask for one; a delivery company's is the first thing they check. -->
         <div class="w-field" data-kind="CARRIER" hidden>
           <label class="w-label" for="registrationNumber">
-            Commercial Registration Number<span class="req">*</span>
+            <span data-t="cr-label">Commercial Registration Number</span><span class="req">*</span>
           </label>
-          <input id="registrationNumber" type="text" maxlength="64" placeholder="e.g. CR-894211A">
+          <input id="registrationNumber" type="text" maxlength="64"
+                 data-t-placeholder="cr-hint" placeholder="e.g. CR-894211A">
         </div>
 
         <div class="w-field" data-kind="CARRIER" hidden>
-          <label class="w-label" for="companyType">Company Type<span class="req">*</span></label>
+          <label class="w-label" for="companyType">
+            <span data-t="company-type">Company Type</span><span class="req">*</span>
+          </label>
           <select id="companyType">
-            <option value="LOGISTICS_COMPANY">Logistics Company</option>
-            <option value="COURIER_SERVICE">Courier Service</option>
-            <option value="FREIGHT_TRUCKING">Freight &amp; Trucking</option>
-            <option value="SOLE_PROPRIETOR">Individual / Sole Proprietor</option>
-            <option value="OTHER">Other</option>
+            <option value="LOGISTICS_COMPANY" data-t="ct-logistics">Logistics Company</option>
+            <option value="COURIER_SERVICE" data-t="ct-courier">Courier Service</option>
+            <option value="FREIGHT_TRUCKING" data-t="ct-freight">Freight &amp; Trucking</option>
+            <option value="SOLE_PROPRIETOR" data-t="ct-sole">Individual / Sole Proprietor</option>
+            <option value="OTHER" data-t="ct-other">Other</option>
           </select>
         </div>
 
@@ -175,7 +197,7 @@
               <span id="contact-label">Your name</span><span class="req">*</span>
             </label>
             <input id="contactName" type="text" required maxlength="160" autocomplete="name"
-                   placeholder="John Doe">
+                   data-t-placeholder="contact-hint" placeholder="John Doe">
           </div>
           <!--
             The design puts a contact phone here. This page verifies the phone with a code on a step
@@ -184,7 +206,8 @@
           -->
           <div class="w-field">
             <label class="w-label" for="phoneSeed">
-              Contact Phone<span class="w-optional">optional</span>
+              <span data-t="contact-phone">Contact Phone</span>
+              <span class="w-optional" data-t="optional">optional</span>
             </label>
             <input id="phoneSeed" type="tel" maxlength="32" autocomplete="tel" placeholder="+961 …">
           </div>
@@ -201,8 +224,11 @@
 
         <div class="w-actions">
           <button class="primary" data-nav="next">
-            <span class="w-next-label">Continue</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <!-- register.js overwrites this the moment the step opens, with the name of the step
+                 it leads to. The tag is for the word underneath: the fallback a step reaches when
+                 there is no specific label for where it goes. -->
+            <span class="w-next-label" data-t="continue">Continue</span>
+            <svg class="w-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -212,32 +238,34 @@
 
       <!-- ------------------------------------------------------------ email -->
       <section class="wstep" data-step="email" hidden>
-        <p class="w-note">
+        <p class="w-note" data-t="email-note">
           We send a six-digit code to check the address reaches you. Everything after this —
           including the decision and how to sign in — goes there, so it has to be one you can open.
         </p>
 
         <div class="w-verify">
           <div class="w-field">
-            <label class="w-label" for="contactEmail">Email<span class="req">*</span></label>
+            <label class="w-label" for="contactEmail">
+              <span data-t="email-label">Email</span><span class="req">*</span>
+            </label>
             <input id="contactEmail" type="email" required maxlength="200" autocomplete="email"
                    placeholder="you@company.com">
           </div>
-          <button class="secondary w-send" id="email-send">Send code</button>
+          <button class="secondary w-send" id="email-send" data-t="send-code">Send code</button>
         </div>
 
         <div class="w-code" id="email-code-box" hidden>
           <div class="w-field">
-            <label class="w-label" for="email-code">The code we sent</label>
+            <label class="w-label" for="email-code" data-t="code-label">The code we sent</label>
             <!-- inputmode numeric so a phone offers a number pad; one-time-code lets both iOS and
                  Android offer to fill it from the message itself. -->
             <input id="email-code" inputmode="numeric" autocomplete="one-time-code"
                    maxlength="6" placeholder="000000">
           </div>
-          <button class="primary w-confirm" id="email-confirm">Verify</button>
+          <button class="primary w-confirm" id="email-confirm" data-t="verify">Verify</button>
           <p class="w-code-foot">
             <span id="email-expiry"></span>
-            <button class="linkish" id="email-resend" disabled>Send another</button>
+            <button class="linkish" id="email-resend" data-t="send-another" disabled>Send another</button>
           </p>
         </div>
 
@@ -246,15 +274,19 @@
             <path d="M14.5335 6.66681C14.838 8.161 14.621 9.71442 13.9187 11.068C13.2165 12.4216 12.0714 13.4935 10.6745 14.105C9.2776 14.7165 7.71326 14.8307 6.24237 14.4284C4.77149 14.0261 3.48297 13.1317 2.59169 11.8944C1.70041 10.6571 1.26025 9.15163 1.34461 7.62906C1.42898 6.10649 2.03276 4.65887 3.05527 3.52759C4.07779 2.39631 5.45723 1.64976 6.96355 1.41244C8.46987 1.17512 10.012 1.46138 11.3328 2.22347M5.99976 7.33315L7.99976 9.33315L14.6664 2.66649"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          Verified
+          <!-- The word is wrapped: data-t writes textContent, and the tick beside it is markup. -->
+          <span data-t="verified">Verified</span>
         </p>
         <p class="form-error" id="email-error" hidden></p>
 
         <div class="w-actions">
-          <button class="secondary" data-nav="back">Back</button>
+          <button class="secondary" data-nav="back" data-t="back">Back</button>
           <button class="primary" data-nav="next" id="email-continue" disabled>
-            <span class="w-next-label">Continue</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <!-- register.js overwrites this the moment the step opens, with the name of the step
+                 it leads to. The tag is for the word underneath: the fallback a step reaches when
+                 there is no specific label for where it goes. -->
+            <span class="w-next-label" data-t="continue">Continue</span>
+            <svg class="w-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -264,7 +296,7 @@
 
       <!-- ------------------------------------------------------------ phone -->
       <section class="wstep" data-step="phone" hidden>
-        <p class="w-note">
+        <p class="w-note" data-t="phone-note">
           Useful when something about an order needs sorting out quickly. If you would rather not,
           skip this — it changes nothing about your application.
         </p>
@@ -272,23 +304,24 @@
         <div class="w-verify">
           <div class="w-field">
             <label class="w-label" for="contactPhone">
-              Phone<span class="w-optional">optional</span>
+              <span data-t="phone-label">Phone</span>
+              <span class="w-optional" data-t="optional">optional</span>
             </label>
             <input id="contactPhone" type="tel" maxlength="32" autocomplete="tel" placeholder="+961 …">
           </div>
-          <button class="secondary w-send" id="phone-send">Send code</button>
+          <button class="secondary w-send" id="phone-send" data-t="send-code">Send code</button>
         </div>
 
         <div class="w-code" id="phone-code-box" hidden>
           <div class="w-field">
-            <label class="w-label" for="phone-code">The code we sent</label>
+            <label class="w-label" for="phone-code" data-t="code-label">The code we sent</label>
             <input id="phone-code" inputmode="numeric" autocomplete="one-time-code"
                    maxlength="6" placeholder="000000">
           </div>
-          <button class="primary w-confirm" id="phone-confirm">Verify</button>
+          <button class="primary w-confirm" id="phone-confirm" data-t="verify">Verify</button>
           <p class="w-code-foot">
             <span id="phone-expiry"></span>
-            <button class="linkish" id="phone-resend" disabled>Send another</button>
+            <button class="linkish" id="phone-resend" data-t="send-another" disabled>Send another</button>
           </p>
         </div>
 
@@ -297,18 +330,22 @@
             <path d="M14.5335 6.66681C14.838 8.161 14.621 9.71442 13.9187 11.068C13.2165 12.4216 12.0714 13.4935 10.6745 14.105C9.2776 14.7165 7.71326 14.8307 6.24237 14.4284C4.77149 14.0261 3.48297 13.1317 2.59169 11.8944C1.70041 10.6571 1.26025 9.15163 1.34461 7.62906C1.42898 6.10649 2.03276 4.65887 3.05527 3.52759C4.07779 2.39631 5.45723 1.64976 6.96355 1.41244C8.46987 1.17512 10.012 1.46138 11.3328 2.22347M5.99976 7.33315L7.99976 9.33315L14.6664 2.66649"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          Verified
+          <!-- The word is wrapped: data-t writes textContent, and the tick beside it is markup. -->
+          <span data-t="verified">Verified</span>
         </p>
         <p class="form-error" id="phone-error" hidden></p>
 
         <!-- Skip is a button beside the others, not a small link underneath them. An optional step
              whose way out is hidden is not optional in practice. -->
         <div class="w-actions">
-          <button class="secondary" data-nav="back">Back</button>
-          <button class="secondary" id="phone-skip">Skip this</button>
+          <button class="secondary" data-nav="back" data-t="back">Back</button>
+          <button class="secondary" id="phone-skip" data-t="skip-this">Skip this</button>
           <button class="primary" data-nav="next" id="phone-continue" disabled>
-            <span class="w-next-label">Continue</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <!-- register.js overwrites this the moment the step opens, with the name of the step
+                 it leads to. The tag is for the word underneath: the fallback a step reaches when
+                 there is no specific label for where it goes. -->
+            <span class="w-next-label" data-t="continue">Continue</span>
+            <svg class="w-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -341,7 +378,7 @@
         enum grows, and the list in register.js is the one place to change.
       -->
       <section class="wstep" data-step="documents" hidden>
-        <p class="w-note">
+        <p class="w-note" data-t="documents-note">
           You will attach these on the next screen, once your application is in and you have chosen
           a passcode. Nothing is uploaded from this step.
         </p>
@@ -351,10 +388,13 @@
         <div class="w-uploads" id="documents-preview"></div>
 
         <div class="w-actions">
-          <button class="secondary" data-nav="back">Back</button>
+          <button class="secondary" data-nav="back" data-t="back">Back</button>
           <button class="primary" data-nav="next">
-            <span class="w-next-label">Continue</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <!-- register.js overwrites this the moment the step opens, with the name of the step
+                 it leads to. The tag is for the word underneath: the fallback a step reaches when
+                 there is no specific label for where it goes. -->
+            <span class="w-next-label" data-t="continue">Continue</span>
+            <svg class="w-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -366,13 +406,13 @@
       <section class="wstep" data-step="fleet" hidden>
         <div class="w-field">
           <label class="w-label" for="fleetSize">
-            Estimated Number of Active Riders/Drivers<span class="req">*</span>
+            <span data-t="fleet-size">Estimated Number of Active Riders/Drivers</span><span class="req">*</span>
           </label>
           <input id="fleetSize" type="number" min="1" max="100000" step="1" placeholder="48">
         </div>
 
         <div class="w-field">
-          <span class="w-label" id="vehicles-label">Vehicle Types Available</span>
+          <span class="w-label" id="vehicles-label" data-t="vehicles-label">Vehicle Types Available</span>
           <div class="w-chips" role="group" aria-labelledby="vehicles-label">
             <label class="w-chip">
               <input type="checkbox" name="vehicleType" value="MOTORCYCLE">
@@ -384,7 +424,8 @@
                 <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              Motorcycles
+              <!-- Wrapped, like every other label that sits beside a glyph on this page. -->
+              <span data-t="veh-motorcycle">Motorcycles</span>
             </label>
             <label class="w-chip">
               <input type="checkbox" name="vehicleType" value="CAR">
@@ -396,7 +437,7 @@
                 <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              Cars
+              <span data-t="veh-car">Cars</span>
             </label>
             <label class="w-chip">
               <input type="checkbox" name="vehicleType" value="VAN">
@@ -408,7 +449,7 @@
                 <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              Vans
+              <span data-t="veh-van">Vans</span>
             </label>
             <label class="w-chip">
               <input type="checkbox" name="vehicleType" value="TRUCK">
@@ -420,7 +461,7 @@
                 <path d="M12.6667 2H3.33333C2.59695 2 2 2.59695 2 3.33333V12.6667C2 13.403 2.59695 14 3.33333 14H12.6667C13.403 14 14 13.403 14 12.6667V3.33333C14 2.59695 13.403 2 12.6667 2Z"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              Trucks
+              <span data-t="veh-truck">Trucks</span>
             </label>
           </div>
         </div>
@@ -435,32 +476,37 @@
         -->
         <div class="w-field">
           <label class="w-label" for="operatingRegions">
-            Preferred Operating Regions<span class="req">*</span>
+            <span data-t="regions-label">Preferred Operating Regions</span><span class="req">*</span>
           </label>
           <input id="operatingRegions" type="text" maxlength="240"
-                 placeholder="e.g. Beirut, Mount Lebanon">
+                 data-t-placeholder="regions-hint" placeholder="e.g. Beirut, Mount Lebanon">
         </div>
 
         <div class="w-field">
           <label class="w-label" for="operatingHours">
-            Preferred Operating Hours<span class="req">*</span>
+            <span data-t="hours-label">Preferred Operating Hours</span><span class="req">*</span>
           </label>
+          <!-- The review step reads the chosen option's own text, so translating the options here
+               translates the summary row too — there is no second copy of these five phrases. -->
           <select id="operatingHours">
-            <option value="TWENTY_FOUR_HOURS">24 Hours (Full Service)</option>
-            <option value="DAYTIME">Daytime (08:00 – 20:00)</option>
-            <option value="EVENINGS">Evenings and nights (16:00 – 02:00)</option>
-            <option value="WEEKENDS">Weekends only</option>
-            <option value="OTHER">Other — described in the notes</option>
+            <option value="TWENTY_FOUR_HOURS" data-t="hours-24">24 Hours (Full Service)</option>
+            <option value="DAYTIME" data-t="hours-day">Daytime (08:00 – 20:00)</option>
+            <option value="EVENINGS" data-t="hours-evening">Evenings and nights (16:00 – 02:00)</option>
+            <option value="WEEKENDS" data-t="hours-weekend">Weekends only</option>
+            <option value="OTHER" data-t="hours-other">Other — described in the notes</option>
           </select>
         </div>
 
         <p class="form-error" id="fleet-error" hidden></p>
 
         <div class="w-actions">
-          <button class="secondary" data-nav="back">Back</button>
+          <button class="secondary" data-nav="back" data-t="back">Back</button>
           <button class="primary" data-nav="next">
-            <span class="w-next-label">Continue</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <!-- register.js overwrites this the moment the step opens, with the name of the step
+                 it leads to. The tag is for the word underneath: the fallback a step reaches when
+                 there is no specific label for where it goes. -->
+            <span class="w-next-label" data-t="continue">Continue</span>
+            <svg class="w-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3.3328 8H12.6672M8 12.6672L12.6672 8L8 3.3328" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -473,10 +519,10 @@
         <dl class="w-summary" id="summary"></dl>
         <p class="form-error" id="submit-error" hidden></p>
         <div class="w-actions">
-          <button class="secondary" data-nav="back">Back</button>
-          <button class="primary" id="submit">Send application</button>
+          <button class="secondary" data-nav="back" data-t="back">Back</button>
+          <button class="primary" id="submit" data-t="send-application">Send application</button>
         </div>
-        <p class="w-note">We read every application. You will hear from us either way.</p>
+        <p class="w-note" data-t="review-note">We read every application. You will hear from us either way.</p>
       </section>
 
     </div>
@@ -513,8 +559,8 @@
         </svg>
       </span>
       <div>
-        <h1>Application Submitted Successfully</h1>
-        <p>
+        <h1 data-t="receipt-title">Application Submitted Successfully</h1>
+        <p data-t="receipt-lede">
           Thank you for applying. We are currently verifying your business details and, where they
           apply, your fleet credentials.
         </p>
@@ -526,7 +572,7 @@
     <!-- The reference. Keep it: it is the only way to check on an application before we reply, and
          it has also gone to the email address that was verified. -->
     <div class="w-block">
-      <p class="w-block-title">Your reference</p>
+      <p class="w-block-title" data-t="your-reference">Your reference</p>
       <p class="reference" id="reference"></p>
     </div>
 
@@ -545,14 +591,16 @@
       sign this person into the portal once a reviewer says yes.
     -->
     <div class="w-block" id="account-block">
-      <p class="w-block-title">Set your passcode</p>
-      <p class="w-note" id="account-note">
+      <p class="w-block-title" data-t="set-passcode">Set your passcode</p>
+      <p class="w-note" id="account-note" data-t="account-note">
         Six digits. It signs you in right here so you can attach your papers, and it is the same
         passcode the app's keypad will ask you for.
       </p>
       <div class="w-verify">
         <div class="w-field">
-          <label class="w-label" for="passcode">Passcode<span class="req">*</span></label>
+          <label class="w-label" for="passcode">
+            <span data-t="passcode-label">Passcode</span><span class="req">*</span>
+          </label>
           <!--
             type=password, not a plain field: this page is written for the shared computer in the
             back of a shop. autocomplete="new-password" so a manager's browser offers to save it
@@ -566,7 +614,7 @@
           <input id="passcode" type="password" inputmode="numeric" autocomplete="new-password"
                  minlength="6" maxlength="6" pattern="[0-9]{6}" placeholder="••••••">
         </div>
-        <button class="primary w-send" id="account-save">Set it</button>
+        <button class="primary w-send" id="account-save" data-t="set-it">Set it</button>
       </div>
 
       <p class="w-verified" id="account-done" hidden>
@@ -574,7 +622,7 @@
           <path d="M14.5335 6.66681C14.838 8.161 14.621 9.71442 13.9187 11.068C13.2165 12.4216 12.0714 13.4935 10.6745 14.105C9.2776 14.7165 7.71326 14.8307 6.24237 14.4284C4.77149 14.0261 3.48297 13.1317 2.59169 11.8944C1.70041 10.6571 1.26025 9.15163 1.34461 7.62906C1.42898 6.10649 2.03276 4.65887 3.05527 3.52759C4.07779 2.39631 5.45723 1.64976 6.96355 1.41244C8.46987 1.17512 10.012 1.46138 11.3328 2.22347M5.99976 7.33315L7.99976 9.33315L14.6664 2.66649"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
-        Signed in
+        <span data-t="signed-in">Signed in</span>
       </p>
       <p class="form-error" id="account-error" hidden></p>
     </div>
@@ -583,8 +631,8 @@
     <div class="w-rule" id="documents-rule" hidden></div>
 
     <div class="w-block" id="documents-block" hidden>
-      <p class="w-block-title">Your documents</p>
-      <p class="w-note">
+      <p class="w-block-title" data-t="your-documents">Your documents</p>
+      <p class="w-note" data-t="documents-note-2">
         A photo or a PDF of each. Upload a better copy any time before a decision — the newest one
         is the one a reviewer reads.
       </p>
@@ -595,31 +643,31 @@
     <div class="w-rule"></div>
 
     <div class="w-block">
-      <p class="w-block-title">What happens next?</p>
+      <p class="w-block-title" data-t="whats-next">What happens next?</p>
       <div class="w-block">
         <div class="w-next-row is-now">
           <span class="w-next-num">1</span>
           <span class="w-next-text">
-            <b>Documents Auditing</b>
-            <span>Our partner relations unit is evaluating your business registration details.</span>
+            <b data-t="next1-title">Documents Auditing</b>
+            <span data-t="next1-body">Our partner relations unit is evaluating your business registration details.</span>
           </span>
         </div>
         <div class="w-next-row">
           <span class="w-next-num">2</span>
           <span class="w-next-text">
-            <b>Verification Call</b>
-            <span>We'll set up a brief onboarding phone call to verify availability.</span>
+            <b data-t="next2-title">Verification Call</b>
+            <span data-t="next2-body">We'll set up a brief onboarding phone call to verify availability.</span>
           </span>
         </div>
         <div class="w-next-row">
           <span class="w-next-num">3</span>
           <span class="w-next-text">
-            <b>Hub Activation</b>
+            <b data-t="next3-title">Hub Activation</b>
             <!-- Approval grants the real role to the account made above and takes APPLICANT off it;
                  it does not mint a second account, so the passcode chosen here keeps working. Said
                  plainly because the old wording promised an email that no longer arrives for
                  anybody who sets a passcode. -->
-            <span>Approval opens your dashboard. The passcode you set above is the one that gets you in.</span>
+            <span data-t="next3-body">Approval opens your dashboard. The passcode you set above is the one that gets you in.</span>
           </span>
         </div>
       </div>
@@ -632,12 +680,12 @@
         <path d="M10 13.3336V10M10 6.6664H10.0083M18.334 10C18.334 14.6027 14.6027 18.334 10 18.334C5.39726 18.334 1.666 14.6027 1.666 10C1.666 5.39726 5.39726 1.666 10 1.666C14.6027 1.666 18.334 5.39726 18.334 10Z"
               stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
-      <p>Verification typically takes 1 – 5 business days. You'll receive email alerts at every step.</p>
+      <p data-t="info-line">Verification typically takes 1 – 5 business days. You'll receive email alerts at every step.</p>
     </div>
 
     <div class="w-actions">
-      <button class="primary" id="check">Check its status</button>
-      <a class="secondary" href="/">Back to the site</a>
+      <button class="primary" id="check" data-t="check-status">Check its status</button>
+      <a class="secondary" href="/" data-t="back-to-site">Back to the site</a>
     </div>
 
     <p class="status-line" id="status" hidden></p>

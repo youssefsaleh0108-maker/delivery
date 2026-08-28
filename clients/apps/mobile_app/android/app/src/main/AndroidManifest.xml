@@ -67,6 +67,22 @@
             android:taskAffinity="com.delivery.mobile_app"
             tools:replace="android:taskAffinity" />
 
+        <!--
+            Where a push lands when it names no channel of its own.
+
+            The connector stamps a channel onto every message it sends, so this is the backstop for
+            anything that reaches the device another way — a console test send, a future sender, a
+            message from before the channel contract existed. Without it those fall to Firebase's
+            fcm_fallback_notification_channel, which is what every notification used to land on:
+            one bucket the user can only silence wholesale, taking their deliveries with it.
+
+            Order updates is the honest default for a delivery app. The id must match
+            NotificationChannels.ORDERS and the connector's CHANNEL_ORDERS.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="youdrop_order_updates" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

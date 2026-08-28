@@ -31,6 +31,476 @@ const REALM = window.DELIVERY_IAM_REALM || 'delivery-platform';
 const IAM_CLIENT = 'mobile-app';
 const TOKEN_URL = `${IAM}/realms/${REALM}/protocol/openid-connect/token`;
 
+// ------------------------------------------------------------------ language
+
+/*
+  Arabic, done the way index.html does it — see the long note at the head of site.js.
+
+  The same storage key, `youdrop-lang`, so the choice somebody made on the landing page is the
+  language this page opens in. The same `data-t` convention: the English is written into
+  register.html and read out of the DOM on load, never restated in a second dictionary, so a copy
+  edit to the markup cannot leave a stale English string behind here. The same fail-open handling of
+  localStorage, and the same `lang` / `dir` flip on the root element. Two pages of one site
+  disagreeing about how language works would be worse than one page not having it at all.
+
+  Two things go further, and both follow from this being a form rather than a document.
+
+  1. THE MARKUP MECHANISM EXTENDS TO ATTRIBUTES. A placeholder and an aria-label are not
+     textContent. `data-t-placeholder` and `data-t-aria` are shaped exactly like `data-t`: the
+     English is read off the attribute at load, the Arabic comes from AR under the same key, and a
+     key with no Arabic falls back to the English rather than blanking the attribute.
+
+  2. MOST OF THIS PAGE'S WORDS ARE NOT IN THE MARKUP AT ALL. Every heading, every step label, every
+     validation line and every upload state is chosen at run time out of the tables below, because
+     it depends on the kind of applicant, the step, or what a server just said. Those tables hold
+     both languages side by side rather than in a dictionary at the other end of the file — for the
+     same reason site.js reads its English out of index.html: the two halves of one string should
+     not be able to drift apart unnoticed. What each write puts on screen is remembered in
+     `rewrites`, so switching mid-form rewrites what is already showing. A wizard that is Arabic
+     until something goes wrong and then English is not a translated wizard.
+
+  What is never translated is what somebody else wrote: a reviewer's reason for refusing a
+  document, a validation message from the onboarding service, a business name as it was typed.
+  Those are passed through exactly as they arrived.
+*/
+
+const STORAGE_KEY = 'youdrop-lang';
+
+/** True while the page is in Arabic. The root element is the one source of truth, as on the site. */
+const arabic = () => document.documentElement.lang === 'ar';
+
+/** One pair in the current language. A pair with no Arabic reads as untranslated, never as empty. */
+const say = (pair) => (arabic() && pair.ar) || pair.en;
+
+/*
+  `{name}` blanks filled in.
+
+  Numbers are left in Western digits on both sides. The fields that produce them are numeric inputs
+  and the codes are typed on a number pad, so a receipt that said ٤ while the box beside it said 4
+  would be one number written two ways on one screen.
+*/
+function fill(text, fills) {
+  if (!fills) return text;
+  return Object.keys(fills).reduce((out, name) => {
+    // A blank may be a function when what goes in it is itself translated — the paper's name inside
+    // "Choose a file for …". Resolved here, at the moment of writing, so the remembered write picks
+    // up the new language on both halves rather than only the sentence around the hole.
+    const value = typeof fills[name] === 'function' ? fills[name]() : fills[name];
+    return out.split(`{${name}}`).join(value);
+  }, text);
+}
+
+/*
+  The strings this script writes that do not belong to a table of their own.
+
+  Sorted the way the page runs: the frame, then each step, then the receipt.
+*/
+const SAY = {
+  /* the frame */
+  'step-of': { en: 'Step {n} of {total}', ar: 'الخطوة {n} من {total}' },
+  'percent': { en: '{percent}% Complete', ar: 'اكتمل {percent}%' },
+  'continue': { en: 'Continue', ar: 'متابعة' },
+
+  /* what a busy button says while it waits */
+  'sending': { en: 'Sending…', ar: 'جارٍ الإرسال…' },
+  'checking': { en: 'Checking…', ar: 'جارٍ التحقّق…' },
+  'setting': { en: 'Setting…', ar: 'جارٍ الحفظ…' },
+  'verify': { en: 'Verify', ar: 'تحقّق' },
+  'send-application': { en: 'Send application', ar: 'أرسل الطلب' },
+
+  /* what the form asks for before it will let go of a step */
+  'need-name': {
+    en: 'Please give the business name and your own name.',
+    ar: 'الرجاء إدخال اسم النشاط التجاري واسمك.',
+  },
+  'need-cr': {
+    en: 'Please give your commercial registration number.',
+    ar: 'الرجاء إدخال رقم السجل التجاري.',
+  },
+  'need-fleet-size': {
+    en: 'Please give roughly how many riders or drivers you have active.',
+    ar: 'الرجاء إدخال عدد تقريبي للمندوبين أو السائقين العاملين لديك.',
+  },
+  'need-region': {
+    en: 'Please name at least one area you would like to work.',
+    ar: 'الرجاء ذكر منطقة واحدة على الأقل ترغب بالعمل فيها.',
+  },
+
+  /* the two codes */
+  'need-email': { en: 'Enter your email address.', ar: 'أدخل بريدك الإلكتروني.' },
+  'need-phone': { en: 'Enter a phone number.', ar: 'أدخل رقم هاتف.' },
+  'need-code': { en: 'Enter the code we sent you.', ar: 'أدخل الرمز الذي أرسلناه إليك.' },
+  'code-send-failed': {
+    en: 'We could not send a code just now.',
+    ar: 'تعذّر إرسال الرمز في الوقت الحالي.',
+  },
+  'code-refused': { en: 'That code was not accepted.', ar: 'لم يُقبل هذا الرمز.' },
+  /* Both keep their trailing space: the resend button sits on the same line. */
+  'code-expired': { en: 'That code has expired. ', ar: 'انتهت صلاحية الرمز. ' },
+  'code-expires': { en: 'Expires in {clock}. ', ar: 'تنتهي صلاحيته خلال {clock}. ' },
+
+  /* the review step */
+  'sum-applying-as': { en: 'Applying as', ar: 'التقديم بصفة' },
+  'sum-shop': { en: 'A shop', ar: 'متجر' },
+  'sum-carrier': { en: 'A delivery company', ar: 'شركة توصيل' },
+  'sum-email': { en: 'Email', ar: 'البريد الإلكتروني' },
+  'sum-phone': { en: 'Phone', ar: 'رقم الهاتف' },
+  'sum-verified': { en: '{value} ✓ verified', ar: '{value} ✓ تمّ التحقّق' },
+  'sum-not-given': { en: 'Not given', ar: 'لم يُذكر' },
+  'sum-registration': { en: 'Registration no.', ar: 'رقم السجل التجاري' },
+  'sum-company-type': { en: 'Company type', ar: 'نوع الشركة' },
+  'sum-documents': { en: 'Documents', ar: 'المستندات' },
+  'sum-documents-later': { en: 'Attached on the next screen', ar: 'تُرفق في الشاشة التالية' },
+  'sum-riders': { en: 'Riders / drivers', ar: 'المندوبون / السائقون' },
+  'sum-vehicles': { en: 'Vehicles', ar: 'المركبات' },
+  'sum-regions': { en: 'Regions', ar: 'المناطق' },
+  'sum-hours': { en: 'Hours', ar: 'أوقات العمل' },
+  'sum-notes': { en: 'Notes', ar: 'ملاحظات' },
+  'submit-failed': {
+    en: 'Something went wrong sending that. Please try again.',
+    ar: 'حدث خلل أثناء إرسال الطلب. الرجاء المحاولة مرة أخرى.',
+  },
+
+  /* the passcode, and the session it buys */
+  'passcode-six': { en: 'Please choose six digits.', ar: 'الرجاء اختيار ستة أرقام.' },
+  'passcode-refused': { en: 'That passcode was not accepted.', ar: 'لم يُقبل رمز الدخول.' },
+  'passcode-failed': {
+    en: 'We could not set that passcode just now.',
+    ar: 'تعذّر حفظ رمز الدخول في الوقت الحالي.',
+  },
+  'passcode-first': { en: 'Set your passcode first.', ar: 'اختر رمز الدخول أولاً.' },
+  'signin-failed': {
+    en: 'We could not sign you in just now.',
+    ar: 'تعذّر تسجيل دخولك في الوقت الحالي.',
+  },
+  'signin-not-allowed': {
+    en: 'This page is not allowed to sign you in yet. Your application is still in — '
+        + 'we will ask for your documents by email.',
+    ar: 'هذه الصفحة غير مخوّلة بتسجيل دخولك بعد. طلبك مُسجّل لدينا، وسنطلب مستنداتك عبر البريد '
+        + 'الإلكتروني.',
+  },
+  'session-lost': { en: 'Your sign-in has run out.', ar: 'انتهت صلاحية جلستك.' },
+  'session-lost-note': {
+    en: 'Your sign-in has run out. Type your passcode again to carry on.',
+    ar: 'انتهت صلاحية جلستك. أدخل رمز الدخول مرة أخرى للمتابعة.',
+  },
+  'lost-track': {
+    en: 'We have lost track of your application on this page. It is still in: keep the reference '
+        + 'above, and the decision will reach the address you verified.',
+    ar: 'فقدنا أثر طلبك على هذه الصفحة. الطلب مُسجّل لدينا: احتفظ بالرقم المرجعي أعلاه، وسيصلك '
+        + 'القرار على العنوان الذي تحقّقت منه.',
+  },
+
+  /* the document rows, on the preview step and on the receipt */
+  'doc-photo-or-pdf': { en: 'A photo or a PDF', ar: 'صورة أو ملف PDF' },
+  'doc-after-submit': { en: 'After you submit', ar: 'بعد إرسال الطلب' },
+  'doc-choose': { en: 'Choose File', ar: 'اختر ملفاً' },
+  /* "لـ" glued straight onto a definite noun reads badly — لـالسجل. The Arabic takes the noun as an
+     apposition instead, which stays correct whichever paper's name lands in the blank. */
+  'doc-choose-for': { en: 'Choose a file for {title}', ar: 'اختر ملفاً لمستند {title}' },
+  'doc-replace': { en: 'Replace', ar: 'استبدل' },
+  'doc-uploading': { en: 'Uploading…', ar: 'جارٍ الرفع…' },
+  'doc-accepted': { en: 'Accepted', ar: 'مقبول' },
+  'doc-accepted-note': {
+    en: 'A reviewer has accepted this one.',
+    ar: 'قبِل المراجع هذا المستند.',
+  },
+  'doc-refused': { en: 'Needs a new copy', ar: 'يحتاج نسخة جديدة' },
+  'doc-refused-note': { en: 'Please upload another copy.', ar: 'الرجاء رفع نسخة أخرى.' },
+  'doc-waiting': { en: 'Awaiting review', ar: 'بانتظار المراجعة' },
+  'doc-waiting-note': {
+    en: 'Uploaded. Replace it any time before a decision.',
+    ar: 'تمّ الرفع. يمكنك استبداله في أي وقت قبل صدور القرار.',
+  },
+  'doc-types': {
+    en: 'We take JPEG, PNG, WebP or PDF files.',
+    ar: 'نقبل ملفات JPEG أو PNG أو WebP أو PDF.',
+  },
+  'doc-too-big': {
+    en: 'That file is {size} and the limit is {limit}.',
+    ar: 'حجم هذا الملف {size} والحد الأقصى {limit}.',
+  },
+  'doc-presign-failed': {
+    en: 'We could not start that upload just now.',
+    ar: 'تعذّر بدء الرفع في الوقت الحالي.',
+  },
+  'doc-put-failed': {
+    en: 'That upload did not finish. Please try again.',
+    ar: 'لم يكتمل الرفع. الرجاء المحاولة مرة أخرى.',
+  },
+  'doc-confirm-failed': {
+    en: 'We could not file that document just now.',
+    ar: 'تعذّر حفظ المستند في الوقت الحالي.',
+  },
+  'megabytes': { en: '{n} MB', ar: '{n} ميغابايت' },
+
+  /* checking back */
+  'status-unknown': { en: 'We could not find that reference.', ar: 'لم نعثر على هذا الرقم المرجعي.' },
+
+  /* the request that never reached anybody */
+  'network-failed': {
+    en: 'We could not reach the server. Check your connection and try again.',
+    ar: 'تعذّر الوصول إلى الخادم. تحقّق من اتصالك وحاول مرة أخرى.',
+  },
+};
+
+/** One of the loose strings above, in the current language, with its blanks filled in. */
+const t = (key, fills) => fill(say(SAY[key]), fills);
+
+/*
+  The Arabic for what is written into register.html.
+
+  Keys match the `data-t`, `data-t-placeholder` and `data-t-aria` attributes in the markup. The
+  English is not here on purpose — it is in the markup, and reading it back from there is what stops
+  a copy edit to the HTML from leaving a stale English string in this file.
+*/
+const AR = {
+  /* the frame */
+  'brand-copyright': '© 2026 شركة YouDrop للتقنيات.',
+  'signin-note': 'مسجّل لدينا من قبل؟',
+  'signin-link': 'تسجيل الدخول',
+  'lang-aria': 'اللغة',
+
+  /* who is applying */
+  'kinds-legend': 'بأي صفة تتقدّم بالطلب؟',
+  'kind-shop': 'متجر',
+  'kind-shop-note': 'اعرض قائمتك على المدينة كلّها ودعنا نجد لك المندوب',
+  'kind-carrier': 'شركة توصيل',
+  'kind-carrier-note': 'أدخل أسطولك إلى المنصّة وتصلك الطلبات تلقائياً',
+  'business-hint': 'مثال: الوصول السريع للخدمات اللوجستية',
+  'contact-hint': 'مثال: أحمد خليل',
+  'cr-label': 'رقم السجل التجاري',
+  'cr-hint': 'مثال: CR-894211A',
+  'company-type': 'نوع الشركة',
+  'ct-logistics': 'شركة خدمات لوجستية',
+  'ct-courier': 'شركة بريد سريع',
+  'ct-freight': 'شحن ونقل بري',
+  'ct-sole': 'مؤسسة فردية',
+  'ct-other': 'غير ذلك',
+  'contact-phone': 'هاتف للتواصل',
+  'optional': 'اختياري',
+
+  /* the two codes */
+  'email-note': 'نرسل رمزاً من ستة أرقام للتأكّد من أن العنوان يصل إليك. كل ما يلي ذلك — بما في '
+      + 'ذلك القرار وطريقة تسجيل الدخول — يذهب إلى هذا العنوان، فليكن عنواناً تستطيع فتحه.',
+  'email-label': 'البريد الإلكتروني',
+  'phone-note': 'مفيد حين يحتاج أمر يخصّ طلباً إلى حلّ سريع. وإن لم ترغب، تجاوز هذه الخطوة — فهي '
+      + 'لا تغيّر شيئاً في طلبك.',
+  'phone-label': 'رقم الهاتف',
+  'send-code': 'أرسل الرمز',
+  'code-label': 'الرمز الذي أرسلناه',
+  'verify': 'تحقّق',
+  'send-another': 'أرسل رمزاً آخر',
+  'verified': 'تمّ التحقّق',
+  'skip-this': 'تجاوز هذه الخطوة',
+  'back': 'رجوع',
+  /* The Continue button's fallback word. Its usual one is written by paint(), out of NEXT_LABEL. */
+  'continue': 'متابعة',
+
+  /* the papers, and the fleet */
+  'documents-note': 'سترفق هذه المستندات في الشاشة التالية، بعد وصول طلبك واختيارك رمز دخول. لا '
+      + 'يُرفع شيء من هذه الخطوة.',
+  'fleet-size': 'العدد التقديري للمندوبين أو السائقين العاملين',
+  'vehicles-label': 'أنواع المركبات المتوفّرة',
+  'veh-motorcycle': 'درّاجات نارية',
+  'veh-car': 'سيارات',
+  'veh-van': 'فانات',
+  'veh-truck': 'شاحنات',
+  'regions-label': 'المناطق المفضّلة للعمل',
+  'regions-hint': 'مثال: بيروت، جبل لبنان',
+  'hours-label': 'أوقات العمل المفضّلة',
+  'hours-24': '24 ساعة (خدمة كاملة)',
+  'hours-day': 'نهاراً (08:00 – 20:00)',
+  'hours-evening': 'مساءً وليلاً (16:00 – 02:00)',
+  'hours-weekend': 'عطلة نهاية الأسبوع فقط',
+  'hours-other': 'غير ذلك — موضّح في الملاحظات',
+
+  /* sending */
+  'send-application': 'أرسل الطلب',
+  'review-note': 'نقرأ كل طلب يصلنا، وسنردّ عليك في الحالتين.',
+
+  /* the receipt */
+  'receipt-title': 'تمّ إرسال طلبك بنجاح',
+  'receipt-lede': 'شكراً لتقدّمك بالطلب. نتحقّق الآن من بيانات نشاطك التجاري، ومن مستندات أسطولك '
+      + 'حيث ينطبق ذلك.',
+  'your-reference': 'رقمك المرجعي',
+  'set-passcode': 'اختر رمز الدخول',
+  'account-note': 'ستة أرقام. يسجّل دخولك هنا مباشرةً لترفق مستنداتك، وهو نفسه رمز الدخول الذي '
+      + 'تطلبه منك لوحة مفاتيح التطبيق.',
+  'passcode-label': 'رمز الدخول',
+  'set-it': 'اعتمده',
+  'signed-in': 'تمّ تسجيل الدخول',
+  'your-documents': 'مستنداتك',
+  'documents-note-2': 'صورة أو ملف PDF لكل مستند. يمكنك رفع نسخة أوضح في أي وقت قبل صدور القرار — '
+      + 'والنسخة الأحدث هي التي يقرأها المراجع.',
+  'whats-next': 'ما الخطوة التالية؟',
+  'next1-title': 'تدقيق المستندات',
+  'next1-body': 'وحدة علاقات الشركاء لدينا تراجع بيانات تسجيل نشاطك التجاري.',
+  'next2-title': 'مكالمة تحقّق',
+  'next2-body': 'سنحدّد معك مكالمة قصيرة للتعريف بالخدمة والتأكّد من جاهزيتك.',
+  'next3-title': 'تفعيل لوحة التحكّم',
+  'next3-body': 'الموافقة تفتح لك لوحة التحكّم. ورمز الدخول الذي اخترته أعلاه هو الذي يُدخلك إليها.',
+  'info-line': 'يستغرق التحقّق عادةً من يوم إلى خمسة أيام عمل. ستصلك إشعارات بالبريد الإلكتروني في '
+      + 'كل مرحلة.',
+  'check-status': 'تحقّق من حالة الطلب',
+  'back-to-site': 'العودة إلى الموقع',
+};
+
+/* The three markup mechanisms, and the English each one reads back out of the document. */
+const translatable = document.querySelectorAll('[data-t]');
+const placeheld = document.querySelectorAll('[data-t-placeholder]');
+const labelled = document.querySelectorAll('[data-t-aria]');
+const toggles = document.querySelectorAll('[data-lang-toggle]');
+
+/* One map per attribute, not one map for all three: an element is allowed to carry a word and a
+   placeholder at once, and a single map keyed by node could only remember one of them. */
+const english = new Map();
+const englishHints = new Map();
+const englishLabels = new Map();
+translatable.forEach((node) => english.set(node, node.textContent));
+placeheld.forEach((node) => englishHints.set(node, node.placeholder));
+labelled.forEach((node) => englishLabels.set(node, node.getAttribute('aria-label')));
+
+/*
+  Everything this script writes, remembered as the job of writing it again.
+
+  site.js can keep a Map of node → its English, because over there the English is in the document.
+  Here it is not: these strings are chosen at run time and the node is often built at run time too.
+  So what is kept is the write itself — a closure that puts the same string in the same place in
+  whatever language is current. Keyed by node, so the newest write for an element replaces the last
+  one and `writeRaw` can drop it entirely when what lands there stops being ours to translate.
+*/
+const rewrites = new Map();
+
+/** One of our own strings, into an element, remembered. */
+function write(node, pair, fills) {
+  const job = () => { node.textContent = fill(say(pair), fills); };
+  rewrites.set(node, job);
+  job();
+}
+
+/** Text somebody else wrote — a server message, a name as typed. Written once and left alone. */
+function writeRaw(node, text) {
+  rewrites.delete(node);
+  node.textContent = text;
+}
+
+/*
+  Whatever the language machinery says this element should say, put back.
+
+  For the buttons that borrow their own label for a moment — "Send code" becomes "Sending…" and then
+  becomes "Send code" again. Reading the word out of the DOM before overwriting it would restore the
+  language the button was in when the request left, which is the wrong one if the reader switched
+  while it was in flight. Both mechanisms are asked in turn: a script write first, then the markup.
+*/
+function restore(node) {
+  const job = rewrites.get(node);
+  if (job) {
+    job();
+    return;
+  }
+  node.textContent = (arabic() && AR[node.dataset.t]) || english.get(node);
+}
+
+/** As `write`, for an aria-label. Its own map: one element can carry both a label and a word. */
+const rewriteLabels = new Map();
+function relabel(node, pair, fills) {
+  const job = () => node.setAttribute('aria-label', fill(say(pair), fills));
+  rewriteLabels.set(node, job);
+  job();
+}
+
+/*
+  localStorage throws outright in a few places — a browser set to block site data, some embedded
+  webviews — rather than merely returning null. A stored preference is not worth taking a form this
+  long down for, so both directions are wrapped and a failure just means the default.
+*/
+function readStored() {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    return null;
+  }
+}
+
+function store(lang) {
+  try {
+    localStorage.setItem(STORAGE_KEY, lang);
+  } catch (error) {
+    /* Nothing to do and nothing worth saying: the page still works, it just forgets. */
+  }
+}
+
+function apply(lang) {
+  const ar = lang === 'ar';
+
+  document.documentElement.lang = ar ? 'ar' : 'en';
+  document.documentElement.dir = ar ? 'rtl' : 'ltr';
+
+  /* A key with no Arabic falls back to the English rather than emptying the element — a missing
+     translation should read as untranslated, never as missing content. */
+  translatable.forEach((node) => {
+    node.textContent = ar ? (AR[node.dataset.t] || english.get(node)) : english.get(node);
+  });
+  placeheld.forEach((node) => {
+    const en = englishHints.get(node);
+    node.placeholder = ar ? (AR[node.dataset.tPlaceholder] || en) : en;
+  });
+  labelled.forEach((node) => {
+    const en = englishLabels.get(node);
+    node.setAttribute('aria-label', ar ? (AR[node.dataset.tAria] || en) : en);
+  });
+
+  toggles.forEach((button) => button.setAttribute('aria-pressed', String(ar)));
+
+  /* The wizard's own copy, rebuilt from the tables: the title, the step, the summary, the preview
+     rows. Then everything else this script has written and is still on screen — the receipt's
+     upload rows, the status line, a countdown — which no rebuild reaches. */
+  applyWording();
+  paint();
+  rewrites.forEach((job, node) => (node.isConnected ? job() : rewrites.delete(node)));
+  rewriteLabels.forEach((job, node) => (node.isConnected ? job() : rewriteLabels.delete(node)));
+}
+
+toggles.forEach((button) => {
+  button.addEventListener('click', () => {
+    const next = arabic() ? 'en' : 'ar';
+    apply(next);
+    store(next);
+  });
+});
+
+/*
+  An error whose message is one of ours, carrying the key it came from.
+
+  Everything on this page that can fail says so in a box, and the box is filled from `e.message` —
+  which may hold our sentence or the onboarding service's. Ours should be rewritten when the
+  language changes and theirs should not, and the only place that difference is still visible is
+  where the error was raised. So it is recorded there.
+*/
+class Said extends Error {
+  constructor(key, fills) {
+    super(t(key, fills));
+    this.key = key;
+    this.fills = fills;
+  }
+}
+
+/**
+ * Puts a failure in its box, in Arabic if it was ours to say and verbatim if it was not.
+ *
+ * The one failure that is neither: `fetch` rejects with a TypeError when the request never reached
+ * anybody — no network, no service, a blocked origin. The browser's words for that are always
+ * English and never say anything an applicant can act on, so they are replaced with ours. Every
+ * other error keeps its own message, because the alternative is hiding what a server actually said.
+ */
+function showError(box, failure) {
+  const error = failure instanceof TypeError ? new Said('network-failed') : failure;
+  if (error.key) write(box, SAY[error.key], error.fills);
+  else writeRaw(box, error.message);
+  box.hidden = false;
+}
+
 const state = {
   step: 'business',
   kind: 'MERCHANT',
@@ -49,21 +519,42 @@ const FLOW = {
   CARRIER: ['business', 'email', 'phone', 'documents', 'fleet', 'review'],
 };
 
-/** The same form for both, with the nouns changed. */
+/*
+  The same form for both, with the nouns changed.
+
+  Every value from here down is a `{ en, ar }` pair. These strings have no home in the markup — the
+  right one is picked at run time — so both languages are written here, a line apart, where an edit
+  to one is an edit in sight of the other.
+*/
 const WORDING = {
   MERCHANT: {
-    hub: 'Merchant Hub',
-    business: 'Shop name',
-    contact: 'Your name',
-    notes: 'What do you sell, and where are you?',
-    fallbackCompany: 'Merchant Partner Application',
+    hub: { en: 'Merchant Hub', ar: 'مركز التجّار' },
+    business: { en: 'Shop name', ar: 'اسم المتجر' },
+    contact: { en: 'Your name', ar: 'اسمك' },
+    notes: {
+      en: 'What do you sell, and where are you?',
+      ar: 'ماذا تبيع، وأين يقع متجرك؟',
+    },
+    fallbackCompany: { en: 'Merchant Partner Application', ar: 'طلب شراكة تاجر' },
   },
   CARRIER: {
-    hub: 'Carrier Hub',
-    business: 'Company / Business Name',
-    contact: 'Owner Full Name',
-    notes: 'How many riders, and which areas do you cover?',
-    fallbackCompany: 'Carrier Partner Application',
+    hub: { en: 'Carrier Hub', ar: 'مركز شركات التوصيل' },
+    business: { en: 'Company / Business Name', ar: 'اسم الشركة أو النشاط التجاري' },
+    contact: { en: 'Owner Full Name', ar: 'الاسم الكامل لصاحب الشركة' },
+    notes: {
+      en: 'How many riders, and which areas do you cover?',
+      ar: 'كم عدد المندوبين لديك، وأي المناطق تغطّونها؟',
+    },
+    fallbackCompany: { en: 'Carrier Partner Application', ar: 'طلب شراكة شركة توصيل' },
+  },
+};
+
+/** The tab's own name, which changes with the kind for the same reason the eyebrow does. */
+const TITLE = {
+  MERCHANT: { en: 'Apply as a shop — YouDrop', ar: 'التقديم كمتجر — YouDrop' },
+  CARRIER: {
+    en: 'Apply as a delivery company — YouDrop',
+    ar: 'التقديم كشركة توصيل — YouDrop',
   },
 };
 
@@ -77,43 +568,85 @@ const WORDING = {
 const COPY = {
   business: {
     MERCHANT: {
-      title: 'Your business',
-      lede: 'Tell us who is applying. Nothing here is published anywhere.',
-      headline: 'Put your menu in front of the whole city.',
+      title: { en: 'Your business', ar: 'نشاطك التجاري' },
+      lede: {
+        en: 'Tell us who is applying. Nothing here is published anywhere.',
+        ar: 'عرّفنا بمن يتقدّم بالطلب. لا يُنشر أي مما هنا في أي مكان.',
+      },
+      headline: {
+        en: 'Put your menu in front of the whole city.',
+        ar: 'اعرض قائمتك على المدينة كلّها.',
+      },
     },
     CARRIER: {
-      title: 'Company Profile',
-      lede: 'Provide official registration details of your business.',
-      headline: 'Start your last-mile delivery partnership.',
+      title: { en: 'Company Profile', ar: 'بيانات الشركة' },
+      lede: {
+        en: 'Provide official registration details of your business.',
+        ar: 'زوّدنا ببيانات التسجيل الرسمية لنشاطك التجاري.',
+      },
+      headline: {
+        en: 'Start your last-mile delivery partnership.',
+        ar: 'ابدأ شراكتك في التوصيل إلى باب العميل.',
+      },
     },
   },
   email: {
-    title: 'Your email address',
-    lede: 'We check it reaches you before anything else.',
-    headline: 'One address, for everything that follows.',
+    title: { en: 'Your email address', ar: 'بريدك الإلكتروني' },
+    lede: {
+      en: 'We check it reaches you before anything else.',
+      ar: 'نتأكّد من وصوله إليك قبل أي شيء آخر.',
+    },
+    headline: {
+      en: 'One address, for everything that follows.',
+      ar: 'عنوان واحد لكل ما يأتي بعده.',
+    },
   },
   phone: {
-    title: 'A phone number',
-    lede: 'Optional, and useful when an order needs sorting out quickly.',
-    headline: 'A number for when something needs sorting fast.',
+    title: { en: 'A phone number', ar: 'رقم هاتف' },
+    lede: {
+      en: 'Optional, and useful when an order needs sorting out quickly.',
+      ar: 'اختياري، ومفيد حين يحتاج طلب إلى حلّ سريع.',
+    },
+    headline: {
+      en: 'A number for when something needs sorting fast.',
+      ar: 'رقم نتّصل به حين يحتاج أمر إلى حلّ سريع.',
+    },
   },
   documents: {
-    title: 'Regulatory Documents',
+    title: { en: 'Regulatory Documents', ar: 'المستندات الرسمية' },
     // Was "Upload high-quality scans...". This step cannot upload anything — there is no account to
     // upload as until the application exists — so the line says what the step is instead of asking
     // for something it has no way to take.
-    lede: 'What we will ask for. You attach them on the next screen.',
-    headline: 'Upload credentials to verify your fleet.',
+    lede: {
+      en: 'What we will ask for. You attach them on the next screen.',
+      ar: 'ما سنطلبه منك. ترفقه في الشاشة التالية.',
+    },
+    headline: {
+      en: 'Upload credentials to verify your fleet.',
+      ar: 'ارفع المستندات التي تُثبت أهلية أسطولك.',
+    },
   },
   fleet: {
-    title: 'Fleet & Service Scope',
-    lede: 'Define your capacity limits and operating capabilities.',
-    headline: 'Configure your active service metrics.',
+    title: { en: 'Fleet & Service Scope', ar: 'الأسطول ونطاق الخدمة' },
+    lede: {
+      en: 'Define your capacity limits and operating capabilities.',
+      ar: 'حدّد طاقتك الاستيعابية وقدراتك التشغيلية.',
+    },
+    headline: {
+      en: 'Configure your active service metrics.',
+      ar: 'اضبط مؤشّرات خدمتك الفعلية.',
+    },
   },
   review: {
-    title: 'Check and send',
-    lede: 'This is what we will read. Go back and change anything that is not right.',
-    headline: 'One last look before it reaches us.',
+    title: { en: 'Check and send', ar: 'راجع وأرسل' },
+    lede: {
+      en: 'This is what we will read. Go back and change anything that is not right.',
+      ar: 'هذا ما سنقرأه. ارجع وعدّل أي معلومة غير صحيحة.',
+    },
+    headline: {
+      en: 'One last look before it reaches us.',
+      ar: 'نظرة أخيرة قبل أن يصلنا الطلب.',
+    },
   },
 };
 
@@ -122,19 +655,27 @@ const COPY = {
   and a paragraph that changed under it every time would be movement for its own sake.
 */
 const BRAND_LEDE = {
-  MERCHANT: 'Reach the whole city from one menu. Orders, riders and receipts arrive in one place, '
-      + 'and we find the rider for you.',
-  CARRIER: 'Connect your fleet to the most advanced last-mile delivery network in the region. '
-      + 'Real-time routing, automated dispatch, and unified billing.',
+  MERCHANT: {
+    en: 'Reach the whole city from one menu. Orders, riders and receipts arrive in one place, '
+        + 'and we find the rider for you.',
+    ar: 'اعرض قائمة واحدة تصل إلى المدينة كلّها. الطلبات والمندوبون والفواتير في مكان واحد، ونحن '
+        + 'نجد لك المندوب.',
+  },
+  CARRIER: {
+    en: 'Connect your fleet to the most advanced last-mile delivery network in the region. '
+        + 'Real-time routing, automated dispatch, and unified billing.',
+    ar: 'اربط أسطولك بأحدث شبكة توصيل إلى باب العميل في المنطقة. توجيه لحظي، وإرسال آلي، وفوترة '
+        + 'موحّدة.',
+  },
 };
 
 /** What the Continue button promises, keyed by where it goes. */
 const NEXT_LABEL = {
-  email: 'Continue to Email',
-  phone: 'Continue to Phone',
-  documents: 'Continue to Documents',
-  fleet: 'Next: Fleet Setup',
-  review: 'Review and Send',
+  email: { en: 'Continue to Email', ar: 'متابعة إلى البريد الإلكتروني' },
+  phone: { en: 'Continue to Phone', ar: 'متابعة إلى رقم الهاتف' },
+  documents: { en: 'Continue to Documents', ar: 'متابعة إلى المستندات' },
+  fleet: { en: 'Next: Fleet Setup', ar: 'التالي: بيانات الأسطول' },
+  review: { en: 'Review and Send', ar: 'المراجعة والإرسال' },
 };
 
 // ------------------------------------------------------------------ arriving
@@ -161,25 +702,25 @@ $('businessName').addEventListener('input', applyCompanyName);
 
 function applyWording() {
   const words = WORDING[state.kind];
-  $('business-label').textContent = words.business;
-  $('contact-label').textContent = words.contact;
-  $('notes-label').textContent = words.notes;
-  $('brand-eyebrow').textContent = words.hub;
-  $('receipt-eyebrow').textContent = words.hub;
-  $('brand-lede').textContent = BRAND_LEDE[state.kind];
+  write($('business-label'), words.business);
+  write($('contact-label'), words.contact);
+  write($('notes-label'), words.notes);
+  write($('brand-eyebrow'), words.hub);
+  write($('receipt-eyebrow'), words.hub);
+  write($('brand-lede'), BRAND_LEDE[state.kind]);
   // Fields only one kind of applicant is asked for.
   document.querySelectorAll('[data-kind]').forEach((node) => {
     node.hidden = node.dataset.kind !== state.kind;
   });
   applyCompanyName();
-  document.title = state.kind === 'CARRIER'
-      ? 'Apply as a delivery company — YouDrop'
-      : 'Apply as a shop — YouDrop';
+  document.title = say(TITLE[state.kind]);
 }
 
 function applyCompanyName() {
   const typed = $('businessName').value.trim();
-  $('brand-company').textContent = typed || WORDING[state.kind].fallbackCompany;
+  // A name somebody typed is theirs and stays exactly as typed; only the stand-in is translated.
+  if (typed) writeRaw($('brand-company'), typed);
+  else write($('brand-company'), WORDING[state.kind].fallbackCompany);
 }
 
 // ------------------------------------------------------------------ steps
@@ -212,6 +753,22 @@ function go(step) {
   // back to the first step is the only honest answer; it cannot happen from the buttons, only from
   // changing the choice on step one, which is where it lands anyway.
   state.step = flow.includes(step) ? step : flow[0];
+  paint();
+
+  // To the top of the step that just opened, not to the top of the document. On a narrow screen the
+  // brand band is above the form and scrolling to the document top would put the progress bar and
+  // the first field below the fold — so pressing Continue would look like it moved you backwards.
+  document.querySelector('.w-head').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/*
+  Drawing the step the wizard is on, without moving.
+
+  Split out of `go` for the language switch, which redraws every word on the page and must not also
+  jump the reader back to the top of a step they were halfway down.
+*/
+function paint() {
+  const flow = FLOW[state.kind];
 
   document.querySelectorAll('.wstep').forEach((section) => {
     section.hidden = section.dataset.step !== state.step;
@@ -219,29 +776,24 @@ function go(step) {
 
   const position = flow.indexOf(state.step) + 1;
   const percent = Math.round((position / flow.length) * 100);
-  $('step-of').textContent = `Step ${position} of ${flow.length}`;
-  $('step-percent').textContent = `${percent}% Complete`;
+  write($('step-of'), SAY['step-of'], { n: position, total: flow.length });
+  write($('step-percent'), SAY.percent, { percent });
   $('bar-fill').style.width = `${percent}%`;
 
   const copy = COPY[state.step][state.kind] || COPY[state.step];
-  $('step-title').textContent = copy.title;
-  $('step-lede').textContent = copy.lede;
-  $('brand-headline').textContent = copy.headline;
+  write($('step-title'), copy.title);
+  write($('step-lede'), copy.lede);
+  write($('brand-headline'), copy.headline);
 
   // Every Continue says where it goes, and where it goes depends on the kind, so it is written at
   // the moment the step opens rather than baked into the markup.
   const next = flow[position];
   const label = document.querySelector(`.wstep[data-step="${state.step}"] .w-next-label`);
-  if (label && next) label.textContent = NEXT_LABEL[next] || 'Continue';
+  if (label && next) write(label, NEXT_LABEL[next] || SAY.continue);
 
   if (state.step === 'phone') seedPhone();
   if (state.step === 'documents') fillDocumentPreview();
   if (state.step === 'review') fillSummary();
-
-  // To the top of the step that just opened, not to the top of the document. On a narrow screen the
-  // brand band is above the form and scrolling to the document top would put the progress bar and
-  // the first field below the fold — so pressing Continue would look like it moved you backwards.
-  document.querySelector('.w-head').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /*
@@ -260,17 +812,17 @@ function seedPhone() {
 
 function validateBusiness() {
   const error = $('page-error');
-  const fail = (message) => {
-    error.textContent = message;
+  const fail = (key) => {
+    write(error, SAY[key]);
     error.hidden = false;
     return false;
   };
 
   if (!$('businessName').value.trim() || !$('contactName').value.trim()) {
-    return fail('Please give the business name and your own name.');
+    return fail('need-name');
   }
   if (state.kind === 'CARRIER' && !$('registrationNumber').value.trim()) {
-    return fail('Please give your commercial registration number.');
+    return fail('need-cr');
   }
   error.hidden = true;
   return true;
@@ -278,18 +830,18 @@ function validateBusiness() {
 
 function validateFleet() {
   const error = $('fleet-error');
-  const fail = (message) => {
-    error.textContent = message;
+  const fail = (key) => {
+    write(error, SAY[key]);
     error.hidden = false;
     return false;
   };
 
   const size = Number($('fleetSize').value.trim());
   if (!Number.isFinite(size) || size < 1) {
-    return fail('Please give roughly how many riders or drivers you have active.');
+    return fail('need-fleet-size');
   }
   if (!$('operatingRegions').value.trim()) {
-    return fail('Please name at least one area you would like to work.');
+    return fail('need-region');
   }
   error.hidden = true;
   return true;
@@ -317,22 +869,18 @@ function wireVerification(channel, ids, onVerified) {
 
   let cooldown = null;
 
-  const fail = (message) => {
-    errorBox.textContent = message;
-    errorBox.hidden = false;
-  };
+  const fail = (error) => showError(errorBox, error);
 
   const send = async (button) => {
     errorBox.hidden = true;
     const destination = destinationInput.value.trim();
     if (!destination) {
-      fail(channel === 'EMAIL' ? 'Enter your email address.' : 'Enter a phone number.');
+      fail(new Said(channel === 'EMAIL' ? 'need-email' : 'need-phone'));
       return;
     }
 
     button.disabled = true;
-    const original = button.textContent;
-    button.textContent = 'Sending…';
+    button.textContent = t('sending');
     try {
       const response = await fetch(`${API}/api/onboarding/verifications`, {
         method: 'POST',
@@ -340,16 +888,18 @@ function wireVerification(channel, ids, onVerified) {
         body: JSON.stringify({ channel, destination }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.message || 'We could not send a code just now.');
+      if (!response.ok) {
+        throw body.message ? new Error(body.message) : new Said('code-send-failed');
+      }
 
       codeBox.hidden = false;
       codeInput.focus();
       startCooldown(new Date(body.expiresAt));
     } catch (e) {
-      fail(e.message);
+      fail(e);
     } finally {
       button.disabled = false;
-      button.textContent = original;
+      restore(button);
     }
   };
 
@@ -361,12 +911,12 @@ function wireVerification(channel, ids, onVerified) {
     const destination = destinationInput.value.trim();
     const code = codeInput.value.trim();
     if (!code) {
-      fail('Enter the code we sent you.');
+      fail(new Said('need-code'));
       return;
     }
 
     confirmButton.disabled = true;
-    confirmButton.textContent = 'Checking…';
+    confirmButton.textContent = t('checking');
     try {
       const response = await fetch(`${API}/api/onboarding/verifications/confirm`, {
         method: 'POST',
@@ -374,7 +924,9 @@ function wireVerification(channel, ids, onVerified) {
         body: JSON.stringify({ channel, destination, code }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.message || 'That code was not accepted.');
+      if (!response.ok) {
+        throw body.message ? new Error(body.message) : new Said('code-refused');
+      }
 
       // The server's spelling of the address, not the one that was typed. It normalises — lower
       // case, punctuation out of phone numbers — and the application has to carry exactly what was
@@ -388,10 +940,10 @@ function wireVerification(channel, ids, onVerified) {
       sendButton.hidden = true;
       if (cooldown) clearInterval(cooldown);
     } catch (e) {
-      fail(e.message);
+      fail(e);
     } finally {
       confirmButton.disabled = false;
-      confirmButton.textContent = 'Verify';
+      restore(confirmButton);
     }
   });
 
@@ -413,14 +965,14 @@ function wireVerification(channel, ids, onVerified) {
     const tick = () => {
       const secondsLeft = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
       if (secondsLeft === 0) {
-        expiryLabel.textContent = 'That code has expired. ';
+        write(expiryLabel, SAY['code-expired']);
         resendButton.disabled = false;
         clearInterval(cooldown);
         return;
       }
       const minutes = Math.floor(secondsLeft / 60);
       const seconds = String(secondsLeft % 60).padStart(2, '0');
-      expiryLabel.textContent = `Expires in ${minutes}:${seconds}. `;
+      write(expiryLabel, SAY['code-expires'], { clock: `${minutes}:${seconds}` });
       // The server refuses another code for the first minute. The button follows that rather than
       // letting somebody press it into a refusal.
       resendButton.disabled = (expiresAt - Date.now()) > (9 * 60 + 1) * 1000;
@@ -495,51 +1047,75 @@ function collectDetails() {
 
 /** Plain words for the review screen, matching the labels the fields carry. */
 const COMPANY_TYPES = {
-  LOGISTICS_COMPANY: 'Logistics Company',
-  COURIER_SERVICE: 'Courier Service',
-  FREIGHT_TRUCKING: 'Freight & Trucking',
-  SOLE_PROPRIETOR: 'Individual / Sole Proprietor',
-  OTHER: 'Other',
+  LOGISTICS_COMPANY: { en: 'Logistics Company', ar: 'شركة خدمات لوجستية' },
+  COURIER_SERVICE: { en: 'Courier Service', ar: 'شركة بريد سريع' },
+  FREIGHT_TRUCKING: { en: 'Freight & Trucking', ar: 'شحن ونقل بري' },
+  SOLE_PROPRIETOR: { en: 'Individual / Sole Proprietor', ar: 'مؤسسة فردية' },
+  OTHER: { en: 'Other', ar: 'غير ذلك' },
 };
 
 const VEHICLES = {
-  MOTORCYCLE: 'Motorcycles',
-  CAR: 'Cars',
-  VAN: 'Vans',
-  TRUCK: 'Trucks',
+  MOTORCYCLE: { en: 'Motorcycles', ar: 'درّاجات نارية' },
+  CAR: { en: 'Cars', ar: 'سيارات' },
+  VAN: { en: 'Vans', ar: 'فانات' },
+  TRUCK: { en: 'Trucks', ar: 'شاحنات' },
 };
 
 // ------------------------------------------------------------------ sending
 
+/*
+  A cell of the summary, as the job of filling it in.
+
+  Half of what is on this screen is ours and half of it was typed by the applicant. A term and a
+  chosen option are translated; a business name, a registration number and a note are not — those
+  are somebody's own words and rewriting them in another language would be inventing facts. The two
+  are told apart here, once, rather than at each of the sixteen rows below.
+*/
+const ours = (pair, fills) => (node) => write(node, pair, fills);
+const theirs = (text) => (node) => writeRaw(node, text);
+
+/** Several of our pairs read as a list, in the current language's own comma. */
+const list = (pairs) => ({
+  en: pairs.map((pair) => pair.en).join(', '),
+  ar: pairs.map((pair) => pair.ar || pair.en).join('، '),
+});
+
 function fillSummary() {
   const words = WORDING[state.kind];
   const rows = [
-    ['Applying as', state.kind === 'CARRIER' ? 'A delivery company' : 'A shop'],
-    [words.business, $('businessName').value.trim()],
-    [words.contact, $('contactName').value.trim()],
-    ['Email', `${state.email} ✓ verified`],
-    ['Phone', state.phone ? `${state.phone} ✓ verified` : 'Not given'],
+    [ours(SAY['sum-applying-as']),
+      ours(state.kind === 'CARRIER' ? SAY['sum-carrier'] : SAY['sum-shop'])],
+    [ours(words.business), theirs($('businessName').value.trim())],
+    [ours(words.contact), theirs($('contactName').value.trim())],
+    [ours(SAY['sum-email']), ours(SAY['sum-verified'], { value: state.email })],
+    [ours(SAY['sum-phone']), state.phone
+      ? ours(SAY['sum-verified'], { value: state.phone })
+      : ours(SAY['sum-not-given'])],
   ];
 
   if (state.kind === 'CARRIER') {
-    rows.push(['Registration no.', $('registrationNumber').value.trim()]);
-    rows.push(['Company type', COMPANY_TYPES[$('companyType').value] || $('companyType').value]);
-    rows.push(['Documents', 'Attached on the next screen']);
+    const companyType = $('companyType').value;
+    rows.push([ours(SAY['sum-registration']), theirs($('registrationNumber').value.trim())]);
+    rows.push([ours(SAY['sum-company-type']),
+      COMPANY_TYPES[companyType] ? ours(COMPANY_TYPES[companyType]) : theirs(companyType)]);
+    rows.push([ours(SAY['sum-documents']), ours(SAY['sum-documents-later'])]);
 
     const size = $('fleetSize').value.trim();
-    if (size) rows.push(['Riders / drivers', size]);
+    if (size) rows.push([ours(SAY['sum-riders']), theirs(size)]);
 
     const vehicles = [...document.querySelectorAll('input[name="vehicleType"]:checked')]
-        .map((box) => VEHICLES[box.value] || box.value);
-    if (vehicles.length) rows.push(['Vehicles', vehicles.join(', ')]);
+        .map((box) => VEHICLES[box.value] || { en: box.value });
+    if (vehicles.length) rows.push([ours(SAY['sum-vehicles']), ours(list(vehicles))]);
 
     const regions = $('operatingRegions').value.trim();
-    if (regions) rows.push(['Regions', regions]);
-    rows.push(['Hours', $('operatingHours').selectedOptions[0].textContent]);
+    if (regions) rows.push([ours(SAY['sum-regions']), theirs(regions)]);
+    // The chosen option's own text, which the markup mechanism has already translated by the time
+    // this runs — so these five phrases are written down once, in register.html, and not again.
+    rows.push([ours(SAY['sum-hours']), theirs($('operatingHours').selectedOptions[0].textContent)]);
   }
 
   const notes = $('notes').value.trim();
-  if (notes) rows.push(['Notes', notes]);
+  if (notes) rows.push([ours(SAY['sum-notes']), theirs(notes)]);
 
   $('summary').innerHTML = rows.map(() => '<dt></dt><dd></dd>').join('');
   // Set as text rather than interpolated into the HTML above: every value here was typed by
@@ -547,8 +1123,8 @@ function fillSummary() {
   const terms = $('summary').querySelectorAll('dt');
   const values = $('summary').querySelectorAll('dd');
   rows.forEach(([term, value], i) => {
-    terms[i].textContent = term;
-    values[i].textContent = value;
+    term(terms[i]);
+    value(values[i]);
   });
 }
 
@@ -567,7 +1143,7 @@ $('submit').addEventListener('click', async () => {
   const errorBox = $('submit-error');
   errorBox.hidden = true;
   button.disabled = true;
-  button.textContent = 'Sending…';
+  button.textContent = t('sending');
 
   try {
     const application = {
@@ -609,20 +1185,21 @@ $('submit').addEventListener('click', async () => {
     }
 
     if (!attempt.response.ok) {
-      throw new Error(attempt.body.message
-          || 'Something went wrong sending that. Please try again.');
+      throw attempt.body.message
+          ? new Error(attempt.body.message)
+          : new Said('submit-failed');
     }
 
-    $('reference').textContent = attempt.body.reference;
+    // The reference is a key, not a sentence: it is written as it arrived in either language.
+    writeRaw($('reference'), attempt.body.reference);
     $('wizard').hidden = true;
     $('receipt').hidden = false;
     window.scrollTo({ top: 0 });
   } catch (e) {
-    errorBox.textContent = e.message;
-    errorBox.hidden = false;
+    showError(errorBox, e);
   } finally {
     button.disabled = false;
-    button.textContent = 'Send application';
+    restore(button);
   }
 });
 
@@ -641,14 +1218,19 @@ $('submit').addEventListener('click', async () => {
   here. There is no document kind for either, so there is no upload that could carry them and no
   reviewer screen that could show them. A reviewer who needs one asks by email, as they did before.
 */
+const PAPERS = {
+  COMMERCIAL_REGISTRATION: { en: 'Commercial Registration (CR)', ar: 'السجل التجاري' },
+  NATIONAL_ID: { en: 'Authorized Signatory Owner ID', ar: 'هوية المفوّض بالتوقيع' },
+};
+
 const DOCUMENTS = {
   MERCHANT: [
-    { kind: 'COMMERCIAL_REGISTRATION', title: 'Commercial Registration (CR)' },
-    { kind: 'NATIONAL_ID', title: 'Authorized Signatory Owner ID' },
+    { kind: 'COMMERCIAL_REGISTRATION', title: PAPERS.COMMERCIAL_REGISTRATION },
+    { kind: 'NATIONAL_ID', title: PAPERS.NATIONAL_ID },
   ],
   CARRIER: [
-    { kind: 'COMMERCIAL_REGISTRATION', title: 'Commercial Registration (CR)' },
-    { kind: 'NATIONAL_ID', title: 'Authorized Signatory Owner ID' },
+    { kind: 'COMMERCIAL_REGISTRATION', title: PAPERS.COMMERCIAL_REGISTRATION },
+    { kind: 'NATIONAL_ID', title: PAPERS.NATIONAL_ID },
   ],
 };
 
@@ -684,7 +1266,7 @@ function documentRow(paper) {
   row.className = 'w-upload';
   row.innerHTML = `<span class="w-upload-tile">${DOC_GLYPH}</span>`
       + '<span class="w-upload-text"><b></b><span></span></span>';
-  row.querySelector('b').textContent = paper.title;
+  write(row.querySelector('b'), paper.title);
   return row;
 }
 
@@ -701,10 +1283,10 @@ function fillDocumentPreview() {
   list.textContent = '';
   papersForKind().forEach((paper) => {
     const row = documentRow(paper);
-    row.querySelector('.w-upload-text span').textContent = 'A photo or a PDF';
+    write(row.querySelector('.w-upload-text span'), SAY['doc-photo-or-pdf']);
     const later = document.createElement('span');
     later.className = 'w-later';
-    later.textContent = 'After you submit';
+    write(later, SAY['doc-after-submit']);
     row.appendChild(later);
     list.appendChild(row);
   });
@@ -738,24 +1320,24 @@ function keep(token) {
 }
 
 /** Keycloak's errors are a code and a sentence; the code is the part worth reacting to. */
-function readTokenError(body, fallback) {
-  if (body.error === 'invalid_grant') return 'That passcode was not accepted.';
+function readTokenError(body, fallbackKey) {
+  if (body.error === 'invalid_grant') return new Said('passcode-refused');
   if (body.error === 'invalid_client' || body.error === 'unauthorized_client') {
     // The one failure an applicant can do nothing about, said plainly rather than as "invalid".
-    return 'This page is not allowed to sign you in yet. Your application is still in — '
-        + 'we will ask for your documents by email.';
+    return new Said('signin-not-allowed');
   }
-  return body.error_description || fallback;
+  // Keycloak's own sentence, in whatever language the realm was configured in. Not ours to rewrite.
+  return body.error_description ? new Error(body.error_description) : new Said(fallbackKey);
 }
 
-async function askForToken(form, fallback) {
+async function askForToken(form, fallbackKey) {
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(form),
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(readTokenError(body, fallback));
+  if (!response.ok) throw readTokenError(body, fallbackKey);
   keep(body);
 }
 
@@ -766,7 +1348,7 @@ function signIn(username, password) {
     scope: 'openid',
     username,
     password,
-  }, 'We could not sign you in just now.');
+  }, 'signin-failed');
 }
 
 /** Quietly true or quietly false: a failed refresh is not something to put on screen on its own. */
@@ -777,7 +1359,7 @@ async function refreshSession() {
       client_id: IAM_CLIENT,
       grant_type: 'refresh_token',
       refresh_token: session.refresh,
-    }, 'expired');
+    }, 'session-lost');
     return true;
   } catch (e) {
     session.access = null;
@@ -799,9 +1381,9 @@ function sessionLost() {
   $('account-note').hidden = false;
   $('account-block').querySelector('.w-verify').hidden = false;
   const errorBox = $('account-error');
-  errorBox.textContent = 'Your sign-in has run out. Type your passcode again to carry on.';
+  write(errorBox, SAY['session-lost-note']);
   errorBox.hidden = false;
-  return new Error('Your sign-in has run out.');
+  return new Said('session-lost');
 }
 
 /**
@@ -813,7 +1395,7 @@ function sessionLost() {
  */
 async function authFetch(path, options) {
   const settings = options || {};
-  if (!session.access) throw new Error('Set your passcode first.');
+  if (!session.access) throw new Said('passcode-first');
   if (Date.now() >= session.expiresAt && !(await refreshSession())) throw sessionLost();
 
   const send = () => fetch(`${API}${path}`, {
@@ -830,10 +1412,15 @@ async function authFetch(path, options) {
   return response;
 }
 
-/** The body of an onboarding error, which is always `{"message": …}` when the service wrote it. */
-async function messageFrom(response, fallback) {
+/*
+  The body of an onboarding error, which is always `{"message": …}` when the service wrote it.
+
+  Returns the failure rather than its words: the service's sentence if it sent one, and otherwise
+  ours under the key given, so the box it lands in can tell which of the two it is holding.
+*/
+async function failureFrom(response, fallbackKey) {
   const body = await response.json().catch(() => ({}));
-  return body.message || fallback;
+  return body.message ? new Error(body.message) : new Said(fallbackKey);
 }
 
 // ------------------------------------------------------------------ setting a passcode
@@ -848,22 +1435,18 @@ $('account-save').addEventListener('click', async () => {
   // Six digits, not "at least six characters" — see the note on the field. The service would take
   // a longer one; the phone in this person's pocket would not.
   if (!/^\d{6}$/.test(passcode)) {
-    errorBox.textContent = 'Please choose six digits.';
-    errorBox.hidden = false;
+    showError(errorBox, new Said('passcode-six'));
     return;
   }
   if (!reference || !state.email) {
     // Not reachable from the buttons — this screen only exists once both are set — but a passcode
     // is being sent somewhere, and "somewhere" has to be checked before it is.
-    errorBox.textContent = 'We have lost track of your application on this page. It is still in: '
-        + 'keep the reference above, and the decision will reach the address you verified.';
-    errorBox.hidden = false;
+    showError(errorBox, new Said('lost-track'));
     return;
   }
 
   button.disabled = true;
-  const label = button.textContent;
-  button.textContent = 'Setting…';
+  button.textContent = t('setting');
   try {
     /*
       Two calls, and the first one is allowed to fail.
@@ -882,12 +1465,12 @@ $('account-save').addEventListener('click', async () => {
       });
     const creationError = created.ok
         ? null
-        : await messageFrom(created, 'We could not set that passcode just now.');
+        : await failureFrom(created, 'passcode-failed');
 
     try {
       await signIn(state.email, passcode);
     } catch (e) {
-      throw new Error(creationError || e.message);
+      throw creationError || e;
     }
 
     $('passcode').value = '';
@@ -896,11 +1479,10 @@ $('account-save').addEventListener('click', async () => {
     $('account-done').hidden = false;
     await openDocuments();
   } catch (e) {
-    errorBox.textContent = e.message;
-    errorBox.hidden = false;
+    showError(errorBox, e);
   } finally {
     button.disabled = false;
-    button.textContent = label;
+    restore(button);
   }
 });
 
@@ -966,17 +1548,19 @@ function buildUploadRow(paper) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'w-choose';
-  button.textContent = 'Choose File';
-  button.setAttribute('aria-label', `Choose a file for ${paper.title}`);
+  write(button, SAY['doc-choose']);
+  // Named for the paper it belongs to, in both halves: the verb from the table and the noun from
+  // the same pair the row's own heading uses.
+  relabel(button, SAY['doc-choose-for'], { title: () => say(paper.title) });
   button.addEventListener('click', () => picker.click());
 
   node.append(pill, picker, button);
-  detail.textContent = 'A photo or a PDF';
+  write(detail, SAY['doc-photo-or-pdf']);
 
   let busy = false;
 
-  function setPill(text, tone) {
-    pill.textContent = text;
+  function setPill(key, tone) {
+    write(pill, SAY[key]);
     pill.className = `w-pill${tone ? ` is-${tone}` : ''}`;
     pill.hidden = false;
   }
@@ -986,20 +1570,22 @@ function buildUploadRow(paper) {
   function show(doc) {
     current = doc;
     node.classList.remove('is-done', 'is-bad');
-    button.textContent = 'Replace';
+    write(button, SAY['doc-replace']);
+    relabel(button, SAY['doc-choose-for'], { title: () => say(paper.title) });
     if (doc.status === 'APPROVED') {
       node.classList.add('is-done');
-      setPill('Accepted', 'ok');
-      detail.textContent = 'A reviewer has accepted this one.';
+      setPill('doc-accepted', 'ok');
+      write(detail, SAY['doc-accepted-note']);
     } else if (doc.status === 'REJECTED') {
       node.classList.add('is-bad');
-      setPill('Needs a new copy', 'bad');
+      setPill('doc-refused', 'bad');
       // The reviewer's reason, as they wrote it. Somebody who is not told why uploads the same
-      // photograph again, unchanged.
-      detail.textContent = doc.rejectionReason || 'Please upload another copy.';
+      // photograph again, unchanged — and it is theirs, so it is never rewritten in Arabic.
+      if (doc.rejectionReason) writeRaw(detail, doc.rejectionReason);
+      else write(detail, SAY['doc-refused-note']);
     } else {
-      setPill('Awaiting review', 'wait');
-      detail.textContent = 'Uploaded. Replace it any time before a decision.';
+      setPill('doc-waiting', 'wait');
+      write(detail, SAY['doc-waiting-note']);
     }
   }
 
@@ -1012,13 +1598,12 @@ function buildUploadRow(paper) {
     errorBox.hidden = true;
     busy = true;
     button.disabled = true;
-    setPill('Uploading…', 'wait');
+    setPill('doc-uploading', 'wait');
 
     try {
       show(await uploadDocument(paper.kind, file));
     } catch (e) {
-      errorBox.textContent = e.message;
-      errorBox.hidden = false;
+      showError(errorBox, e);
       // Back to whatever the row honestly is. A failed replacement changed nothing on the server,
       // so a row that already held an accepted document goes back to saying so rather than to
       // looking empty — the old document is still the one on file.
@@ -1027,7 +1612,7 @@ function buildUploadRow(paper) {
       } else {
         pill.hidden = true;
         node.classList.remove('is-done', 'is-bad');
-        detail.textContent = 'A photo or a PDF';
+        write(detail, SAY['doc-photo-or-pdf']);
       }
     } finally {
       busy = false;
@@ -1040,7 +1625,7 @@ function buildUploadRow(paper) {
 
 /** Bytes, in the units somebody would say out loud. */
 function megabytes(bytes) {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return t('megabytes', { n: (bytes / (1024 * 1024)).toFixed(1) });
 }
 
 function typeOf(file) {
@@ -1062,23 +1647,24 @@ function typeOf(file) {
  */
 async function uploadDocument(kind, file) {
   const contentType = typeOf(file);
-  if (!contentType) throw new Error('We take JPEG, PNG, WebP or PDF files.');
+  if (!contentType) throw new Said('doc-types');
 
   const presigned = await authFetch('/api/onboarding/applications/mine/documents/presign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind, contentType }),
   });
-  if (!presigned.ok) {
-    throw new Error(await messageFrom(presigned, 'We could not start that upload just now.'));
-  }
+  if (!presigned.ok) throw await failureFrom(presigned, 'doc-presign-failed');
   const ticket = await presigned.json();
 
   // Checked here rather than after the bytes have gone: the server would refuse the confirm
   // anyway, and by then somebody on a phone connection has uploaded the whole thing for nothing.
   if (ticket.maxSizeBytes && file.size > ticket.maxSizeBytes) {
-    throw new Error(`That file is ${megabytes(file.size)} and the limit is `
-        + `${megabytes(ticket.maxSizeBytes)}.`);
+    // Both sizes are read at the moment of writing, so the unit switches with the sentence.
+    throw new Said('doc-too-big', {
+      size: () => megabytes(file.size),
+      limit: () => megabytes(ticket.maxSizeBytes),
+    });
   }
 
   // No Authorization header on this one, deliberately: the URL carries its own signature, and
@@ -1088,7 +1674,7 @@ async function uploadDocument(kind, file) {
     headers: { 'Content-Type': ticket.contentType },
     body: file,
   });
-  if (!stored.ok) throw new Error('That upload did not finish. Please try again.');
+  if (!stored.ok) throw new Said('doc-put-failed');
 
   const confirmed = await authFetch(
     `/api/onboarding/applications/mine/documents/${ticket.fileId}/confirm`, {
@@ -1096,9 +1682,7 @@ async function uploadDocument(kind, file) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind }),
     });
-  if (!confirmed.ok) {
-    throw new Error(await messageFrom(confirmed, 'We could not file that document just now.'));
-  }
+  if (!confirmed.ok) throw await failureFrom(confirmed, 'doc-confirm-failed');
   return confirmed.json();
 }
 
@@ -1110,40 +1694,63 @@ $('check').addEventListener('click', async () => {
   if (!reference) return;
 
   line.hidden = false;
-  line.textContent = 'Checking…';
+  write(line, SAY.checking);
   try {
     const response = await fetch(
       `${API}/api/onboarding/applications/by-reference/${encodeURIComponent(reference)}`);
-    if (!response.ok) throw new Error('We could not find that reference.');
-    line.textContent = describe(await response.json());
+    if (!response.ok) throw new Said('status-unknown');
+    const [pair, fills] = describe(await response.json());
+    write(line, pair, fills);
   } catch (e) {
-    line.textContent = e.message;
+    showError(line, e);
   }
 });
 
-/** Plain words. An applicant should not have to know what PROVISIONED means. */
+/*
+  Plain words. An applicant should not have to know what PROVISIONED means.
+
+  Returns the pair and its blanks rather than a finished sentence, so the line it lands on can be
+  rewritten if the language changes while somebody is still reading it.
+*/
+const STATUS = {
+  SUBMITTED: {
+    en: 'Received — waiting for someone to read it.',
+    ar: 'وصلنا طلبك — بانتظار من يقرأه.',
+  },
+  IN_REVIEW: { en: 'Someone is reading it now.', ar: 'أحد المراجعين يقرأه الآن.' },
+  APPROVED: {
+    en: 'Approved. We are setting your account up.',
+    ar: 'تمّت الموافقة. نُجهّز حسابك الآن.',
+  },
+  PROVISIONED: {
+    en: 'Approved and ready — check your email to set a password.',
+    ar: 'تمّت الموافقة والحساب جاهز — راجع بريدك الإلكتروني لتعيين كلمة المرور.',
+  },
+  REJECTED: { en: 'Not this time: {reason}', ar: 'ليس هذه المرة: {reason}' },
+  // Honest rather than reassuring: somebody has to look at it, and saying "approved" would leave
+  // them waiting for an email that is not coming.
+  FAILED: {
+    en: 'Approved, but setting your account up did not finish. We are on it.',
+    ar: 'تمّت الموافقة، لكن تجهيز حسابك لم يكتمل. نحن نعمل على ذلك.',
+  },
+  UNKNOWN: { en: 'Status: {status}', ar: 'الحالة: {status}' },
+};
+
 function describe(application) {
-  switch (application.status) {
-    case 'SUBMITTED':
-      return 'Received — waiting for someone to read it.';
-    case 'IN_REVIEW':
-      return 'Someone is reading it now.';
-    case 'APPROVED':
-      return 'Approved. We are setting your account up.';
-    case 'PROVISIONED':
-      return 'Approved and ready — check your email to set a password.';
-    case 'REJECTED':
-      return `Not this time: ${application.rejectionReason}`;
-    case 'FAILED':
-      // Honest rather than reassuring: somebody has to look at it, and saying "approved" would
-      // leave them waiting for an email that is not coming.
-      return 'Approved, but setting your account up did not finish. We are on it.';
-    default:
-      return `Status: ${application.status}`;
-  }
+  const known = STATUS[application.status];
+  if (!known) return [STATUS.UNKNOWN, { status: application.status }];
+  // The reviewer's own reason rides in the blank and is not translated.
+  if (application.status === 'REJECTED') return [known, { reason: application.rejectionReason }];
+  return [known];
 }
 
 // ------------------------------------------------------------------ first paint
 
 applyWording();
 go('business');
+
+/*
+  Only Arabic needs applying on load, exactly as on the marketing site: the document already holds
+  its English, and the two calls above have just written the rest of it in English too.
+*/
+if (readStored() === 'ar') apply('ar');

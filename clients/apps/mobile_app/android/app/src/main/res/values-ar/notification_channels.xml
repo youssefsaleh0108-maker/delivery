@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Arabic names for the notification channels, shown in Android's own Settings screen.
+
+  Flutter localises everything inside the app; these four strings are the exception, because the
+  system draws them. Without this file an Arabic-speaking customer finds four English channel names
+  in their phone settings — the one place the app's bilingualism would visibly stop.
+-->
+<resources>
+    <string name="channel_orders_name">تحديثات الطلب</string>
+    <string name="channel_orders_desc">تم القبول، في الطريق، تم التوصيل.</string>
+
+    <string name="channel_chat_name">الرسائل</string>
+    <string name="channel_chat_desc">رسائل من السائق أو المتجر.</string>
+
+    <string name="channel_promotions_name">العروض</string>
+    <string name="channel_promotions_desc">الخصومات والعروض. مغلقة ما لم تطلبها.</string>
+
+    <string name="channel_account_name">الحساب والأمان</string>
+    <string name="channel_account_desc">رموز تسجيل الدخول والتغييرات على حسابك.</string>
+</resources>

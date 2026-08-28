@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.delivery.notifications.domain.NotificationCategory;
 import com.delivery.notifications.domain.NotificationLog;
 import com.delivery.notifications.domain.NotificationLogRepository;
 import com.delivery.notifications.domain.NotificationTemplate;
@@ -319,6 +320,18 @@ public class NotificationDispatchService {
             if (entry.getOrderId() != null) {
                 metadata.put("orderId", entry.getOrderId().toString());
             }
+
+            // The category, so a push can land on an Android channel that matches it.
+            //
+            // Without this every notification arrived on Firebase's fcm_fallback_notification_channel
+            // — one undifferentiated bucket, which is what a real handset showed. That is not
+            // cosmetic: Android's per-channel controls are how somebody mutes marketing while
+            // keeping "your rider is outside", and a single fallback channel makes the preference
+            // grid this service already enforces server-side unrepresentable on the device. The
+            // mapping is resolved HERE, from the same enum the preference check uses, so the
+            // channel a notification lands on and the category that decided whether to send it can
+            // never disagree.
+            metadata.put("category", NotificationCategory.forEventType(entry.getEventType()).name());
 
             // Where a tap should land: the typed pair (linkTarget, linkId) plus the canonical
             // string under `deepLink`. Both, not one.

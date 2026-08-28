@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What Android shows in Settings → Notifications for this app.
+
+  These are the user-facing names of the four channels NotificationChannels.kt creates. They are
+  resources rather than literals so the Arabic build names them in Arabic (values-ar), which is the
+  only place in the product where a string escapes Flutter's own localisation and lands in the
+  system UI instead.
+-->
+<resources>
+    <string name="channel_orders_name">Order updates</string>
+    <string name="channel_orders_desc">Accepted, on the way, delivered.</string>
+
+    <string name="channel_chat_name">Messages</string>
+    <string name="channel_chat_desc">Messages from your rider or the shop.</string>
+
+    <string name="channel_promotions_name">Offers</string>
+    <string name="channel_promotions_desc">Discounts and promotions. Off unless you ask for them.</string>
+
+    <string name="channel_account_name">Account and security</string>
+    <string name="channel_account_desc">Sign-in codes and changes to your account.</string>
+</resources>
