@@ -46,6 +46,12 @@ class OrderApi {
     /// PCI scope by never seeing one.
     String? paymentInstrumentToken,
 
+    /// How fast the customer asked for it. Standard is what the server assumes when absent —
+    /// sent explicitly all the same, like [paymentMethod], so the order records a choice the
+    /// customer actually made. The tier and nothing else: the EXPRESS premium is priced
+    /// server-side and comes back on the order as `expressSurcharge`.
+    DeliveryTier deliveryTier = DeliveryTier.standard,
+
     /// The map pin for [deliveryAddress], as the address picker resolved it. Both or neither —
     /// the server drops half a pair rather than route to the wrong hemisphere. Without a pin the
     /// order is placed and delivered exactly as before; what it does not get is a live ETA.
@@ -68,6 +74,7 @@ class OrderApi {
         if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
         'paymentMethod': paymentMethod.wire,
+        'deliveryTier': deliveryTier.wire,
         if (promoCode != null && promoCode.isNotEmpty) 'promoCode': promoCode,
         if (paymentInstrumentToken != null && paymentInstrumentToken.isNotEmpty)
           'paymentInstrumentToken': paymentInstrumentToken,

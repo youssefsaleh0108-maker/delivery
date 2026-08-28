@@ -62,6 +62,33 @@ class TrackingApi {
     return RiderPresence.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// The rider's own hours online, day by day. DELIVERY only; the rider is the token subject.
+  ///
+  /// [days] is 1..30 and out of range is a 400 — this service refuses rather than clamping, unlike
+  /// the order-manager daily series. The response carries ONLY dates with on-duty time
+  /// ([HoursOnline.days] can be empty); the screen draws its own zeros across the window.
+  Future<HoursOnline> myDutyHours({int days = 7}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/riders/me/duty/hours',
+      queryParameters: <String, dynamic>{'days': days},
+    );
+    return HoursOnline.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// One rider's hours online, by their Keycloak subject. BACKOFFICE (any rider) or CARRIER
+  /// (their own fleet, resolved from the caller's membership — never the request).
+  ///
+  /// For a carrier, a foreign rider and an unknown rider return the IDENTICAL 404 — riders are not
+  /// enumerable across fleets, so a 404 here means "nobody you can see", nothing more. A CARRIER
+  /// with no company gets 403. History starts at the feature's migration; nothing is backfilled.
+  Future<HoursOnline> riderDutyHours(String riderId, {int days = 7}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/riders/$riderId/duty/hours',
+      queryParameters: <String, dynamic>{'days': days},
+    );
+    return HoursOnline.fromJson(response.data as Map<String, dynamic>);
+  }
+
   // ---------------------------------------------------------------- location
 
   /// Reports where this rider is while holding no job.

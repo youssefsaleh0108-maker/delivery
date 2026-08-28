@@ -233,3 +233,79 @@ class RiderPresence {
   static DateTime? _date(Object? value) =>
       value is String ? DateTime.tryParse(value)?.toLocal() : null;
 }
+
+/// One date's on-duty time, mirroring the duty-hours `DayOnline` rows.
+class DutyDay {
+  const DutyDay({
+    required this.date,
+    required this.secondsOnline,
+    required this.hoursOnline,
+    required this.sessions,
+  });
+
+  /// A plain date in the report's zone ([HoursOnline.zone]) — the server already decided which day
+  /// each shift belongs to; keep its label rather than shifting it by the viewer's offset.
+  final DateTime date;
+
+  /// The exact figure. Use THIS for any arithmetic — totals, averages, comparisons.
+  final int secondsOnline;
+
+  /// [secondsOnline] / 3600 at 2dp, computed server-side. Use for display only; adding rounded
+  /// numbers up is how a week comes to 39.99 hours.
+  final double hoursOnline;
+
+  /// Distinct shifts touching this date. A shift across midnight counts on both dates.
+  final int sessions;
+
+  factory DutyDay.fromJson(Map<String, dynamic> json) => DutyDay(
+        date: DateTime.parse(json['date'] as String),
+        secondsOnline: (json['secondsOnline'] as num?)?.toInt() ?? 0,
+        hoursOnline: (json['hoursOnline'] as num?)?.toDouble() ?? 0,
+        sessions: (json['sessions'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// A rider's hours-online report, mirroring the duty-hours `HoursOnline` response.
+///
+/// [days] carries ONLY dates with on-duty time, ascending, and is empty when there were none — the
+/// client draws its own zeros across the [from]..[to] window. The opposite convention from the
+/// daily trade series, which is zero-filled; read each contract's note.
+///
+/// The figures are live at the near edge: an open shift counts up to now while the rider is
+/// pinging, and only to their last sighting once quiet — so a number can grow on refresh but never
+/// shrink.
+class HoursOnline {
+  const HoursOnline({
+    required this.riderId,
+    required this.zone,
+    required this.from,
+    required this.to,
+    required this.days,
+  });
+
+  final String riderId;
+
+  /// The zone the days were split in, echoed so the client never guesses which midnight a
+  /// 23:00–01:00 shift straddled.
+  final String zone;
+
+  /// The requested window, inclusive; [to] is today in [zone].
+  final DateTime from;
+  final DateTime to;
+
+  final List<DutyDay> days;
+
+  /// The window's total, from the exact figures.
+  int get totalSecondsOnline =>
+      days.fold(0, (int sum, DutyDay d) => sum + d.secondsOnline);
+
+  factory HoursOnline.fromJson(Map<String, dynamic> json) => HoursOnline(
+        riderId: json['riderId'] as String,
+        zone: json['zone'] as String? ?? 'UTC',
+        from: DateTime.parse(json['from'] as String),
+        to: DateTime.parse(json['to'] as String),
+        days: (json['days'] as List<dynamic>? ?? <dynamic>[])
+            .map((dynamic d) => DutyDay.fromJson(d as Map<String, dynamic>))
+            .toList(),
+      );
+}

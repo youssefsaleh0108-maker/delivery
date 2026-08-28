@@ -62,6 +62,31 @@ enum OrderAction {
       };
 }
 
+/// How fast the customer asked for it, mirroring `com.delivery.order.domain.DeliveryTier`.
+///
+/// Chosen at placement and never changed afterwards. There is no surcharge in the request and never
+/// will be: the EXPRESS premium is priced server-side from configuration and snapshotted onto the
+/// order, which is where [DeliveryOrder.expressSurcharge] comes from.
+enum DeliveryTier {
+  /// The default. An order that says nothing about tier is a standard order, which is exactly what
+  /// the server assumes.
+  standard('STANDARD', 'Standard'),
+
+  /// Jumped the queue for a fixed premium. The premium is platform revenue: it is charged even
+  /// when the base delivery fee is waived, because the waiver covers the delivery, not the hurry.
+  express('EXPRESS', 'Express');
+
+  const DeliveryTier(this.wire, this.label);
+
+  final String wire;
+  final String label;
+
+  static DeliveryTier fromWire(String? value) => DeliveryTier.values.firstWhere(
+        (DeliveryTier t) => t.wire == value,
+        orElse: () => DeliveryTier.standard,
+      );
+}
+
 /// How an order is paid for, mirroring `com.delivery.order.domain.Payment.Method`.
 ///
 /// [cash] is the only method that moves real money today. [card] and [wallet] are fully wired —
@@ -160,6 +185,8 @@ class DeliveryOrder {
     this.subtotal,
     this.deliveryFee = 0,
     this.deliveryFeeCharged = 0,
+    this.deliveryTier = DeliveryTier.standard,
+    this.expressSurcharge = 0,
     this.deliveryFeeWaived = false,
     this.merchantFeeWaived = false,
     this.carrierFeeWaived = false,
@@ -200,6 +227,17 @@ class DeliveryOrder {
   /// Separate from [deliveryFee] because a receipt that adds up the cost against the total does
   /// not balance on a waived order. Rendering the cost as though it were charged was a real bug.
   final double deliveryFeeCharged;
+
+  /// How fast the customer asked for it. Standard on every order placed before tiers existed.
+  final DeliveryTier deliveryTier;
+
+  /// What the hurry cost: zero on a STANDARD order, the snapshotted premium on EXPRESS.
+  ///
+  /// Inside [totalAmount] but NOT inside [deliveryFee] — a receipt itemises it as its own line
+  /// ("Express +2.00"), and it stays payable even when the base fee is waived, because the waiver
+  /// covers the delivery rather than the premium. Never add it to a merchant or carrier payout
+  /// figure: it is platform revenue.
+  final double expressSurcharge;
 
   /// The platform absorbed the delivery fee. Worth saying on screen — a customer who is not told
   /// they were given something has not been given anything that changes their behaviour.
@@ -273,6 +311,8 @@ class DeliveryOrder {
         // placed before this field shipped genuinely paid.
         deliveryFeeCharged: (json['deliveryFeeCharged'] as num?)?.toDouble()
             ?? (json['deliveryFee'] as num?)?.toDouble() ?? 0,
+        deliveryTier: DeliveryTier.fromWire(json['deliveryTier'] as String?),
+        expressSurcharge: (json['expressSurcharge'] as num?)?.toDouble() ?? 0,
         deliveryFeeWaived: json['deliveryFeeWaived'] as bool? ?? false,
         merchantFeeWaived: json['merchantFeeWaived'] as bool? ?? false,
         carrierFeeWaived: json['carrierFeeWaived'] as bool? ?? false,

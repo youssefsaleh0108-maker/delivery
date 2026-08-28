@@ -12,6 +12,17 @@ import '../auth/auth_service.dart';
 abstract final class ApiClient {
   static const String correlationIdHeader = 'X-Correlation-Id';
 
+  /// Marks a request that must go out WITHOUT the bearer token.
+  ///
+  /// Set it as `Options(extra: {ApiClient.skipAuth: true})`. Almost nothing needs this — the one
+  /// caller is the partner job board, which authenticates by `X-API-Key` alone. Sending a stray
+  /// `Authorization` header there is not harmless: the partner path is permit-all in the JWT chain,
+  /// so a token that happens to be expired would be rejected by the resource server before the key
+  /// filter ever ran, failing a request the key alone would have served.
+  ///
+  /// Absent (the default), every request behaves exactly as it always has.
+  static const String skipAuth = 'delivery.skipAuth';
+
   static Dio create({
     required String baseUrl,
     required AuthService authService,
@@ -71,7 +82,7 @@ class _AuthInterceptor extends QueuedInterceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final AuthSession? session = _authService.session;
-    if (session != null) {
+    if (session != null && options.extra[ApiClient.skipAuth] != true) {
       options.headers['Authorization'] = 'Bearer ${session.accessToken}';
     }
     handler.next(options);
@@ -81,8 +92,11 @@ class _AuthInterceptor extends QueuedInterceptor {
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     final bool isUnauthorised = err.response?.statusCode == 401;
     final bool alreadyRetried = err.requestOptions.extra['delivery.retried'] == true;
+    // A key-authenticated request's 401 means the KEY was refused. Refreshing the human session
+    // would not change that, and retrying would just present the same rejected key again.
+    final bool skipsAuth = err.requestOptions.extra[ApiClient.skipAuth] == true;
 
-    if (!isUnauthorised || alreadyRetried || _authService.session == null) {
+    if (!isUnauthorised || alreadyRetried || skipsAuth || _authService.session == null) {
       return handler.next(err);
     }
 
