@@ -26,6 +26,7 @@ class MerchantShell extends StatefulWidget {
     required this.orderApi,
     required this.storeApi,
     required this.catalogApi,
+    this.prefsApi,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -39,6 +40,9 @@ class MerchantShell extends StatefulWidget {
 
   /// The catalogue behind the Products tab.
   final CatalogApi catalogApi;
+
+  /// Handed to the settings page's notification-preferences grid; null leaves the row undrawn.
+  final NotificationPrefsApi? prefsApi;
 
   final AuthSession session;
 
@@ -154,6 +158,7 @@ class _MerchantShellState extends State<MerchantShell> {
       builder: (_) => SettingsScreen(
         locale: widget.locale,
         userId: widget.session.subject,
+        prefsApi: widget.prefsApi,
       ),
     ));
   }

@@ -36,6 +36,7 @@ class AccountScreen extends StatefulWidget {
     this.locale,
     this.inbox,
     this.onOpenOrders,
+    this.prefsApi,
   });
 
   final AuthSession session;
@@ -53,6 +54,9 @@ class AccountScreen extends StatefulWidget {
 
   /// Jumps to the Orders tab from the Order History row.
   final VoidCallback? onOpenOrders;
+
+  /// The per-category notification grid. Null leaves the preferences row undrawn.
+  final NotificationPrefsApi? prefsApi;
 
   @override
   State<AccountScreen> createState() => _AccountScreenState();
@@ -248,16 +252,18 @@ class _AccountScreenState extends State<AccountScreen> {
         value: _addressSummary(t),
         onTap: () => showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi),
       ),
-      // Drawn as designed and inert: cash is the only method the platform settles, so a payment
-      // methods screen would have nothing to manage.
-      YdComingSoon.wrap(
-        label: t.custSoon,
-        child: YdListRow(
-          icon: Icons.credit_card,
-          title: t.custPaymentMethods,
-          value: PaymentMethod.cash.labelIn(t),
-          trailing: const SizedBox.shrink(),
-        ),
+      // Live now that checkout takes all three. Informational rather than a management screen on
+      // purpose: there is nothing to add or remove yet — cash needs no setup and card/wallet run
+      // against the dev provider — so the row states what checkout offers and the subtitle says
+      // plainly that non-cash is a test rail. A management screen arrives with a real processor,
+      // where stored instruments exist to manage.
+      YdListRow(
+        icon: Icons.credit_card,
+        title: t.custPaymentMethods,
+        value:
+            '${PaymentMethod.cash.labelIn(t)} · ${PaymentMethod.card.labelIn(t)} · ${t.paymentWallet}',
+        subtitle: t.paymentTestModeNote,
+        trailing: const SizedBox.shrink(),
       ),
       if (widget.onOpenOrders != null)
         YdListRow(
@@ -272,6 +278,18 @@ class _AccountScreenState extends State<AccountScreen> {
           value: widget.inbox!.unread > 0 ? '${widget.inbox!.unread}' : null,
           onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
             builder: (_) => NotificationsScreen(inbox: widget.inbox!),
+          )),
+        ),
+      // The per-category grid, distinct from the inbox above: one is what arrived, the other is
+      // what is allowed to arrive. Only drawn when the shell handed over the API — this page is
+      // the customer's whole settings surface, so leaving the row out here would leave customers
+      // no road to their preferences at all.
+      if (widget.prefsApi != null)
+        YdListRow(
+          icon: Icons.tune,
+          title: t.notifPreferences,
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => NotificationPrefsScreen(api: widget.prefsApi!),
           )),
         ),
       // Kept from the settings screen this page absorbs, and deliberately not dropped for being

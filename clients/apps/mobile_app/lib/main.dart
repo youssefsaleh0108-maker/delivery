@@ -114,6 +114,26 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// exists, and the pending screen reads and corrects them while the application waits.
   late final DocumentsApi _documentsApi = DocumentsApi(_dio);
   late final NotificationApi _notificationApi = NotificationApi(_dio);
+
+  // The capability APIs. Every screen takes these as OPTIONAL parameters — null renders the
+  // feature's honest inert state — which is what let the screens land in parallel without breaking
+  // each other's compile. The cost of that pattern is that nothing fails when the wiring is
+  // forgotten: the first installed build of the wired app shipped with all of these missing HERE,
+  // every screen quietly fell back to its "coming soon" chip, and analyze, tests and the build
+  // were green throughout because tests inject their own. This block is the single point where
+  // the app decides those features exist. Removing a line here turns the feature off everywhere,
+  // silently — treat it like the release switch it is.
+  late final TrackingApi _trackingApi = TrackingApi(_dio);
+  late final PromoApi _promoApi = PromoApi(_dio);
+  late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
+  late final RiderMoneyApi _riderMoneyApi = RiderMoneyApi(_dio);
+  late final ChatApi _chatApi = ChatApi(_dio);
+  late final NotificationPrefsApi _prefsApi = NotificationPrefsApi(_dio);
+
+  /// One socket for the session's live frames (chat, and whatever joins it later). Lazy, so a
+  /// build that never reaches a chat screen never opens a connection.
+  late final UserQueueSocket _socket =
+      UserQueueSocket(apiBaseUrl: Uri.parse(_apiBaseUrl), auth: _authService);
   late final ButlerApi _butlerApi = ButlerApi(_dio);
   /// The area list the address sheet offers. Nullable nowhere: a deployment with no areas
   /// configured simply gets an empty list and no picker.
@@ -327,6 +347,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       notificationApi: _notificationApi,
       butlerApi: _butlerApi,
       zoneApi: _zoneApi,
+      promoApi: _promoApi,
+      geocodingApi: _geocodingApi,
+      trackingApi: _trackingApi,
+      chatApi: _chatApi,
+      prefsApi: _prefsApi,
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,
@@ -522,6 +547,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             return RiderHomeScreen(
               api: _orderApi,
               butlerApi: _butlerApi,
+              trackingApi: _trackingApi,
+              moneyApi: _riderMoneyApi,
+              chatApi: _chatApi,
+              socket: _socket,
+              prefsApi: _prefsApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,
@@ -538,6 +568,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               orderApi: _orderApi,
               storeApi: _storeApi,
               catalogApi: _catalogApi,
+              prefsApi: _prefsApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,

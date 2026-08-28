@@ -95,12 +95,14 @@ public class TrackingPartitionMaintenance {
             int rolledUp = rollUpExpired();
             int dropped = dropExpired();
             int dutyEventsRemoved = expireDutyEvents();
+            int dutySessionsRemoved = expireDutySessions();
 
-            if (created > 0 || dropped > 0 || dutyEventsRemoved > 0) {
+            if (created > 0 || dropped > 0 || dutyEventsRemoved > 0 || dutySessionsRemoved > 0) {
                 log.info("Tracking partitions: {} created, {} days rolled up, {} dropped "
-                                + "(retention {} days); {} duty events expired (retention {} days)",
+                                + "(retention {} days); {} duty events and {} duty sessions "
+                                + "expired (retention {} days)",
                         created, rolledUp, dropped, retentionDays,
-                        dutyEventsRemoved, dutyEventRetentionDays);
+                        dutyEventsRemoved, dutySessionsRemoved, dutyEventRetentionDays);
             }
         } catch (Exception e) {
             // Never propagate out of a scheduled method: an exception here cancels all future runs
@@ -197,6 +199,23 @@ public class TrackingPartitionMaintenance {
     private int expireDutyEvents() {
         Instant cutoff = Instant.now().minus(Duration.ofDays(dutyEventRetentionDays));
         return jdbc.update("DELETE FROM rider_duty_events WHERE occurred_at < ?",
+                Timestamp.from(cutoff));
+    }
+
+    /**
+     * Retires old duty sessions under the same retention as the duty events they were built from —
+     * the two describe the same shift boundaries and must age out together, or one table would
+     * claim shifts the other has forgotten.
+     *
+     * <p>Only closed sessions are eligible. An open session past the retention window could only
+     * exist if the expiry sweep in {@code DutySessionService} had been broken for over a year, and
+     * even then deleting an open shift would silently destroy the record that it was never closed
+     * — the one fact somebody debugging that breakage would need.
+     */
+    private int expireDutySessions() {
+        Instant cutoff = Instant.now().minus(Duration.ofDays(dutyEventRetentionDays));
+        return jdbc.update(
+                "DELETE FROM duty_sessions WHERE ended_at IS NOT NULL AND started_at < ?",
                 Timestamp.from(cutoff));
     }
 

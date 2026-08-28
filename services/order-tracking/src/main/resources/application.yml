@@ -122,8 +122,25 @@ delivery:
         profile: mapbox/driving-traffic
 
     # Shift boundaries are kept far longer than raw GPS: payroll and late disputes ask about them
-    # months later, and the table is a few rows per rider per day rather than millions.
+    # months later, and the table is a few rows per rider per day rather than millions. The same
+    # retention covers duty_sessions — the intervals are built from the same boundaries and age out
+    # together.
     duty-event-retention-days: 400
+
+    duty-session:
+      # The zone whose midnights split a shift into per-day hours. One zone platform-wide, because
+      # payroll and every console must agree on what "Tuesday" means; it is echoed on every
+      # hours-online response so no client has to guess.
+      day-zone: UTC
+      # How long a rider must be silent before an open shift is given up on. Deliberately hours
+      # where the presence ttl above is seconds: a STALE rider staying visible on the roster is a
+      # feature (the dispatcher is meant to notice), so expiry fires only long after anyone
+      # watching had the chance. Whenever it fires, the session closes at the rider's last
+      # sighting, not at the sweep run — silence is never credited as hours.
+      expire-after: 4h
+      # How often the sweep looks. Only bounds how promptly abandonment is noticed; the closed
+      # session's end is the last sighting regardless. ISO-8601 because @Scheduled reads it raw.
+      sweep-interval: PT15M
 
 management:
   endpoints:

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.domain.ContactVerification;
 import com.delivery.onboarding.domain.ContactVerification.Channel;
+import com.delivery.onboarding.domain.ContactVerification.Purpose;
 import com.delivery.onboarding.domain.ContactVerificationRepository;
 
 /**
@@ -74,6 +76,18 @@ public class VerificationService {
         }
     }
 
+    /**
+     * Thrown when the relay refused the message. A subtype so a caller can tell "your input is
+     * wrong" from "our sending is down": the sign-up form surfaces both, but the password-reset
+     * endpoint must swallow this one — answering differently when the relay fails would answer
+     * differently only for addresses that have an account, which is the fact it must not reveal.
+     */
+    public static class CodeSendFailedException extends VerificationException {
+        public CodeSendFailedException(String message) {
+            super(message);
+        }
+    }
+
     // ---------------------------------------------------------------- sending
 
     /**
@@ -85,6 +99,27 @@ public class VerificationService {
      */
     @Transactional
     public Instant request(Channel channel, String rawDestination) {
+        return request(channel, rawDestination, Purpose.SIGNUP, () -> true);
+    }
+
+    /**
+     * A password-reset challenge, recorded whether or not the address has an account.
+     *
+     * <p>The shape of this method is the anti-enumeration property. The challenge row is saved and
+     * the limits are counted for <em>every</em> request, so a cooldown refusal, a daily-cap
+     * refusal and a 202 all behave identically for an address with an account and one without —
+     * the only difference is whether a message actually leaves, which the caller cannot observe.
+     * {@code accountExists} is a supplier rather than a boolean so the account lookup runs only
+     * after the limits have passed: the limits are this endpoint's shield, and the lookup should
+     * sit behind them, not in front.
+     */
+    @Transactional
+    public Instant requestPasswordReset(String rawEmail, BooleanSupplier accountExists) {
+        return request(Channel.EMAIL, rawEmail, Purpose.PASSWORD_RESET, accountExists);
+    }
+
+    private Instant request(Channel channel, String rawDestination, Purpose purpose,
+                            BooleanSupplier deliverable) {
         String destination = normalise(channel, rawDestination);
 
         Instant now = Instant.now();
@@ -104,35 +139,51 @@ public class VerificationService {
                     "That address has been sent too many codes today. Try again tomorrow.");
         }
 
-        ContactVerification.Issued issued = ContactVerification.issue(channel, destination);
+        ContactVerification.Issued issued = ContactVerification.issue(channel, destination, purpose);
         // Saved before sending. A code that goes out and was never recorded cannot be confirmed,
         // which is the one failure the person holding it can do nothing about.
         verifications.saveAndFlush(issued.verification());
 
-        deliver(channel, destination, issued.code());
-
-        log.info("Verification code sent on {} (attempt {} today)", channel, today + 1);
+        if (deliverable.getAsBoolean()) {
+            deliver(channel, destination, purpose, issued.code());
+            log.info("{} code sent on {} (attempt {} today)", purpose, channel, today + 1);
+        } else {
+            // A reset asked for on an address with no account. The challenge above was still
+            // recorded so the limits and the response stay identical either way; the code it holds
+            // was never sent and cannot be guessed, so nothing can be done with the row.
+            log.info("{} code recorded but not sent on {} (attempt {} today)",
+                    purpose, channel, today + 1);
+        }
         return issued.verification().getExpiresAt();
     }
 
-    private void deliver(Channel channel, String destination, String code) {
+    private void deliver(Channel channel, String destination, Purpose purpose, String code) {
         long minutes = ContactVerification.LIFETIME.toMinutes();
+
+        String act = purpose == Purpose.PASSWORD_RESET
+                ? "reset your YouDrop passcode"
+                : "confirm your email address for YouDrop";
 
         // The code stands alone on the first line, and everything else follows in prose. That shape
         // is what makes both renderings work: the email layout shows a lone short code as a code
         // block, and on a phone the first thing in the notification preview is the code itself,
         // which is the only part anybody actually wants.
         String emailBody = code + "\n\n"
-                + "Use this code to confirm your email address for YouDrop."
+                + "Use this code to " + act + "."
                 + " It expires in " + minutes + " minutes and can be used once.\n\n"
                 + "If you did not ask for this code, no action is needed —"
-                + " somebody may have typed your address by mistake."
+                + (purpose == Purpose.PASSWORD_RESET
+                        ? " your passcode has not changed."
+                        : " somebody may have typed your address by mistake.")
                 + " Do not share it with anyone; YouDrop will never ask you for it.";
 
         // SMS is one line: no layout renders it, and a message split across several parts costs
         // more and can arrive out of order.
         String smsBody = code + " is your YouDrop verification code. It expires in "
                 + minutes + " minutes. Never share it with anyone.";
+
+        String notifyPurpose = purpose == Purpose.PASSWORD_RESET
+                ? "onboarding.password-reset" : "onboarding.verification";
 
         try {
             if (channel == Channel.EMAIL) {
@@ -141,18 +192,20 @@ public class VerificationService {
                 // mail, which is the fastest path for the person who asked for it and also visible
                 // to anyone looking at their screen. Every large provider makes the same call, and
                 // the code is already in the body, so this adds no exposure inside our own logs.
-                platform.notifyDirect("EMAIL", destination,
-                        code + " is your YouDrop verification code",
-                        emailBody, "onboarding.verification");
+                String subject = purpose == Purpose.PASSWORD_RESET
+                        ? code + " is your YouDrop passcode reset code"
+                        : code + " is your YouDrop verification code";
+                platform.notifyDirect("EMAIL", destination, subject, emailBody, notifyPurpose);
             } else {
-                platform.notifyDirect("SMS", destination, null, smsBody, "onboarding.verification");
+                platform.notifyDirect("SMS", destination, null, smsBody, notifyPurpose);
             }
         } catch (Exception e) {
             // Told plainly rather than reported as success. "We have sent you a code" is a promise,
             // and a screen that makes it while the send failed leaves somebody waiting for a
-            // message that is never coming.
+            // message that is never coming. (The password-reset path deliberately swallows this
+            // subtype — see CodeSendFailedException for why.)
             log.error("Could not send a verification code on {}", channel, e);
-            throw new VerificationException(
+            throw new CodeSendFailedException(
                     "We could not send the code just now. Please try again in a moment.");
         }
     }
@@ -166,10 +219,22 @@ public class VerificationService {
      */
     @Transactional
     public Confirmed confirm(Channel channel, String rawDestination, String code) {
+        return confirm(channel, rawDestination, code, Purpose.SIGNUP);
+    }
+
+    /**
+     * The purpose-aware form. The lookup itself filters by purpose, which is what makes a
+     * password-reset code worthless on the sign-up form and the reverse: a code answered against
+     * the wrong purpose simply finds no challenge, and is refused in the same words as a wrong
+     * code so the caller learns nothing from the difference.
+     */
+    @Transactional
+    public Confirmed confirm(Channel channel, String rawDestination, String code, Purpose purpose) {
         String destination = normalise(channel, rawDestination);
 
         ContactVerification verification = verifications
-                .findFirstByChannelAndDestinationOrderByCreatedAtDesc(channel, destination)
+                .findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+                        channel, destination, purpose)
                 // Worded the same as a wrong code, deliberately. "No code was requested for that
                 // address" tells a stranger which addresses are mid-application, which is a fact
                 // about somebody else that they asked for by guessing.
@@ -206,6 +271,18 @@ public class VerificationService {
      */
     @Transactional
     public Instant consume(String token, Channel channel, String expectedDestination) {
+        return consume(token, channel, expectedDestination, Purpose.SIGNUP);
+    }
+
+    /**
+     * The purpose-aware form. The purpose check mirrors the destination check above it and exists
+     * for the same reason: a proof earned for one act must not be spendable on another. Without it
+     * a password-reset token — earned by holding an inbox for ten minutes — would stand in for the
+     * sign-up verification an application requires.
+     */
+    @Transactional
+    public Instant consume(String token, Channel channel, String expectedDestination,
+                           Purpose purpose) {
         String destination = normalise(channel, expectedDestination);
 
         ContactVerification verification = verifications.findByToken(token)
@@ -217,6 +294,10 @@ public class VerificationService {
                 || !verification.getDestination().equals(destination)) {
             throw new VerificationException(
                     "That verification was for a different " + channel.name().toLowerCase(Locale.ROOT));
+        }
+        if (verification.getPurpose() != purpose) {
+            throw new VerificationException(
+                    "That verification was for something else. Please verify again.");
         }
         if (!verification.isUsable()) {
             throw new VerificationException(
@@ -234,6 +315,9 @@ public class VerificationService {
         return verifications.findByToken(token)
                 .filter(ContactVerification::isUsable)
                 .filter(v -> v.getChannel() == channel)
+                // Sign-up proofs only. This backs sign-up forms, and a reset token must read as
+                // unverified there for the same reason consume refuses it.
+                .filter(v -> v.getPurpose() == Purpose.SIGNUP)
                 .filter(v -> v.getDestination().equals(normalise(channel, destination)))
                 .isPresent();
     }

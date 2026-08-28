@@ -142,6 +142,12 @@ delivery:
       # list is safe while removing that check is not — this would create Keycloak accounts on any
       # address a stranger typed.
       - /api/onboarding/signup
+      # Forgot-password, open by the same necessity: the caller is somebody who cannot sign in.
+      # What stands in for authentication is the one-time code sent to the account's own address,
+      # with the same limits as the verification endpoints above. The request endpoint answers 202
+      # for known and unknown addresses alike, so it cannot be used to enumerate accounts.
+      - /api/onboarding/password-reset
+      - /api/onboarding/password-reset/confirm
 
   onboarding:
     verification:

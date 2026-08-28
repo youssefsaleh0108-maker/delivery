@@ -32,7 +32,11 @@ public class RiderDutyEvent {
         RIDER,
         /** A backoffice operator, e.g. ending an abandoned shift. */
         BACKOFFICE,
-        /** The platform itself. Reserved for automatic expiry, which is not written today. */
+        /**
+         * The platform itself — the staleness sweep ending the shift of a rider who went silent.
+         * See {@code DutySessionService#expireAbandoned} for why the paired session closes at the
+         * rider's last sighting while this event carries the sweep's own time.
+         */
         SYSTEM
     }
 

@@ -16,6 +16,18 @@ public interface ContactVerificationRepository extends JpaRepository<ContactVeri
             ContactVerification.Channel channel, String destination);
 
     /**
+     * The live challenge for one purpose only.
+     *
+     * <p>This is the lookup the confirm step uses, and the purpose in it is not decoration: it is
+     * what makes a password-reset code unable to verify a sign-up and the reverse. The
+     * purpose-less variant above stays for the resend cooldown, which deliberately counts every
+     * recent send to a destination regardless of why it was sent.
+     */
+    Optional<ContactVerification> findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+            ContactVerification.Channel channel, String destination,
+            ContactVerification.Purpose purpose);
+
+    /**
      * How many codes this address has been sent recently.
      *
      * <p>This is the rate limit, and it is the difference between a verification endpoint and a

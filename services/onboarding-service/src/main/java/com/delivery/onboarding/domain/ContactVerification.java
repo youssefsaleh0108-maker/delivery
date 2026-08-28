@@ -39,6 +39,18 @@ public class ContactVerification {
     public enum Channel { EMAIL, PHONE }
 
     /**
+     * What answering this code is allowed to accomplish.
+     *
+     * <p>A code is proof that somebody holds an inbox <em>right now</em>, and the two things that
+     * proof unlocks are very different acts: {@link #SIGNUP} lets an application or an account name
+     * the address, {@link #PASSWORD_RESET} replaces the passcode of an account that already exists.
+     * Without this field the two would be interchangeable — a reset code answered on the sign-up
+     * form would verify an address for an application, and a sign-up code would reset a passcode.
+     * Every lookup that resolves a challenge therefore matches on purpose as well as destination.
+     */
+    public enum Purpose { SIGNUP, PASSWORD_RESET }
+
+    /**
      * Six digits.
      *
      * <p>Short enough to be read from a notification and typed without a mistake, which is not a
@@ -66,6 +78,10 @@ public class ContactVerification {
 
     @Column(name = "destination", nullable = false, updatable = false, length = 255)
     private String destination;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, updatable = false, length = 32)
+    private Purpose purpose = Purpose.SIGNUP;
 
     @Column(name = "code_hash", nullable = false, updatable = false, length = 64)
     private String codeHash;
@@ -95,10 +111,11 @@ public class ContactVerification {
         // for JPA
     }
 
-    private ContactVerification(Channel channel, String destination, String code) {
+    private ContactVerification(Channel channel, String destination, Purpose purpose, String code) {
         this.id = UUID.randomUUID();
         this.channel = channel;
         this.destination = destination;
+        this.purpose = purpose;
         this.salt = randomBase64(12);
         this.codeHash = hash(code, this.salt);
         this.attempts = 0;
@@ -114,8 +131,13 @@ public class ContactVerification {
      * there were a getter for it.
      */
     public static Issued issue(Channel channel, String destination) {
+        return issue(channel, destination, Purpose.SIGNUP);
+    }
+
+    /** A challenge for a stated purpose. See {@link Purpose} for why the two cannot be swapped. */
+    public static Issued issue(Channel channel, String destination, Purpose purpose) {
         String code = randomCode();
-        return new Issued(new ContactVerification(channel, destination, code), code);
+        return new Issued(new ContactVerification(channel, destination, purpose, code), code);
     }
 
     public record Issued(ContactVerification verification, String code) {
@@ -219,6 +241,10 @@ public class ContactVerification {
 
     public String getDestination() {
         return destination;
+    }
+
+    public Purpose getPurpose() {
+        return purpose;
     }
 
     public String getToken() {

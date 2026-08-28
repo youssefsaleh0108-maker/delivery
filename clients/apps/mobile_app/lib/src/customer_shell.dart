@@ -22,6 +22,11 @@ class CustomerShell extends StatefulWidget {
     required this.butlerApi,
     required this.zoneApi,
     required this.offerApi,
+    this.promoApi,
+    this.geocodingApi,
+    this.trackingApi,
+    this.chatApi,
+    this.prefsApi,
     required this.session,
     required this.locale,
     required this.onSignOut,
@@ -33,6 +38,15 @@ class CustomerShell extends StatefulWidget {
   final ButlerApi butlerApi;
   final DeliveryZoneApi zoneApi;
   final OfferApi offerApi;
+
+  // The capability APIs, optional like everywhere else — but this shell is the ONLY road from
+  // main.dart to the customer screens, so a null here is a feature dark for every customer.
+  // main.dart passes all five; the nullability exists for tests, not for the app.
+  final PromoApi? promoApi;
+  final GeocodingApi? geocodingApi;
+  final TrackingApi? trackingApi;
+  final ChatApi? chatApi;
+  final NotificationPrefsApi? prefsApi;
   final AuthSession session;
 
   /// Passed to the home screen for the language toggle in the app bar.
@@ -116,6 +130,7 @@ class _CustomerShellState extends State<CustomerShell> {
           storeApi: widget.storeApi,
           zoneApi: widget.zoneApi,
           orderApi: widget.orderApi,
+          prefsApi: widget.prefsApi,
           cart: _cart,
           addresses: _addresses,
           inbox: _inbox,
@@ -127,6 +142,8 @@ class _CustomerShellState extends State<CustomerShell> {
         return MyOrdersScreen(
           api: widget.orderApi,
           storeApi: widget.storeApi,
+          trackingApi: widget.trackingApi,
+          chatApi: widget.chatApi,
           cart: _cart,
         );
       case CustomerNavBar.butlerIndex:
@@ -136,6 +153,8 @@ class _CustomerShellState extends State<CustomerShell> {
           api: widget.butlerApi,
           orderApi: widget.orderApi,
           storeApi: widget.storeApi,
+          trackingApi: widget.trackingApi,
+          chatApi: widget.chatApi,
           cart: _cart,
         );
       case CustomerNavBar.basketIndex:
@@ -145,6 +164,8 @@ class _CustomerShellState extends State<CustomerShell> {
           orderApi: widget.orderApi,
           offerApi: widget.offerApi,
           zoneApi: widget.zoneApi,
+          promoApi: widget.promoApi,
+          geocodingApi: widget.geocodingApi,
           onOrderPlaced: () => _open(CustomerNavBar.ordersIndex),
         );
       case CustomerNavBar.accountIndex:
@@ -158,6 +179,7 @@ class _CustomerShellState extends State<CustomerShell> {
           // shell owns rather than something the screen can reach on its own.
           locale: widget.locale,
           inbox: _inbox,
+          prefsApi: widget.prefsApi,
           onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
         );
       default:

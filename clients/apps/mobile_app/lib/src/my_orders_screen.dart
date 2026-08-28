@@ -20,6 +20,8 @@ class MyOrdersScreen extends StatefulWidget {
     super.key,
     required this.api,
     required this.storeApi,
+    this.trackingApi,
+    this.chatApi,
     required this.cart,
   });
 
@@ -27,6 +29,11 @@ class MyOrdersScreen extends StatefulWidget {
 
   /// Both are handed to the details page, which resolves the shop and can rebuild the basket.
   final StoreApi storeApi;
+
+  /// Handed to the details page too: the live ETA and the chat with the rider live there, and
+  /// this list is the road every order takes to reach it.
+  final TrackingApi? trackingApi;
+  final ChatApi? chatApi;
   final Cart cart;
 
   @override
@@ -98,6 +105,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       builder: (_) => OrderDetailsScreen(
         orderApi: widget.api,
         storeApi: widget.storeApi,
+        trackingApi: widget.trackingApi,
+        chatApi: widget.chatApi,
         cart: widget.cart,
         orderId: order.id,
         preview: order,

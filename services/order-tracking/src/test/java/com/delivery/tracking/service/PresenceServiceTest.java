@@ -10,11 +10,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import com.delivery.tracking.domain.CarrierMembership;
 import com.delivery.tracking.domain.CarrierMembershipRepository;
+import com.delivery.tracking.domain.DutySession;
+import com.delivery.tracking.domain.DutySessionRepository;
 import com.delivery.tracking.domain.DutyState;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
 import com.delivery.tracking.domain.PresenceState;
@@ -59,6 +62,7 @@ class PresenceServiceTest {
 
     private RiderPresenceRepository presenceRepo;
     private RiderDutyEventRepository dutyEvents;
+    private DutySessionRepository dutySessions;
     private CarrierMembershipRepository memberships;
     private OrderParticipantsRepository participants;
     private StringRedisTemplate redis;
@@ -69,6 +73,7 @@ class PresenceServiceTest {
     void setUp() {
         presenceRepo = mock(RiderPresenceRepository.class);
         dutyEvents = mock(RiderDutyEventRepository.class);
+        dutySessions = mock(DutySessionRepository.class);
         memberships = mock(CarrierMembershipRepository.class);
         participants = mock(OrderParticipantsRepository.class);
         redis = mock(StringRedisTemplate.class);
@@ -78,9 +83,10 @@ class PresenceServiceTest {
         when(presenceRepo.save(any(RiderPresence.class))).thenAnswer(c -> c.getArgument(0));
         when(presenceRepo.findById(anyString())).thenReturn(Optional.empty());
         when(memberships.findById(anyString())).thenReturn(Optional.empty());
+        when(dutySessions.findByRiderIdAndEndedAtIsNull(anyString())).thenReturn(Optional.empty());
 
-        presence = new PresenceService(presenceRepo, dutyEvents, memberships, participants,
-                redis, new ObjectMapper().registerModule(new JavaTimeModule()),
+        presence = new PresenceService(presenceRepo, dutyEvents, dutySessions, memberships,
+                participants, redis, new ObjectMapper().registerModule(new JavaTimeModule()),
                 PRESENCE_WINDOW, Duration.ofSeconds(30));
     }
 
@@ -203,6 +209,80 @@ class PresenceServiceTest {
             presence.declare(RIDER, DutyState.OFF_DUTY, RiderDutyEvent.Source.RIDER);
 
             verify(dutyEvents).save(any(RiderDutyEvent.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("duty sessions: the intervals hours-online is summed from")
+    class Sessions {
+
+        @Test
+        void going_on_duty_opens_a_session() {
+            presence.declare(RIDER, DutyState.ON_DUTY, RiderDutyEvent.Source.RIDER);
+
+            ArgumentCaptor<DutySession> saved = ArgumentCaptor.forClass(DutySession.class);
+            verify(dutySessions).save(saved.capture());
+            assertThat(saved.getValue().isOpen()).isTrue();
+            assertThat(saved.getValue().getRiderId()).isEqualTo(RIDER);
+        }
+
+        /**
+         * The idempotency guarantee. An app that re-asserts ON_DUTY on every foreground must not
+         * open a second shift — the reconciliation is against what is actually open, not against
+         * whether this particular call happened to be a transition.
+         */
+        @Test
+        void a_repeated_on_duty_declaration_does_not_open_a_second_session() {
+            rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
+            when(dutySessions.findByRiderIdAndEndedAtIsNull(RIDER))
+                    .thenReturn(Optional.of(DutySession.open(RIDER, Instant.now())));
+
+            presence.declare(RIDER, DutyState.ON_DUTY, RiderDutyEvent.Source.RIDER);
+
+            verify(dutySessions, never()).save(any(DutySession.class));
+        }
+
+        @Test
+        void going_off_duty_closes_the_open_session_and_records_who_ended_it() {
+            rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
+            DutySession open = DutySession.open(RIDER, Instant.now().minus(Duration.ofHours(3)));
+            when(dutySessions.findByRiderIdAndEndedAtIsNull(RIDER)).thenReturn(Optional.of(open));
+
+            presence.declare(RIDER, DutyState.OFF_DUTY, RiderDutyEvent.Source.RIDER);
+
+            assertThat(open.isOpen()).isFalse();
+            assertThat(open.getEndReason()).isEqualTo(DutySession.EndReason.RIDER);
+            verify(dutySessions).save(open);
+        }
+
+        /**
+         * History starts at the migration. A rider who was already on duty before duty_sessions
+         * existed has no open session, and going off duty must close nothing rather than invent a
+         * shift backwards.
+         */
+        @Test
+        void going_off_duty_with_no_open_session_closes_nothing() {
+            rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
+
+            presence.declare(RIDER, DutyState.OFF_DUTY, RiderDutyEvent.Source.RIDER);
+
+            verify(dutySessions, never()).save(any(DutySession.class));
+        }
+
+        /**
+         * The self-healing half of open-if-none: a rider whose previous session was expired starts
+         * a fresh one on their next ON_DUTY declaration even if the presence row somehow still says
+         * ON_DUTY — hours must start counting again the moment there is a declaration to count from.
+         */
+        @Test
+        void an_on_duty_declaration_with_no_open_session_opens_one_even_without_a_transition() {
+            rider(DutyState.ON_DUTY, Duration.ofSeconds(5));
+
+            presence.declare(RIDER, DutyState.ON_DUTY, RiderDutyEvent.Source.RIDER);
+
+            verify(dutySessions).save(any(DutySession.class));
+            // But the transition log stays quiet: nothing actually changed state.
+            verify(dutyEvents, never()).save(any(RiderDutyEvent.class));
         }
     }
 

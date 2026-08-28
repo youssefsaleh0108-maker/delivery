@@ -39,6 +39,7 @@ class RiderHomeScreen extends StatefulWidget {
     this.moneyApi,
     this.chatApi,
     this.socket,
+    this.prefsApi,
     this.pendingApproval = false,
     required this.onSignOut,
   });
@@ -60,6 +61,9 @@ class RiderHomeScreen extends StatefulWidget {
   /// header exactly as it was — no chat button at all.
   final ChatApi? chatApi;
   final UserQueueSocket? socket;
+
+  /// Handed to the settings page's notification-preferences grid; null leaves the row undrawn.
+  final NotificationPrefsApi? prefsApi;
 
   final AuthSession session;
 
@@ -586,6 +590,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                     builder: (_) => SettingsScreen(
                       locale: widget.locale,
                       userId: widget.session.subject,
+                      prefsApi: widget.prefsApi,
                     ),
                   )),
                 ),

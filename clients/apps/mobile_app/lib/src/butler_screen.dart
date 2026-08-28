@@ -35,6 +35,8 @@ class ButlerScreen extends StatefulWidget {
     required this.api,
     required this.orderApi,
     required this.storeApi,
+    this.trackingApi,
+    this.chatApi,
     required this.cart,
   });
 
@@ -48,6 +50,11 @@ class ButlerScreen extends StatefulWidget {
   /// it becomes the moment its price is agreed.
   final OrderApi orderApi;
   final StoreApi storeApi;
+
+  /// Handed through the request list to the ordinary order screen an approved errand opens —
+  /// the live ETA and the rider chat live there, same as for a shop order.
+  final TrackingApi? trackingApi;
+  final ChatApi? chatApi;
   final Cart cart;
 
   @override
@@ -206,6 +213,8 @@ class _ButlerScreenState extends State<ButlerScreen> {
                     _formCard(),
                     const SizedBox(height: DeliverySpacing.md),
                     ButlerRequestsList(
+                      trackingApi: widget.trackingApi,
+                      chatApi: widget.chatApi,
                       api: widget.api,
                       orderApi: widget.orderApi,
                       storeApi: widget.storeApi,

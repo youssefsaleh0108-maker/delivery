@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -330,6 +331,75 @@ public class KeycloakAdminClient {
                         "name", representation.path("name").asText())))
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    /**
+     * The account holding an email address, if one exists.
+     *
+     * <p>Empty is a normal answer, not an error — the password-reset flow asks this for every
+     * address a stranger types, and "no account" must cost the same and look the same as "account"
+     * from the outside. Which is also why the caller, not this method, decides what to do with an
+     * empty result: this method must not log the address at a level that turns a reset probe into
+     * a directory of who has an account.
+     *
+     * @param email already normalised (lower-cased, trimmed) by the caller
+     */
+    public Optional<String> findUserIdByEmail(String email) {
+        String bearer = adminToken();
+
+        // The address rides in a URI template variable, never concatenated: template values are
+        // encoded strictly, so a plus-alias ('me+shop@gmail.com') arrives as %2B rather than being
+        // decoded server-side into a space — the same failure idFromLocation exists to avoid.
+        JsonNode users = keycloak.get()
+                .uri("/admin/realms/{realm}/users?email={email}&exact=true", realm, email)
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+
+        if (users == null || !users.isArray()) {
+            return Optional.empty();
+        }
+        for (JsonNode user : users) {
+            // exact=true should already guarantee this; checked anyway so a looser Keycloak
+            // version cannot make "some other account whose address merely contains yours" match.
+            if (email.equalsIgnoreCase(user.path("email").asText())
+                    && user.hasNonNull("id")) {
+                return Optional.of(user.path("id").asText());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Replaces an account's passcode with one its owner just chose.
+     *
+     * <p>The one caller is the password-reset flow, and it calls this only after a one-time code
+     * sent to the account's own address was answered — that proof, not this method, is the
+     * security boundary. {@code temporary} is false for the same reason it is at sign-up: this is
+     * the passcode the person chose and expects to use, and a forced-change screen at the next
+     * sign-in would demand a second new passcode for no reason.
+     *
+     * <p>The passcode itself is never logged, here or anywhere.
+     */
+    public void resetPassword(String userRef, String newPassword) {
+        String bearer = adminToken();
+        try {
+            keycloak.put()
+                    .uri("/admin/realms/{realm}/users/{id}/reset-password", realm, userRef)
+                    .header("Authorization", "Bearer " + bearer)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of(
+                            "type", "password",
+                            "value", newPassword,
+                            "temporary", false))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception e) {
+            log.error("Could not reset the passcode for {}", userRef, e);
+            throw new ProvisioningException(
+                    "The passcode could not be updated just now. Please try again in a moment.");
+        }
+        log.info("Passcode reset for {}", userRef);
     }
 
     /**

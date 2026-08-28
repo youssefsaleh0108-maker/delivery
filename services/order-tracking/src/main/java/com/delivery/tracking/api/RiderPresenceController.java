@@ -6,6 +6,8 @@ import java.util.UUID;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.delivery.platform.security.CurrentUser;
 import com.delivery.tracking.domain.DutyState;
 import com.delivery.tracking.domain.RiderDutyEvent;
+import com.delivery.tracking.service.DutySessionService;
+import com.delivery.tracking.service.DutySessionService.HoursOnline;
 import com.delivery.tracking.service.PresenceService;
 import com.delivery.tracking.service.PresenceService.NoCarrierException;
 import com.delivery.tracking.service.PresenceService.PresenceNotFoundException;
@@ -46,9 +50,11 @@ import com.delivery.tracking.service.PresenceService.RiderPresenceView;
 public class RiderPresenceController {
 
     private final PresenceService presence;
+    private final DutySessionService dutySessions;
 
-    public RiderPresenceController(PresenceService presence) {
+    public RiderPresenceController(PresenceService presence, DutySessionService dutySessions) {
         this.presence = presence;
+        this.dutySessions = dutySessions;
     }
 
     /**
@@ -134,6 +140,40 @@ public class RiderPresenceController {
             @RequestParam(defaultValue = "true") boolean onDutyOnly) {
         return presence.roster(CurrentUser.requireId(), CurrentUser.hasRole("BACKOFFICE"),
                 carrierId, onDutyOnly);
+    }
+
+    /**
+     * A rider's own hours online per day — the stat tile in the rider app.
+     *
+     * <p>DELIVERY only, and only ever about the caller: the id comes from the token and no request
+     * shape names anybody else, same rule as every other {@code /me} route here.
+     *
+     * <p>{@code days} is capped at 30. The window is bounded because the query walks every session
+     * in it; a rider wanting their quarter belongs in a payroll export, not a tile poll.
+     */
+    @GetMapping("/me/duty/hours")
+    @PreAuthorize("hasRole('DELIVERY')")
+    public HoursOnline ownHours(
+            @RequestParam(defaultValue = "7") @Min(1) @Max(30) int days) {
+        return dutySessions.ownHours(CurrentUser.requireId(), days);
+    }
+
+    /**
+     * One rider's hours online per day — the hours column in the backoffice and carrier consoles.
+     *
+     * <p>BACKOFFICE may ask about any rider. CARRIER is scoped exactly as the roster is: their
+     * fleet comes from their own membership row, never from the request, and the rider must belong
+     * to that fleet by the same {@code rider_presence.carrier_id} linkage the roster filters on.
+     * A rider outside that fleet — or an id that does not exist — gets the same 404, so this
+     * endpoint cannot enumerate riders any more than the location one can.
+     */
+    @GetMapping("/{riderId}/duty/hours")
+    @PreAuthorize("hasAnyRole('BACKOFFICE','CARRIER')")
+    public HoursOnline riderHours(
+            @PathVariable String riderId,
+            @RequestParam(defaultValue = "7") @Min(1) @Max(30) int days) {
+        return dutySessions.riderHours(riderId, CurrentUser.requireId(),
+                CurrentUser.hasRole("BACKOFFICE"), days);
     }
 
     @ExceptionHandler(PresenceNotFoundException.class)

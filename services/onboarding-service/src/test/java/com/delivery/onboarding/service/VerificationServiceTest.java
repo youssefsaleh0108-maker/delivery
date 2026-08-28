@@ -50,6 +50,8 @@ class VerificationServiceTest {
 
         when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))
                 .thenReturn(Optional.empty());
+        when(verifications.findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+                any(), anyString(), any())).thenReturn(Optional.empty());
         when(verifications.countByDestinationAndCreatedAtAfter(anyString(), any())).thenReturn(0L);
         when(verifications.saveAndFlush(any(ContactVerification.class)))
                 .thenAnswer(call -> call.getArgument(0));
@@ -295,8 +297,9 @@ class VerificationServiceTest {
         void the_right_code_hands_back_the_proof() {
             ContactVerification.Issued issued =
                     ContactVerification.issue(Channel.EMAIL, "sam@example.test");
-            when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(
-                    eq(Channel.EMAIL), eq("sam@example.test")))
+            when(verifications.findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+                    eq(Channel.EMAIL), eq("sam@example.test"),
+                    eq(ContactVerification.Purpose.SIGNUP)))
                     .thenReturn(Optional.of(issued.verification()));
 
             VerificationService.Confirmed confirmed =
@@ -313,8 +316,9 @@ class VerificationServiceTest {
         @Test
         void a_stranger_cannot_collect_the_proof_for_an_address_somebody_else_verified() {
             ContactVerification victim = confirmedFor(Channel.EMAIL, "victim@example.test");
-            when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(
-                    eq(Channel.EMAIL), eq("victim@example.test")))
+            when(verifications.findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+                    eq(Channel.EMAIL), eq("victim@example.test"),
+                    eq(ContactVerification.Purpose.SIGNUP)))
                     .thenReturn(Optional.of(victim));
 
             assertThatThrownBy(() ->
@@ -329,8 +333,8 @@ class VerificationServiceTest {
          */
         @Test
         void an_unknown_address_is_refused_in_the_same_words_as_a_wrong_code() {
-            when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))
-                    .thenReturn(Optional.empty());
+            when(verifications.findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+                    any(), anyString(), any())).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.confirm(Channel.EMAIL, "nobody@example.test", "123456"))
                     .isInstanceOf(VerificationException.class)
@@ -341,7 +345,8 @@ class VerificationServiceTest {
         void a_wrong_code_is_refused() {
             ContactVerification.Issued issued =
                     ContactVerification.issue(Channel.EMAIL, "sam@example.test");
-            when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))
+            when(verifications.findFirstByChannelAndDestinationAndPurposeOrderByCreatedAtDesc(
+                    any(), anyString(), any()))
                     .thenReturn(Optional.of(issued.verification()));
 
             assertThatThrownBy(() -> service.confirm(Channel.EMAIL, "sam@example.test",
@@ -477,6 +482,52 @@ class VerificationServiceTest {
             when(verifications.findByToken(anyString())).thenReturn(Optional.empty());
 
             assertThat(service.isVerified("nope", Channel.EMAIL, "sam@example.test")).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("keeping the two purposes apart")
+    class Purposes {
+
+        /**
+         * A reset proof is earned by holding an inbox for ten minutes; a sign-up verification is
+         * what lets an application name an address. Letting one stand in for the other would let
+         * anybody with a reset code apply as the address's owner.
+         */
+        @Test
+        void a_reset_proof_cannot_be_spent_as_a_signup_verification() {
+            ContactVerification.Issued issued = ContactVerification.issue(
+                    Channel.EMAIL, "sam@example.test", ContactVerification.Purpose.PASSWORD_RESET);
+            issued.verification().confirm(issued.code());
+            when(verifications.findByToken(issued.verification().getToken()))
+                    .thenReturn(Optional.of(issued.verification()));
+
+            assertThatThrownBy(() -> service.consume(
+                    issued.verification().getToken(), Channel.EMAIL, "sam@example.test"))
+                    .isInstanceOf(VerificationException.class)
+                    .hasMessageContaining("something else");
+        }
+
+        /** The peek used by sign-up forms must agree with consume, or the form lies to the person. */
+        @Test
+        void a_reset_token_reads_as_unverified_on_the_signup_path() {
+            ContactVerification.Issued issued = ContactVerification.issue(
+                    Channel.EMAIL, "sam@example.test", ContactVerification.Purpose.PASSWORD_RESET);
+            issued.verification().confirm(issued.code());
+            when(verifications.findByToken(issued.verification().getToken()))
+                    .thenReturn(Optional.of(issued.verification()));
+
+            assertThat(service.isVerified(issued.verification().getToken(),
+                    Channel.EMAIL, "sam@example.test")).isFalse();
+        }
+
+        /** The default the whole existing surface relies on: no purpose stated means sign-up. */
+        @Test
+        void a_challenge_issued_without_a_purpose_is_a_signup_challenge() {
+            ContactVerification plain =
+                    ContactVerification.issue(Channel.EMAIL, "sam@example.test").verification();
+
+            assertThat(plain.getPurpose()).isEqualTo(ContactVerification.Purpose.SIGNUP);
         }
     }
 

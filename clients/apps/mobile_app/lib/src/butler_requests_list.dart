@@ -24,6 +24,8 @@ class ButlerRequestsList extends StatefulWidget {
     required this.api,
     required this.orderApi,
     required this.storeApi,
+    this.trackingApi,
+    this.chatApi,
     required this.cart,
     this.version = 0,
     this.query = '',
@@ -32,6 +34,8 @@ class ButlerRequestsList extends StatefulWidget {
   final ButlerApi api;
   final OrderApi orderApi;
   final StoreApi storeApi;
+  final TrackingApi? trackingApi;
+  final ChatApi? chatApi;
   final Cart cart;
 
   /// Bumped by the form above when it submits, to reload without a manual pull.
@@ -287,6 +291,8 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
                   orderId: r.orderId!,
                   orderApi: widget.orderApi,
                   storeApi: widget.storeApi,
+                  trackingApi: widget.trackingApi,
+                  chatApi: widget.chatApi,
                   cart: widget.cart,
                 ),
               )),

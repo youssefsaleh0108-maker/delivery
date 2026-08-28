@@ -43,6 +43,22 @@ public class OnboardingApplication {
         public boolean mayNameACompany() {
             return this == RIDER;
         }
+
+        /**
+         * The realm role a partner of this kind trades under.
+         *
+         * <p>One mapping, used everywhere a kind becomes a role — granting at sign-up and
+         * approval, revoking and re-granting at suspension. Kept here so the grant and the revoke
+         * cannot drift apart: a suspension that revoked a different role than approval granted
+         * would leave the partner fully active while the record said suspended.
+         */
+        public String liveRole() {
+            return switch (this) {
+                case MERCHANT -> "MERCHANT";
+                case CARRIER -> "CARRIER";
+                case RIDER -> "DELIVERY";
+            };
+        }
     }
 
     public enum Status {
@@ -295,6 +311,63 @@ public class OnboardingApplication {
         this.decidedAt = Instant.now();
         this.decidedBy = decidedBy;
         this.rejectionReason = reason;
+    }
+
+    // ---------------------------------------------------------------- backoffice edits
+
+    /**
+     * The four fields backoffice may correct on a partner's record. Each returns whether anything
+     * actually changed, so the caller can write an audit row for real changes and only those —
+     * an audit trail padded with no-ops is one nobody reads.
+     */
+    public boolean updateBusinessName(String businessName) {
+        if (businessName.equals(this.businessName)) {
+            return false;
+        }
+        this.businessName = businessName;
+        return true;
+    }
+
+    public boolean updateContactName(String contactName) {
+        if (contactName.equals(this.contactName)) {
+            return false;
+        }
+        this.contactName = contactName;
+        return true;
+    }
+
+    /**
+     * Corrects the contact email.
+     *
+     * <p>Note what this does NOT touch: {@code emailVerifiedAt} still dates the code the original
+     * applicant answered on the original address, and the Keycloak account's sign-in email is a
+     * separate fact this deliberately leaves alone — an edited contact address changes where the
+     * platform writes to, not who the partner signs in as. The audit row is the record that the
+     * address on file is no longer the one that was code-verified.
+     */
+    public boolean updateContactEmail(String contactEmail) {
+        if (contactEmail.equals(this.contactEmail)) {
+            return false;
+        }
+        this.contactEmail = contactEmail;
+        return true;
+    }
+
+    /**
+     * Corrects the phone number, clearing the proof that no longer applies.
+     *
+     * <p>{@code phoneVerifiedAt} is nulled whenever the number changes, because whatever code was
+     * once answered was answered on the old number. A cleared timestamp reads as "not checked" in
+     * every reviewer view, which is exactly true of a number typed in by backoffice. (V41 moved
+     * the matching database CHECK to the intake path for precisely this row shape.)
+     */
+    public boolean updateContactPhone(String contactPhone) {
+        if (contactPhone.equals(this.contactPhone)) {
+            return false;
+        }
+        this.contactPhone = contactPhone;
+        this.phoneVerifiedAt = null;
+        return true;
     }
 
     public void provisionedAs(String userRef, UUID entityId) {

@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.tracking.domain.CarrierMembership;
 import com.delivery.tracking.domain.CarrierMembershipRepository;
+import com.delivery.tracking.domain.DutySession;
+import com.delivery.tracking.domain.DutySessionRepository;
 import com.delivery.tracking.domain.DutyState;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
 import com.delivery.tracking.domain.PresenceState;
@@ -66,6 +68,7 @@ public class PresenceService {
 
     private final RiderPresenceRepository presence;
     private final RiderDutyEventRepository dutyEvents;
+    private final DutySessionRepository dutySessions;
     private final CarrierMembershipRepository memberships;
     private final OrderParticipantsRepository participants;
     private final StringRedisTemplate redis;
@@ -75,6 +78,7 @@ public class PresenceService {
 
     public PresenceService(RiderPresenceRepository presence,
                            RiderDutyEventRepository dutyEvents,
+                           DutySessionRepository dutySessions,
                            CarrierMembershipRepository memberships,
                            OrderParticipantsRepository participants,
                            StringRedisTemplate redis,
@@ -83,6 +87,7 @@ public class PresenceService {
                            @Value("${delivery.tracking.presence.persist-interval:30s}") Duration persistInterval) {
         this.presence = presence;
         this.dutyEvents = dutyEvents;
+        this.dutySessions = dutySessions;
         this.memberships = memberships;
         this.participants = participants;
         this.redis = redis;
@@ -123,8 +128,41 @@ public class PresenceService {
             dutyEvents.save(new RiderDutyEvent(riderId, state, source, now));
         }
 
+        // The session is reconciled against what is actually open, not against the transition flag.
+        // Open-if-none rather than open-on-transition makes a repeated ON_DUTY declaration a no-op
+        // (idempotent, however many times the app re-asserts it) and lets a rider whose previous
+        // session was expired-or-missing start accruing hours on their next declaration instead of
+        // needing a full off/on cycle. The partial unique index on open sessions backs the check,
+        // so two concurrent declarations cannot leave two shifts both accruing hours.
+        if (state == DutyState.ON_DUTY) {
+            if (dutySessions.findByRiderIdAndEndedAtIsNull(riderId).isEmpty()) {
+                dutySessions.save(DutySession.open(riderId, now));
+            }
+        } else {
+            // Close-if-open: a rider who was on duty before duty_sessions existed has no open
+            // session, and going off duty simply closes nothing — history starts at the migration
+            // and is never invented backwards.
+            dutySessions.findByRiderIdAndEndedAtIsNull(riderId).ifPresent(session -> {
+                session.close(now, endReasonOf(source));
+                dutySessions.save(session);
+            });
+        }
+
         cache(PresenceSnapshot.of(row));
         return RiderPresenceView.of(row, now, presenceWindow);
+    }
+
+    /**
+     * Who ended the shift, derived from who made the declaration. SYSTEM maps to EXPIRED because
+     * the only declaration the platform itself makes is the staleness sweep giving up on a rider —
+     * see {@link DutySessionService#expireAbandoned}.
+     */
+    private static DutySession.EndReason endReasonOf(RiderDutyEvent.Source source) {
+        return switch (source) {
+            case RIDER -> DutySession.EndReason.RIDER;
+            case BACKOFFICE -> DutySession.EndReason.BACKOFFICE;
+            case SYSTEM -> DutySession.EndReason.EXPIRED;
+        };
     }
 
     /**

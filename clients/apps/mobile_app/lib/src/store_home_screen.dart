@@ -33,6 +33,7 @@ class StoreHomeScreen extends StatefulWidget {
     required this.cart,
     required this.addresses,
     required this.zoneApi,
+    this.prefsApi,
     required this.inbox,
     required this.locale,
     required this.session,
@@ -40,6 +41,10 @@ class StoreHomeScreen extends StatefulWidget {
   });
 
   final StoreApi storeApi;
+
+  /// Threaded through to the settings page's notification-preferences grid. Null keeps that row
+  /// undrawn — the settings screen's own rule — so this screen needs no fallback of its own.
+  final NotificationPrefsApi? prefsApi;
 
   /// Threaded through to the store page purely so its Buy Again tab has a history to read.
   final OrderApi orderApi;
@@ -355,7 +360,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 semanticLabel: t.settings,
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => SettingsScreen(
-                      locale: widget.locale, userId: widget.session.subject),
+                      locale: widget.locale,
+                      userId: widget.session.subject,
+                      prefsApi: widget.prefsApi),
                 )),
               ),
             ],
