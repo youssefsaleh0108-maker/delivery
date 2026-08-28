@@ -43,6 +43,13 @@ dependencies:
   # Phase 3; the package is listed now so token registration is wired from the first build.
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
+  # The real basemap under the tracking sheet and the address picker's draggable pin —
+  # OpenStreetMap raster tiles, attributed on every map. latlong2 is flutter_map's own coordinate
+  # type, depended on directly because the app constructs LatLng values itself.
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  # Help & Support: "Chat on WhatsApp" and the email support link both leave the app.
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:
