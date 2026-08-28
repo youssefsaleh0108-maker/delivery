@@ -100,10 +100,15 @@ http:
   routers:
     # ------------------------------------------------------------------ product-service (8103)
     product-service:
+      # /api/admin/thumbnails is the one-off derivative backfill. Routed because an operator has to
+      # be able to run it, BACKOFFICE-gated in the service because it reads and re-encodes every
+      # image in the catalogue — an expensive operation nobody but the platform's own staff should
+      # be able to start. A new prefix does not exist at the gateway until it is written here, and
+      # this file has now caught that three times.
       rule: >-
         PathPrefix(`/api/products`) || PathPrefix(`/api/categories`)
         || PathPrefix(`/api/stores`) || PathPrefix(`/api/banners`)
-        || PathPrefix(`/api/delivery-zones`)
+        || PathPrefix(`/api/delivery-zones`) || PathPrefix(`/api/admin/thumbnails`)
       service: product-service
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
