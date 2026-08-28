@@ -110,9 +110,15 @@ http:
 
     # ------------------------------------------------------------------ order-manager (8101)
     order-manager:
+      # /api/partner-keys is the carrier's key management; /api/partner is the machine surface those
+      # keys authenticate (X-API-Key, no JWT — the service's own filter is the authentication).
+      # Both landed unrouted at first: a new top-level prefix does not exist at the gateway until
+      # somebody writes it here, and the failure reads as a 404 from Traefik that looks exactly
+      # like "the feature was never built".
       rule: >-
         PathPrefix(`/api/orders`) || PathPrefix(`/api/butler`)
         || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`)
+        || PathPrefix(`/api/partner-keys`) || PathPrefix(`/api/partner`)
       service: order-manager
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
