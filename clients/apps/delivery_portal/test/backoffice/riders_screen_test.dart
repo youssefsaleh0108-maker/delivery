@@ -62,9 +62,18 @@ void main() {
   late DeliveryProviderApi api;
   late TrackingApi trackingApi;
   late OrderApi orderApi;
+  late RiderPerformanceApi performanceApi;
 
   /// Rosters by provider id. Replaced per test.
   late Map<String, String> rosters;
+
+  /// What `GET /api/orders/riders/delivered-today` answers. 'boom' takes the column down; the
+  /// default is that it does, so the "what nothing reports" group keeps meaning exactly that.
+  late String deliveredJson;
+
+  /// Duty-hours reports by rider ref. A rider absent from this map 404s, which is what the tracking
+  /// service returns for a rider it has never heard of.
+  late Map<String, String> dutyJson;
 
   /// What the tracking roster answers. `[]` — nobody has ever declared duty — unless a test says
   /// otherwise; 'boom' takes the whole presence column down.
@@ -78,6 +87,16 @@ void main() {
         if (options.path.contains('/tracking/riders/roster')) {
           if (presenceJson == 'boom') throw StateError('tracking is down');
           return _json(presenceJson);
+        }
+        if (options.path.endsWith('/duty/hours')) {
+          for (final MapEntry<String, String> e in dutyJson.entries) {
+            if (options.path.contains(e.key)) return _json(e.value);
+          }
+          return ResponseBody.fromString('{}', 404);
+        }
+        if (options.path.endsWith('/riders/delivered-today')) {
+          if (deliveredJson == 'boom') throw StateError('the counter is down');
+          return _json(deliveredJson);
         }
         if (options.path.endsWith('/rating')) {
           for (final MapEntry<String, String> e in standings.entries) {
@@ -102,9 +121,12 @@ void main() {
     api = DeliveryProviderApi(dio);
     trackingApi = TrackingApi(dio);
     orderApi = OrderApi(dio);
+    performanceApi = RiderPerformanceApi(dio);
   }
 
   setUp(() {
+    deliveredJson = 'boom';
+    dutyJson = <String, String>{};
     rosters = <String, String>{
       'p1': '{"providerId":"p1","riders":["rider-1111-2222-3333","rider-4444-5555-6666"]}',
       'p2': '{"providerId":"p2","riders":["rider-7777-8888-9999"]}',
@@ -122,7 +144,12 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
       home: Scaffold(
-        body: RidersScreen(api: api, trackingApi: trackingApi, orderApi: orderApi),
+        body: RidersScreen(
+          api: api,
+          trackingApi: trackingApi,
+          orderApi: orderApi,
+          performanceApi: performanceApi,
+        ),
       ),
     ));
     await tester.pumpAndSettle();
@@ -162,9 +189,13 @@ void main() {
     testWidgets('is left empty rather than guessed at', (WidgetTester tester) async {
       await pump(tester);
 
-      // Region, deliveries today and rating: three per row, and not one number among them.
-      expect(find.byType(ConsoleNoValue), findsNWidgets(9));
+      // In this configuration nothing answers: region has no source at all, and the delivered
+      // counter, the duty ledger and the ratings are all down. Four dashes per row, and not one
+      // number among them — a failed request must never render as a zero.
+      expect(find.byType(ConsoleNoValue), findsNWidgets(12));
       expect(find.textContaining('★'), findsNothing);
+      expect(find.text('0'), findsNothing);
+      expect(find.text('0.0h'), findsNothing);
     });
 
     testWidgets('and presence reads "Unknown", never "Offline"',
@@ -188,20 +219,21 @@ void main() {
       expect(find.text('New'), findsNothing);
     });
 
-    testWidgets('and the region filter is drawn, marked, and does nothing',
+    testWidgets('and the region filter is not drawn at all',
         (WidgetTester tester) async {
       await pump(tester);
 
-      final ConsoleFilterButton region = tester.widget<ConsoleFilterButton>(
-          find.widgetWithText(ConsoleFilterButton, 'All regions'));
-      expect(region.onPressed, isNull);
-      expect(
-        find.descendant(
-          of: find.widgetWithText(ConsoleFilterButton, 'All regions'),
-          matching: find.byType(ConsoleComingSoonChip),
-        ),
-        findsOneWidget,
-      );
+      // It used to be drawn dead, with a "coming soon" chip on it. Nothing ties a rider to a work
+      // region anywhere on this platform — there is no field to filter on and no plan in the data
+      // model that would create one — so the chip was promising an operator a capability that is
+      // not coming. Gone entirely rather than drawn and marked.
+      expect(find.text('All regions'), findsNothing);
+      expect(find.byType(ConsoleComingSoonChip), findsNothing);
+
+      // What replaces it is the two controls beside it, which are real and stay real.
+      expect(find.text('All Carriers'), findsOneWidget);
+      expect(find.widgetWithText(ConsoleSearchField, 'Search riders...'),
+          findsOneWidget);
     });
   });
 
@@ -237,6 +269,51 @@ void main() {
       // A fact about the platform, not about the riders — the column degrades, the page stays.
       expect(find.text('Unknown'), findsNWidgets(3));
       expect(find.text('Off duty'), findsNothing);
+    });
+  });
+
+  group('the two columns the platform now answers', () {
+    testWidgets('joins the delivered count onto the roster and draws its own zeros',
+        (WidgetTester tester) async {
+      // The endpoint omits riders who delivered nothing — that is the contract — so the zeros are
+      // this screen's to draw against its own roster, and they are real zeros.
+      deliveredJson =
+          '[{"riderId":"rider-1111-2222-3333","delivered":4,"day":"2026-08-27"}]';
+      wire();
+      await pump(tester);
+
+      expect(find.text('4'), findsOneWidget);
+      expect(find.text('0'), findsNWidgets(2));
+    });
+
+    testWidgets('a delivered count that could not be read is a dash, never a zero',
+        (WidgetTester tester) async {
+      // 'boom' is the default; asserted explicitly because the distinction is the whole point.
+      await pump(tester);
+
+      expect(find.text('0'), findsNothing);
+    });
+
+    testWidgets('totals duty hours from the exact seconds, and 0.0h only when it means it',
+        (WidgetTester tester) async {
+      dutyJson = <String, String>{
+        // An hour on one day and half an hour on the next: 5400 seconds, shown as 1.5h.
+        'rider-1111-2222-3333': '''
+{"riderId":"rider-1111-2222-3333","zone":"UTC","from":"2026-08-21","to":"2026-08-27",
+ "days":[{"date":"2026-08-26","secondsOnline":3600,"hoursOnline":1.00,"sessions":1},
+         {"date":"2026-08-27","secondsOnline":1800,"hoursOnline":0.50,"sessions":1}]}''',
+        // Known to the tracking service, and never on duty in the window. The contract expresses
+        // that as an empty `days` list, and it is a true zero.
+        'rider-4444-5555-6666': '''
+{"riderId":"rider-4444-5555-6666","zone":"UTC","from":"2026-08-21","to":"2026-08-27","days":[]}''',
+      };
+      wire();
+      await pump(tester);
+
+      expect(find.text('1.5h'), findsOneWidget);
+      expect(find.text('0.0h'), findsOneWidget);
+      // The third rider 404s — never heard of — and stays a dash rather than becoming another zero.
+      expect(find.text('Hours Online (7d)'), findsOneWidget);
     });
   });
 

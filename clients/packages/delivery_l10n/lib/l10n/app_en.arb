@@ -1517,8 +1517,8 @@
   "authPreferredArea": "Preferred area",
   "authPreferredAreaHint": "e.g. Hamra, Achrafieh",
   "authAvailableZones": "Available zones",
-  "authZonesComingSoonTitle": "Zones are not mapped yet",
-  "authZonesComingSoonBlurb": "Pickable delivery zones arrive with the coverage map. Until then, the area above is what we go by.",
+  "authZonesNoneToPickTitle": "No zones to pick",
+  "authZonesNoneToPickBlurb": "Nothing ties a rider to a fixed zone on this platform. The pin you placed and the area you typed above are what a reviewer goes by.",
   "authBusinessInformation": "Business information",
   "authBusinessInformationBlurb": "Tell us about your company and the contact person.",
   "authBusinessShopName": "Business / shop name",
@@ -1674,6 +1674,61 @@
   },
   "merchbNoOptionsYet": "No options on this item yet",
   "merchbOptionsReadOnly": "Shown as customers see them. Editing options arrives soon.",
+  "merchbOptionsNeedSave": "Save the item first, then add its options.",
+  "merchbOptionsLoadFailed": "Could not load the current options. Nothing was changed.",
+  "merchbOptionsSaveFailed": "Could not save the options.",
+  "merchbAddGroup": "+ Add group",
+  "merchbGroupName": "Group name",
+  "merchbRemoveGroup": "Remove group",
+  "merchbOptionName": "Option",
+  "merchbRemoveOption": "Remove option",
+  "merchbPriceDelta": "Extra",
+  "merchbMinSelect": "Choose at least",
+  "merchbMaxSelect": "Choose at most",
+  "merchbRuleRequired": "Required — the customer must choose.",
+  "merchbRuleOptional": "Optional — the customer may skip this.",
+  "merchbUntitledGroup": "this group",
+  "merchbGroupNeedsName": "Every group needs a name.",
+  "merchbGroupNeedsOption": "{name} needs at least one option.",
+  "@merchbGroupNeedsOption": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "merchbOptionNeedsName": "Every option in {name} needs a name.",
+  "@merchbOptionNeedsName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "merchbMinAboveMax": "In {name}, the minimum is above the maximum.",
+  "@merchbMinAboveMax": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "merchbMinAboveCount": "In {name}, the minimum is more than the number of options.",
+  "@merchbMinAboveCount": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "merchbGroupOutOfRange": "In {name}, the numbers must be between 0 and 50.",
+  "@merchbGroupOutOfRange": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "merchbSaveMenuItem": "Save Menu Item",
   "merchbSoon": "Soon",
   "merchbShopConfiguration": "Shop Configuration",
@@ -1715,6 +1770,8 @@
   "merchbLangShortAr": "AR",
   "merchbShopProfile": "Shop Profile",
   "merchbPaymentBankDetails": "Payment & Bank details",
+  "merchbBankReadOnly": "This is the account on file. It was set with your application, and the platform team is who changes it now — not this screen.",
+  "merchbBankNoneFiled": "No bank details were filed with your application. The bank step closes once an application is decided, so the platform team is who adds them now.",
   "merchbNotificationSettings": "Notification Settings",
   "merchbShopAnalytics": "Shop Analytics",
   "merchbLogOutAccount": "Log Out Account",
@@ -2041,5 +2098,216 @@
   "wizPayoutSave": "Save bank details",
   "wizPayoutChange": "Change",
   "wizPayoutSentOnSubmit": "Your bank details are sent when you submit the application.",
-  "wizCouldNotSendPayout": "Your application is in, but the bank details did not go through."
+  "wizCouldNotSendPayout": "Your application is in, but the bank details did not go through.",
+  "merchPinShopLocation": "Shop location",
+  "merchPinDropHint": "Tap the map to put the pin on your shop, then save.",
+  "merchPinWhyItMatters": "Customers see this pin, and delivery distance is measured from it.",
+  "merchPinNoneYet": "No location pinned yet",
+  "merchPinSetIt": "Set location",
+  "merchPinSaved": "Shop location saved",
+  "merchPinCleared": "Shop location removed",
+  "merchMapUnavailable": "Map could not load",
+  "merchUpOnPrevious": "{percent}% up on the {days} days before",
+  "@merchUpOnPrevious": {
+    "placeholders": {
+      "percent": {
+        "type": "Object"
+      },
+      "days": {
+        "type": "Object"
+      }
+    }
+  },
+  "merchDownOnPrevious": "{percent}% down on the {days} days before",
+  "@merchDownOnPrevious": {
+    "placeholders": {
+      "percent": {
+        "type": "Object"
+      },
+      "days": {
+        "type": "Object"
+      }
+    }
+  },
+  "merchSameAsPrevious": "Same as the {days} days before",
+  "@merchSameAsPrevious": {
+    "placeholders": {
+      "days": {
+        "type": "Object"
+      }
+    }
+  },
+  "merchNonePrevious": "Nothing in the {days} days before",
+  "@merchNonePrevious": {
+    "placeholders": {
+      "days": {
+        "type": "Object"
+      }
+    }
+  },
+  "merchNothingEitherPeriod": "Nothing in either period",
+  "merchAnalyticsBlurb": "Every day in the window, split by how fast the customer asked for the delivery.",
+  "merchTierSplit": "By delivery speed",
+  "merchOrderValue": "Order value",
+  "merchOrderValueNote": "What customers paid in total, delivery and any express premium included — not your payout.",
+  "deliveryTierStandard": "Standard",
+  "deliveryTierExpress": "Express",
+  "custPinYourDoor": "Pin your door",
+  "custSetHere": "Set here",
+  "custNamingThisPlace": "Looking up this place…",
+  "custMapUnavailable": "The map could not load. The address you type is what we will use.",
+  "custYourAddress": "Your address",
+  "custTheRider": "The rider",
+  "custDeliverySpeed": "Delivery speed",
+  "custExpressSurchargeApplies": "Surcharge applies",
+  "custExpressNote": "Express costs extra. The platform sets the amount and your receipt shows it as its own line. A free-delivery offer does not cover it.",
+  "authResetYourPasscode": "Reset your passcode",
+  "authChangeYourPasscode": "Change your passcode",
+  "authResetAskForAddress": "Tell us the email on your account. If it has one, a six-digit code goes to it.",
+  "authResetToYourAddress": "A six-digit code goes to the email on your account.",
+  "authResetCodeMaybeSent": "If {destination} has an account, a 6-digit code is on its way. It expires in 10 minutes and can be used once.",
+  "@authResetCodeMaybeSent": {
+    "placeholders": {
+      "destination": {
+        "type": "Object"
+      }
+    }
+  },
+  "authSetNewPasscode": "Set new passcode",
+  "authPasscodeChanged": "Passcode changed",
+  "authPasscodeChangedSignIn": "Sign in with your new six-digit passcode.",
+  "authPasscodeChangedSignedIn": "Use your new six-digit passcode the next time you sign in.",
+  "custEditProfile": "Edit profile",
+  "custProfileFieldsFixed": "Your name and email were set when the account was created and cannot be changed from the app yet.",
+  "custNoEmailOnAccount": "This account has no email address on it, so there is nowhere to send a code.",
+  "custCouldNotOpenThat": "Nothing on this phone could open that.",
+  "custHelpIntro": "Answers to the things people ask most, and the ways to reach a person when the answer is not here.",
+  "custHelpTalkToUs": "Talk to us",
+  "custChatOnWhatsApp": "Chat on WhatsApp",
+  "custEmailSupport": "Email support",
+  "custHelpNoChannelsYet": "No support channel is set up in this build yet. Your orders still carry a chat with the rider once one is assigned.",
+  "custHelpOrdering": "Ordering",
+  "custHelpDelivery": "Delivery",
+  "custHelpPayments": "Payments",
+  "custHelpAccount": "Your account",
+  "custHelpApplying": "Selling and riding",
+  "custFaqOneShopQ": "Why can my basket only hold one shop?",
+  "custFaqOneShopA": "One order goes to one shop and is carried by one rider. Two shops means two collections, two fees and two journeys, so the basket asks you to finish one before starting the other.",
+  "custFaqMinimumQ": "What is a minimum order?",
+  "custFaqMinimumA": "Some shops will not send a rider out below a certain amount. The basket shows the shop's minimum and exactly how much is still missing, and checkout stays closed until it is met.",
+  "custFaqChangeOrderQ": "Can I change or cancel an order?",
+  "custFaqChangeOrderA": "An order cannot be edited after it is placed. The order page lists what you can still do with it, and cancelling leaves that list once the shop has started preparing. Once a rider is assigned you can message them from the order page.",
+  "custFaqTiersQ": "What is the difference between Standard and Express?",
+  "custFaqTiersA": "Express asks for the order to be treated as urgent and adds a surcharge on top of the delivery fee. The platform sets that amount, not the shop, and your receipt shows it as its own line. A free-delivery offer covers the delivery fee only — the express surcharge stays payable.",
+  "custFaqWhereIsRiderQ": "Where is my rider?",
+  "custFaqWhereIsRiderA": "The order page draws the rider's recorded positions on a map from the moment they collect your order. The arrival time comes from the tracking service; when it has no recent position to measure from, it says so instead of showing a guess.",
+  "custFaqDeliveryFeeQ": "How is the delivery fee worked out?",
+  "custFaqDeliveryFeeA": "By the area you are delivering to, which is why a saved address carries an area. A promotion can waive it, and when it does the basket names the promotion rather than only showing a zero.",
+  "custFaqAddressPinQ": "Why should I drop a pin on the map?",
+  "custFaqAddressPinA": "A typed line gets the rider to the street; the pin gets them to the door, and it is the point the arrival time is measured against. Without one your order still arrives, but there is nothing on the map to estimate from.",
+  "custFaqPayMethodsQ": "Which payment methods really work?",
+  "custFaqPayMethodsA": "Cash on delivery is the only method in this build that moves real money. Card and wallet are wired to a test payment provider and are labelled \"Test payment\" at checkout: choosing one authorises against that provider and nothing is charged.",
+  "custFaqPromoQ": "How do promo codes work?",
+  "custFaqPromoA": "Type one in the basket and it is checked against what is in the basket right then, so a code can start applying the moment you cross its minimum. What is actually billed is recomputed by the server when the order is placed, and the confirmation shows that figure.",
+  "custFaqRefundQ": "How do I get a refund?",
+  "custFaqRefundA": "There is no refund button in the app. Cash orders are settled at the door, so a problem with one is sorted with us directly — message or email support with your order number and what went wrong.",
+  "custFaqPasscodeQ": "I forgot my passcode.",
+  "custFaqPasscodeA": "Tap \"Forgot password?\" on the sign-in screen. A six-digit code goes to the email on the account, lasts ten minutes and works once. From inside the app the same steps are under Edit on this screen.",
+  "custFaqProfileQ": "Can I change my name or email?",
+  "custFaqProfileA": "Not from the app yet. They were set when the account was created; the passcode is the one thing on the account you can change yourself.",
+  "custFaqApplyQ": "How do I sell on YouDrop, or deliver for it?",
+  "custFaqApplyA": "From the welcome screen, before signing in: choose shop or rider and fill in the application. You will be asked for contact details, documents and payout details, and you get an account at the end so you can sign in and follow it.",
+  "custFaqApplyWaitQ": "How long does an application take?",
+  "custFaqApplyWaitA": "A person reads it, so there is no fixed time. Your application screen shows the stage it is at and whether any document was sent back for a correction — that screen is the status, and nothing is decided automatically.",
+  "deliveryTierExpressSurcharge": "Express +{amount}",
+  "@deliveryTierExpressSurcharge": {
+    "placeholders": {
+      "amount": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderTierExpress": "Express",
+  "riderCompletionRate": "Completed",
+  "riderHoursValue": "{hours} h",
+  "@riderHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderPerformanceLine": "{delivered} of {claimed} claimed jobs delivered in {days} days",
+  "@riderPerformanceLine": {
+    "placeholders": {
+      "delivered": {
+        "type": "Object"
+      },
+      "claimed": {
+        "type": "Object"
+      },
+      "days": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderPerformanceDropped": " · {count} dropped after claiming",
+  "@riderPerformanceDropped": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ratingWithCount": "{average} · {ratings} ratings",
+  "@ratingWithCount": {
+    "placeholders": {
+      "average": {
+        "type": "Object"
+      },
+      "ratings": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderMapYouAreHere": "You",
+  "riderMapNoFixYet": "Waiting for your first GPS fix",
+  "riderMapUnavailable": "Map unavailable",
+  "riderNavigateFailed": "No map app could be opened.",
+  "riderRegionAllAreas": "Every area",
+  "riderHelpTitle": "Help & support",
+  "riderHelpConversations": "Your conversations",
+  "riderHelpNoConversations": "A chat opens with the customer on every job you are assigned.",
+  "riderHelpCouldNotLoad": "Could not load your conversations",
+  "riderHelpOrderThread": "Order {ref}",
+  "@riderHelpOrderThread": {
+    "placeholders": {
+      "ref": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderHelpThreadClosed": "Closed",
+  "riderHelpHowItWorks": "How this works",
+  "riderHelpDuty": "You only receive work while you are on duty and your phone is reporting its position.",
+  "riderHelpClaim": "A job is yours the moment you accept it. If someone accepted it first, the board says so.",
+  "riderHelpCashOut": "Cash-out is requested from the Earnings tab and handed over by the platform team.",
+  "riderHelpExpress": "An Express job is a customer who paid for speed. The premium is the platform's, not part of your fee.",
+  "riderDocumentsTitle": "Documents & licences",
+  "riderDocumentsCouldNotLoad": "Could not load your documents",
+  "riderPayoutCouldNotLoad": "Could not load your bank details",
+  "authPinYourArea": "Tap the map to mark where you will be working",
+  "authPinnedAt": "Pinned at {lat}, {lng}",
+  "@authPinnedAt": {
+    "placeholders": {
+      "lat": {
+        "type": "Object"
+      },
+      "lng": {
+        "type": "Object"
+      }
+    }
+  },
+  "authPinClear": "Remove pin",
+  "authMapUnavailable": "Map unavailable"
 }

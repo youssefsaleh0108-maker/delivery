@@ -12,6 +12,12 @@ library;
 
 export 'src/dashboard_screen.dart';
 export 'src/delivery_screen.dart';
+// The shop's own daily series as a page. Exported as well as reachable from settings, so a host
+// with room for it in a rail can mount it directly instead of hiding it one tap into a menu.
+export 'src/merchant_analytics_screen.dart';
+// The bank record behind the settings row. Exported like the analytics page and for the same
+// reason: a host with room for it can mount it directly.
+export 'src/merchant_payout_screen.dart';
 export 'src/merchant_settings_screen.dart';
 // The order detail screen and, with it, the small parts the three merchant frames share —
 // `MerchantMetricCard`, `MerchantTileGrid`, `MerchantStatusTag`, `merchantMaxContentWidth` and the
@@ -22,6 +28,10 @@ export 'src/orders_screen.dart';
 export 'src/product_form_screen.dart';
 export 'src/product_list_screen.dart';
 export 'src/store_screen.dart';
+// The map pin's own parts — the preview that sits in the shop-config frame's map slot and the
+// picker behind it. Exported for the same reason the metric cards are: a host or a test has to be
+// able to name them without reaching into another package's `src/`.
+export 'src/store_pin_map.dart';
 // Exported although the WhatsApp screen is the only thing that mounts it today: the portal's tests
 // drive the draft panel directly, and reaching into another package's `src/` to do that is the lint
 // this export exists to avoid.

@@ -223,14 +223,19 @@ class ConsoleCard extends StatelessWidget {
   }
 }
 
-/// The mark put on an affordance the design draws but no backend answers yet.
+/// The console's quiet pill: slate on the page background, hairlined, 11px SemiBold.
 ///
-/// Deliberately quiet — slate on the page background rather than anything brand-coloured. It is a
-/// note about the state of the platform, not a feature being advertised, and a crimson chip would
-/// pull more attention than the control it is attached to. (Brand text at this size on
-/// [DeliveryColors.brandSoft] is also below AA, per the note in `tokens.dart`.)
-class ConsoleComingSoonChip extends StatelessWidget {
-  const ConsoleComingSoonChip({super.key, this.label = 'Coming soon'});
+/// Deliberately unbrand-coloured. It qualifies the thing beside it — a state, a caveat, a note
+/// about the platform — and a crimson chip would pull more attention than the value it is
+/// attached to. (Brand text at this size on [DeliveryColors.brandSoft] is also below AA, per the
+/// note in `tokens.dart`.)
+///
+/// Split out from [ConsoleComingSoonChip], which it now draws. The two had been the same class,
+/// so a real state that happens to want a quiet pill — a provisional score, say — could only get
+/// one by wearing the "no backend answers this yet" widget. That made the chip's own name stop
+/// meaning anything, and made grepping for unfinished work report finished work.
+class ConsoleQuietChip extends StatelessWidget {
+  const ConsoleQuietChip({super.key, required this.label});
 
   final String label;
 
@@ -256,6 +261,20 @@ class ConsoleComingSoonChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The mark put on an affordance the design draws but no backend answers yet.
+///
+/// A [ConsoleQuietChip] with one fixed meaning. Keep it for exactly that meaning: this type is
+/// what a sweep for unfinished surfaces counts, so wearing it for a real state hides the real
+/// ones in the noise.
+class ConsoleComingSoonChip extends StatelessWidget {
+  const ConsoleComingSoonChip({super.key, this.label = 'Coming soon'});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => ConsoleQuietChip(label: label);
 }
 
 /// The square icon button the design puts in the page header — the notification bell, and anything

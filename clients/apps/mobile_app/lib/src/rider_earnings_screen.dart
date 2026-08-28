@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -14,20 +16,46 @@ import 'rider_job_card.dart';
 /// Tips are rendered from the API even though nothing can collect one online yet — a day with no
 /// tips reads "0.00 tips", honestly, rather than wearing a chip.
 ///
-/// Two of the design's stats still have no source anywhere in the platform — acceptance rate and
-/// hours online — and they keep their "coming soon" chips. The rating column is real now: the
-/// rider's own standing from the rating API, rendered as "new" (never zero) while nobody has
-/// rated them.
+/// The three stats under the headline are all real now, and none of them comes from the ledger:
+///
+/// * **Deliveries** — the period's finished jobs, from the ledger.
+/// * **Completed** — the rider-performance endpoint's 30-day completion rate. Deliberately not
+///   labelled "accept rate": nothing anywhere records a *declined* offer (the board is claim-only,
+///   so a job a rider scrolls past is indistinguishable from one they never saw), and putting the
+///   completion rate under an acceptance label would be a lie about a different measurement. Null
+///   when the rider has claimed nothing in the window, and rendered "—" then, never 0% or 100%.
+/// * **Rating** — the rider's own standing, "new" (never zero) while nobody has rated them.
+///
+/// **Hours online** is the duty-hours report, bucketed in the *server's* zone rather than the
+/// phone's: the report echoes which zone split its days and this screen reads today's row out of
+/// it by that label instead of guessing which midnight a night shift belonged to.
+///
+/// All three ride alongside the money and none of them can sink it — a rider whose rating service
+/// is down still needs to see what they earned today, so each failure degrades to its own stat and
+/// no further.
 ///
 /// Without [moneyApi] the screen keeps its pre-wiring behaviour: figures derived from the rider's
-/// own delivered orders, labelled as derived, and an inert payout chip.
+/// own delivered orders, labelled as derived. The stats above are wired in that flavour too.
 class RiderEarningsScreen extends StatefulWidget {
-  const RiderEarningsScreen({super.key, required this.api, this.moneyApi});
+  const RiderEarningsScreen({
+    super.key,
+    required this.api,
+    this.moneyApi,
+    this.trackingApi,
+    this.performanceApi,
+  });
 
   final OrderApi api;
 
   /// The accounting ledger. Null keeps the derived-from-orders fallback.
   final RiderMoneyApi? moneyApi;
+
+  /// The duty half of the tracking service, behind the HOURS ONLINE figure. Null keeps that one
+  /// stat inert; everything else on the screen is unaffected.
+  final TrackingApi? trackingApi;
+
+  /// The rider-performance endpoint, behind the completion rate. Null keeps that one stat inert.
+  final RiderPerformanceApi? performanceApi;
 
   @override
   State<RiderEarningsScreen> createState() => _RiderEarningsScreenState();
@@ -43,7 +71,6 @@ class _LedgerData {
     required this.earnings,
     required this.jobs,
     required this.cashOuts,
-    this.standing,
   });
 
   final RiderEarnings earnings;
@@ -52,10 +79,29 @@ class _LedgerData {
   /// Newest first. What the cash-out sheet lists, and where a decided request shows PAID or
   /// REJECTED after a refresh.
   final List<CashOut> cashOuts;
+}
 
-  /// Null when the rating service could not answer — the stat then keeps its chip rather than
-  /// showing an invented number.
+/// The three facts about the *rider* rather than about their money, fetched from three different
+/// services and held together only because the design draws them in one row.
+///
+/// Every field is nullable and every one is loaded independently: a service that does not answer
+/// costs its own stat and nothing else. That is why they are not part of [_LedgerData] — a single
+/// failed rating call must not take the earnings down with it.
+class _RiderStats {
+  const _RiderStats({this.standing, this.performance, this.hours});
+
+  /// Null when the rating service could not answer. Distinct from an unrated rider, which is a
+  /// successful answer with no average in it.
   final RiderStanding? standing;
+
+  /// The 30-day claimed/delivered record. Null when no performance API was handed in, or the call
+  /// failed.
+  final RiderPerformance? performance;
+
+  /// Days with on-duty time in the window, in the server's own day zone. Null when no tracking API
+  /// was handed in, or the call failed. An empty [HoursOnline.days] is NOT null — it is a rider
+  /// who was never online, and reads as 0.00.
+  final HoursOnline? hours;
 }
 
 class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
@@ -63,6 +109,17 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
 
   late Future<List<DeliveryOrder>> _delivered;
   late Future<_LedgerData> _ledger;
+
+  /// The rider's own stats. Starts empty — every stat renders its own honest resting state until
+  /// the call behind it lands, and keeps the last answer if a later refresh fails.
+  _RiderStats _stats = const _RiderStats();
+
+  /// How many days of duty history the HOURS ONLINE figure covers.
+  ///
+  /// Seven, to match the WEEK period and the chart beside it: the tracking service refuses a
+  /// `days` outside 1..30 with a 400 rather than clamping, so this is a fixed, in-range constant
+  /// and never arithmetic on something a screen decided.
+  static const int _dutyWindowDays = 7;
 
   @override
   void initState() {
@@ -72,6 +129,7 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
     } else {
       _ledger = _loadLedger();
     }
+    unawaited(_loadStats());
   }
 
   // ------------------------------------------------------------------- loading
@@ -83,23 +141,47 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
       money.recentJobs(limit: 50),
       money.myCashOuts(limit: 10),
     ]);
-    // The rating rides along but must not sink the money screen: a rider whose rating service is
-    // down still needs to see what they earned today.
-    RiderStanding? standing;
-    try {
-      standing = await widget.api.myRiderRating();
-    } catch (_) {
-      standing = null;
-    }
     return _LedgerData(
       earnings: parts[0] as RiderEarnings,
       jobs: parts[1] as List<RiderJob>,
       cashOuts: parts[2] as List<CashOut>,
-      standing: standing,
     );
   }
 
-  void _reloadLedger() => setState(() => _ledger = _loadLedger());
+  /// The three rider stats, each independently.
+  ///
+  /// [Future.wait] would be wrong here: it completes with the first error and would throw away two
+  /// good answers because the third service was down. Each call is caught on its own instead, and
+  /// a failure leaves that stat null while the other two render.
+  Future<void> _loadStats() async {
+    final _RiderStats loaded = _RiderStats(
+      standing: await _quiet<RiderStanding>(() => widget.api.myRiderRating()),
+      performance: widget.performanceApi == null
+          ? null
+          : await _quiet<RiderPerformance>(() => widget.performanceApi!.mine()),
+      hours: widget.trackingApi == null
+          ? null
+          : await _quiet<HoursOnline>(
+              () => widget.trackingApi!.myDutyHours(days: _dutyWindowDays)),
+    );
+    if (!mounted) return;
+    setState(() => _stats = loaded);
+  }
+
+  /// Runs a call for its answer and treats any refusal as "no answer", which is what every one of
+  /// these stats renders as its own inert state.
+  static Future<T?> _quiet<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _reloadLedger() {
+    setState(() => _ledger = _loadLedger());
+    unawaited(_loadStats());
+  }
 
   /// The rider's own finished work — the pre-ledger fallback's source.
   Future<List<DeliveryOrder>> _loadDerived() async {
@@ -109,7 +191,10 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
         .toList();
   }
 
-  void _reloadDerived() => setState(() => _delivered = _loadDerived());
+  void _reloadDerived() {
+    setState(() => _delivered = _loadDerived());
+    unawaited(_loadStats());
+  }
 
   /// Midnight today, which is where "Today" starts and the 7-day window ends.
   static DateTime _startOfToday() {
@@ -275,9 +360,7 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
                     ),
                   ),
                   const SizedBox(height: DeliverySpacing.xs),
-                  // Nothing aggregates shift time yet — the presence service keeps only the
-                  // latest fix — so this stat stays honestly inert.
-                  YdComingSoon(label: t.riderComingSoon),
+                  _hoursOnlineValue(t),
                 ],
               ),
             ],
@@ -330,6 +413,12 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
               ),
             ),
           ],
+          // The counts behind the completion stat below, so the percentage is checkable rather
+          // than a figure the platform asserts about somebody's work.
+          if (_performanceCaption(t) case final Widget counts) ...<Widget>[
+            const SizedBox(height: 2),
+            counts,
+          ],
           const SizedBox(height: DeliverySpacing.md),
           const RiderHairline(),
           const SizedBox(height: DeliverySpacing.md),
@@ -352,29 +441,17 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
               ),
               Expanded(
                 child: _stat(
-                  // Nothing records a declined offer — the board is claim-only — so there is no
-                  // acceptance rate to compute.
-                  value: YdComingSoon(label: t.riderComingSoon),
-                  label: t.riderAcceptRate,
+                  // Deliberately the completion rate under a completion label. Nothing records a
+                  // declined offer — the board is claim-only, so an offer a rider scrolled past
+                  // is indistinguishable from one they never saw — and there is therefore no
+                  // acceptance rate on this platform to put here.
+                  value: _completionValue(t),
+                  label: t.riderCompletionRate,
                 ),
               ),
               Expanded(
                 child: _stat(
-                  value: data.standing == null
-                      ? YdComingSoon(label: t.riderComingSoon)
-                      : Text(
-                          // Unrated is "new", never zero — a zero shown as a score is a lie
-                          // about somebody's livelihood.
-                          data.standing!.isRated
-                              ? data.standing!.average!.toStringAsFixed(1)
-                              : t.ratingNewRider,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: DeliveryColors.ink,
-                            height: 1.2,
-                          ),
-                        ),
+                  value: _ratingValue(t),
                   label: t.riderRating,
                 ),
               ),
@@ -573,13 +650,18 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
 
   // ==================================================================== shared
 
-  /// The white 56px bar. Wired, the design's "Payout" slot is the cash-out entry: a live control
-  /// while there is money to ask for, and the REQUESTED tag while a request is in flight. Without
-  /// the ledger it stays the inert chip it always was.
+  /// The white 56px bar. The design's "Payout" slot is the cash-out entry: a live control while
+  /// there is money to ask for, and the REQUESTED tag while a request is in flight.
+  ///
+  /// The slot is left empty rather than chipped when this screen was built without a ledger. The
+  /// cash-out shipped — it is the `else` branch below, and it is what every rider in the app
+  /// reaches — so a "coming soon" chip here would describe a delivered feature as unbuilt. An
+  /// empty slot says the truth for a shell that was handed no ledger: there is nothing here to
+  /// press.
   Widget _header(DeliveryStrings t, {RiderBalance? balance}) {
     Widget? trailing;
     if (widget.moneyApi == null) {
-      trailing = YdComingSoon(label: t.riderPayout);
+      trailing = null;
     } else if (balance != null) {
       final CashOut? open = balance.openCashOut;
       trailing = Semantics(
@@ -692,6 +774,114 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// The 16px figure every stat in this screen renders itself as.
+  static const TextStyle _statValue = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: DeliveryColors.ink,
+    height: 1.2,
+  );
+
+  /// HOURS ONLINE, from the duty-hours report — the same figure in both flavours of the screen.
+  ///
+  /// The window's days are labelled in the *server's* zone, echoed on the report, so "today" is
+  /// the report's own `to` date rather than the phone's midnight: a 23:00–01:00 shift is split by
+  /// the zone that recorded it and this screen must not re-split it by a different one.
+  ///
+  /// Today reads the server's rounded per-day figure; the week sums the exact seconds and rounds
+  /// once, because adding seven rounded numbers is how a week comes to 39.99 hours. A date absent
+  /// from the report is a day with no on-duty time — the report carries only the days that had
+  /// some — so it reads 0.00 rather than going missing.
+  ///
+  /// No report yet — not loaded, or the service did not answer — reads "—", for the reason the
+  /// rating below gives: on-duty hours are a shipped, working figure, and a "coming soon" chip
+  /// would tell a rider their own timesheet was never built.
+  Widget _hoursOnlineValue(DeliveryStrings t) {
+    final HoursOnline? hours = _stats.hours;
+    if (hours == null) return Text('—', style: _statValue);
+
+    final double figure = _period == _Period.today
+        ? _hoursOn(hours, hours.to)
+        : hours.totalSecondsOnline / Duration.secondsPerHour;
+    return Text(
+      t.riderHoursValue(figure.toStringAsFixed(2)),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: _statValue,
+    );
+  }
+
+  static double _hoursOn(HoursOnline hours, DateTime day) {
+    for (final DutyDay entry in hours.days) {
+      if (entry.date.year == day.year &&
+          entry.date.month == day.month &&
+          entry.date.day == day.day) {
+        return entry.hoursOnline;
+      }
+    }
+    return 0;
+  }
+
+  /// The completion rate: delivered as a percentage of claimed over the server's own window.
+  ///
+  /// Null exactly when the rider has claimed nothing in the window, and rendered "—" then. Not
+  /// 0%, which reads as a rider who fails everything, and not 100%, which reads as an invented
+  /// success — both are lies about somebody's livelihood told by a screen with no data.
+  ///
+  /// A report that has not arrived reads "—" for the same reason: the figure is measured and
+  /// shipped, so the honest thing to say about a missing one is nothing, not "coming soon".
+  Widget _completionValue(DeliveryStrings t) {
+    final RiderPerformance? performance = _stats.performance;
+    if (performance == null) return Text('—', style: _statValue);
+
+    final double? rate = performance.completionRate;
+    return Text(
+      rate == null ? '—' : '${rate.toStringAsFixed(2)}%',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: _statValue,
+    );
+  }
+
+  /// The rider's own standing. Unrated is "new", never zero.
+  ///
+  /// A rating service that did not answer renders "—" rather than a "coming soon" chip: ratings
+  /// shipped, and a chip would describe the feature as unbuilt instead of the call as failed.
+  Widget _ratingValue(DeliveryStrings t) {
+    final RiderStanding? standing = _stats.standing;
+    if (standing == null) return const Text('—', style: _statValue);
+    return Text(
+      standing.isRated ? standing.average!.toStringAsFixed(1) : t.ratingNewRider,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: _statValue,
+    );
+  }
+
+  /// The counts the completion rate is computed from, in the caption language the stats card
+  /// already uses for "where this number came from" lines.
+  ///
+  /// Null when there is no performance answer, which draws no line at all — the card's other
+  /// caption lines are conditional in exactly the same way.
+  Widget? _performanceCaption(DeliveryStrings t) {
+    final RiderPerformance? performance = _stats.performance;
+    if (performance == null) return null;
+
+    final String dropped = performance.cancelledAfterClaim > 0
+        ? t.riderPerformanceDropped(performance.cancelledAfterClaim)
+        : '';
+    return Text(
+      t.riderPerformanceLine(performance.delivered, performance.claimed,
+              performance.windowDays) +
+          dropped,
+      style: const TextStyle(
+        fontSize: 11,
+        color: DeliveryColors.faint,
+        height: 1.4,
       ),
     );
   }
@@ -908,7 +1098,7 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
                     ),
                   ),
                   const SizedBox(height: DeliverySpacing.xs),
-                  YdComingSoon(label: t.riderComingSoon),
+                  _hoursOnlineValue(t),
                 ],
               ),
             ],
@@ -924,6 +1114,10 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
               height: 1.4,
             ),
           ),
+          if (_performanceCaption(t) case final Widget counts) ...<Widget>[
+            const SizedBox(height: 2),
+            counts,
+          ],
           const SizedBox(height: DeliverySpacing.md),
           const RiderHairline(),
           const SizedBox(height: DeliverySpacing.md),
@@ -946,13 +1140,13 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
               ),
               Expanded(
                 child: _stat(
-                  value: YdComingSoon(label: t.riderComingSoon),
-                  label: t.riderAcceptRate,
+                  value: _completionValue(t),
+                  label: t.riderCompletionRate,
                 ),
               ),
               Expanded(
                 child: _stat(
-                  value: YdComingSoon(label: t.riderComingSoon),
+                  value: _ratingValue(t),
                   label: t.riderRating,
                 ),
               ),

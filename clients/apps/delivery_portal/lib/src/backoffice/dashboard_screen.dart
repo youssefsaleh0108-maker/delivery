@@ -21,9 +21,13 @@ import '../shell/shell.dart';
 /// deep links, and renaming it would be a wide change for a screen that has always been the orders
 /// page whatever the file is called.
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key, required this.api});
+  const DashboardScreen({super.key, required this.api, this.notificationApi});
 
   final OrderApi api;
+
+  /// The operator's own in-app inbox, behind the header's bell. Optional so the screen can be
+  /// rendered on its own — a null one draws the bell greyed rather than polling nothing.
+  final NotificationApi? notificationApi;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -133,15 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: 'Orders Ledger',
         subtitle: 'Monitor active deliveries and order history',
         actions: <Widget>[
-          const ConsoleSearchField.global(
-            hintText: 'Search backoffice...',
-            enabled: false,
-          ),
-          const ConsoleComingSoonChip(),
-          const ConsoleIconAction(
-            icon: Icons.notifications_none,
-            tooltip: 'Notifications — coming soon',
-          ),
+          ConsoleBell(api: widget.notificationApi),
           ConsoleIconAction(
             icon: Icons.refresh,
             tooltip: 'Refresh · updates every ${_pollInterval.inSeconds}s',

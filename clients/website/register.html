@@ -81,6 +81,28 @@
 
     <div class="w-col">
 
+      <!--
+        With scripting off, said once and said where it can be read.
+
+        This has to sit here rather than inside the steps it is about. Every step but the first
+        carries the `hidden` attribute in the markup, and it is script that takes it off — so a note
+        inside the documents step, or on the receipt, is a note nobody without script will ever see.
+        This is the one place on the page that is visible before a single line of JavaScript runs.
+
+        The message does not pretend the form still works: it does not. Every field on it is
+        collected by script, the two verification codes are checked over the network, and the
+        documents are uploaded to storage. Nor does it offer an address to write to instead: this
+        site publishes no contact address, and inventing one here would send applications into a
+        mailbox nobody reads.
+      -->
+      <noscript>
+        <p class="form-error w-noscript">
+          This form needs JavaScript. The verification codes, the application itself and the
+          document uploads all go over the network as you fill it in, and none of that can happen
+          with scripting switched off. Turn it on for this site and reload the page.
+        </p>
+      </noscript>
+
       <!-- The step indicator. Numbered out of however many steps this kind of applicant has: a
            shop has four and a delivery company six, and saying "of 6" to a shop would be a lie. -->
       <div class="w-head">
@@ -296,84 +318,37 @@
 
       <!-- ------------------------------------------------------------ documents -->
       <!--
-        Drawn as designed, and still inert — deliberately.
+        A preview of what comes next, not a form.
 
-        The upload pipeline now exists server-side (presign → PUT to storage → confirm, on
-        /api/onboarding/applications/mine/documents), but every applicant-side document endpoint is
-        keyed on the caller's token: the service resolves the application from the signed-in
-        APPLICANT account, never from a reference in the URL, precisely so that a forwarded
-        reference cannot attach papers to somebody else's KYC file. This page is anonymous by
-        design — the documents step sits BEFORE the application even exists, and this origin has no
-        OAuth client: config.js carries only the API base, there is no Keycloak issuer configured
-        for the website, and the platform's allowed-client-ids list names only the mobile app, the
-        portal and the onboarding service. No applicant token can ever exist here, so the rows stay
-        in their empty state with the buttons disabled and the reason said once, at the top. The
-        accepted state is in register.css, ready for the day this page gains a signed-in applicant.
+        Every applicant-side document endpoint is keyed on the caller's token: the service resolves
+        the application from the signed-in APPLICANT account, never from a reference in the URL,
+        precisely so that a forwarded reference cannot attach papers to somebody else's KYC file.
+        There is no account to sign in with until the application exists — and it does not exist
+        until the last step of this wizard sends it — so a working upload control cannot be put
+        here. The real one is on the receipt, three clicks away, behind a passcode.
+
+        So this step keeps the design's rows and drops the design's button. A disabled "Choose File"
+        would be a control that never works, which is the thing this wave exists to remove; what
+        stands in its place is a plain label saying when the row becomes live. Nothing here is dead:
+        there is nothing here to press.
+
+        TWO ROWS, NOT FOUR. The design draws Tax & VAT Certificate and Active Fleet Insurance
+        alongside these. The platform has four document kinds in total — NATIONAL_ID,
+        DRIVING_LICENCE, VEHICLE_REGISTRATION, COMMERCIAL_REGISTRATION — and a carrier is asked for
+        the first and the last of them; presign refuses anything else before a URL exists. Drawing a
+        row for a paper that no endpoint will accept would be a promise this site cannot keep, so
+        the two rows that have a kind behind them are the two that ship. Add the rows back when the
+        enum grows, and the list in register.js is the one place to change.
       -->
       <section class="wstep" data-step="documents" hidden>
         <p class="w-note">
-          <span class="w-soon">Coming soon</span>
-          Uploads are not open yet. Your application is read without them, and we will ask for these
-          by email if we need them before deciding.
+          You will attach these on the next screen, once your application is in and you have chosen
+          a passcode. Nothing is uploaded from this step.
         </p>
 
-        <div class="w-uploads">
-          <div class="w-upload">
-            <span class="w-upload-tile">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <span class="w-upload-text">
-              <b>Commercial Registration (CR)</b>
-              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
-            </span>
-            <button class="w-choose" disabled>Choose File</button>
-          </div>
-
-          <div class="w-upload">
-            <span class="w-upload-tile">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <span class="w-upload-text">
-              <b>Tax &amp; VAT Certificate</b>
-              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
-            </span>
-            <button class="w-choose" disabled>Choose File</button>
-          </div>
-
-          <div class="w-upload">
-            <span class="w-upload-tile">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <span class="w-upload-text">
-              <b>Active Fleet Insurance Certificate</b>
-              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
-            </span>
-            <button class="w-choose" disabled>Choose File</button>
-          </div>
-
-          <div class="w-upload">
-            <span class="w-upload-tile">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M11.6665 1.666H5.0005C4.55852 1.666 4.13464 1.84161 3.82211 2.1542C3.50958 2.46678 3.334 2.89074 3.334 3.3328V16.6672C3.334 17.1093 3.50958 17.5332 3.82211 17.8458C4.13464 18.1584 4.55852 18.334 5.0005 18.334H14.9995C15.4415 18.334 15.8654 18.1584 16.1779 17.8458C16.4904 17.5332 16.666 17.1093 16.666 16.6672V6.6664M11.6665 1.666C11.9303 1.66558 12.1915 1.71734 12.4352 1.81832C12.6789 1.9193 12.9002 2.0675 13.0864 2.25438L16.0761 5.24462C16.2634 5.43089 16.412 5.65244 16.5133 5.89647C16.6145 6.14051 16.6664 6.40219 16.666 6.6664M11.6665 1.666V5.833C11.6665 6.05403 11.7543 6.26601 11.9106 6.4223C12.0668 6.57859 12.2788 6.6664 12.4997 6.6664L16.666 6.6664M8.3335 7.4998H6.667M13.333 10.8334H6.667M13.333 14.167H6.667"
-                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <span class="w-upload-text">
-              <b>Authorized Signatory Owner ID</b>
-              <span>Drag and drop or click to upload (PDF, PNG up to 5MB)</span>
-            </span>
-            <button class="w-choose" disabled>Choose File</button>
-          </div>
-        </div>
+        <!-- Rows written by register.js from the same list the receipt's real panel uses, so the
+             preview and the thing it previews cannot drift apart. -->
+        <div class="w-uploads" id="documents-preview"></div>
 
         <div class="w-actions">
           <button class="secondary" data-nav="back">Back</button>
@@ -557,6 +532,68 @@
 
     <div class="w-rule"></div>
 
+    <!--
+      Setting a passcode, and what it is for.
+
+      The documents endpoints are keyed on the caller's token and nothing else: the service looks
+      the application up from the signed-in APPLICANT account rather than from a reference in a URL,
+      so that a reference forwarded to a colleague cannot be used to staple papers onto somebody
+      else's KYC file. That design is the reason this block exists here rather than a step earlier —
+      there is no account until there is an application, and the application is sent one screen ago.
+
+      The passcode is the same one the mobile app's keypad collects, and the same one that will
+      sign this person into the portal once a reviewer says yes.
+    -->
+    <div class="w-block" id="account-block">
+      <p class="w-block-title">Set your passcode</p>
+      <p class="w-note" id="account-note">
+        Six digits. It signs you in right here so you can attach your papers, and it is the same
+        passcode the app's keypad will ask you for.
+      </p>
+      <div class="w-verify">
+        <div class="w-field">
+          <label class="w-label" for="passcode">Passcode<span class="req">*</span></label>
+          <!--
+            type=password, not a plain field: this page is written for the shared computer in the
+            back of a shop. autocomplete="new-password" so a manager's browser offers to save it
+            under the right heading rather than overwriting something else.
+
+            EXACTLY six digits, and the length is not this page's choice. The service takes 6 to 128
+            characters, but the mobile app signs in with a six-key pad and refuses anything else, so
+            a seven-character passcode set here would be a credential its owner could not use on
+            their phone. Six digits works in the app, in the portal and here.
+          -->
+          <input id="passcode" type="password" inputmode="numeric" autocomplete="new-password"
+                 minlength="6" maxlength="6" pattern="[0-9]{6}" placeholder="••••••">
+        </div>
+        <button class="primary w-send" id="account-save">Set it</button>
+      </div>
+
+      <p class="w-verified" id="account-done" hidden>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M14.5335 6.66681C14.838 8.161 14.621 9.71442 13.9187 11.068C13.2165 12.4216 12.0714 13.4935 10.6745 14.105C9.2776 14.7165 7.71326 14.8307 6.24237 14.4284C4.77149 14.0261 3.48297 13.1317 2.59169 11.8944C1.70041 10.6571 1.26025 9.15163 1.34461 7.62906C1.42898 6.10649 2.03276 4.65887 3.05527 3.52759C4.07779 2.39631 5.45723 1.64976 6.96355 1.41244C8.46987 1.17512 10.012 1.46138 11.3328 2.22347M5.99976 7.33315L7.99976 9.33315L14.6664 2.66649"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Signed in
+      </p>
+      <p class="form-error" id="account-error" hidden></p>
+    </div>
+
+    <!-- The real thing, unlocked by the block above. Rows are written by register.js. -->
+    <div class="w-rule" id="documents-rule" hidden></div>
+
+    <div class="w-block" id="documents-block" hidden>
+      <p class="w-block-title">Your documents</p>
+      <p class="w-note">
+        A photo or a PDF of each. Upload a better copy any time before a decision — the newest one
+        is the one a reviewer reads.
+      </p>
+      <div class="w-uploads" id="documents-list"></div>
+      <p class="form-error" id="documents-error" hidden></p>
+    </div>
+
+    <div class="w-rule"></div>
+
     <div class="w-block">
       <p class="w-block-title">What happens next?</p>
       <div class="w-block">
@@ -578,7 +615,11 @@
           <span class="w-next-num">3</span>
           <span class="w-next-text">
             <b>Hub Activation</b>
-            <span>You'll receive an email to set a password and open your dashboard.</span>
+            <!-- Approval grants the real role to the account made above and takes APPLICANT off it;
+                 it does not mint a second account, so the passcode chosen here keeps working. Said
+                 plainly because the old wording promised an email that no longer arrives for
+                 anybody who sets a passcode. -->
+            <span>Approval opens your dashboard. The passcode you set above is the one that gets you in.</span>
           </span>
         </div>
       </div>

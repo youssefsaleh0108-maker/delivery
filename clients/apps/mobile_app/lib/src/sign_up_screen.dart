@@ -46,7 +46,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   final TextEditingController _name = TextEditingController();
   final TextEditingController _email = TextEditingController();
-  final TextEditingController _phone = TextEditingController();
   final TextEditingController _code = TextEditingController();
 
   /// Entered twice on the form. This IS the Keycloak password, not a local unlock on top of one,
@@ -78,7 +77,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void dispose() {
     for (final TextEditingController c in <TextEditingController>[
-      _name, _email, _phone, _code, _passcode, _confirmPasscode
+      _name, _email, _code, _passcode, _confirmPasscode
     ]) {
       c.removeListener(_refresh);
       c.dispose();
@@ -327,20 +326,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
           autofillHints: const <String>[AutofillHints.email],
         ),
         const SizedBox(height: 14),
-        // Drawn, and inert. `/api/onboarding/signup` takes an address, a name and a passcode and
-        // nothing else — a number typed here would be collected and dropped, which is worse than
-        // not asking for it. It becomes real when the endpoint grows a phone field.
-        YdComingSoon.wrap(
-          label: t.authComingSoon,
-          child: AuthField(
-            label: t.authPhoneNumber,
-            hint: t.authPhoneHint,
-            controller: _phone,
-            enabled: false,
-            keyboardType: TextInputType.phone,
-          ),
-        ),
-        const SizedBox(height: 14),
+        // The design draws a phone field here and it is gone rather than chipped. `SignUpRequest`
+        // is an address, a verification token, two names and a passcode — there is no phone on it,
+        // and no other endpoint on the customer path takes one. A greyed field asking for a number
+        // the platform cannot store is a question with nowhere to put the answer: it costs the
+        // reader a moment deciding whether to fill it in and gives nothing back. When the endpoint
+        // grows a phone field, the field comes back live rather than as a chip.
         AuthField(
           label: t.password,
           hint: t.authPasscodeHint,

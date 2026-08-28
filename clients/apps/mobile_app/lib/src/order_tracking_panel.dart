@@ -5,22 +5,31 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+// `hide Path`: latlong2 ships a `Path<T>` of its own, and the trail painter below draws with
+// `dart:ui`'s. Importing both unqualified turns every `Path()` in this file into the wrong one.
+import 'package:latlong2/latlong.dart' hide Path;
 
+import 'address_sheet.dart' show OsmBasemap;
 import 'customer_chat_screen.dart';
-import 'delivery_address.dart' show custEtaLegLabel, custEtaReasonLabel;
+import 'delivery_address.dart';
 import 'order_details_screen.dart' show CustomerStatusPill;
 
 /// Live tracking for an order in flight, drawn as the redesign's `customer-order-tracking`
 /// (node 3:619): a 520px map canvas with the tracking sheet — rounded 24 at the top, lifted by the
 /// heavier sheet shadow — sitting under it.
 ///
-/// **The map canvas is still a styled placeholder — but the data on it is real now.** A tile
-/// layer needs a reachable tile server and an API key, and this deployment has neither, so the
-/// canvas stays the marked not-yet-live surface the design sizes it at. What changed with the
-/// tracking backend: the rider's recorded fixes are drawn on it as before, and the remaining
-/// distance and ETA the tracking service computes are drawn over it and into the sheet's
-/// headline. When the server says no estimate exists, its reason is shown instead — a number is
-/// never invented.
+/// **The map canvas is a real map now.** OpenStreetMap raster tiles under the sheet, carrying the
+/// rider's recorded track as a polyline, a marker on their latest fix, and a marker on the door
+/// when the address the order went to still has its pin in this device's address book. The
+/// remaining distance and ETA the tracking service computes are drawn over the tiles and into the
+/// sheet's headline. When the server says no estimate exists, its reason is shown instead — a
+/// number is never invented, and neither is a position: nothing is plotted that a fix did not put
+/// there.
+///
+/// The styled canvas the panel used to be survives as the tile-failure surface — an unreachable
+/// tile server leaves the shape of the journey drawn on the palette's own neutrals rather than a
+/// grey lattice of missing squares.
 ///
 /// The design's rider card — avatar, name, rating, call button — is still not drawn. The wire
 /// carries a `riderId` and nothing else about the person, and inventing a name, a face or a
@@ -59,6 +68,13 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
   /// The height the design gives the map canvas.
   static const double _canvasHeight = 520;
 
+  /// Where the canvas opens before any fix exists to look at.
+  ///
+  /// The platform's own configured zone (`delivery.platform.zone`, `Asia/Beirut`) as a point, and
+  /// only ever a viewport: it is not a position, is never labelled as one, and no marker is drawn
+  /// on it. The moment a real fix or a real door coordinate exists the camera fits to that instead.
+  static const LatLng _openingView = LatLng(33.8938, 35.5018);
+
   Timer? _poll;
   List<RiderPosition> _trail = <RiderPosition>[];
   RiderPosition? _latest;
@@ -67,6 +83,27 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
   /// The server's last answer about when the rider is expected. Null until the first answer —
   /// and always rendered exactly as sent: a number when it has one, its reason when it does not.
   OrderEta? _eta;
+
+  // ------------------------------------------------------------------ the map
+
+  final MapController _map = MapController();
+  bool _mapReady = false;
+
+  /// True once the customer has panned or zoomed. After that the camera is theirs: refitting it
+  /// under their thumb every five seconds is the classic way to make a live map unusable.
+  bool _cameraIsTheirs = false;
+
+  /// How many points the camera was last fitted to, so a fit only happens when there is something
+  /// new to fit.
+  int _fittedTo = 0;
+
+  /// The door, when this device knows where it is.
+  ///
+  /// The order carries the address as a line of text and nothing else — the wire has no
+  /// coordinates on it — so the only honest source is the address book this customer placed the
+  /// order from, where the pin they dropped is stored against that same line. No match means no
+  /// destination marker; a guessed one would be a pin on somebody else's door.
+  LatLng? _destination;
 
   bool get _isLive =>
       widget.order.status.wire != 'DELIVERED' && widget.order.status.wire != 'CANCELLED';
@@ -79,6 +116,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
   void initState() {
     super.initState();
     _refresh();
+    _resolveDestination();
     if (_isLive) {
       _poll = Timer.periodic(_pollInterval, (_) => _refresh());
     }
@@ -87,7 +125,42 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
   @override
   void dispose() {
     _poll?.cancel();
+    _map.dispose();
     super.dispose();
+  }
+
+  /// Looks the order's address up in this customer's own address book to find the pin it was
+  /// placed with.
+  ///
+  /// Scoped to [DeliveryOrder.customerId], which is the same Keycloak subject the store is keyed
+  /// on — so one account can never read another's saved pins, and a device that never saved this
+  /// address simply has no destination marker.
+  Future<void> _resolveDestination() async {
+    final DeliveryAddressStore book =
+        DeliveryAddressStore(ownerId: widget.order.customerId);
+    LatLng? found;
+    try {
+      await book.load();
+      final String line = widget.order.deliveryAddress.trim();
+      for (final DeliveryAddress a in <DeliveryAddress>[
+        if (book.selected != null) book.selected!,
+        ...book.recents,
+      ]) {
+        if (a.line.trim() != line) continue;
+        final double? lat = a.latitude;
+        final double? lng = a.longitude;
+        if (lat == null || lng == null) continue;
+        found = LatLng(lat, lng);
+        break;
+      }
+    } catch (_) {
+      // No marker. The address book is a local convenience and an unreadable one costs the map a
+      // pin, not the screen.
+    } finally {
+      book.dispose();
+    }
+    if (!mounted || found == null) return;
+    setState(() => _destination = found);
   }
 
   Future<void> _refresh() async {
@@ -163,21 +236,148 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
 
   // ------------------------------------------------------------------ the map slot
 
+  /// Everything with a real position on it: the recorded track, and the door when it is known.
+  List<LatLng> get _plotted => <LatLng>[
+        for (final RiderPosition p in _trail) LatLng(p.lat, p.lng),
+        if (_destination != null) _destination!,
+      ];
+
+  /// Keeps the whole journey in frame while it is still the app's camera to move.
+  void _fitCamera() {
+    if (!_mapReady || _cameraIsTheirs) return;
+    final List<LatLng> points = _plotted;
+    if (points.isEmpty || points.length == _fittedTo) return;
+    _fittedTo = points.length;
+    _map.fitCamera(CameraFit.coordinates(
+      coordinates: points,
+      padding: const EdgeInsets.all(56),
+      // A single fix would otherwise fit at the maximum zoom the projection allows, which is a
+      // doorstep filling the screen with no street around it to place it on.
+      maxZoom: 16.5,
+    ));
+  }
+
   Widget _mapCanvas(DeliveryStrings t) {
+    final List<LatLng> points = _plotted;
+    // Fitting inside build would move the camera during layout; this runs after the frame that
+    // brought the new fix in.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fitCamera();
+    });
+
     return SizedBox(
       height: _canvasHeight,
-      child: Stack(
-        children: <Widget>[
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _MapSurfacePainter(),
-              child: _trail.isEmpty
-                  ? null
-                  : CustomPaint(painter: _TrailPainter(_trail)),
-            ),
+      child: OsmBasemap(
+        mapController: _map,
+        options: MapOptions(
+          initialCenter: points.isEmpty ? _openingView : points.first,
+          initialZoom: points.isEmpty ? 12 : 15,
+          minZoom: 3,
+          maxZoom: 18,
+          backgroundColor: DeliveryColors.background,
+          initialCameraFit: points.isEmpty
+              ? null
+              : CameraFit.coordinates(
+                  coordinates: points,
+                  padding: const EdgeInsets.all(56),
+                  maxZoom: 16.5,
+                ),
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.drag |
+                InteractiveFlag.pinchZoom |
+                InteractiveFlag.pinchMove |
+                InteractiveFlag.doubleTapZoom |
+                InteractiveFlag.scrollWheelZoom,
           ),
-          if (_trail.isEmpty)
-            Positioned.fill(
+          onMapReady: () {
+            _mapReady = true;
+            _fittedTo = points.length;
+          },
+          onPositionChanged: (MapCamera _, bool hasGesture) {
+            if (hasGesture) _cameraIsTheirs = true;
+          },
+        ),
+        layers: <Widget>[
+          if (_trail.length > 1)
+            PolylineLayer<Object>(
+              polylines: <Polyline<Object>>[
+                Polyline<Object>(
+                  points: <LatLng>[
+                    for (final RiderPosition p in _trail) LatLng(p.lat, p.lng),
+                  ],
+                  color: DeliveryColors.brand.withValues(alpha: 0.75),
+                  borderColor: DeliveryColors.white,
+                  borderStrokeWidth: 1.5,
+                  strokeWidth: 4,
+                ),
+              ],
+            ),
+          MarkerLayer(
+            markers: <Marker>[
+              if (_destination case final LatLng door)
+                Marker(
+                  point: door,
+                  width: 34,
+                  height: 34,
+                  child: _destinationMarker(t),
+                ),
+              if (_latest case final RiderPosition fix)
+                Marker(
+                  point: LatLng(fix.lat, fix.lng),
+                  width: 34,
+                  height: 34,
+                  child: _riderMarker(t),
+                ),
+            ],
+          ),
+        ],
+        // The canvas this panel used to be, kept for exactly the case it was built for: no tiles.
+        fallback: _styledSurface(),
+        overlay: (bool _) => _mapOverlay(t),
+      ),
+    );
+  }
+
+  /// Where the door is: the brand pin, ringed in white so it reads over any tile.
+  Widget _destinationMarker(DeliveryStrings t) => Semantics(
+        label: t.custYourAddress,
+        child: const Icon(Icons.place, size: 30, color: DeliveryColors.brand),
+      );
+
+  /// Where the rider was at their last recorded fix — never anywhere they have not pinged from.
+  Widget _riderMarker(DeliveryStrings t) => Semantics(
+        label: t.custTheRider,
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: DeliveryColors.ink,
+            shape: BoxShape.circle,
+            border: Border.all(color: DeliveryColors.white, width: 2.5),
+            boxShadow: YdCard.softShadow,
+          ),
+          child: const Icon(Icons.two_wheeler, size: 16, color: DeliveryColors.white),
+        ),
+      );
+
+  /// The tile-failure surface: the page background, the faint lattice, and the journey drawn on it
+  /// at its own scale — the panel's original canvas, now doing the one job it is still right for.
+  Widget _styledSurface() {
+    return CustomPaint(
+      painter: _MapSurfacePainter(),
+      child: _trail.isEmpty
+          ? null
+          : CustomPaint(painter: _TrailPainter(_trail)),
+    );
+  }
+
+  /// Everything drawn in screen space over the canvas, in either state: the "Live map" label, the
+  /// ETA chip, and the sentence that stands in for a track there is nothing to draw yet.
+  Widget _mapOverlay(DeliveryStrings t) {
+    return Stack(
+      children: <Widget>[
+        if (_trail.isEmpty && _destination == null)
+          Positioned.fill(
+            child: IgnorePointer(
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -198,13 +398,24 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                     Padding(
                       padding: const EdgeInsetsDirectional.symmetric(
                           horizontal: DeliverySpacing.lg),
-                      child: Text(
-                        _afterPickup ? t.waitingForRider : t.locationAfterPickup,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: DeliveryColors.muted,
-                          height: 1.4,
+                      child: Container(
+                        padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: DeliverySpacing.sm + 2,
+                          vertical: DeliverySpacing.xs + 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: DeliveryColors.white,
+                          borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                          boxShadow: YdCard.softShadow,
+                        ),
+                        child: Text(
+                          _afterPickup ? t.waitingForRider : t.locationAfterPickup,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: DeliveryColors.muted,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     ),
@@ -212,12 +423,15 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                 ),
               ),
             ),
-          // The real numbers, on the map surface: how far the rider still has to go and when
-          // they are expected — drawn only when the tracking service actually sent them.
-          if (_eta case final OrderEta eta when eta.available)
-            PositionedDirectional(
-              bottom: DeliverySpacing.md,
-              start: DeliverySpacing.lg,
+          ),
+        // The real numbers, on the map surface: how far the rider still has to go and when
+        // they are expected — drawn only when the tracking service actually sent them.
+        if (_eta case final OrderEta eta when eta.available)
+          PositionedDirectional(
+            // Above the licence notice in the opposite corner, and clear of the sheet's lip.
+            bottom: DeliverySpacing.md,
+            start: DeliverySpacing.lg,
+            child: IgnorePointer(
               child: Container(
                 padding: const EdgeInsetsDirectional.symmetric(
                   horizontal: DeliverySpacing.sm + 2,
@@ -246,41 +460,34 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                 ),
               ),
             ),
-          // The basemap itself is the part that does not exist yet, and says so in the design's
-          // own chip language rather than by drawing streets nobody can navigate by.
-          PositionedDirectional(
-            top: DeliverySpacing.md,
-            start: DeliverySpacing.lg,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Container(
-                  padding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: DeliverySpacing.sm + 2,
-                    vertical: DeliverySpacing.xs + 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: DeliveryColors.white,
-                    borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-                    boxShadow: YdCard.softShadow,
-                  ),
-                  child: Text(
-                    t.custLiveMap,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: DeliveryColors.muted,
-                      height: 1.2,
-                    ),
-                  ),
+          ),
+        PositionedDirectional(
+          top: DeliverySpacing.md,
+          start: DeliverySpacing.lg,
+          child: IgnorePointer(
+            child: Container(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: DeliverySpacing.sm + 2,
+                vertical: DeliverySpacing.xs + 2,
+              ),
+              decoration: BoxDecoration(
+                color: DeliveryColors.white,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                boxShadow: YdCard.softShadow,
+              ),
+              child: Text(
+                t.custLiveMap,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryColors.muted,
+                  height: 1.2,
                 ),
-                const SizedBox(width: DeliverySpacing.sm),
-                YdComingSoon(label: t.custSoon, icon: Icons.schedule),
-              ],
+              ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

@@ -5,8 +5,16 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
+
+import 'store_pin_map.dart';
 
 /// Shop Configuration — everything a merchant needs to get their store listed and keep it accurate.
+///
+/// The map thumbnail under the address card is a real OpenStreetMap view now, and the shop's pin
+/// is placed and cleared through the store's own `location` endpoints. It keeps the exact slot the
+/// frame gives it — 100px, same radius, same place in the column — and falls back to the styled
+/// lattice this screen used to draw whenever the tiles will not load.
 ///
 /// Drawn to the 2026-08 Figma frame `merchant-shop-config` (3:2039): a 120px cover area with a
 /// "Change Cover" badge over a scrim, a bordered address card above a map thumbnail, and one
@@ -20,9 +28,13 @@ import 'package:flutter/material.dart';
 /// controls all stay — restyled into the frame's own card-and-labelled-box language rather than
 /// dropped, because dropping them would strand a real merchant in DRAFT with no way out.
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key, required this.api});
+  const StoreScreen({super.key, required this.api, this.geocoding});
 
   final StoreApi api;
+
+  /// Lets the map picker turn the typed address into a point instead of making the merchant pan
+  /// across a country. Optional: without it the picker still works, it just has no search box.
+  final GeocodingApi? geocoding;
 
   @override
   State<StoreScreen> createState() => _StoreScreenState();
@@ -253,7 +265,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
                 _profileCard(t),
                 const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
-                _addressSection(t),
+                _addressSection(t, store),
                 const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
                 _operatingCard(t),
                 const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
@@ -587,7 +599,39 @@ class _StoreScreenState extends State<StoreScreen> {
 
   // ---------------------------------------------------------------- address
 
-  Widget _addressSection(DeliveryStrings t) {
+  /// The pin the merchant just placed, or removed, saved through the store's own endpoints.
+  ///
+  /// Goes through [_run] like every other write on this screen, so a refusal is reported in the
+  /// same words and the form reloads from the server rather than from what we hoped happened.
+  Future<void> _editPin(DeliveryStrings t, Store store) async {
+    final StorePinChoice? choice = await showStorePinPicker(
+      context,
+      latitude: store.latitude,
+      longitude: store.longitude,
+      geocoding: widget.geocoding,
+      // Whatever is in the address box now, not what was loaded — a merchant who has just typed
+      // their street should find it offered, not the old one.
+      addressHint: _address.text.trim().isEmpty ? null : _address.text.trim(),
+    );
+    if (choice == null || !mounted) return;
+
+    switch (choice) {
+      case StorePinPlaced(point: final LatLng point):
+        await _run(
+          () => widget.api
+              .setPin(store.id, lat: point.latitude, lng: point.longitude)
+              .then((_) {}),
+          t.merchPinSaved,
+        );
+      case StorePinRemoved():
+        await _run(
+          () => widget.api.clearPin(store.id).then((_) {}),
+          t.merchPinCleared,
+        );
+    }
+  }
+
+  Widget _addressSection(DeliveryStrings t, Store store) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -625,7 +669,19 @@ class _StoreScreenState extends State<StoreScreen> {
           ),
         ),
         const SizedBox(height: DeliverySpacing.sm),
-        _MapPlaceholder(label: t.merchbMapPreviewSoon, soonLabel: t.merchbSoon),
+        // The frame's 100px map slot, now a real one. Same size, same radius, same place in the
+        // column — what changed is that it draws where the shop actually is and is the way to
+        // move it.
+        StorePinPreview(
+          latitude: store.latitude,
+          longitude: store.longitude,
+          onTap: _saving ? null : () => _editPin(t, store),
+        ),
+        const SizedBox(height: DeliverySpacing.xs + 2),
+        Text(
+          t.merchPinWhyItMatters,
+          style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+        ),
       ],
     );
   }
@@ -1171,83 +1227,3 @@ class _ChipButton extends StatelessWidget {
   }
 }
 
-/// The frame's 100px map thumbnail, as a styled surface rather than a map.
-///
-/// Nothing in the data model carries coordinates — not a store, not an address — so there is no
-/// map to draw and no pin to place. The slot keeps the exact size and radius the frame gives it,
-/// painted as a faint grid with a pin glyph, and says plainly that it is not live yet. Faking a
-/// location here would be worse than leaving it empty: a merchant would believe it.
-class _MapPlaceholder extends StatelessWidget {
-  const _MapPlaceholder({required this.label, required this.soonLabel});
-
-  /// Already localised by the caller.
-  final String label;
-  final String soonLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 100,
-      width: double.infinity,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: DeliveryColors.background,
-            border: Border.all(color: DeliveryColors.border),
-            borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          ),
-          child: Stack(
-            children: <Widget>[
-              const Positioned.fill(
-                child: CustomPaint(painter: _GridPainter()),
-              ),
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const Icon(Icons.place_outlined, size: 18, color: DeliveryColors.faint),
-                    const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: DeliveryColors.faint,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(width: DeliverySpacing.sm),
-                    YdComingSoon(label: soonLabel),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The faint 16px lattice behind the map slot — enough to read as "a map goes here", not enough to
-/// be mistaken for one.
-class _GridPainter extends CustomPainter {
-  const _GridPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = DeliveryColors.border
-      ..strokeWidth = 1;
-    for (double x = 0; x < size.width; x += 16) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += 16) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GridPainter oldDelegate) => false;
-}

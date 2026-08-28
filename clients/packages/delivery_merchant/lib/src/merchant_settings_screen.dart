@@ -1,6 +1,10 @@
+import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
+
+import 'merchant_analytics_screen.dart';
+import 'merchant_payout_screen.dart';
 
 /// Account Settings, as the 2026-08 Figma frame `merchant-settings` (3:2194) draws it.
 ///
@@ -12,12 +16,21 @@ import 'package:flutter/material.dart';
 /// it takes the things only the host knows — who is signed in, where "Shop Profile" leads, how to
 /// sign out — as parameters rather than reaching for a session singleton.
 ///
-/// Three of the frame's affordances have no backend behind them yet and are drawn inert rather than
-/// wired to something invented: the payout details row, the analytics row, and — unless the host
-/// passes [onNotificationSettings] — the notifications row. Each carries the design's own
-/// "Soon" chip. Note also that the frame's `Linked` status text beside the payout row is *not*
-/// reproduced: there is no payout record to be linked to, and a status that is always "Linked"
-/// would be a lie told in a small font.
+/// Shop Analytics is live: Order Manager aggregates a shop's own daily series now, and the row
+/// opens [MerchantAnalyticsScreen] as soon as the host hands over an [AggregatesApi].
+///
+/// Payment & Bank details is live too, and the note that used to sit here is worth keeping as a
+/// correction. It said no merchant payout or bank record exists anywhere on the platform, reading
+/// the accounting service — whose payout side really is rider cash-outs only — and concluding
+/// there was nothing to show. The record was in onboarding all along: every partner gives an
+/// account holder and an IBAN on the wizard's bank step, and the endpoint that reads it back
+/// resolves the application from the caller's token rather than from a role. See
+/// [MerchantPayoutScreen]. The frame's `Linked` status text beside the row is still *not*
+/// reproduced — the record carries its own verification state, and that is what the page shows
+/// rather than a word that would always say the same thing.
+///
+/// Every remaining "Soon" chip on this screen is now a statement about the *host's* wiring — a
+/// null [aggregates], [documents] or [onNotificationSettings] — and not about the platform.
 class MerchantSettingsScreen extends StatelessWidget {
   const MerchantSettingsScreen({
     super.key,
@@ -27,6 +40,8 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onEditAccount,
     this.onShopProfile,
     this.onNotificationSettings,
+    this.aggregates,
+    this.documents,
     this.onSignOut,
   });
 
@@ -49,6 +64,16 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// Opens the host's notification preferences. Null marks the row as not yet available rather
   /// than hiding it, because the frame draws it.
   final VoidCallback? onNotificationSettings;
+
+  /// Opens Shop Analytics. Optional only because a host that has not wired the daily-series
+  /// client cannot open a screen that is nothing but the series; when it is null the row keeps the
+  /// design's "Soon" chip rather than leading to an empty page.
+  final AggregatesApi? aggregates;
+
+  /// The onboarding documents-and-payout client, behind the Payment & Bank details row. Null
+  /// leaves that row marked as not yet available, which is now a statement about the host's
+  /// wiring rather than about the platform.
+  final DocumentsApi? documents;
 
   /// Ends the session. Null hides the button entirely — a sign-out that does nothing is worse
   /// than no sign-out at all.
@@ -202,11 +227,14 @@ class MerchantSettingsScreen extends StatelessWidget {
             onTap: onShopProfile,
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-          // No payout or bank record exists anywhere in the platform yet.
+          // Live. The chip that stood here rested on "no payout or bank record exists anywhere in
+          // the platform yet", and the record was there the whole time — filed against the
+          // application, read back from the token, role-blind. See [MerchantPayoutScreen].
           _MenuRow(
             icon: Icons.credit_card,
             title: t.merchbPaymentBankDetails,
-            soonLabel: t.merchbSoon,
+            onTap: documents == null ? null : () => _openPayout(context),
+            soonLabel: documents == null ? t.merchbSoon : null,
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           _MenuRow(
@@ -216,11 +244,14 @@ class MerchantSettingsScreen extends StatelessWidget {
             soonLabel: onNotificationSettings == null ? t.merchbSoon : null,
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-          // Per-shop analytics are not aggregated by any service today.
+          // Live now that Order Manager aggregates a shop's own daily series. Opens the screen
+          // itself rather than a host callback: the page is nothing but that series, so a host
+          // that has the client has everything the screen needs.
           _MenuRow(
             icon: Icons.bar_chart,
             title: t.merchbShopAnalytics,
-            soonLabel: t.merchbSoon,
+            onTap: aggregates == null ? null : () => _openAnalytics(context),
+            soonLabel: aggregates == null ? t.merchbSoon : null,
           ),
           if (onSignOut != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
@@ -232,6 +263,27 @@ class MerchantSettingsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _openPayout(BuildContext context) {
+    final DocumentsApi? api = documents;
+    if (api == null) return;
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => MerchantPayoutScreen(api: api, onBack: navigator.pop),
+    ));
+  }
+
+  void _openAnalytics(BuildContext context) {
+    final AggregatesApi? api = aggregates;
+    if (api == null) return;
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => MerchantAnalyticsScreen(
+        api: api,
+        onBack: navigator.pop,
+      ),
+    ));
   }
 
   /// Signing out of a phone that has no other way back in is worth one question first — the same

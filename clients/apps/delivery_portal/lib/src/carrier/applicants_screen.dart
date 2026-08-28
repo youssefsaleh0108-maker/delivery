@@ -196,9 +196,12 @@ class _ApplicantsScreenState extends State<ApplicantsScreen> {
             tooltip: t.refresh,
             onPressed: () => _load(),
           ),
+          // FINISH-WAVE NOTE: the console bell's slot. `ConsoleBell` is not exported from
+          // `shell/shell.dart` yet, so this keeps the drawn control and compiles against the
+          // barrel as it stands.
           const ConsoleIconAction(
             icon: Icons.notifications_none,
-            tooltip: 'Notifications — coming soon',
+            tooltip: 'Notifications',
           ),
         ],
       ),

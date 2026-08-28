@@ -16,9 +16,15 @@ import '../shell/shell.dart';
 /// draws; everything else a carrier needs (its payout account, its logins, its roster) opens in the
 /// drawer behind the first of them.
 class ProvidersScreen extends StatefulWidget {
-  const ProvidersScreen({super.key, required this.api});
+  const ProvidersScreen({super.key, required this.api, this.notificationApi});
 
   final DeliveryProviderApi api;
+
+  /// The in-app inbox behind the header bell, exactly as the other Backoffice frames carry it.
+  ///
+  /// This screen kept a greyed bell and a "coming soon" chip after the inbox went live on the
+  /// other five — the feed existed, this frame just never asked for it.
+  final NotificationApi? notificationApi;
 
   @override
   State<ProvidersScreen> createState() => _ProvidersScreenState();
@@ -196,11 +202,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
             controller: _search,
             onChanged: (String v) => setState(() => _query = v),
           ),
-          const ConsoleIconAction(
-            icon: Icons.notifications_none,
-            tooltip: 'Notifications — no feed yet',
-          ),
-          const ConsoleComingSoonChip(),
+          ConsoleBell(api: widget.notificationApi),
           // Not drawn on this frame, and it has to be here: onboarding a company is the only way a
           // carrier enters the register at all, and it lived on a floating button before.
           ConsoleButton(
@@ -589,7 +591,9 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
             ),
             const SizedBox(width: DeliverySpacing.sm),
             if (score.provisional)
-              const ConsoleComingSoonChip(label: 'Provisional')
+              // A measured state, not an unbuilt one: the score is answered, it is just answered
+              // from too few orders to lean on. The quiet pill, not the coming-soon chip.
+              const ConsoleQuietChip(label: 'Provisional')
             else
               Text('out of 100', style: ConsoleText.meta),
           ],

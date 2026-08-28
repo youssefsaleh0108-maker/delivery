@@ -18,27 +18,40 @@ import '../shell/shell.dart';
 /// joins them. That is N+1 requests, bounded by the number of carriers, and it is the only path
 /// there is; a joined endpoint would be the right fix and is not this screen's to write.
 ///
-/// Presence and ratings are real now. The Status column renders what the presence roster reports —
-/// on duty, signal lost, off duty — and "Unknown" only for a rider who has never declared duty at
-/// all, which is a different fact from "offline". The Rating column renders the customer average
-/// where one exists and "New" where nobody has rated the rider yet, never a zero. What still has no
-/// source — a rider's work region and their deliveries today — stays empty and says so under the
-/// table rather than being invented.
+/// Presence, ratings, today's deliveries and hours on the road are all real now. The Status column
+/// renders what the presence roster reports — on duty, signal lost, off duty — and "Unknown" only
+/// for a rider who has never declared duty at all, which is a different fact from "offline". The
+/// Rating column renders the customer average where one exists and "New" where nobody has rated the
+/// rider yet, never a zero. Deliveries Today comes from the platform's own per-rider count, and
+/// Hours Online from the tracking service's duty ledger.
+///
+/// The one column with no source anywhere on the platform is Region: nothing ties a rider to a
+/// zone in any service, so that cell stays empty and the note under the table says why.
 class RidersScreen extends StatefulWidget {
   const RidersScreen({
     super.key,
     required this.api,
     required this.trackingApi,
     required this.orderApi,
+    this.performanceApi,
+    this.notificationApi,
   });
 
   final DeliveryProviderApi api;
 
-  /// The presence roster — the Online/Offline dots and the last-seen times.
+  /// The presence roster — the Online/Offline dots and the last-seen times — and the per-rider
+  /// duty-hours ledger behind the Hours Online column.
   final TrackingApi trackingApi;
 
   /// Rider standings, one lookup per rider; there is no batch endpoint.
   final OrderApi orderApi;
+
+  /// Per-rider delivered counts for today, platform-wide. Optional so the screen still renders
+  /// standalone; null leaves the column empty rather than drawing a zero it did not measure.
+  final RiderPerformanceApi? performanceApi;
+
+  /// The operator's own in-app inbox, behind the header's bell.
+  final NotificationApi? notificationApi;
 
   @override
   State<RidersScreen> createState() => _RidersScreenState();
@@ -58,6 +71,11 @@ class _RidersScreenState extends State<RidersScreen> {
   /// presence: the carrier join and the ratings move on human timescales and reload on demand.
   static const Duration _presencePoll = Duration(seconds: 30);
 
+  /// The duty-hours window. The tracking endpoint REFUSES a `days` outside 1..30 with a 400 —
+  /// unlike the order-manager series, which clamps — so this is a value the request can always
+  /// carry, and the column header says which window it is.
+  static const int _dutyWindowDays = 7;
+
   late Future<List<_RiderRow>> _roster = _load();
   Timer? _poll;
 
@@ -67,6 +85,19 @@ class _RidersScreenState extends State<RidersScreen> {
 
   /// True when the roster call itself failed — every pill then reads "Unknown" honestly.
   bool _presenceDown = false;
+
+  /// Today's delivered count per rider, in the platform's own zone.
+  ///
+  /// Null until the first answer, and null again if the endpoint stops answering — the column then
+  /// empties rather than showing yesterday's numbers. When it IS present, a rider missing from it
+  /// genuinely delivered nothing: the contract omits zero-delivery riders and leaves the client to
+  /// draw its own zeros against its own roster, which is what [_deliveriesCell] does.
+  Map<String, int>? _deliveredToday;
+
+  /// Seconds on duty over the last [_dutyWindowDays] days, keyed by rider ref. A missing key means
+  /// the lookup failed or has not landed; a present zero means the rider was genuinely never on
+  /// duty in the window, which the duty contract expresses as an empty `days` list.
+  Map<String, int> _dutySeconds = <String, int>{};
 
   /// Customer standings, keyed by rider ref. A missing key means the lookup failed or has not
   /// landed; a present standing with a null average means genuinely unrated.
@@ -81,7 +112,7 @@ class _RidersScreenState extends State<RidersScreen> {
   @override
   void initState() {
     super.initState();
-    _poll = Timer.periodic(_presencePoll, (_) => _refreshPresence());
+    _poll = Timer.periodic(_presencePoll, (_) => _refreshLive());
   }
 
   @override
@@ -98,9 +129,9 @@ class _RidersScreenState extends State<RidersScreen> {
   /// unreachable roster must not hide every other rider on the platform. The same holds for the
   /// tracking service and the ratings — each degrades to its own column, never to the table.
   Future<List<_RiderRow>> _load() async {
-    // Fired first and not awaited yet: presence is one request for the whole fleet and can land
-    // while the per-carrier rosters are still being joined.
-    final Future<void> presenceDone = _refreshPresence();
+    // Fired first and not awaited yet: presence and today's delivered counts are one request each
+    // for the whole fleet and can land while the per-carrier rosters are still being joined.
+    final Future<void> liveDone = _refreshLive();
 
     final Paged<DeliveryProviderInfo> page = await widget.api.all(size: 50);
 
@@ -130,9 +161,15 @@ class _RidersScreenState extends State<RidersScreen> {
       });
 
     unawaited(_loadStandings(rows));
-    await presenceDone;
+    unawaited(_loadDutyHours(rows));
+    await liveDone;
     return rows;
   }
+
+  /// The two fleet-wide reads that change while the console sits open: who is on the road, and how
+  /// many drops each of them has made today. Each fails into its own column, never into the page.
+  Future<void> _refreshLive() =>
+      Future.wait<void>(<Future<void>>[_refreshPresence(), _refreshDelivered()]);
 
   /// One presence request for the whole fleet. Failure marks the column down rather than the page.
   Future<void> _refreshPresence() async {
@@ -150,6 +187,58 @@ class _RidersScreenState extends State<RidersScreen> {
       if (!mounted) return;
       setState(() => _presenceDown = true);
     }
+  }
+
+  /// Today's delivered count for every rider who delivered anything, platform-wide.
+  ///
+  /// One request for the whole fleet. Riders with nothing delivered are absent from the answer by
+  /// design, so the map is joined onto this screen's own roster and the zeros are drawn here —
+  /// never treating absence as an error, and never treating a failed request as a zero.
+  Future<void> _refreshDelivered() async {
+    final RiderPerformanceApi? api = widget.performanceApi;
+    if (api == null) return;
+    try {
+      final List<RiderDeliveredToday> counts = await api.deliveredToday();
+      if (!mounted) return;
+      setState(() {
+        _deliveredToday = <String, int>{
+          for (final RiderDeliveredToday c in counts) c.riderId: c.delivered,
+        };
+      });
+    } catch (_) {
+      // The column empties. A stale count on a page somebody is reading to decide who to dispatch
+      // is worse than an honest dash.
+      if (!mounted) return;
+      setState(() => _deliveredToday = null);
+    }
+  }
+
+  /// One duty-hours report per rider, concurrently; there is no batch endpoint.
+  ///
+  /// Not polled: this is a seven-day total and it moves on the scale of a shift, not of a refresh.
+  /// A rider the tracking service has never heard of comes back 404 and simply stays out of the
+  /// map — the cell then reads as "nothing loaded", which is not the same as "no hours".
+  Future<void> _loadDutyHours(List<_RiderRow> rows) async {
+    final List<MapEntry<String, int>?> found = await Future.wait<MapEntry<String, int>?>(
+      rows.map((_RiderRow r) async {
+        try {
+          final HoursOnline report =
+              await widget.trackingApi.riderDutyHours(r.ref, days: _dutyWindowDays);
+          // The exact seconds, as the contract insists: adding the rounded hours up is how a week
+          // comes to 39.99.
+          return MapEntry<String, int>(r.ref, report.totalSecondsOnline);
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      _dutySeconds = <String, int>{
+        for (final MapEntry<String, int>? e in found)
+          if (e != null) e.key: e.value,
+      };
+    });
   }
 
   /// One standing per rider, concurrently. A failed lookup leaves its cell empty — never a zero,
@@ -179,6 +268,7 @@ class _RidersScreenState extends State<RidersScreen> {
     setState(() {
       _roster = _load();
       _standings = <String, RiderStanding>{};
+      _dutySeconds = <String, int>{};
     });
   }
 
@@ -189,15 +279,7 @@ class _RidersScreenState extends State<RidersScreen> {
         title: 'Riders Control Panel',
         subtitle: 'Manage active courier performance and dispatch statuses',
         actions: <Widget>[
-          const ConsoleSearchField.global(
-            hintText: 'Search backoffice...',
-            enabled: false,
-          ),
-          const ConsoleIconAction(
-            icon: Icons.notifications_none,
-            tooltip: 'Notifications — no feed yet',
-          ),
-          const ConsoleComingSoonChip(),
+          ConsoleBell(api: widget.notificationApi),
           ConsoleIconAction(
             icon: Icons.refresh,
             tooltip: 'Refresh',
@@ -301,14 +383,15 @@ class _RidersScreenState extends State<RidersScreen> {
               ],
               onSelected: (String? id) => setState(() => _carrierId = id),
             ),
-            // The design's second selector. Riders carry no work region on this platform — zones
-            // exist, but nothing ties a rider to one — so it is drawn and dead rather than
-            // filtering on a field that would have to be invented first.
-            const ConsoleFilterButton(
-              label: 'All regions',
-              icon: Icons.public,
-              trailing: ConsoleComingSoonChip(),
-            ),
+            // The design draws a second selector, "All regions", and it is not here.
+            //
+            // Riders carry no work region on this platform. Zones exist, but they describe where a
+            // *customer* is; no rider record holds one, and the rider wizard's own zone step says
+            // the same thing from the other end. So this is not a filter waiting on a release —
+            // there is no field for it to filter on, and there is no plan in the data model that
+            // would create one. A dead control with a "coming soon" chip promised an operator that
+            // regional filtering was arriving; an operator who wants riders in one area filters by
+            // carrier or searches by name, which are both live beside this.
           ],
         ),
         ConsoleSearchField(
@@ -324,13 +407,18 @@ class _RidersScreenState extends State<RidersScreen> {
 
   Widget _table(List<_RiderRow> rows) {
     return ConsoleTable(
-      minWidth: 1000,
+      // 1120, not the design's 1000: the Hours Online column is new, and the table scrolls inside
+      // its own card rather than the page overflowing at a narrow window.
+      minWidth: 1120,
       columns: const <ConsoleColumn>[
         ConsoleColumn(label: 'Rider Name', flex: 1),
         ConsoleColumn(label: 'Carrier Partner', width: 180),
         ConsoleColumn(label: 'Status', width: 140),
-        ConsoleColumn(label: 'Region', width: 120),
+        ConsoleColumn(label: 'Region', width: 110),
         ConsoleColumn(label: 'Deliveries Today', width: 130),
+        // The window is named in the header rather than left to a tooltip: "12h" means nothing
+        // without it, and the endpoint's window is a request parameter, not a platform constant.
+        ConsoleColumn(label: 'Hours Online (7d)', width: 130),
         ConsoleColumn(label: 'Rating', width: 100, alignRight: true),
       ],
       rows: <ConsoleTableRow>[
@@ -355,7 +443,8 @@ class _RidersScreenState extends State<RidersScreen> {
               ),
               _statusCell(r),
               const ConsoleNoValue(tooltip: 'Riders carry no work region yet'),
-              const ConsoleNoValue(tooltip: 'No per-rider delivery count yet'),
+              _deliveriesCell(r),
+              _hoursCell(r),
               _ratingCell(r),
             ],
           ),
@@ -383,9 +472,9 @@ class _RidersScreenState extends State<RidersScreen> {
         ),
       ),
       footer: const ConsoleInertNote(
-        text: 'Work region and daily deliveries are not reported by any service yet. Riders '
-            'shown are those assigned to a carrier; the in-house fleet is everyone else and '
-            'cannot be listed.',
+        text: 'Nothing on the platform ties a rider to a work region, so that column stays empty. '
+            'Riders shown are those assigned to a carrier; the in-house fleet is everyone else '
+            'and cannot be listed.',
       ),
     );
   }
@@ -431,6 +520,51 @@ class _RidersScreenState extends State<RidersScreen> {
           Text('seen ${_ago(p.lastSeenAt!)}', style: ConsoleText.meta),
         ],
       ],
+    );
+  }
+
+  /// Today's drops, in the platform's zone.
+  ///
+  /// A zero here is a real zero: the endpoint omits riders who delivered nothing, and this screen
+  /// joins that answer onto its own roster. An empty cell means something else entirely — the
+  /// count could not be read — and the two must never render alike.
+  Widget _deliveriesCell(_RiderRow r) {
+    final Map<String, int>? counts = _deliveredToday;
+    if (counts == null) {
+      return const ConsoleNoValue(tooltip: 'Today’s delivery counts could not be read');
+    }
+    final int delivered = counts[r.ref] ?? 0;
+    return Tooltip(
+      message: delivered == 0
+          ? 'Nothing delivered today'
+          : '$delivered delivered today, in the platform’s timezone',
+      child: Text(
+        '$delivered',
+        style: delivered == 0 ? ConsoleText.cellMuted : ConsoleText.cellStrong,
+      ),
+    );
+  }
+
+  /// Time on duty over the last seven days.
+  ///
+  /// Totalled from the exact seconds the tracking service reports and shown to one decimal, because
+  /// summing its already-rounded hours is how a week comes to 39.99. A rider it has never heard of
+  /// is absent from the map and gets a dash; a rider it knows with no shifts in the window gets a
+  /// true "0.0h".
+  Widget _hoursCell(_RiderRow r) {
+    final int? seconds = _dutySeconds[r.ref];
+    if (seconds == null) {
+      return const ConsoleNoValue(tooltip: 'No duty history loaded for this rider');
+    }
+    final double hours = seconds / 3600;
+    return Tooltip(
+      message: seconds == 0
+          ? 'Never on duty in the last $_dutyWindowDays days'
+          : 'Over the last $_dutyWindowDays days',
+      child: Text(
+        '${hours.toStringAsFixed(1)}h',
+        style: seconds == 0 ? ConsoleText.cellMuted : ConsoleText.cell,
+      ),
     );
   }
 

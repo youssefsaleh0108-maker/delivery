@@ -13,10 +13,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// The Carrier Control Tower — Figma `carrier-dashboard` (3:3429).
 ///
-/// The design asks for four KPI cards, an hourly chart and a live feed, and the platform can
-/// honestly answer some of that and not the rest. These tests are about that line: every figure on
-/// screen has to come from something the app loaded, and every figure the design draws that nothing
-/// can answer has to say so rather than showing a plausible number.
+/// The design asks for four KPI cards with movements, a two-series hourly chart and a live feed.
+/// Most of that is answerable now: the carrier-scoped daily series carries the tier split and two
+/// whole weeks, and orders carry the tier they were placed at. These tests are about the line that
+/// has not moved — every figure on screen comes from something the app loaded, and a comparison
+/// nothing measured is not drawn at all.
 class _StubAdapter implements HttpClientAdapter {
   _StubAdapter(this.responses, {this.failing = const <String>{}});
 
@@ -64,11 +65,20 @@ Map<String, dynamic> _day(String day, int orders, int delivered, double money) =
       'waived': 0,
     };
 
+/// Fourteen days of the carrier's own money: a quiet week, then one worth twice as much. Two equal
+/// windows, which is the only shape a week-on-week line may be drawn from.
+List<Map<String, dynamic>> _fortnight() => <Map<String, dynamic>>[
+      for (int i = 1; i <= 7; i++)
+        _day('2026-08-0${i.toString()}', 2, 1, 10),
+      for (int i = 10; i <= 16; i++) _day('2026-08-$i', 4, 2, 20),
+    ];
+
 Map<String, dynamic> _summary({
   int todayDelivered = 8,
   int yesterdayDelivered = 6,
   double todayMoney = 45,
   double yesterdayMoney = 36,
+  List<Map<String, dynamic>>? days,
 }) {
   final Map<String, dynamic> yesterday =
       _day('2026-08-15', yesterdayDelivered, yesterdayDelivered, yesterdayMoney);
@@ -77,7 +87,7 @@ Map<String, dynamic> _summary({
 
   return <String, dynamic>{
     'windowDays': 14,
-    'days': <Map<String, dynamic>>[yesterday, today],
+    'days': days ?? _fortnight(),
     'today': today,
     'yesterday': yesterday,
     'window': <String, dynamic>{
@@ -92,12 +102,33 @@ Map<String, dynamic> _summary({
   };
 }
 
+/// The carrier-scoped tier series: seven quiet days, then seven with twice the deliveries, both
+/// tiers always present because the server zero-fills.
+Map<String, dynamic> _series() => <String, dynamic>{
+      'windowDays': 14,
+      'days': <Map<String, dynamic>>[
+        for (int i = 1; i <= 7; i++)
+          <String, dynamic>{
+            'day': '2026-08-0$i',
+            'standard': <String, dynamic>{'orders': 2, 'delivered': 1, 'gross': 30.0},
+            'express': <String, dynamic>{'orders': 0, 'delivered': 0, 'gross': 0.0},
+          },
+        for (int i = 10; i <= 16; i++)
+          <String, dynamic>{
+            'day': '2026-08-$i',
+            'standard': <String, dynamic>{'orders': 3, 'delivered': 1, 'gross': 40.0},
+            'express': <String, dynamic>{'orders': 1, 'delivered': 1, 'gross': 25.0},
+          },
+      ],
+    };
+
 /// One carrier job. [hoursAgo] places it on today's clock, which is what the hourly chart buckets.
 Map<String, dynamic> _job({
   required String id,
   String status = 'DELIVERED',
   String? riderId = 'rider-aaaaaaaa',
   int hoursAgo = 1,
+  String tier = 'STANDARD',
 }) {
   final DateTime at = DateTime.now().subtract(Duration(hours: hoursAgo));
   return <String, dynamic>{
@@ -109,6 +140,8 @@ Map<String, dynamic> _job({
     'totalAmount': 50.0,
     'deliveryAddress': '12 Bliss Street',
     'deliveryFee': 5.0,
+    'deliveryTier': tier,
+    'expressSurcharge': tier == 'EXPRESS' ? 2.0 : 0.0,
     'storeName': 'Corner Shop',
     'contactPhone': '+100',
     'notes': null,
@@ -143,23 +176,45 @@ Map<String, dynamic> _company() => <String, dynamic>{
 
 late _StubAdapter _adapter;
 
-({OrderApi order, DeliveryProviderApi provider}) _apis({
+typedef CarrierApis = ({
+  OrderApi order,
+  DeliveryProviderApi provider,
+  AggregatesApi aggregates,
+  RiderPerformanceApi performance,
+});
+
+CarrierApis _apis({
   Map<String, dynamic>? summary,
   List<String> riders = const <String>['rider-aaaaaaaa', 'rider-bbbbbbbb'],
   List<Map<String, dynamic>>? jobs,
+  List<Map<String, dynamic>>? deliveredToday,
   Set<String> failing = const <String>{},
 }) {
   _adapter = _StubAdapter(
     <String, Object>{
       '/orders/carrier/summary': summary ?? _summary(),
+      '/orders/carrier/daily': _series(),
       '/orders/carrier': _page(jobs ?? <Map<String, dynamic>>[_job(id: 'aaaaaaaa11')]),
+      '/orders/riders/delivered-today': deliveredToday ??
+          <Map<String, dynamic>>[
+            <String, dynamic>{
+              'riderId': 'rider-aaaaaaaa',
+              'delivered': 4,
+              'day': '2026-08-16',
+            },
+          ],
       '/my-company/riders': <String, dynamic>{'providerId': 'p1', 'riders': riders},
       '/my-company': _company(),
     },
     failing: failing,
   );
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = _adapter;
-  return (order: OrderApi(dio), provider: DeliveryProviderApi(dio));
+  return (
+    order: OrderApi(dio),
+    provider: DeliveryProviderApi(dio),
+    aggregates: AggregatesApi(dio),
+    performance: RiderPerformanceApi(dio),
+  );
 }
 
 Widget _wrap(Widget child, {Locale locale = const Locale('en')}) => MaterialApp(
@@ -177,12 +232,15 @@ Widget _wrap(Widget child, {Locale locale = const Locale('en')}) => MaterialApp(
 
 Future<void> pump(
   WidgetTester tester,
-  ({OrderApi order, DeliveryProviderApi provider}) apis, {
+  CarrierApis apis, {
   Locale locale = const Locale('en'),
   VoidCallback? onShowJobs,
   /// The content column's width — the viewport minus the 260px rail when this screen is mounted
   /// in the console. 1180 is what the design's 1440 leaves it.
   double width = 1180,
+  /// The shell has not been rewired to pass the new clients yet, so the screen has to work with
+  /// and without them. False mounts it the way the portal mounts it today.
+  bool wired = true,
 }) async {
   // The console is drawn at 1440. Tall, because the page scrolls and a short viewport makes every
   // findsNothing below the fold pass for the wrong reason.
@@ -194,6 +252,8 @@ Future<void> pump(
     CarrierDashboardScreen(
       api: apis.order,
       providerApi: apis.provider,
+      aggregatesApi: wired ? apis.aggregates : null,
+      performanceApi: wired ? apis.performance : null,
       onShowJobs: onShowJobs,
     ),
     locale: locale,
@@ -229,14 +289,24 @@ void main() {
     expect(find.text('0 Active'), findsOneWidget);
   });
 
-  testWidgets('the fleet card admits it cannot compare with yesterday',
+  testWidgets('the fleet card says what it knows about today, not an invented movement',
       (WidgetTester tester) async {
-    // The design's "+4 new vs yesterday". Nothing records how large a fleet was yesterday, so the
-    // card must not print a movement — it prints the chip instead.
+    // The design's "+4 new vs yesterday" has no source — nothing records a fleet's size yesterday.
+    // What the platform does know about the same riders today is drawn instead.
     await pump(tester, _apis());
 
-    expect(find.text('Day-over-day soon'), findsOneWidget);
+    expect(find.text('1 of 2 delivered something today'), findsOneWidget);
+    expect(find.text('Day-over-day soon'), findsNothing);
     expect(find.textContaining('+4'), findsNothing);
+  });
+
+  testWidgets('a rider absent from delivered-today counts as zero, not as missing',
+      (WidgetTester tester) async {
+    // The endpoint omits riders who delivered nothing. Treating that absence as an error would
+    // blank a card on the commonest morning of all.
+    await pump(tester, _apis(deliveredToday: const <Map<String, dynamic>>[]));
+
+    expect(find.text('0 of 2 delivered something today'), findsOneWidget);
   });
 
   testWidgets('the two figures that can be compared show a real movement',
@@ -250,6 +320,27 @@ void main() {
     expect(find.text('vs yesterday'), findsNWidgets(2));
   });
 
+  testWidgets('the week-over-week line is computed from two equal windows',
+      (WidgetTester tester) async {
+    // Deliveries from the carrier-scoped series: 7 last fortnight, 14 this week. Money from the
+    // summary's own day list: 70.00 then 140.00 — never from the series, whose gross carries the
+    // express surcharge, which is platform revenue and not a carrier's.
+    await pump(tester, _apis());
+
+    expect(find.textContaining('This week: 14 delivered'), findsOneWidget);
+    expect(find.textContaining('This week: 140.00 earned on delivery fees'), findsOneWidget);
+    expect(find.textContaining('+100.0% on the week before'), findsNWidgets(2));
+  });
+
+  testWidgets('a series that did not arrive leaves the week line off, not at zero',
+      (WidgetTester tester) async {
+    await pump(tester, _apis(failing: const <String>{'/orders/carrier/daily'}));
+
+    expect(find.textContaining('This week: 14 delivered'), findsNothing);
+    // The money half comes from the summary and is unaffected.
+    expect(find.textContaining('This week: 140.00 earned on delivery fees'), findsOneWidget);
+  });
+
   testWidgets('never divides by a yesterday of nothing', (WidgetTester tester) async {
     await pump(tester, _apis(summary: _summary(yesterdayDelivered: 0, yesterdayMoney: 0)));
 
@@ -258,17 +349,18 @@ void main() {
     expect(find.text('Nothing delivered yesterday to compare with'), findsOneWidget);
   });
 
-  testWidgets('the chart is one series and says the tier split is not real',
+  testWidgets('the chart draws the design two series, off the tier each job was placed at',
       (WidgetTester tester) async {
-    // The design splits every column into Express and Standard. There are no service tiers on this
-    // platform; a second series would be an invented number beside a real one.
-    await pump(tester, _apis());
+    await pump(tester, _apis(jobs: <Map<String, dynamic>>[
+      _job(id: 'aaaaaaaa11'),
+      _job(id: 'bbbbbbbb22', tier: 'EXPRESS', hoursAgo: 2),
+    ]));
 
     expect(find.text('Hourly Dispatch Volume'), findsOneWidget);
-    expect(find.text('Jobs'), findsOneWidget);
-    expect(find.text('Tier split soon'), findsOneWidget);
-    expect(find.text('Express'), findsNothing);
-    expect(find.text('Standard'), findsNothing);
+    expect(find.text('Standard'), findsOneWidget);
+    expect(find.text('Express'), findsOneWidget);
+    expect(find.text('Tier split soon'), findsNothing);
+    expect(find.textContaining('split by the tier each was placed at'), findsOneWidget);
   });
 
   testWidgets('the feed is built from real jobs with real timestamps',
@@ -281,6 +373,21 @@ void main() {
     expect(find.text('Live Active Feed'), findsOneWidget);
     expect(find.textContaining('Job #aaaaaaaa delivered'), findsOneWidget);
     expect(find.textContaining('Job #bbbbbbbb was cancelled.'), findsOneWidget);
+    expect(find.text('2 of 2 recent'), findsOneWidget);
+  });
+
+  testWidgets('the header search narrows the feed to matching jobs', (WidgetTester tester) async {
+    await pump(tester, _apis(jobs: <Map<String, dynamic>>[
+      _job(id: 'aaaaaaaa11'),
+      _job(id: 'bbbbbbbb22', status: 'CANCELLED', hoursAgo: 2),
+    ]));
+
+    await tester.enterText(find.byType(TextField).first, 'bbbbbbbb');
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Job #bbbbbbbb was cancelled.'), findsOneWidget);
+    expect(find.textContaining('Job #aaaaaaaa delivered'), findsNothing);
+    expect(find.text('1 of 1 matching'), findsOneWidget);
   });
 
   testWidgets('a KPI whose data did not arrive shows a dash, not a zero',
@@ -291,6 +398,17 @@ void main() {
 
     expect(find.text('—'), findsWidgets);
     expect(find.text('0 Riders'), findsNothing);
+  });
+
+  testWidgets('works, and says less, when the new clients are not passed',
+      (WidgetTester tester) async {
+    // The portal shell still builds this screen with two APIs. Until it passes the rest, the page
+    // has to draw what it can rather than break or invent.
+    await pump(tester, _apis(), wired: false);
+
+    expect(find.text('8 Completed'), findsOneWidget);
+    expect(find.text('Fleet size is not recorded day by day'), findsOneWidget);
+    expect(find.textContaining('This week: 14 delivered'), findsNothing);
   });
 
   testWidgets('the deliveries card leads to the job board', (WidgetTester tester) async {

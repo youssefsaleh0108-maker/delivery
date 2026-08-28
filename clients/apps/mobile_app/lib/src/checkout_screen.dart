@@ -84,6 +84,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// card to tokenise.
   static const String _devInstrumentToken = 'dev-test-instrument';
 
+  /// How fast the customer asked for it. Standard by default, and sent explicitly either way —
+  /// an absent tier means STANDARD on the server, but saying so is what keeps this screen and the
+  /// order agreeing when that default ever changes.
+  ///
+  /// The premium is priced entirely server-side from `delivery.orders.express-surcharge` and
+  /// snapshotted onto the order at placement. **Nothing publishes that figure before an order
+  /// exists** — there is no quote endpoint and, by the contract, never a surcharge field on the
+  /// request — so this screen offers the choice and says a surcharge applies, and the amount is
+  /// itemised on the receipt from the order's own `expressSurcharge`. A number guessed here would
+  /// be a price the server never quoted.
+  DeliveryTier _tier = DeliveryTier.standard;
+
+  /// The two tiers, in the order the server declares them.
+  static const List<DeliveryTier> _tiers = <DeliveryTier>[
+    DeliveryTier.standard,
+    DeliveryTier.express,
+  ];
+
   bool _placing = false;
 
   @override
@@ -183,6 +201,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         contactPhone: _phone.text.trim(),
         notes: notes,
         paymentMethod: _payment,
+        // Always sent, never inferred. The surcharge that follows from it is the server's to
+        // price and the receipt's to itemise.
+        deliveryTier: _tier,
         // The canonical code the server quoted, never raw field text. The discount is recomputed
         // at placement against the basket the server priced itself.
         promoCode: widget.promo?.code,
@@ -243,6 +264,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               padding: const EdgeInsets.all(DeliverySpacing.lg),
               children: <Widget>[
                 _addressSection(t),
+                const SizedBox(height: _sectionGap),
+                _tierSection(t),
                 const SizedBox(height: _sectionGap),
                 _paymentSection(t),
                 const SizedBox(height: _sectionGap),
@@ -464,7 +487,76 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (address.notes != null && address.notes!.isNotEmpty) address.notes!,
       ].join(' · ');
 
-  // ------------------------------------------------------------------ section 2: how it is paid
+  // ------------------------------------------------------------------ section 2: how fast
+
+  /// The delivery tier: the same two-up card strip the payment section uses, because it is the
+  /// same kind of decision — one of a short list, made once, in the same geometry.
+  ///
+  /// Express carries a caption saying a surcharge applies rather than a figure. The premium is a
+  /// server config value snapshotted at placement and no endpoint publishes it beforehand, so the
+  /// amount appears where the server first states it: on the receipt, itemised as its own line.
+  Widget _tierSection(DeliveryStrings t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          t.custDeliverySpeed,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+            height: 1.25,
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            for (int i = 0; i < _tiers.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(
+                child: _payCard(
+                  icon: _tiers[i] == DeliveryTier.express
+                      ? Icons.bolt_rounded
+                      : Icons.schedule_rounded,
+                  label: _tiers[i] == DeliveryTier.express
+                      ? t.deliveryTierExpress
+                      : t.deliveryTierStandard,
+                  caption: _tiers[i] == DeliveryTier.express
+                      ? t.custExpressSurchargeApplies
+                      : null,
+                  selected: _tier == _tiers[i],
+                  onTap: () => setState(() => _tier = _tiers[i]),
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (_tier == DeliveryTier.express) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Icon(Icons.info_outline, size: 14, color: DeliveryColors.muted),
+              const SizedBox(width: DeliverySpacing.xs + 2),
+              Expanded(
+                child: Text(
+                  t.custExpressNote,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: DeliveryColors.muted,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------------ section 3: how it is paid
 
   /// The payment strip: equal cards in the design's geometry, cash first.
   ///
@@ -607,7 +699,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // ------------------------------------------------------------------ section 3: the note
+  // ------------------------------------------------------------------ section 4: the note
 
   Widget _notesSection(DeliveryStrings t) {
     return _fieldSection(

@@ -57,6 +57,19 @@ String _application({
  "rejectionReason":${rejectionReason == null ? 'null' : '"$rejectionReason"'},
  "provisionedUserRef":null,"provisionedEntityId":null}''';
 
+/// `PartnerRecordView` — what the correction endpoint answers with. Thinner than an application:
+/// this is the record being corrected, not the application being reviewed.
+String _record({
+  required String id,
+  required String name,
+  bool phoneVerified = true,
+}) =>
+    '''
+{"id":"$id","kind":"MERCHANT","status":"PROVISIONED","businessName":"$name",
+ "contactName":"Sam Owner","contactEmail":"sam@$id.example","contactPhone":"+9612000",
+ "emailVerifiedAt":"2026-08-20T09:00:00Z",
+ "phoneVerifiedAt":${phoneVerified ? '"2026-08-20T09:00:00Z"' : 'null'}}''';
+
 String _document({
   required String id,
   String kind = 'NATIONAL_ID',
@@ -73,6 +86,7 @@ void main() {
   late _FakeAdapter adapter;
   late OnboardingApi api;
   late DocumentsApi documentsApi;
+  late PartnerManagementApi managementApi;
 
   /// The waiting queue. Set per test before [pump].
   late String queueJson;
@@ -80,14 +94,43 @@ void main() {
   /// What `/applications/{id}/documents` answers. Empty unless a test uploads something.
   late String documentsJson;
 
+  /// What `/applications/{id}/suspension` answers — the standing and its whole history. Active
+  /// and never touched unless a test says otherwise.
+  late String standingJson;
+
+  /// What `/applications/{id}/audit` answers. Empty means the record was never corrected.
+  late String auditJson;
+
   setUp(() {
+    standingJson = '{"suspended":false,"lastChange":null,"history":[]}';
+    auditJson = '[]';
     queueJson = '''
 [${_application(id: 'a1', name: 'Rose & Crust Pizzeria', details: '{"businessType":"Pizza & Italian","vehicleType":"Van"}')},
  ${_application(id: 'a2', name: 'Waffle Wonder', emailVerifiedAt: null)}]''';
     documentsJson = '[]';
 
     adapter = _FakeAdapter((RequestOptions options) {
-      // Document verdicts first: their paths also end in /approve and /reject, and answering them
+      // Partner management first: a correction is a PATCH on the bare application path, which
+      // every other branch below would otherwise answer with a list.
+      if (options.method == 'PATCH') {
+        return _json(
+            _record(id: 'a9', name: (options.data as Map<String, dynamic>)['businessName'] as String?
+                ?? 'Sushi Express',
+                phoneVerified: !(options.data as Map<String, dynamic>).containsKey('contactPhone')));
+      }
+      if (options.path.endsWith('/suspension')) return _json(standingJson);
+      if (options.path.endsWith('/audit')) return _json(auditJson);
+      if (options.path.endsWith('/suspend')) {
+        return _json('''
+{"suspended":true,"lastChange":{"suspended":true,"reason":"FRAUD","reasonNote":"Three chargebacks",
+ "actor":"operator-1234-5678","at":"2026-08-27T10:00:00Z"}}''');
+      }
+      if (options.path.endsWith('/unsuspend')) {
+        return _json('''
+{"suspended":false,"lastChange":{"suspended":false,"reason":null,"reasonNote":null,
+ "actor":"operator-1234-5678","at":"2026-08-28T10:00:00Z"}}''');
+      }
+      // Document verdicts next: their paths also end in /approve and /reject, and answering them
       // with an application would be a shape lie.
       if (options.path.contains('/documents/') && options.path.endsWith('/approve')) {
         return _json(_document(id: 'd1', status: 'APPROVED'));
@@ -117,6 +160,7 @@ void main() {
         Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
     api = OnboardingApi(dio);
     documentsApi = DocumentsApi(dio);
+    managementApi = PartnerManagementApi(dio);
   });
 
   Future<void> pump(WidgetTester tester, {Size size = const Size(1500, 1200)}) async {
@@ -126,8 +170,21 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
-      home: Scaffold(body: OnboardingScreen(api: api, documentsApi: documentsApi)),
+      home: Scaffold(
+        body: OnboardingScreen(
+          api: api,
+          documentsApi: documentsApi,
+          managementApi: managementApi,
+        ),
+      ),
     ));
+    await tester.pumpAndSettle();
+  }
+
+  /// The directory tab, where the already-decided partners are. The queue tab has nobody live on
+  /// it, and every management action below applies to a partner who already exists.
+  Future<void> openDirectory(WidgetTester tester) async {
+    await tester.tap(find.text('All Partners'));
     await tester.pumpAndSettle();
   }
 
@@ -313,7 +370,11 @@ void main() {
       await pump(tester);
 
       expect(find.byType(ConsoleInertNote), findsOneWidget);
-      expect(find.text('Coming soon'), findsWidgets);
+      // "Not aggregated", not "Coming soon". The note explains a column with no source behind it,
+      // and the chip on it says which kind of absence that is instead of promising a delivery
+      // date nobody has committed to.
+      expect(find.text('Not aggregated'), findsOneWidget);
+      expect(find.text('Coming soon'), findsNothing);
     });
   });
 
@@ -367,5 +428,157 @@ void main() {
 
     expect(find.text('Waffle Wonder'), findsOneWidget);
     expect(find.text('Rose & Crust Pizzeria'), findsNothing);
+  });
+
+  /// Managing a partner who already exists — the two row actions that used to be drawn dead.
+  ///
+  /// The fixture directory has one live partner (Sushi Express, PROVISIONED) and one declined one
+  /// (Salad & Co.), which is exactly the pair that matters: the server refuses a suspension on a
+  /// declined application, so one of these rows must offer the action and the other must not.
+  group('managing a live partner', () {
+    testWidgets('sends only the fields that actually changed',
+        (WidgetTester tester) async {
+      await pump(tester);
+      await openDirectory(tester);
+
+      await tester.tap(find.byTooltip('Edit partner').first);
+      await tester.pumpAndSettle();
+
+      // Field order is the audited order: business name, contact name, email, phone.
+      final Finder fields =
+          find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+      await tester.enterText(fields.at(0), 'Sushi Express Ltd');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ConsoleButton, 'Save changes'));
+      await tester.pumpAndSettle();
+
+      final Map<String, dynamic> sent = adapter.bodies
+          .whereType<Map<String, dynamic>>()
+          .firstWhere((Map<String, dynamic> b) => b.containsKey('businessName'));
+      // Three untouched fields are absent, not echoed back: a field sent unchanged would write an
+      // audit row for a change nobody made.
+      expect(sent.keys.toList(), <String>['businessName']);
+      expect(sent['businessName'], 'Sushi Express Ltd');
+      expect(
+        adapter.calls.any((String c) => c.startsWith('PATCH') && c.endsWith('/applications/a9')),
+        isTrue,
+      );
+    });
+
+    testWidgets('will not save a correction that changes nothing',
+        (WidgetTester tester) async {
+      await pump(tester);
+      await openDirectory(tester);
+
+      await tester.tap(find.byTooltip('Edit partner').first);
+      await tester.pumpAndSettle();
+
+      final Finder save = find.widgetWithText(ConsoleButton, 'Save changes');
+      expect(tester.widget<ConsoleButton>(save.hitTestable()).onPressed, isNull);
+    });
+
+    testWidgets('states the role a suspension revokes, and insists on a reason and a note',
+        (WidgetTester tester) async {
+      await pump(tester);
+      await openDirectory(tester);
+
+      // The declined application offers nothing to press — the server would refuse it.
+      expect(find.byTooltip('Suspend partner'), findsOneWidget);
+      expect(find.byTooltip('A declined application has no standing to withdraw'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Suspend partner'));
+      await tester.pumpAndSettle();
+
+      // The consequence, before the button rather than after it.
+      expect(find.textContaining('revokes their MERCHANT role'), findsOneWidget);
+      expect(find.textContaining('can still sign in'), findsOneWidget);
+
+      final Finder confirm = find.widgetWithText(ConsoleButton, 'Suspend partner');
+      expect(tester.widget<ConsoleButton>(confirm.hitTestable()).onPressed, isNull);
+
+      await tester.tap(find.widgetWithText(ConsoleFilterButton, 'Choose a reason'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(PopupMenuItem<int>, 'Fraud'));
+      await tester.pumpAndSettle();
+
+      // A reason alone is still not enough: somebody reads this later.
+      expect(tester.widget<ConsoleButton>(confirm.hitTestable()).onPressed, isNull);
+
+      await tester.enterText(
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)),
+        'Three chargebacks in a week',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(confirm.hitTestable());
+      await tester.pumpAndSettle();
+
+      final Map<String, dynamic> sent = adapter.bodies
+          .whereType<Map<String, dynamic>>()
+          .firstWhere((Map<String, dynamic> b) => b.containsKey('reason'));
+      expect(sent['reason'], 'FRAUD');
+      expect(sent['note'], 'Three chargebacks in a week');
+    });
+
+    testWidgets('a suspended partner says so in the directory and offers reinstatement',
+        (WidgetTester tester) async {
+      standingJson = '''
+{"suspended":true,
+ "lastChange":{"suspended":true,"reason":"FRAUD","reasonNote":"Three chargebacks",
+               "actor":"operator-1234-5678","at":"2026-08-27T10:00:00Z"},
+ "history":[]}''';
+      await pump(tester);
+      await openDirectory(tester);
+
+      // Somebody scanning for "why is this shop not taking orders" reads the status column first.
+      expect(find.text('Suspended'), findsOneWidget);
+      expect(find.byTooltip('Reinstate partner'), findsOneWidget);
+      expect(find.byTooltip('Suspend partner'), findsNothing);
+
+      await tester.tap(find.byTooltip('Reinstate partner'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ConsoleButton, 'Reinstate'));
+      await tester.pumpAndSettle();
+
+      expect(
+        adapter.calls.any((String c) => c.contains('POST') && c.endsWith('/a9/unsuspend')),
+        isTrue,
+      );
+    });
+
+    testWidgets('the drawer reads the corrections and the standing changes as one story',
+        (WidgetTester tester) async {
+      auditJson = '''
+[{"field":"contactPhone","oldValue":"+9611000","newValue":"+9612000",
+  "actor":"operator-1234-5678","at":"2026-08-26T09:00:00Z"}]''';
+      standingJson = '''
+{"suspended":false,
+ "lastChange":{"suspended":false,"reason":null,"reasonNote":null,
+               "actor":"operator-1234-5678","at":"2026-08-27T10:00:00Z"},
+ "history":[{"suspended":false,"reason":null,"reasonNote":null,
+             "actor":"operator-1234-5678","at":"2026-08-27T10:00:00Z"},
+            {"suspended":true,"reason":"ABUSE","reasonNote":"Threatened a rider",
+             "actor":"operator-1234-5678","at":"2026-08-25T10:00:00Z"}]}''';
+      await pump(tester);
+      await openDirectory(tester);
+
+      await tester.tap(find.text('Sushi Express'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('HISTORY'), findsOneWidget);
+      expect(find.text('Contact phone changed from "+9611000" to "+9612000"'), findsOneWidget);
+      expect(find.text('Suspended — Abuse · Threatened a rider'), findsOneWidget);
+      expect(find.text('Reinstated'), findsOneWidget);
+    });
+
+    testWidgets('an empty history says so rather than looking like a failed read',
+        (WidgetTester tester) async {
+      await pump(tester);
+      await openDirectory(tester);
+
+      await tester.tap(find.text('Sushi Express'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nothing has been changed on this record.'), findsOneWidget);
+    });
   });
 }

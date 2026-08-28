@@ -107,6 +107,11 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     tracking: TrackingApi(_dio),
     promo: PromoApi(_dio),
     documents: DocumentsApi(_dio),
+    notification: NotificationApi(_dio),
+    aggregates: AggregatesApi(_dio),
+    activity: ActivityApi(_dio),
+    riderPerformance: RiderPerformanceApi(_dio),
+    partnerManagement: PartnerManagementApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

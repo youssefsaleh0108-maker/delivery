@@ -4,11 +4,17 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'application_documents_step.dart';
 import 'one_time_code.dart';
 import 'passcode_pad.dart';
 import 'payout_details_step.dart';
+// For the OpenStreetMap tile template, user agent and attribution, which every map in this app
+// draws from the same three constants — a second spelling of the tile URL is how one surface ends
+// up quietly violating the tile policy the others honour.
+import 'rider_job_card.dart';
 
 /// Applying to sell or to deliver, from inside the app and before having an account.
 ///
@@ -143,6 +149,21 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   final TextEditingController _vehicleYear = TextEditingController();
   final TextEditingController _preferredArea = TextEditingController();
   _Vehicle? _vehicle;
+
+  /// Where on the map the applicant said they will work, or null while they have not said.
+  ///
+  /// Null is the resting state and stays null unless the applicant deliberately taps the map: the
+  /// wizard runs before there is an account, so there is no location permission to ask for, no
+  /// stored address to read and no geocoder to call (the geocoding endpoints are authenticated).
+  /// A point is therefore only ever one the applicant chose with their own finger.
+  LatLng? _workPin;
+
+  /// Tiles that came back refused, and whether the picker has given up on them.
+  int _mapTileFailures = 0;
+  bool _mapTilesFailed = false;
+
+  /// How many refusals before the map is replaced by the designed placeholder.
+  static const int _mapTileFailureLimit = 6;
 
   // Merchant-only.
   _BusinessType? _businessType;
@@ -414,6 +435,13 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       put('dateOfBirth', _dateOfBirth.text);
       put('nationalId', _nationalId.text);
       put('preferredArea', _preferredArea.text);
+      // The pin, when there is one. Sent as numbers rather than a formatted string so a reviewer's
+      // console can put it back on a map; absent entirely when the applicant never placed one,
+      // because "no answer" and "0, 0" are different answers and the second is in the Atlantic.
+      if (_workPin != null) {
+        details['workLatitude'] = _workPin!.latitude;
+        details['workLongitude'] = _workPin!.longitude;
+      }
       details['ridesFor'] = _company == null ? 'YOUDROP' : _company!.name;
     } else {
       if (_businessType != null) {
@@ -918,7 +946,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       ];
 
   List<Widget> _riderZone(DeliveryStrings t) => <Widget>[
-        AuthMapPlaceholder(label: t.authMapComingSoon),
+        _workAreaPicker(t),
         const SizedBox(height: DeliverySpacing.lg),
         AuthField(
           label: t.authPreferredArea,
@@ -931,23 +959,29 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           textCapitalization: TextCapitalization.words,
         ),
         const SizedBox(height: DeliverySpacing.lg),
-        Row(
-          children: <Widget>[
-            AuthFieldLabel(label: t.authAvailableZones, uppercase: true),
-            const SizedBox(width: DeliverySpacing.sm),
-            YdComingSoon(label: t.authComingSoon, icon: Icons.schedule),
-          ],
-        ),
+        AuthFieldLabel(label: t.authAvailableZones, uppercase: true),
         const SizedBox(height: DeliverySpacing.sm),
-        // The design lists three named city zones to tick. There is no zone service behind them —
-        // no geometry, no coverage map, nothing that would make the names true — so the list is an
-        // empty state rather than three plausible-looking inventions. The free-text area above is
-        // the real answer until it exists.
+        // The design lists three named city zones to tick, and this list stays empty. Two separate
+        // reasons, and neither of them is "not built yet", which is why the chip that used to sit
+        // beside the label is gone.
+        //
+        // The first is reach: there IS a zone service (`GET /api/delivery-zones` returns the
+        // platform's areas), and this wizard cannot read it — that endpoint is open to any
+        // *signed-in* user, and an applicant has no account yet, because getting one is the thing
+        // being asked for. product-service declares no permit-all list, so there is no anonymous
+        // route to it either.
+        //
+        // The second outlasts the first: even signed in, there would be nothing to save the answer
+        // to. Zones describe where a *customer* is, not where a rider works — no rider record on
+        // this platform carries a zone, which is the same fact the Backoffice roster's dead "All
+        // regions" filter reports from the other end. So this is not a picker waiting on a
+        // release. The map pin above and the free-text area carry the answer, and the card says so
+        // rather than promising a list that has nothing to be a list of.
         YdCard.bordered(
           child: YdEmptyState(
             icon: Icons.map_outlined,
-            title: t.authZonesComingSoonTitle,
-            message: t.authZonesComingSoonBlurb,
+            title: t.authZonesNoneToPickTitle,
+            message: t.authZonesNoneToPickBlurb,
             padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
           ),
         ),
@@ -958,6 +992,152 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         const SizedBox(height: DeliverySpacing.sm),
         _companyPicker(t),
       ];
+
+  /// `map-canvas-container` (Figma 22:624), as a real map with a pin the applicant places.
+  ///
+  /// The design's 180px hairlined box keeps its exact geometry; what changed is that the grid
+  /// inside it is now OpenStreetMap. Tapping drops a pin, and the pin's coordinates travel in the
+  /// application's `details` object beside the free-text area — a reviewer reading "Hamra" and a
+  /// reviewer reading a point on a map are answering different questions, and the second one is
+  /// answerable without knowing the city.
+  ///
+  /// **It opens on the world, not on a guess.** There is no signed-in account at this point in the
+  /// wizard, so there is no saved address to read, no location permission that has been asked for,
+  /// and no geocoder to call — the geocoding endpoints are authenticated. Opening the camera over
+  /// a plausible-looking city would be the app asserting where somebody lives. The applicant
+  /// navigates to their own area, which is a few gestures, and nothing is recorded until they tap.
+  ///
+  /// Tiles that will not come degrade to the same styled placeholder the step had before there was
+  /// a map, so a rider applying on a bad connection never sees a broken grid.
+  Widget _workAreaPicker(DeliveryStrings t) {
+    if (_mapTilesFailed) {
+      return AuthMapPlaceholder(label: t.authMapUnavailable);
+    }
+
+    final LatLng? pin = _workPin;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          height: 180,
+          decoration: BoxDecoration(
+            color: DeliveryColors.background,
+            borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+            border: Border.all(color: DeliveryColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: FlutterMap(
+                  options: MapOptions(
+                    // A world view: the app knows nothing about this person yet and says nothing.
+                    initialCenter: const LatLng(25, 15),
+                    initialZoom: 1.5,
+                    backgroundColor: DeliveryColors.background,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.drag |
+                          InteractiveFlag.pinchZoom |
+                          InteractiveFlag.pinchMove |
+                          InteractiveFlag.doubleTapZoom,
+                    ),
+                    onTap: _busy
+                        ? null
+                        : (TapPosition _, LatLng point) =>
+                            setState(() => _workPin = point),
+                  ),
+                  children: <Widget>[
+                    TileLayer(
+                      urlTemplate: riderOsmTileTemplate,
+                      userAgentPackageName: riderOsmUserAgent,
+                      maxNativeZoom: 19,
+                      errorTileCallback: (_, __, ___) => _noteMapTileFailure(),
+                    ),
+                    if (pin != null)
+                      MarkerLayer(
+                        markers: <Marker>[
+                          Marker(
+                            point: pin,
+                            width: 32,
+                            height: 32,
+                            child: const Icon(Icons.place,
+                                size: 32, color: DeliveryColors.brand),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              // Required by the OpenStreetMap tile policy on every map that draws its tiles.
+              PositionedDirectional(
+                bottom: 4,
+                start: 6,
+                child: Container(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: DeliveryColors.white.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                  ),
+                  child: const Text(
+                    riderOsmAttribution,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: DeliveryColors.muted,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.sm),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                pin == null
+                    ? t.authPinYourArea
+                    : t.authPinnedAt(
+                        pin.latitude.toStringAsFixed(4),
+                        pin.longitude.toStringAsFixed(4),
+                      ),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: DeliveryColors.muted,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            if (pin != null)
+              TextButton(
+                onPressed: _busy ? null : () => setState(() => _workPin = null),
+                style: TextButton.styleFrom(
+                  foregroundColor: DeliveryColors.brand,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(t.authPinClear),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// One refused tile is weather; a run of them is an applicant with no usable connection.
+  void _noteMapTileFailure() {
+    if (_mapTilesFailed) return;
+    _mapTileFailures++;
+    if (_mapTileFailures < _mapTileFailureLimit) return;
+    // The callback fires from inside the tile layer's own build and paint work.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _mapTilesFailed = true);
+    });
+  }
 
   Widget _companyPicker(DeliveryStrings t) {
     return Column(

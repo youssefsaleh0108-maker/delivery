@@ -683,3 +683,79 @@ class CategoryChip {
         imageUrl: json['imageUrl'] as String?,
       );
 }
+
+/// A group of options as the MERCHANT is editing it, before the server has seen it.
+///
+/// Separate from [OptionGroup] because the two carry different truths. [OptionGroup] is what the
+/// catalog returned: every field is filled and every row has a server-assigned id. A draft is what
+/// somebody is half-way through typing — a new group has no id at all, and `required`/`singleChoice`
+/// are not fields here because the server DERIVES them from the numbers (required = minSelect > 0,
+/// singleChoice = maxSelect == 1). Offering a merchant a "required" switch beside a minimum of zero
+/// would let them set a contradiction the server would silently overrule.
+class OptionGroupDraft {
+  OptionGroupDraft({
+    required this.name,
+    this.minSelect = 0,
+    this.maxSelect = 1,
+    List<OptionDraft>? options,
+  }) : options = options ?? <OptionDraft>[];
+
+  /// Reads an existing group back into an editable draft. Ids are dropped deliberately — see
+  /// [CatalogApi.setProductOptions].
+  factory OptionGroupDraft.from(OptionGroup group) => OptionGroupDraft(
+        name: group.name,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        options: group.options
+            .map((ProductOptionChoice o) => OptionDraft(
+                  name: o.name,
+                  priceDelta: o.priceDelta,
+                  isDefault: o.isDefault,
+                ))
+            .toList(),
+      );
+
+  String name;
+  int minSelect;
+  int maxSelect;
+  final List<OptionDraft> options;
+
+  /// What the server will refuse, checked here so the merchant is told in the form rather than by
+  /// a 400 after saving. Mirrors OptionGroupRequest's constraints exactly.
+  String? get problem {
+    if (name.trim().isEmpty) return 'nameRequired';
+    if (options.isEmpty) return 'needsAnOption';
+    if (options.any((OptionDraft o) => o.name.trim().isEmpty)) return 'optionNameRequired';
+    if (minSelect < 0 || minSelect > 50) return 'minOutOfRange';
+    if (maxSelect < 1 || maxSelect > 50) return 'maxOutOfRange';
+    if (minSelect > maxSelect) return 'minAboveMax';
+    // A minimum nobody can reach: the server would accept it and the customer could never check
+    // out, because no valid selection exists.
+    if (minSelect > options.length) return 'minAboveOptionCount';
+    return null;
+  }
+
+  Map<String, dynamic> toRequestJson() => <String, dynamic>{
+        'name': name.trim(),
+        'minSelect': minSelect,
+        'maxSelect': maxSelect,
+        'options': options.map((OptionDraft o) => o.toRequestJson()).toList(),
+      };
+}
+
+/// One answer inside an [OptionGroupDraft].
+class OptionDraft {
+  OptionDraft({this.name = '', this.priceDelta = 0, this.isDefault = false});
+
+  String name;
+
+  /// Signed: "Small" may be worth less than the base price.
+  double priceDelta;
+  bool isDefault;
+
+  Map<String, dynamic> toRequestJson() => <String, dynamic>{
+        'name': name.trim(),
+        'priceDelta': priceDelta,
+        'isDefault': isDefault,
+      };
+}

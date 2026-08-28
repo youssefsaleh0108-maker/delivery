@@ -5114,17 +5114,17 @@ abstract class DeliveryStrings {
   /// **'Available zones'**
   String get authAvailableZones;
 
-  /// No description provided for @authZonesComingSoonTitle.
+  /// No description provided for @authZonesNoneToPickTitle.
   ///
   /// In en, this message translates to:
-  /// **'Zones are not mapped yet'**
-  String get authZonesComingSoonTitle;
+  /// **'No zones to pick'**
+  String get authZonesNoneToPickTitle;
 
-  /// No description provided for @authZonesComingSoonBlurb.
+  /// No description provided for @authZonesNoneToPickBlurb.
   ///
   /// In en, this message translates to:
-  /// **'Pickable delivery zones arrive with the coverage map. Until then, the area above is what we go by.'**
-  String get authZonesComingSoonBlurb;
+  /// **'Nothing ties a rider to a fixed zone on this platform. The pin you placed and the area you typed above are what a reviewer goes by.'**
+  String get authZonesNoneToPickBlurb;
 
   /// No description provided for @authBusinessInformation.
   ///
@@ -5930,6 +5930,126 @@ abstract class DeliveryStrings {
   /// **'Shown as customers see them. Editing options arrives soon.'**
   String get merchbOptionsReadOnly;
 
+  /// No description provided for @merchbOptionsNeedSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the item first, then add its options.'**
+  String get merchbOptionsNeedSave;
+
+  /// No description provided for @merchbOptionsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the current options. Nothing was changed.'**
+  String get merchbOptionsLoadFailed;
+
+  /// No description provided for @merchbOptionsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the options.'**
+  String get merchbOptionsSaveFailed;
+
+  /// No description provided for @merchbAddGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Add group'**
+  String get merchbAddGroup;
+
+  /// No description provided for @merchbGroupName.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get merchbGroupName;
+
+  /// No description provided for @merchbRemoveGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove group'**
+  String get merchbRemoveGroup;
+
+  /// No description provided for @merchbOptionName.
+  ///
+  /// In en, this message translates to:
+  /// **'Option'**
+  String get merchbOptionName;
+
+  /// No description provided for @merchbRemoveOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove option'**
+  String get merchbRemoveOption;
+
+  /// No description provided for @merchbPriceDelta.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra'**
+  String get merchbPriceDelta;
+
+  /// No description provided for @merchbMinSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at least'**
+  String get merchbMinSelect;
+
+  /// No description provided for @merchbMaxSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at most'**
+  String get merchbMaxSelect;
+
+  /// No description provided for @merchbRuleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required — the customer must choose.'**
+  String get merchbRuleRequired;
+
+  /// No description provided for @merchbRuleOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — the customer may skip this.'**
+  String get merchbRuleOptional;
+
+  /// No description provided for @merchbUntitledGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'this group'**
+  String get merchbUntitledGroup;
+
+  /// No description provided for @merchbGroupNeedsName.
+  ///
+  /// In en, this message translates to:
+  /// **'Every group needs a name.'**
+  String get merchbGroupNeedsName;
+
+  /// No description provided for @merchbGroupNeedsOption.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} needs at least one option.'**
+  String merchbGroupNeedsOption(String name);
+
+  /// No description provided for @merchbOptionNeedsName.
+  ///
+  /// In en, this message translates to:
+  /// **'Every option in {name} needs a name.'**
+  String merchbOptionNeedsName(String name);
+
+  /// No description provided for @merchbMinAboveMax.
+  ///
+  /// In en, this message translates to:
+  /// **'In {name}, the minimum is above the maximum.'**
+  String merchbMinAboveMax(String name);
+
+  /// No description provided for @merchbMinAboveCount.
+  ///
+  /// In en, this message translates to:
+  /// **'In {name}, the minimum is more than the number of options.'**
+  String merchbMinAboveCount(String name);
+
+  /// No description provided for @merchbGroupOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'In {name}, the numbers must be between 0 and 50.'**
+  String merchbGroupOutOfRange(String name);
+
   /// No description provided for @merchbSaveMenuItem.
   ///
   /// In en, this message translates to:
@@ -6115,6 +6235,18 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Payment & Bank details'**
   String get merchbPaymentBankDetails;
+
+  /// No description provided for @merchbBankReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the account on file. It was set with your application, and the platform team is who changes it now — not this screen.'**
+  String get merchbBankReadOnly;
+
+  /// No description provided for @merchbBankNoneFiled.
+  ///
+  /// In en, this message translates to:
+  /// **'No bank details were filed with your application. The bank step closes once an application is decided, so the platform team is who adds them now.'**
+  String get merchbBankNoneFiled;
 
   /// No description provided for @merchbNotificationSettings.
   ///
@@ -7339,6 +7471,660 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your application is in, but the bank details did not go through.'**
   String get wizCouldNotSendPayout;
+
+  /// No description provided for @merchPinShopLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop location'**
+  String get merchPinShopLocation;
+
+  /// No description provided for @merchPinDropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the map to put the pin on your shop, then save.'**
+  String get merchPinDropHint;
+
+  /// No description provided for @merchPinWhyItMatters.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers see this pin, and delivery distance is measured from it.'**
+  String get merchPinWhyItMatters;
+
+  /// No description provided for @merchPinNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No location pinned yet'**
+  String get merchPinNoneYet;
+
+  /// No description provided for @merchPinSetIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Set location'**
+  String get merchPinSetIt;
+
+  /// No description provided for @merchPinSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop location saved'**
+  String get merchPinSaved;
+
+  /// No description provided for @merchPinCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop location removed'**
+  String get merchPinCleared;
+
+  /// No description provided for @merchMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Map could not load'**
+  String get merchMapUnavailable;
+
+  /// No description provided for @merchUpOnPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% up on the {days} days before'**
+  String merchUpOnPrevious(Object percent, Object days);
+
+  /// No description provided for @merchDownOnPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% down on the {days} days before'**
+  String merchDownOnPrevious(Object percent, Object days);
+
+  /// No description provided for @merchSameAsPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as the {days} days before'**
+  String merchSameAsPrevious(Object days);
+
+  /// No description provided for @merchNonePrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in the {days} days before'**
+  String merchNonePrevious(Object days);
+
+  /// No description provided for @merchNothingEitherPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in either period'**
+  String get merchNothingEitherPeriod;
+
+  /// No description provided for @merchAnalyticsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day in the window, split by how fast the customer asked for the delivery.'**
+  String get merchAnalyticsBlurb;
+
+  /// No description provided for @merchTierSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'By delivery speed'**
+  String get merchTierSplit;
+
+  /// No description provided for @merchOrderValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Order value'**
+  String get merchOrderValue;
+
+  /// No description provided for @merchOrderValueNote.
+  ///
+  /// In en, this message translates to:
+  /// **'What customers paid in total, delivery and any express premium included — not your payout.'**
+  String get merchOrderValueNote;
+
+  /// No description provided for @deliveryTierStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get deliveryTierStandard;
+
+  /// No description provided for @deliveryTierExpress.
+  ///
+  /// In en, this message translates to:
+  /// **'Express'**
+  String get deliveryTierExpress;
+
+  /// No description provided for @custPinYourDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin your door'**
+  String get custPinYourDoor;
+
+  /// No description provided for @custSetHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Set here'**
+  String get custSetHere;
+
+  /// No description provided for @custNamingThisPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up this place…'**
+  String get custNamingThisPlace;
+
+  /// No description provided for @custMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The map could not load. The address you type is what we will use.'**
+  String get custMapUnavailable;
+
+  /// No description provided for @custYourAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Your address'**
+  String get custYourAddress;
+
+  /// No description provided for @custTheRider.
+  ///
+  /// In en, this message translates to:
+  /// **'The rider'**
+  String get custTheRider;
+
+  /// No description provided for @custDeliverySpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery speed'**
+  String get custDeliverySpeed;
+
+  /// No description provided for @custExpressSurchargeApplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Surcharge applies'**
+  String get custExpressSurchargeApplies;
+
+  /// No description provided for @custExpressNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Express costs extra. The platform sets the amount and your receipt shows it as its own line. A free-delivery offer does not cover it.'**
+  String get custExpressNote;
+
+  /// No description provided for @authResetYourPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset your passcode'**
+  String get authResetYourPasscode;
+
+  /// No description provided for @authChangeYourPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Change your passcode'**
+  String get authChangeYourPasscode;
+
+  /// No description provided for @authResetAskForAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us the email on your account. If it has one, a six-digit code goes to it.'**
+  String get authResetAskForAddress;
+
+  /// No description provided for @authResetToYourAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'A six-digit code goes to the email on your account.'**
+  String get authResetToYourAddress;
+
+  /// No description provided for @authResetCodeMaybeSent.
+  ///
+  /// In en, this message translates to:
+  /// **'If {destination} has an account, a 6-digit code is on its way. It expires in 10 minutes and can be used once.'**
+  String authResetCodeMaybeSent(Object destination);
+
+  /// No description provided for @authSetNewPasscode.
+  ///
+  /// In en, this message translates to:
+  /// **'Set new passcode'**
+  String get authSetNewPasscode;
+
+  /// No description provided for @authPasscodeChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Passcode changed'**
+  String get authPasscodeChanged;
+
+  /// No description provided for @authPasscodeChangedSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your new six-digit passcode.'**
+  String get authPasscodeChangedSignIn;
+
+  /// No description provided for @authPasscodeChangedSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your new six-digit passcode the next time you sign in.'**
+  String get authPasscodeChangedSignedIn;
+
+  /// No description provided for @custEditProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get custEditProfile;
+
+  /// No description provided for @custProfileFieldsFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name and email were set when the account was created and cannot be changed from the app yet.'**
+  String get custProfileFieldsFixed;
+
+  /// No description provided for @custNoEmailOnAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has no email address on it, so there is nowhere to send a code.'**
+  String get custNoEmailOnAccount;
+
+  /// No description provided for @custCouldNotOpenThat.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing on this phone could open that.'**
+  String get custCouldNotOpenThat;
+
+  /// No description provided for @custHelpIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers to the things people ask most, and the ways to reach a person when the answer is not here.'**
+  String get custHelpIntro;
+
+  /// No description provided for @custHelpTalkToUs.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk to us'**
+  String get custHelpTalkToUs;
+
+  /// No description provided for @custChatOnWhatsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat on WhatsApp'**
+  String get custChatOnWhatsApp;
+
+  /// No description provided for @custEmailSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Email support'**
+  String get custEmailSupport;
+
+  /// No description provided for @custHelpNoChannelsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No support channel is set up in this build yet. Your orders still carry a chat with the rider once one is assigned.'**
+  String get custHelpNoChannelsYet;
+
+  /// No description provided for @custHelpOrdering.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordering'**
+  String get custHelpOrdering;
+
+  /// No description provided for @custHelpDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get custHelpDelivery;
+
+  /// No description provided for @custHelpPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments'**
+  String get custHelpPayments;
+
+  /// No description provided for @custHelpAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account'**
+  String get custHelpAccount;
+
+  /// No description provided for @custHelpApplying.
+  ///
+  /// In en, this message translates to:
+  /// **'Selling and riding'**
+  String get custHelpApplying;
+
+  /// No description provided for @custFaqOneShopQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Why can my basket only hold one shop?'**
+  String get custFaqOneShopQ;
+
+  /// No description provided for @custFaqOneShopA.
+  ///
+  /// In en, this message translates to:
+  /// **'One order goes to one shop and is carried by one rider. Two shops means two collections, two fees and two journeys, so the basket asks you to finish one before starting the other.'**
+  String get custFaqOneShopA;
+
+  /// No description provided for @custFaqMinimumQ.
+  ///
+  /// In en, this message translates to:
+  /// **'What is a minimum order?'**
+  String get custFaqMinimumQ;
+
+  /// No description provided for @custFaqMinimumA.
+  ///
+  /// In en, this message translates to:
+  /// **'Some shops will not send a rider out below a certain amount. The basket shows the shop\'s minimum and exactly how much is still missing, and checkout stays closed until it is met.'**
+  String get custFaqMinimumA;
+
+  /// No description provided for @custFaqChangeOrderQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Can I change or cancel an order?'**
+  String get custFaqChangeOrderQ;
+
+  /// No description provided for @custFaqChangeOrderA.
+  ///
+  /// In en, this message translates to:
+  /// **'An order cannot be edited after it is placed. The order page lists what you can still do with it, and cancelling leaves that list once the shop has started preparing. Once a rider is assigned you can message them from the order page.'**
+  String get custFaqChangeOrderA;
+
+  /// No description provided for @custFaqTiersQ.
+  ///
+  /// In en, this message translates to:
+  /// **'What is the difference between Standard and Express?'**
+  String get custFaqTiersQ;
+
+  /// No description provided for @custFaqTiersA.
+  ///
+  /// In en, this message translates to:
+  /// **'Express asks for the order to be treated as urgent and adds a surcharge on top of the delivery fee. The platform sets that amount, not the shop, and your receipt shows it as its own line. A free-delivery offer covers the delivery fee only — the express surcharge stays payable.'**
+  String get custFaqTiersA;
+
+  /// No description provided for @custFaqWhereIsRiderQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Where is my rider?'**
+  String get custFaqWhereIsRiderQ;
+
+  /// No description provided for @custFaqWhereIsRiderA.
+  ///
+  /// In en, this message translates to:
+  /// **'The order page draws the rider\'s recorded positions on a map from the moment they collect your order. The arrival time comes from the tracking service; when it has no recent position to measure from, it says so instead of showing a guess.'**
+  String get custFaqWhereIsRiderA;
+
+  /// No description provided for @custFaqDeliveryFeeQ.
+  ///
+  /// In en, this message translates to:
+  /// **'How is the delivery fee worked out?'**
+  String get custFaqDeliveryFeeQ;
+
+  /// No description provided for @custFaqDeliveryFeeA.
+  ///
+  /// In en, this message translates to:
+  /// **'By the area you are delivering to, which is why a saved address carries an area. A promotion can waive it, and when it does the basket names the promotion rather than only showing a zero.'**
+  String get custFaqDeliveryFeeA;
+
+  /// No description provided for @custFaqAddressPinQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Why should I drop a pin on the map?'**
+  String get custFaqAddressPinQ;
+
+  /// No description provided for @custFaqAddressPinA.
+  ///
+  /// In en, this message translates to:
+  /// **'A typed line gets the rider to the street; the pin gets them to the door, and it is the point the arrival time is measured against. Without one your order still arrives, but there is nothing on the map to estimate from.'**
+  String get custFaqAddressPinA;
+
+  /// No description provided for @custFaqPayMethodsQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Which payment methods really work?'**
+  String get custFaqPayMethodsQ;
+
+  /// No description provided for @custFaqPayMethodsA.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery is the only method in this build that moves real money. Card and wallet are wired to a test payment provider and are labelled \"Test payment\" at checkout: choosing one authorises against that provider and nothing is charged.'**
+  String get custFaqPayMethodsA;
+
+  /// No description provided for @custFaqPromoQ.
+  ///
+  /// In en, this message translates to:
+  /// **'How do promo codes work?'**
+  String get custFaqPromoQ;
+
+  /// No description provided for @custFaqPromoA.
+  ///
+  /// In en, this message translates to:
+  /// **'Type one in the basket and it is checked against what is in the basket right then, so a code can start applying the moment you cross its minimum. What is actually billed is recomputed by the server when the order is placed, and the confirmation shows that figure.'**
+  String get custFaqPromoA;
+
+  /// No description provided for @custFaqRefundQ.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I get a refund?'**
+  String get custFaqRefundQ;
+
+  /// No description provided for @custFaqRefundA.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no refund button in the app. Cash orders are settled at the door, so a problem with one is sorted with us directly — message or email support with your order number and what went wrong.'**
+  String get custFaqRefundA;
+
+  /// No description provided for @custFaqPasscodeQ.
+  ///
+  /// In en, this message translates to:
+  /// **'I forgot my passcode.'**
+  String get custFaqPasscodeQ;
+
+  /// No description provided for @custFaqPasscodeA.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap \"Forgot password?\" on the sign-in screen. A six-digit code goes to the email on the account, lasts ten minutes and works once. From inside the app the same steps are under Edit on this screen.'**
+  String get custFaqPasscodeA;
+
+  /// No description provided for @custFaqProfileQ.
+  ///
+  /// In en, this message translates to:
+  /// **'Can I change my name or email?'**
+  String get custFaqProfileQ;
+
+  /// No description provided for @custFaqProfileA.
+  ///
+  /// In en, this message translates to:
+  /// **'Not from the app yet. They were set when the account was created; the passcode is the one thing on the account you can change yourself.'**
+  String get custFaqProfileA;
+
+  /// No description provided for @custFaqApplyQ.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I sell on YouDrop, or deliver for it?'**
+  String get custFaqApplyQ;
+
+  /// No description provided for @custFaqApplyA.
+  ///
+  /// In en, this message translates to:
+  /// **'From the welcome screen, before signing in: choose shop or rider and fill in the application. You will be asked for contact details, documents and payout details, and you get an account at the end so you can sign in and follow it.'**
+  String get custFaqApplyA;
+
+  /// No description provided for @custFaqApplyWaitQ.
+  ///
+  /// In en, this message translates to:
+  /// **'How long does an application take?'**
+  String get custFaqApplyWaitQ;
+
+  /// No description provided for @custFaqApplyWaitA.
+  ///
+  /// In en, this message translates to:
+  /// **'A person reads it, so there is no fixed time. Your application screen shows the stage it is at and whether any document was sent back for a correction — that screen is the status, and nothing is decided automatically.'**
+  String get custFaqApplyWaitA;
+
+  /// No description provided for @deliveryTierExpressSurcharge.
+  ///
+  /// In en, this message translates to:
+  /// **'Express +{amount}'**
+  String deliveryTierExpressSurcharge(Object amount);
+
+  /// No description provided for @riderTierExpress.
+  ///
+  /// In en, this message translates to:
+  /// **'Express'**
+  String get riderTierExpress;
+
+  /// No description provided for @riderCompletionRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get riderCompletionRate;
+
+  /// No description provided for @riderHoursValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h'**
+  String riderHoursValue(Object hours);
+
+  /// No description provided for @riderPerformanceLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{delivered} of {claimed} claimed jobs delivered in {days} days'**
+  String riderPerformanceLine(Object delivered, Object claimed, Object days);
+
+  /// No description provided for @riderPerformanceDropped.
+  ///
+  /// In en, this message translates to:
+  /// **' · {count} dropped after claiming'**
+  String riderPerformanceDropped(Object count);
+
+  /// No description provided for @ratingWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{average} · {ratings} ratings'**
+  String ratingWithCount(Object average, Object ratings);
+
+  /// No description provided for @riderMapYouAreHere.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get riderMapYouAreHere;
+
+  /// No description provided for @riderMapNoFixYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your first GPS fix'**
+  String get riderMapNoFixYet;
+
+  /// No description provided for @riderMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Map unavailable'**
+  String get riderMapUnavailable;
+
+  /// No description provided for @riderNavigateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No map app could be opened.'**
+  String get riderNavigateFailed;
+
+  /// No description provided for @riderRegionAllAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Every area'**
+  String get riderRegionAllAreas;
+
+  /// No description provided for @riderHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & support'**
+  String get riderHelpTitle;
+
+  /// No description provided for @riderHelpConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'Your conversations'**
+  String get riderHelpConversations;
+
+  /// No description provided for @riderHelpNoConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'A chat opens with the customer on every job you are assigned.'**
+  String get riderHelpNoConversations;
+
+  /// No description provided for @riderHelpCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your conversations'**
+  String get riderHelpCouldNotLoad;
+
+  /// No description provided for @riderHelpOrderThread.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {ref}'**
+  String riderHelpOrderThread(Object ref);
+
+  /// No description provided for @riderHelpThreadClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get riderHelpThreadClosed;
+
+  /// No description provided for @riderHelpHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How this works'**
+  String get riderHelpHowItWorks;
+
+  /// No description provided for @riderHelpDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'You only receive work while you are on duty and your phone is reporting its position.'**
+  String get riderHelpDuty;
+
+  /// No description provided for @riderHelpClaim.
+  ///
+  /// In en, this message translates to:
+  /// **'A job is yours the moment you accept it. If someone accepted it first, the board says so.'**
+  String get riderHelpClaim;
+
+  /// No description provided for @riderHelpCashOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash-out is requested from the Earnings tab and handed over by the platform team.'**
+  String get riderHelpCashOut;
+
+  /// No description provided for @riderHelpExpress.
+  ///
+  /// In en, this message translates to:
+  /// **'An Express job is a customer who paid for speed. The premium is the platform\'s, not part of your fee.'**
+  String get riderHelpExpress;
+
+  /// No description provided for @riderDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents & licences'**
+  String get riderDocumentsTitle;
+
+  /// No description provided for @riderDocumentsCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your documents'**
+  String get riderDocumentsCouldNotLoad;
+
+  /// No description provided for @riderPayoutCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your bank details'**
+  String get riderPayoutCouldNotLoad;
+
+  /// No description provided for @authPinYourArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the map to mark where you will be working'**
+  String get authPinYourArea;
+
+  /// No description provided for @authPinnedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned at {lat}, {lng}'**
+  String authPinnedAt(Object lat, Object lng);
+
+  /// No description provided for @authPinClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove pin'**
+  String get authPinClear;
+
+  /// No description provided for @authMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Map unavailable'**
+  String get authMapUnavailable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

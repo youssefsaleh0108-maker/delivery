@@ -22,9 +22,13 @@ import '../shell/shell.dart';
 /// the 2026-08 design set draws no promotions frame: a register is a table, and the detail that
 /// does not fit in a 40px row goes in the drawer beside it.
 class PromotionsScreen extends StatefulWidget {
-  const PromotionsScreen({super.key, required this.api});
+  const PromotionsScreen({super.key, required this.api, this.notificationApi});
 
   final PromoApi api;
+
+  /// The operator's own in-app inbox, behind the header's bell. Optional so the screen can be
+  /// rendered on its own — a null one draws the bell greyed rather than polling nothing.
+  final NotificationApi? notificationApi;
 
   @override
   State<PromotionsScreen> createState() => _PromotionsScreenState();
@@ -100,17 +104,7 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
         title: 'Promo Codes',
         subtitle: 'Mint and withdraw discount codes, and see what each one has cost',
         actions: <Widget>[
-          // Drawn on every console frame and answered by nothing: there is no cross-entity search
-          // endpoint. Rendered rather than removed, greyed rather than pretending.
-          const ConsoleSearchField.global(
-            hintText: 'Search backoffice...',
-            enabled: false,
-          ),
-          const ConsoleIconAction(
-            icon: Icons.notifications_none,
-            tooltip: 'Notifications — no feed yet',
-          ),
-          const ConsoleComingSoonChip(),
+          ConsoleBell(api: widget.notificationApi),
           ConsoleIconAction(
             icon: Icons.refresh,
             tooltip: 'Refresh',

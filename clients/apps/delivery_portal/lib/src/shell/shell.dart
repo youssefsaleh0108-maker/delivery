@@ -13,6 +13,7 @@
 /// ```
 library;
 
+export 'console_bell.dart';
 export 'console_chrome.dart';
 export 'console_drawer.dart';
 export 'external_link.dart';

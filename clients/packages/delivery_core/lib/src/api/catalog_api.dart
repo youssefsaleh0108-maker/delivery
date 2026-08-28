@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
+// OptionGroup and its drafts live with the storefront models, because the customer side reads the
+// same structure this writes.
+import '../models/store_models.dart';
 
 /// Typed client for the Product Service, reached through the API Gateway.
 class CatalogApi {
@@ -62,6 +65,28 @@ class CatalogApi {
   Future<Product> publish(String id) async {
     final Response<dynamic> response = await _dio.post<dynamic>('/api/products/$id/publish');
     return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Replaces the product's whole option structure — the merchant's side of what a customer sees
+  /// as "Choose a size".
+  ///
+  /// A REPLACE, not a merge, because the server's endpoint is: whatever is sent becomes the
+  /// product's options, and a group left out is deleted. Callers must send the complete set they
+  /// want to end up with, which is why the editor loads the existing groups first.
+  ///
+  /// The server assigns every id. A group being edited has one and an unsaved one does not, and
+  /// neither is sent — sending an id would invite a client to claim an option row it does not own.
+  Future<List<OptionGroup>> setProductOptions(
+    String productId,
+    List<OptionGroupDraft> groups,
+  ) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/products/$productId/options',
+      data: groups.map((OptionGroupDraft g) => g.toRequestJson()).toList(),
+    );
+    return (response.data as List<dynamic>)
+        .map((dynamic json) => OptionGroup.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   /// Archive, not delete. Past orders still reference the product.

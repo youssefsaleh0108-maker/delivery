@@ -53,6 +53,11 @@ class PortalApis {
     required this.tracking,
     required this.promo,
     required this.documents,
+    required this.notification,
+    required this.aggregates,
+    required this.activity,
+    required this.riderPerformance,
+    required this.partnerManagement,
   });
 
   final CatalogApi catalog;
@@ -70,6 +75,21 @@ class PortalApis {
   final TrackingApi tracking;
   final PromoApi promo;
   final DocumentsApi documents;
+
+  /// The signed-in operator's own in-app inbox, behind every console header's bell.
+  final NotificationApi notification;
+
+  /// The tier-split daily trade series. Backoffice reads the platform scope, a carrier its own.
+  final AggregatesApi aggregates;
+
+  /// The Backoffice activity feed — a poll, not a push.
+  final ActivityApi activity;
+
+  /// Rider counters: delivered-today, and one rider's thirty-day standing.
+  final RiderPerformanceApi riderPerformance;
+
+  /// Corrections, the audit trail, and the suspension switch on a partner who already exists.
+  final PartnerManagementApi partnerManagement;
 }
 
 /// One destination in a rail.
@@ -291,6 +311,9 @@ class PortalArea {
         build: (PortalApis a, _, __, void Function(int) jump) => OverviewScreen(
           api: a.order,
           storeApi: a.store,
+          aggregatesApi: a.aggregates,
+          activityApi: a.activity,
+          notificationApi: a.notification,
           onShowOrders: () => jump(1),
         ),
       ),
@@ -299,7 +322,8 @@ class PortalArea {
         icon: Icons.shopping_bag_outlined,
         selectedIcon: Icons.shopping_bag,
         label: (DeliveryStrings t) => t.navOrders,
-        build: (PortalApis a, _, __, ___) => DashboardScreen(api: a.order),
+        build: (PortalApis a, _, __, ___) =>
+            DashboardScreen(api: a.order, notificationApi: a.notification),
       ),
       PortalDestination(
         icon: Icons.category_outlined,
@@ -328,8 +352,12 @@ class PortalArea {
         icon: Icons.how_to_reg_outlined,
         selectedIcon: Icons.how_to_reg,
         label: (DeliveryStrings t) => t.navOnboarding,
-        build: (PortalApis a, _, __, ___) =>
-            OnboardingScreen(api: a.onboarding, documentsApi: a.documents),
+        build: (PortalApis a, _, __, ___) => OnboardingScreen(
+          api: a.onboarding,
+          documentsApi: a.documents,
+          managementApi: a.partnerManagement,
+          notificationApi: a.notification,
+        ),
       ),
       // Beside Finance: who carries orders is an operating question, and the money split that
       // follows from it is right next door.
@@ -337,7 +365,8 @@ class PortalArea {
         icon: Icons.local_shipping_outlined,
         selectedIcon: Icons.local_shipping,
         label: (DeliveryStrings t) => t.navCarriers,
-        build: (PortalApis a, _, __, ___) => ProvidersScreen(api: a.provider),
+        build: (PortalApis a, _, __, ___) =>
+            ProvidersScreen(api: a.provider, notificationApi: a.notification),
       ),
       // Immediately after Carriers, because a rider is reached through one: the roster is
       // assembled from the same register the page above lists.
@@ -352,6 +381,8 @@ class PortalArea {
           api: a.provider,
           trackingApi: a.tracking,
           orderApi: a.order,
+          performanceApi: a.riderPerformance,
+          notificationApi: a.notification,
         ),
       ),
       PortalDestination(
@@ -382,7 +413,8 @@ class PortalArea {
         icon: Icons.sell_outlined,
         selectedIcon: Icons.sell,
         label: (DeliveryStrings _) => 'Promo Codes',
-        build: (PortalApis a, _, __, ___) => PromotionsScreen(api: a.promo),
+        build: (PortalApis a, _, __, ___) =>
+            PromotionsScreen(api: a.promo, notificationApi: a.notification),
       ),
       // Last, and deliberately so: the least-used and most consequential page here.
       PortalDestination(

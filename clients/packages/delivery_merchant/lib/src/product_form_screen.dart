@@ -6,6 +6,8 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+import 'product_options_editor.dart';
+
 /// Create or edit one product, and manage its images.
 ///
 /// Drawn to the 2026-08 Figma frame `merchant-add-product` (3:1964): a dashed upload dropzone under
@@ -61,6 +63,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   bool _saving = false;
   bool _uploading = false;
   bool _dirty = false;
+
+  /// True while the option structure is being written. The whole structure goes in one PUT, so a
+  /// second save landing mid-flight would race the first and one of them would lose silently.
+  bool _savingOptions = false;
 
   Future<List<OptionGroup>>? _loadOptions() {
     final Product? product = _product;
@@ -398,12 +404,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   // --------------------------------------------------------------- variants
 
-  /// The frame's "Variants & Options" card.
+  /// The frame's "Variants & Options" card — editable.
   ///
-  /// Read-only, and deliberately so. The option groups exist and the customer app renders them, but
-  /// the Dart client wraps only the read (`StoreApi.productOptions`); the service's replace
-  /// endpoint has no client method yet, so "+ Add option" is drawn as the frame draws it and marked
-  /// as not yet working rather than wired to something invented.
+  /// It was read-only while `CatalogApi` wrapped only the read; the service has always had
+  /// `PUT /api/products/{id}/options`, and now so does the client. A group can only be added once
+  /// the product exists, because the endpoint is addressed by product id — so on a new product the
+  /// action says to save first rather than opening an editor whose Save could not go anywhere.
   Widget _variants(DeliveryStrings t) {
     return YdCard.bordered(
       child: Column(
@@ -423,15 +429,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 ),
               ),
               const SizedBox(width: DeliverySpacing.sm),
-              YdComingSoon.wrap(
-                label: t.merchbSoon,
-                child: Text(
-                  t.merchbAddOption,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: DeliveryColors.brand,
-                    height: 1.2,
+              // Brand-coloured and tappable once the product has an id. Before that it stays the
+              // frame's text in the muted colour with the reason beneath the card, because an
+              // enabled control whose save cannot be addressed is worse than a disabled one.
+              InkWell(
+                onTap: _product == null || _savingOptions ? null : () => _editOptions(t),
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: DeliverySpacing.xs, vertical: DeliverySpacing.xs),
+                  child: Text(
+                    t.merchbAddOption,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _product == null
+                          ? DeliveryColors.faint
+                          : DeliveryColors.brand,
+                      height: 1.2,
+                    ),
                   ),
                 ),
               ),
@@ -439,14 +455,71 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           _optionRows(t),
-          const SizedBox(height: DeliverySpacing.sm),
-          Text(
-            t.merchbOptionsReadOnly,
-            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
-          ),
+          // The only note left is the one that is still true: options are addressed by product id,
+          // so a product that has never been saved has nowhere to put them.
+          if (_product == null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              t.merchbOptionsNeedSave,
+              style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Opens the option editor, then writes the WHOLE structure back.
+  ///
+  /// The endpoint is a replace: what is sent becomes the product's options and anything left out is
+  /// deleted. So the existing groups are read first and travel into the sheet — editing one group
+  /// while silently dropping the others is exactly the mistake this shape invites.
+  Future<void> _editOptions(DeliveryStrings t) async {
+    final Product? product = _product;
+    final StoreApi? store = widget.storeApi;
+    if (product == null) return;
+
+    List<OptionGroup> existing = const <OptionGroup>[];
+    try {
+      existing = store == null ? const <OptionGroup>[] : await store.productOptions(product.id);
+    } catch (_) {
+      // Editing from an unknown starting point would replace groups that are still there with
+      // nothing. Refuse rather than risk deleting a menu.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(t.merchbOptionsLoadFailed)));
+      return;
+    }
+    if (!mounted) return;
+
+    final List<OptionGroupDraft>? edited = await showModalBottomSheet<List<OptionGroupDraft>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) => ProductOptionsEditor(
+        groups: existing.map(OptionGroupDraft.from).toList(),
+      ),
+    );
+    if (edited == null || !mounted) return;
+
+    setState(() => _savingOptions = true);
+    try {
+      await widget.api.setProductOptions(product.id, edited);
+      if (!mounted) return;
+      setState(() {
+        _savingOptions = false;
+        _dirty = true;
+        // Re-read rather than trusting the response into the same future the card renders from:
+        // one source for what is on screen, which is the server's answer.
+        _options = _loadOptions();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.saved)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _savingOptions = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(t.merchbOptionsSaveFailed)));
+    }
   }
 
   Widget _optionRows(DeliveryStrings t) {

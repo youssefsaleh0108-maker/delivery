@@ -6,6 +6,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'rider_butler_board.dart';
 import 'rider_earnings_screen.dart';
@@ -37,6 +39,8 @@ class RiderHomeScreen extends StatefulWidget {
     required this.locale,
     this.trackingApi,
     this.moneyApi,
+    this.performanceApi,
+    this.documentsApi,
     this.chatApi,
     this.socket,
     this.prefsApi,
@@ -56,6 +60,14 @@ class RiderHomeScreen extends StatefulWidget {
   /// The accounting ledger behind the Earnings tab. Null keeps the tab on its old derived-from-
   /// orders numbers, labelled as derived.
   final RiderMoneyApi? moneyApi;
+
+  /// The rider-performance endpoint, behind the Earnings tab's completion stat. Null leaves that
+  /// one figure inert and changes nothing else.
+  final RiderPerformanceApi? performanceApi;
+
+  /// The applicant documents and payout endpoints, behind the Documents and Bank Details rows in
+  /// Settings. Null leaves those two rows inert.
+  final DocumentsApi? documentsApi;
 
   /// The order chat, and the socket its live half rides on. Both null keeps the order-detail
   /// header exactly as it was — no chat button at all.
@@ -110,12 +122,31 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   /// True while a duty declaration is in flight; the switch refuses input meanwhile.
   bool _dutyBusy = false;
 
+  /// The rider's own rating, on their profile card. Null while the rating service has not
+  /// answered — the line is then absent rather than showing a score nobody gave.
+  RiderStanding? _standing;
+
   /// Simulated position, walked slightly on each ping.
   ///
   /// Real GPS needs a location plugin and a runtime permission prompt, which is a Phase 5 concern.
   /// What matters now is that the tracking pipeline carries real, changing coordinates end to end.
   double _lat = 51.5074;
   double _lng = -0.1278;
+
+  /// Where the mini-map's camera was placed, kept for the life of the tab.
+  ///
+  /// The camera is set once, from the first fix the platform reports. Every ping after that moves
+  /// the marker and leaves the view alone — a map that re-centres itself every ten seconds cannot
+  /// be looked at, because it snaps back the moment the rider drags it.
+  LatLng? _mapAnchor;
+
+  /// Tiles that came back refused, and whether the map has given up on them.
+  int _tileFailures = 0;
+  bool _tilesFailed = false;
+
+  /// How many refusals before the map is replaced by the designed placeholder. More than one, so
+  /// a single missing tile at the edge of a zoom level does not tear the map down.
+  static const int _tileFailureLimit = 6;
 
   @override
   void initState() {
@@ -124,6 +155,19 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     _refreshTimer = Timer.periodic(_refreshInterval, (_) => _refresh(silent: true));
     _pingTimer = Timer.periodic(_pingInterval, (_) => _pingActiveDeliveries());
     unawaited(_loadPresence());
+    unawaited(_loadStanding());
+  }
+
+  /// The rider's own rating, once. It never moves fast enough to be worth polling, and a rating
+  /// service that is down must cost nothing but the one line it feeds.
+  Future<void> _loadStanding() async {
+    try {
+      final RiderStanding standing = await widget.api.myRiderRating();
+      if (!mounted) return;
+      setState(() => _standing = standing);
+    } catch (_) {
+      // The profile card simply draws no rating line.
+    }
   }
 
   @override
@@ -198,10 +242,22 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     try {
       final RiderPresence? presence = await tracking.myPresence();
       if (!mounted) return;
-      setState(() => _presence = presence);
+      setState(() {
+        _presence = presence;
+        _anchorMap(presence);
+      });
     } catch (_) {
       // The toggle keeps rendering the last answer; the next poll retries.
     }
+  }
+
+  /// Places the mini-map's camera the first time the platform reports a fix, and never again.
+  ///
+  /// Must be called from inside the same [setState] that stores the presence: the anchor is read
+  /// during build, so changing it outside a rebuild would leave the map keyed on a stale point.
+  void _anchorMap(RiderPresence? presence) {
+    if (_mapAnchor != null || presence == null || !presence.hasFix) return;
+    _mapAnchor = LatLng(presence.lat!, presence.lng!);
   }
 
   /// Declares duty and renders the *server's* answer — which can come back STALE when the phone
@@ -215,7 +271,10 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
       final RiderPresence result =
           await tracking.setDuty(on ? DutyState.onDuty : DutyState.offDuty);
       if (!mounted) return;
-      setState(() => _presence = result);
+      setState(() {
+        _presence = result;
+        _anchorMap(result);
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +341,12 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         child: switch (_tab) {
           0 => _availableTab(t),
           1 => _activeTab(t),
-          2 => RiderEarningsScreen(api: widget.api, moneyApi: widget.moneyApi),
+          2 => RiderEarningsScreen(
+              api: widget.api,
+              moneyApi: widget.moneyApi,
+              trackingApi: widget.trackingApi,
+              performanceApi: widget.performanceApi,
+            ),
           _ => _settingsTab(t),
         },
       ),
@@ -359,10 +423,17 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
 
   /// The white `region-selector` bar.
   ///
-  /// The design's chevron opens a zone picker. A rider's account carries no zone preference and the
-  /// board is not filtered by one — every approved rider sees every ready order — so there is
-  /// nothing here to choose between yet. The row is drawn as designed and says so, rather than
-  /// offering a menu that would change nothing.
+  /// The design's chevron opens a zone picker, and there is still nothing for it to pick between.
+  /// The platform's zone list is real, but an order does not carry the zone it was placed for —
+  /// `OrderResponse` has no zone field — and a rider's account carries no zone preference, so a
+  /// picker here could not filter the board by anything and could not remember an answer. What is
+  /// honest is the value beside the label, and it changed: the row used to show the app's own
+  /// name, and now says what is actually true of this board — every approved rider sees every
+  /// ready order, everywhere.
+  ///
+  /// No chip beside it, either. "Coming soon" would promise a picker that no client change can
+  /// deliver — it waits on an order carrying a zone and a rider carrying a preference — and the
+  /// row no longer needs one: a statement of fact does not have to apologise for being true.
   Widget _regionBar(DeliveryStrings t) {
     return Container(
       width: double.infinity,
@@ -392,7 +463,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                   ),
                 ),
                 Text(
-                  t.appTitle,
+                  t.riderRegionAllAreas,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -405,44 +476,75 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
               ],
             ),
           ),
-          const SizedBox(width: DeliverySpacing.sm),
-          YdComingSoon(label: t.riderComingSoon),
         ],
       ),
     );
   }
 
-  /// The 160px `regional-mini-map`, painted as a placeholder surface.
+  /// The last fix the *platform* holds for this rider, or null when it holds none.
   ///
-  /// No entity on this platform carries coordinates — the rider's own position is a random walk
-  /// from a hard-coded origin — so there is nothing to draw a map from. It keeps its exact designed
-  /// height and its dark overlay pill, and the pill carries a real number: how many orders are
-  /// waiting on the board right now.
+  /// Read from presence rather than from this screen's own [_lat]/[_lng] on purpose. Those two
+  /// start at a hard-coded origin and are only a position once a ping has actually been sent, so
+  /// centring a map on them before that would put a rider somewhere they have never been. Presence
+  /// carries a fix exactly when one has been recorded — which is also the position a dispatcher is
+  /// looking at, so the rider and the platform are reading the same map.
+  LatLng? get _riderFix {
+    final RiderPresence? presence = _presence;
+    if (presence == null || !presence.hasFix) return null;
+    return LatLng(presence.lat!, presence.lng!);
+  }
+
+  /// The 160px `regional-mini-map`, drawn from OpenStreetMap raster tiles.
+  ///
+  /// **What is on it.** The rider, at the last fix the platform holds for them. Nothing else — and
+  /// that is a data fact rather than a shortcut. An order carries no coordinates anywhere in its
+  /// contract (`OrderResponse` has an address string and no latitude or longitude), so there is no
+  /// honest pin to drop for a job on the board. Inventing one from the address would need a
+  /// geocoder call per order on a five-second refresh, and would put a rider's decision on a point
+  /// a third-party guessed. The pill above the map carries the real number instead: how many
+  /// orders are waiting right now.
+  ///
+  /// **When the tiles do not come.** The styled placeholder is painted underneath the map rather
+  /// than instead of it, so a slow tile shows the designed surface and not a grey hole; and after
+  /// [_tileFailureLimit] refusals the map is taken down altogether and the placeholder is all that
+  /// is left. A rider on a dead connection sees the surface they saw before there were maps, never
+  /// a broken grid.
+  ///
+  /// The OpenStreetMap attribution is on the map whenever the map is: it is the tile policy's
+  /// requirement and not decoration, which is why it is not conditional on anything.
   Widget _mapSlot(DeliveryStrings t) {
+    final LatLng? centre = _riderFix;
+
     return SizedBox(
       height: 160,
       width: double.infinity,
       child: Stack(
         alignment: Alignment.center,
         children: <Widget>[
+          // The designed surface, always underneath: it is what a missing tile falls back to.
           Positioned.fill(
             child: CustomPaint(
               painter: _MapGridPainter(),
               child: const SizedBox.expand(),
             ),
           ),
-          for (final Alignment where in const <Alignment>[
-            Alignment(-0.62, -0.45),
-            Alignment(0.48, -0.6),
-            Alignment(-0.3, 0.55),
-            Alignment(0.66, 0.4),
-          ])
+          if (centre != null && !_tilesFailed) ...<Widget>[
+            Positioned.fill(child: _map(t, centre)),
+            PositionedDirectional(
+              bottom: 4,
+              start: 6,
+              child: _attribution(),
+            ),
+          ] else
             Align(
-              alignment: where,
-              child: Icon(
-                Icons.place,
-                size: 16,
-                color: DeliveryColors.brand.withValues(alpha: 0.35),
+              alignment: const Alignment(0, 0.55),
+              child: Text(
+                centre == null ? t.riderMapNoFixYet : t.riderMapUnavailable,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: DeliveryColors.muted,
+                  height: 1.3,
+                ),
               ),
             ),
           Container(
@@ -467,6 +569,87 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _map(DeliveryStrings t, LatLng centre) {
+    return FlutterMap(
+      // Keyed on the anchor rather than on the live fix: the camera is placed once, and every
+      // later ping moves the marker instead of yanking the view out from under a rider who has
+      // panned it somewhere on purpose.
+      key: ValueKey<String>('rider-map-${_mapAnchor ?? centre}'),
+      options: MapOptions(
+        initialCenter: _mapAnchor ?? centre,
+        initialZoom: 14,
+        // Transparent, so the placeholder painted underneath is what shows through a tile that
+        // has not arrived — flutter_map's own default is a flat grey.
+        backgroundColor: Colors.transparent,
+        // A 160px strip inside a scrolling column: dragging it is fine, rotating it is not, and
+        // a two-finger gesture here belongs to the page.
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.drag | InteractiveFlag.doubleTapZoom,
+        ),
+      ),
+      children: <Widget>[
+        TileLayer(
+          urlTemplate: riderOsmTileTemplate,
+          userAgentPackageName: riderOsmUserAgent,
+          maxNativeZoom: 19,
+          errorTileCallback: (_, __, ___) => _noteTileFailure(),
+        ),
+        MarkerLayer(
+          markers: <Marker>[
+            Marker(
+              point: centre,
+              width: 28,
+              height: 28,
+              child: Semantics(
+                label: t.riderMapYouAreHere,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: DeliveryColors.brand,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: DeliveryColors.white, width: 2),
+                  ),
+                  child: const Icon(Icons.navigation_rounded,
+                      size: 14, color: DeliveryColors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// The credit OpenStreetMap's tile usage policy requires on every map drawn from its tiles.
+  Widget _attribution() => Container(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: DeliveryColors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+        ),
+        child: const Text(
+          riderOsmAttribution,
+          style: TextStyle(
+            fontSize: 9,
+            color: DeliveryColors.muted,
+            height: 1.2,
+          ),
+        ),
+      );
+
+  /// One refused tile is weather; a run of them is a rider with no usable connection.
+  ///
+  /// Counted rather than acted on immediately because a single 404 at the edge of a zoom level
+  /// must not tear the map down. Deferred to after the frame: the callback fires from inside the
+  /// tile layer's own build and paint work.
+  void _noteTileFailure() {
+    if (_tilesFailed) return;
+    _tileFailures++;
+    if (_tileFailures < _tileFailureLimit) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _tilesFailed = true);
+    });
   }
 
   Widget _offers(DeliveryStrings t) {
@@ -572,13 +755,17 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: <Widget>[
-                RiderProfileCard(name: widget.session.displayName),
+                RiderProfileCard(
+                  name: widget.session.displayName,
+                  standing: _standing,
+                ),
                 const SizedBox(height: DeliverySpacing.md),
                 RiderDutyToggleCard(
-                  wired: widget.trackingApi != null,
                   presence: _presence,
                   busy: _dutyBusy,
-                  onChanged: _setDuty,
+                  // No presence service, no control: a null callback disables the switch rather
+                  // than offering a toggle that would silently do nothing.
+                  onChanged: widget.trackingApi == null ? null : _setDuty,
                 ),
                 const SizedBox(height: DeliverySpacing.md),
                 // The language itself is set on the shared settings screen, which is also where
@@ -597,27 +784,61 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                 const SizedBox(height: DeliverySpacing.md),
                 RiderPreferencesGroup(
                   rows: <RiderPreference>[
-                    // Document upload, payout details, per-rider notification preferences and live
-                    // chat are all new capabilities with no backend behind them yet.
-                    RiderPreference(
-                      icon: Icons.folder_outlined,
-                      label: t.riderDocuments,
-                      inert: true,
-                    ),
-                    RiderPreference(
-                      icon: Icons.credit_card_outlined,
-                      label: t.riderBankDetails,
-                      inert: true,
-                    ),
+                    // The rider's own KYC file, read back from the applicant-documents endpoints:
+                    // what the platform holds and what a reviewer made of each one.
+                    //
+                    // Both of these rows are omitted rather than drawn dead when a shell was
+                    // handed no documents client. They used to render greyed with a "coming soon"
+                    // chip, which described two shipped sheets as unbuilt — and, because the app
+                    // itself forgot to pass the client, that is what every rider actually saw. A
+                    // row that leads nowhere is not information; a shell without the client simply
+                    // has no documents page, and says so by not offering one.
+                    if (widget.documentsApi != null)
+                      RiderPreference(
+                        icon: Icons.folder_outlined,
+                        label: t.riderDocuments,
+                        onTap: () => showRiderSheet(
+                          context,
+                          (_) => RiderDocumentsSheet(api: widget.documentsApi!),
+                        ),
+                      ),
+                    // Where the money goes. Read-only by the server's rule, not by choice — the
+                    // onboarding payout endpoint refuses a change once an application is decided,
+                    // and a rider signed in here has been approved.
+                    if (widget.documentsApi != null)
+                      RiderPreference(
+                        icon: Icons.credit_card_outlined,
+                        label: t.riderBankDetails,
+                        onTap: () => showRiderSheet(
+                          context,
+                          (_) => RiderPayoutSheet(api: widget.documentsApi!),
+                        ),
+                      ),
+                    // Notification preferences are one question with one answer per account, and
+                    // the shared settings screen already owns them. This row opens that page
+                    // rather than growing a second grid that could disagree with it.
                     RiderPreference(
                       icon: Icons.notifications_outlined,
                       label: t.riderNotificationPreferences,
-                      inert: true,
+                      onTap: () =>
+                          Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => SettingsScreen(
+                          locale: widget.locale,
+                          userId: widget.session.subject,
+                          prefsApi: widget.prefsApi,
+                        ),
+                      )),
                     ),
                     RiderPreference(
                       icon: Icons.help_outline_rounded,
                       label: t.riderHelpAndSupport,
-                      inert: true,
+                      onTap: () => showRiderSheet(
+                        context,
+                        (_) => RiderHelpSheet(
+                          chatApi: widget.chatApi,
+                          socket: widget.socket,
+                        ),
+                      ),
                     ),
                   ],
                 ),

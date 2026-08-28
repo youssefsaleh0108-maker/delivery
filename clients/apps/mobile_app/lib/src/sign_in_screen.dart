@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'biometric_lock.dart';
+import 'forgot_password_screen.dart';
 import 'one_time_code.dart';
 import 'passcode_pad.dart';
 
@@ -35,12 +36,21 @@ class SignInScreen extends StatefulWidget {
     required this.onSignedIn,
     required this.onBack,
     required this.onCreateAccount,
+    this.passwordResetApi,
   });
 
   final AuthService authService;
   final ValueChanged<AuthSession> onSignedIn;
   final VoidCallback onBack;
   final VoidCallback onCreateAccount;
+
+  /// The forgotten-passcode client behind the "Forgot password?" link.
+  ///
+  /// Optional, and — unusually for this codebase — a null here does NOT turn the feature off. The
+  /// reset endpoints are open by design, so [ForgotPasswordScreen] builds its own client against
+  /// the same `API_BASE_URL` define when none is passed. This exists so a caller that already has
+  /// a wired Dio can share it, and so a test can inject one.
+  final PasswordResetApi? passwordResetApi;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -181,6 +191,27 @@ class _SignInScreenState extends State<SignInScreen> {
         _passcode = '';
       });
     }
+  }
+
+  /// Opens the reset flow and, when it succeeds, leaves the person on the credentials step with
+  /// their address still filled in and the passcode field cleared — the passcode they had in mind
+  /// is not the one that works any more.
+  Future<void> _openPasswordReset() async {
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ForgotPasswordScreen(
+          api: widget.passwordResetApi,
+          initialEmail: _username.text.trim(),
+        ),
+      ),
+    );
+    if (!mounted || changed != true) return;
+    setState(() {
+      _step = _Step.credentials;
+      _password.clear();
+      _passcode = '';
+      _error = null;
+    });
   }
 
   void _back() {
@@ -350,17 +381,25 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
               ),
             ),
-            // Drawn, and honestly inert: there is no password-reset endpoint on this realm yet, and
-            // a link that silently does nothing is worse than one that says so.
-            YdComingSoon.wrap(
-              label: t.authComingSoon,
-              child: Text(
-                t.authForgotPassword,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: DeliveryColors.brand,
-                  height: 1.2,
+            // Live: the onboarding service's open password-reset pair. Carries whatever is
+            // already in the address field so somebody who typed their email and then could not
+            // remember their passcode does not type it a second time.
+            Semantics(
+              button: true,
+              child: InkWell(
+                onTap: _busy ? null : _openPasswordReset,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Text(
+                    t.authForgotPassword,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: DeliveryColors.brand,
+                      height: 1.2,
+                    ),
+                  ),
                 ),
               ),
             ),

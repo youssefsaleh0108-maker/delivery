@@ -2836,11 +2836,11 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get authAvailableZones => 'Available zones';
 
   @override
-  String get authZonesComingSoonTitle => 'Zones are not mapped yet';
+  String get authZonesNoneToPickTitle => 'No zones to pick';
 
   @override
-  String get authZonesComingSoonBlurb =>
-      'Pickable delivery zones arrive with the coverage map. Until then, the area above is what we go by.';
+  String get authZonesNoneToPickBlurb =>
+      'Nothing ties a rider to a fixed zone on this platform. The pin you placed and the area you typed above are what a reviewer goes by.';
 
   @override
   String get authBusinessInformation => 'Business information';
@@ -3282,6 +3282,78 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Shown as customers see them. Editing options arrives soon.';
 
   @override
+  String get merchbOptionsNeedSave =>
+      'Save the item first, then add its options.';
+
+  @override
+  String get merchbOptionsLoadFailed =>
+      'Could not load the current options. Nothing was changed.';
+
+  @override
+  String get merchbOptionsSaveFailed => 'Could not save the options.';
+
+  @override
+  String get merchbAddGroup => '+ Add group';
+
+  @override
+  String get merchbGroupName => 'Group name';
+
+  @override
+  String get merchbRemoveGroup => 'Remove group';
+
+  @override
+  String get merchbOptionName => 'Option';
+
+  @override
+  String get merchbRemoveOption => 'Remove option';
+
+  @override
+  String get merchbPriceDelta => 'Extra';
+
+  @override
+  String get merchbMinSelect => 'Choose at least';
+
+  @override
+  String get merchbMaxSelect => 'Choose at most';
+
+  @override
+  String get merchbRuleRequired => 'Required — the customer must choose.';
+
+  @override
+  String get merchbRuleOptional => 'Optional — the customer may skip this.';
+
+  @override
+  String get merchbUntitledGroup => 'this group';
+
+  @override
+  String get merchbGroupNeedsName => 'Every group needs a name.';
+
+  @override
+  String merchbGroupNeedsOption(String name) {
+    return '$name needs at least one option.';
+  }
+
+  @override
+  String merchbOptionNeedsName(String name) {
+    return 'Every option in $name needs a name.';
+  }
+
+  @override
+  String merchbMinAboveMax(String name) {
+    return 'In $name, the minimum is above the maximum.';
+  }
+
+  @override
+  String merchbMinAboveCount(String name) {
+    return 'In $name, the minimum is more than the number of options.';
+  }
+
+  @override
+  String merchbGroupOutOfRange(String name) {
+    return 'In $name, the numbers must be between 0 and 50.';
+  }
+
+  @override
   String get merchbSaveMenuItem => 'Save Menu Item';
 
   @override
@@ -3375,6 +3447,14 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get merchbPaymentBankDetails => 'Payment & Bank details';
+
+  @override
+  String get merchbBankReadOnly =>
+      'This is the account on file. It was set with your application, and the platform team is who changes it now — not this screen.';
+
+  @override
+  String get merchbBankNoneFiled =>
+      'No bank details were filed with your application. The bank step closes once an application is decided, so the platform team is who adds them now.';
 
   @override
   String get merchbNotificationSettings => 'Notification Settings';
@@ -4074,4 +4154,389 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizCouldNotSendPayout =>
       'Your application is in, but the bank details did not go through.';
+
+  @override
+  String get merchPinShopLocation => 'Shop location';
+
+  @override
+  String get merchPinDropHint =>
+      'Tap the map to put the pin on your shop, then save.';
+
+  @override
+  String get merchPinWhyItMatters =>
+      'Customers see this pin, and delivery distance is measured from it.';
+
+  @override
+  String get merchPinNoneYet => 'No location pinned yet';
+
+  @override
+  String get merchPinSetIt => 'Set location';
+
+  @override
+  String get merchPinSaved => 'Shop location saved';
+
+  @override
+  String get merchPinCleared => 'Shop location removed';
+
+  @override
+  String get merchMapUnavailable => 'Map could not load';
+
+  @override
+  String merchUpOnPrevious(Object percent, Object days) {
+    return '$percent% up on the $days days before';
+  }
+
+  @override
+  String merchDownOnPrevious(Object percent, Object days) {
+    return '$percent% down on the $days days before';
+  }
+
+  @override
+  String merchSameAsPrevious(Object days) {
+    return 'Same as the $days days before';
+  }
+
+  @override
+  String merchNonePrevious(Object days) {
+    return 'Nothing in the $days days before';
+  }
+
+  @override
+  String get merchNothingEitherPeriod => 'Nothing in either period';
+
+  @override
+  String get merchAnalyticsBlurb =>
+      'Every day in the window, split by how fast the customer asked for the delivery.';
+
+  @override
+  String get merchTierSplit => 'By delivery speed';
+
+  @override
+  String get merchOrderValue => 'Order value';
+
+  @override
+  String get merchOrderValueNote =>
+      'What customers paid in total, delivery and any express premium included — not your payout.';
+
+  @override
+  String get deliveryTierStandard => 'Standard';
+
+  @override
+  String get deliveryTierExpress => 'Express';
+
+  @override
+  String get custPinYourDoor => 'Pin your door';
+
+  @override
+  String get custSetHere => 'Set here';
+
+  @override
+  String get custNamingThisPlace => 'Looking up this place…';
+
+  @override
+  String get custMapUnavailable =>
+      'The map could not load. The address you type is what we will use.';
+
+  @override
+  String get custYourAddress => 'Your address';
+
+  @override
+  String get custTheRider => 'The rider';
+
+  @override
+  String get custDeliverySpeed => 'Delivery speed';
+
+  @override
+  String get custExpressSurchargeApplies => 'Surcharge applies';
+
+  @override
+  String get custExpressNote =>
+      'Express costs extra. The platform sets the amount and your receipt shows it as its own line. A free-delivery offer does not cover it.';
+
+  @override
+  String get authResetYourPasscode => 'Reset your passcode';
+
+  @override
+  String get authChangeYourPasscode => 'Change your passcode';
+
+  @override
+  String get authResetAskForAddress =>
+      'Tell us the email on your account. If it has one, a six-digit code goes to it.';
+
+  @override
+  String get authResetToYourAddress =>
+      'A six-digit code goes to the email on your account.';
+
+  @override
+  String authResetCodeMaybeSent(Object destination) {
+    return 'If $destination has an account, a 6-digit code is on its way. It expires in 10 minutes and can be used once.';
+  }
+
+  @override
+  String get authSetNewPasscode => 'Set new passcode';
+
+  @override
+  String get authPasscodeChanged => 'Passcode changed';
+
+  @override
+  String get authPasscodeChangedSignIn =>
+      'Sign in with your new six-digit passcode.';
+
+  @override
+  String get authPasscodeChangedSignedIn =>
+      'Use your new six-digit passcode the next time you sign in.';
+
+  @override
+  String get custEditProfile => 'Edit profile';
+
+  @override
+  String get custProfileFieldsFixed =>
+      'Your name and email were set when the account was created and cannot be changed from the app yet.';
+
+  @override
+  String get custNoEmailOnAccount =>
+      'This account has no email address on it, so there is nowhere to send a code.';
+
+  @override
+  String get custCouldNotOpenThat => 'Nothing on this phone could open that.';
+
+  @override
+  String get custHelpIntro =>
+      'Answers to the things people ask most, and the ways to reach a person when the answer is not here.';
+
+  @override
+  String get custHelpTalkToUs => 'Talk to us';
+
+  @override
+  String get custChatOnWhatsApp => 'Chat on WhatsApp';
+
+  @override
+  String get custEmailSupport => 'Email support';
+
+  @override
+  String get custHelpNoChannelsYet =>
+      'No support channel is set up in this build yet. Your orders still carry a chat with the rider once one is assigned.';
+
+  @override
+  String get custHelpOrdering => 'Ordering';
+
+  @override
+  String get custHelpDelivery => 'Delivery';
+
+  @override
+  String get custHelpPayments => 'Payments';
+
+  @override
+  String get custHelpAccount => 'Your account';
+
+  @override
+  String get custHelpApplying => 'Selling and riding';
+
+  @override
+  String get custFaqOneShopQ => 'Why can my basket only hold one shop?';
+
+  @override
+  String get custFaqOneShopA =>
+      'One order goes to one shop and is carried by one rider. Two shops means two collections, two fees and two journeys, so the basket asks you to finish one before starting the other.';
+
+  @override
+  String get custFaqMinimumQ => 'What is a minimum order?';
+
+  @override
+  String get custFaqMinimumA =>
+      'Some shops will not send a rider out below a certain amount. The basket shows the shop\'s minimum and exactly how much is still missing, and checkout stays closed until it is met.';
+
+  @override
+  String get custFaqChangeOrderQ => 'Can I change or cancel an order?';
+
+  @override
+  String get custFaqChangeOrderA =>
+      'An order cannot be edited after it is placed. The order page lists what you can still do with it, and cancelling leaves that list once the shop has started preparing. Once a rider is assigned you can message them from the order page.';
+
+  @override
+  String get custFaqTiersQ =>
+      'What is the difference between Standard and Express?';
+
+  @override
+  String get custFaqTiersA =>
+      'Express asks for the order to be treated as urgent and adds a surcharge on top of the delivery fee. The platform sets that amount, not the shop, and your receipt shows it as its own line. A free-delivery offer covers the delivery fee only — the express surcharge stays payable.';
+
+  @override
+  String get custFaqWhereIsRiderQ => 'Where is my rider?';
+
+  @override
+  String get custFaqWhereIsRiderA =>
+      'The order page draws the rider\'s recorded positions on a map from the moment they collect your order. The arrival time comes from the tracking service; when it has no recent position to measure from, it says so instead of showing a guess.';
+
+  @override
+  String get custFaqDeliveryFeeQ => 'How is the delivery fee worked out?';
+
+  @override
+  String get custFaqDeliveryFeeA =>
+      'By the area you are delivering to, which is why a saved address carries an area. A promotion can waive it, and when it does the basket names the promotion rather than only showing a zero.';
+
+  @override
+  String get custFaqAddressPinQ => 'Why should I drop a pin on the map?';
+
+  @override
+  String get custFaqAddressPinA =>
+      'A typed line gets the rider to the street; the pin gets them to the door, and it is the point the arrival time is measured against. Without one your order still arrives, but there is nothing on the map to estimate from.';
+
+  @override
+  String get custFaqPayMethodsQ => 'Which payment methods really work?';
+
+  @override
+  String get custFaqPayMethodsA =>
+      'Cash on delivery is the only method in this build that moves real money. Card and wallet are wired to a test payment provider and are labelled \"Test payment\" at checkout: choosing one authorises against that provider and nothing is charged.';
+
+  @override
+  String get custFaqPromoQ => 'How do promo codes work?';
+
+  @override
+  String get custFaqPromoA =>
+      'Type one in the basket and it is checked against what is in the basket right then, so a code can start applying the moment you cross its minimum. What is actually billed is recomputed by the server when the order is placed, and the confirmation shows that figure.';
+
+  @override
+  String get custFaqRefundQ => 'How do I get a refund?';
+
+  @override
+  String get custFaqRefundA =>
+      'There is no refund button in the app. Cash orders are settled at the door, so a problem with one is sorted with us directly — message or email support with your order number and what went wrong.';
+
+  @override
+  String get custFaqPasscodeQ => 'I forgot my passcode.';
+
+  @override
+  String get custFaqPasscodeA =>
+      'Tap \"Forgot password?\" on the sign-in screen. A six-digit code goes to the email on the account, lasts ten minutes and works once. From inside the app the same steps are under Edit on this screen.';
+
+  @override
+  String get custFaqProfileQ => 'Can I change my name or email?';
+
+  @override
+  String get custFaqProfileA =>
+      'Not from the app yet. They were set when the account was created; the passcode is the one thing on the account you can change yourself.';
+
+  @override
+  String get custFaqApplyQ => 'How do I sell on YouDrop, or deliver for it?';
+
+  @override
+  String get custFaqApplyA =>
+      'From the welcome screen, before signing in: choose shop or rider and fill in the application. You will be asked for contact details, documents and payout details, and you get an account at the end so you can sign in and follow it.';
+
+  @override
+  String get custFaqApplyWaitQ => 'How long does an application take?';
+
+  @override
+  String get custFaqApplyWaitA =>
+      'A person reads it, so there is no fixed time. Your application screen shows the stage it is at and whether any document was sent back for a correction — that screen is the status, and nothing is decided automatically.';
+
+  @override
+  String deliveryTierExpressSurcharge(Object amount) {
+    return 'Express +$amount';
+  }
+
+  @override
+  String get riderTierExpress => 'Express';
+
+  @override
+  String get riderCompletionRate => 'Completed';
+
+  @override
+  String riderHoursValue(Object hours) {
+    return '$hours h';
+  }
+
+  @override
+  String riderPerformanceLine(Object delivered, Object claimed, Object days) {
+    return '$delivered of $claimed claimed jobs delivered in $days days';
+  }
+
+  @override
+  String riderPerformanceDropped(Object count) {
+    return ' · $count dropped after claiming';
+  }
+
+  @override
+  String ratingWithCount(Object average, Object ratings) {
+    return '$average · $ratings ratings';
+  }
+
+  @override
+  String get riderMapYouAreHere => 'You';
+
+  @override
+  String get riderMapNoFixYet => 'Waiting for your first GPS fix';
+
+  @override
+  String get riderMapUnavailable => 'Map unavailable';
+
+  @override
+  String get riderNavigateFailed => 'No map app could be opened.';
+
+  @override
+  String get riderRegionAllAreas => 'Every area';
+
+  @override
+  String get riderHelpTitle => 'Help & support';
+
+  @override
+  String get riderHelpConversations => 'Your conversations';
+
+  @override
+  String get riderHelpNoConversations =>
+      'A chat opens with the customer on every job you are assigned.';
+
+  @override
+  String get riderHelpCouldNotLoad => 'Could not load your conversations';
+
+  @override
+  String riderHelpOrderThread(Object ref) {
+    return 'Order $ref';
+  }
+
+  @override
+  String get riderHelpThreadClosed => 'Closed';
+
+  @override
+  String get riderHelpHowItWorks => 'How this works';
+
+  @override
+  String get riderHelpDuty =>
+      'You only receive work while you are on duty and your phone is reporting its position.';
+
+  @override
+  String get riderHelpClaim =>
+      'A job is yours the moment you accept it. If someone accepted it first, the board says so.';
+
+  @override
+  String get riderHelpCashOut =>
+      'Cash-out is requested from the Earnings tab and handed over by the platform team.';
+
+  @override
+  String get riderHelpExpress =>
+      'An Express job is a customer who paid for speed. The premium is the platform\'s, not part of your fee.';
+
+  @override
+  String get riderDocumentsTitle => 'Documents & licences';
+
+  @override
+  String get riderDocumentsCouldNotLoad => 'Could not load your documents';
+
+  @override
+  String get riderPayoutCouldNotLoad => 'Could not load your bank details';
+
+  @override
+  String get authPinYourArea => 'Tap the map to mark where you will be working';
+
+  @override
+  String authPinnedAt(Object lat, Object lng) {
+    return 'Pinned at $lat, $lng';
+  }
+
+  @override
+  String get authPinClear => 'Remove pin';
+
+  @override
+  String get authMapUnavailable => 'Map unavailable';
 }

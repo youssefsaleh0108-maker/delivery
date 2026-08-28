@@ -2,6 +2,7 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// The rider board's cards and the small parts they are assembled from.
 ///
@@ -314,106 +315,61 @@ String riderDistanceLabel(DeliveryStrings t, double metres) => metres >= 1000
     ? t.riderKmUnit((metres / 1000).toStringAsFixed(1))
     : t.riderMetreUnit(metres.round().toString());
 
-/// Localised strings for the wave-2 rider wiring, resolved from the same keys the l10n fragment
-/// carries (`l10n-fragments2/rider2.json` and the API layer's `core.json`).
+/// The attribution OpenStreetMap's tile policy requires on every map that draws its tiles.
 ///
-/// This extension exists so the wiring compiles and speaks both languages *before* the fragment is
-/// merged into the shared .arb files. Every member matches its fragment key by name and by value,
-/// and Dart resolves instance members ahead of extension members — so the moment the finish agent
-/// merges and regenerates `DeliveryStrings`, the generated getters take over at every call site
-/// and this extension goes dormant. It can then be deleted.
-extension RiderWave2Strings on DeliveryStrings {
-  bool get _ar => localeName.startsWith('ar');
-  String _s(String en, String ar) => _ar ? ar : en;
+/// Deliberately not localised: it is the licence's own wording and a credit line, not copy.
+const String riderOsmAttribution = '© OpenStreetMap contributors';
 
-  // ---------------------------------------------------------------- earnings + cash-out
-  String riderBalanceLine(String balance, String available) => _s(
-      'Balance $balance · available for cash-out $available',
-      'الرصيد $balance · المتاح للسحب $available');
-  String riderEarningsBreakdown(String earnings, String tips) =>
-      _s('$earnings delivery pay · $tips tips', '$earnings أجرة توصيل · $tips إكراميات');
-  String get riderCashOutTitle => _s('Cash out', 'سحب الرصيد');
-  String get riderCashOutAvailable => _s('Available to cash out', 'المتاح للسحب');
-  String riderCashOutMinimum(String amount) =>
-      _s('Minimum $amount', 'الحد الأدنى $amount');
-  String get riderCashOutManualNote => _s(
-      'Payouts are handed over by the platform team — nothing transfers automatically.',
-      'تُسلَّم الدفعات يدوياً من فريق المنصة — لا يُحوَّل شيء تلقائياً.');
-  String get riderCashOutRequest => _s('Request cash-out', 'طلب سحب');
-  String get riderCashOutAmountLabel => _s('Amount', 'المبلغ');
-  String get riderCashOutAlreadyOpen => _s('A cash-out request is already on its way.',
-      'هناك طلب سحب قيد المعالجة بالفعل.');
-  String get riderCashOutFailed =>
-      _s('The cash-out could not be requested.', 'تعذّر طلب السحب.');
-  String riderCashOutOpenLine(String amount) => _s(
-      '$amount requested — waiting on the payout', '$amount مطلوبة — بانتظار التسليم');
-  String get riderCashOutLastRefused =>
-      _s('Your last cash-out was refused.', 'رُفض طلب السحب الأخير.');
-  String get riderCashOutHistory => _s('Recent requests', 'الطلبات الأخيرة');
-  String riderTipLine(String tip) => _s('+$tip tip', '+$tip إكرامية');
-  String riderReimbursedLine(String amount) =>
-      _s('+$amount reimbursed', '+$amount مستردّة');
+/// The OSM raster tile template every map in this app draws from.
+const String riderOsmTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-  // ---------------------------------------------------------------- duty + presence
-  String riderLastSeen(String when) => _s('Last seen $when', 'آخر ظهور $when');
-  String get riderDutyChangeFailed =>
-      _s('Could not update your duty state.', 'تعذّر تحديث حالة الدوام.');
-  String get riderDutyNotYetDeclared =>
-      _s('You have not gone on duty yet.', 'لم تبدأ الدوام بعد.');
-  String get dutyOnDuty => _s('On duty', 'على رأس العمل');
-  String get dutyOffDuty => _s('Off duty', 'خارج الدوام');
-  String get presenceSignalLost => _s('Signal lost', 'انقطعت الإشارة');
+/// The user agent OSM's policy asks a client to identify itself with.
+const String riderOsmUserAgent = 'shop.youdrop.app';
 
-  // ---------------------------------------------------------------- eta
-  String get riderEtaCaption => _s('Live ETA', 'الوقت المتوقع للوصول');
-  String riderEtaAway(String distance) =>
-      _s('$distance away', 'على بُعد $distance');
-  String riderEtaArrivingAt(String time) =>
-      _s('arriving about $time', 'الوصول نحو $time');
-  String riderKmUnit(String km) => _s('$km km', '$km كم');
-  String riderMetreUnit(String m) => _s('$m m', '$m م');
-  String riderEtaComputedBy(String provider) =>
-      _s('Estimated by $provider', 'التقدير من $provider');
-  String get etaWaitingFirstFix => _s("Waiting for the rider's first GPS fix",
-      'بانتظار أول إشارة GPS من السائق');
-  String get etaPositionOutOfDate =>
-      _s("The rider's position is out of date", 'موقع السائق غير محدَّث');
-  String get etaNoMapPoint =>
-      _s('No map point to measure to', 'لا توجد نقطة على الخريطة للقياس إليها');
-  String get etaRouteServiceDown =>
-      _s('The route service did not answer', 'خدمة المسارات لم تستجب');
-  String get etaNothingOnItsWay =>
-      _s('Nothing is on its way', 'لا يوجد شيء في الطريق');
-  String get etaUnavailable =>
-      _s('No estimate available', 'لا يتوفر تقدير للوصول');
-  String get etaHeadingToShop => _s('Heading to the shop', 'في الطريق إلى المتجر');
-  String get etaOnTheWayToYou => _s('On the way to you', 'في الطريق إليك');
-  String get etaStraightLineNote => _s(
-      'Rough estimate — measured in a straight line, not by road',
-      'تقدير تقريبي — يُقاس بخط مستقيم لا عبر الطرقات');
+/// Hands an address to whatever the phone uses for maps.
+///
+/// This is the honest shape of "Navigate" here: the platform has no routing engine of its own and
+/// orders carry no coordinates, so the app forwards the *door* — the address the customer typed —
+/// to a real maps application, which does know about roads. Nothing is fabricated on the way: the
+/// query is the delivery address verbatim.
+///
+/// Reports a refusal rather than swallowing it. A rider who taps Navigate and sees nothing happen
+/// assumes the app is broken and stops using the button.
+Future<void> riderNavigateTo(BuildContext context, String address) async {
+  final DeliveryStrings t = DeliveryStrings.of(context);
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  final String query = address.trim();
+  if (query.isEmpty) return;
 
-  // ---------------------------------------------------------------- money labels
-  String get cashOutRequested => _s('Requested', 'مطلوب');
-  String get cashOutPaid => _s('Paid', 'مدفوع');
-  String get cashOutRefused => _s('Refused', 'مرفوض');
-  String get paidByPlatform => _s('Paid by the platform', 'تدفعها المنصة');
-  String get paidByYourCompany => _s('Paid by your company', 'تدفعها شركتك');
-  String get paidElsewhere => _s('Paid elsewhere', 'تُدفع خارج المنصة');
-  String get ratingNewRider => _s('New', 'جديد');
+  final Uri destination = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}');
 
-  // ---------------------------------------------------------------- chat
-  String get riderChatTitle => _s('Customer chat', 'محادثة الزبون');
-  String get riderChatHint => _s('Type a message…', 'اكتب رسالة…');
-  String get riderChatSend => _s('Send', 'إرسال');
-  String get riderChatClosed =>
-      _s('This conversation has closed.', 'أُغلقت هذه المحادثة.');
-  String get riderChatEmpty => _s('No messages yet.', 'لا رسائل بعد.');
-  String get riderChatCouldNotLoad =>
-      _s('Could not load the conversation', 'تعذّر تحميل المحادثة');
-  String get riderChatSendFailed =>
-      _s('The message was not sent.', 'لم تُرسَل الرسالة.');
-  String get riderChatReconnecting => _s('Reconnecting…', 'جارٍ إعادة الاتصال…');
+  bool opened = false;
+  try {
+    opened = await launchUrl(destination, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    // A device with nothing registered for the scheme throws rather than answering false.
+    opened = false;
+  }
+  if (!opened) {
+    messenger.showSnackBar(SnackBar(content: Text(t.riderNavigateFailed)));
+  }
 }
+
+/// The EXPRESS badge, in the cards' own tag language.
+///
+/// Drawn only on an EXPRESS order — a STANDARD one wears nothing, because a badge that is always
+/// there says nothing. It is a fact about the *customer's* order, not about the rider's pay: the
+/// surcharge is platform revenue and is deliberately absent from the delivery fee this card leads
+/// with, so the badge carries no number at all.
+Widget? riderTierTag(DeliveryStrings t, DeliveryTier tier) =>
+    tier == DeliveryTier.express
+        ? RiderTag(
+            label: t.riderTierExpress.toUpperCase(),
+            color: DeliveryColors.brand,
+            background: DeliveryColors.brandSoft,
+          )
+        : null;
 
 /// The sentence for an ETA the server declined to number.
 String riderEtaReasonLabel(DeliveryStrings t, EtaUnavailableReason reason) =>
@@ -493,22 +449,40 @@ class RiderJobCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // The design's slot for a neutral distance tag. There are no coordinates in the data
-              // model, so it carries the one fact that changes what happens at the door instead:
-              // a rider who arrives thinking an order is prepaid either leaves without the money or
-              // has an argument on a doorstep.
-              if (order.collectsCashOnDelivery)
-                RiderTag(
-                  label: t.collectCash(order.totalAmount.toStringAsFixed(2)),
-                  color: DeliveryAccent.caution.color,
-                  background: DeliveryAccent.caution.tint,
-                )
-              else
-                RiderTag(
-                  label: t.itemCountWithDot(
-                    order.items.fold<int>(0, (int a, OrderLine l) => a + l.qty),
-                  ),
+              // Two tags can share this slot now, so the group flexes: an EXPRESS badge beside a
+              // cash-to-collect amount must ellipsize, never overflow the card on a narrow phone.
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    // Express first, because it changes how the job is *run* rather than how it
+                    // ends: a rider choosing between two offers is choosing which to hurry on.
+                    if (riderTierTag(t, order.deliveryTier) case final Widget tier) ...<Widget>[
+                      tier,
+                      const SizedBox(width: DeliverySpacing.xs),
+                    ],
+                    // The design's slot for a neutral distance tag. There are no coordinates in the
+                    // data model, so it carries the one fact that changes what happens at the door
+                    // instead: a rider who arrives thinking an order is prepaid either leaves
+                    // without the money or has an argument on a doorstep.
+                    Flexible(
+                      child: order.collectsCashOnDelivery
+                          ? RiderTag(
+                              label:
+                                  t.collectCash(order.totalAmount.toStringAsFixed(2)),
+                              color: DeliveryAccent.caution.color,
+                              background: DeliveryAccent.caution.tint,
+                            )
+                          : RiderTag(
+                              label: t.itemCountWithDot(
+                                order.items
+                                    .fold<int>(0, (int a, OrderLine l) => a + l.qty),
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
@@ -598,6 +572,10 @@ class RiderTaskCard extends StatelessWidget {
           Row(
             children: <Widget>[
               YdStatusPill(status: status, label: order.status.labelIn(t)),
+              if (riderTierTag(t, order.deliveryTier) case final Widget tier) ...<Widget>[
+                const SizedBox(width: DeliverySpacing.xs),
+                tier,
+              ],
               const Spacer(),
               if (age != null)
                 Text(
@@ -658,15 +636,19 @@ class RiderTaskCard extends StatelessWidget {
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           Row(
             children: <Widget>[
-              // Turn-by-turn needs coordinates and a routing engine, neither of which exists yet.
+              // Navigate hands the door to the phone's own maps application — the platform has no
+              // routing engine and the order carries no coordinates, but the address is real and
+              // a maps app knows what to do with it. Disabled only when there is no address to
+              // hand over, which the server does not currently allow but the model does.
               Expanded(
                 child: RiderButton(
                   label: t.riderNavigate,
                   style: RiderButtonStyle.soft,
                   fontSize: 13,
                   verticalPadding: 10,
-                  onPressed: null,
-                  trailing: YdComingSoon(label: t.riderComingSoon),
+                  onPressed: order.deliveryAddress.trim().isEmpty
+                      ? null
+                      : () => riderNavigateTo(context, order.deliveryAddress),
                 ),
               ),
               const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),

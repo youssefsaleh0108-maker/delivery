@@ -1,5 +1,5 @@
 /*
-  The public site's only moving part: the language switch.
+  The public site's two moving parts: the language switch, and the QR code on the download band.
 
   Applying used to live here too, as a dialog. It is now its own page at /register — see
   register.js — because a flow that asks somebody to leave and fetch a code from their inbox needs
@@ -39,7 +39,9 @@ const AR = {
   'cta-shop': 'افتح متجرك الآن',
   'cta-partner': 'كن شريكاً لنا',
   'cta-download': 'حمّل تطبيق العملاء',
+  'cta-apk': 'حمّل ملف APK مباشرةً',
   'soon': 'قريباً',
+  'tag-android': 'ملف APK لأندرويد',
 
   /* hero */
   'hero-eyebrow': '⚡ منظومة موحّدة للخدمات اللوجستية والتوصيل',
@@ -123,8 +125,7 @@ const AR = {
   /* the app */
   'mobile-eyebrow': 'التطبيق على هاتفك',
   'mobile-title': 'حمّل YouDrop على هاتفك اليوم',
-  'mobile-lede': 'متاح لأجهزة iOS وAndroid. امسح رمز الاستجابة السريعة للتثبيت، أو حمّله مباشرةً من متجر التطبيقات المفضّل لديك.',
-  'qr-slot': 'رمز الاستجابة السريعة قريباً',
+  'mobile-lede': 'متاح لأجهزة Android الآن. امسح رمز الاستجابة السريعة لتثبيته، أو حمّل ملف APK مباشرةً من هذه الصفحة. أمّا إدراج التطبيق في App Store وGoogle Play فهو في الطريق.',
 
   /* questions */
   'faq-eyebrow': 'مركز المساعدة',
@@ -205,7 +206,53 @@ function apply(lang) {
 
   switchLabels.forEach((node) => { node.textContent = SWITCH_LABEL[arabic ? 'ar' : 'en']; });
   toggles.forEach((button) => button.setAttribute('aria-pressed', String(arabic)));
+
+  /* The QR's own label, which cannot ride on data-t: that mechanism writes textContent, and the
+     code inside this element is markup. The picture itself does not change with the language —
+     it is an address, and an address has no language. */
+  if (qrDrawn) qrNode.setAttribute('aria-label', QR_LABEL[arabic ? 'ar' : 'en']);
 }
+
+/*
+  ------------------------------------------------------------------ the QR code
+
+  Drawn here rather than fetched, and drawn rather than shipped as a file, for two reasons that
+  pull the same way. A hosted QR service would put an outbound request on every load of this page —
+  the destination URL handed to somebody else's server, and the picture missing entirely when that
+  server is slow or blocked. A pre-rendered image file would be one more thing to remember: change
+  the address and the picture keeps pointing at the old one, silently, because nobody re-scans an
+  image they have seen a hundred times. The address below is the single source of truth and the
+  code is derived from it on the spot.
+
+  If lib/qr.js is missing or throws, the slot keeps the plain sentence it ships with and the direct
+  download link beside it still works. A landing page must not lose its download to a failed script.
+*/
+
+const QR_TARGET = 'https://www.youdrop.shop/app';
+
+const QR_LABEL = {
+  en: 'QR code for youdrop.shop/app, where the Android app downloads',
+  ar: 'رمز استجابة سريعة يفتح youdrop.shop/app حيث يُحمَّل تطبيق أندرويد'
+};
+
+const qrNode = document.getElementById('qr-code');
+
+const qrDrawn = (() => {
+  if (!qrNode || typeof YouDropQR === 'undefined') return false;
+  try {
+    /* Two modules of quiet zone rather than the specification's four: the tile this sits in is
+       white and carries 12px of padding of its own, which is another three and a half modules at
+       this size. Four inside as well would shrink the code without adding any margin. */
+    qrNode.innerHTML = YouDropQR.svg(QR_TARGET, { quiet: 2, dark: '#0F172A', light: '#FFFFFF' });
+  } catch (error) {
+    return false;
+  }
+  /* The dashed placeholder box comes off; the 100px square it lived in stays. */
+  qrNode.classList.remove('qr-slot');
+  qrNode.setAttribute('role', 'img');
+  qrNode.setAttribute('aria-label', QR_LABEL.en);
+  return true;
+})();
 
 toggles.forEach((button) => {
   button.addEventListener('click', () => {

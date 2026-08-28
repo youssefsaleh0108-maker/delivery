@@ -172,13 +172,20 @@ class ConsoleFactMark {
   final DeliveryAccent accent;
 }
 
-/// The line pinned under a table whose columns the platform cannot fill yet.
+/// The line pinned under a table with a column the platform has nothing to fill from.
 ///
-/// A single sentence and one [ConsoleComingSoonChip] rather than a chip in every affected cell:
-/// the design's columns stay drawn and stay empty, and this says once why — which is the honest
-/// reading, and the only one that does not put a number nobody measured in front of an operator.
+/// A single sentence and one quiet chip rather than a chip in every affected cell: the design's
+/// columns stay drawn and stay empty, and this says once why — which is the honest reading, and
+/// the only one that does not put a number nobody measured in front of an operator.
+///
+/// The chip is a [ConsoleQuietChip] and the label defaults to "No source", not "Coming soon".
+/// Both of these notes explain an *absent source*, and one of them — no rider on this platform
+/// carries a work region — is a fact about the data model rather than a queue position. Promising
+/// an operator that a column is arriving, when nothing is coming, is the failure this widget was
+/// written to avoid; it should not commit it in its own chip. Callers whose column really is
+/// waiting on an endpoint pass a label that says so.
 class ConsoleInertNote extends StatelessWidget {
-  const ConsoleInertNote({super.key, required this.text, this.chipLabel = 'Coming soon'});
+  const ConsoleInertNote({super.key, required this.text, this.chipLabel = 'No source'});
 
   final String text;
   final String chipLabel;
@@ -187,7 +194,7 @@ class ConsoleInertNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        ConsoleComingSoonChip(label: chipLabel),
+        ConsoleQuietChip(label: chipLabel),
         const SizedBox(width: DeliverySpacing.sm + 2),
         Expanded(
           child: Text(

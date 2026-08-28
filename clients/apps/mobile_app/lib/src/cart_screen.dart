@@ -206,9 +206,21 @@ class _CartScreenState extends State<CartScreen> {
     // claim a discount on nothing.
     _removePromo();
 
+    final DeliveryStrings t = DeliveryStrings.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(DeliveryStrings.of(context).orderPlacedToastShort(
-          order.shortId, order.totalAmount.toStringAsFixed(2)))),
+      SnackBar(
+        content: Text(<String>[
+          t.orderPlacedToastShort(
+              order.shortId, order.totalAmount.toStringAsFixed(2)),
+          // The express premium, itemised as its own figure the moment the server first states
+          // one. It sits INSIDE that total and outside the delivery fee, so the total alone never
+          // says what the hurry cost — and this is the first screen that can say it, because the
+          // amount does not exist until the order does.
+          if (order.expressSurcharge > 0)
+            t.deliveryTierExpressSurcharge(
+                order.expressSurcharge.toStringAsFixed(2)),
+        ].join(' · ')),
+      ),
     );
     // Jump to Orders so the customer immediately sees the thing they just created.
     widget.onOrderPlaced();
@@ -365,31 +377,18 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  /// The promo row — live against the promotions API when one was provided, and the drawn-inert
-  /// affordance it always was when not, because a field that accepts anything and validates
-  /// nothing is worse than one that says it is not ready.
+  /// The promo row, live against the promotions API.
+  ///
+  /// It used to have a second face: with no [PromoApi] it drew the field greyed under a
+  /// coming-soon chip. That chip is gone. The promotions API is wired for every customer the app
+  /// signs in, so the only thing the inert face ever described was a screen pumped without a
+  /// server — and drawing a dead control for that is worse than drawing nothing. Without an API
+  /// there is now simply no promo row, and every path a customer can actually reach has the real
+  /// one.
   Widget _promoSection(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
-    if (widget.promoApi == null) {
-      return Padding(
-        padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
-        child: YdComingSoon.wrap(
-          label: t.custSoon,
-          icon: Icons.schedule,
-          child: _promoRowShell(
-            t,
-            field: Text(
-              t.custPromoCode,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
-            ),
-            onApply: null,
-          ),
-        ),
-      );
-    }
+    if (widget.promoApi == null) return const SizedBox.shrink();
 
     final PromoQuote? quote = _quote;
     return Padding(

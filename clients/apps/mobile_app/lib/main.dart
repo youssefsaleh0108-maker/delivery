@@ -126,7 +126,15 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final TrackingApi _trackingApi = TrackingApi(_dio);
   late final PromoApi _promoApi = PromoApi(_dio);
   late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
+  late final AggregatesApi _aggregatesApi = AggregatesApi(_dio);
   late final RiderMoneyApi _riderMoneyApi = RiderMoneyApi(_dio);
+
+  /// The rider's own completion rate and claimed/delivered counts, behind the Earnings tab.
+  ///
+  /// It was written, threaded through two screens and never built here — exactly the failure the
+  /// block comment above describes, caught by grepping for the chip it left on screen rather than
+  /// by anything that could go red.
+  late final RiderPerformanceApi _performanceApi = RiderPerformanceApi(_dio);
   late final ChatApi _chatApi = ChatApi(_dio);
   late final NotificationPrefsApi _prefsApi = NotificationPrefsApi(_dio);
 
@@ -549,6 +557,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               butlerApi: _butlerApi,
               trackingApi: _trackingApi,
               moneyApi: _riderMoneyApi,
+              performanceApi: _performanceApi,
+              // Settings' Documents and Bank Details rows. The same client the wizard and the
+              // pending screen already use — an approved rider resolves their own application
+              // from their token, so the applicant-facing route is the one that answers here.
+              documentsApi: _documentsApi,
               chatApi: _chatApi,
               socket: _socket,
               prefsApi: _prefsApi,
@@ -568,6 +581,8 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               orderApi: _orderApi,
               storeApi: _storeApi,
               catalogApi: _catalogApi,
+              aggregatesApi: _aggregatesApi,
+              documentsApi: _documentsApi,
               prefsApi: _prefsApi,
               session: session,
               locale: _locale,

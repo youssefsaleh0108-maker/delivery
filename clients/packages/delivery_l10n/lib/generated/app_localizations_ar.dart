@@ -2820,11 +2820,11 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get authAvailableZones => 'المناطق المتاحة';
 
   @override
-  String get authZonesComingSoonTitle => 'لم تُرسَم المناطق بعد';
+  String get authZonesNoneToPickTitle => 'لا توجد مناطق للاختيار';
 
   @override
-  String get authZonesComingSoonBlurb =>
-      'ستتوفّر المناطق القابلة للاختيار مع خريطة التغطية. حتى ذلك الحين نعتمد على المنطقة المذكورة أعلاه.';
+  String get authZonesNoneToPickBlurb =>
+      'لا يُربط السائق بمنطقة ثابتة على هذه المنصة. ما يعتمد عليه المراجع هو الدبوس الذي وضعته والمنطقة التي كتبتها أعلاه.';
 
   @override
   String get authBusinessInformation => 'معلومات العمل';
@@ -3273,6 +3273,77 @@ class DeliveryStringsAr extends DeliveryStrings {
       'تظهر كما يراها الزبون. تعديل الخيارات سيتوفر قريباً.';
 
   @override
+  String get merchbOptionsNeedSave => 'احفظ الصنف أولاً، ثم أضف خياراته.';
+
+  @override
+  String get merchbOptionsLoadFailed =>
+      'تعذّر تحميل الخيارات الحالية. لم يتم تغيير أي شيء.';
+
+  @override
+  String get merchbOptionsSaveFailed => 'تعذّر حفظ الخيارات.';
+
+  @override
+  String get merchbAddGroup => '+ أضف مجموعة';
+
+  @override
+  String get merchbGroupName => 'اسم المجموعة';
+
+  @override
+  String get merchbRemoveGroup => 'حذف المجموعة';
+
+  @override
+  String get merchbOptionName => 'الخيار';
+
+  @override
+  String get merchbRemoveOption => 'حذف الخيار';
+
+  @override
+  String get merchbPriceDelta => 'الفرق بالسعر';
+
+  @override
+  String get merchbMinSelect => 'اختر على الأقل';
+
+  @override
+  String get merchbMaxSelect => 'اختر بحد أقصى';
+
+  @override
+  String get merchbRuleRequired => 'إلزامي — على الزبون أن يختار.';
+
+  @override
+  String get merchbRuleOptional => 'اختياري — يمكن للزبون تخطّيه.';
+
+  @override
+  String get merchbUntitledGroup => 'هذه المجموعة';
+
+  @override
+  String get merchbGroupNeedsName => 'كل مجموعة تحتاج إلى اسم.';
+
+  @override
+  String merchbGroupNeedsOption(String name) {
+    return '$name تحتاج إلى خيار واحد على الأقل.';
+  }
+
+  @override
+  String merchbOptionNeedsName(String name) {
+    return 'كل خيار في $name يحتاج إلى اسم.';
+  }
+
+  @override
+  String merchbMinAboveMax(String name) {
+    return 'في $name، الحد الأدنى أكبر من الحد الأقصى.';
+  }
+
+  @override
+  String merchbMinAboveCount(String name) {
+    return 'في $name، الحد الأدنى أكبر من عدد الخيارات.';
+  }
+
+  @override
+  String merchbGroupOutOfRange(String name) {
+    return 'في $name، يجب أن تكون الأرقام بين 0 و50.';
+  }
+
+  @override
   String get merchbSaveMenuItem => 'حفظ الصنف';
 
   @override
@@ -3366,6 +3437,14 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get merchbPaymentBankDetails => 'الدفع والحساب البنكي';
+
+  @override
+  String get merchbBankReadOnly =>
+      'هذا هو الحساب المسجَّل. حُدِّد مع طلبك، وفريق المنصة هو من يغيّره الآن — لا هذه الشاشة.';
+
+  @override
+  String get merchbBankNoneFiled =>
+      'لم تُسجَّل بيانات بنكية مع طلبك. تُغلق خطوة البيانات البنكية بعد البتّ في الطلب، لذا فريق المنصة هو من يضيفها الآن.';
 
   @override
   String get merchbNotificationSettings => 'إعدادات الإشعارات';
@@ -4072,4 +4151,390 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizCouldNotSendPayout =>
       'تم استلام طلبك، لكن البيانات البنكية لم تُرسل.';
+
+  @override
+  String get merchPinShopLocation => 'موقع المتجر';
+
+  @override
+  String get merchPinDropHint =>
+      'انقر على الخريطة لتضع الدبوس على متجرك، ثم احفظ.';
+
+  @override
+  String get merchPinWhyItMatters =>
+      'يرى العملاء هذا الدبوس، ومنه تُقاس مسافة التوصيل.';
+
+  @override
+  String get merchPinNoneYet => 'لم يُحدَّد موقع بعد';
+
+  @override
+  String get merchPinSetIt => 'حدِّد الموقع';
+
+  @override
+  String get merchPinSaved => 'تم حفظ موقع المتجر';
+
+  @override
+  String get merchPinCleared => 'تمت إزالة موقع المتجر';
+
+  @override
+  String get merchMapUnavailable => 'تعذّر تحميل الخريطة';
+
+  @override
+  String merchUpOnPrevious(Object percent, Object days) {
+    return 'أعلى بنسبة $percent% عن الـ$days يوماً السابقة';
+  }
+
+  @override
+  String merchDownOnPrevious(Object percent, Object days) {
+    return 'أقل بنسبة $percent% عن الـ$days يوماً السابقة';
+  }
+
+  @override
+  String merchSameAsPrevious(Object days) {
+    return 'مثل الـ$days يوماً السابقة';
+  }
+
+  @override
+  String merchNonePrevious(Object days) {
+    return 'لا شيء في الـ$days يوماً السابقة';
+  }
+
+  @override
+  String get merchNothingEitherPeriod => 'لا شيء في الفترتين';
+
+  @override
+  String get merchAnalyticsBlurb =>
+      'كل يوم في الفترة، مقسّماً حسب سرعة التوصيل التي طلبها العميل.';
+
+  @override
+  String get merchTierSplit => 'حسب سرعة التوصيل';
+
+  @override
+  String get merchOrderValue => 'قيمة الطلبات';
+
+  @override
+  String get merchOrderValueNote =>
+      'إجمالي ما دفعه العملاء، شاملاً التوصيل وأي رسم سرعة إضافي — وليس مستحقّاتك.';
+
+  @override
+  String get deliveryTierStandard => 'عادي';
+
+  @override
+  String get deliveryTierExpress => 'سريع';
+
+  @override
+  String get custPinYourDoor => 'حدّد موقع بابك';
+
+  @override
+  String get custSetHere => 'حدّد هنا';
+
+  @override
+  String get custNamingThisPlace => 'جارٍ التعرّف على هذا المكان…';
+
+  @override
+  String get custMapUnavailable =>
+      'تعذّر تحميل الخريطة. سنعتمد على العنوان الذي تكتبه.';
+
+  @override
+  String get custYourAddress => 'عنوانك';
+
+  @override
+  String get custTheRider => 'السائق';
+
+  @override
+  String get custDeliverySpeed => 'سرعة التوصيل';
+
+  @override
+  String get custExpressSurchargeApplies => 'تُضاف رسوم إضافية';
+
+  @override
+  String get custExpressNote =>
+      'التوصيل السريع بتكلفة إضافية. تحدّد المنصّة قيمتها وتظهر في الفاتورة كبند مستقل. وعرض التوصيل المجاني لا يشملها.';
+
+  @override
+  String get authResetYourPasscode => 'إعادة تعيين رمز الدخول';
+
+  @override
+  String get authChangeYourPasscode => 'تغيير رمز الدخول';
+
+  @override
+  String get authResetAskForAddress =>
+      'أدخل البريد الإلكتروني المرتبط بحسابك. إذا كان له حساب، فسيصله رمز من ستة أرقام.';
+
+  @override
+  String get authResetToYourAddress =>
+      'سيصل رمز من ستة أرقام إلى البريد الإلكتروني المسجّل في حسابك.';
+
+  @override
+  String authResetCodeMaybeSent(Object destination) {
+    return 'إذا كان لدى $destination حساب، فإن رمزًا من ٦ أرقام في طريقه إليه. تنتهي صلاحيته خلال ١٠ دقائق ويُستخدم مرة واحدة.';
+  }
+
+  @override
+  String get authSetNewPasscode => 'تعيين رمز الدخول';
+
+  @override
+  String get authPasscodeChanged => 'تم تغيير رمز الدخول';
+
+  @override
+  String get authPasscodeChangedSignIn =>
+      'سجّل الدخول باستخدام رمزك الجديد المكوّن من ستة أرقام.';
+
+  @override
+  String get authPasscodeChangedSignedIn =>
+      'استخدم رمزك الجديد المكوّن من ستة أرقام في المرة القادمة التي تسجّل فيها الدخول.';
+
+  @override
+  String get custEditProfile => 'تعديل الملف الشخصي';
+
+  @override
+  String get custProfileFieldsFixed =>
+      'تم تحديد اسمك وبريدك الإلكتروني عند إنشاء الحساب، ولا يمكن تغييرهما من التطبيق حتى الآن.';
+
+  @override
+  String get custNoEmailOnAccount =>
+      'لا يوجد بريد إلكتروني مرتبط بهذا الحساب، لذا لا يوجد مكان يُرسَل إليه الرمز.';
+
+  @override
+  String get custCouldNotOpenThat =>
+      'لا يوجد تطبيق على هذا الهاتف يمكنه فتح ذلك.';
+
+  @override
+  String get custHelpIntro =>
+      'إجابات عن أكثر ما يسأل عنه الناس، وطرق التواصل مع شخص حقيقي إذا لم تجد إجابتك هنا.';
+
+  @override
+  String get custHelpTalkToUs => 'تواصل معنا';
+
+  @override
+  String get custChatOnWhatsApp => 'المحادثة عبر واتساب';
+
+  @override
+  String get custEmailSupport => 'مراسلة الدعم بالبريد';
+
+  @override
+  String get custHelpNoChannelsYet =>
+      'لم يتم إعداد قناة دعم في هذه النسخة بعد. ولا يزال بإمكانك مراسلة السائق من صفحة الطلب بعد إسناده.';
+
+  @override
+  String get custHelpOrdering => 'الطلب';
+
+  @override
+  String get custHelpDelivery => 'التوصيل';
+
+  @override
+  String get custHelpPayments => 'الدفع';
+
+  @override
+  String get custHelpAccount => 'حسابك';
+
+  @override
+  String get custHelpApplying => 'البيع والتوصيل';
+
+  @override
+  String get custFaqOneShopQ => 'لماذا تقتصر السلة على متجر واحد؟';
+
+  @override
+  String get custFaqOneShopA =>
+      'الطلب الواحد يذهب إلى متجر واحد ويحمله سائق واحد. متجران يعنيان عمليتَي استلام ورسمين ورحلتين، لذلك تطلب منك السلة إنهاء أحدهما قبل البدء بالآخر.';
+
+  @override
+  String get custFaqMinimumQ => 'ما هو الحد الأدنى للطلب؟';
+
+  @override
+  String get custFaqMinimumA =>
+      'بعض المتاجر لا ترسل سائقًا لطلب أقل من مبلغ معيّن. تعرض السلة الحد الأدنى للمتجر والمبلغ المتبقّي بالضبط، ويبقى إتمام الطلب مغلقًا حتى يتحقّق.';
+
+  @override
+  String get custFaqChangeOrderQ => 'هل يمكنني تعديل الطلب أو إلغاؤه؟';
+
+  @override
+  String get custFaqChangeOrderA =>
+      'لا يمكن تعديل الطلب بعد إرساله. تعرض صفحة الطلب ما يمكنك فعله به، ويختفي خيار الإلغاء من القائمة بمجرد أن يبدأ المتجر بالتحضير. وبعد إسناد سائق يمكنك مراسلته من صفحة الطلب.';
+
+  @override
+  String get custFaqTiersQ => 'ما الفرق بين العادي والسريع؟';
+
+  @override
+  String get custFaqTiersA =>
+      'التوصيل السريع يجعل الطلب ذا أولوية ويضيف رسومًا فوق رسوم التوصيل. تحدّد المنصّة هذه القيمة وليس المتجر، وتظهر في الفاتورة كبند مستقل. وعرض التوصيل المجاني يغطي رسوم التوصيل فقط، أما رسوم السرعة فتبقى مستحقّة.';
+
+  @override
+  String get custFaqWhereIsRiderQ => 'أين السائق؟';
+
+  @override
+  String get custFaqWhereIsRiderA =>
+      'تعرض صفحة الطلب مواقع السائق المسجّلة على الخريطة منذ لحظة استلامه طلبك. ويأتي وقت الوصول من خدمة التتبّع؛ وعندما لا يتوفّر لديها موقع حديث تقول ذلك بدل عرض تخمين.';
+
+  @override
+  String get custFaqDeliveryFeeQ => 'كيف تُحتسب رسوم التوصيل؟';
+
+  @override
+  String get custFaqDeliveryFeeA =>
+      'بحسب المنطقة التي يُوصَّل إليها، ولهذا يحمل العنوان المحفوظ منطقة. وقد يلغيها عرض ترويجي، وعندها تذكر السلة اسم العرض بدل عرض صفر فقط.';
+
+  @override
+  String get custFaqAddressPinQ => 'لماذا أضع دبوسًا على الخريطة؟';
+
+  @override
+  String get custFaqAddressPinA =>
+      'السطر المكتوب يوصل السائق إلى الشارع، والدبوس يوصله إلى الباب، وهو النقطة التي يُحتسب عليها وقت الوصول. وبدونه يصل طلبك أيضًا، لكن لا توجد نقطة على الخريطة يُقدَّر منها الوقت.';
+
+  @override
+  String get custFaqPayMethodsQ => 'ما وسائل الدفع التي تعمل فعليًا؟';
+
+  @override
+  String get custFaqPayMethodsA =>
+      'الدفع نقدًا عند الاستلام هو الوسيلة الوحيدة في هذه النسخة التي تحرّك أموالًا حقيقية. أما البطاقة والمحفظة فموصولتان بمزوّد دفع تجريبي وتظهران عند الدفع بعلامة «دفع تجريبي»: اختيار إحداهما يتم عبر ذلك المزوّد ولا يُخصم منك شيء.';
+
+  @override
+  String get custFaqPromoQ => 'كيف تعمل رموز الخصم؟';
+
+  @override
+  String get custFaqPromoA =>
+      'اكتب الرمز في السلة ليُفحَص مقابل محتوياتها في تلك اللحظة، فقد يبدأ تطبيقه فور تجاوزك حدّه الأدنى. أما المبلغ المحتسَب فعليًا فيعيد الخادم حسابه عند إرسال الطلب، ويظهر في تأكيد الطلب.';
+
+  @override
+  String get custFaqRefundQ => 'كيف أسترد مبلغًا؟';
+
+  @override
+  String get custFaqRefundA =>
+      'لا يوجد زر لاسترداد المبلغ في التطبيق. تُسوّى الطلبات النقدية عند الباب، لذا تُعالَج أي مشكلة معنا مباشرة — راسلنا عبر واتساب أو البريد مع رقم الطلب وما حدث.';
+
+  @override
+  String get custFaqPasscodeQ => 'نسيت رمز الدخول.';
+
+  @override
+  String get custFaqPasscodeA =>
+      'اضغط «نسيت كلمة المرور؟» في شاشة تسجيل الدخول. يُرسَل رمز من ستة أرقام إلى بريد الحساب، ويبقى صالحًا عشر دقائق ويُستخدم مرة واحدة. ومن داخل التطبيق ستجد الخطوات نفسها تحت «تعديل» في هذه الشاشة.';
+
+  @override
+  String get custFaqProfileQ => 'هل يمكنني تغيير اسمي أو بريدي الإلكتروني؟';
+
+  @override
+  String get custFaqProfileA =>
+      'ليس من التطبيق حتى الآن. فقد تم تحديدهما عند إنشاء الحساب؛ ورمز الدخول هو الشيء الوحيد في الحساب الذي يمكنك تغييره بنفسك.';
+
+  @override
+  String get custFaqApplyQ => 'كيف أبيع عبر YouDrop أو أعمل في التوصيل؟';
+
+  @override
+  String get custFaqApplyA =>
+      'من شاشة الترحيب قبل تسجيل الدخول: اختر متجرًا أو سائقًا واملأ الطلب. سيُطلب منك بيانات التواصل والمستندات وتفاصيل التحويل، وستحصل على حساب في النهاية لتسجّل الدخول وتتابع طلبك.';
+
+  @override
+  String get custFaqApplyWaitQ => 'كم يستغرق النظر في الطلب؟';
+
+  @override
+  String get custFaqApplyWaitA =>
+      'يقرأه شخص حقيقي، لذا لا توجد مدة ثابتة. تعرض شاشة طلبك المرحلة التي وصل إليها وما إذا أُعيد أي مستند للتصحيح — تلك الشاشة هي الحالة، ولا يُتخذ أي قرار تلقائيًا.';
+
+  @override
+  String deliveryTierExpressSurcharge(Object amount) {
+    return 'سريع +$amount';
+  }
+
+  @override
+  String get riderTierExpress => 'سريع';
+
+  @override
+  String get riderCompletionRate => 'نسبة الإتمام';
+
+  @override
+  String riderHoursValue(Object hours) {
+    return '$hours س';
+  }
+
+  @override
+  String riderPerformanceLine(Object delivered, Object claimed, Object days) {
+    return 'أُنجزت $delivered من $claimed مهمة مقبولة خلال $days يوماً';
+  }
+
+  @override
+  String riderPerformanceDropped(Object count) {
+    return ' · $count تُركت بعد القبول';
+  }
+
+  @override
+  String ratingWithCount(Object average, Object ratings) {
+    return '$average · $ratings تقييماً';
+  }
+
+  @override
+  String get riderMapYouAreHere => 'أنت';
+
+  @override
+  String get riderMapNoFixYet => 'بانتظار أول إشارة GPS';
+
+  @override
+  String get riderMapUnavailable => 'الخريطة غير متاحة';
+
+  @override
+  String get riderNavigateFailed => 'تعذّر فتح تطبيق خرائط.';
+
+  @override
+  String get riderRegionAllAreas => 'كل المناطق';
+
+  @override
+  String get riderHelpTitle => 'المساعدة والدعم';
+
+  @override
+  String get riderHelpConversations => 'محادثاتك';
+
+  @override
+  String get riderHelpNoConversations =>
+      'تُفتح محادثة مع الزبون في كل مهمة تُسند إليك.';
+
+  @override
+  String get riderHelpCouldNotLoad => 'تعذّر تحميل محادثاتك';
+
+  @override
+  String riderHelpOrderThread(Object ref) {
+    return 'الطلب $ref';
+  }
+
+  @override
+  String get riderHelpThreadClosed => 'مغلقة';
+
+  @override
+  String get riderHelpHowItWorks => 'كيف يعمل هذا';
+
+  @override
+  String get riderHelpDuty =>
+      'لا تصلك مهام إلا وأنت على رأس العمل وهاتفك يرسل موقعه.';
+
+  @override
+  String get riderHelpClaim =>
+      'تصبح المهمة لك فور قبولها. وإن سبقك إليها غيرك، فسيخبرك اللوح بذلك.';
+
+  @override
+  String get riderHelpCashOut =>
+      'يُطلب السحب من تبويب الأرباح ويُسلَّم يدوياً من فريق المنصة.';
+
+  @override
+  String get riderHelpExpress =>
+      'المهمة السريعة يدفع فيها الزبون مقابل السرعة. والعلاوة للمنصة وليست جزءاً من أجرتك.';
+
+  @override
+  String get riderDocumentsTitle => 'المستندات والرخص';
+
+  @override
+  String get riderDocumentsCouldNotLoad => 'تعذّر تحميل مستنداتك';
+
+  @override
+  String get riderPayoutCouldNotLoad => 'تعذّر تحميل بياناتك المصرفية';
+
+  @override
+  String get authPinYourArea =>
+      'اضغط على الخريطة لتحديد المنطقة التي ستعمل فيها';
+
+  @override
+  String authPinnedAt(Object lat, Object lng) {
+    return 'مثبّت عند $lat، $lng';
+  }
+
+  @override
+  String get authPinClear => 'إزالة الدبوس';
+
+  @override
+  String get authMapUnavailable => 'الخريطة غير متاحة';
 }

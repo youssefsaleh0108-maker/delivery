@@ -28,11 +28,21 @@ class MerchantDashboardScreen extends StatefulWidget {
     super.key,
     required this.api,
     this.storeApi,
+    this.aggregates,
     this.pendingApproval = false,
     this.onShowOrders,
   });
 
   final OrderApi api;
+
+  /// The tier-split daily series for this shop, which is what the window figures are compared
+  /// against.
+  ///
+  /// Optional, and the window tiles simply carry no comparison without it — a dashboard that
+  /// cannot fetch the previous fortnight says nothing about it rather than guessing. The series is
+  /// also the only source here that can answer "compared with what?": [MerchantSummary] carries
+  /// today and yesterday and then one flat total for the window, with nothing behind it.
+  final AggregatesApi? aggregates;
 
   /// Drives the header's publish switch and supplies the shop's name.
   ///
@@ -85,6 +95,14 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   Store? _store;
   bool _publishing = false;
 
+  /// Twice the dashboard's own window, so the fortnight on screen has a fortnight behind it to be
+  /// compared with. 28 is inside the server's 1..30 clamp, so nothing is quietly truncated.
+  static const int _comparisonDays = 28;
+
+  /// The two halves of [_comparisonDays], summed. Null until the series arrives, and null again if
+  /// it will not — never a zero standing in for an unknown.
+  _PeriodPair? _periods;
+
   @override
   void initState() {
     super.initState();
@@ -103,7 +121,27 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
       _refreshSummary(silent: silent),
       _refreshRecent(),
       _refreshStore(),
+      _refreshPeriods(),
     ]);
+  }
+
+  /// The fortnight-on-fortnight comparison, from the shop's own daily series.
+  ///
+  /// The server sends no percentages by design — the arithmetic is the client's, and it is done
+  /// once here so the tiles cannot each do it slightly differently.
+  Future<void> _refreshPeriods() async {
+    final AggregatesApi? api = widget.aggregates;
+    if (api == null) return;
+    try {
+      final TierTradeSeries series = await api.merchantDaily(days: _comparisonDays);
+      if (!mounted) return;
+      setState(() => _periods = _PeriodPair.split(series));
+    } catch (_) {
+      // The comparison disappears rather than the page. It is a footnote under a figure that is
+      // still correct without it.
+      if (!mounted) return;
+      setState(() => _periods = null);
+    }
   }
 
   Future<void> _refreshSummary({bool silent = false}) async {
@@ -488,6 +526,57 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     return today > yesterday ? t.upOnYesterday(percent) : t.downOnYesterday(percent);
   }
 
+  /// The same arrow-and-words pair as [_trend], but against the fortnight before this one.
+  ///
+  /// Null — no line at all — until the series has arrived, so a tile never briefly claims a
+  /// comparison it has not made yet.
+  Widget? _periodTrend(double Function(_PeriodTotals) read, DeliveryStrings t) {
+    final _PeriodPair? periods = _periods;
+    if (periods == null) return null;
+
+    final double now = read(periods.current);
+    final double before = read(periods.previous);
+    final TrendDirection direction = TrendDirection.between(now, before);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(direction.icon, size: 14, color: direction.color),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            _compareToPrevious(now, before, periods.days, t),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: direction.color,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The period comparison, worded the same way the day comparison is.
+  ///
+  /// The zero cases are said rather than divided, for the reason [_compare] gives: a percentage
+  /// against nothing is `Infinity` or `NaN` on a merchant's dashboard, and "up 100%" from a
+  /// standing start says less than "nothing in the fortnight before".
+  static String _compareToPrevious(num now, num before, int days, DeliveryStrings t) {
+    if (now == 0 && before == 0) return t.merchNothingEitherPeriod;
+    if (before == 0) return t.merchNonePrevious(days);
+    if (now == before) return t.merchSameAsPrevious(days);
+
+    final double change = ((now - before) / before * 100).abs();
+    final int percent = change.round();
+    return now > before
+        ? t.merchUpOnPrevious(percent, days)
+        : t.merchDownOnPrevious(percent, days);
+  }
+
   /// "3 New Orders", with the one affordance on this screen that is a job rather than a fact.
   Widget _pendingCard(MerchantSummary s, DeliveryStrings t) {
     final bool anything = s.awaitingYou > 0;
@@ -735,13 +824,25 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
               value: '${s.window.orders}',
               accent: DeliveryAccent.neutral,
               footnote: t.lastDaysHeading(s.windowDays),
+              trend: _periodTrend(
+                (_PeriodTotals p) => p.orders.toDouble(),
+                t,
+              ),
             ),
             MerchantMetricCard.accent(
               icon: Icons.check_circle_outline,
               label: t.deliveredInWindow,
               value: '${s.window.delivered}',
               accent: DeliveryAccent.positive,
+              trend: _periodTrend(
+                (_PeriodTotals p) => p.delivered.toDouble(),
+                t,
+              ),
             ),
+            // No period comparison on this one, deliberately. The summary's `money` is the goods a
+            // shop is paid on; the series' `gross` is the whole bill the customer paid, delivery
+            // and any express premium included. A percentage worked out from the second and
+            // printed under the first would be a true number about the wrong figure.
             MerchantMetricCard.accent(
               icon: Icons.payments_outlined,
               label: t.salesInWindow,
@@ -989,6 +1090,65 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   static String _dayLabel(BuildContext context, DateTime day) {
     // narrowWeekdays is indexed from Sunday; DateTime.weekday runs Monday(1)..Sunday(7).
     return MaterialLocalizations.of(context).narrowWeekdays[day.weekday % 7];
+  }
+}
+
+/// One period of the daily series, added up.
+///
+/// Both tiers together: a shop is paid on the goods either way, and the express premium is the
+/// platform's revenue rather than the shop's, so splitting the count here would suggest a
+/// distinction the merchant's takings do not have. The split is on the analytics screen, where it
+/// is labelled for what it is.
+class _PeriodTotals {
+  const _PeriodTotals({required this.orders, required this.delivered});
+
+  final int orders;
+  final int delivered;
+
+  static _PeriodTotals of(Iterable<TierTradeDay> days) {
+    int orders = 0;
+    int delivered = 0;
+    for (final TierTradeDay day in days) {
+      orders += day.orders;
+      delivered += day.delivered;
+    }
+    return _PeriodTotals(orders: orders, delivered: delivered);
+  }
+}
+
+/// The window on screen and the window before it, cut out of one series.
+class _PeriodPair {
+  const _PeriodPair({
+    required this.current,
+    required this.previous,
+    required this.days,
+  });
+
+  final _PeriodTotals current;
+  final _PeriodTotals previous;
+
+  /// How long each half is — the number the comparison names, rather than the 14 this screen
+  /// happens to ask for. The server clamps `days`, so what came back is the only honest length.
+  final int days;
+
+  /// Splits an ascending, zero-filled series down the middle: the newer half is "now".
+  ///
+  /// Null when there are fewer than two days to split, which is the case where there is no
+  /// previous period to compare against and therefore nothing to say.
+  static _PeriodPair? split(TierTradeSeries series) {
+    final List<TierTradeDay> days = series.days;
+    if (days.length < 2) return null;
+
+    // Both halves are exactly the same length. An odd-length series drops its oldest day rather
+    // than comparing fourteen days with thirteen and calling the difference trade.
+    final int half = days.length ~/ 2;
+    return _PeriodPair(
+      current: _PeriodTotals.of(days.sublist(days.length - half)),
+      previous: _PeriodTotals.of(
+        days.sublist(days.length - 2 * half, days.length - half),
+      ),
+      days: half,
+    );
   }
 }
 

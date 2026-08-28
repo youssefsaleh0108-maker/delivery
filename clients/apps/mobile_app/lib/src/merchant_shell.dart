@@ -6,6 +6,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:flutter/material.dart';
 
+import 'notifications_screen.dart' show NotificationPrefsScreen;
 import 'settings_screen.dart';
 
 /// The shop owner's surface: the four-tab app the redesign draws.
@@ -26,6 +27,8 @@ class MerchantShell extends StatefulWidget {
     required this.orderApi,
     required this.storeApi,
     required this.catalogApi,
+    this.aggregatesApi,
+    this.documentsApi,
     this.prefsApi,
     required this.session,
     required this.locale,
@@ -40,6 +43,17 @@ class MerchantShell extends StatefulWidget {
 
   /// The catalogue behind the Products tab.
   final CatalogApi catalogApi;
+
+  /// The shop's own daily series: the dashboard's period comparisons and the analytics page.
+  ///
+  /// The portal handed this to the same two screens from the day they landed and the phone did
+  /// not, so a merchant with only a phone — the exact person this shell exists for — got tiles
+  /// with no movement on them and an Analytics row wearing a "coming soon" chip for a page that
+  /// was already written.
+  final AggregatesApi? aggregatesApi;
+
+  /// The onboarding documents-and-payout client, behind the Settings tab bank row.
+  final DocumentsApi? documentsApi;
 
   /// Handed to the settings page's notification-preferences grid; null leaves the row undrawn.
   final NotificationPrefsApi? prefsApi;
@@ -122,6 +136,7 @@ class _MerchantShellState extends State<MerchantShell> {
         return MerchantDashboardScreen(
           api: widget.orderApi,
           storeApi: widget.storeApi,
+          aggregates: widget.aggregatesApi,
           pendingApproval: widget.pendingApproval,
           onShowOrders: () => _open(_ordersTab),
         );
@@ -143,9 +158,17 @@ class _MerchantShellState extends State<MerchantShell> {
           // disappeared with it, taking the only way to turn the lock on or off with it.
           onEditAccount: _openAccountPreferences,
           onShopProfile: _openShopProfile,
-          // Null on purpose: no notification preferences exist for a merchant on any service, and
-          // the screen draws the row as "Soon" rather than as a control that does nothing.
-          onNotificationSettings: null,
+          // Wired. The row carried a "Soon" chip on the claim that a merchant has no notification
+          // preferences on any service — and that was never true of this shell: preferences are
+          // per *account*, keyed on the signed-in subject, and this same file has been opening
+          // that very screen from the Edit chip all along. The row now goes straight to it
+          // instead of by way of account preferences, because that is what its label promises.
+          onNotificationSettings:
+              widget.prefsApi == null ? null : _openNotificationPreferences,
+          // The dashboard's other half: the shop's own daily series, behind the Analytics row.
+          aggregates: widget.aggregatesApi,
+          // The bank record on this account, read from the onboarding application.
+          documents: widget.documentsApi,
           onSignOut: () => widget.onSignOut(),
         );
       default:
@@ -160,6 +183,13 @@ class _MerchantShellState extends State<MerchantShell> {
         userId: widget.session.subject,
         prefsApi: widget.prefsApi,
       ),
+    ));
+  }
+
+  /// The Settings tab's notification row, straight to the grid it names.
+  void _openNotificationPreferences() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NotificationPrefsScreen(api: widget.prefsApi!),
     ));
   }
 

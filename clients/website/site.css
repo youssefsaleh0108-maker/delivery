@@ -6,9 +6,11 @@
   like a different company from the product it sells is a small, constant tax on trust.
 
   Rebuilt 2026-08 from the Figma frame 14:4 "delivio-website"
-  (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). This file is shared by three pages — index.html,
-  register.html and admin.html — so the primitives near the top (buttons, masthead, panel, form,
-  sheet) are the shared vocabulary and the section rules further down belong to the landing page.
+  (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). This file is shared by three pages — the landing page,
+  the application form, and the unlisted staff page — so the primitives near the top (buttons,
+  masthead, panel, form, sheet) are the shared vocabulary and the section rules further down belong
+  to the landing page. The third page is not named here: this stylesheet is fetched by every visitor
+  to the site, and a comment naming that file is the same as a link to it.
 */
 
 :root {
@@ -187,6 +189,28 @@ a { color: inherit; }
 .soon-on-dark {
   background: rgba(255, 255, 255, .15);
   color: var(--white);
+}
+
+/*
+  The same pill, saying something true instead.
+
+  Where a "Coming soon" chip used to sit beside a dead button there is now a live link and this: not
+  an apology, a fact about what the link hands over. It borrows the chip's geometry deliberately —
+  the slot in the design is that shape, and the reader's eye already knows to look there for the
+  small print about the button next to it.
+*/
+.tag {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: normal;
+  padding: 3px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ buttons */
@@ -586,8 +610,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   gap: 10px;
   flex-wrap: wrap;
 }
-.cta-soon .secondary,
-.cta-soon .primary { cursor: default; }
+/* These were spans with `cursor: default` while there was nothing behind them. They are links to
+   /app now and take the button system's own pointer, so the override is gone. */
 
 /*
   The hero's partner row is not styled here because it is not on the page. The design puts "Trusted
@@ -970,12 +994,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 }
 
 /*
-  The QR slot.
+  The QR tile.
 
-  The design puts a code here. The one in the file is branded for a different product name and
-  encodes a destination nobody on this side can verify, so the tile is drawn at the geometry it was
-  designed at — a white 16px-radius tile, 12px of padding, a 100px square inside — and says what it
-  is instead of pointing somewhere unknown.
+  The design's own code is branded for a different product name and encodes a destination nobody on
+  this side can verify, so what sits here is one generated in the browser from the address in
+  site.js. The tile keeps the geometry it was designed at — a white 16px-radius tile, 12px of
+  padding, a 100px square inside — and the code is drawn to fill that square exactly.
 */
 .qr {
   background: var(--white);
@@ -983,9 +1007,17 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   padding: 12px;
   flex: none;
 }
-.qr-slot {
+.qr-code {
   width: 100px;
   height: 100px;
+}
+/* The SVG is square and sized by its viewBox; `display: block` keeps the inline baseline gap from
+   pushing it a few pixels off the bottom of the tile. */
+.qr-code svg { display: block; width: 100%; height: 100%; }
+
+/* The state before the code exists — scripting off, or lib/qr.js failed to load. Removed from the
+   element the moment a code is drawn into it. */
+.qr-slot {
   border-radius: var(--r-sm);
   background: var(--bg);
   border: 1px dashed var(--border);
@@ -993,7 +1025,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   place-items: center;
   padding: 8px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.3;
   color: var(--muted);
@@ -1032,6 +1064,26 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   color: var(--white);
 }
 .store img { width: 18px; height: 18px; display: block; }
+
+/*
+  The direct download, under the two badges that cannot be links yet.
+
+  Underlined rather than drawn as a third button: it is the same destination as the QR code beside
+  it, and two buttons of equal weight for one file would read as two different downloads.
+*/
+.apk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: normal;
+  color: var(--white);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.apk-link:hover { color: var(--brand-line); }
+.apk-link img { width: 16px; height: 16px; display: block; }
 
 .downloads-note {
   margin: 0;
@@ -1210,7 +1262,7 @@ footer {
 /* ------------------------------------------------------------------ applying */
 
 /*
-  Everything from here down belongs to register.html and admin.html.
+  Everything from here down belongs to the two pages that are not the landing page.
 
   It is kept in this file, and kept under the same class names, because those two pages link this
   stylesheet and are owned elsewhere — renaming a selector here would break a page this change is

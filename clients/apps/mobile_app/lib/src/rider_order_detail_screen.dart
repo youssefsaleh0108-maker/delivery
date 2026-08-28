@@ -216,8 +216,14 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                     ),
                     const SizedBox(height: 10),
                   ],
-                  // Turn-by-turn needs coordinates on the addresses and a routing engine; neither
-                  // exists. Drawn as designed, and inert.
+                  // Real, and honest about what it is: the platform has no routing engine and the
+                  // order carries no coordinates, so this hands the door — the address the
+                  // customer actually typed — to whatever the phone uses for maps. That
+                  // application does know about roads. Nothing is invented on the way across:
+                  // the search query is the delivery address verbatim.
+                  //
+                  // While the rider still has to collect, the shop is the stop that matters, so
+                  // the button navigates there first and to the door once the goods are aboard.
                   SizedBox(
                     width: double.infinity,
                     child: RiderButton(
@@ -226,8 +232,9 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       verticalPadding: 14,
-                      onPressed: null,
-                      trailing: YdComingSoon(label: t.riderComingSoon),
+                      onPressed: _navigationTarget(order).isEmpty
+                          ? null
+                          : () => riderNavigateTo(context, _navigationTarget(order)),
                     ),
                   ),
                   // Not in the design, and kept anyway: cancel is a real transition the server
@@ -256,6 +263,23 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
         ),
       ),
     );
+  }
+
+  /// Which stop Navigate should open.
+  ///
+  /// Before pick-up the rider is going to the shop, after it to the door — sending them to the
+  /// customer while the bag is still on the counter is the one way this button can waste a
+  /// journey. The shop is only ever named, never addressed, so its name is what the maps app is
+  /// asked to find; the customer's address is a real address.
+  ///
+  /// Empty when there is nothing to hand over, which disables the button rather than opening a
+  /// maps application on an empty search.
+  static String _navigationTarget(DeliveryOrder order) {
+    final bool collected = order.status == OrderStatus.pickedUp ||
+        order.status == OrderStatus.delivered;
+    final String? shop = order.storeName;
+    if (!collected && shop != null && shop.trim().isNotEmpty) return shop.trim();
+    return order.deliveryAddress.trim();
   }
 
   /// The design's `back-header`: 20/12 padding, a chevron and a 16px bold title.

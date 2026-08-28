@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'address_sheet.dart';
 import 'biometric_lock.dart';
 import 'delivery_address.dart';
+import 'forgot_password_screen.dart';
+import 'help_support_screen.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'settings_screen.dart' show AppLanguageRow;
@@ -231,14 +233,122 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           const SizedBox(width: DeliverySpacing.sm),
-          // Drawn as designed and inert: editing a profile writes to Keycloak, and nothing in the
-          // app does that yet.
-          YdComingSoon.wrap(
-            label: t.custSoon,
-            child: YdBadge.brand(label: t.edit, uppercase: false, fontSize: 12),
+          // Live. What this badge gated was "editing a profile writes to Keycloak, and nothing in
+          // the app does that yet" — and one thing does now: the onboarding service's
+          // password-reset pair sets a new passcode on the realm account. So the badge opens what
+          // can genuinely be changed, and states plainly what cannot. See [_editProfile].
+          Semantics(
+            button: true,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+              onTap: _editProfile,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.all(DeliverySpacing.xs),
+                child: YdBadge.brand(label: t.edit, uppercase: false, fontSize: 12),
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  /// What "Edit" can honestly offer.
+  ///
+  /// The passcode is real: `/api/onboarding/password-reset` sends a code to the account's own
+  /// address and its `/confirm` sets the new one on Keycloak, and that is the whole flow this
+  /// sheet opens — with the address locked to the signed-in account, because a signed-in session
+  /// must not be a way to send reset codes to strangers.
+  ///
+  /// The name and the email are a different matter, and the sheet says so in a sentence rather
+  /// than by showing greyed fields: the sign-up call sets them once and no endpoint on the
+  /// platform changes them afterwards. Drawing a disabled "Full name" box would look like a
+  /// feature that is loading.
+  Future<void> _editProfile() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final String? email = widget.session.email;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: DeliveryColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(DeliveryRadius.sheet)),
+      ),
+      builder: (BuildContext sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: DeliveryColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: DeliverySpacing.md),
+              Text(
+                t.custEditProfile,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryColors.ink,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: DeliverySpacing.md),
+              // No address on the token means no way to send a code to the right person, and the
+              // reset endpoint is keyed on the address rather than the subject — so the row is
+              // withheld rather than opening a flow that cannot finish.
+              if (email != null && email.isNotEmpty)
+                YdListRow(
+                  icon: Icons.password_rounded,
+                  title: t.authChangeYourPasscode,
+                  subtitle: email,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _changePasscode(email);
+                  },
+                )
+              else
+                SoftNote(icon: Icons.info_outline, text: t.custNoEmailOnAccount),
+              const SizedBox(height: DeliverySpacing.md),
+              Text(
+                t.custProfileFieldsFixed,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: DeliveryColors.muted,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: DeliverySpacing.sm),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changePasscode(String email) async {
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ForgotPasswordScreen(
+          initialEmail: email,
+          // The account is known; the address is not a field to retype.
+          emailFixed: true,
+          signedIn: true,
+        ),
+      ),
+    );
+    if (!mounted || changed != true) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(DeliveryStrings.of(context).authPasscodeChanged)),
     );
   }
 
@@ -312,14 +422,15 @@ class _AccountScreenState extends State<AccountScreen> {
                   onChanged: _setBiometrics,
                 ),
         ),
-      // Drawn as designed and inert: there is no help desk, chat or ticket queue behind it yet.
-      YdComingSoon.wrap(
-        label: t.custSoon,
-        child: YdListRow(
-          icon: Icons.help_outline_rounded,
-          title: t.custHelpSupport,
-          trailing: const SizedBox.shrink(),
-        ),
+      // Live: the support channels the business actually answers on, and honest answers to the
+      // questions this app's own behaviour raises. There is still no ticket queue — that is a
+      // staffing commitment rather than a screen — and the page does not pretend there is one.
+      YdListRow(
+        icon: Icons.help_outline_rounded,
+        title: t.custHelpSupport,
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => const HelpSupportScreen(),
+        )),
       ),
     ];
   }
