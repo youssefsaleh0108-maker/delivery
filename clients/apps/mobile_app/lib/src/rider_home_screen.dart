@@ -40,6 +40,7 @@ class RiderHomeScreen extends StatefulWidget {
     this.trackingApi,
     this.moneyApi,
     this.performanceApi,
+    this.statementsApi,
     this.documentsApi,
     this.chatApi,
     this.socket,
@@ -64,6 +65,10 @@ class RiderHomeScreen extends StatefulWidget {
   /// The rider-performance endpoint, behind the Earnings tab's completion stat. Null leaves that
   /// one figure inert and changes nothing else.
   final RiderPerformanceApi? performanceApi;
+
+  /// The counterparty-statements client, behind the Earnings tab's statement row. Null leaves that
+  /// row undrawn and changes nothing else on the tab.
+  final StatementsApi? statementsApi;
 
   /// The applicant documents and payout endpoints, behind the Documents and Bank Details rows in
   /// Settings. Null leaves those two rows inert.
@@ -346,6 +351,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
               moneyApi: widget.moneyApi,
               trackingApi: widget.trackingApi,
               performanceApi: widget.performanceApi,
+              statementsApi: widget.statementsApi,
             ),
           _ => _settingsTab(t),
         },

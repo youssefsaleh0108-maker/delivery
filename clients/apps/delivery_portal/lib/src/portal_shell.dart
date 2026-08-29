@@ -18,6 +18,7 @@ import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
 import 'backoffice/riders_screen.dart';
 import 'backoffice/settings_screen.dart';
+import 'backoffice/statements_screen.dart';
 // Prefixed: this and delivery_merchant's ZonesScreen share a name and are different pages — the
 // Backoffice one administers platform-wide areas, the merchant one picks which of them a shop
 // delivers to. The prefix goes on this one because it is the local file of the two.
@@ -30,6 +31,9 @@ import 'carrier/jobs_screen.dart';
 // No prefix needed: this file's class is `CarrierSettingsScreen`, distinct from the Backoffice
 // `SettingsScreen` imported above, because the two administer entirely different things.
 import 'carrier/settings_screen.dart';
+// Likewise `CarrierStatementScreen` — the carrier reads only its own, through /mine, where the
+// Backoffice screen reads everybody's.
+import 'carrier/statement_screen.dart';
 import 'shell/shell.dart';
 
 /// Every API the portal can use, built once in main and handed down.
@@ -59,6 +63,7 @@ class PortalApis {
     required this.riderPerformance,
     required this.partnerManagement,
     required this.autoApproval,
+    required this.statements,
   });
 
   final CatalogApi catalog;
@@ -94,6 +99,10 @@ class PortalApis {
 
   /// The three approval gates: written from Settings, read by the review queue.
   final AutoApprovalApi autoApproval;
+
+  /// Counterparty statements. The Backoffice reads everybody's and sends them; a carrier reads only
+  /// its own, through a route that takes no ref at all.
+  final StatementsApi statements;
 }
 
 /// One destination in a rail.
@@ -263,6 +272,18 @@ class PortalArea {
         label: (DeliveryStrings t) => t.navEarnings,
         build: (PortalApis a, _, __, ___) => EarningsScreen(api: a.order),
       ),
+      // Immediately after Earnings, because the two are the same money asked about twice: Earnings
+      // is the rolling window off the order service, this is the ledger's own arithmetic for a
+      // closed period — the figures the platform would actually pay against.
+      //
+      // An inline English label rather than a [DeliveryStrings] key, matching Riders and Promo Codes
+      // in the Backoffice rail: the console screens are English-only in this wave.
+      PortalDestination(
+        icon: Icons.receipt_long_outlined,
+        selectedIcon: Icons.receipt_long,
+        label: (DeliveryStrings _) => 'Statement',
+        build: (PortalApis a, _, __, ___) => CarrierStatementScreen(api: a.statements),
+      ),
       // The design's `users-round` glyph. This is the fleet page — the company's own record is on
       // Settings now, where the design puts it.
       PortalDestination(
@@ -401,6 +422,20 @@ class PortalArea {
         selectedIcon: Icons.account_balance,
         label: (DeliveryStrings t) => t.navFinance,
         build: (PortalApis a, _, __, ___) => ReconciliationScreen(api: a.accounting),
+      ),
+      // Immediately after Finance, and deliberately so: Reconciliation answers "what has not
+      // settled" inside our own books, and this answers the question that follows it — who are we
+      // square with, and has anybody outside this building actually been told.
+      //
+      // An inline English label, matching Riders and Promo Codes below.
+      PortalDestination(
+        icon: Icons.receipt_long_outlined,
+        selectedIcon: Icons.receipt_long,
+        label: (DeliveryStrings _) => 'Statements',
+        build: (PortalApis a, _, __, ___) => StatementsScreen(
+          api: a.statements,
+          notificationApi: a.notification,
+        ),
       ),
       // Immediately after Finance, because that is what an offer spends.
       PortalDestination(

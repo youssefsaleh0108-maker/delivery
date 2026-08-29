@@ -113,6 +113,7 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     riderPerformance: RiderPerformanceApi(_dio),
     partnerManagement: PartnerManagementApi(_dio),
     autoApproval: AutoApprovalApi(_dio),
+    statements: StatementsApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

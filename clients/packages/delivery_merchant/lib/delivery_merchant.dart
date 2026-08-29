@@ -19,6 +19,10 @@ export 'src/merchant_analytics_screen.dart';
 // reason: a host with room for it can mount it directly.
 export 'src/merchant_payout_screen.dart';
 export 'src/merchant_settings_screen.dart';
+// The shop's own statement — what the ledger says it is owed over a range, and the orders behind
+// it. Exported for the same reason as the two above, and for one more: it is the page a host will
+// want to put somewhere a merchant can find without going through Settings.
+export 'src/merchant_statement_screen.dart';
 // The order detail screen and, with it, the small parts the three merchant frames share —
 // `MerchantMetricCard`, `MerchantTileGrid`, `MerchantStatusTag`, `merchantMaxContentWidth` and the
 // rest. Exported because they are the package's own vocabulary: a host mounting these screens in

@@ -135,6 +135,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// block comment above describes, caught by grepping for the chip it left on screen rather than
   /// by anything that could go red.
   late final RiderPerformanceApi _performanceApi = RiderPerformanceApi(_dio);
+
+  /// Counterparty statements. In this app only `/mine` is ever called — a rider reading their own
+  /// standing with the platform from the Earnings tab. The Backoffice routes on the same client are
+  /// BACKOFFICE-gated server-side and are not reachable from any screen here.
+  late final StatementsApi _statementsApi = StatementsApi(_dio);
   late final ChatApi _chatApi = ChatApi(_dio);
   late final NotificationPrefsApi _prefsApi = NotificationPrefsApi(_dio);
 
@@ -558,6 +563,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               trackingApi: _trackingApi,
               moneyApi: _riderMoneyApi,
               performanceApi: _performanceApi,
+              statementsApi: _statementsApi,
               // Settings' Documents and Bank Details rows. The same client the wizard and the
               // pending screen already use — an approved rider resolves their own application
               // from their token, so the applicant-facing route is the one that answers here.
@@ -584,6 +590,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               aggregatesApi: _aggregatesApi,
               documentsApi: _documentsApi,
               prefsApi: _prefsApi,
+              // The same client the rider shell is handed two branches down. Its absence here is
+              // what left the merchant statement screen unreachable in the shipping app.
+              statementsApi: _statementsApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,

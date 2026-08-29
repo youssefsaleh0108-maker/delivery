@@ -30,6 +30,7 @@ class MerchantShell extends StatefulWidget {
     this.aggregatesApi,
     this.documentsApi,
     this.prefsApi,
+    this.statementsApi,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -57,6 +58,16 @@ class MerchantShell extends StatefulWidget {
 
   /// Handed to the settings page's notification-preferences grid; null leaves the row undrawn.
   final NotificationPrefsApi? prefsApi;
+
+  /// The shop's own statement — what the ledger says they are owed for a period they choose.
+  ///
+  /// Optional in the same way the three above are, and for the same reason: a host without one
+  /// draws no row rather than a dead one. Worth stating why it is here at all, though. The screen,
+  /// its Arabic strings and its "this is not a payment" notice were written and tested and then
+  /// reached nobody, because this shell — the only thing that builds a merchant settings page on
+  /// the phone — never took the client. The row hides itself when unwired, so nothing failed and
+  /// no test went red; the most carefully written screen of the four simply shipped dead.
+  final StatementsApi? statementsApi;
 
   final AuthSession session;
 
@@ -169,6 +180,9 @@ class _MerchantShellState extends State<MerchantShell> {
           aggregates: widget.aggregatesApi,
           // The bank record on this account, read from the onboarding application.
           documents: widget.documentsApi,
+          // What the ledger says this shop is owed. Without this line the statement row hides
+          // itself and the screen behind it is unreachable — which is exactly what shipped.
+          statements: widget.statementsApi,
           onSignOut: () => widget.onSignOut(),
         );
       default:

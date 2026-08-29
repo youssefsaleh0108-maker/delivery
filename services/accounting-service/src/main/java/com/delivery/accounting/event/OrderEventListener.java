@@ -193,6 +193,11 @@ public class OrderEventListener {
                         event.path("carrierFeeWaived").asBoolean(false),
                         discount.isNumber() ? discount.decimalValue() : null);
 
+                // WHO, alongside WHERE THE MONEY GOES. Both identifiers were already parsed a few
+                // lines above and then used only to look up an account — which is how the ledger
+                // ended up unable to name a shop: `accounts.forUser` answers a different question,
+                // and today it answers it with one omnibus bucket for every merchant on the
+                // platform. Passing the ids as well costs nothing and is the whole fix.
                 settlements.settle(
                         orderId,
                         new BigDecimal(total.asText()),
@@ -200,7 +205,9 @@ public class OrderEventListener {
                         accounts.forUser(customerId),
                         accounts.forUser(merchantId),
                         carrierAccount,
-                        holder, correlationId, waivers, rider, deliveredAt);
+                        holder, correlationId, waivers, rider, deliveredAt,
+                        new SettlementService.Parties(
+                                merchantId, event.path("deliveryProviderId").asText(null)));
             }
 
             // Points, which is what the merchant and the carrier can actually convert into money.

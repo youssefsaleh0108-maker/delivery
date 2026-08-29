@@ -38,6 +38,53 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
             """)
     BigDecimal outstandingTotalFor(@Param("holder") String holder);
 
+    /**
+     * What one holder collected, or banked, inside a window.
+     *
+     * <p>The two halves of the rider's cash line, and they are asked for separately rather than
+     * netted in SQL because a statement has to SHOW both. "You took 2,425 and banked 2,100" is a
+     * sentence a rider can check against their own week; "you owe 325" is one they can only argue
+     * with.
+     *
+     * <p>Half-open, matching the ledger queries: {@code to} is the exclusive start of the day after
+     * the range ends.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.holderRef = :holder
+              AND f.entryKind = :kind
+              AND f.createdAt >= :from AND f.createdAt < :to
+            """)
+    BigDecimal totalForHolderBetween(@Param("holder") String holder,
+                                     @Param("kind") CashFloatEntry.Kind kind,
+                                     @Param("from") java.time.Instant from,
+                                     @Param("to") java.time.Instant to);
+
+    /** The same figure across every holder, for the platform's own statement. */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.entryKind = :kind
+              AND f.createdAt >= :from AND f.createdAt < :to
+            """)
+    BigDecimal totalBetween(@Param("kind") CashFloatEntry.Kind kind,
+                            @Param("from") java.time.Instant from,
+                            @Param("to") java.time.Instant to);
+
+    /**
+     * Everything anybody is still holding, right now, whenever they collected it.
+     *
+     * <p>Deliberately NOT range-scoped, and used only in a statement's {@code note}. Cash collected
+     * in July and still not banked in August is a fact about today that no August window can show,
+     * and leaving it out of the note is how a statement can be arithmetically perfect and still
+     * mislead the person reading it.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            """)
+    BigDecimal outstandingTotal();
+
     /** Everyone currently holding platform cash, largest first — the operator's collection list. */
     @Query("""
             SELECT f.holderRef AS holderRef,

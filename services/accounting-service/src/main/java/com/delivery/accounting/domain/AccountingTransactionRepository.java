@@ -24,6 +24,85 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
      */
     boolean existsByOrderId(UUID orderId);
 
+    // ------------------------------------------------------------------------------ statements
+
+    /**
+     * One party's own legs over a window.
+     *
+     * <p>Bucketed on {@code createdAt}, which on this table is the moment the settlement was
+     * written. There is no delivered-at column here — {@code rider_ledger.earned_at} exists for
+     * precisely that reason and only riders needed it — so a statement range is a range over when
+     * the money was recorded. Worth stating because it differs from the rider's Earnings screen by
+     * however long the bus took.
+     *
+     * <p>Half-open on purpose: {@code to} is the exclusive start of the day after the inclusive end
+     * date, so no leg written at 23:59:59.999 falls out of the month it belongs to.
+     */
+    @Query("""
+            select t from AccountingTransaction t
+             where t.counterpartyKind = :kind
+               and t.counterpartyRef = :ref
+               and t.createdAt >= :from and t.createdAt < :to
+             order by t.createdAt
+            """)
+    List<AccountingTransaction> legsForCounterparty(
+            @Param("kind") CounterpartyKind kind,
+            @Param("ref") String ref,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    /**
+     * Every leg of a set of orders.
+     *
+     * <p>A statement needs its counterparty's own legs AND the rest of each order's legs: what the
+     * platform took on an order is on the platform's leg, not on the merchant's, and a merchant
+     * statement that showed only what it could see would have no commission line at all. Fetched for
+     * the whole order set at once rather than per order, so a month is two queries and not two
+     * hundred.
+     */
+    List<AccountingTransaction> findByOrderIdIn(Collection<UUID> orderIds);
+
+    /**
+     * Everyone with activity in a window.
+     *
+     * <p>Returns the identities only; the figures are built per party afterwards. Doing the
+     * arithmetic in SQL would mean a second implementation of every rule in
+     * {@code StatementService}, and the two would disagree the first time one of them was changed.
+     */
+    @Query("""
+            select distinct t.counterpartyKind, t.counterpartyRef from AccountingTransaction t
+             where t.counterpartyKind is not null
+               and t.createdAt >= :from and t.createdAt < :to
+            """)
+    List<Object[]> activeCounterparties(@Param("from") Instant from, @Param("to") Instant to);
+
+    /**
+     * Money paid out in the window that cannot be assigned to anybody.
+     *
+     * <p>Every row written before V47, and any later row whose event named no party. This is the
+     * number the {@code unattributed} block reports, and it is the honest counterweight to a
+     * counterparties listing that would otherwise look complete while omitting most of the money.
+     *
+     * <p>PAYEE legs only. A {@code CUSTOMER_DEBIT} has no counterparty by design and would sit in
+     * this total forever, turning a figure that should fall to zero into one that never can.
+     */
+    @Query("""
+            select coalesce(sum(t.amount), 0), count(distinct t.orderId)
+              from AccountingTransaction t
+             where t.counterpartyKind is null
+               and t.leg in :legs
+               and t.createdAt >= :from and t.createdAt < :to
+            """)
+    List<Object[]> unattributedTotal(@Param("legs") Collection<AccountingTransaction.Leg> legs,
+                                     @Param("from") Instant from,
+                                     @Param("to") Instant to);
+
+    /** The legs that pay somebody. What "unattributed money" means. */
+    Set<AccountingTransaction.Leg> PAYEE_LEGS = Set.of(
+            AccountingTransaction.Leg.MERCHANT_CREDIT,
+            AccountingTransaction.Leg.RIDER_CREDIT,
+            AccountingTransaction.Leg.PROVIDER_CREDIT);
+
     /** The reconciliation view: what has not reached a terminal state. */
     @Query("select t from AccountingTransaction t where t.status in "
             + "(com.delivery.accounting.domain.AccountingTransaction$Status.PENDING, "

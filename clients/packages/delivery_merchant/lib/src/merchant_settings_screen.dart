@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'merchant_analytics_screen.dart';
 import 'merchant_payout_screen.dart';
+import 'merchant_statement_screen.dart';
 
 /// Account Settings, as the 2026-08 Figma frame `merchant-settings` (3:2194) draws it.
 ///
@@ -29,6 +30,11 @@ import 'merchant_payout_screen.dart';
 /// reproduced — the record carries its own verification state, and that is what the page shows
 /// rather than a word that would always say the same thing.
 ///
+/// Your statement is the newest row and the only one the Figma frame does not draw: it opens
+/// [MerchantStatementScreen], which is the ledger's own answer to "what am I owed". It appears only
+/// when the host wires the client — see [statements] for why that is a hidden row rather than a
+/// "Soon" one.
+///
 /// Every remaining "Soon" chip on this screen is now a statement about the *host's* wiring — a
 /// null [aggregates], [documents] or [onNotificationSettings] — and not about the platform.
 class MerchantSettingsScreen extends StatelessWidget {
@@ -42,6 +48,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onNotificationSettings,
     this.aggregates,
     this.documents,
+    this.statements,
     this.onSignOut,
   });
 
@@ -74,6 +81,15 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// leaves that row marked as not yet available, which is now a statement about the host's
   /// wiring rather than about the platform.
   final DocumentsApi? documents;
+
+  /// The counterparty-statements client, behind the Statement row.
+  ///
+  /// Null *hides* the row rather than marking it "Soon", which is the opposite of what the two
+  /// rows above do — and deliberately. Those rows are drawn on the Figma frame, so their absence
+  /// would be a regression against a design somebody signed off; this one is not on the frame at
+  /// all, so a host that has not wired it is simply a host that does not offer the page. A "Soon"
+  /// chip on a row the design never drew would promise a shop something no roadmap has agreed.
+  final StatementsApi? statements;
 
   /// Ends the session. Null hides the button entirely — a sign-out that does nothing is worse
   /// than no sign-out at all.
@@ -236,6 +252,16 @@ class MerchantSettingsScreen extends StatelessWidget {
             onTap: documents == null ? null : () => _openPayout(context),
             soonLabel: documents == null ? t.merchbSoon : null,
           ),
+          // Sits directly under the bank row because the two answer halves of the same question —
+          // that one is which account is on file, this one is what the figure against it is.
+          if (statements != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.receipt_long_outlined,
+              title: MerchantStatementWords.of(context).title,
+              onTap: () => _openStatement(context),
+            ),
+          ],
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           _MenuRow(
             icon: Icons.notifications_none,
@@ -271,6 +297,15 @@ class MerchantSettingsScreen extends StatelessWidget {
     final NavigatorState navigator = Navigator.of(context);
     navigator.push(MaterialPageRoute<void>(
       builder: (_) => MerchantPayoutScreen(api: api, onBack: navigator.pop),
+    ));
+  }
+
+  void _openStatement(BuildContext context) {
+    final StatementsApi? api = statements;
+    if (api == null) return;
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => MerchantStatementScreen(api: api, onBack: navigator.pop),
     ));
   }
 

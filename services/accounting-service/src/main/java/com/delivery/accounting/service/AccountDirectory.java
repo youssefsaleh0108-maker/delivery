@@ -46,6 +46,18 @@ public class AccountDirectory {
     private final String unmappedAccount;
     private final Duration cacheTtl;
 
+    /**
+     * Attributes a partner's trading name might be under.
+     *
+     * <p>None of them is written today: onboarding provisions a Keycloak account with the CONTACT
+     * PERSON's first and last name and keeps the business name in its own table. So in practice the
+     * fallback below is what a statement shows, and that is stated rather than hidden — a statement
+     * headed with the owner's name is legible, and one headed with a UUID is not. The list is here
+     * so that whichever of these onboarding eventually sets, this picks it up without a change.
+     */
+    private static final java.util.List<String> NAME_ATTRIBUTES =
+            java.util.List.of("businessName", "storeName", "companyName", "tradingName");
+
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
     private volatile CachedToken token = new CachedToken(null, Instant.EPOCH);
 
@@ -66,17 +78,45 @@ public class AccountDirectory {
     }
 
     public String forUser(String userId) {
-        Cached cached = cache.get(userId);
-        if (cached != null && Instant.now().isBefore(cached.expiresAt())) {
-            return cached.accountRef();
-        }
-
-        String accountRef = load(userId);
-        cache.put(userId, new Cached(accountRef, Instant.now().plus(cacheTtl)));
-        return accountRef;
+        return profileOf(userId).accountRef();
     }
 
-    private String load(String userId) {
+    /**
+     * Everything this service needs to know about one account holder.
+     *
+     * <p>One record and one cache entry rather than a second directory, because the underlying call
+     * is the same: {@code load} already fetched the whole user document and threw away everything
+     * but one attribute. A statement needs a name to head it with and an address to send it to, and
+     * fetching those separately would double the traffic to Keycloak and leave two caches that can
+     * disagree about the same person.
+     *
+     * @param accountRef where the money would post. Never null — see the class note on the fallback
+     * @param name       what to call them on a statement, or null if Keycloak knows no name
+     * @param email      where to send it, or null. Null is an ANSWER, not a failure: the send
+     *                   endpoint refuses with a 409 rather than guessing an address
+     */
+    public record Profile(String accountRef, String name, String email) {
+    }
+
+    /**
+     * The account holder behind a Keycloak subject.
+     *
+     * <p>Returns a profile with the fallback account and no name for an id Keycloak does not know —
+     * a delivery company's id, for instance, which is an Order Manager row and was never a user.
+     * Throwing there would take a statement down over a missing display name.
+     */
+    public Profile profileOf(String userId) {
+        Cached cached = cache.get(userId);
+        if (cached != null && Instant.now().isBefore(cached.expiresAt())) {
+            return cached.profile();
+        }
+
+        Profile profile = load(userId);
+        cache.put(userId, new Cached(profile, Instant.now().plus(cacheTtl)));
+        return profile;
+    }
+
+    private Profile load(String userId) {
         try {
             JsonNode user = keycloak.get()
                     .uri("/admin/realms/{realm}/users/{id}", realm, userId)
@@ -85,21 +125,54 @@ public class AccountDirectory {
                     .body(JsonNode.class);
 
             if (user != null) {
-                JsonNode values = user.path("attributes").path(ACCOUNT_ATTRIBUTE);
-                if (values.isArray() && !values.isEmpty()) {
-                    String accountRef = values.get(0).asText(null);
-                    if (accountRef != null && !accountRef.isBlank()) {
-                        return accountRef;
-                    }
+                String accountRef = attribute(user, ACCOUNT_ATTRIBUTE);
+                if (accountRef == null) {
+                    log.warn("User {} has no {} attribute; settling to {}",
+                            userId, ACCOUNT_ATTRIBUTE, unmappedAccount);
                 }
+                return new Profile(accountRef == null ? unmappedAccount : accountRef,
+                        nameOf(user), text(user.path("email")));
             }
-            log.warn("User {} has no {} attribute; settling to {}",
-                    userId, ACCOUNT_ATTRIBUTE, unmappedAccount);
+            log.warn("Keycloak returned nothing for user {}; settling to {}",
+                    userId, unmappedAccount);
 
         } catch (Exception e) {
-            log.error("Could not read the bank account for {}: {}", userId, e.getMessage());
+            log.error("Could not read the account for {}: {}", userId, e.getMessage());
         }
-        return unmappedAccount;
+        return new Profile(unmappedAccount, null, null);
+    }
+
+    /**
+     * What to head a statement with.
+     *
+     * <p>The trading name if anybody has recorded one, otherwise the contact person's name, and only
+     * then the username. Never the raw subject: a statement addressed to a UUID is one nobody can
+     * check, and the caller can fall back to the id itself if this returns null.
+     */
+    private static String nameOf(JsonNode user) {
+        for (String attribute : NAME_ATTRIBUTES) {
+            String value = attribute(user, attribute);
+            if (value != null) {
+                return value;
+            }
+        }
+        String first = text(user.path("firstName"));
+        String last = text(user.path("lastName"));
+        if (first != null || last != null) {
+            return ((first == null ? "" : first) + " " + (last == null ? "" : last)).trim();
+        }
+        return text(user.path("username"));
+    }
+
+    /** The first value of a Keycloak user attribute, which is always modelled as an array. */
+    private static String attribute(JsonNode user, String name) {
+        JsonNode values = user.path("attributes").path(name);
+        return values.isArray() && !values.isEmpty() ? text(values.get(0)) : null;
+    }
+
+    private static String text(JsonNode node) {
+        String value = node.asText(null);
+        return value == null || value.isBlank() ? null : value;
     }
 
     private String accessToken() {
@@ -133,7 +206,7 @@ public class AccountDirectory {
         return fresh.value();
     }
 
-    private record Cached(String accountRef, Instant expiresAt) {
+    private record Cached(Profile profile, Instant expiresAt) {
     }
 
     private record CachedToken(String value, Instant expiresAt) {

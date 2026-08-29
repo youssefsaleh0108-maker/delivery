@@ -116,6 +116,20 @@ public class AccountingTransaction {
     @Column(name = "account_ref", nullable = false, length = 64)
     private String accountRef;
 
+    /**
+     * Which sort of party this leg is about. Null on a leg written before attribution existed, and
+     * on {@link Leg#CUSTOMER_DEBIT}, which has no counterparty in this model.
+     *
+     * @see #attributedTo(CounterpartyKind, String)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "counterparty_kind", length = 16)
+    private CounterpartyKind counterpartyKind;
+
+    /** The party's own identifier. A Keycloak subject, a provider id, or the platform constant. */
+    @Column(name = "counterparty_ref", length = 64)
+    private String counterpartyRef;
+
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
@@ -213,6 +227,47 @@ public class AccountingTransaction {
         this.postingRequired = false;
         this.status = Status.SETTLED_IN_CASH;
         this.postedAt = Instant.now();
+    }
+
+    /**
+     * Records WHO this leg is about, alongside the account it would post to.
+     *
+     * <p>Deliberately separate from {@code accountRef}, which is left exactly as it was. That field
+     * is what a bank posting would use and it is an omnibus bucket today — every merchant credit in
+     * the database points at one account, and every genuinely onboarded merchant resolves to
+     * {@code ACC-UNMAPPED}. Both are correct as postings and neither can say which shop sold the
+     * goods. Changing account_ref to fix that would break the thing it is right about in order to
+     * fix the thing it was never for.
+     *
+     * <p><strong>Both or neither.</strong> A null ref leaves the kind null too, which is what makes
+     * "we could not attribute this" a single, queryable state rather than two half-populated rows
+     * that a statement query skips and a reconciliation total counts. A leg whose party the event
+     * did not name is honestly unattributed, and the counterparties listing reports it as such.
+     *
+     * @return this, so it can be chained where the leg is constructed
+     */
+    public AccountingTransaction attributedTo(CounterpartyKind kind, String ref) {
+        if (kind == null || ref == null || ref.isBlank()) {
+            this.counterpartyKind = null;
+            this.counterpartyRef = null;
+            return this;
+        }
+        this.counterpartyKind = kind;
+        this.counterpartyRef = ref;
+        return this;
+    }
+
+    public CounterpartyKind getCounterpartyKind() {
+        return counterpartyKind;
+    }
+
+    public String getCounterpartyRef() {
+        return counterpartyRef;
+    }
+
+    /** Whether this leg can be assigned to somebody. False for every row written before V47. */
+    public boolean isAttributed() {
+        return counterpartyKind != null;
     }
 
     public boolean isPostingRequired() {

@@ -102,7 +102,33 @@ delivery:
     # fails startup rather than silently falling back — see RiderPayoutProviders.
     provider: MANUAL
 
+  services:
+    # Statements are emailed through Notifications Manager's direct path, exactly as Onboarding
+    # sends a one-time code. That service owns the templates, the provider credentials and the
+    # delivery log; a second sending path here would be a class of message nobody can answer
+    # "did it arrive" about.
+    notifications-manager: ${NOTIFICATIONS_MANAGER_URL:http://localhost:8104}
+    # Asked one question only: which delivery company is the caller staff of.
+    #
+    # A carrier's legs are attributed with Order Manager's provider id while their token carries a
+    # Keycloak subject, and this service cannot bridge the two without the membership table that
+    # service owns. Copying that mapping here would drift the first time somebody joins or leaves a
+    # fleet, so it is asked for instead — with the caller's own token, so the answer is Order
+    # Manager's to give and a provider id can never arrive from a request parameter.
+    order-manager: ${ORDER_MANAGER_URL:http://localhost:8101}
+
   accounting:
+    statements:
+      # The calendar a from/to range is interpreted in. "August" is a different 31 days depending
+      # on where you are standing, and every statement query resolves the range once, here.
+      zone: UTC
+      # Where the PLATFORM's own statement goes. DELIBERATELY BLANK: the platform is not a user
+      # and has no address on file, and a wrong default here does not fail loudly — it sends the
+      # platform's own figures to a stale inbox. Blank means the send endpoint refuses with a 409
+      # until somebody names a real finance mailbox.
+      platform-recipient:
+      platform-name: The platform
+
     order-events-queue: accounting.order-events
     results-queue: accounting.posting-results
     platform-account: ACC-PLATFORM

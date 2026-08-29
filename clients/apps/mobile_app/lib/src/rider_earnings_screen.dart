@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'rider_job_card.dart';
+import 'rider_settings_widgets.dart';
+import 'rider_statement_screen.dart';
 
 /// What the rider has earned — Figma `rider-earnings` (3:1486).
 ///
@@ -43,6 +45,7 @@ class RiderEarningsScreen extends StatefulWidget {
     this.moneyApi,
     this.trackingApi,
     this.performanceApi,
+    this.statementsApi,
   });
 
   final OrderApi api;
@@ -56,6 +59,13 @@ class RiderEarningsScreen extends StatefulWidget {
 
   /// The rider-performance endpoint, behind the completion rate. Null keeps that one stat inert.
   final RiderPerformanceApi? performanceApi;
+
+  /// The counterparty-statements client, behind the row that opens [RiderStatementScreen].
+  ///
+  /// Null draws no row at all rather than an inert one. The statement is a whole screen with its
+  /// own network call, and a row that opens an empty version of it is worse than no row: this
+  /// screen's own figures are still true without it.
+  final StatementsApi? statementsApi;
 
   @override
   State<RiderEarningsScreen> createState() => _RiderEarningsScreenState();
@@ -250,6 +260,10 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
           _periodSelector(t),
           const SizedBox(height: DeliverySpacing.md),
           _ledgerStatsCard(t, data, total),
+          if (_statementRow(context, t) case final Widget row) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md),
+            row,
+          ],
           const SizedBox(height: DeliverySpacing.md),
           _ledgerWeeklyCard(t, data.earnings.series),
           const SizedBox(height: DeliverySpacing.md),
@@ -726,6 +740,36 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
     );
   }
 
+  /// The way through to the rider's own statement.
+  ///
+  /// It sits directly under the stats card because it answers the question that card raises and
+  /// cannot answer: this screen shows what a rider has *earned*, and the statement shows where that
+  /// leaves them with the platform once the cash they collected at the door is counted. Two very
+  /// different numbers, and a rider who only ever sees the first one is surprised by the second.
+  ///
+  /// Null [RiderEarningsScreen.statementsApi] draws nothing — see that field.
+  Widget? _statementRow(BuildContext context, DeliveryStrings t) {
+    final StatementsApi? statements = widget.statementsApi;
+    if (statements == null) return null;
+
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return RiderSettingRow(
+      icon: Icons.receipt_long_outlined,
+      tint: DeliveryColors.brandSoft,
+      iconColour: DeliveryColors.brand,
+      label: t.riderStatementTitle,
+      subtitle: t.riderStatementRowSubtitle,
+      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => RiderStatementScreen(api: statements),
+      )),
+      trailing: Icon(
+        rtl ? Icons.chevron_left : Icons.chevron_right,
+        size: 16,
+        color: DeliveryColors.faint,
+      ),
+    );
+  }
+
   /// `period-selector`: a border-filled track with a white selected segment.
   Widget _periodSelector(DeliveryStrings t) {
     return Container(
@@ -1001,6 +1045,10 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
                     _periodSelector(t),
                     const SizedBox(height: DeliverySpacing.md),
                     _derivedStatsCard(t, period),
+                    if (_statementRow(context, t) case final Widget row) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.md),
+                      row,
+                    ],
                     const SizedBox(height: DeliverySpacing.md),
                     _derivedWeeklyCard(t, all),
                     const SizedBox(height: DeliverySpacing.md),

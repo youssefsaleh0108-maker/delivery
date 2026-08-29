@@ -20,6 +20,7 @@ import com.delivery.accounting.domain.AccountingTransaction.Leg;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
 import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.domain.CashFloatRepository;
+import com.delivery.accounting.domain.CounterpartyKind;
 import com.delivery.accounting.domain.RiderLedgerEntry;
 import com.delivery.accounting.domain.RiderLedgerRepository;
 
@@ -222,6 +223,35 @@ public class SettlementService {
     public record Rider(String riderRef, String accountRef, String carrierRef, String customerRef) {
     }
 
+    /**
+     * WHO the legs of this order belong to, as distinct from where their money would be posted.
+     *
+     * <p>Every one of these identifiers is already on the {@code order.delivered} event and was
+     * being thrown away here. That is why the ledger cannot currently say which of two shops sold
+     * the goods: {@code account_ref} is resolved from a Keycloak attribute nobody has set, so all 45
+     * merchant credits in the database point at one omnibus account, and every genuinely onboarded
+     * merchant resolves to {@code ACC-UNMAPPED}. The account is not wrong — it is what a bank
+     * posting would use — it simply is not an identity, and there was no second field holding one.
+     *
+     * <p>The rider is not in here because {@link Rider} already carries them, and two places to
+     * learn the same fact is two places for them to disagree.
+     *
+     * @param merchantRef the shop's Keycloak subject, from the event's {@code merchantId}
+     * @param carrierRef  the delivery company, from the event's {@code deliveryProviderId}. Null on
+     *                    an order the platform's own fleet carried, which has no provider leg either
+     */
+    public record Parties(String merchantRef, String carrierRef) {
+
+        /**
+         * Nobody named. The shape of every settlement written before attribution existed, and of
+         * every caller that has not been told about it — those legs stay honestly unattributed
+         * rather than being guessed at.
+         */
+        public static Parties none() {
+            return new Parties(null, null);
+        }
+    }
+
     /** The pre-waiver signature, kept so existing callers and tests read unchanged. */
     @Transactional
     public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
@@ -246,9 +276,11 @@ public class SettlementService {
     }
 
     /**
-     * @param rider     who carried it, or null when the event does not say
-     * @param earnedAt  when it was delivered, for the rider's per-day statement. The row must land
-     *                  in the day the work happened, not the day a slow bus delivered the event
+     * The pre-attribution signature: settles identically, but names nobody.
+     *
+     * <p>Kept so existing callers and tests read unchanged. Legs settled through it carry no
+     * counterparty and appear in the {@code unattributed} block of the statements API, which is the
+     * correct answer — the caller did not say who this was for.
      */
     @Transactional
     public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
@@ -258,6 +290,24 @@ public class SettlementService {
                                               CashHolder cashHolder, String correlationId,
                                               Waivers waivers, Rider rider,
                                               java.time.Instant earnedAt) {
+        return settle(orderId, total, merchantBase, customerAccount, merchantAccount, carrierAccount,
+                cashHolder, correlationId, waivers, rider, earnedAt, Parties.none());
+    }
+
+    /**
+     * @param rider     who carried it, or null when the event does not say
+     * @param earnedAt  when it was delivered, for the rider's per-day statement. The row must land
+     *                  in the day the work happened, not the day a slow bus delivered the event
+     * @param parties   who each leg is about. See {@link Parties}; never null
+     */
+    @Transactional
+    public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
+                                              BigDecimal merchantBase,
+                                              String customerAccount, String merchantAccount,
+                                              String carrierAccount,
+                                              CashHolder cashHolder, String correlationId,
+                                              Waivers waivers, Rider rider,
+                                              java.time.Instant earnedAt, Parties parties) {
 
         // At-least-once bus delivery means order.delivered can arrive twice. Settling twice would
         // really move money twice, so this check — backed by the unique constraint on
@@ -360,32 +410,40 @@ public class SettlementService {
         BigDecimal platformShare =
                 amount.subtract(merchantShare).subtract(carrierShare).subtract(riderShare);
 
+        // Each leg is attributed as it is built, from the identifiers the event already carried.
+        // Attaching it here rather than in a pass afterwards is what makes it impossible to add a
+        // leg and forget: the attribution sits on the same line as the amount.
         List<AccountingTransaction> legs = new ArrayList<>();
         legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
         legs.add(new AccountingTransaction(orderId, Leg.MERCHANT_CREDIT, merchantAccount,
-                merchantShare, currency, Direction.CREDIT, correlationId));
+                merchantShare, currency, Direction.CREDIT, correlationId)
+                .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
 
         if (carrierShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.PROVIDER_CREDIT, carrierAccount,
-                    carrierShare, currency, Direction.CREDIT, correlationId));
+                    carrierShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.CARRIER, parties.carrierRef()));
         }
 
         if (riderShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, rider.accountRef(),
-                    riderShare, currency, Direction.CREDIT, correlationId));
+                    riderShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.RIDER, rider.riderRef()));
         }
 
         // A zero-value posting (a fully-discounted order, or a rounding floor) must not be sent:
         // the bank rejects those, and the rejection would look like a real failure.
         if (platformShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.PLATFORM_COMMISSION, platformAccount,
-                    platformShare, currency, Direction.CREDIT, correlationId));
+                    platformShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF));
         } else if (platformShare.signum() < 0) {
             // The platform is paying in. Posted as its own DEBIT leg rather than skipped: dropping
             // it would leave the credits exceeding what was collected, and the books not balancing
             // is a worse problem than the loss it is hiding.
             legs.add(new AccountingTransaction(orderId, Leg.PLATFORM_SUBSIDY, platformAccount,
-                    platformShare.negate(), currency, Direction.DEBIT, correlationId));
+                    platformShare.negate(), currency, Direction.DEBIT, correlationId)
+                    .attributedTo(CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF));
         }
 
         transactions.saveAll(legs);
@@ -480,14 +538,18 @@ public class SettlementService {
 
         List<AccountingTransaction> legs = new ArrayList<>();
         legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
+        // The rider is the payee here, so the rider record IS the attribution — there is no separate
+        // Parties argument on this path because an errand has no merchant and no carrier.
         legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, riderAccount,
-                riderShare, currency, Direction.CREDIT, correlationId));
+                riderShare, currency, Direction.CREDIT, correlationId)
+                .attributedTo(CounterpartyKind.RIDER, rider == null ? null : rider.riderRef()));
 
         // A fee small enough to round the commission to zero produces no leg: the bank rejects a
         // zero posting, and that rejection would look like a real failure.
         if (commission.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.PLATFORM_COMMISSION, platformAccount,
-                    commission, currency, Direction.CREDIT, correlationId));
+                    commission, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF));
         }
 
         transactions.saveAll(legs);
@@ -638,6 +700,9 @@ public class SettlementService {
                                                 String customerAccount, CashHolder holder,
                                                 String correlationId) {
         if (holder == null) {
+            // No counterparty, and deliberately none. A customer is the other side of a collection,
+            // not a party the platform settles with; giving them a kind would put every order in the
+            // counterparties listing and leave the unattributed total permanently non-zero.
             return new AccountingTransaction(orderId, Leg.CUSTOMER_DEBIT, customerAccount,
                     amount, currency, Direction.DEBIT, correlationId);
         }
@@ -649,8 +714,25 @@ public class SettlementService {
                     holder.ref(), holder.kind(), orderId, amount, currency));
         }
 
+        // Attributed to whoever took the notes, which is what makes a rider's statement able to say
+        // "you are holding this". The float row beside it says the same thing; both exist because
+        // the float is the operator's collection list and this is the ledger's side of it.
         return AccountingTransaction.obligation(orderId, Leg.CASH_COLLECTED, holder.ref(),
-                amount, currency, Direction.DEBIT, correlationId);
+                        amount, currency, Direction.DEBIT, correlationId)
+                .attributedTo(kindOf(holder.kind()), holder.ref());
+    }
+
+    /**
+     * A cash holder as a counterparty.
+     *
+     * <p>{@code PROVIDER} on the float becomes {@code CARRIER} on the ledger: the two enums were
+     * named at different times for the same thing, and mapping them here — once — is better than
+     * renaming a column with rows in it or letting a statement query look for the wrong word.
+     */
+    private static CounterpartyKind kindOf(CashFloatEntry.HolderKind holderKind) {
+        return holderKind == CashFloatEntry.HolderKind.PROVIDER
+                ? CounterpartyKind.CARRIER
+                : CounterpartyKind.RIDER;
     }
 
     /**

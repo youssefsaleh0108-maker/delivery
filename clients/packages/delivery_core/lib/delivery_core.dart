@@ -19,6 +19,8 @@ export 'src/api/notification_prefs_api.dart';
 export 'src/api/offer_api.dart';
 export 'src/api/promo_api.dart';
 export 'src/api/rider_money_api.dart';
+export 'src/api/statements_api.dart';
+export 'src/models/statement_models.dart';
 export 'src/api/tracking_api.dart';
 export 'src/models/chat_models.dart';
 export 'src/models/geo_models.dart';

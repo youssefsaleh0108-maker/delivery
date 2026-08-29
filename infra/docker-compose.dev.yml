@@ -923,6 +923,11 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      # Both are asked one question each and neither defaults usefully inside a container:
+      # spring falls back to localhost, where nothing listens, and the failure surfaces only when
+      # somebody presses Send on a statement.
+      NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
+      ORDER_MANAGER_URL: http://order-manager:8101
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
