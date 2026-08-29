@@ -22,13 +22,11 @@ import 'package:flutter_test/flutter_test.dart';
 /// So what is pinned here is not that uploading works. It is that a picker failure is VISIBLE, and
 /// that a cancel is still not treated as one.
 class _FakeFileSelector extends FileSelectorPlatform {
-  _FakeFileSelector({this.throws, this.returns});
+  _FakeFileSelector({this.throws});
 
-  /// What `openFile` should throw, if anything.
+  /// What `openFile` should throw, if anything. Null means it returns null instead, which is what
+  /// the platform does when somebody dismisses the dialog — the case that must stay silent.
   final Object? throws;
-
-  /// What it should return otherwise. Null models the user cancelling the dialog.
-  final XFile? returns;
 
   int calls = 0;
 
@@ -40,7 +38,7 @@ class _FakeFileSelector extends FileSelectorPlatform {
   }) async {
     calls++;
     if (throws != null) throw throws!;
-    return returns;
+    return null;
   }
 }
 
