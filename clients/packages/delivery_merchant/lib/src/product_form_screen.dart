@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui' show PathMetric;
 
 import 'package:delivery_core/delivery_core.dart';
@@ -17,9 +18,11 @@ import 'product_options_editor.dart';
 /// a SemiBold label, a stack of labelled white input boxes with Price and Category sharing a row,
 /// a bordered "Variants & Options" card, and one full-width brand button at the bottom.
 ///
-/// Images can only be attached to a product that already exists, because the presign endpoint is
-/// scoped to a product id. On a new product the dropzone stays inert until the first save — which
-/// is also what makes the ownership check on presign meaningful.
+/// Photos can be picked while creating the product, not only after. The presign endpoint is scoped
+/// to a product id, so on a NEW product the picked bytes are held in memory and uploaded the moment
+/// the first save earns an id; on an existing product a pick uploads straight away. Either way the
+/// ownership check on presign still holds, because the upload only ever happens against a product
+/// this merchant just created or already owns.
 class ProductFormScreen extends StatefulWidget {
   const ProductFormScreen({
     super.key,
@@ -56,8 +59,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   late String? _categoryId = widget.existing?.categoryId;
   late Product? _product = widget.existing;
 
-  /// Fetched once; the category tree does not change while a form is open.
-  late final Future<List<Category>> _categories = widget.api.categories();
+  /// The category tree, which does not change while a form is open — but the fetch can fail, and a
+  /// failure must not strand the form. It used to be a `late final` future read by a FutureBuilder
+  /// whose only non-data branch was a spinner, so a category load that errored left a spinner that
+  /// never resolved AND a merchant who could never reach the Save button past it. Held in state so
+  /// it can be retried, and the field below renders a plain "Uncategorised" dropdown when it fails,
+  /// because a product does not need a category to be created.
+  late Future<List<Category>> _categories = widget.api.categories();
+
+  void _reloadCategories() {
+    setState(() => _categories = widget.api.categories());
+  }
 
   /// The option groups this product already has, as the customer app reads them. Null when there
   /// is nothing to read them with — a new product, or a host that passed no [StoreApi].
@@ -66,6 +78,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   bool _saving = false;
   bool _uploading = false;
   bool _dirty = false;
+
+  /// Photos picked before the product exists, held until the first save can attach them.
+  ///
+  /// This is what lets a shopkeeper add pictures WHILE creating a product rather than having to
+  /// save a blank item and come back for the photos. The create call returns an id, and these are
+  /// uploaded against it immediately afterwards — see [_save]. On an existing product this list
+  /// stays empty, because there a pick uploads straight away.
+  final List<PickedImageBytes> _pendingImages = <PickedImageBytes>[];
 
   /// True while the option structure is being written. The whole structure goes in one PUT, so a
   /// second save landing mid-flight would race the first and one of them would lose silently.
@@ -111,14 +131,35 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       setState(() {
         _product = saved;
         _dirty = true;
-        _saving = false;
         // The first save is what gives the product an id, and therefore what makes its options
         // readable at all.
         _options ??= _loadOptions();
       });
+
+      // Now that the product has an id, attach any photos picked while it did not. This is the
+      // other half of "add photos while creating": the pick buffered the bytes, the create earned
+      // the id, and this is where the two meet. Kept inside the save spinner so the button stays
+      // busy until the pictures are really up.
+      final String? photoProblem = await _uploadPending(saved.id);
+
+      Product finalProduct = saved;
+      if (_pendingImages.isEmpty) {
+        // Everything that was pending is now uploaded (or none was) — re-read so the tiles show the
+        // real, server-hosted images rather than the local previews.
+        try {
+          finalProduct = await widget.api.read(saved.id);
+        } catch (_) {
+          // A failed re-read is cosmetic; the product and its images are saved. Keep what we have.
+        }
+      }
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(DeliveryStrings.of(context).saved)));
+      setState(() {
+        _product = finalProduct;
+        _saving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(photoProblem ?? DeliveryStrings.of(context).saved)));
     } catch (e) {
       setState(() => _saving = false);
       if (!mounted) return;
@@ -127,12 +168,87 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
+  /// Uploads the photos picked before the product existed, against its new id.
+  ///
+  /// Each one that lands is removed from [_pendingImages], so a retry after a partial failure only
+  /// repeats what did not upload — and the product itself is already saved, so a photo that fails
+  /// never costs the shopkeeper the item. Returns a sentence to show when something did not upload,
+  /// or null when everything did.
+  Future<String?> _uploadPending(String productId) async {
+    if (_pendingImages.isEmpty) {
+      return null;
+    }
+    for (final PickedImageBytes image
+        in List<PickedImageBytes>.of(_pendingImages)) {
+      try {
+        await widget.api.uploadImage(
+          productId: productId,
+          bytes: image.bytes,
+          contentType: image.contentType,
+        );
+        _pendingImages.remove(image);
+      } catch (e, stack) {
+        debugPrint('PENDING PRODUCT IMAGE UPLOAD FAILED: $e');
+        debugPrintStack(stackTrace: stack, label: 'pending-product-image');
+        if (!mounted) return null;
+        // The product saved; only a picture did not. Say which way it failed and stop — the
+        // remaining pending ones stay in the list for a retry from the now-existing product.
+        return DeliveryStrings.of(context).uploadFailedBecause(_reasonFrom(e));
+      }
+    }
+    return null;
+  }
+
+  /// Picks one photo, then either uploads it now or holds it for the first save.
+  ///
+  /// The dropzone is live whether the product exists yet or not — a shopkeeper adds pictures WHILE
+  /// creating an item, not after. When the product already has an id the pick uploads immediately;
+  /// when it does not, the bytes are held in [_pendingImages] and attached the moment [_save]
+  /// creates the product.
   Future<void> _addImage() async {
-    final Product? product = _product;
-    if (product == null) {
+    final PickedImageBytes? picked = await _pickImage();
+    if (picked == null) {
       return;
     }
 
+    final Product? product = _product;
+    if (product == null) {
+      // No id to presign against yet — hold it, show it as a pending thumbnail, and let Save do
+      // the upload.
+      setState(() {
+        _pendingImages.add(picked);
+        _dirty = true;
+      });
+      return;
+    }
+
+    setState(() => _uploading = true);
+    try {
+      await widget.api.uploadImage(
+        productId: product.id,
+        bytes: picked.bytes,
+        contentType: picked.contentType,
+      );
+      final Product refreshed = await widget.api.read(product.id);
+      setState(() {
+        _product = refreshed;
+        _dirty = true;
+        _uploading = false;
+      });
+    } catch (e, stack) {
+      debugPrint('PRODUCT IMAGE UPLOAD FAILED: $e');
+      debugPrintStack(stackTrace: stack, label: 'product-image-upload');
+      setState(() => _uploading = false);
+      if (!mounted) return;
+      // With the reason. "Upload failed" on its own cannot be acted on and cannot be reported:
+      // a file too large, a refused type and a network that is not there all read identically.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).uploadFailedBecause(_reasonFrom(e)))));
+    }
+  }
+
+  /// Opens the picker and reads the bytes, or null on cancel. Failures are surfaced, never silent.
+  Future<PickedImageBytes?> _pickImage() async {
     // The accepted types mirror the service's allow-list; it re-checks and returns 422 regardless,
     // so this only saves the user a pointless round trip.
     final XTypeGroup images = XTypeGroup(
@@ -156,39 +272,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       // fault, and the sentence a shopkeeper can read is rarely the sentence that diagnoses it.
       debugPrint('PRODUCT IMAGE PICKER FAILED: $e');
       debugPrintStack(stackTrace: stack, label: 'product-image-picker');
-      if (!mounted) return;
+      if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(DeliveryStrings.of(context).couldNotOpenPicker(_reasonFrom(e)))));
-      return;
+      return null;
     }
     if (file == null) {
       // Cancelled. Not a failure, and must not be reported as one.
-      return;
+      return null;
     }
-
-    setState(() => _uploading = true);
-    try {
-      await widget.api.uploadImage(
-        productId: product.id,
-        bytes: await file.readAsBytes(),
-        contentType: _contentTypeFor(file),
-      );
-      final Product refreshed = await widget.api.read(product.id);
-      setState(() {
-        _product = refreshed;
-        _dirty = true;
-        _uploading = false;
-      });
-    } catch (e, stack) {
-      debugPrint('PRODUCT IMAGE UPLOAD FAILED: $e');
-      debugPrintStack(stackTrace: stack, label: 'product-image-upload');
-      setState(() => _uploading = false);
-      if (!mounted) return;
-      // With the reason. "Upload failed" on its own cannot be acted on and cannot be reported:
-      // a file too large, a refused type and a network that is not there all read identically.
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(DeliveryStrings.of(context).uploadFailedBecause(_reasonFrom(e)))));
-    }
+    return PickedImageBytes(await file.readAsBytes(), _contentTypeFor(file));
   }
 
   /// The shortest true sentence about a failure, for a snackbar.
@@ -297,17 +390,35 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           cta: t.merchbUploadImageCta,
           hint: t.merchbUploadHint,
           busy: _uploading,
-          // Inert until the product exists — the presign endpoint is scoped to a product id.
-          onTap: isNew || _uploading ? null : _addImage,
+          // Live whether the product exists yet or not. On a new product the pick is held and
+          // uploaded on save; on an existing one it uploads straight away — see [_addImage].
+          onTap: _uploading ? null : _addImage,
         ),
         if (isNew) ...<Widget>[
-          // Why the dropzone is inert. Below the box rather than inside it: the frame's inner hint
-          // line is one line of file formats, and a two-line explanation there overflows the 130px
-          // the design gives the area.
+          // Below the box rather than inside it: the frame's inner hint line is one line of file
+          // formats, and a two-line explanation there overflows the 130px the design gives the area.
           const SizedBox(height: DeliverySpacing.sm),
           Text(
-            t.saveProductFirst,
+            _pendingImages.isEmpty ? t.merchbAddPhotosNow : t.merchbPhotosAddedOnSave,
             style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+          ),
+        ],
+        // Photos picked before the product was saved, shown from their own bytes so the shopkeeper
+        // sees exactly what will be attached.
+        if (_pendingImages.isNotEmpty) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          Wrap(
+            spacing: DeliverySpacing.sm,
+            runSpacing: DeliverySpacing.sm,
+            children: <Widget>[
+              for (int i = 0; i < _pendingImages.length; i++)
+                _PendingImageTile(
+                  bytes: _pendingImages[i].bytes,
+                  onRemove: _saving
+                      ? null
+                      : () => setState(() => _pendingImages.removeAt(i)),
+                ),
+            ],
           ),
         ],
         if (urls.isNotEmpty) ...<Widget>[
@@ -325,7 +436,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 ),
             ],
           ),
-        ] else if (!isNew) ...<Widget>[
+        ] else if (!isNew && _pendingImages.isEmpty) ...<Widget>[
           const SizedBox(height: DeliverySpacing.sm),
           Text(
             t.needsAPhotoToPublish,
@@ -403,7 +514,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       child: FutureBuilder<List<Category>>(
         future: _categories,
         builder: (BuildContext context, AsyncSnapshot<List<Category>> snapshot) {
-          if (!snapshot.hasData) {
+          // Still loading: a spinner, but only while genuinely waiting.
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return Container(
               height: 45,
               alignment: AlignmentDirectional.centerStart,
@@ -416,6 +528,41 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               child: const SizedBox.square(
                 dimension: 16,
                 child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+              ),
+            );
+          }
+          // Failed: a tappable "retry" rather than a spinner that never ends. Critically, the form
+          // is still usable — Save creates the product uncategorised, so a category outage does not
+          // block adding a product, which is exactly what it used to do.
+          if (snapshot.hasError || snapshot.data == null) {
+            return InkWell(
+              onTap: _reloadCategories,
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              child: Container(
+                height: 45,
+                alignment: AlignmentDirectional.centerStart,
+                padding:
+                    const EdgeInsetsDirectional.all(DeliverySpacing.md - DeliverySpacing.xs),
+                decoration: BoxDecoration(
+                  color: DeliveryColors.white,
+                  border: Border.all(color: DeliveryColors.border),
+                  borderRadius: BorderRadius.circular(DeliveryRadius.md),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Icon(Icons.refresh_rounded, size: 16, color: DeliveryColors.brand),
+                    const SizedBox(width: DeliverySpacing.xs),
+                    Flexible(
+                      child: Text(
+                        t.tryAgain,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, color: DeliveryColors.brand),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -574,13 +721,36 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return FutureBuilder<List<OptionGroup>>(
       future: options,
       builder: (BuildContext context, AsyncSnapshot<List<OptionGroup>> snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
             height: 2,
             child: LinearProgressIndicator(
               minHeight: 2,
               color: DeliveryColors.brand,
               backgroundColor: DeliveryColors.borderFaint,
+            ),
+          );
+        }
+        // A failed load is NOT "no options" — showing the empty state there would tell a shopkeeper
+        // their product lost its variants when the request merely errored. It gets a tappable retry
+        // instead, the same treatment the category field got, so a load failure on an existing
+        // product reads as something to fix rather than a silent blank (or, worse, a spinner that
+        // never ends).
+        if (snapshot.hasError) {
+          return InkWell(
+            onTap: () => setState(() => _options = _loadOptions()),
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(Icons.refresh_rounded, size: 16, color: DeliveryColors.brand),
+                  const SizedBox(width: DeliverySpacing.xs),
+                  Text(t.tryAgain,
+                      style: const TextStyle(fontSize: 13, color: DeliveryColors.brand)),
+                ],
+              ),
             ),
           );
         }
@@ -922,6 +1092,82 @@ class _ImageTile extends StatelessWidget {
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) =>
                 const Icon(Icons.broken_image_outlined, color: DeliveryColors.muted),
+          ),
+        ),
+        if (onRemove != null)
+          PositionedDirectional(
+            top: 2,
+            end: 2,
+            child: Material(
+              color: DeliveryColors.white,
+              shape: const CircleBorder(),
+              child: IconButton(
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                onPressed: onRemove,
+                icon: const Icon(Icons.close, color: DeliveryColors.brand),
+                tooltip: DeliveryStrings.of(context).remove,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A photo the shopkeeper picked, in memory, waiting to be uploaded.
+///
+/// Held while a new product has no id to attach it to. Carries the bytes and a content type the
+/// server's allow-list accepts; the upload path shrinks it to fit before it goes.
+class PickedImageBytes {
+  const PickedImageBytes(this.bytes, this.contentType);
+
+  final Uint8List bytes;
+  final String contentType;
+}
+
+/// One picked-but-not-yet-uploaded photo, drawn from its own bytes.
+///
+/// Distinct from [_ImageTile], which loads an already-hosted image over the network. This one has
+/// no URL — the point of the feature is that it is shown before it has been sent anywhere.
+class _PendingImageTile extends StatelessWidget {
+  const _PendingImageTile({required this.bytes, this.onRemove});
+
+  final Uint8List bytes;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Container(
+          width: 104,
+          height: 104,
+          decoration: BoxDecoration(
+            border: Border.all(color: DeliveryColors.border),
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.broken_image_outlined, color: DeliveryColors.muted),
+          ),
+        ),
+        // A small badge so it reads as "queued", not "saved".
+        PositionedDirectional(
+          bottom: 0,
+          start: 0,
+          end: 0,
+          child: Container(
+            color: DeliveryColors.ink.withValues(alpha: 0.55),
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              DeliveryStrings.of(context).merchbPending,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, color: DeliveryColors.white, height: 1.2),
+            ),
           ),
         ),
         if (onRemove != null)

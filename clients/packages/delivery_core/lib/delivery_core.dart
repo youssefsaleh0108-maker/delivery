@@ -2,6 +2,7 @@
 library;
 
 export 'src/api/accounting_api.dart';
+export 'src/util/image_prep.dart';
 export 'src/api/auto_approval_api.dart';
 export 'src/models/auto_approval_models.dart';
 export 'src/api/banner_api.dart';

@@ -762,7 +762,7 @@ class MerchantStatementWords {
       ][index];
 
   static const MerchantStatementWords en = MerchantStatementWords._(
-    title: 'Your statement',
+    title: 'Reconciliation',
     notAPayment:
         'This is what the platform\'s ledger records for these dates. It is not a payment. '
         'There is no payout yet, so no money has been transferred to you and none is scheduled — '
@@ -798,7 +798,7 @@ class MerchantStatementWords {
   );
 
   static const MerchantStatementWords ar = MerchantStatementWords._(
-    title: 'كشف حسابك',
+    title: 'التسوية',
     notAPayment: 'هذا ما يسجّله دفتر المنصّة لهذه التواريخ، وهو ليس دفعة. '
         'لا يوجد صرف بعد، فلم يُحوَّل إليك أي مبلغ ولا يوجد تحويل مجدول — '
         'وتسوية المستحقّات ما زالت تتم مع المنصّة مباشرة.',

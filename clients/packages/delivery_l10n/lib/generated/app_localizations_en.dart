@@ -1269,6 +1269,16 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get saveProductFirst => 'Save the product first, then add photos.';
 
   @override
+  String get merchbAddPhotosNow =>
+      'Add photos now — they upload when you save.';
+
+  @override
+  String get merchbPhotosAddedOnSave => 'These photos are added when you save.';
+
+  @override
+  String get merchbPending => 'Pending';
+
+  @override
   String get needsAPhotoToPublish =>
       'A product needs at least one photo before it can be published.';
 
@@ -4551,7 +4561,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get authMapUnavailable => 'Map unavailable';
 
   @override
-  String get riderStatementTitle => 'Statement';
+  String get riderStatementTitle => 'Reconciliation';
 
   @override
   String get riderStatementRowSubtitle =>

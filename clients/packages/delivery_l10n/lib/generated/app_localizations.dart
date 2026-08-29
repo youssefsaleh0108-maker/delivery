@@ -2270,6 +2270,24 @@ abstract class DeliveryStrings {
   /// **'Save the product first, then add photos.'**
   String get saveProductFirst;
 
+  /// No description provided for @merchbAddPhotosNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photos now — they upload when you save.'**
+  String get merchbAddPhotosNow;
+
+  /// No description provided for @merchbPhotosAddedOnSave.
+  ///
+  /// In en, this message translates to:
+  /// **'These photos are added when you save.'**
+  String get merchbPhotosAddedOnSave;
+
+  /// No description provided for @merchbPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get merchbPending;
+
   /// No description provided for @needsAPhotoToPublish.
   ///
   /// In en, this message translates to:
@@ -8141,7 +8159,7 @@ abstract class DeliveryStrings {
   /// No description provided for @riderStatementTitle.
   ///
   /// In en, this message translates to:
-  /// **'Statement'**
+  /// **'Reconciliation'**
   String get riderStatementTitle;
 
   /// No description provided for @riderStatementRowSubtitle.

@@ -424,6 +424,21 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       debugShowCheckedModeBanner: false,
+      // Content was drawing under the phone's status bar on every screen: titles overlapped the
+      // clock/battery row because shells and pushed routes (e.g. the product form) were
+      // inconsistent about SafeArea — a few wrapped their body, most did not. Insetting the TOP
+      // once here, at the MaterialApp level, wraps every route's child (shells AND pages pushed via
+      // Navigator) so individual screens no longer each have to. bottom/left/right stay false: the
+      // shells manage their own bottom-nav insets, and adding a bottom inset here would double-pad
+      // them. Nested SafeAreas are harmless — inner ones become no-ops — so screens that already
+      // wrap themselves are unaffected.
+      builder: (BuildContext context, Widget? child) => SafeArea(
+        top: true,
+        bottom: false,
+        left: false,
+        right: false,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: FutureBuilder<AuthSession?>(
         future: _bootstrap,
         builder: (BuildContext context, AsyncSnapshot<AuthSession?> snapshot) {

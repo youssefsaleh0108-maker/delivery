@@ -23,6 +23,9 @@ dependencies:
   web: ^1.1.0
 
   firebase_messaging: ^15.1.5
+  # Pure-Dart image decode/encode, so a chosen product photo can be downscaled to under the upload
+  # cap on every platform including web — no native codec dependency. Used only by ImagePrep.
+  image: ^4.3.0
   dio: ^5.7.0
   # The one realtime socket (STOMP over WebSocket on /ws/notifications). Chosen because it is the
   # only WebSocket client that works identically on mobile, desktop and web — the auth travels in

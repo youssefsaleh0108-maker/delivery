@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
+import '../util/image_prep.dart';
 // OptionGroup and its drafts live with the storefront models, because the customer side reads the
 // same structure this writes.
 import '../models/store_models.dart';
@@ -122,19 +123,31 @@ class CatalogApi {
     required String productId,
     required Uint8List bytes,
     required String contentType,
+    int maxBytes = ImagePrep.defaultMaxBytes,
   }) async {
+    // 0. Shrink an oversized photo BEFORE anything else, and presign for what will actually be
+    // sent. A phone camera hands back several megabytes; a product thumbnail needs a fraction of
+    // that, and downscaling here means a shop on mobile data is not pushing the original — the
+    // upload that used to time out now completes. Re-encoding a resized image makes it JPEG, so the
+    // presign has to be told that type rather than the picked one, which is why this happens first.
+    final PreparedImage prepared = ImagePrep.forUpload(bytes, contentType, maxBytes: maxBytes);
+    final Uint8List sending = prepared.bytes;
+
     // 1. Ask the service for a one-shot URL. It checks that this merchant owns the product.
     final Response<dynamic> presign = await _dio.post<dynamic>(
       '/api/products/$productId/images/presign',
-      data: <String, dynamic>{'contentType': contentType},
+      data: <String, dynamic>{'contentType': prepared.contentType},
     );
     final Map<String, dynamic> upload = presign.data as Map<String, dynamic>;
     final String uploadUrl = upload['uploadUrl'] as String;
     final String fileId = upload['fileId'] as String;
     final int maxSize = (upload['maxSizeBytes'] as num).toInt();
 
-    if (bytes.length > maxSize) {
-      throw ArgumentError('Image is ${bytes.length} bytes; the limit is $maxSize');
+    if (sending.length > maxSize) {
+      // After preparation this should never fire — the cap is well under the server's — but a photo
+      // that could not be brought under the ceiling is refused here rather than at MinIO, where the
+      // failure would be an opaque 403 on the signed URL.
+      throw ArgumentError('Image is ${sending.length} bytes; the limit is $maxSize');
     }
 
     // 2. PUT straight to MinIO.
@@ -146,11 +159,11 @@ class CatalogApi {
     final Dio bare = Dio();
     await bare.put<void>(
       uploadUrl,
-      data: Stream<List<int>>.fromIterable(<List<int>>[bytes]),
+      data: Stream<List<int>>.fromIterable(<List<int>>[sending]),
       options: Options(
         headers: <String, dynamic>{
-          'Content-Type': contentType,
-          Headers.contentLengthHeader: bytes.length,
+          'Content-Type': prepared.contentType,
+          Headers.contentLengthHeader: sending.length,
         },
       ),
     );

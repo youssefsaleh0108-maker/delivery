@@ -1268,6 +1268,15 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get saveProductFirst => 'احفظ المنتج أولًا ثم أضف الصور.';
 
   @override
+  String get merchbAddPhotosNow => 'أضف الصور الآن — تُرفع عند الحفظ.';
+
+  @override
+  String get merchbPhotosAddedOnSave => 'تُضاف هذه الصور عند الحفظ.';
+
+  @override
+  String get merchbPending => 'قيد الإضافة';
+
+  @override
   String get needsAPhotoToPublish =>
       'يحتاج المنتج إلى صورة واحدة على الأقل قبل نشره.';
 
@@ -4549,7 +4558,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get authMapUnavailable => 'الخريطة غير متاحة';
 
   @override
-  String get riderStatementTitle => 'كشف الحساب';
+  String get riderStatementTitle => 'التسوية';
 
   @override
   String get riderStatementRowSubtitle => 'النقد الذي بحوزتك، مقابل ما كسبته';
