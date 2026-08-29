@@ -191,11 +191,17 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     }
   }
 
-  /// Whether the shop is on the storefront, read the same way "My Shop" reads it.
+  /// Whether the shop is listed on the storefront — the fact the Active switch reflects.
+  ///
+  /// Reads the store's listing STATUS, not its availability. The two were conflated here: the
+  /// switch used to be on whenever the shop was not closed for the night or had a closing time on
+  /// the clock. Suspending a shop leaves its opening hours untouched, so the switch stayed on
+  /// "Active" while the server had already delisted it — the button appeared to do nothing. Status
+  /// is the thing publish/suspend actually move.
   bool get _published {
     final Store? store = _store;
     if (store == null) return false;
-    return store.availability != StoreAvailability.closed || store.closesAt != null;
+    return store.status.isListed;
   }
 
   Future<void> _setPublished(bool value) async {

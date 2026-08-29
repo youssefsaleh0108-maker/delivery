@@ -286,8 +286,10 @@ class _StoreScreenState extends State<StoreScreen> {
   /// Publish are the controls that decide whether this shop appears on the storefront at all, and
   /// this is the screen that gets a shop listed. They stay, in the frame's button language.
   Widget _statusCard(DeliveryStrings t, Store store) {
-    final bool listed =
-        store.availability != StoreAvailability.closed || store.closesAt != null;
+    // The listing status, not the clock. Availability is open/busy/closed for the night; whether
+    // the shop is on the storefront at all is its status, and that is what "Listed" here means.
+    // Reading availability instead left a suspended shop still reading "Listed on the storefront".
+    final bool listed = store.status.isListed;
 
     return YdCard.bordered(
       child: Column(

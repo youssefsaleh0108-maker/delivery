@@ -34,6 +34,38 @@ enum StoreVertical {
 
 /// What the card says right now. Derived server-side from opening hours and the busy flag, so the
 /// client never has to know the store's timezone to render it correctly.
+/// Whether a shop is listed on the storefront, which is a different question from whether it is
+/// open right now.
+///
+/// [StoreAvailability] is the clock — open, busy, closed for the night. This is the switch: a
+/// merchant publishes (ACTIVE) or is delisted (SUSPENDED), and a shop starts life as DRAFT. The
+/// two were conflated once — the merchant dashboard's Active switch read the availability and the
+/// closing time to guess whether the shop was published, so suspending a shop that still had a
+/// closing time on the clock left the switch stuck on "Active". They are separate facts and this
+/// is the one the publish/suspend buttons move.
+enum StoreListingStatus {
+  draft('DRAFT'),
+  active('ACTIVE'),
+  suspended('SUSPENDED');
+
+  const StoreListingStatus(this.wireValue);
+
+  final String wireValue;
+
+  /// On the storefront and orderable, subject to the clock.
+  bool get isListed => this == StoreListingStatus.active;
+
+  /// Unknown or absent reads as DRAFT — the safe default, an unpublished shop, never a live one.
+  static StoreListingStatus fromWire(String? value) {
+    for (final StoreListingStatus status in StoreListingStatus.values) {
+      if (status.wireValue == value) {
+        return status;
+      }
+    }
+    return StoreListingStatus.draft;
+  }
+}
+
 enum StoreAvailability {
   open('OPEN', 'Open'),
   busy('BUSY', 'Busy'),
@@ -237,6 +269,7 @@ class Store {
     required this.name,
     required this.vertical,
     required this.availability,
+    this.status = StoreListingStatus.active,
     this.tagline,
     this.description,
     this.tags = const <String>[],
@@ -262,6 +295,12 @@ class Store {
   final String slug;
   final String name;
   final StoreVertical vertical;
+
+  /// Listed, delisted, or not yet published. What the merchant dashboard's Active switch reflects.
+  /// Defaults to active because the customer storefront only ever returns listed shops — a customer
+  /// never holds a suspended one — so the field only carries real information on the merchant side.
+  final StoreListingStatus status;
+
   final String? tagline;
   final String? description;
   final List<String> tags;
@@ -345,6 +384,7 @@ class Store {
         name: name,
         vertical: vertical,
         availability: availability,
+        status: status,
         tagline: tagline,
         description: description,
         tags: tags,
@@ -379,6 +419,7 @@ class Store {
         etaMinMinutes: json['etaMinMinutes'] as int? ?? 20,
         etaMaxMinutes: json['etaMaxMinutes'] as int? ?? 40,
         availability: StoreAvailability.fromWire(json['availability'] as String?),
+        status: StoreListingStatus.fromWire(json['status'] as String?),
         closesAt: json['closesAt'] as String?,
         logoUrl: json['logoUrl'] as String?,
         coverUrl: json['coverUrl'] as String?,
