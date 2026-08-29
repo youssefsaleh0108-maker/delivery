@@ -3,7 +3,10 @@ import 'dart:ui' show PathMetric;
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:dio/dio.dart';
 import 'package:file_selector/file_selector.dart';
+// material.dart already re-exports debugPrint and debugPrintStack. Importing foundation.dart for
+// them drags in its Category annotation, which collides with delivery_core's Category model.
 import 'package:flutter/material.dart';
 
 import 'product_options_editor.dart';
@@ -138,8 +141,28 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       mimeTypes: <String>['image/jpeg', 'image/png', 'image/webp'],
     );
 
-    final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
+    // INSIDE the guard, and that is the whole point of this block.
+    //
+    // openFile used to be called before the try, so anything it threw — a plugin missing on the
+    // platform, a picker the OS refused to open — escaped this method as an unhandled async error.
+    // The screen showed nothing at all: no snackbar, no spinner, no message. Tapping "add a photo"
+    // simply did nothing, which is indistinguishable from a dead button and is exactly how it was
+    // reported. Whatever goes wrong here now has to say so.
+    final XFile? file;
+    try {
+      file = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
+    } catch (e, stack) {
+      // The reason reaches the device log as well as the screen: a picker failure is a platform
+      // fault, and the sentence a shopkeeper can read is rarely the sentence that diagnoses it.
+      debugPrint('PRODUCT IMAGE PICKER FAILED: $e');
+      debugPrintStack(stackTrace: stack, label: 'product-image-picker');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).couldNotOpenPicker(_reasonFrom(e)))));
+      return;
+    }
     if (file == null) {
+      // Cancelled. Not a failure, and must not be reported as one.
       return;
     }
 
@@ -156,12 +179,32 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _dirty = true;
         _uploading = false;
       });
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('PRODUCT IMAGE UPLOAD FAILED: $e');
+      debugPrintStack(stackTrace: stack, label: 'product-image-upload');
       setState(() => _uploading = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(DeliveryStrings.of(context).uploadFailed)));
+      // With the reason. "Upload failed" on its own cannot be acted on and cannot be reported:
+      // a file too large, a refused type and a network that is not there all read identically.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).uploadFailedBecause(_reasonFrom(e)))));
     }
+  }
+
+  /// The shortest true sentence about a failure, for a snackbar.
+  ///
+  /// Dio wraps the useful part in a long toString that begins with the whole request; an
+  /// ArgumentError carries only its message. Neither renders well raw, and a shopkeeper reading
+  /// "DioException [bad response]: This exception was thrown because..." learns nothing.
+  static String _reasonFrom(Object e) {
+    if (e is DioException) {
+      final int? code = e.response?.statusCode;
+      if (code != null) return 'the server refused it ($code)';
+      return e.message ?? 'the server could not be reached';
+    }
+    if (e is ArgumentError) return e.message?.toString() ?? e.toString();
+    final String text = e.toString();
+    return text.length > 140 ? '${text.substring(0, 140)}…' : text;
   }
 
   Future<void> _removeImage(String objectKey) async {

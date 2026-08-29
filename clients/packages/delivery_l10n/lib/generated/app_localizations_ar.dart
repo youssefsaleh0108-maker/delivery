@@ -1219,6 +1219,16 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get uploadFailed => 'فشل الرفع';
 
   @override
+  String couldNotOpenPicker(Object reason) {
+    return 'تعذّر فتح منتقي الملفات: $reason';
+  }
+
+  @override
+  String uploadFailedBecause(Object reason) {
+    return 'فشل الرفع: $reason';
+  }
+
+  @override
   String get newProduct => 'منتج جديد';
 
   @override
@@ -4537,4 +4547,69 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get authMapUnavailable => 'الخريطة غير متاحة';
+
+  @override
+  String get riderStatementTitle => 'كشف الحساب';
+
+  @override
+  String get riderStatementRowSubtitle => 'النقد الذي بحوزتك، مقابل ما كسبته';
+
+  @override
+  String get riderStatementPeriodThisMonth => 'هذا الشهر';
+
+  @override
+  String get riderStatementPeriodLastMonth => 'الشهر الماضي';
+
+  @override
+  String riderStatementRangeLine(Object from, Object to) {
+    return '$from – $to';
+  }
+
+  @override
+  String riderStatementGeneratedAt(Object when) {
+    return 'احتُسب $when';
+  }
+
+  @override
+  String get riderStatementCouldNotLoad => 'تعذّر تحميل كشف حسابك';
+
+  @override
+  String get riderStatementNothingYet => 'لم تتحرك أي مبالغ في هذه الفترة.';
+
+  @override
+  String get riderStatementSummary => 'كيف يُحتسب';
+
+  @override
+  String get riderStatementOrders => 'طلبات هذه الفترة';
+
+  @override
+  String riderStatementCollectedLine(Object amount) {
+    return 'حصّلت $amount عند الباب';
+  }
+
+  @override
+  String get riderStatementYouOwe => 'أنت مدين للمنصة';
+
+  @override
+  String get riderStatementOwedToYou => 'المنصة مدينة لك';
+
+  @override
+  String get riderStatementSettled => 'لا شيء معلّق في الاتجاهين';
+
+  @override
+  String get riderStatementDirectionUnclear => 'تعذّرت قراءة اتجاه هذا الرصيد';
+
+  @override
+  String get riderStatementDebtNote =>
+      'هذا أمر طبيعي. النقد الذي تحصّله عند الباب يخصّ المنصة حتى تسلّمه — وهو ليس خصماً من أجرك.';
+
+  @override
+  String get riderStatementCreditNote => 'هذا مالك، ولم يصلك بعد.';
+
+  @override
+  String get riderStatementSettledNote => 'جرت تسوية كل ما حصّلته.';
+
+  @override
+  String get riderStatementUnclearNote =>
+      'تعذّر على التطبيق تحديد اتجاه هذا الرصيد. راجع المنصة قبل التصرّف بناءً عليه.';
 }

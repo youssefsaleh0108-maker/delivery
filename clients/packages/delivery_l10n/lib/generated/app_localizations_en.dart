@@ -1220,6 +1220,16 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get uploadFailed => 'Upload failed';
 
   @override
+  String couldNotOpenPicker(Object reason) {
+    return 'Could not open the file picker: $reason';
+  }
+
+  @override
+  String uploadFailedBecause(Object reason) {
+    return 'Upload failed: $reason';
+  }
+
+  @override
   String get newProduct => 'New product';
 
   @override
@@ -4539,4 +4549,72 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get authMapUnavailable => 'Map unavailable';
+
+  @override
+  String get riderStatementTitle => 'Statement';
+
+  @override
+  String get riderStatementRowSubtitle =>
+      'Cash you are holding, against what you have earned';
+
+  @override
+  String get riderStatementPeriodThisMonth => 'This month';
+
+  @override
+  String get riderStatementPeriodLastMonth => 'Last month';
+
+  @override
+  String riderStatementRangeLine(Object from, Object to) {
+    return '$from – $to';
+  }
+
+  @override
+  String riderStatementGeneratedAt(Object when) {
+    return 'Worked out $when';
+  }
+
+  @override
+  String get riderStatementCouldNotLoad => 'Could not load your statement';
+
+  @override
+  String get riderStatementNothingYet => 'No money moved in this period.';
+
+  @override
+  String get riderStatementSummary => 'How it adds up';
+
+  @override
+  String get riderStatementOrders => 'Orders in this period';
+
+  @override
+  String riderStatementCollectedLine(Object amount) {
+    return 'You collected $amount at the door';
+  }
+
+  @override
+  String get riderStatementYouOwe => 'You owe the platform';
+
+  @override
+  String get riderStatementOwedToYou => 'The platform owes you';
+
+  @override
+  String get riderStatementSettled => 'Nothing outstanding either way';
+
+  @override
+  String get riderStatementDirectionUnclear => 'This balance could not be read';
+
+  @override
+  String get riderStatementDebtNote =>
+      'This is normal. Cash you take at the door belongs to the platform until you hand it over — it is not a deduction from your pay.';
+
+  @override
+  String get riderStatementCreditNote =>
+      'This is your money, still to reach you.';
+
+  @override
+  String get riderStatementSettledNote =>
+      'Everything you have collected has been accounted for.';
+
+  @override
+  String get riderStatementUnclearNote =>
+      'This app could not tell which way this balance points. Ask the platform before acting on it.';
 }

@@ -968,10 +968,26 @@ class _StoreScreenState extends State<StoreScreen> {
       mimeTypes: <String>['image/jpeg', 'image/png', 'image/webp'],
     );
 
-    final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
-    if (file == null) {
+    // Guarded, for the same reason as the product form: an unguarded openFile that throws leaves
+    // this method as an unhandled async error and the shop sees nothing happen at all, which reads
+    // as a dead button rather than as a failure worth reporting.
+    final XFile? picked;
+    try {
+      picked = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
+    } catch (e, stack) {
+      debugPrint('SHOP PICTURE PICKER FAILED: $e');
+      debugPrintStack(stackTrace: stack, label: 'shop-picture-picker');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).couldNotOpenPicker(e.toString()))));
       return;
     }
+    if (picked == null) {
+      // Cancelled, which is not a failure.
+      return;
+    }
+    // Rebound non-null: a local assigned inside a try is not promoted by the null check above.
+    final XFile file = picked;
     final Uint8List bytes = await file.readAsBytes();
     // The file dialog and the read are both async gaps; this State can be gone by now.
     if (!mounted) return;

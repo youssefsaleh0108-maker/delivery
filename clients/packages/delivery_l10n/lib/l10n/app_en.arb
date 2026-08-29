@@ -829,6 +829,18 @@
   "couldNotSaveProduct": "Could not save this product",
   "images": "Images",
   "uploadFailed": "Upload failed",
+  "couldNotOpenPicker": "Could not open the file picker: {reason}",
+  "@couldNotOpenPicker": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
+  "uploadFailedBecause": "Upload failed: {reason}",
+  "@uploadFailedBecause": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
   "newProduct": "New product",
   "editProduct": "Edit product",
   "nameLabel": "Name",
@@ -2309,5 +2321,48 @@
     }
   },
   "authPinClear": "Remove pin",
-  "authMapUnavailable": "Map unavailable"
+  "authMapUnavailable": "Map unavailable",
+  "riderStatementTitle": "Statement",
+  "riderStatementRowSubtitle": "Cash you are holding, against what you have earned",
+  "riderStatementPeriodThisMonth": "This month",
+  "riderStatementPeriodLastMonth": "Last month",
+  "riderStatementRangeLine": "{from} – {to}",
+  "@riderStatementRangeLine": {
+    "placeholders": {
+      "from": {
+        "type": "Object"
+      },
+      "to": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderStatementGeneratedAt": "Worked out {when}",
+  "@riderStatementGeneratedAt": {
+    "placeholders": {
+      "when": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderStatementCouldNotLoad": "Could not load your statement",
+  "riderStatementNothingYet": "No money moved in this period.",
+  "riderStatementSummary": "How it adds up",
+  "riderStatementOrders": "Orders in this period",
+  "riderStatementCollectedLine": "You collected {amount} at the door",
+  "@riderStatementCollectedLine": {
+    "placeholders": {
+      "amount": {
+        "type": "Object"
+      }
+    }
+  },
+  "riderStatementYouOwe": "You owe the platform",
+  "riderStatementOwedToYou": "The platform owes you",
+  "riderStatementSettled": "Nothing outstanding either way",
+  "riderStatementDirectionUnclear": "This balance could not be read",
+  "riderStatementDebtNote": "This is normal. Cash you take at the door belongs to the platform until you hand it over — it is not a deduction from your pay.",
+  "riderStatementCreditNote": "This is your money, still to reach you.",
+  "riderStatementSettledNote": "Everything you have collected has been accounted for.",
+  "riderStatementUnclearNote": "This app could not tell which way this balance points. Ask the platform before acting on it."
 }

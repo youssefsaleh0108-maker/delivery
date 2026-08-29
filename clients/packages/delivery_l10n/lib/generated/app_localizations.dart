@@ -2180,6 +2180,18 @@ abstract class DeliveryStrings {
   /// **'Upload failed'**
   String get uploadFailed;
 
+  /// No description provided for @couldNotOpenPicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the file picker: {reason}'**
+  String couldNotOpenPicker(Object reason);
+
+  /// No description provided for @uploadFailedBecause.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload failed: {reason}'**
+  String uploadFailedBecause(Object reason);
+
   /// No description provided for @newProduct.
   ///
   /// In en, this message translates to:
@@ -8125,6 +8137,120 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Map unavailable'**
   String get authMapUnavailable;
+
+  /// No description provided for @riderStatementTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement'**
+  String get riderStatementTitle;
+
+  /// No description provided for @riderStatementRowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash you are holding, against what you have earned'**
+  String get riderStatementRowSubtitle;
+
+  /// No description provided for @riderStatementPeriodThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This month'**
+  String get riderStatementPeriodThisMonth;
+
+  /// No description provided for @riderStatementPeriodLastMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Last month'**
+  String get riderStatementPeriodLastMonth;
+
+  /// No description provided for @riderStatementRangeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} – {to}'**
+  String riderStatementRangeLine(Object from, Object to);
+
+  /// No description provided for @riderStatementGeneratedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Worked out {when}'**
+  String riderStatementGeneratedAt(Object when);
+
+  /// No description provided for @riderStatementCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your statement'**
+  String get riderStatementCouldNotLoad;
+
+  /// No description provided for @riderStatementNothingYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No money moved in this period.'**
+  String get riderStatementNothingYet;
+
+  /// No description provided for @riderStatementSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'How it adds up'**
+  String get riderStatementSummary;
+
+  /// No description provided for @riderStatementOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders in this period'**
+  String get riderStatementOrders;
+
+  /// No description provided for @riderStatementCollectedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'You collected {amount} at the door'**
+  String riderStatementCollectedLine(Object amount);
+
+  /// No description provided for @riderStatementYouOwe.
+  ///
+  /// In en, this message translates to:
+  /// **'You owe the platform'**
+  String get riderStatementYouOwe;
+
+  /// No description provided for @riderStatementOwedToYou.
+  ///
+  /// In en, this message translates to:
+  /// **'The platform owes you'**
+  String get riderStatementOwedToYou;
+
+  /// No description provided for @riderStatementSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing outstanding either way'**
+  String get riderStatementSettled;
+
+  /// No description provided for @riderStatementDirectionUnclear.
+  ///
+  /// In en, this message translates to:
+  /// **'This balance could not be read'**
+  String get riderStatementDirectionUnclear;
+
+  /// No description provided for @riderStatementDebtNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This is normal. Cash you take at the door belongs to the platform until you hand it over — it is not a deduction from your pay.'**
+  String get riderStatementDebtNote;
+
+  /// No description provided for @riderStatementCreditNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your money, still to reach you.'**
+  String get riderStatementCreditNote;
+
+  /// No description provided for @riderStatementSettledNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything you have collected has been accounted for.'**
+  String get riderStatementSettledNote;
+
+  /// No description provided for @riderStatementUnclearNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This app could not tell which way this balance points. Ask the platform before acting on it.'**
+  String get riderStatementUnclearNote;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

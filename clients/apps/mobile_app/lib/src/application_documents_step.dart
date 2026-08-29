@@ -129,8 +129,20 @@ class ApplicationDocumentsStep extends StatelessWidget {
   final void Function(ApplicantDocumentKind kind) onRemoved;
 
   Future<void> _pick(BuildContext context, ApplicantDocumentKind kind) async {
-    final PickedDocument? document =
-        await pickApplicantDocument(DeliveryStrings.of(context).wizDocFileTypes);
+    // Guarded: pickApplicantDocument returns null for a cancel but THROWS when the platform picker
+    // itself fails, and an unguarded call leaves that as an unhandled async error — the applicant
+    // taps "choose a file" and nothing happens, with no way to tell a dead button from a refusal.
+    final PickedDocument? document;
+    try {
+      document = await pickApplicantDocument(DeliveryStrings.of(context).wizDocFileTypes);
+    } catch (e, stack) {
+      debugPrint('APPLICANT DOCUMENT PICKER FAILED (${kind.wire}): $e');
+      debugPrintStack(stackTrace: stack, label: 'applicant-document-picker');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).couldNotOpenPicker(e.toString()))));
+      return;
+    }
     if (document == null) return;
     onPicked(kind, document);
   }
@@ -215,7 +227,19 @@ class _ApplicantDocumentsCardState extends State<ApplicantDocumentsCard> {
 
   Future<void> _replace(ApplicantDocumentKind kind) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final PickedDocument? file = await pickApplicantDocument(t.wizDocFileTypes);
+    // Guarded for the same reason as the wizard's own picker above: a throw here used to be
+    // silent, and this card is how somebody replaces a document a reviewer rejected — the one
+    // moment they most need to be told why nothing happened.
+    final PickedDocument? file;
+    try {
+      file = await pickApplicantDocument(t.wizDocFileTypes);
+    } catch (e, stack) {
+      debugPrint('APPLICANT DOCUMENT PICKER FAILED (${kind.wire}): $e');
+      debugPrintStack(stackTrace: stack, label: 'applicant-document-picker');
+      if (!mounted) return;
+      setState(() => _error = t.couldNotOpenPicker(e.toString()));
+      return;
+    }
     if (file == null || !mounted) return;
     setState(() {
       _uploading = kind;

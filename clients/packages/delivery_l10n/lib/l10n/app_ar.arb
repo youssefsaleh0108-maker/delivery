@@ -423,6 +423,18 @@
   "couldNotSaveProduct": "تعذّر حفظ هذا المنتج",
   "images": "الصور",
   "uploadFailed": "فشل الرفع",
+  "couldNotOpenPicker": "تعذّر فتح منتقي الملفات: {reason}",
+  "@couldNotOpenPicker": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
+  "uploadFailedBecause": "فشل الرفع: {reason}",
+  "@uploadFailedBecause": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
   "newProduct": "منتج جديد",
   "editProduct": "تعديل المنتج",
   "nameLabel": "الاسم",
@@ -1549,5 +1561,24 @@
   "authPinYourArea": "اضغط على الخريطة لتحديد المنطقة التي ستعمل فيها",
   "authPinnedAt": "مثبّت عند {lat}، {lng}",
   "authPinClear": "إزالة الدبوس",
-  "authMapUnavailable": "الخريطة غير متاحة"
+  "authMapUnavailable": "الخريطة غير متاحة",
+  "riderStatementTitle": "كشف الحساب",
+  "riderStatementRowSubtitle": "النقد الذي بحوزتك، مقابل ما كسبته",
+  "riderStatementPeriodThisMonth": "هذا الشهر",
+  "riderStatementPeriodLastMonth": "الشهر الماضي",
+  "riderStatementRangeLine": "{from} – {to}",
+  "riderStatementGeneratedAt": "احتُسب {when}",
+  "riderStatementCouldNotLoad": "تعذّر تحميل كشف حسابك",
+  "riderStatementNothingYet": "لم تتحرك أي مبالغ في هذه الفترة.",
+  "riderStatementSummary": "كيف يُحتسب",
+  "riderStatementOrders": "طلبات هذه الفترة",
+  "riderStatementCollectedLine": "حصّلت {amount} عند الباب",
+  "riderStatementYouOwe": "أنت مدين للمنصة",
+  "riderStatementOwedToYou": "المنصة مدينة لك",
+  "riderStatementSettled": "لا شيء معلّق في الاتجاهين",
+  "riderStatementDirectionUnclear": "تعذّرت قراءة اتجاه هذا الرصيد",
+  "riderStatementDebtNote": "هذا أمر طبيعي. النقد الذي تحصّله عند الباب يخصّ المنصة حتى تسلّمه — وهو ليس خصماً من أجرك.",
+  "riderStatementCreditNote": "هذا مالك، ولم يصلك بعد.",
+  "riderStatementSettledNote": "جرت تسوية كل ما حصّلته.",
+  "riderStatementUnclearNote": "تعذّر على التطبيق تحديد اتجاه هذا الرصيد. راجع المنصة قبل التصرّف بناءً عليه."
 }
