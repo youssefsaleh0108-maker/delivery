@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,8 +231,14 @@ public class StatementService {
                 .add(sum(payable, EntryType.CASHOUT_RELEASED))
                 .add(sum(payable, EntryType.CASHOUT_PAID));
 
-        BigDecimal collected = floatEntries.totalForHolderBetween(
+        // The rows, not just the total: they are what the itemisation is built from. Summed here
+        // rather than queried twice so the figure on the statement and the rows underneath it are
+        // the same data and cannot disagree.
+        List<CashFloatEntry> collections = floatEntries.forHolderBetween(
                 ref, CashFloatEntry.Kind.COLLECTED, range.fromInstant(), range.toExclusive());
+        BigDecimal collected = collections.stream()
+                .map(CashFloatEntry::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal remitted = floatEntries.totalForHolderBetween(
                 ref, CashFloatEntry.Kind.REMITTED, range.fromInstant(), range.toExclusive());
 
@@ -260,26 +267,83 @@ public class StatementService {
                 .subtract(collected);
 
         return Statement.of(CounterpartyKind.RIDER, ref, name, range, currency,
-                lines, control, riderEntries(payable, ledger), (int) jobs,
+                lines, control, riderEntries(payable, collections, range),
+                // The order count is what they actually touched, not what they earned on. A rider
+                // who collected on 44 orders and earned nothing was reported as "0 orders", which
+                // is the same blank the itemisation used to be.
+                Math.max((int) jobs, (int) collections.stream()
+                        .map(CashFloatEntry::getOrderId)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .count()),
                 riderNote(ref, rows, collected, remitted));
     }
 
-    /** One row per job, with whether the rider took cash for it — the fact they can check. */
-    private List<Statement.Entry> riderEntries(List<RiderLedgerEntry> payable, Ledger ledger) {
-        Set<UUID> cashJobs = ledger.orderIdsWith(Leg.CASH_COLLECTED);
-        return payable.stream()
+    /**
+     * One row per order the rider touched: what they took at the door, and what they kept.
+     *
+     * <p><strong>Both halves, and the cash half is the one that was missing.</strong> This used to
+     * itemise {@code rider_ledger} job earnings alone, which is right on a platform where delivery
+     * fees are set — and produces an EMPTY list on one where they are not, because a zero earning
+     * is deliberately never written as a row. The live result was a rider told they owed the
+     * platform two thousand four hundred dollars above an empty table. A number somebody is asked
+     * to hand back is exactly the number that has to be checkable against the jobs that produced it.
+     *
+     * <p>So the two are merged by order id. {@code gross} is the cash taken at the door — the whole
+     * basket, which is not theirs — and {@code net} is what they earned for the job. On a cash order
+     * with no delivery fee that reads "you collected 24.00, you earned nothing", which is the true
+     * and uncomfortable shape of the arrangement rather than a blank.
+     */
+    private List<Statement.Entry> riderEntries(List<RiderLedgerEntry> payable,
+                                               List<CashFloatEntry> collections,
+                                               StatementRange range) {
+        // Order id -> what they earned on it. Orders with no earning simply never appear here.
+        Map<UUID, RiderLedgerEntry> earnedBy = payable.stream()
                 .filter(e -> e.getEntryType() == EntryType.JOB_EARNING && e.getOrderId() != null)
-                .sorted(Comparator.comparing(RiderLedgerEntry::getEarnedAt))
+                .collect(Collectors.toMap(RiderLedgerEntry::getOrderId, e -> e, (a, b) -> a,
+                        LinkedHashMap::new));
+
+        Map<UUID, Statement.Entry> byOrder = new LinkedHashMap<>();
+
+        // Cash first, in the order it was taken: on a cash platform this is most of the list.
+        for (CashFloatEntry collection : collections) {
+            UUID orderId = collection.getOrderId();
+            if (orderId == null) {
+                continue;
+            }
+            RiderLedgerEntry earned = earnedBy.get(orderId);
+            // cash_float.created_at is insertable=false with a database default, so it is null on
+            // any entity that has not been read back. Falling back to the earning's own timestamp
+            // rather than letting that null reach the sort: an unflushed row must not be able to
+            // take a rider's whole statement down with a NullPointerException.
+            Instant at = collection.getCreatedAt() != null
+                    ? collection.getCreatedAt()
+                    : (earned != null ? earned.getEarnedAt() : range.fromInstant());
+            byOrder.put(orderId, new Statement.Entry(
+                    orderId,
+                    at,
+                    Statement.money(collection.getAmount()),
+                    // A rider's earning is not commissioned: what the platform kept came off the
+                    // delivery fee before the leg was written, and there is no per-job figure for
+                    // it here that would not be an invention.
+                    Statement.money(BigDecimal.ZERO),
+                    Statement.money(earned == null ? BigDecimal.ZERO : earned.getAmount()),
+                    "CASH"));
+        }
+
+        // Then any job they earned on without taking cash — a card order, or a carrier's fleet.
+        for (RiderLedgerEntry earned : earnedBy.values()) {
+            byOrder.computeIfAbsent(earned.getOrderId(), id -> new Statement.Entry(
+                    id, earned.getEarnedAt(),
+                    Statement.money(BigDecimal.ZERO),
+                    Statement.money(BigDecimal.ZERO),
+                    Statement.money(earned.getAmount()),
+                    null));
+        }
+
+        return byOrder.values().stream()
+                .sorted(Comparator.comparing(Statement.Entry::at))
                 .limit(MAX_ENTRIES)
-                .map(e -> new Statement.Entry(
-                        e.getOrderId(), e.getEarnedAt(),
-                        Statement.money(e.getAmount()),
-                        // A rider's earning is not commissioned: what the platform kept came off the
-                        // delivery fee before the leg was written, and there is no per-job figure
-                        // for it here that would not be an invention.
-                        Statement.money(BigDecimal.ZERO),
-                        Statement.money(e.getAmount()),
-                        cashJobs.contains(e.getOrderId()) ? "CASH" : null))
                 .toList();
     }
 

@@ -85,11 +85,28 @@ class RiderCounterpartyStatementTest {
         when(riderLedger.between(eq(RIDER), any(), any())).thenReturn(rows);
     }
 
+    /**
+     * The collected figure is stubbed as ROWS, because that is where it now comes from.
+     *
+     * <p>The statement sums the collections it itemises rather than asking for a separate total, so
+     * the number on the line and the rows underneath it are the same data and cannot drift. Stubbing
+     * a total here instead would test a path the service no longer takes.
+     */
     private void cash(String collected, String remitted) {
-        when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
-                any(), any())).thenReturn(new BigDecimal(collected));
+        BigDecimal amount = new BigDecimal(collected);
+        when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+                any(), any()))
+                .thenReturn(amount.signum() == 0
+                        ? List.of()
+                        : List.of(collection(amount, UUID.randomUUID())));
         when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.REMITTED),
                 any(), any())).thenReturn(new BigDecimal(remitted));
+    }
+
+    /** One collection row, as settlement writes it: the whole basket, against one order. */
+    private static CashFloatEntry collection(BigDecimal amount, UUID orderId) {
+        return CashFloatEntry.collected(RIDER, CashFloatEntry.HolderKind.RIDER, orderId,
+                amount, "USD");
     }
 
     private static RiderLedgerEntry job(String amount) {
@@ -243,6 +260,50 @@ class RiderCounterpartyStatementTest {
             }
             return entry;
         }
+    }
+
+    /**
+     * The gap this itemisation was added for, in the exact shape the live platform is in.
+     *
+     * <p>Every delivery fee on this deployment is zero, so no JOB_EARNING row is ever written — a
+     * zero earning is deliberately not a row. Itemising {@code rider_ledger} alone therefore
+     * produced an EMPTY list, and a rider was shown one line saying they owed the platform 2,400.00
+     * with nothing underneath it to check it against. That is the version of a statement most
+     * likely to end in an argument, and the cash was against specific orders the whole time.
+     */
+    @Test
+    @DisplayName("cash with no earnings is still itemised, order by order")
+    void cashWithoutEarningsIsStillItemised() {
+        ledgerHolds(List.of());
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+                any(), any()))
+                .thenReturn(List.of(collection(new BigDecimal("19.50"), first),
+                        collection(new BigDecimal("24.00"), second)));
+        when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.REMITTED),
+                any(), any())).thenReturn(BigDecimal.ZERO);
+
+        Statement statement = service.build(CounterpartyKind.RIDER, RIDER, august);
+
+        assertThat(statement.net().amount()).isEqualByComparingTo("43.50");
+        assertThat(statement.net().direction()).isEqualTo(Statement.Direction.THEY_OWE);
+        // The point: two rows, one per order, not an empty table under a four-figure debt.
+        assertThat(statement.entries()).hasSize(2);
+        assertThat(statement.entries())
+                .extracting(Statement.Entry::orderId)
+                .containsExactlyInAnyOrder(first, second);
+        // What they took at the door, and what they kept for it — which here is nothing.
+        assertThat(statement.entries()).allSatisfy(entry -> {
+            assertThat(entry.net()).isEqualByComparingTo("0.00");
+            assertThat(entry.paymentMethod()).isEqualTo("CASH");
+        });
+        assertThat(statement.entries())
+                .extracting(Statement.Entry::gross)
+                .containsExactlyInAnyOrder(new BigDecimal("19.50"), new BigDecimal("24.00"));
+        // And the order count follows what they touched, not what they earned on: a rider who
+        // collected on two orders and earned nothing used to be reported as "0 orders".
+        assertThat(statement.orders()).isEqualTo(2);
     }
 
     private static Statement.Line labelled(Statement statement, String label) {

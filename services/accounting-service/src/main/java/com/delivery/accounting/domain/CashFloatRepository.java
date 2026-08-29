@@ -1,6 +1,7 @@
 package com.delivery.accounting.domain;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,6 +60,28 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
                                      @Param("kind") CashFloatEntry.Kind kind,
                                      @Param("from") java.time.Instant from,
                                      @Param("to") java.time.Instant to);
+
+    /**
+     * The rows behind that total, so a statement can itemise them.
+     *
+     * <p>Needed because a rider's itemisation used to come only from {@code rider_ledger}, and on a
+     * platform where the delivery fee is zero that table is empty — so a rider was shown a single
+     * line saying they owed the platform two thousand four hundred dollars with nothing underneath
+     * it. The cash they took was collected against specific orders and every one of them is a row
+     * here; a figure somebody is asked to hand back has to be checkable against the jobs that
+     * produced it.
+     */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderRef = :holder
+              AND f.entryKind = :kind
+              AND f.createdAt >= :from AND f.createdAt < :to
+            ORDER BY f.createdAt
+            """)
+    List<CashFloatEntry> forHolderBetween(@Param("holder") String holder,
+                                          @Param("kind") CashFloatEntry.Kind kind,
+                                          @Param("from") Instant from,
+                                          @Param("to") Instant to);
 
     /** The same figure across every holder, for the platform's own statement. */
     @Query("""
