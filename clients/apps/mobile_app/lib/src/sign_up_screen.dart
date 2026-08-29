@@ -219,15 +219,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        const SizedBox(height: DeliverySpacing.md),
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: AuthBackButton(
-                            onPressed: _busy ? null : _back,
-                            semanticLabel: t.back,
-                          ),
-                        ),
                         const SizedBox(height: DeliverySpacing.sm),
+                        _SignupHeader(
+                          current: _step == _Step.details ? 1 : 2,
+                          total: 2,
+                          onBack: _busy ? null : _back,
+                        ),
+                        const SizedBox(height: DeliverySpacing.lg),
                         if (_step == _Step.details)
                           ..._detailsStep(t)
                         else
@@ -286,25 +284,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // ------------------------------------------------------------------ 1. the account
 
   List<Widget> _detailsStep(DeliveryStrings t) => <Widget>[
-        Text(
-          t.createAccount,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: DeliveryColors.ink,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: DeliverySpacing.sm),
-        Text(
-          t.authCreateAccountSubtitle,
-          style: const TextStyle(
-            fontSize: 13,
-            color: DeliveryColors.muted,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: DeliverySpacing.md),
         AuthField(
           label: t.authFullName,
           hint: t.authFullNameHint,
@@ -326,12 +305,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
           autofillHints: const <String>[AutofillHints.email],
         ),
         const SizedBox(height: 14),
-        // The design draws a phone field here and it is gone rather than chipped. `SignUpRequest`
-        // is an address, a verification token, two names and a passcode — there is no phone on it,
-        // and no other endpoint on the customer path takes one. A greyed field asking for a number
-        // the platform cannot store is a question with nowhere to put the answer: it costs the
-        // reader a moment deciding whether to fill it in and gives nothing back. When the endpoint
-        // grows a phone field, the field comes back live rather than as a chip.
+        // The updated design draws a phone field here (and the earlier delivery-address card). Both
+        // are left out on purpose. `SignUpRequest` is an address, a verification token, two names
+        // and a passcode — there is no phone on it, and no other endpoint on the customer path takes
+        // one, so a field asking for a number the platform cannot store is a question with nowhere to
+        // put the answer. The address is set after login, on the account's own screen, rather than
+        // proved-and-stored during a flow whose only verified fact is the email. When the signup
+        // endpoint grows a phone, the field comes back here live. The passcode the design moved to a
+        // later step stays here: it is the credential the account is created with, and the flow still
+        // sets it before the account exists.
         AuthField(
           label: t.password,
           hint: t.authPasscodeHint,
@@ -420,6 +402,54 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ),
       ];
+}
+
+/// The signup header (Figma `signup-header` 40:1140): the round back control, the flow's title
+/// centred, and how far along it is pulled to the end — "Step 1 of 2" on the form, "Step 2 of 2" on
+/// the code. The title stays "Create Account" across both steps; each step names its own task in the
+/// body below it.
+class _SignupHeader extends StatelessWidget {
+  const _SignupHeader({
+    required this.current,
+    required this.total,
+    required this.onBack,
+  });
+
+  final int current;
+  final int total;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Row(
+      children: <Widget>[
+        AuthBackButton(onPressed: onBack, semanticLabel: t.back),
+        Expanded(
+          child: Center(
+            child: Text(
+              t.createAccount,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: DeliveryColors.ink,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
+        Text(
+          t.authStepOf(current, total),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: DeliveryColors.brand,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// The three-segment meter under the passcode field (Figma `password-strength` 22:141).

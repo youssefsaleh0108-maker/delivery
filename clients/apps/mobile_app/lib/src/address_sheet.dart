@@ -142,6 +142,65 @@ class _AddressSheetState extends State<_AddressSheet> {
     _lng = widget.store.selected?.longitude;
     _centre = _lat != null && _lng != null ? LatLng(_lat!, _lng!) : _openingView;
     _loadZones();
+    // No saved pin: quietly aim the camera at the phone instead of the city-wide default. VIEWPORT
+    // only, same as [_openingView] — nothing is committed until "Set here", and every refusal
+    // (services off, denied, no fix) just leaves the default view without a word. The pushy
+    // version of this question belongs to the "My location" button, where it was asked for.
+    if (_lat == null && _lng == null) {
+      DeviceLocation.current().then((DeviceLocationResult fix) {
+        if (!mounted || _lat != null) return;
+        if (fix is LocationFix) {
+          _moveTo(LatLng(fix.latitude, fix.longitude), 16);
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  /// True while the "My location" button is resolving a fix.
+  bool _locating = false;
+
+  /// The button's flow: fix → pin it; services off → offer the switch; denied → say so.
+  Future<void> _useMyLocation(DeliveryStrings t) async {
+    setState(() => _locating = true);
+    final DeviceLocationResult result = await DeviceLocation.current();
+    if (!mounted) return;
+    setState(() => _locating = false);
+
+    switch (result) {
+      case LocationFix(:final double latitude, :final double longitude):
+        _moveTo(LatLng(latitude, longitude), 16);
+        // Pressing the button IS choosing the point, so it commits like "Set here" does.
+        await _setPinHere();
+      case LocationServicesOff():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(t.locServicesOff),
+            action: SnackBarAction(
+              label: t.locTurnOn,
+              onPressed: DeviceLocation.openLocationSettings,
+            ),
+          ));
+      case LocationDenied():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(t.locPermissionNeeded)));
+      case LocationDeniedForever():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(t.locPermissionNeeded),
+            action: SnackBarAction(
+              label: t.locOpenSettings,
+              onPressed: DeviceLocation.openAppSettings,
+            ),
+          ));
+      case LocationFailed():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(t.locNoFix)));
+    }
   }
 
   /// Points the camera at a place, whether or not the map has finished building.
@@ -629,10 +688,21 @@ class _AddressSheetState extends State<_AddressSheet> {
             children: <Widget>[
               YdPillButton(
                 label: t.custSetHere,
-                icon: Icons.my_location_rounded,
+                // The crosshair glyph moved to "My location", whose job it names; committing the
+                // point under the pin is a place, so it gets the place glyph.
+                icon: Icons.place,
                 size: YdPillButtonSize.compact,
                 expand: false,
                 onPressed: _setPinHere,
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              YdPillButton.secondary(
+                label: t.locMyLocation,
+                icon: Icons.my_location_rounded,
+                size: YdPillButtonSize.compact,
+                expand: false,
+                busy: _locating,
+                onPressed: _locating ? null : () => _useMyLocation(t),
               ),
             ],
           ),

@@ -27,6 +27,7 @@ class CustomerShell extends StatefulWidget {
     this.trackingApi,
     this.chatApi,
     this.prefsApi,
+    this.profileApi,
     required this.session,
     required this.locale,
     required this.onSignOut,
@@ -47,6 +48,9 @@ class CustomerShell extends StatefulWidget {
   final TrackingApi? trackingApi;
   final ChatApi? chatApi;
   final NotificationPrefsApi? prefsApi;
+
+  /// The account's own picture, for the Account tab. Null keeps the monogram.
+  final ProfileApi? profileApi;
   final AuthSession session;
 
   /// Passed to the home screen for the language toggle in the app bar.
@@ -180,6 +184,7 @@ class _CustomerShellState extends State<CustomerShell> {
           locale: widget.locale,
           inbox: _inbox,
           prefsApi: widget.prefsApi,
+          profileApi: widget.profileApi,
           onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
         );
       default:

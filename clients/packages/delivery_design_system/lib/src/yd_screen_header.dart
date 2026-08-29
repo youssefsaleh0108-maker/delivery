@@ -35,12 +35,30 @@ class YdScreenHeader extends StatelessWidget implements PreferredSizeWidget {
 
   static const double height = 56;
 
+  /// The status bar height, read without a BuildContext for [preferredSize].
+  ///
+  /// The app draws edge-to-edge (see the mobile entrypoint), so the status bar sits over the top of
+  /// this header. It is the system's, not the app's: this header fills its own white behind it and
+  /// keeps the title below it, the same in both the ways it is used — as a Scaffold `appBar:` and as
+  /// the first child of a screen's body.
+  static double _statusBarInset() {
+    final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+    return view == null ? 0 : MediaQueryData.fromView(view).padding.top;
+  }
+
   @override
-  Size get preferredSize => const Size.fromHeight(height);
+  // When used as an appBar, Scaffold reserves exactly this height and positions the body below it,
+  // so the reserved height must include the status bar the header now draws under — otherwise the
+  // body would slide up under the last few pixels of the header.
+  Size get preferredSize => Size.fromHeight(height + _statusBarInset());
 
   @override
   Widget build(BuildContext context) {
     final bool hasSides = onBack != null || trailing != null;
+    // The status bar overlaps the top of this header (edge-to-edge). Read what it takes here — zero
+    // when an ancestor SafeArea has already consumed it, e.g. a tab under a shell that insets its
+    // own body — and fill the header's white up into it while keeping the title below it.
+    final double topInset = MediaQuery.paddingOf(context).top;
 
     final Widget titleBlock = Column(
       mainAxisSize: MainAxisSize.min,
@@ -73,8 +91,12 @@ class YdScreenHeader extends StatelessWidget implements PreferredSizeWidget {
       // the largest setting an 18px title over a 12px subtitle needs about 85px. A hard `height`
       // clipped that and painted the overflow stripe across the top of the screen; growing instead
       // costs nothing at 1x and keeps the header readable at 2x.
-      constraints: const BoxConstraints(minHeight: height),
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.lg),
+      constraints: BoxConstraints(minHeight: height + topInset),
+      padding: EdgeInsetsDirectional.only(
+        top: topInset,
+        start: DeliverySpacing.lg,
+        end: DeliverySpacing.lg,
+      ),
       decoration: const BoxDecoration(
         color: DeliveryColors.white,
         border: Border(bottom: BorderSide(color: DeliveryColors.border)),

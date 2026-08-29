@@ -21,12 +21,13 @@ import 'passcode_pad.dart';
 /// the platform's own first-party app against its own realm — see
 /// [AuthService.signInWithPassword].
 ///
-/// <p><strong>One form, and a keypad behind it.</strong> Figma `customer-login` (22:46) draws a
-/// single screen: an address, a password, Sign In. The credential this realm holds is a six-digit
-/// passcode, so the drawn password field accepts exactly that — same field, same call, digits
-/// only. The keypad the screen used to force everybody through is still here, one tap away and
-/// restyled, because it is the only place the fingerprint key can live: [PasscodePad] carries it in
-/// the slot under the 7, where a phone lock screen puts it and where a thumb already knows to go.
+/// <p><strong>One form, and a keypad behind it.</strong> Figma `sign-in` (40:1026) draws a single
+/// screen: the brand lockup, an email-or-phone address, a password, Log In. The credential this
+/// realm holds is a six-digit passcode, so the drawn password field accepts exactly that — same
+/// field, same call, digits only. The keypad the screen used to force everybody through is still
+/// here, one tap away in the field's suffix, because it is the only place the fingerprint key can
+/// live: [PasscodePad] carries it in the slot under the 7, where a phone lock screen puts it and
+/// where a thumb already knows to go.
 enum _Step { credentials, passcode }
 
 class SignInScreen extends StatefulWidget {
@@ -36,6 +37,7 @@ class SignInScreen extends StatefulWidget {
     required this.onSignedIn,
     required this.onBack,
     required this.onCreateAccount,
+    this.locale,
     this.passwordResetApi,
   });
 
@@ -43,6 +45,11 @@ class SignInScreen extends StatefulWidget {
   final ValueChanged<AuthSession> onSignedIn;
   final VoidCallback onBack;
   final VoidCallback onCreateAccount;
+
+  /// Drives the AR/EN pill on this screen. It is the signed-out landing now, so the language
+  /// control lives here — a person who cannot read it has to be able to change it from here, before
+  /// they are past the first screen. Null hides the pill.
+  final LocaleController? locale;
 
   /// The forgotten-passcode client behind the "Forgot password?" link.
   ///
@@ -229,6 +236,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool onCredentials = _step == _Step.credentials;
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
@@ -237,52 +245,43 @@ class _SignInScreenState extends State<SignInScreen> {
           slivers: <Widget>[
             SliverFillRemaining(
               hasScrollBody: false,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: DeliverySpacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const SizedBox(height: DeliverySpacing.md),
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: AuthBackButton(
-                            onPressed: _busy ? null : _back,
-                            semanticLabel: t.back,
-                          ),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: DeliverySpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    const SizedBox(height: DeliverySpacing.md),
+                    // The design's sign-in has no back control: it is the root of the auth flow, and
+                    // the "Sign Up" link below is the way across to the other side. The keypad is a
+                    // step pushed on top of the form, so that one keeps a back arrow to return to it.
+                    if (!onCredentials)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: AuthBackButton(
+                          onPressed: _busy ? null : _back,
+                          semanticLabel: t.back,
                         ),
-                        const SizedBox(height: DeliverySpacing.md),
-                        const AuthBrandRow(),
-                        const SizedBox(height: DeliverySpacing.md),
-                        if (_step == _Step.credentials)
-                          ..._credentials(t)
-                        else
-                          ..._keypad(t),
-                        if (_error != null) ...<Widget>[
-                          const SizedBox(height: DeliverySpacing.md),
-                          AuthErrorNote(message: _error!),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                      top: DeliverySpacing.lg,
-                      bottom: 20,
-                      start: DeliverySpacing.lg,
-                      end: DeliverySpacing.lg,
-                    ),
-                    child: AuthFooterLink(
-                      question: t.authDontHaveAnAccount,
-                      action: t.authSignUp,
-                      onTap: _busy ? null : widget.onCreateAccount,
-                    ),
-                  ),
-                ],
+                      ),
+                    if (onCredentials)
+                      ..._credentials(t)
+                    else
+                      ..._keypad(t),
+                    if (_error != null) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.md),
+                      AuthErrorNote(message: _error!),
+                    ],
+                    if (onCredentials) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.lg),
+                      AuthFooterLink(
+                        question: t.authDontHaveAnAccount,
+                        action: t.authSignUp,
+                        onTap: _busy ? null : widget.onCreateAccount,
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ],
@@ -294,18 +293,28 @@ class _SignInScreenState extends State<SignInScreen> {
   // ------------------------------------------------------------------ the drawn login form
 
   List<Widget> _credentials(DeliveryStrings t) => <Widget>[
+        if (widget.locale != null)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: _LanguagePill(locale: widget.locale!),
+          ),
+        const SizedBox(height: DeliverySpacing.sm),
+        const _BrandLockup(),
+        const SizedBox(height: DeliverySpacing.xl),
         Text(
           t.welcomeBack,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w700,
             color: DeliveryColors.ink,
-            height: 1.25,
+            height: 1.2,
           ),
         ),
         const SizedBox(height: 6),
         Text(
-          t.authSignInSubtitle,
+          t.authSignInAccountSubtitle,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 14,
             color: DeliveryColors.muted,
@@ -327,63 +336,36 @@ class _SignInScreenState extends State<SignInScreen> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: DeliverySpacing.md),
-        AuthField(
-          label: t.password,
-          hint: t.authPasscodeHint,
-          controller: _password,
-          enabled: !_busy,
-          obscure: true,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done,
-          autofillHints: const <String>[AutofillHints.password],
-          // The realm's credential is six digits. Filtering here is what keeps a vendor keyboard's
-          // comma or minus sign out of a field that would otherwise fail as a wrong passcode.
-          inputFormatters: <TextInputFormatter>[
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(PasscodePad.passcodeLength),
-          ],
-          onChanged: (_) => setState(() {}),
-          onSubmitted: (_) => _submitCredentials(),
+        _passwordField(t),
+        const SizedBox(height: DeliverySpacing.lg),
+        AuthPrimaryButton(
+          label: t.authLogIn,
+          busy: _busy,
+          onPressed: _busy ? null : _submitCredentials,
         ),
-        const SizedBox(height: DeliverySpacing.md),
+        const SizedBox(height: DeliverySpacing.lg),
+        _SocialAuth(enabled: !_busy),
+      ];
+
+  /// The design's password group (Figma `password-input-group` 40:1054): the label with "Forgot?"
+  /// pulled to the end of its row, then the obscured six-digit field.
+  ///
+  /// The drawn field carries no suffix, but the flow has two things the design does not show and
+  /// still needs a home for — the fingerprint key, when there is a stored session to unlock, and
+  /// the keypad otherwise, for a thumb that would rather not use the OS keyboard. Both live in the
+  /// suffix slot, one at a time: fingerprint when it is on offer, the keypad when it is not.
+  Widget _passwordField(DeliveryStrings t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            // The keypad the pad-first flow used to force on everybody, kept as the way to the
-            // fingerprint key and to a thumb-sized target.
-            Semantics(
-              button: true,
-              child: InkWell(
-                onTap: _busy ? null : _toKeypad,
-                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Icon(
-                        _fingerprintOffered ? Icons.fingerprint : Icons.dialpad,
-                        size: 16,
-                        color: DeliveryColors.brand,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        t.authUseTheKeypad,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: DeliveryColors.brand,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Live: the onboarding service's open password-reset pair. Carries whatever is
-            // already in the address field so somebody who typed their email and then could not
-            // remember their passcode does not type it a second time.
+            AuthFieldLabel(label: t.password),
+            const Spacer(),
+            // Live: the onboarding service's open password-reset pair. Carries whatever is already in
+            // the address field so somebody who typed their email and then could not remember their
+            // passcode does not type it a second time.
             Semantics(
               button: true,
               child: InkWell(
@@ -392,7 +374,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(2),
                   child: Text(
-                    t.authForgotPassword,
+                    t.authForgotShort,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -405,15 +387,71 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
           ],
         ),
-        const SizedBox(height: DeliverySpacing.md + DeliverySpacing.sm),
-        AuthPrimaryButton(
-          label: t.signIn,
-          busy: _busy,
-          onPressed: _busy ? null : _submitCredentials,
+        const SizedBox(height: 6),
+        TextField(
+          controller: _password,
+          enabled: !_busy,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          autofillHints: const <String>[AutofillHints.password],
+          // The realm's credential is six digits. Filtering here is what keeps a vendor keyboard's
+          // comma or minus sign out of a field that would otherwise fail as a wrong passcode.
+          inputFormatters: <TextInputFormatter>[
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(PasscodePad.passcodeLength),
+          ],
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _submitCredentials(),
+          style: const TextStyle(
+            fontSize: 14,
+            color: DeliveryColors.ink,
+            height: 1.3,
+          ),
+          decoration: InputDecoration(
+            hintText: t.authPasscodeHint,
+            isDense: true,
+            contentPadding: const EdgeInsetsDirectional.symmetric(
+              horizontal: 14,
+              vertical: 14,
+            ),
+            suffixIcon: Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: Semantics(
+                button: true,
+                label: _fingerprintOffered
+                    ? t.unlockWithFingerprint
+                    : t.authUseTheKeypad,
+                child: InkResponse(
+                  onTap: _busy
+                      ? null
+                      : (_fingerprintOffered ? _useFingerprint : _toKeypad),
+                  radius: 20,
+                  child: Icon(
+                    _fingerprintOffered ? Icons.fingerprint : Icons.dialpad,
+                    size: 20,
+                    color: _fingerprintOffered
+                        ? DeliveryColors.brand
+                        : DeliveryColors.faint,
+                  ),
+                ),
+              ),
+            ),
+            suffixIconConstraints:
+                const BoxConstraints(minWidth: 0, minHeight: 0),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              borderSide: const BorderSide(color: DeliveryColors.borderFaint),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              borderSide: const BorderSide(color: DeliveryColors.borderFaint),
+            ),
+          ),
         ),
-        const SizedBox(height: DeliverySpacing.lg),
-        _SocialAuth(enabled: !_busy),
-      ];
+      ],
+    );
+  }
 
   // ------------------------------------------------------------------ the keypad behind it
 
@@ -495,16 +533,91 @@ class AuthBrandRow extends StatelessWidget {
   }
 }
 
-/// The divider and the two social buttons (Figma `social-auth` 22:81).
+/// The centred brand lockup at the head of the new sign-in (Figma `brand-header` 40:1036): the round
+/// mark, the two-tone wordmark, and the tagline in brand caps under it.
 ///
-/// Both are drawn and neither works: the Google identity provider on this realm has no client id
-/// or secret — Google refuses to register a redirect URI on a bare IP over http, which is what this
-/// deployment is — and Apple is not configured at all. They are rendered exactly as designed and
-/// marked, rather than quietly opening a browser onto a broker that will refuse.
+/// The wordmark is split — ink "You", brand "Drop" — the way the design draws it. It is a fixed
+/// product name, not a localised string, so the two halves are literals here.
+class _BrandLockup extends StatelessWidget {
+  const _BrandLockup();
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: DeliveryColors.brand,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text.rich(
+              TextSpan(
+                children: <InlineSpan>[
+                  TextSpan(
+                    text: 'You',
+                    style: TextStyle(color: DeliveryColors.ink),
+                  ),
+                  TextSpan(
+                    text: 'Drop',
+                    style: TextStyle(color: DeliveryColors.brand),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          t.authTaglineLebanon.toUpperCase(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.brand,
+            letterSpacing: 1.5,
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The divider and the two social buttons (Figma `social-logins` 40:1066).
+///
+/// Neither provider works: the Google identity provider on this realm has no client id or secret —
+/// Google refuses to register a redirect URI on a bare IP over http, which is what this deployment
+/// is — and Apple is not configured at all. The updated design drops the "Soon" chip and draws them
+/// as plain buttons, so that is what is rendered; a tap says so in a snackbar rather than quietly
+/// opening a browser onto a broker that will refuse.
 class _SocialAuth extends StatelessWidget {
   const _SocialAuth({required this.enabled});
 
   final bool enabled;
+
+  void _comingSoon(BuildContext context, String provider) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+          SnackBar(content: Text(t.authSocialComingSoon(provider))));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -518,12 +631,11 @@ class _SocialAuth extends StatelessWidget {
               padding: const EdgeInsetsDirectional.symmetric(
                   horizontal: DeliverySpacing.sm),
               child: Text(
-                t.authOrContinueWith.toUpperCase(),
+                t.authOrContinueWith.toLowerCase(),
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                   color: DeliveryColors.faint,
-                  letterSpacing: 0.5,
                   height: 1.2,
                 ),
               ),
@@ -535,17 +647,20 @@ class _SocialAuth extends StatelessWidget {
         Row(
           children: <Widget>[
             Expanded(
-              child: YdComingSoon.wrap(
-                label: t.authComingSoon,
-                child: const _SocialButton(
-                    icon: Icons.g_mobiledata, label: 'Google'),
+              child: _SocialButton(
+                icon: Icons.g_mobiledata,
+                iconColor: DeliveryColors.brand,
+                label: 'Google',
+                onTap: enabled ? () => _comingSoon(context, 'Google') : null,
               ),
             ),
             const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
             Expanded(
-              child: YdComingSoon.wrap(
-                label: t.authComingSoon,
-                child: const _SocialButton(icon: Icons.apple, label: 'Apple'),
+              child: _SocialButton(
+                icon: Icons.apple,
+                iconColor: DeliveryColors.ink,
+                label: 'Apple',
+                onTap: enabled ? () => _comingSoon(context, 'Apple') : null,
               ),
             ),
           ],
@@ -556,37 +671,106 @@ class _SocialAuth extends StatelessWidget {
 }
 
 class _SocialButton extends StatelessWidget {
-  const _SocialButton({required this.icon, required this.label});
+  const _SocialButton({
+    required this.icon,
+    required this.label,
+    this.iconColor = DeliveryColors.ink,
+    this.onTap,
+  });
 
   final IconData icon;
+  final Color iconColor;
 
   /// A provider's own name — not translated, and so not an l10n string.
   final String label;
 
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsetsDirectional.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: DeliveryColors.white,
+    return Material(
+      color: DeliveryColors.white,
+      borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        border: Border.all(color: DeliveryColors.borderFaint),
+        child: Container(
+          padding: const EdgeInsetsDirectional.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            border: Border.all(color: DeliveryColors.borderFaint),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(icon, size: 20, color: iconColor),
+              const SizedBox(width: DeliverySpacing.sm),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: DeliveryColors.ink,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(icon, size: 18, color: DeliveryColors.ink),
-          const SizedBox(width: DeliverySpacing.sm),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: DeliveryColors.ink,
-              height: 1.2,
+    );
+  }
+}
+
+/// The AR/EN language pill in the sign-in header corner.
+///
+/// Shows the language you would be switching *to*, in that language's own name — the honest label
+/// when a third language is added. A bordered white pill with ink lettering, for the light screen.
+class _LanguagePill extends StatelessWidget {
+  const _LanguagePill({required this.locale});
+
+  final LocaleController locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final String target = isArabic ? t.english : t.arabic;
+
+    return Semantics(
+      button: true,
+      label: t.language,
+      value: target,
+      child: Material(
+        color: DeliveryColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+          side: const BorderSide(color: DeliveryColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => locale.setLanguage(isArabic ? 'en' : 'ar'),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: 12, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(Icons.language, size: 16, color: DeliveryColors.muted),
+                const SizedBox(width: DeliverySpacing.xs),
+                Text(
+                  target,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.ink,
+                    height: 1.2,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

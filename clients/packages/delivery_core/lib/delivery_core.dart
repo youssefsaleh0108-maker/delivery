@@ -3,6 +3,7 @@ library;
 
 export 'src/api/accounting_api.dart';
 export 'src/util/image_prep.dart';
+export 'src/util/device_location.dart';
 export 'src/api/auto_approval_api.dart';
 export 'src/models/auto_approval_models.dart';
 export 'src/api/banner_api.dart';
@@ -39,6 +40,7 @@ export 'src/api/partner_api_keys_api.dart';
 export 'src/api/partner_jobs_api.dart';
 export 'src/api/partner_management_api.dart';
 export 'src/api/password_reset_api.dart';
+export 'src/api/profile_api.dart';
 export 'src/api/provider_profile_api.dart';
 export 'src/api/rider_performance_api.dart';
 export 'src/models/activity_models.dart';

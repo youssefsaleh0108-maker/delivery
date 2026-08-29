@@ -571,6 +571,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// only one of them may be walked past here. See [_collateralSkippable].
   Future<_CollateralFailure?> _sendCollateral(DeliveryStrings t) async {
     bool documentFailed = false;
+    String? documentReason;
     for (final MapEntry<ApplicantDocumentKind, PickedDocument> entry
         in List<MapEntry<ApplicantDocumentKind, PickedDocument>>.of(
             _pickedDocs.entries)) {
@@ -585,11 +586,19 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         debugPrint('APPLICANT DOCUMENT UPLOAD FAILED (${entry.key.wire}): $e');
         debugPrintStack(stackTrace: stack, label: 'applicant-document');
         documentFailed = true;
+        // Kept so the note can say WHY, not just that it failed — a server "file too large" or a
+        // network refusal read identically before, which made a retry a guess.
+        documentReason = _messageFrom(e);
       }
     }
     // Not skippable: these are the papers the application is judged on.
     if (documentFailed) {
-      return _CollateralFailure(t.wizCouldNotSendDocuments, skippable: false);
+      return _CollateralFailure(
+        documentReason == null || documentReason == t.thatDidNotGoThrough
+            ? t.wizCouldNotSendDocuments
+            : '${t.wizCouldNotSendDocuments} $documentReason',
+        skippable: false,
+      );
     }
 
     final bool hasPayout = _accountHolder.text.trim().isNotEmpty &&

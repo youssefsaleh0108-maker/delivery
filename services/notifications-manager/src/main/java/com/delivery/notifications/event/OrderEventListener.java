@@ -82,7 +82,18 @@ public class OrderEventListener {
                     notify("order.placed.merchant", orderId, event.path("merchantId").asText(null),
                             values, correlationId);
                 }
-                case "order.status_changed", "order.delivered" ->
+                case "order.status_changed" ->
+                        // With a dedupe key carrying the RAW status. The order-based check treats
+                        // all four transitions (ACCEPTED, PREPARING, READY, PICKED_UP) as one
+                        // notification — same order, same type — so only the first ever fired and
+                        // the rest were silently discarded as duplicates. Keyed per status, each
+                        // transition notifies exactly once and a redelivered event still cannot
+                        // notify twice. The raw wire value, not the humanised one: the key must be
+                        // stable however the copy is worded.
+                        notify(eventType, orderId, event.path("customerId").asText(null),
+                                values, correlationId,
+                                orderId + ":" + event.path("status").asText(""));
+                case "order.delivered" ->
                         notify(eventType, orderId, event.path("customerId").asText(null),
                                 values, correlationId);
                 case "order.rider_assigned" -> {
@@ -114,11 +125,16 @@ public class OrderEventListener {
 
     private void notify(String eventType, UUID orderId, String recipientId,
                         Map<String, String> values, String correlationId) {
+        notify(eventType, orderId, recipientId, values, correlationId, null);
+    }
+
+    private void notify(String eventType, UUID orderId, String recipientId,
+                        Map<String, String> values, String correlationId, String dedupeKey) {
         if (recipientId == null || recipientId.isBlank()) {
             return;
         }
         dispatch.dispatch(eventType, orderId, recipientId,
-                recipients.contactsFor(recipientId), values, correlationId);
+                recipients.contactsFor(recipientId), values, correlationId, dedupeKey);
     }
 
     /**
@@ -136,6 +152,7 @@ public class OrderEventListener {
         values.put("shortId", orderId.toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT));
         values.put("orderId", orderId.toString());
         values.put("status", humanise(event.path("status").asText("")));
+        values.put("statusMessage", statusMessage(event.path("status").asText("")));
         values.put("total", money(event.path("totalAmount")));
         values.put("address", event.path("deliveryAddress").asText(""));
         values.put("reason", event.path("cancelReason").asText(""));
@@ -149,6 +166,22 @@ public class OrderEventListener {
         return status.isEmpty()
                 ? ""
                 : status.replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * A real sentence per status, for the customer's status-change push. "Order #X is now
+     * preparing" is a state machine talking; "The restaurant is preparing your order" is a
+     * platform talking. Unknown statuses fall back to the humanised word so a new state never
+     * sends an empty message.
+     */
+    private static String statusMessage(String status) {
+        return switch (status) {
+            case "ACCEPTED" -> "The restaurant has accepted your order.";
+            case "PREPARING" -> "The restaurant is preparing your order.";
+            case "READY" -> "Your order is ready and waiting for a rider.";
+            case "PICKED_UP" -> "Your rider has picked up your order and is on the way.";
+            default -> status.isEmpty() ? "" : "Your order is now " + humanise(status) + ".";
+        };
     }
 
     private static String money(JsonNode amount) {

@@ -2580,6 +2580,100 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get authRoleMerchantBlurb => 'بِع ونمِّ عملك';
 
   @override
+  String get authJoinYoudrop => 'انضم إلى YouDrop';
+
+  @override
+  String get authChooseHowToUse => 'اختر طريقة استخدامك لـ YouDrop';
+
+  @override
+  String get authRolePopular => 'شائع';
+
+  @override
+  String get authRoleWantOrder => 'أريد أن أطلب';
+
+  @override
+  String get authRoleWantOrderBlurb => 'احصل على الطعام والبقالة والطرود بسرعة';
+
+  @override
+  String get authRoleWantDeliver => 'أريد أن أوصّل';
+
+  @override
+  String get authRoleWantDeliverBlurb => 'اعمل وفق جدولك واحتفظ بكامل البقشيش';
+
+  @override
+  String get authRoleWantSell => 'أريد أن أبيع';
+
+  @override
+  String get authRoleWantSellBlurb => 'طوّر مطعمك أو متجرك';
+
+  @override
+  String get riderIntroHeader => 'قدّم كشريك';
+
+  @override
+  String get riderIntroTitle => 'اكسب وفق جدولك';
+
+  @override
+  String get riderIntroSubtitle =>
+      'انضم إلى أفضل أسطول توصيل في لبنان. قُد سكوتر أو دراجة نارية أو سيارة، وابدأ الكسب اليوم.';
+
+  @override
+  String get riderPerk1Title => 'قُد في وقتك الخاص';
+
+  @override
+  String get riderPerk1Body => 'لا حدّ أدنى للساعات، ورديات مرنة تماماً.';
+
+  @override
+  String get riderPerk2Title => 'دفعات سريعة نقداً وبالدولار';
+
+  @override
+  String get riderPerk2Body => 'احصل على أجرك يومياً أو أسبوعياً نقداً مباشرة.';
+
+  @override
+  String get riderPerk3Title => 'مكافآت وقود للسائقين';
+
+  @override
+  String get riderPerk3Body => 'استفد من محطات وقود بأسعار مخفّضة في كل لبنان.';
+
+  @override
+  String get applyToDeliver => 'قدّم للتوصيل';
+
+  @override
+  String get merchantIntroHeader => 'انمُ معنا';
+
+  @override
+  String get merchantIntroHeaderLogin => 'شريك بالفعل؟';
+
+  @override
+  String get merchantIntroTitle => 'نمِّ عملك';
+
+  @override
+  String get merchantIntroSubtitle =>
+      'اعمل مع YouDrop وقدّم توصيلاً سريعاً أو طلبات خارجية لسكان بيروت وكل لبنان.';
+
+  @override
+  String get merchantBenefit1Title => 'الوصول إلى أكثر من 50,000 زبون';
+
+  @override
+  String get merchantBenefit1Body => 'ظهور فوري للزبائن الجائعين ضمن نطاقك.';
+
+  @override
+  String get merchantBenefit2Title => 'بدون رسوم إعداد وقوائم سهلة';
+
+  @override
+  String get merchantBenefit2Body =>
+      'فريقنا يبني وينسّق قائمتك أو كتالوج متجرك على الإنترنت.';
+
+  @override
+  String get merchantBenefit3Title => 'دفعات مباشرة ولوحة تحكّم';
+
+  @override
+  String get merchantBenefit3Body =>
+      'تابع المبيعات والطلبات واسحب النقد لحظياً.';
+
+  @override
+  String get registerStoreNow => 'سجّل متجرك الآن';
+
+  @override
   String get authAlreadyHaveAnAccount => 'لديك حساب بالفعل؟';
 
   @override
@@ -2590,6 +2684,28 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get authSignInSubtitle => 'أدخل بياناتك لتسجيل الدخول.';
+
+  @override
+  String get authSignInAccountSubtitle => 'سجّل الدخول إلى حسابك على YouDrop';
+
+  @override
+  String get authTaglineLebanon => 'وصّل كل شيء في لبنان';
+
+  @override
+  String get authLogIn => 'تسجيل الدخول';
+
+  @override
+  String get authForgotShort => 'نسيت؟';
+
+  @override
+  String authSocialComingSoon(String provider) {
+    return 'تسجيل الدخول عبر $provider قادم قريباً.';
+  }
+
+  @override
+  String authStepOf(int current, int total) {
+    return 'الخطوة $current من $total';
+  }
 
   @override
   String get authEmailOrPhone => 'البريد الإلكتروني أو رقم الهاتف';
@@ -3189,6 +3305,9 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get merchShopHidden => 'تم إخفاء متجرك عن السوق.';
+
+  @override
+  String get merchbHideShop => 'إخفاء المتجر';
 
   @override
   String get merchOrderFlow => 'مسار الطلبات';
@@ -4245,6 +4364,25 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get custSetHere => 'حدّد هنا';
+
+  @override
+  String get locMyLocation => 'موقعي';
+
+  @override
+  String get locServicesOff => 'خدمة الموقع مطفأة على هذا الهاتف.';
+
+  @override
+  String get locTurnOn => 'تشغيل';
+
+  @override
+  String get locPermissionNeeded =>
+      'اسمح بالوصول إلى الموقع ليتوجّه إليك على الخريطة.';
+
+  @override
+  String get locOpenSettings => 'افتح الإعدادات';
+
+  @override
+  String get locNoFix => 'تعذّر تحديد موقعك. جرّب مجدداً في مكان مكشوف.';
 
   @override
   String get custNamingThisPlace => 'جارٍ التعرّف على هذا المكان…';

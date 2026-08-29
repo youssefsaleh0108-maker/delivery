@@ -1,6 +1,7 @@
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// The first thing anyone sees: a full-bleed red field with the wordmark.
 ///
@@ -48,7 +49,8 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _tailFade = _curve(0.55, 1.00, Curves.easeOut);
 
   Animation<double> _curve(double begin, double end, Curve curve) =>
-      CurvedAnimation(parent: _controller, curve: Interval(begin, end, curve: curve));
+      CurvedAnimation(
+          parent: _controller, curve: Interval(begin, end, curve: curve));
 
   @override
   void dispose() {
@@ -60,146 +62,158 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final bool failed = widget.error != null;
 
-    return Scaffold(
-      backgroundColor: DeliveryColors.brand,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(DeliverySpacing.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                // The mark, the way a launcher icon reads: white tile, rose mark. Inverted from
-                // the app bar's white-on-rose, because here the field behind it is already rose.
-                FadeTransition(
-                  opacity: _markFade,
-                  child: ScaleTransition(
-                    scale: _markScale,
-                    child: Container(
-                      // The welcome frame's hero, exactly: a 100px white disc holding a 48px brand
-                      // mark. The splash drew a 96px rounded tile, so the first two screens of the
-                      // app gave the same mark two different shapes. Still the platform's own bag
-                      // rather than a Material glyph — this one screen is where the mark belongs.
-                      width: 100,
-                      height: 100,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: DeliveryColors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: DeliveryColors.ink.withValues(alpha: 0.12),
-                            blurRadius: 12,
-                            offset: const Offset(0, 8),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+        // Full-crimson screen: light status-bar glyphs to read against it. Reverts to the app-wide
+        // dark glyphs (main()) when the next, light screen appears.
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          backgroundColor: DeliveryColors.brand,
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(DeliverySpacing.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    // The mark, the way a launcher icon reads: white tile, rose mark. Inverted from
+                    // the app bar's white-on-rose, because here the field behind it is already rose.
+                    FadeTransition(
+                      opacity: _markFade,
+                      child: ScaleTransition(
+                        scale: _markScale,
+                        child: Container(
+                          // The welcome frame's hero, exactly: a 100px white disc holding a 48px brand
+                          // mark. The splash drew a 96px rounded tile, so the first two screens of the
+                          // app gave the same mark two different shapes. Still the platform's own bag
+                          // rather than a Material glyph — this one screen is where the mark belongs.
+                          width: 100,
+                          height: 100,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: DeliveryColors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color:
+                                    DeliveryColors.ink.withValues(alpha: 0.12),
+                                blurRadius: 12,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: const DeliveryLogo.mark(
-                        size: 48,
-                        foreground: DeliveryColors.brand,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: DeliverySpacing.lg),
-
-                // The wordmark. Heavy, tight tracking, white on red — the shape a delivery brand
-                // takes. Translated, so the Arabic build shows the Arabic name rather than a
-                // transliteration.
-                FadeTransition(
-                  opacity: _nameFade,
-                  child: AnimatedBuilder(
-                    animation: _nameRise,
-                    builder: (BuildContext context, Widget? child) => Transform.translate(
-                      offset: Offset(0, _nameRise.value),
-                      child: child,
-                    ),
-                    child: Text(
-                      DeliveryStrings.of(context).appTitle,
-                      // ExtraBold 36 with tight tracking, matched to the welcome wordmark so the
-                      // name does not change size between the splash and the screen after it.
-                      style: const TextStyle(
-                        color: DeliveryColors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1,
-                        height: 1.15,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: DeliverySpacing.sm),
-                FadeTransition(
-                  opacity: _tailFade,
-                  child: Text(
-                    DeliveryStrings.of(context).splashTagline,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: DeliveryColors.onBrandSoft,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: DeliverySpacing.xxl),
-
-                if (!failed)
-                  const SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2.5, color: DeliveryColors.white),
-                  )
-                else ...<Widget>[
-                  Text(
-                    DeliveryStrings.of(context).signInFailed,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: DeliveryColors.onBrandSoft, fontSize: 14),
-                  ),
-                  const SizedBox(height: DeliverySpacing.md),
-                  FilledButton(
-                    onPressed: widget.onRetry,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: DeliveryColors.white,
-                      foregroundColor: DeliveryColors.brand,
-                      minimumSize: const Size(180, 48),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(DeliveryRadius.md)),
-                    ),
-                    child: Text(DeliveryStrings.of(context).tryAgain,
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  // The way in for somebody who has no account and cannot get one by trying again.
-                  //
-                  // It belongs on this state and not the loading one: a would-be rider opens the
-                  // app, is sent to sign in, has nothing to sign in with, and lands back here.
-                  // That is the moment they need this — offering it during the intro would put it
-                  // on screen for a second and a half, mostly in front of customers who are being
-                  // signed in anyway.
-                  if (widget.onApply != null) ...<Widget>[
-                    const SizedBox(height: DeliverySpacing.lg),
-                    TextButton(
-                      onPressed: widget.onApply,
-                      child: Text(
-                        DeliveryStrings.of(context).wantToRideForACompany,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: DeliveryColors.onBrandSoft,
-                          decoration: TextDecoration.underline,
-                          decorationColor: DeliveryColors.onBrandBorder,
-                          fontWeight: FontWeight.w600,
+                          child: const DeliveryLogo.mark(
+                            size: 48,
+                            foreground: DeliveryColors.brand,
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(height: DeliverySpacing.lg),
+
+                    // The wordmark. Heavy, tight tracking, white on red — the shape a delivery brand
+                    // takes. Translated, so the Arabic build shows the Arabic name rather than a
+                    // transliteration.
+                    FadeTransition(
+                      opacity: _nameFade,
+                      child: AnimatedBuilder(
+                        animation: _nameRise,
+                        builder: (BuildContext context, Widget? child) =>
+                            Transform.translate(
+                          offset: Offset(0, _nameRise.value),
+                          child: child,
+                        ),
+                        child: Text(
+                          DeliveryStrings.of(context).appTitle,
+                          // ExtraBold 36 with tight tracking, matched to the welcome wordmark so the
+                          // name does not change size between the splash and the screen after it.
+                          style: const TextStyle(
+                            color: DeliveryColors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1,
+                            height: 1.15,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.sm),
+                    FadeTransition(
+                      opacity: _tailFade,
+                      child: Text(
+                        DeliveryStrings.of(context).splashTagline,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: DeliveryColors.onBrandSoft,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.xxl),
+
+                    if (!failed)
+                      const SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: DeliveryColors.white),
+                      )
+                    else ...<Widget>[
+                      Text(
+                        DeliveryStrings.of(context).signInFailed,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: DeliveryColors.onBrandSoft, fontSize: 14),
+                      ),
+                      const SizedBox(height: DeliverySpacing.md),
+                      FilledButton(
+                        onPressed: widget.onRetry,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: DeliveryColors.white,
+                          foregroundColor: DeliveryColors.brand,
+                          minimumSize: const Size(180, 48),
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(DeliveryRadius.md)),
+                        ),
+                        child: Text(DeliveryStrings.of(context).tryAgain,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                      // The way in for somebody who has no account and cannot get one by trying again.
+                      //
+                      // It belongs on this state and not the loading one: a would-be rider opens the
+                      // app, is sent to sign in, has nothing to sign in with, and lands back here.
+                      // That is the moment they need this — offering it during the intro would put it
+                      // on screen for a second and a half, mostly in front of customers who are being
+                      // signed in anyway.
+                      if (widget.onApply != null) ...<Widget>[
+                        const SizedBox(height: DeliverySpacing.lg),
+                        TextButton(
+                          onPressed: widget.onApply,
+                          child: Text(
+                            DeliveryStrings.of(context).wantToRideForACompany,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: DeliveryColors.onBrandSoft,
+                              decoration: TextDecoration.underline,
+                              decorationColor: DeliveryColors.onBrandBorder,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ],
-                ],
-              ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }

@@ -267,7 +267,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ],
           PositionedDirectional(
-            top: DeliverySpacing.lg,
+            // The hero photo runs full-bleed under the transparent status bar by design; the back
+            // button must not, so it clears the bar on top of its own 24px inset.
+            top: DeliverySpacing.lg + MediaQuery.paddingOf(context).top,
             start: DeliverySpacing.lg,
             child: GlassCircleButton(
               icon: Directionality.of(context) == TextDirection.rtl

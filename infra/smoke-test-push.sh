@@ -180,9 +180,13 @@ echo '=== 4. Every push was accepted by the provider ===========================
 
 MINE=$(printf '%s\n%s\n' "$(pushes_of "$ORDER")" "$(pushes_of "$ORDER2")" | jq -s 'add')
 
-# Six, not five. The five templates fire once each, and order.placed.merchant fires twice —
-# once per order — because the second order is placed before it is cancelled.
-check 'six pushes across the two orders' "$(( EXPECT_PUSH * 6 ))" "$(echo "$MINE" | jq 'length')"
+# Ten: the five original templates fire once each, order.placed.merchant fires twice — once per
+# order, because the second order is placed before it is cancelled — and V17's status-change push
+# fires four times on order 1 (ACCEPTED, PREPARING, READY, PICKED_UP), each dedupe-keyed on its
+# own status so a redelivery still cannot double-send.
+check 'ten pushes across the two orders' "$(( EXPECT_PUSH * 10 ))" "$(echo "$MINE" | jq 'length')"
+check 'customer pushed: each status change' "$(( EXPECT_PUSH * 4 ))" \
+  "$(pushes_for "$ORDER" order.status_changed)"
 check 'none left PENDING'  '0' "$(echo "$MINE" | jq '[.[]|select(.status=="PENDING")]|length')"
 # Provider-aware, because "failed" means different things in the two modes.
 #

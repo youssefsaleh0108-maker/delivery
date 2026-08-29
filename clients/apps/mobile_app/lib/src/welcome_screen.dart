@@ -2,6 +2,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'one_time_code.dart';
+
 /// The first thing a signed-out person sees, and the fork in the road.
 ///
 /// <p>Before this, the app auto-launched the Keycloak browser tab on startup. That is the right
@@ -9,33 +11,37 @@ import 'package:flutter/material.dart';
 /// way to create an account from the app at all, and the first thing a new user saw was a browser
 /// showing a raw IP address asking for a password.
 ///
-/// <p>Figma `unified-welcome` (22:8) turns the three doors into three *roles* rather than three
-/// verbs. That is a better question to ask first: "which of these are you" has one obvious answer
-/// for everybody, where "sign in / create account / join as partner" asked a returning merchant to
-/// work out which of the three they were. Customer leads to sign-up, rider and merchant to their
-/// own intro; the footer keeps the way back for anyone who already has an account.
+/// <p>Figma `signup-role-selection` (40:1079) draws this as the account's front door: a light
+/// screen headed "Create Account", three roles phrased as intentions — "I want to Order / Deliver /
+/// Sell" — and a single Continue. Unlike the earlier crimson welcome, which committed the moment a
+/// card was tapped, this one lets a role be chosen and reconsidered before Continue acts on it;
+/// Order leads a shopper to sign-up, Deliver and Sell each to their partner intro. The footer keeps
+/// the way back for anyone who already has an account.
 ///
-/// <p>The whole screen is [DeliveryColors.brand], so every colour on it is an on-brand token —
-/// the cards are white at 15% inside a white-at-20% hairline, exactly as drawn.
-class WelcomeScreen extends StatelessWidget {
+/// <p>The screen is [DeliveryColors.background], not brand — the crimson brand moment is the splash
+/// before it. So the status bar keeps the app-wide dark glyphs; no per-screen override is needed.
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({
     super.key,
     required this.onSignIn,
     required this.onSignUp,
     required this.onJoinAsPartner,
+    this.onBack,
     this.onJoinAsRider,
     this.onJoinAsMerchant,
     this.onGoogle,
-    this.locale,
     this.busy = false,
   });
 
+  /// Back to Sign In, which this screen is reached from. Null leaves the back control off.
+  final VoidCallback? onBack;
+
   final VoidCallback onSignIn;
 
-  /// The Customer card, and the footer's counterpart.
+  /// The Customer role — "I want to Order" — and the footer's counterpart.
   final VoidCallback onSignUp;
 
-  /// The merchant-or-rider fork. Still the destination for both partner cards until the router
+  /// The merchant-or-rider fork. Still the destination for both partner roles until the router
   /// offers [onJoinAsRider] and [onJoinAsMerchant] — the choice screen asks the same question the
   /// card already answered, which is one tap of redundancy rather than a broken path.
   final VoidCallback onJoinAsPartner;
@@ -46,112 +52,146 @@ class WelcomeScreen extends StatelessWidget {
   /// Straight into the merchant intro, skipping the fork. Null falls back to [onJoinAsPartner].
   final VoidCallback? onJoinAsMerchant;
 
-  /// Opens the browser on Google, or null when Google sign-in is not configured.
-  ///
-  /// Null hides the control entirely rather than disabling it. A greyed-out Google button still
-  /// reads as "this should work", and a tester who taps one that cannot work learns nothing except
-  /// that the app is broken. It comes back the moment a client id and secret exist — see the
-  /// identity provider in infra/keycloak/realm-delivery-platform.json. The redesign moves social
-  /// sign-in to the login screen; this stays wired so the broker round trip keeps a way in.
+  /// Opens the browser on Google, or null when Google sign-in is not configured. The redesign moves
+  /// social sign-in onto the login screen, so this screen no longer draws a Google button; the hook
+  /// stays on the widget so the broker round trip has somewhere to return to when it is restored.
   final VoidCallback? onGoogle;
 
-  /// Drives the design's language pill (22:20). Null hides it — a pill that cannot change the
-  /// language is worse than no pill.
-  final LocaleController? locale;
-
-  /// True while the Google round trip is in flight. Only that path can be busy here — the other
-  /// buttons just change screens.
+  /// True while a Google round trip is in flight. The role buttons just change screens.
   final bool busy;
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  /// The chosen role, acted on by Continue. Order is the default: it is the role almost everybody
+  /// arriving here holds, and the design draws it selected and badged Popular.
+  int _selected = 0;
+
+  void _continue() {
+    if (widget.busy) return;
+    switch (_selected) {
+      case 0:
+        widget.onSignUp();
+      case 1:
+        (widget.onJoinAsRider ?? widget.onJoinAsPartner)();
+      case 2:
+        (widget.onJoinAsMerchant ?? widget.onJoinAsPartner)();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
     return Scaffold(
-      backgroundColor: DeliveryColors.brand,
+      backgroundColor: DeliveryColors.background,
       body: SafeArea(
         child: CustomScrollView(
           slivers: <Widget>[
             SliverFillRemaining(
               hasScrollBody: false,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  Column(
-                    children: <Widget>[
-                      if (locale != null)
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(
-                            top: 12,
-                            start: DeliverySpacing.lg,
-                            end: DeliverySpacing.lg,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: DeliverySpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    const SizedBox(height: DeliverySpacing.sm),
+                    // The header: the flow's title centred, with the back to Sign In at the start.
+                    // This screen is reached from Sign In, so it carries the way back.
+                    SizedBox(
+                      height: 40,
+                      child: Stack(
+                        children: <Widget>[
+                          Center(
+                            child: Text(
+                              t.createAccount,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: DeliveryColors.ink,
+                                height: 1.2,
+                              ),
+                            ),
                           ),
-                          child: Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: _LanguagePill(locale: locale!),
-                          ),
-                        ),
-                      const SizedBox(height: 56),
-                      const _BrandHero(),
-                      const SizedBox(height: DeliverySpacing.lg),
-                    ],
-                  ),
-
-                  // The three doors. Ordered as the design orders them: the role almost everybody
-                  // arriving here holds, then the two that lead to a reviewed application.
-                  Padding(
-                    padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: DeliverySpacing.lg),
-                    child: Column(
-                      children: <Widget>[
-                        YdRoleCard(
-                          icon: Icons.shopping_bag_outlined,
-                          title: t.authRoleCustomer,
-                          subtitle: t.authRoleCustomerBlurb,
-                          onTap: busy ? () {} : onSignUp,
-                        ),
-                        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                        YdRoleCard(
-                          icon: Icons.two_wheeler,
-                          title: t.authRoleRider,
-                          subtitle: t.authRoleRiderBlurb,
-                          onTap: busy ? () {} : (onJoinAsRider ?? onJoinAsPartner),
-                        ),
-                        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                        YdRoleCard(
-                          icon: Icons.storefront,
-                          title: t.authRoleMerchant,
-                          subtitle: t.authRoleMerchantBlurb,
-                          onTap:
-                              busy ? () {} : (onJoinAsMerchant ?? onJoinAsPartner),
-                        ),
-                        if (onGoogle != null) ...<Widget>[
-                          const SizedBox(height: DeliverySpacing.md),
-                          YdPillButton.onBrand(
-                            label: t.continueWithGoogle,
-                            icon: Icons.g_mobiledata,
-                            busy: busy,
-                            onPressed: onGoogle,
-                          ),
+                          if (widget.onBack != null)
+                            Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: AuthBackButton(
+                                onPressed: widget.busy ? null : widget.onBack,
+                                semanticLabel: t.back,
+                              ),
+                            ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                      top: DeliverySpacing.lg,
-                      bottom: 20,
-                      start: DeliverySpacing.lg,
-                      end: DeliverySpacing.lg,
+                    const SizedBox(height: 6),
+                    Center(
+                      child: AuthFooterLink(
+                        question: t.authAlreadyHaveAnAccount,
+                        action: t.authLogIn,
+                        onTap: widget.busy ? null : widget.onSignIn,
+                      ),
                     ),
-                    child: AuthFooterLinkOnBrand(
-                      question: t.authAlreadyHaveAnAccount,
-                      action: t.signIn,
-                      onTap: busy ? null : onSignIn,
+                    const SizedBox(height: DeliverySpacing.xl),
+                    Text(
+                      t.authJoinYoudrop,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: DeliveryColors.ink,
+                        height: 1.2,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Text(
+                      t.authChooseHowToUse,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: DeliveryColors.muted,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.lg),
+                    _RoleOption(
+                      icon: Icons.shopping_bag_outlined,
+                      title: t.authRoleWantOrder,
+                      subtitle: t.authRoleWantOrderBlurb,
+                      selected: _selected == 0,
+                      popular: true,
+                      onTap: () => setState(() => _selected = 0),
+                    ),
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                    _RoleOption(
+                      icon: Icons.two_wheeler_outlined,
+                      title: t.authRoleWantDeliver,
+                      subtitle: t.authRoleWantDeliverBlurb,
+                      selected: _selected == 1,
+                      onTap: () => setState(() => _selected = 1),
+                    ),
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                    _RoleOption(
+                      icon: Icons.storefront_outlined,
+                      title: t.authRoleWantSell,
+                      subtitle: t.authRoleWantSellBlurb,
+                      selected: _selected == 2,
+                      onTap: () => setState(() => _selected = 2),
+                    ),
+                    const SizedBox(height: DeliverySpacing.lg),
+                    const Spacer(),
+                    AuthPrimaryButton(
+                      label: t.continueLabel,
+                      busy: widget.busy,
+                      onPressed: widget.busy ? null : _continue,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ],
@@ -161,104 +201,111 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-/// The 100px white ring, the wordmark and the tagline (Figma `brand-hero` 22:24).
+/// One selectable role (Figma `role-card-order` 40:1096 and its deliver / sell twins).
 ///
-/// The mark is the same one the splash and the launcher icon carry, so the three read as one app.
-class _BrandHero extends StatelessWidget {
-  const _BrandHero();
+/// A white card that takes a brand outline and a brand-tinted icon tile when it is the chosen one,
+/// so the selection reads at a glance without a separate radio. The Popular pill is drawn only on
+/// the role the design badges.
+class _RoleOption extends StatelessWidget {
+  const _RoleOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+    this.popular = false,
+  });
+
+  final IconData icon;
+
+  /// Already localised by the caller.
+  final String title;
+
+  /// Already localised by the caller.
+  final String subtitle;
+
+  final bool selected;
+  final bool popular;
+  final VoidCallback onTap;
+
+  static const double _radius = 16;
 
   @override
   Widget build(BuildContext context) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    return Column(
-      children: <Widget>[
-        Container(
-          width: 100,
-          height: 100,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: DeliveryColors.white,
-            shape: BoxShape.circle,
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 12,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.shopping_bag_outlined,
-              size: 48, color: DeliveryColors.brand),
-        ),
-        const SizedBox(height: DeliverySpacing.md),
-        Text(
-          t.appTitle,
-          style: const TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w800,
-            color: DeliveryColors.white,
-            letterSpacing: -1,
-            height: 1.15,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          t.authTagline,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: DeliveryColors.onBrandSoft.withValues(alpha: 0.9),
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The translucent language pill in the top corner (Figma `lang-selector` 22:20).
-///
-/// The design letters it "AR / EN". This shows the language you would be switching *to*, in that
-/// language's own name — which is what the two words in the drawn pill are standing in for, and the
-/// only version of it that stays true when a third language is added.
-class _LanguagePill extends StatelessWidget {
-  const _LanguagePill({required this.locale});
-
-  final LocaleController locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final String target = isArabic ? t.english : t.arabic;
-
+    final BorderRadius corners = BorderRadius.circular(_radius);
     return Semantics(
       button: true,
-      label: t.language,
-      value: target,
+      selected: selected,
       child: Material(
-        color: DeliveryColors.onBrandSurface,
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+        color: DeliveryColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: corners,
+          side: BorderSide(
+            color: selected ? DeliveryColors.brand : DeliveryColors.borderFaint,
+            width: selected ? 2 : 1.5,
+          ),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => locale.setLanguage(isArabic ? 'en' : 'ar'),
+          onTap: onTap,
           child: Padding(
-            padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.all(DeliverySpacing.md),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Icon(Icons.language,
-                    size: 16, color: DeliveryColors.white),
-                const SizedBox(width: DeliverySpacing.xs),
-                Text(
-                  target,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: DeliveryColors.white,
-                    height: 1.2,
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? DeliveryColors.brandSoft
+                        : DeliveryColors.borderFaint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color:
+                        selected ? DeliveryColors.brand : DeliveryColors.muted,
+                  ),
+                ),
+                const SizedBox(width: DeliverySpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Flexible(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: DeliveryColors.ink,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          if (popular) ...<Widget>[
+                            const SizedBox(width: DeliverySpacing.sm),
+                            const _PopularBadge(),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: DeliveryColors.muted,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -270,63 +317,28 @@ class _LanguagePill extends StatelessWidget {
   }
 }
 
-/// The welcome footer's sentence, in the on-brand dialect (Figma 24:22).
-///
-/// The same shape as the auth screens' footer link, but drawn on the brand fill: a rose-tinted
-/// question and a white answer. Kept here rather than parameterising the light one, because the two
-/// never appear on the same screen and the colours are the only thing they disagree about.
-class AuthFooterLinkOnBrand extends StatelessWidget {
-  const AuthFooterLinkOnBrand({
-    super.key,
-    required this.question,
-    required this.action,
-    required this.onTap,
-  });
-
-  /// Already localised by the caller.
-  final String question;
-
-  /// Already localised by the caller.
-  final String action;
-
-  final VoidCallback? onTap;
+/// The brand-tinted "Popular" pill on the first role (Figma `badge` 63:40).
+class _PopularBadge extends StatelessWidget {
+  const _PopularBadge();
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: DeliverySpacing.xs,
-      children: <Widget>[
-        Text(
-          question,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: DeliveryColors.onBrandSoft.withValues(alpha: 0.9),
-            height: 1.3,
-          ),
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+      ),
+      child: Text(
+        DeliveryStrings.of(context).authRolePopular.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: DeliveryColors.brand,
+          letterSpacing: 0.5,
+          height: 1.1,
         ),
-        Semantics(
-          button: true,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
-              child: Text(
-                action,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: DeliveryColors.white,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

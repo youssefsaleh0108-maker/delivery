@@ -208,8 +208,9 @@ class _MerchantShellState extends State<MerchantShell> {
   }
 
   void _openShopProfile() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => StoreScreen(api: widget.storeApi),
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => StoreScreen(api: widget.storeApi, onBack: navigator.pop),
     ));
   }
 
@@ -219,11 +220,19 @@ class _MerchantShellState extends State<MerchantShell> {
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
-      body: IndexedStack(
-        index: _tab,
-        children: <Widget>[
-          for (int tab = 0; tab < _tabCount; tab++) _tabAt(tab),
-        ],
+      // Edge-to-edge: the shell paints its background behind the now-transparent status bar, and
+      // this keeps every tab's content clear of it. Tabs that already wrap themselves in a SafeArea
+      // see the inset already consumed and become no-ops; none of the merchant tabs use an AppBar,
+      // so nothing is double-inset. The bottom stays open — the nav bar below handles that edge.
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: IndexedStack(
+          index: _tab,
+          children: <Widget>[
+            for (int tab = 0; tab < _tabCount; tab++) _tabAt(tab),
+          ],
+        ),
       ),
       bottomNavigationBar: YdBottomNav(
         currentIndex: _tab,

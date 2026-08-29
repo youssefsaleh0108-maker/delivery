@@ -95,6 +95,18 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   Store? _store;
   bool _publishing = false;
 
+  /// The value the switch was just moved to, shown while the call is in flight. Without it the
+  /// thumb sat in its OLD position, greyed, for the whole round trip — which reads as a dead
+  /// control, and is most of "the switch does nothing until I reload". Cleared when the server's
+  /// answer lands (or the call fails and the truth is refetched).
+  bool? _pendingPublish;
+
+  /// Generation counter for [_refreshStore]. The 60s poll, pull-to-refresh and the reload button
+  /// all call it concurrently with the publish/suspend round trip; a `mine()` that STARTED before
+  /// the toggle must not land after it and overwrite the fresh status with the stale one — that is
+  /// the "switch snaps back until I reload again" half of the bug.
+  int _storeSeq = 0;
+
   /// Twice the dashboard's own window, so the fortnight on screen has a fortnight behind it to be
   /// compared with. 28 is inside the server's 1..30 clamp, so nothing is quietly truncated.
   static const int _comparisonDays = 28;
@@ -180,14 +192,24 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   Future<void> _refreshStore() async {
     final StoreApi? api = widget.storeApi;
     if (api == null) return;
-    try {
-      // One page is plenty: this header names a single shop, and a merchant with several sees the
-      // first — the same shop "My Shop" edits.
-      final List<Store> mine = (await api.mine(size: 1)).content;
-      if (!mounted) return;
-      setState(() => _store = mine.isEmpty ? null : mine.first);
-    } catch (_) {
-      // No switch rather than a broken switch.
+    // Never while a publish/suspend is in flight: its response is fresher than any read started
+    // beside it, and the next poll re-reads soon enough.
+    if (_publishing) return;
+    final int seq = ++_storeSeq;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        // One page is plenty: this header names a single shop, and a merchant with several sees the
+        // first — the same shop "My Shop" edits.
+        final List<Store> mine = (await api.mine(size: 1)).content;
+        if (!mounted || seq != _storeSeq) return;
+        setState(() => _store = mine.isEmpty ? null : mine.first);
+        return;
+      } catch (_) {
+        // Retried once, immediately: the first load fires in a burst of four requests at mount and
+        // is the one most likely to be squeezed out. One quiet failure used to leave the switch
+        // greyed with no way back but the reload button — the reported bug. After the retry the
+        // 60s poll is the healer, as it is for the summary.
+      }
     }
   }
 
@@ -199,6 +221,9 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   /// "Active" while the server had already delisted it — the button appeared to do nothing. Status
   /// is the thing publish/suspend actually move.
   bool get _published {
+    // The in-flight value wins while the call runs, so the thumb moves the moment it is tapped.
+    final bool? pending = _pendingPublish;
+    if (pending != null) return pending;
     final Store? store = _store;
     if (store == null) return false;
     return store.status.isListed;
@@ -210,26 +235,38 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     if (api == null || store == null) return;
 
     final DeliveryStrings t = DeliveryStrings.of(context);
-    setState(() => _publishing = true);
+    setState(() {
+      _publishing = true;
+      _pendingPublish = value;
+    });
     try {
       final Store updated =
           value ? await api.publish(store.id) : await api.suspend(store.id);
       if (!mounted) return;
-      setState(() => _store = updated);
+      // The response replaces any concurrent read: bump the generation so a `mine()` that started
+      // before this call cannot land after it with the stale status.
+      _storeSeq++;
+      setState(() {
+        _store = updated;
+        _pendingPublish = null;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(value ? t.yourShopIsLive : t.merchShopHidden)),
       );
     } catch (e) {
       if (!mounted) return;
+      setState(() => _pendingPublish = null);
       // Surfaces the server's own explanation — "a store needs opening hours before it can be
       // listed" is the whole reason publish fails, and hiding it leaves the merchant guessing.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(_serverMessage(e)),
         backgroundColor: DeliveryColors.brandDark,
       ));
-      await _refreshStore();
     } finally {
       if (mounted) setState(() => _publishing = false);
+      // AFTER _publishing clears, so the read is not skipped by its own guard: on failure this
+      // refetches the truth the optimistic thumb was wrong about.
+      await _refreshStore();
     }
   }
 
@@ -391,19 +428,29 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             ),
           ),
           const SizedBox(width: DeliverySpacing.sm),
-          SizedBox(
-            width: 48,
-            height: 26,
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: Switch(
-                value: on,
-                onChanged: enabled ? _setPublished : null,
-                activeThumbColor: DeliveryColors.white,
-                activeTrackColor: DeliveryColors.brand,
-                inactiveThumbColor: DeliveryColors.white,
-                inactiveTrackColor: DeliveryColors.border,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          // The drawn switch is 26dp tall and sits right beside a 48dp reload button, so a thumb
+          // aiming at it easily hit reload instead. The transparent padding grows the hit box to
+          // the 48dp a thumb needs; the switch itself stays the design's size.
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: enabled ? () => _setPublished(!on) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              child: SizedBox(
+                width: 48,
+                height: 26,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Switch(
+                    value: on,
+                    onChanged: enabled ? _setPublished : null,
+                    activeThumbColor: DeliveryColors.white,
+                    activeTrackColor: DeliveryColors.brand,
+                    inactiveThumbColor: DeliveryColors.white,
+                    inactiveTrackColor: DeliveryColors.border,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
               ),
             ),
           ),

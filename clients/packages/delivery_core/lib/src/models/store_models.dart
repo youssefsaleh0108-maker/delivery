@@ -400,6 +400,9 @@ class Store {
         logoThumbUrl: logoThumbUrl,
         coverThumbUrl: coverThumbUrl,
         address: address,
+        // Carried, not defaulted: dropping these erased the shop's map pin on every copyWith.
+        latitude: latitude,
+        longitude: longitude,
         favorite: favorite ?? this.favorite,
         offers: offers,
       );

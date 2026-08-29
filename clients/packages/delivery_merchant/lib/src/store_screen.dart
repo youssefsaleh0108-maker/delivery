@@ -28,13 +28,17 @@ import 'store_pin_map.dart';
 /// controls all stay — restyled into the frame's own card-and-labelled-box language rather than
 /// dropped, because dropping them would strand a real merchant in DRAFT with no way out.
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key, required this.api, this.geocoding});
+  const StoreScreen({super.key, required this.api, this.geocoding, this.onBack});
 
   final StoreApi api;
 
   /// Lets the map picker turn the typed address into a point instead of making the merchant pan
   /// across a country. Optional: without it the picker still works, it just has no search box.
   final GeocodingApi? geocoding;
+
+  /// Back to whatever pushed this. Null on the portal, where the shop config is a nav-rail tab
+  /// rather than a pushed route and so needs no back control.
+  final VoidCallback? onBack;
 
   @override
   State<StoreScreen> createState() => _StoreScreenState();
@@ -209,6 +213,8 @@ class _StoreScreenState extends State<StoreScreen> {
             title: t.merchbShopConfiguration,
             // The frame's subtitle is the shop's own name.
             subtitle: store?.name,
+            onBack: widget.onBack,
+            backSemanticLabel: t.back,
           ),
           Expanded(child: _body(t, store)),
         ],
@@ -351,17 +357,32 @@ class _StoreScreenState extends State<StoreScreen> {
                           t.noLongerBusy,
                         ),
               ),
-              _ActionButton(
-                label: t.publish,
-                icon: Icons.rocket_launch_rounded,
-                primary: true,
-                onPressed: _saving
-                    ? null
-                    : () => _run(
-                          () => widget.api.publish(store.id).then((_) {}),
-                          t.yourShopIsLive,
-                        ),
-              ),
+              // One button, two directions: Publish while the shop is off the storefront, Hide
+              // while it is on. There used to be no way OFF the storefront from this screen at
+              // all — "inactivate the shop" existed only as the dashboard's switch.
+              if (listed)
+                _ActionButton(
+                  label: t.merchbHideShop,
+                  icon: Icons.visibility_off_outlined,
+                  onPressed: _saving
+                      ? null
+                      : () => _run(
+                            () => widget.api.suspend(store.id).then((_) {}),
+                            t.merchShopHidden,
+                          ),
+                )
+              else
+                _ActionButton(
+                  label: t.publish,
+                  icon: Icons.rocket_launch_rounded,
+                  primary: true,
+                  onPressed: _saving
+                      ? null
+                      : () => _run(
+                            () => widget.api.publish(store.id).then((_) {}),
+                            t.yourShopIsLive,
+                          ),
+                ),
             ],
           ),
         ],

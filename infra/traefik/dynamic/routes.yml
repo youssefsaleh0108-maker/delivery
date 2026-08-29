@@ -257,8 +257,10 @@ http:
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
     # ------------------------------------------------------------------ onboarding-service (8117)
+    # /api/profile is the signed-in account's own profile (the avatar). It lives in this service
+    # because that is the identity-adjacent one — see UserProfileController.
     onboarding-service:
-      rule: PathPrefix(`/api/onboarding`)
+      rule: PathPrefix(`/api/onboarding`) || PathPrefix(`/api/profile`)
       service: onboarding-service
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]

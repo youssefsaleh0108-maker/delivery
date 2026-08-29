@@ -6,12 +6,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'src/biometric_lock.dart';
 import 'src/biometric_lock_screen.dart';
 import 'src/customer_shell.dart';
 import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
+import 'src/partner_intro_screen.dart';
 import 'src/pending_application_screen.dart';
 import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
@@ -29,6 +31,24 @@ Future<void> main() async {
   // Required before any plugin call, because Firebase is initialised below and that talks to the
   // platform channel.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // The status bar and gesture bar belong to the system, not the app. Draw the screen's own
+  // background to the very edges and let those bars float over it, fully transparent. The Figma
+  // frames deliberately draw no status bar; without this Android fills it with an opaque (near
+  // black) bar of its own, which reads as an app element sitting on top of every screen. Each
+  // Scaffold already paints its background full-bleed, so with the bar transparent that colour —
+  // crimson on the welcome and splash, the light shell everywhere else — is what shows through it.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Dark status-bar glyphs by default: nearly every screen has a light background behind the bar.
+  // The two crimson screens (welcome, splash) flip this to light glyphs with an AnnotatedRegion of
+  // their own. `statusBarBrightness` is the iOS spelling of the same choice.
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarContrastEnforced: false,
+  ));
 
   try {
     // Reads the config the Gradle plugin generated from google-services.json. Wrapped because a
@@ -109,6 +129,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final CatalogApi _catalogApi = CatalogApi(_dio);
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
+  late final ProfileApi _profileApi = ProfileApi(_dio);
 
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
@@ -152,7 +173,18 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// configured simply gets an empty list and no picker.
   late final DeliveryZoneApi _zoneApi = DeliveryZoneApi(_dio);
 
-  late Future<AuthSession?> _bootstrap = _authService.restore();
+  late Future<AuthSession?> _bootstrap = _restoreAfterSplash();
+
+  /// Restores the stored session, but not before the splash has had its full [SplashScreen.hold].
+  /// A device with no session to restore answers in a few milliseconds, so without this the branded
+  /// welcome is a flicker on the way to Sign In. The read and the hold run together, so the wait is
+  /// the hold — not the hold plus the read.
+  Future<AuthSession?> _restoreAfterSplash() async {
+    final Future<void> minimum = Future<void>.delayed(SplashScreen.hold);
+    final AuthSession? session = await _authService.restore();
+    await minimum;
+    return session;
+  }
 
   /// Writes this device's push token onto the signed-in account.
   late final DeviceTokenRegistrar _deviceTokens =
@@ -240,7 +272,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   );
   /// Which of the signed-out screens is showing. The sign-in and sign-up screens own their own
   /// busy and error state, because both are forms somebody is actively working in.
-  _Gate _gate = _Gate.welcome;
+  _Gate _gate = _Gate.signIn;
 
   /// True while the Google round trip is in flight.
   bool _brokering = false;
@@ -283,6 +315,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   bool _applyingAsPartner = false;
   PartnerKind? _partnerKind;
 
+  /// Whether the role's intro has been passed. Once a kind is known the intro sells that role
+  /// (Figma `rider-signup-intro` / `merchant-signup-intro`), then the application form follows.
+  bool _partnerIntroDone = false;
+
   /// True when the fork was shown on the way in.
   ///
   /// Decides where Back from the application form goes: to the fork if they came through it, and
@@ -296,6 +332,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
         _applyingAsPartner = true;
         _partnerKind = kind;
         _forkedByChoice = kind == null;
+        _partnerIntroDone = false;
       });
 
   /// Adopts a session from either form. Shared so the two screens cannot drift on what "signed in"
@@ -315,7 +352,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       // immediately after a SUCCESSFUL sign-in — which any enclosing catch then reports as the
       // sign-in having failed.
       _bootstrap = Future<AuthSession?>.value(session);
-      _gate = _Gate.welcome;
+      _gate = _Gate.signIn;
     });
   }
 
@@ -365,6 +402,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       trackingApi: _trackingApi,
       chatApi: _chatApi,
       prefsApi: _prefsApi,
+      profileApi: _profileApi,
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,
@@ -424,19 +462,28 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       debugShowCheckedModeBanner: false,
-      // Content was drawing under the phone's status bar on every screen: titles overlapped the
-      // clock/battery row because shells and pushed routes (e.g. the product form) were
-      // inconsistent about SafeArea — a few wrapped their body, most did not. Insetting the TOP
-      // once here, at the MaterialApp level, wraps every route's child (shells AND pages pushed via
-      // Navigator) so individual screens no longer each have to. bottom/left/right stay false: the
-      // shells manage their own bottom-nav insets, and adding a bottom inset here would double-pad
-      // them. Nested SafeAreas are harmless — inner ones become no-ops — so screens that already
-      // wrap themselves are unaffected.
-      builder: (BuildContext context, Widget? child) => SafeArea(
-        top: true,
-        bottom: false,
-        left: false,
-        right: false,
+      // No global SafeArea here on purpose. Wrapping every route in one pushed each Scaffold down
+      // below the status bar, leaving the bar's ground painted by nobody — the black strip. Going
+      // edge-to-edge instead (see main()) lets each Scaffold's own background fill behind the now
+      // transparent bar; content is kept clear of it by a SafeArea inside each screen's body, which
+      // every full-page screen here now has (or an AppBar, which insets itself).
+      //
+      // The AnnotatedRegion is the app's DEFAULT status-bar style: dark glyphs, for the light
+      // screens that are almost everything. It has to live here and not only in main()'s one-shot
+      // SystemChrome call, because the crimson screens (splash, welcome) set light glyphs with
+      // AnnotatedRegions of their own — and a one-shot call is overwritten by those and never
+      // reasserted, which left white glyphs on white screens after the splash. Layered regions fix
+      // that: the deepest visible region wins, so crimson screens go light and everything else
+      // falls back to this dark default the moment they leave the tree.
+      builder: (BuildContext context, Widget? child) =>
+          AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarContrastEnforced: false,
+        ),
         child: child ?? const SizedBox.shrink(),
       ),
       home: FutureBuilder<AuthSession?>(
@@ -462,8 +509,31 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               // is an easy mistake and should cost one tap.
               if (_partnerKind == null) {
                 return PartnerChoiceScreen(
-                  onChoose: (PartnerKind kind) => setState(() => _partnerKind = kind),
+                  onChoose: (PartnerKind kind) => setState(() {
+                    _partnerKind = kind;
+                    _partnerIntroDone = false;
+                  }),
                   onClose: () => setState(() => _applyingAsPartner = false),
+                );
+              }
+              if (!_partnerIntroDone) {
+                // Sells the role, then Continue hands off to the form. Back returns to the fork if
+                // it was shown, otherwise out to the role screen; "Log In" leaves for Sign In.
+                return PartnerIntroScreen(
+                  kind: _partnerKind!,
+                  onContinue: () => setState(() => _partnerIntroDone = true),
+                  onBack: () => setState(() {
+                    if (_forkedByChoice) {
+                      _partnerKind = null;
+                    } else {
+                      _applyingAsPartner = false;
+                    }
+                  }),
+                  onLogIn: () => setState(() {
+                    _applyingAsPartner = false;
+                    _partnerKind = null;
+                    _gate = _Gate.signIn;
+                  }),
                 );
               }
               return PartnerApplicationScreen(
@@ -480,33 +550,35 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   });
                   _adoptSession(session);
                 },
-                onClose: () => setState(() {
-                  if (_forkedByChoice) {
-                    _partnerKind = null;
-                  } else {
-                    _applyingAsPartner = false;
-                  }
-                }),
+                // Back from the form returns to the role's intro, not out of the flow.
+                onClose: () => setState(() => _partnerIntroDone = false),
               );
             }
             switch (_gate) {
               case _Gate.signIn:
+                // The landing after the splash. Sign In is the hub the Figma draws it as: no back
+                // control (there is nothing behind it), and "Create Account" opens the role screen.
                 return SignInScreen(
                   authService: _authService,
                   onSignedIn: _adoptSession,
-                  onBack: () => setState(() => _gate = _Gate.welcome),
-                  onCreateAccount: () => setState(() => _gate = _Gate.signUp),
+                  onBack: () {},
+                  onCreateAccount: () => setState(() => _gate = _Gate.welcome),
+                  locale: _locale,
                 );
               case _Gate.signUp:
                 return SignUpScreen(
                   api: _onboardingApi,
                   authService: _authService,
                   onSignedIn: _adoptSession,
+                  // Back returns to the role screen it was reached through, not out to Sign In.
                   onBack: () => setState(() => _gate = _Gate.welcome),
                 );
               case _Gate.welcome:
+                // The role screen — "Create Account / Join YouDrop". Reached from Sign In, so it
+                // carries a back to it; the fork's role cards each lead to that role's sign-up.
                 return WelcomeScreen(
                   busy: _brokering,
+                  onBack: () => setState(() => _gate = _Gate.signIn),
                   // Null until a Google client id and secret exist. Google refuses to register a
                   // redirect URI on a bare IP over http, which is what this deployment is, so the
                   // round trip cannot work yet and a control that cannot work should not be shown.
@@ -515,16 +587,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   onSignIn: () => setState(() => _gate = _Gate.signIn),
                   onSignUp: () => setState(() => _gate = _Gate.signUp),
                   onJoinAsPartner: () => _applyAs(null),
-                  // The design's welcome frame asks the question the choice screen used to ask —
-                  // three role cards, one tap each — so a card that already says "rider" goes
-                  // straight to the rider intro instead of to a screen asking which one again.
-                  // The fork is still there for anything that arrives without a kind.
+                  // A card that already says "rider" goes straight to that application's intro rather
+                  // than to a screen asking which one again. The fork is kept for anything that
+                  // arrives without a kind.
                   onJoinAsRider: () => _applyAs(PartnerKind.rider),
                   onJoinAsMerchant: () => _applyAs(PartnerKind.merchant),
-                  // Drives the AR/EN pill. Somebody who cannot read the welcome screen has to be
-                  // able to change the language *from* it — every other language control in the
-                  // app is behind a sign-in.
-                  locale: _locale,
                 );
             }
           }

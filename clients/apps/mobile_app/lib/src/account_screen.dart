@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
@@ -39,6 +42,7 @@ class AccountScreen extends StatefulWidget {
     this.inbox,
     this.onOpenOrders,
     this.prefsApi,
+    this.profileApi,
   });
 
   final AuthSession session;
@@ -60,6 +64,10 @@ class AccountScreen extends StatefulWidget {
   /// The per-category notification grid. Null leaves the preferences row undrawn.
   final NotificationPrefsApi? prefsApi;
 
+  /// The account's own picture. Null keeps the monogram and hides the upload affordance — the
+  /// one part of this screen that DOES need a round trip, since a selfie is not in the JWT.
+  final ProfileApi? profileApi;
+
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
@@ -76,10 +84,85 @@ class _AccountScreenState extends State<AccountScreen> {
   /// True while the system prompt is out, so the row can say something is happening.
   bool _biometricsWorking = false;
 
+  /// The presigned viewing URL for the account's picture. Null while loading or when none is set;
+  /// fetched fresh each time the screen opens because the URL is short-lived by design.
+  String? _avatarUrl;
+  bool _avatarBusy = false;
+
   @override
   void initState() {
     super.initState();
     _loadBiometrics();
+    _loadAvatar();
+  }
+
+  Future<void> _loadAvatar() async {
+    final ProfileApi? api = widget.profileApi;
+    if (api == null) return;
+    try {
+      final String? url = await api.myAvatarUrl();
+      if (!mounted) return;
+      setState(() => _avatarUrl = url);
+    } catch (_) {
+      // The monogram stands. A profile picture that cannot be fetched is not worth an error bar
+      // on a screen whose real content is the menu below it.
+    }
+  }
+
+  /// Picks a picture and uploads it as the account's face.
+  Future<void> _pickAvatar() async {
+    final ProfileApi? api = widget.profileApi;
+    if (api == null || _avatarBusy) return;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    const XTypeGroup images = XTypeGroup(
+      label: 'images',
+      extensions: <String>['jpg', 'jpeg', 'png', 'webp'],
+    );
+    final XFile? picked;
+    try {
+      picked = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.couldNotOpenPicker(e.toString()))));
+      return;
+    }
+    if (picked == null) return;
+    final Uint8List bytes = await picked.readAsBytes();
+    if (!mounted) return;
+
+    setState(() => _avatarBusy = true);
+    try {
+      final String? url = await api.uploadAvatar(
+        bytes: bytes,
+        contentType: _contentTypeFor(picked),
+      );
+      if (!mounted) return;
+      setState(() {
+        _avatarBusy = false;
+        _avatarUrl = url;
+      });
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(t.pictureUpdated)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _avatarBusy = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(t.somethingWentWrong)));
+    }
+  }
+
+  /// `XFile.mimeType` is null on several platforms, so fall back to the extension.
+  static String _contentTypeFor(XFile file) {
+    final String? declared = file.mimeType;
+    if (declared != null && declared.startsWith('image/')) {
+      return declared;
+    }
+    final String name = file.name.toLowerCase();
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
   }
 
   Future<void> _loadBiometrics() async {
@@ -184,6 +267,66 @@ class _AccountScreenState extends State<AccountScreen> {
 
   // ------------------------------------------------------------------ profile
 
+  /// The face on the account: the uploaded selfie when there is one, the deterministic monogram
+  /// when there is not — same treatment a shop gets, one piece of code rendering both. Tappable
+  /// (with the small camera badge saying so) only when a [ProfileApi] was provided.
+  Widget _avatar(DeliveryStrings t, AuthSession s) {
+    final String? url = _avatarUrl;
+
+    final Widget face = url == null
+        ? StoreMonogram(name: s.displayName, size: 64, radius: 32)
+        : ClipOval(
+            child: Image.network(
+              url,
+              width: 64,
+              height: 64,
+              fit: BoxFit.cover,
+              // A URL that expired or failed falls back to the monogram rather than a broken tile.
+              errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
+                  StoreMonogram(name: s.displayName, size: 64, radius: 32),
+            ),
+          );
+
+    if (widget.profileApi == null) return face;
+
+    return Semantics(
+      button: true,
+      label: t.edit,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _avatarBusy ? null : _pickAvatar,
+        child: Stack(
+          children: <Widget>[
+            face,
+            // The camera badge, bottom-end of the circle — what says "this is editable".
+            PositionedDirectional(
+              bottom: 0,
+              end: 0,
+              child: Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: DeliveryColors.brand,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: DeliveryColors.white, width: 2),
+                ),
+                child: _avatarBusy
+                    ? const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 1.5, color: DeliveryColors.white),
+                      )
+                    : const Icon(Icons.photo_camera,
+                        size: 11, color: DeliveryColors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _profileCard(DeliveryStrings t) {
     final AuthSession s = widget.session;
 
@@ -196,9 +339,7 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Row(
         children: <Widget>[
-          // Reuses the store monogram: same deterministic colour-from-name treatment, so a person
-          // and a shop are rendered by one piece of code. 64px, fully rounded, as drawn.
-          StoreMonogram(name: s.displayName, size: 64, radius: 32),
+          _avatar(t, s),
           const SizedBox(width: DeliverySpacing.md),
           Expanded(
             child: Column(

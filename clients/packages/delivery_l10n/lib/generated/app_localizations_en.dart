@@ -1939,7 +1939,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get navDashboard => 'Dashboard';
 
   @override
-  String get createAccount => 'Create an account';
+  String get createAccount => 'Create Account';
 
   @override
   String get continueWithGoogle => 'Continue with Google';
@@ -2594,6 +2594,105 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get authRoleMerchantBlurb => 'Sell and grow your business';
 
   @override
+  String get authJoinYoudrop => 'Join YouDrop';
+
+  @override
+  String get authChooseHowToUse => 'Choose how you want to use YouDrop';
+
+  @override
+  String get authRolePopular => 'Popular';
+
+  @override
+  String get authRoleWantOrder => 'I want to Order';
+
+  @override
+  String get authRoleWantOrderBlurb =>
+      'Get food, groceries & parcels delivered fast';
+
+  @override
+  String get authRoleWantDeliver => 'I want to Deliver';
+
+  @override
+  String get authRoleWantDeliverBlurb =>
+      'Drive on your schedule, keep 100% of tips';
+
+  @override
+  String get authRoleWantSell => 'I want to Sell';
+
+  @override
+  String get authRoleWantSellBlurb => 'Grow your restaurant or store business';
+
+  @override
+  String get riderIntroHeader => 'Apply as Partner';
+
+  @override
+  String get riderIntroTitle => 'Earn on Your Schedule';
+
+  @override
+  String get riderIntroSubtitle =>
+      'Join Lebanon\'s premier delivery fleet. Drive a scooter, motorcycle or car, and start earning today.';
+
+  @override
+  String get riderPerk1Title => 'Drive on Your Own Time';
+
+  @override
+  String get riderPerk1Body => 'No minimum hours, completely flexible shifts.';
+
+  @override
+  String get riderPerk2Title => 'Fast Payouts in Cash & USD';
+
+  @override
+  String get riderPerk2Body =>
+      'Get paid daily or weekly directly in fresh cash.';
+
+  @override
+  String get riderPerk3Title => 'Rider Fuel Rewards';
+
+  @override
+  String get riderPerk3Body =>
+      'Access discounted fuel partners across Lebanon.';
+
+  @override
+  String get applyToDeliver => 'Apply to Deliver';
+
+  @override
+  String get merchantIntroHeader => 'Grow with Us';
+
+  @override
+  String get merchantIntroHeaderLogin => 'Partner already?';
+
+  @override
+  String get merchantIntroTitle => 'Grow Your Business';
+
+  @override
+  String get merchantIntroSubtitle =>
+      'Partner with YouDrop and offer fast delivery or takeout to residents across Beirut and Lebanon.';
+
+  @override
+  String get merchantBenefit1Title => 'Reach 50,000+ Customers';
+
+  @override
+  String get merchantBenefit1Body =>
+      'Instant visibility to hungry customers in your radius.';
+
+  @override
+  String get merchantBenefit2Title => 'Zero Setup Fee & Easy Menus';
+
+  @override
+  String get merchantBenefit2Body =>
+      'Our team builds and styles your online menu or store catalog.';
+
+  @override
+  String get merchantBenefit3Title => 'Direct Payouts & Dashboard';
+
+  @override
+  String get merchantBenefit3Body =>
+      'Track sales, orders, and withdraw cash in real-time.';
+
+  @override
+  String get registerStoreNow => 'Register Store Now';
+
+  @override
   String get authAlreadyHaveAnAccount => 'Already have an account?';
 
   @override
@@ -2604,6 +2703,28 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get authSignInSubtitle => 'Please enter your credentials to log in.';
+
+  @override
+  String get authSignInAccountSubtitle => 'Sign in to your YouDrop account';
+
+  @override
+  String get authTaglineLebanon => 'Deliver everything in Lebanon';
+
+  @override
+  String get authLogIn => 'Log In';
+
+  @override
+  String get authForgotShort => 'Forgot?';
+
+  @override
+  String authSocialComingSoon(String provider) {
+    return '$provider sign-in is coming soon.';
+  }
+
+  @override
+  String authStepOf(int current, int total) {
+    return 'Step $current of $total';
+  }
 
   @override
   String get authEmailOrPhone => 'Email or phone number';
@@ -3201,6 +3322,9 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get merchShopHidden => 'Your shop is hidden from the market.';
+
+  @override
+  String get merchbHideShop => 'Hide shop';
 
   @override
   String get merchOrderFlow => 'Order Flow';
@@ -4249,6 +4373,25 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get custSetHere => 'Set here';
+
+  @override
+  String get locMyLocation => 'My location';
+
+  @override
+  String get locServicesOff => 'Location is turned off on this phone.';
+
+  @override
+  String get locTurnOn => 'Turn on';
+
+  @override
+  String get locPermissionNeeded =>
+      'Allow location access to point the map at you.';
+
+  @override
+  String get locOpenSettings => 'Open settings';
+
+  @override
+  String get locNoFix => 'Couldn\'t get your location. Try again in the open.';
 
   @override
   String get custNamingThisPlace => 'Looking up this place…';

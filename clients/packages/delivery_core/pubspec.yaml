@@ -27,6 +27,7 @@ dependencies:
   # cap on every platform including web — no native codec dependency. Used only by ImagePrep.
   image: ^4.3.0
   dio: ^5.7.0
+  geolocator: ^13.0.2
   # The one realtime socket (STOMP over WebSocket on /ws/notifications). Chosen because it is the
   # only WebSocket client that works identically on mobile, desktop and web — the auth travels in
   # the STOMP CONNECT frame, so no platform needs upgrade-request headers.

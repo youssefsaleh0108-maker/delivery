@@ -520,14 +520,87 @@ class _StorePinPickerState extends State<_StorePinPicker> {
   int _searchGeneration = 0;
   Timer? _debounce;
 
+  /// [MapController.move] throws before the map has been laid out; a move requested earlier —
+  /// the opening device fix, mostly — waits here for [MapOptions.onMapReady].
+  bool _mapReady = false;
+  LatLng? _pendingMove;
+  double _pendingZoom = _pinnedZoom;
+
+  /// True while the my-location control is resolving a fix.
+  bool _locating = false;
+
   @override
   void initState() {
     super.initState();
     if (widget.latitude != null && widget.longitude != null) {
       _picked = LatLng(widget.latitude!, widget.longitude!);
+    } else {
+      // No saved pin: quietly aim the camera at the phone instead of city-wide Beirut. Camera
+      // ONLY — `_picked` stays null and Save stays disabled, because a merchant standing in their
+      // shop and a merchant setting it up from home are indistinguishable here, and the pin is a
+      // claim about the SHOP. Refusals of any kind just leave the fallback view; the my-location
+      // button is where the question is asked out loud.
+      DeviceLocation.current().then((DeviceLocationResult fix) {
+        if (!mounted || _picked != null) return;
+        if (fix is LocationFix) {
+          _moveTo(LatLng(fix.latitude, fix.longitude), _pinnedZoom);
+        }
+      });
     }
     _search.text = widget.addressHint ?? '';
     _watch.start();
+  }
+
+  /// Points the camera somewhere, whether or not the map has finished building.
+  void _moveTo(LatLng point, double zoom) {
+    if (!_mapReady) {
+      _pendingMove = point;
+      _pendingZoom = zoom;
+      return;
+    }
+    _map.move(point, zoom);
+  }
+
+  /// The my-location control's flow: a fix drops the pin there; each refusal is worded as its own
+  /// problem, with the settings shortcut where one exists.
+  Future<void> _useMyLocation(DeliveryStrings t) async {
+    setState(() => _locating = true);
+    final DeviceLocationResult result = await DeviceLocation.current();
+    if (!mounted) return;
+    setState(() => _locating = false);
+
+    switch (result) {
+      case LocationFix(:final double latitude, :final double longitude):
+        _place(LatLng(latitude, longitude));
+      case LocationServicesOff():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(t.locServicesOff),
+            action: SnackBarAction(
+              label: t.locTurnOn,
+              onPressed: DeviceLocation.openLocationSettings,
+            ),
+          ));
+      case LocationDenied():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(t.locPermissionNeeded)));
+      case LocationDeniedForever():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(t.locPermissionNeeded),
+            action: SnackBarAction(
+              label: t.locOpenSettings,
+              onPressed: DeviceLocation.openAppSettings,
+            ),
+          ));
+      case LocationFailed():
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(t.locNoFix)));
+    }
   }
 
   @override
@@ -587,7 +660,7 @@ class _StorePinPickerState extends State<_StorePinPicker> {
 
   void _place(LatLng point, {double? zoom}) {
     setState(() => _picked = point);
-    _map.move(point, zoom ?? _pinnedZoom);
+    _moveTo(point, zoom ?? _pinnedZoom);
   }
 
   @override
@@ -653,12 +726,21 @@ class _StorePinPickerState extends State<_StorePinPicker> {
   }
 
   Widget _interactiveMap(LatLng? picked) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return FlutterMap(
       mapController: _map,
       options: MapOptions(
         initialCenter: picked ?? _fallbackCamera,
         initialZoom: picked == null ? _fallbackZoom : _pinnedZoom,
         backgroundColor: DeliveryColors.background,
+        onMapReady: () {
+          _mapReady = true;
+          final LatLng? queued = _pendingMove;
+          if (queued != null) {
+            _pendingMove = null;
+            _map.move(queued, _pendingZoom);
+          }
+        },
         onTap: (TapPosition _, LatLng point) => setState(() => _picked = point),
         interactionOptions: const InteractionOptions(
           // No rotation: a shop pin does not need a tilted north, and a two-finger twist on a
@@ -683,6 +765,39 @@ class _StorePinPickerState extends State<_StorePinPicker> {
               ),
             ],
           ),
+        // My-location, floated at the start corner so the attribution keeps the end one. Drops
+        // the pin at the phone — the one-tap answer for the common case of a merchant standing
+        // in their own shop.
+        Align(
+          alignment: AlignmentDirectional.bottomStart,
+          child: Padding(
+            padding: const EdgeInsets.all(DeliverySpacing.sm),
+            child: Material(
+              color: DeliveryColors.white,
+              shape: const CircleBorder(),
+              elevation: 2,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _locating ? null : () => _useMyLocation(t),
+                child: SizedBox.square(
+                  dimension: 40,
+                  child: _locating
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: DeliveryColors.brand),
+                        )
+                      : Semantics(
+                          button: true,
+                          label: t.locMyLocation,
+                          child: const Icon(Icons.my_location_rounded,
+                              size: 20, color: DeliveryColors.brand),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
         const Align(
           alignment: AlignmentDirectional.bottomEnd,
           child: Padding(

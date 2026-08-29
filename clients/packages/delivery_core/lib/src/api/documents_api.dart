@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../models/onboarding_models.dart';
+import '../util/image_prep.dart';
 
 /// Client for the onboarding documents and payout-details endpoints.
 ///
@@ -48,10 +49,20 @@ class DocumentsApi {
     required Uint8List bytes,
     required String contentType,
   }) async {
-    final DocumentUploadTicket ticket = await presign(kind, contentType);
-    if (ticket.maxSizeBytes > 0 && bytes.length > ticket.maxSizeBytes) {
+    // Shrink an oversized photo BEFORE presigning, mirroring the product-image path. A licence or
+    // ID snapped on a phone is several megabytes at full sensor resolution; the reviewer reads it a
+    // few hundred pixels wide, and the onboarding document endpoint has its own size ceiling. Left
+    // at full size, that camera original bounced off the ceiling and the whole submission failed
+    // with "could not send documents" after the account had already been created. Re-encoding a
+    // resized image makes it JPEG, so the presign is told that type. A PDF or other non-image is
+    // passed through untouched and stands or falls on its own size.
+    final PreparedImage prepared = ImagePrep.forUpload(bytes, contentType);
+    final Uint8List sending = prepared.bytes;
+
+    final DocumentUploadTicket ticket = await presign(kind, prepared.contentType);
+    if (ticket.maxSizeBytes > 0 && sending.length > ticket.maxSizeBytes) {
       throw ArgumentError(
-          'Document is ${bytes.length} bytes; the limit is ${ticket.maxSizeBytes}');
+          'Document is ${sending.length} bytes; the limit is ${ticket.maxSizeBytes}');
     }
 
     // A separate, bare Dio: S3-compatible storage rejects a presigned request that also carries an
@@ -59,10 +70,10 @@ class DocumentsApi {
     final Dio bare = Dio();
     await bare.put<void>(
       ticket.uploadUrl,
-      data: Stream<List<int>>.fromIterable(<List<int>>[bytes]),
+      data: Stream<List<int>>.fromIterable(<List<int>>[sending]),
       options: Options(headers: <String, dynamic>{
         'Content-Type': ticket.contentType,
-        Headers.contentLengthHeader: bytes.length,
+        Headers.contentLengthHeader: sending.length,
       }),
     );
 

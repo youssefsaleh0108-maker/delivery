@@ -3473,7 +3473,7 @@ abstract class DeliveryStrings {
   /// No description provided for @createAccount.
   ///
   /// In en, this message translates to:
-  /// **'Create an account'**
+  /// **'Create Account'**
   String get createAccount;
 
   /// No description provided for @continueWithGoogle.
@@ -4640,6 +4640,186 @@ abstract class DeliveryStrings {
   /// **'Sell and grow your business'**
   String get authRoleMerchantBlurb;
 
+  /// No description provided for @authJoinYoudrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Join YouDrop'**
+  String get authJoinYoudrop;
+
+  /// No description provided for @authChooseHowToUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how you want to use YouDrop'**
+  String get authChooseHowToUse;
+
+  /// No description provided for @authRolePopular.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get authRolePopular;
+
+  /// No description provided for @authRoleWantOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to Order'**
+  String get authRoleWantOrder;
+
+  /// No description provided for @authRoleWantOrderBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Get food, groceries & parcels delivered fast'**
+  String get authRoleWantOrderBlurb;
+
+  /// No description provided for @authRoleWantDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to Deliver'**
+  String get authRoleWantDeliver;
+
+  /// No description provided for @authRoleWantDeliverBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Drive on your schedule, keep 100% of tips'**
+  String get authRoleWantDeliverBlurb;
+
+  /// No description provided for @authRoleWantSell.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to Sell'**
+  String get authRoleWantSell;
+
+  /// No description provided for @authRoleWantSellBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Grow your restaurant or store business'**
+  String get authRoleWantSellBlurb;
+
+  /// No description provided for @riderIntroHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply as Partner'**
+  String get riderIntroHeader;
+
+  /// No description provided for @riderIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Earn on Your Schedule'**
+  String get riderIntroTitle;
+
+  /// No description provided for @riderIntroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join Lebanon\'s premier delivery fleet. Drive a scooter, motorcycle or car, and start earning today.'**
+  String get riderIntroSubtitle;
+
+  /// No description provided for @riderPerk1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Drive on Your Own Time'**
+  String get riderPerk1Title;
+
+  /// No description provided for @riderPerk1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'No minimum hours, completely flexible shifts.'**
+  String get riderPerk1Body;
+
+  /// No description provided for @riderPerk2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast Payouts in Cash & USD'**
+  String get riderPerk2Title;
+
+  /// No description provided for @riderPerk2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Get paid daily or weekly directly in fresh cash.'**
+  String get riderPerk2Body;
+
+  /// No description provided for @riderPerk3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Fuel Rewards'**
+  String get riderPerk3Title;
+
+  /// No description provided for @riderPerk3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Access discounted fuel partners across Lebanon.'**
+  String get riderPerk3Body;
+
+  /// No description provided for @applyToDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to Deliver'**
+  String get applyToDeliver;
+
+  /// No description provided for @merchantIntroHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Grow with Us'**
+  String get merchantIntroHeader;
+
+  /// No description provided for @merchantIntroHeaderLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner already?'**
+  String get merchantIntroHeaderLogin;
+
+  /// No description provided for @merchantIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grow Your Business'**
+  String get merchantIntroTitle;
+
+  /// No description provided for @merchantIntroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner with YouDrop and offer fast delivery or takeout to residents across Beirut and Lebanon.'**
+  String get merchantIntroSubtitle;
+
+  /// No description provided for @merchantBenefit1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach 50,000+ Customers'**
+  String get merchantBenefit1Title;
+
+  /// No description provided for @merchantBenefit1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Instant visibility to hungry customers in your radius.'**
+  String get merchantBenefit1Body;
+
+  /// No description provided for @merchantBenefit2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Zero Setup Fee & Easy Menus'**
+  String get merchantBenefit2Title;
+
+  /// No description provided for @merchantBenefit2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Our team builds and styles your online menu or store catalog.'**
+  String get merchantBenefit2Body;
+
+  /// No description provided for @merchantBenefit3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Payouts & Dashboard'**
+  String get merchantBenefit3Title;
+
+  /// No description provided for @merchantBenefit3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Track sales, orders, and withdraw cash in real-time.'**
+  String get merchantBenefit3Body;
+
+  /// No description provided for @registerStoreNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Register Store Now'**
+  String get registerStoreNow;
+
   /// No description provided for @authAlreadyHaveAnAccount.
   ///
   /// In en, this message translates to:
@@ -4663,6 +4843,42 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Please enter your credentials to log in.'**
   String get authSignInSubtitle;
+
+  /// No description provided for @authSignInAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to your YouDrop account'**
+  String get authSignInAccountSubtitle;
+
+  /// No description provided for @authTaglineLebanon.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver everything in Lebanon'**
+  String get authTaglineLebanon;
+
+  /// No description provided for @authLogIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Log In'**
+  String get authLogIn;
+
+  /// No description provided for @authForgotShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot?'**
+  String get authForgotShort;
+
+  /// No description provided for @authSocialComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} sign-in is coming soon.'**
+  String authSocialComingSoon(String provider);
+
+  /// No description provided for @authStepOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String authStepOf(int current, int total);
 
   /// No description provided for @authEmailOrPhone.
   ///
@@ -5779,6 +5995,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your shop is hidden from the market.'**
   String get merchShopHidden;
+
+  /// No description provided for @merchbHideShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide shop'**
+  String get merchbHideShop;
 
   /// No description provided for @merchOrderFlow.
   ///
@@ -7627,6 +7849,42 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Set here'**
   String get custSetHere;
+
+  /// No description provided for @locMyLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'My location'**
+  String get locMyLocation;
+
+  /// No description provided for @locServicesOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is turned off on this phone.'**
+  String get locServicesOff;
+
+  /// No description provided for @locTurnOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get locTurnOn;
+
+  /// No description provided for @locPermissionNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow location access to point the map at you.'**
+  String get locPermissionNeeded;
+
+  /// No description provided for @locOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get locOpenSettings;
+
+  /// No description provided for @locNoFix.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get your location. Try again in the open.'**
+  String get locNoFix;
 
   /// No description provided for @custNamingThisPlace.
   ///
