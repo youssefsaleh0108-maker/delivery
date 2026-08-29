@@ -57,6 +57,10 @@ public class OnboardingService {
             // At WARN, on purpose. This is the platform telling its operator that nobody is reading
             // applications for these kinds — a thing worth noticing in a log somebody skims, and
             // worth being able to point at when the question is asked later.
+            //
+            // It is the state at boot and nothing more. Backoffice can move this at runtime now
+            // (see AutoApprovalPolicy), so a later change logs its own WARN there and this line
+            // must not be read as the whole story — auto_approval_audit is.
             log.warn("Auto-approval is ON for {}: these applications are approved on submission "
                     + "with no human review", autoApproval.automaticKinds());
         }

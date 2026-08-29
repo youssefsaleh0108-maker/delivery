@@ -3,9 +3,19 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'auto_approval_panel.dart';
 import 'delivery_rate_panel.dart';
 
-/// Connector Settings — the Backoffice's runtime control over the integration layer (Section 8).
+/// Backoffice Settings — the platform's runtime controls, in one place (Section 8).
+///
+/// Two sections, and they are here together for the same reason: each replaces a thing that used to
+/// need a deployment. Automatic approval comes first because it is the one an operator arrives
+/// looking for — it was an environment variable and a container restart, which is precisely why
+/// nobody could find it — and because the connector list below is long enough to bury it.
+///
+/// The rest of this comment is about the connectors.
+///
+/// Connector Settings — the Backoffice's runtime control over the integration layer.
 ///
 /// The screen exists so switching SMS provider is a business decision rather than a release. That
 /// also makes it the most consequential page in the Backoffice: a change here redirects real SMS
@@ -20,10 +30,20 @@ import 'delivery_rate_panel.dart';
 ///  * **Every change is confirmed and then shown in the history below it.** Reversing a mistaken
 ///    switch is only possible if the previous value is on screen.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.api, required this.rateApi});
+  const SettingsScreen({
+    super.key,
+    required this.api,
+    required this.rateApi,
+    required this.autoApprovalApi,
+  });
 
   final ConnectorSettingsApi api;
   final DeliveryRateApi rateApi;
+
+  /// The three approval gates. Required rather than optional: a build that forgot to wire it would
+  /// silently go back to having no control on the page, which is the state this screen exists to
+  /// end.
+  final AutoApprovalApi autoApprovalApi;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -44,11 +64,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Fills the width the rail shell gives it — see the note in dashboard_screen.dart.
+    //
+    // The connector load is inside the list rather than around it. It used to wrap the whole page,
+    // which meant a gateway that could not answer for the connectors took the approval switches
+    // down with it — two unrelated endpoints, one of which an operator may well be on this page to
+    // reach because the other is misbehaving.
+    return ListView(
+      padding: const EdgeInsets.all(DeliverySpacing.lg),
+      children: <Widget>[
+        Text('Approvals', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: DeliverySpacing.xs),
+        Text(
+          'Who is read by a person before they go live. Changes take effect immediately — no '
+          'deploy, no restart.',
+          style:
+              Theme.of(context).textTheme.bodyMedium?.copyWith(color: DeliveryColors.muted),
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        AutoApprovalPanel(api: widget.autoApprovalApi),
+        const SizedBox(height: DeliverySpacing.lg + DeliverySpacing.sm),
+        Text('Connectors', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: DeliverySpacing.xs),
+        Text(
+          'Which provider each integration uses right now. Changes take effect within '
+          'seconds — no deploy, no restart.',
+          style:
+              Theme.of(context).textTheme.bodyMedium?.copyWith(color: DeliveryColors.muted),
+        ),
+        const SizedBox(height: DeliverySpacing.lg),
+        _connectorList(),
+      ],
+    );
+  }
+
+  Widget _connectorList() {
     return FutureBuilder<List<ConnectorSetting>>(
       future: _connectors,
       builder: (BuildContext context, AsyncSnapshot<List<ConnectorSetting>> snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: DeliverySpacing.lg),
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
         if (snapshot.hasError) {
           return Center(child: Text('Could not load connector settings: ${snapshot.error}'));
@@ -56,41 +114,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         final List<ConnectorSetting> connectors = snapshot.data!;
 
-        // Fills the width the rail shell gives it — see the note in dashboard_screen.dart.
-        return ListView(
-              padding: const EdgeInsets.all(DeliverySpacing.lg),
-              children: <Widget>[
-                Text('Connectors', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: DeliverySpacing.xs),
-                Text(
-                  'Which provider each integration uses right now. Changes take effect within '
-                  'seconds — no deploy, no restart.',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: DeliveryColors.muted),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SectionLabel('Integrations',
+                trailing: Text('${connectors.length} connectors',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.muted))),
+            for (final ConnectorSetting connector in connectors)
+              Padding(
+                padding: const EdgeInsets.only(bottom: DeliverySpacing.md),
+                child: _ConnectorCard(
+                  // Keyed by connector so a reload cannot hand one card's in-flight state to
+                  // another if the server ever returns them in a different order.
+                  key: ValueKey<String>(connector.connectorType),
+                  connector: connector,
+                  api: widget.api,
+                  rateApi: widget.rateApi,
+                  onChanged: _reload,
                 ),
-                const SizedBox(height: DeliverySpacing.lg),
-                SectionLabel('Integrations',
-                    trailing: Text('${connectors.length} connectors',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: DeliveryColors.muted))),
-                for (final ConnectorSetting connector in connectors)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: DeliverySpacing.md),
-                    child: _ConnectorCard(
-                      // Keyed by connector so a reload cannot hand one card's in-flight state to
-                      // another if the server ever returns them in a different order.
-                      key: ValueKey<String>(connector.connectorType),
-                      connector: connector,
-                      api: widget.api,
-                      rateApi: widget.rateApi,
-                      onChanged: _reload,
-                    ),
-                  ),
-              ],
+              ),
+          ],
         );
       },
     );

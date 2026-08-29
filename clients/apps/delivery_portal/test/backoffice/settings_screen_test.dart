@@ -49,13 +49,23 @@ const String _connectorsJson = '''
    "updatedAt":"2026-08-09T10:00:00Z"}
 ]''';
 
+/// What the approval gates answer with. This screen now carries them above the connectors, so the
+/// stub has to hold up its end — the switches are covered in `auto_approval_test.dart`.
+const String _autoApprovalJson = '''
+{"rider":{"automatic":false,"source":"CONFIG"},
+ "merchant":{"automatic":false,"source":"CONFIG"},
+ "carrier":{"automatic":false,"source":"CONFIG"},
+ "lastChangedBy":null,"lastChangedAt":null}''';
+
 void main() {
   late _FakeAdapter adapter;
   late ConnectorSettingsApi api;
   late DeliveryRateApi rateApi;
+  late AutoApprovalApi autoApprovalApi;
 
   setUp(() {
     adapter = _FakeAdapter((RequestOptions options) {
+      if (options.path.contains('auto-approval')) return _json(_autoApprovalJson);
         if (options.path.contains('notification-rates')) {
         // The Phase 6 panel lives on this screen now, so the stub has to answer for it.
         return _json('[{"channel":"SMS","provider":"DEV_PASSTHROUGH","total":10,"sent":10,"failed":0,"inFlight":0,"successRate":100.0,"avgSecondsToSend":0.4,"windowHours":24}]');
@@ -72,19 +82,27 @@ void main() {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
     api = ConnectorSettingsApi(dio);
     rateApi = DeliveryRateApi(dio);
+    autoApprovalApi = AutoApprovalApi(dio);
   });
 
   Future<void> pump(WidgetTester tester) async {
     // Desktop height, not just width. The Phase 6 delivery-rate panel and ramp control made each
     // connector card taller, and on the default 600px-high test surface the second card falls off
-    // the bottom — the widgets exist but are never laid out, so finders miss them.
-    tester.view.physicalSize = const Size(1600, 1600);
+    // the bottom — the widgets exist but are never laid out, so finders miss them. The approval
+    // section now sits above both, which pushes them down again.
+    tester.view.physicalSize = const Size(1600, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
-      home: Scaffold(body: SettingsScreen(api: api, rateApi: rateApi)),
+      home: Scaffold(
+        body: SettingsScreen(
+          api: api,
+          rateApi: rateApi,
+          autoApprovalApi: autoApprovalApi,
+        ),
+      ),
     ));
     await tester.pumpAndSettle();
   }

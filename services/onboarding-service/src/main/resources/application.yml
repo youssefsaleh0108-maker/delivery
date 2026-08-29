@@ -150,7 +150,7 @@ delivery:
       - /api/onboarding/password-reset/confirm
 
   onboarding:
-    # Who gets in without a human deciding.
+    # Who gets in without a human deciding — the SEED, no longer the source of truth.
     #
     # The platform was built so every application waits for a reviewer. These turn that off per
     # kind, because growth and review pull against each other: a rider who applies on Friday
@@ -165,6 +165,13 @@ delivery:
     # Per kind because the risks are not equal: a rider who is nobody wastes a delivery, a merchant
     # who is nobody takes money for food that never existed, and a carrier signs for a fleet and a
     # payout account.
+    #
+    # WHAT THESE NOW MEAN. Backoffice owns this decision at runtime, through
+    # PUT /api/onboarding/admin/auto-approval, which writes it to auto_approval_settings with the
+    # actor and an audit row (V43). A value below answers only for a kind nobody has decided there
+    # yet — which is why an existing deployment behaves exactly as before until somebody uses that
+    # screen. Once a kind has been set from the portal, changing it here does nothing for that kind
+    # and the API reports it as source=PORTAL; the way back is the same screen, not a redeploy.
     auto-approve:
       rider: ${AUTO_APPROVE_RIDER:false}
       merchant: ${AUTO_APPROVE_MERCHANT:false}

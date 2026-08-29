@@ -58,6 +58,7 @@ class PortalApis {
     required this.activity,
     required this.riderPerformance,
     required this.partnerManagement,
+    required this.autoApproval,
   });
 
   final CatalogApi catalog;
@@ -90,6 +91,9 @@ class PortalApis {
 
   /// Corrections, the audit trail, and the suspension switch on a partner who already exists.
   final PartnerManagementApi partnerManagement;
+
+  /// The three approval gates: written from Settings, read by the review queue.
+  final AutoApprovalApi autoApproval;
 }
 
 /// One destination in a rail.
@@ -357,6 +361,7 @@ class PortalArea {
           documentsApi: a.documents,
           managementApi: a.partnerManagement,
           notificationApi: a.notification,
+          autoApprovalApi: a.autoApproval,
         ),
       ),
       // Beside Finance: who carries orders is an operating question, and the money split that
@@ -421,8 +426,11 @@ class PortalArea {
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings,
         label: (DeliveryStrings t) => t.navSettings,
-        build: (PortalApis a, _, __, ___) =>
-            SettingsScreen(api: a.settings, rateApi: a.rate),
+        build: (PortalApis a, _, __, ___) => SettingsScreen(
+          api: a.settings,
+          rateApi: a.rate,
+          autoApprovalApi: a.autoApproval,
+        ),
       ),
     ],
   );

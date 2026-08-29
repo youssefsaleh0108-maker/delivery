@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../shell/console_controls.dart';
 import '../shell/shell.dart';
+import 'auto_approval_panel.dart';
 
 /// Who is asking to join, and the decision.
 ///
@@ -41,10 +42,22 @@ class OnboardingScreen extends StatefulWidget {
     required this.documentsApi,
     this.managementApi,
     this.notificationApi,
+    this.autoApprovalApi,
   });
 
   final OnboardingApi api;
   final DocumentsApi documentsApi;
+
+  /// Read-only here, and only so the queue can say which kinds are approving themselves.
+  ///
+  /// A reviewer opening an empty queue has two explanations available — nobody applied, or nobody
+  /// has to be read any more — and guessing wrong either way is expensive. The switches themselves
+  /// stay on Settings: this screen is where applications are decided, and a control that changes
+  /// whether they arrive at all does not belong beside the decision.
+  ///
+  /// Optional so the screen still renders standalone; null simply draws no line rather than
+  /// claiming everything waits for a person.
+  final AutoApprovalApi? autoApprovalApi;
 
   /// Corrections, the audit trail and the suspension switch. Optional so the screen still renders
   /// standalone; null leaves the two decided-row actions drawn and disabled, as they were.
@@ -89,11 +102,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// The Category filter's chosen value, or null for all of them.
   String? _category;
 
+  /// Which kinds are being waved through, or null while unknown — including after a failed read.
+  ///
+  /// Deliberately not retried and not surfaced as an error: this is context on somebody else's
+  /// page. A queue that loaded is still workable without it, and a red box about a settings
+  /// endpoint would take attention from the applications this screen is for.
+  AutoApprovalSettings? _autoApproval;
+
   @override
   void initState() {
     super.initState();
     _refresh();
+    _loadAutoApproval();
     _poll = Timer.periodic(_pollInterval, (_) => _refresh(silent: true));
+  }
+
+  Future<void> _loadAutoApproval() async {
+    final AutoApprovalApi? api = widget.autoApprovalApi;
+    if (api == null) return;
+    try {
+      final AutoApprovalSettings loaded = await api.get();
+      if (!mounted) return;
+      setState(() => _autoApproval = loaded);
+    } catch (_) {
+      // Left null. See the field comment: silence is the right failure here.
+    }
   }
 
   @override
@@ -314,9 +347,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       children: <Widget>[
         _controls(),
+        if (_autoApproval != null) _autoApprovalLine(_autoApproval!),
         _table(),
       ],
     );
+  }
+
+  /// One quiet line above the table: which kinds never reach it, and where that is changed.
+  ///
+  /// Said in both directions. "Nothing is automatic" is the more useful of the two sentences to a
+  /// reviewer staring at an empty queue, because it rules out the explanation that would otherwise
+  /// be the first guess — and it is only true when it has actually been read from the server.
+  Widget _autoApprovalLine(AutoApprovalSettings settings) {
+    final List<OnboardingKind> automatic = settings.automaticKinds;
+    // "Never appear here" would be wrong, and wrong in the place a reviewer can see: auto-approved
+    // applications are persisted like any other and the All Partners tab lists them, already
+    // approved and stamped system:auto-approval. Only the pending queue excludes them, because
+    // that query asks for SUBMITTED and IN_REVIEW. The honest sentence is about waiting, not about
+    // appearing — and it has to survive being read on either tab.
+    final String text = automatic.isEmpty
+        ? 'Every application is read by a person. Nothing is approved automatically.'
+        : '${_and(automatic.map(autoApprovalKindLabel).toList())} are approved automatically — '
+            'those applications are never waiting for a decision. Their documents are still '
+            'collected and still open from the row.';
+
+    return Row(
+      children: <Widget>[
+        Icon(
+          automatic.isEmpty ? Icons.how_to_reg_outlined : Icons.bolt_outlined,
+          size: 14,
+          color: DeliveryColors.faint,
+        ),
+        const SizedBox(width: DeliverySpacing.sm),
+        Expanded(child: Text(text, style: ConsoleText.meta)),
+        // Read-only, and it says so by pointing at the page that is not: the control belongs with
+        // the other settings, and a reviewer who wants it should not have to hunt for it twice.
+        const Text('Changed in Settings › Approvals', style: ConsoleText.meta),
+      ],
+    );
+  }
+
+  /// "Riders", "Riders and Shops", "Riders, Shops and Delivery companies".
+  static String _and(List<String> parts) {
+    if (parts.length == 1) return parts.single;
+    return '${parts.sublist(0, parts.length - 1).join(', ')} and ${parts.last}';
   }
 
   /// Figma `controls-row` (3:2720): the tabs against the left edge, the filters against the right.

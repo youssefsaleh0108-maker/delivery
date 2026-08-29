@@ -11,6 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.delivery.onboarding.client.KeycloakAdminClient;
+import com.delivery.onboarding.domain.AutoApprovalAuditRepository;
+import com.delivery.onboarding.domain.AutoApprovalDecisionRepository;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplication.Kind;
 import com.delivery.onboarding.domain.OnboardingApplicationRepository;
@@ -49,8 +51,11 @@ class ApplicationDecisionOverDocumentsTest {
                 mock(KeycloakAdminClient.class), documents,
                 // Manual review: this suite is about a HUMAN deciding over outstanding documents,
                 // and an automatic approval on submission would decide the application before
-                // any of these tests reached their assertion.
-                new AutoApprovalPolicy(false, false, false));
+                // any of these tests reached their assertion. Nothing configured and an empty
+                // settings store, which is both halves of "manual" — see AutoApprovalPolicy.
+                new AutoApprovalPolicy(false, false, false,
+                        mock(AutoApprovalDecisionRepository.class),
+                        mock(AutoApprovalAuditRepository.class)));
 
         application = new OnboardingApplication(Kind.RIDER, "Sam Salem", "Sam Salem",
                 "sam@example.test", Instant.now(), null, null, null, null, null);
