@@ -1039,6 +1039,15 @@ services:
       # Where one-time codes and decision emails are handed off. Without it the default is
       # localhost, which inside a container is this service talking to itself.
       NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
+      # MinIO, for the applicant documents and the account avatars. The INTERNAL endpoint is where
+      # this service stats and confirms objects; presigned upload/view URLs are signed for the
+      # PUBLIC one, which must be reachable from the PHONE. These were never set, so both fell to
+      # the localhost defaults — presigned URLs pointing at the phone's own localhost — which is
+      # why every document and avatar upload died client-side while this service logged nothing.
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9010}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-delivery}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-delivery123}
       # Who is let in without a reviewer ever seeing the application. Off unless .env says
       # otherwise, so the safe behaviour is the one you get by forgetting; the service logs a WARN
       # naming the kinds whenever any of these is on, because "nobody is reading applications" is
