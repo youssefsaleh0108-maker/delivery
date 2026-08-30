@@ -36,6 +36,27 @@ public interface PointsEntryRepository extends JpaRepository<PointsEntry, UUID> 
             OwnerKind kind, String ref, Pageable pageable);
 
     /**
+     * Everything ever EARNED — the number a loyalty tier is judged on.
+     *
+     * <p>Not the balance: spending points must never demote anybody, or redeeming a reward would
+     * cost the standing the reward was meant to celebrate.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(p.points), 0) FROM PointsEntry p
+             WHERE p.ownerKind = :kind AND p.ownerRef = :ref
+               AND p.reason = com.delivery.accounting.domain.PointsEntry$Reason.ORDER_EARNED
+            """)
+    long lifetimeEarnedOf(@Param("kind") OwnerKind kind, @Param("ref") String ref);
+
+    /** How many orders have earned — the "5 orders completed" under the tier. */
+    @Query("""
+            SELECT COUNT(p) FROM PointsEntry p
+             WHERE p.ownerKind = :kind AND p.ownerRef = :ref
+               AND p.reason = com.delivery.accounting.domain.PointsEntry$Reason.ORDER_EARNED
+            """)
+    long earnedCountOf(@Param("kind") OwnerKind kind, @Param("ref") String ref);
+
+    /**
      * What each of a carrier's riders earned, so the carrier can pay them.
      *
      * <p>Only {@code ORDER_EARNED} rows: a redemption is the carrier's, not any rider's, and

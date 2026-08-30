@@ -63,12 +63,16 @@ class _SplashScreenState extends State<SplashScreen>
     final bool failed = widget.error != null;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-        // Full-crimson screen: light status-bar glyphs to read against it. Reverts to the app-wide
-        // dark glyphs (main()) when the next, light screen appears.
+        // Full-crimson screen: both bars go brand-on-brand while it is up, so the intro reads as
+        // one red field instead of a red panel between two white strips. The bars keep their own
+        // space — the app still draws nothing under them — and the app-wide white default (see
+        // the MaterialApp builder) comes back the moment this screen leaves.
         value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
+          statusBarColor: DeliveryColors.brand,
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: DeliveryColors.brand,
+          systemNavigationBarIconBrightness: Brightness.light,
         ),
         child: Scaffold(
           backgroundColor: DeliveryColors.brand,

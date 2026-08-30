@@ -5882,11 +5882,179 @@ abstract class DeliveryStrings {
   /// **'Account Settings'**
   String get custAccountSettings;
 
-  /// No description provided for @custAppLanguage.
+  /// No description provided for @custHiName.
   ///
   /// In en, this message translates to:
-  /// **'App Language'**
-  String get custAppLanguage;
+  /// **'Hi, {name}'**
+  String custHiName(String name);
+
+  /// No description provided for @custRewardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards & Points'**
+  String get custRewardsTitle;
+
+  /// No description provided for @custTotalPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Total points'**
+  String get custTotalPoints;
+
+  /// No description provided for @custPtsThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'+{points} pts this month'**
+  String custPtsThisMonth(int points);
+
+  /// No description provided for @custNextTierLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Next tier: {tier}'**
+  String custNextTierLabel(String tier);
+
+  /// No description provided for @custPtsToGo.
+  ///
+  /// In en, this message translates to:
+  /// **'{points} pts to go'**
+  String custPtsToGo(int points);
+
+  /// No description provided for @custRewardsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Earn points on every delivered order. Redeem for vouchers and cashback.'**
+  String get custRewardsBlurb;
+
+  /// No description provided for @custCurrentTierHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Current tier'**
+  String get custCurrentTierHeading;
+
+  /// No description provided for @custCurrentTierLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Tier: {tier}'**
+  String custCurrentTierLine(String tier);
+
+  /// No description provided for @custTierEarnedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned {points} points · {orders} orders completed'**
+  String custTierEarnedLine(int points, int orders);
+
+  /// No description provided for @custNextTierLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Tier: {tier}'**
+  String custNextTierLine(String tier);
+
+  /// No description provided for @custNextTierBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach {points} points to unlock better rewards.'**
+  String custNextTierBlurb(int points);
+
+  /// No description provided for @custTopTier.
+  ///
+  /// In en, this message translates to:
+  /// **'You are at the top tier.'**
+  String get custTopTier;
+
+  /// No description provided for @custRewardCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Reward categories'**
+  String get custRewardCategories;
+
+  /// No description provided for @custFreeDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Free Delivery'**
+  String get custFreeDelivery;
+
+  /// No description provided for @custVouchersAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Vouchers available'**
+  String get custVouchersAvailable;
+
+  /// No description provided for @custCashback.
+  ///
+  /// In en, this message translates to:
+  /// **'Cashback'**
+  String get custCashback;
+
+  /// No description provided for @custEarnedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned'**
+  String get custEarnedLabel;
+
+  /// No description provided for @custReferralBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral Bonus'**
+  String get custReferralBonus;
+
+  /// No description provided for @custRecentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent activity'**
+  String get custRecentActivity;
+
+  /// No description provided for @custNoActivityYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No points yet — they arrive with your first delivered order.'**
+  String get custNoActivityYet;
+
+  /// No description provided for @custPointsOrderEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'{points} pts · Order #{shortId}'**
+  String custPointsOrderEntry(String points, String shortId);
+
+  /// No description provided for @custPointsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'{points} pts'**
+  String custPointsEntry(String points);
+
+  /// No description provided for @tierBronze.
+  ///
+  /// In en, this message translates to:
+  /// **'Bronze'**
+  String get tierBronze;
+
+  /// No description provided for @tierSilver.
+  ///
+  /// In en, this message translates to:
+  /// **'Silver'**
+  String get tierSilver;
+
+  /// No description provided for @tierGold.
+  ///
+  /// In en, this message translates to:
+  /// **'Gold'**
+  String get tierGold;
+
+  /// No description provided for @tierPlatinum.
+  ///
+  /// In en, this message translates to:
+  /// **'Platinum'**
+  String get tierPlatinum;
+
+  /// No description provided for @custMyAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'My account'**
+  String get custMyAccount;
+
+  /// No description provided for @custMyOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'My Orders'**
+  String get custMyOrders;
 
   /// No description provided for @custMyAddresses.
   ///
@@ -5899,6 +6067,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Payment Methods'**
   String get custPaymentMethods;
+
+  /// No description provided for @custVouchersPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'Vouchers & Promos'**
+  String get custVouchersPromos;
+
+  /// No description provided for @custPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get custPreferences;
+
+  /// No description provided for @custSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get custSupport;
+
+  /// No description provided for @custTermsPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms & Privacy'**
+  String get custTermsPrivacy;
+
+  /// No description provided for @custAboutYoudrop.
+  ///
+  /// In en, this message translates to:
+  /// **'About YouDrop'**
+  String get custAboutYoudrop;
+
+  /// No description provided for @custEditProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get custEditProfile;
+
+  /// No description provided for @custLogOutAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Out Account'**
+  String get custLogOutAccount;
+
+  /// No description provided for @custAppLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'App Language'**
+  String get custAppLanguage;
 
   /// No description provided for @custOrderHistory.
   ///
@@ -7981,12 +8197,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Use your new six-digit passcode the next time you sign in.'**
   String get authPasscodeChangedSignedIn;
-
-  /// No description provided for @custEditProfile.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit profile'**
-  String get custEditProfile;
 
   /// No description provided for @custProfileFieldsFixed.
   ///

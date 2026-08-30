@@ -3267,13 +3267,143 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custAccountSettings => 'Account Settings';
 
   @override
-  String get custAppLanguage => 'App Language';
+  String custHiName(String name) {
+    return 'Hi, $name';
+  }
+
+  @override
+  String get custRewardsTitle => 'Rewards & Points';
+
+  @override
+  String get custTotalPoints => 'Total points';
+
+  @override
+  String custPtsThisMonth(int points) {
+    return '+$points pts this month';
+  }
+
+  @override
+  String custNextTierLabel(String tier) {
+    return 'Next tier: $tier';
+  }
+
+  @override
+  String custPtsToGo(int points) {
+    return '$points pts to go';
+  }
+
+  @override
+  String get custRewardsBlurb =>
+      'Earn points on every delivered order. Redeem for vouchers and cashback.';
+
+  @override
+  String get custCurrentTierHeading => 'Current tier';
+
+  @override
+  String custCurrentTierLine(String tier) {
+    return 'Current Tier: $tier';
+  }
+
+  @override
+  String custTierEarnedLine(int points, int orders) {
+    return 'Earned $points points · $orders orders completed';
+  }
+
+  @override
+  String custNextTierLine(String tier) {
+    return 'Next Tier: $tier';
+  }
+
+  @override
+  String custNextTierBlurb(int points) {
+    return 'Reach $points points to unlock better rewards.';
+  }
+
+  @override
+  String get custTopTier => 'You are at the top tier.';
+
+  @override
+  String get custRewardCategories => 'Reward categories';
+
+  @override
+  String get custFreeDelivery => 'Free Delivery';
+
+  @override
+  String get custVouchersAvailable => 'Vouchers available';
+
+  @override
+  String get custCashback => 'Cashback';
+
+  @override
+  String get custEarnedLabel => 'Earned';
+
+  @override
+  String get custReferralBonus => 'Referral Bonus';
+
+  @override
+  String get custRecentActivity => 'Recent activity';
+
+  @override
+  String get custNoActivityYet =>
+      'No points yet — they arrive with your first delivered order.';
+
+  @override
+  String custPointsOrderEntry(String points, String shortId) {
+    return '$points pts · Order #$shortId';
+  }
+
+  @override
+  String custPointsEntry(String points) {
+    return '$points pts';
+  }
+
+  @override
+  String get tierBronze => 'Bronze';
+
+  @override
+  String get tierSilver => 'Silver';
+
+  @override
+  String get tierGold => 'Gold';
+
+  @override
+  String get tierPlatinum => 'Platinum';
+
+  @override
+  String get custMyAccount => 'My account';
+
+  @override
+  String get custMyOrders => 'My Orders';
 
   @override
   String get custMyAddresses => 'My Addresses';
 
   @override
   String get custPaymentMethods => 'Payment Methods';
+
+  @override
+  String get custVouchersPromos => 'Vouchers & Promos';
+
+  @override
+  String get custPreferences => 'Preferences';
+
+  @override
+  String get custSupport => 'Support';
+
+  @override
+  String get custTermsPrivacy => 'Terms & Privacy';
+
+  @override
+  String get custAboutYoudrop => 'About YouDrop';
+
+  @override
+  String get custEditProfile => 'Edit profile';
+
+  @override
+  String get custLogOutAccount => 'Log Out Account';
+
+  @override
+  String get custAppLanguage => 'App Language';
 
   @override
   String get custOrderHistory => 'Order History';
@@ -4448,9 +4578,6 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get authPasscodeChangedSignedIn =>
       'Use your new six-digit passcode the next time you sign in.';
-
-  @override
-  String get custEditProfile => 'Edit profile';
 
   @override
   String get custProfileFieldsFixed =>

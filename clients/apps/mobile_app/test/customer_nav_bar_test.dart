@@ -47,9 +47,9 @@ void main() {
     final DeliveryStrings t = await DeliveryStrings.delegate.load(const Locale('en'));
     final List<String> expected = <String>[
       t.navHome,
-      t.navOrders,
       t.navButler,
       t.navBasket,
+      t.navOrders,
       t.navAccount,
     ];
 

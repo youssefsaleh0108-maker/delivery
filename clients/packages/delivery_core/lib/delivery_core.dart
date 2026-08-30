@@ -41,6 +41,8 @@ export 'src/api/partner_jobs_api.dart';
 export 'src/api/partner_management_api.dart';
 export 'src/api/password_reset_api.dart';
 export 'src/api/profile_api.dart';
+export 'src/api/points_api.dart';
+export 'src/models/points_models.dart';
 export 'src/api/provider_profile_api.dart';
 export 'src/api/rider_performance_api.dart';
 export 'src/models/activity_models.dart';

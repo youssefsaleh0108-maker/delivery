@@ -32,22 +32,20 @@ Future<void> main() async {
   // platform channel.
   WidgetsFlutterBinding.ensureInitialized();
 
-  // The status bar and gesture bar belong to the system, not the app. Draw the screen's own
-  // background to the very edges and let those bars float over it, fully transparent. The Figma
-  // frames deliberately draw no status bar; without this Android fills it with an opaque (near
-  // black) bar of its own, which reads as an app element sitting on top of every screen. Each
-  // Scaffold already paints its background full-bleed, so with the bar transparent that colour —
-  // crimson on the welcome and splash, the light shell everywhere else — is what shows through it.
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  // Dark status-bar glyphs by default: nearly every screen has a light background behind the bar.
-  // The two crimson screens (welcome, splash) flip this to light glyphs with an AnnotatedRegion of
-  // their own. `statusBarBrightness` is the iOS spelling of the same choice.
+  // The status bar and the navigation bar keep their own reserved space — the app never draws
+  // under either. Edge-to-edge was tried and rejected: content and controls sliding beneath the
+  // clock and behind the system's back/home buttons read as the app COVERING the phone's own
+  // chrome. So no SystemUiMode.edgeToEdge here, and both bars get an opaque white ground with
+  // dark glyphs, which sits flush with the app's light surfaces. The splash overrides this to
+  // brand-on-brand while it is up (see SplashScreen); everything else inherits the default from
+  // the AnnotatedRegion at the MaterialApp builder. On Android 15+, where the OS pushes apps
+  // edge-to-edge by default, the themes opt out via windowOptOutEdgeToEdgeEnforcement.
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
+    statusBarColor: Colors.white,
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarContrastEnforced: false,
+    systemNavigationBarColor: Colors.white,
+    systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
   try {
@@ -130,6 +128,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
   late final ProfileApi _profileApi = ProfileApi(_dio);
+  late final PointsApi _pointsApi = PointsApi(_dio);
 
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
@@ -403,6 +402,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       chatApi: _chatApi,
       prefsApi: _prefsApi,
       profileApi: _profileApi,
+      pointsApi: _pointsApi,
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,
@@ -468,21 +468,21 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       // transparent bar; content is kept clear of it by a SafeArea inside each screen's body, which
       // every full-page screen here now has (or an AppBar, which insets itself).
       //
-      // The AnnotatedRegion is the app's DEFAULT status-bar style: dark glyphs, for the light
-      // screens that are almost everything. It has to live here and not only in main()'s one-shot
-      // SystemChrome call, because the crimson screens (splash, welcome) set light glyphs with
-      // AnnotatedRegions of their own — and a one-shot call is overwritten by those and never
-      // reasserted, which left white glyphs on white screens after the splash. Layered regions fix
-      // that: the deepest visible region wins, so crimson screens go light and everything else
-      // falls back to this dark default the moment they leave the tree.
+      // The AnnotatedRegion is the app's DEFAULT system-bar style: opaque white bars with dark
+      // glyphs, in their own reserved space the app never draws under. It has to live here and
+      // not only in main()'s one-shot SystemChrome call, because the splash sets brand-on-brand
+      // bars with an AnnotatedRegion of its own — and a one-shot call is overwritten by that and
+      // never reasserted, which once left the wrong style stuck after the splash. Layered regions
+      // fix that: the deepest visible region wins, and everything falls back to this default the
+      // moment it leaves the tree.
       builder: (BuildContext context, Widget? child) =>
           AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
+          statusBarColor: Colors.white,
           statusBarIconBrightness: Brightness.dark,
           statusBarBrightness: Brightness.light,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarContrastEnforced: false,
+          systemNavigationBarColor: Colors.white,
+          systemNavigationBarIconBrightness: Brightness.dark,
         ),
         child: child ?? const SizedBox.shrink(),
       ),

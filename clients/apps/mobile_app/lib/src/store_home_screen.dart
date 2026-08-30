@@ -12,7 +12,6 @@ import 'delivery_address.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
-import 'settings_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
 
@@ -37,6 +36,7 @@ class StoreHomeScreen extends StatefulWidget {
     required this.inbox,
     required this.locale,
     required this.session,
+    this.profileApi,
     required this.onSignOut,
   });
 
@@ -61,6 +61,9 @@ class StoreHomeScreen extends StatefulWidget {
   /// Drives the language toggle. Switching rebuilds the whole app in the other direction.
   final LocaleController locale;
   final AuthSession session;
+
+  /// The account's picture for the header avatar. Null keeps the monogram.
+  final ProfileApi? profileApi;
   final Future<void> Function() onSignOut;
 
   @override
@@ -110,6 +113,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     super.initState();
     _stores.addListener(_onStoresChanged);
     _load();
+    _loadHeaderAvatar();
   }
 
   void _onStoresChanged() {
@@ -368,8 +372,31 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   }
 
   /// The white `home-header`: the delivery address on one row, the search field under it.
+  /// The header avatar's viewing URL. Fetched once; the monogram covers every failure.
+  String? _headerAvatarUrl;
+
+  Future<void> _loadHeaderAvatar() async {
+    final ProfileApi? api = widget.profileApi;
+    if (api == null) return;
+    try {
+      final String? url = await api.myAvatarUrl();
+      if (!mounted) return;
+      setState(() => _headerAvatarUrl = url);
+    } catch (_) {
+      // The monogram stands.
+    }
+  }
+
+  /// The design's `profile-header`: the avatar (which opens the profile drawer), the greeting,
+  /// the delivery location under it, and the bell in the end slot.
+  ///
+  /// The bell is the one departure from the frame, which puts a brand chip there instead: the
+  /// unread count is load-bearing on the tab the customer lives in, and a decoration is not.
+  /// Settings lost its seat because the drawer now carries everything it opened.
   Widget _header() {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final String firstName = widget.session.displayName.split(' ').first;
+
     return Container(
       color: DeliveryColors.white,
       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -378,28 +405,66 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Expanded(child: _locationRow()),
-              // Alerts and settings are not drawn on this frame, and both are live: the bell
-              // carries an unread count that has to be visible from the tab the customer spends
-              // their time on, and settings is the only route to the language toggle. They sit in
-              // the header's end slot, in the design's 32px round-chip language.
+              _headerAvatar(t),
+              const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      t.custHiName(firstName),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: DeliveryColors.ink,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    InkWell(
+                      onTap: () => showAddressSheet(context, widget.addresses,
+                          zoneApi: widget.zoneApi),
+                      borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const Icon(Icons.location_on_outlined,
+                              size: 14, color: DeliveryColors.brand),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              widget.addresses
+                                  .headerLabelOr(t.setDeliveryAddress),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: DeliveryColors.muted,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.keyboard_arrow_down,
+                              size: 14, color: DeliveryColors.muted),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
               _headerAction(
                 icon: Icons.notifications_outlined,
                 semanticLabel: t.alerts,
                 badgeCount: widget.inbox.unread,
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                onPressed: () =>
+                    Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => NotificationsScreen(inbox: widget.inbox),
-                )),
-              ),
-              const SizedBox(width: DeliverySpacing.sm),
-              _headerAction(
-                icon: Icons.settings_outlined,
-                semanticLabel: t.settings,
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => SettingsScreen(
-                      locale: widget.locale,
-                      userId: widget.session.subject,
-                      prefsApi: widget.prefsApi),
                 )),
               ),
             ],
@@ -419,43 +484,31 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     );
   }
 
-  Widget _locationRow() {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    return InkWell(
-      onTap: () => showAddressSheet(context, widget.addresses, zoneApi: widget.zoneApi),
-      borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.xs),
-        child: Row(
-          children: <Widget>[
-            const Icon(Icons.location_on_outlined, size: 20, color: DeliveryColors.brand),
-            const SizedBox(width: DeliverySpacing.sm),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(t.deliverTo,
-                      style: const TextStyle(
-                          fontSize: 12, color: DeliveryColors.faint, height: 1.25)),
-                  Text(
-                    widget.addresses.headerLabelOr(t.setDeliveryAddress),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: DeliveryColors.ink,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
+  /// The face that opens the profile drawer — the drawer lives on the shell's Scaffold above
+  /// this screen, which is what Scaffold.of finds from here.
+  Widget _headerAvatar(DeliveryStrings t) {
+    final String? url = _headerAvatarUrl;
+    final Widget face = url == null
+        ? StoreMonogram(name: widget.session.displayName, size: 40, radius: 20)
+        : ClipOval(
+            child: Image.network(
+              url,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
+                  StoreMonogram(
+                      name: widget.session.displayName, size: 40, radius: 20),
             ),
-            const SizedBox(width: DeliverySpacing.xs),
-            const Icon(Icons.keyboard_arrow_down, size: 16, color: DeliveryColors.ink),
-          ],
-        ),
+          );
+
+    return Semantics(
+      button: true,
+      label: t.custAccountSettings,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Scaffold.of(context).openDrawer(),
+        child: face,
       ),
     );
   }

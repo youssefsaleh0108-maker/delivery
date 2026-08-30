@@ -39,6 +39,7 @@ public class PointsService {
     private final PointsRedemptionRepository redemptions;
     private final BigDecimal merchantRate;
     private final BigDecimal deliveryRate;
+    private final BigDecimal customerRate;
     private final BigDecimal pointValue;
     private final long minimumRedemption;
     private final String currency;
@@ -52,6 +53,10 @@ public class PointsService {
                          // because the two reward different work and will be tuned against each
                          // other, not together.
                          @Value("${delivery.points.delivery-rate:10}") BigDecimal deliveryRate,
+                         // Points per unit of the order TOTAL, for the customer who placed it —
+                         // the loyalty half. Its own rate because loyalty is priced against
+                         // marketing spend, not against what a shop or a carrier is owed.
+                         @Value("${delivery.points.customer-rate:5}") BigDecimal customerRate,
                          // What one point is worth on redemption.
                          @Value("${delivery.points.point-value:0.01}") BigDecimal pointValue,
                          // Below this a request is refused. Stops the payout queue filling with
@@ -62,6 +67,7 @@ public class PointsService {
         this.redemptions = redemptions;
         this.merchantRate = merchantRate;
         this.deliveryRate = deliveryRate;
+        this.customerRate = customerRate;
         this.pointValue = pointValue;
         this.minimumRedemption = minimumRedemption;
         this.currency = currency;
@@ -86,7 +92,8 @@ public class PointsService {
      */
     @Transactional
     public void awardForDelivery(UUID orderId, String merchantRef, BigDecimal goodsAmount,
-                                 String riderRef, String carrierRef, BigDecimal deliveryFee) {
+                                 String riderRef, String carrierRef, BigDecimal deliveryFee,
+                                 String customerRef, BigDecimal totalAmount) {
 
         if (merchantRef != null && isPositive(goodsAmount)) {
             long points = pointsFor(goodsAmount, merchantRate);
@@ -108,6 +115,78 @@ public class PointsService {
                 }
             }
         }
+
+        // The customer's loyalty half: earned on the TOTAL, because loyalty rewards what they
+        // spent — goods, fee and all — where the shop and the carrier are each paid for their own
+        // part. Same idempotent index, so a redelivered event still pays nobody twice.
+        if (customerRef != null && isPositive(totalAmount)) {
+            long points = pointsFor(totalAmount, customerRate);
+            if (points > 0) {
+                award(PointsEntry.earned(OwnerKind.CUSTOMER, customerRef, orderId, points, null),
+                        orderId);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------- loyalty tiers
+
+    /**
+     * The loyalty ladder, judged on LIFETIME earnings so spending points never demotes anybody.
+     *
+     * <p>Constants rather than configuration: a tier threshold is a promise printed on a
+     * customer's screen, and quietly moving it in a config file is how "550 points to Gold"
+     * becomes a lie between two deploys. Changing these is a product decision that should look
+     * like one — a code change with a review.
+     */
+    public enum Tier {
+        BRONZE(0),
+        SILVER(1_000),
+        GOLD(3_000),
+        PLATINUM(8_000);
+
+        private final long floor;
+
+        Tier(long floor) {
+            this.floor = floor;
+        }
+
+        public long floor() {
+            return floor;
+        }
+
+        public static Tier forLifetime(long lifetimeEarned) {
+            Tier current = BRONZE;
+            for (Tier tier : values()) {
+                if (lifetimeEarned >= tier.floor) {
+                    current = tier;
+                }
+            }
+            return current;
+        }
+
+        /** The next rung, or null from the top one. */
+        public Tier next() {
+            int i = ordinal() + 1;
+            return i < values().length ? values()[i] : null;
+        }
+    }
+
+    /** Everything the rewards screen needs in one read. */
+    public record LoyaltyStanding(long balance, long lifetimeEarned, long ordersCompleted,
+                                  Tier tier, Tier nextTier, long pointsToNextTier,
+                                  BigDecimal cashbackValue, String currency) {
+    }
+
+    @Transactional(readOnly = true)
+    public LoyaltyStanding standingOf(OwnerKind kind, String ref) {
+        long balance = entries.balanceOf(kind, ref);
+        long lifetime = entries.lifetimeEarnedOf(kind, ref);
+        long orders = entries.earnedCountOf(kind, ref);
+        Tier tier = Tier.forLifetime(lifetime);
+        Tier next = tier.next();
+        long toNext = next == null ? 0 : Math.max(0, next.floor() - lifetime);
+        return new LoyaltyStanding(balance, lifetime, orders, tier, next, toNext,
+                valueOf(Math.max(0, balance)), currency);
     }
 
     /**

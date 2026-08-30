@@ -10,6 +10,8 @@ import 'customer_nav_bar.dart';
 import 'delivery_address.dart';
 import 'my_orders_screen.dart';
 import 'notification_inbox.dart';
+import 'profile_drawer.dart';
+import 'rewards_screen.dart';
 import 'store_home_screen.dart';
 
 /// The Customer surface: shops, basket, orders, notifications.
@@ -28,6 +30,7 @@ class CustomerShell extends StatefulWidget {
     this.chatApi,
     this.prefsApi,
     this.profileApi,
+    this.pointsApi,
     required this.session,
     required this.locale,
     required this.onSignOut,
@@ -49,8 +52,13 @@ class CustomerShell extends StatefulWidget {
   final ChatApi? chatApi;
   final NotificationPrefsApi? prefsApi;
 
-  /// The account's own picture, for the Account tab. Null keeps the monogram.
+  /// The account's own picture, for the profile drawer and the home header. Null keeps the
+  /// monogram.
   final ProfileApi? profileApi;
+
+  /// The points ledger behind the Account tab's rewards screen. Null keeps the old account page —
+  /// the fallback a test that constructs the shell without APIs lands on.
+  final PointsApi? pointsApi;
   final AuthSession session;
 
   /// Passed to the home screen for the language toggle in the app bar.
@@ -140,6 +148,7 @@ class _CustomerShellState extends State<CustomerShell> {
           inbox: _inbox,
           locale: widget.locale,
           session: widget.session,
+          profileApi: widget.profileApi,
           onSignOut: widget.onSignOut,
         );
       case CustomerNavBar.ordersIndex:
@@ -173,14 +182,17 @@ class _CustomerShellState extends State<CustomerShell> {
           onOrderPlaced: () => _open(CustomerNavBar.ordersIndex),
         );
       case CustomerNavBar.accountIndex:
+        // The redesign splits what this tab used to hold: the tab itself shows Rewards & Points,
+        // and account management lives in the profile drawer opened from the home header. The old
+        // merged page remains only as the fallback when no points API was provided.
+        if (widget.pointsApi != null) {
+          return RewardsScreen(pointsApi: widget.pointsApi!);
+        }
         return AccountScreen(
           session: widget.session,
           zoneApi: widget.zoneApi,
           addresses: _addresses,
           onSignOut: widget.onSignOut,
-          // The merged Account Settings page: the redesign folds language, notifications and the
-          // route into order history into this one screen, and each of those needs something the
-          // shell owns rather than something the screen can reach on its own.
           locale: widget.locale,
           inbox: _inbox,
           prefsApi: widget.prefsApi,
@@ -201,6 +213,19 @@ class _CustomerShellState extends State<CustomerShell> {
       animation: Listenable.merge(<Listenable>[_cart, _inbox, _addresses]),
       builder: (BuildContext context, _) {
         return Scaffold(
+          // The profile side menu, opened from the home header's avatar. On the SHELL's scaffold
+          // rather than a screen's so it slides over everything, nav bar included, the way the
+          // frame draws it.
+          drawer: ProfileDrawer(
+            session: widget.session,
+            addresses: _addresses,
+            zoneApi: widget.zoneApi,
+            onSignOut: widget.onSignOut,
+            locale: widget.locale,
+            inbox: _inbox,
+            profileApi: widget.profileApi,
+            onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
+          ),
           // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight requests
           // alive, so switching to the basket and back does not refetch the catalog.
           //

@@ -328,6 +328,9 @@ public class OrderEventListener {
                 ? null
                 : event.path("deliveryProviderId").asText(null);
 
+        JsonNode totalNode = event.path("totalAmount");
+        BigDecimal total = totalNode.isNumber() ? totalNode.decimalValue() : null;
+
         points.awardForDelivery(
                 orderId,
                 // No shop earns on an errand: there was not one.
@@ -335,6 +338,9 @@ public class OrderEventListener {
                 goods,
                 riderId,
                 carrierRef,
-                deliveryFee);
+                deliveryFee,
+                // The customer's loyalty points, on what they spent.
+                event.path("customerId").asText(null),
+                total);
     }
 }

@@ -34,7 +34,8 @@ public class PointsEntry {
     public enum OwnerKind {
         MERCHANT,
         CARRIER,
-        RIDER
+        RIDER,
+        CUSTOMER
     }
 
     public enum Reason {

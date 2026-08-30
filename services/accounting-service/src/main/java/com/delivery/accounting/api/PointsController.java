@@ -47,16 +47,16 @@ public class PointsController {
         this.points = points;
     }
 
-    /** The caller's own balance, as a merchant or as a platform rider. */
+    /** The caller's own balance, as a merchant, a platform rider — or a customer. */
     @GetMapping("/balance")
-    @PreAuthorize("hasAnyRole('MERCHANT', 'DELIVERY')")
+    @PreAuthorize("hasAnyRole('MERCHANT', 'DELIVERY', 'CUSTOMER')")
     public Map<String, Object> myBalance(@AuthenticationPrincipal Jwt jwt) {
         OwnerKind kind = kindFor(jwt);
         return balancePayload(kind, jwt.getSubject());
     }
 
     @GetMapping("/history")
-    @PreAuthorize("hasAnyRole('MERCHANT', 'DELIVERY')")
+    @PreAuthorize("hasAnyRole('MERCHANT', 'DELIVERY', 'CUSTOMER')")
     public List<Map<String, Object>> myHistory(@AuthenticationPrincipal Jwt jwt,
                                                @RequestParam(defaultValue = "50") int limit) {
         OwnerKind kind = kindFor(jwt);
@@ -211,6 +211,14 @@ public class PointsController {
         if (roles.contains("CARRIER")) {
             return OwnerKind.CARRIER;
         }
+        // DELIVERY before CUSTOMER: a rider who also shops holds a rider balance — their earnings
+        // — and their shopping loyalty rides the same account. Earnings beat perks on a tie.
+        if (roles.contains("DELIVERY")) {
+            return OwnerKind.RIDER;
+        }
+        if (roles.contains("CUSTOMER")) {
+            return OwnerKind.CUSTOMER;
+        }
         return OwnerKind.RIDER;
     }
 
@@ -233,6 +241,24 @@ public class PointsController {
         payload.put("openRequest", points.openRequestFor(kind, ref)
                 .map(PointsController::redemptionPayload)
                 .orElse(null));
+        // The loyalty ladder rides along for a customer — tier, the next one, and the distance to
+        // it, judged on lifetime earnings so redeeming never demotes. Absent for the working
+        // kinds, whose points are earnings, not standing.
+        if (kind == OwnerKind.CUSTOMER) {
+            PointsService.LoyaltyStanding standing = points.standingOf(kind, ref);
+            Map<String, Object> loyalty = new java.util.LinkedHashMap<>();
+            loyalty.put("lifetimeEarned", standing.lifetimeEarned());
+            loyalty.put("ordersCompleted", standing.ordersCompleted());
+            loyalty.put("tier", standing.tier());
+            loyalty.put("tierFloor", standing.tier().floor());
+            loyalty.put("nextTier", standing.nextTier());
+            loyalty.put("nextTierAt", standing.nextTier() == null
+                    ? null : standing.nextTier().floor());
+            loyalty.put("pointsToNextTier", standing.pointsToNextTier());
+            loyalty.put("cashbackValue", standing.cashbackValue());
+            loyalty.put("currency", standing.currency());
+            payload.put("loyalty", loyalty);
+        }
         return payload;
     }
 

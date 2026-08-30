@@ -3250,13 +3250,142 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custAccountSettings => 'إعدادات الحساب';
 
   @override
-  String get custAppLanguage => 'لغة التطبيق';
+  String custHiName(String name) {
+    return 'أهلاً $name';
+  }
+
+  @override
+  String get custRewardsTitle => 'المكافآت والنقاط';
+
+  @override
+  String get custTotalPoints => 'مجموع النقاط';
+
+  @override
+  String custPtsThisMonth(int points) {
+    return '+$points نقطة هذا الشهر';
+  }
+
+  @override
+  String custNextTierLabel(String tier) {
+    return 'الفئة التالية: $tier';
+  }
+
+  @override
+  String custPtsToGo(int points) {
+    return 'بقي $points نقطة';
+  }
+
+  @override
+  String get custRewardsBlurb =>
+      'اكسب نقاطاً على كل طلب يُوصَل. استبدلها بقسائم واسترداد نقدي.';
+
+  @override
+  String get custCurrentTierHeading => 'فئتك الحالية';
+
+  @override
+  String custCurrentTierLine(String tier) {
+    return 'الفئة الحالية: $tier';
+  }
+
+  @override
+  String custTierEarnedLine(int points, int orders) {
+    return 'كسبت $points نقطة · $orders طلبات مكتملة';
+  }
+
+  @override
+  String custNextTierLine(String tier) {
+    return 'الفئة التالية: $tier';
+  }
+
+  @override
+  String custNextTierBlurb(int points) {
+    return 'اجمع $points نقطة لفتح مكافآت أفضل.';
+  }
+
+  @override
+  String get custTopTier => 'أنت في أعلى فئة.';
+
+  @override
+  String get custRewardCategories => 'فئات المكافآت';
+
+  @override
+  String get custFreeDelivery => 'توصيل مجاني';
+
+  @override
+  String get custVouchersAvailable => 'قسائم متاحة';
+
+  @override
+  String get custCashback => 'استرداد نقدي';
+
+  @override
+  String get custEarnedLabel => 'المكتسب';
+
+  @override
+  String get custReferralBonus => 'مكافأة الإحالة';
+
+  @override
+  String get custRecentActivity => 'النشاط الأخير';
+
+  @override
+  String get custNoActivityYet => 'لا نقاط بعد — تصلك مع أول طلب يُوصَل.';
+
+  @override
+  String custPointsOrderEntry(String points, String shortId) {
+    return '$points نقطة · طلب #$shortId';
+  }
+
+  @override
+  String custPointsEntry(String points) {
+    return '$points نقطة';
+  }
+
+  @override
+  String get tierBronze => 'برونزية';
+
+  @override
+  String get tierSilver => 'فضية';
+
+  @override
+  String get tierGold => 'ذهبية';
+
+  @override
+  String get tierPlatinum => 'بلاتينية';
+
+  @override
+  String get custMyAccount => 'حسابي';
+
+  @override
+  String get custMyOrders => 'طلباتي';
 
   @override
   String get custMyAddresses => 'عناويني';
 
   @override
   String get custPaymentMethods => 'طرق الدفع';
+
+  @override
+  String get custVouchersPromos => 'القسائم والعروض';
+
+  @override
+  String get custPreferences => 'التفضيلات';
+
+  @override
+  String get custSupport => 'الدعم';
+
+  @override
+  String get custTermsPrivacy => 'الشروط والخصوصية';
+
+  @override
+  String get custAboutYoudrop => 'حول YouDrop';
+
+  @override
+  String get custEditProfile => 'تعديل الملف الشخصي';
+
+  @override
+  String get custLogOutAccount => 'تسجيل الخروج من الحساب';
+
+  @override
+  String get custAppLanguage => 'لغة التطبيق';
 
   @override
   String get custOrderHistory => 'سجل الطلبات';
@@ -4439,9 +4568,6 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get authPasscodeChangedSignedIn =>
       'استخدم رمزك الجديد المكوّن من ستة أرقام في المرة القادمة التي تسجّل فيها الدخول.';
-
-  @override
-  String get custEditProfile => 'تعديل الملف الشخصي';
 
   @override
   String get custProfileFieldsFixed =>
