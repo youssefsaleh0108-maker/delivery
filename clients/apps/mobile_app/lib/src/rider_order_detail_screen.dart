@@ -28,6 +28,7 @@ class RiderOrderDetailScreen extends StatefulWidget {
     this.trackingApi,
     this.chatApi,
     this.socket,
+    this.splitApi,
   });
 
   final DeliveryOrder order;
@@ -44,6 +45,12 @@ class RiderOrderDetailScreen extends StatefulWidget {
   final ChatApi? chatApi;
   final UserQueueSocket? socket;
 
+  /// The group-split ledger. When this order is a split, the cash-collection checklist
+  /// (Figma `rider-cash-checklist` 83:769) draws under the items: who already paid digitally,
+  /// and exactly whose cash — and how much of it — the door owes. Null, or an order with no
+  /// split behind it, draws nothing.
+  final SplitApi? splitApi;
+
   @override
   State<RiderOrderDetailScreen> createState() => _RiderOrderDetailScreenState();
 }
@@ -58,6 +65,181 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
   /// The tracking API's last answer. Null until it has answered once — the panel renders nothing
   /// rather than a spinner or an invented figure.
   OrderEta? _eta;
+
+  /// The split plan behind this order, or null for the overwhelming majority that have none.
+  SplitPlan? _split;
+
+  Future<void> _loadSplit() async {
+    final SplitApi? api = widget.splitApi;
+    if (api == null) return;
+    try {
+      final SplitPlan plan = await api.forOrder(widget.order.id);
+      if (!mounted) return;
+      setState(() => _split = plan);
+    } catch (_) {
+      // 404 is the normal answer: not a split order.
+    }
+  }
+
+  /// The frame's cash-collection checklist: digitally-paid shares listed as settled, and the
+  /// cash shares — the ones the door owes — summed into one figure to collect.
+  Widget _splitChecklist(DeliveryStrings t) {
+    final SplitPlan plan = _split!;
+    final List<SplitShare> cash = plan.shares
+        .where((SplitShare s) => s.method == 'CASH_AT_DOOR')
+        .toList();
+    final List<SplitShare> digital = plan.shares
+        .where((SplitShare s) =>
+            s.method != 'CASH_AT_DOOR' && s.status != 'PENDING' && s.status != 'DECLINED')
+        .toList();
+    final double cashTotal =
+        cash.fold(0, (double sum, SplitShare s) => sum + s.amountUsd);
+
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t.riderCashChecklist,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: DeliveryColors.brandSoft,
+                  borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+                ),
+                child: Text(
+                  t.riderSplitOrderTag.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: DeliveryColors.brand,
+                    letterSpacing: 0.5,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          for (final SplitShare share in cash)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.payments_outlined,
+                      size: 16, color: DeliveryColors.brand),
+                  const SizedBox(width: DeliverySpacing.sm),
+                  Expanded(
+                    child: Text(
+                      share.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '\$${share.amountUsd.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: DeliveryColors.brand,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (digital.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              t.riderAlreadyPaid.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: DeliveryColors.faint,
+                letterSpacing: 0.5,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final SplitShare share in digital)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Row(
+                  children: <Widget>[
+                    Icon(Icons.check_rounded,
+                        size: 14, color: DeliveryAccent.positive.color),
+                    const SizedBox(width: DeliverySpacing.sm),
+                    Expanded(
+                      child: Text(
+                        '${share.name} · ${share.method ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: DeliveryColors.muted,
+                            height: 1.3),
+                      ),
+                    ),
+                    Text(
+                      '\$${share.amountUsd.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: DeliveryColors.muted,
+                          height: 1.2),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          const Divider(
+              height: DeliverySpacing.md * 1.5, color: DeliveryColors.borderFaint),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t.riderTotalCashCollect,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              Text(
+                '\$${cashTotal.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: DeliveryColors.brand,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
   Timer? _etaTimer;
 
   /// The conversation behind the chat button, and its badge. Null while the server has not
@@ -70,6 +252,7 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadSplit());
     if (widget.trackingApi != null && !widget.order.status.isTerminal) {
       unawaited(_loadEta());
       _etaTimer = Timer.periodic(_etaInterval, (_) => _loadEta());
@@ -202,6 +385,10 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
                   const SizedBox(height: DeliverySpacing.md),
                   _itemsCard(t, order),
                   const SizedBox(height: DeliverySpacing.md),
+                  if (_split != null) ...<Widget>[
+                    _splitChecklist(t),
+                    const SizedBox(height: DeliverySpacing.md),
+                  ],
                   for (final OrderAction action in forward) ...<Widget>[
                     SizedBox(
                       width: double.infinity,

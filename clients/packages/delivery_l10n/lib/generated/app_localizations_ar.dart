@@ -3338,6 +3338,213 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custGiftNoteRides => 'رسالتك تسافر مع الطلب وتُقرأ عند الباب.';
 
   @override
+  String get you => 'أنت';
+
+  @override
+  String get custSoloOrder => 'طلب فردي';
+
+  @override
+  String get custSplitOrder => 'طلب مشترك';
+
+  @override
+  String get custOrderParticipants => 'المشاركون في الطلب';
+
+  @override
+  String get custAddFriend => 'أضف صديقاً';
+
+  @override
+  String custAssignedTo(String name) {
+    return 'على حساب: $name';
+  }
+
+  @override
+  String get custPaymentSplitSummary => 'ملخص تقسيم الدفع';
+
+  @override
+  String get custTotalOrderAmount => 'إجمالي الطلب';
+
+  @override
+  String get custSendPaymentRequests => 'أرسل طلبات الدفع';
+
+  @override
+  String get custSplitWithGroup => 'قسّم مع المجموعة';
+
+  @override
+  String get custHowManyPeople => 'كم شخصاً؟';
+
+  @override
+  String get custIncludingYourself => 'بمن فيهم أنت';
+
+  @override
+  String get custEvenBreakdown => 'التقسيم بالتساوي';
+
+  @override
+  String get custEachPays => 'كل واحد يدفع';
+
+  @override
+  String custHostAbsorbs(String amount) {
+    return 'المضيف يتحمل الباقي $amount';
+  }
+
+  @override
+  String get custAddFriendsHdr => 'أضف الأصدقاء';
+
+  @override
+  String get custEnterUsername => 'اكتب اسم المستخدم';
+
+  @override
+  String get custYourShareYou => 'حصتك (أنت)';
+
+  @override
+  String get cust15MinNote => 'أمام أصدقائك 15 دقيقة للدفع بعد الدعوة';
+
+  @override
+  String get custSendInvites => 'أرسل الدعوات';
+
+  @override
+  String get custWaitingGroupPayments => 'بانتظار دفعات المجموعة';
+
+  @override
+  String get custTimeRemaining => 'الوقت المتبقي';
+
+  @override
+  String custSplitNWays(String amount, int n) {
+    return '$amount مقسومة على $n';
+  }
+
+  @override
+  String get custPaymentProgress => 'تقدم الدفع';
+
+  @override
+  String custNPaid(int paid, int total) {
+    return 'دفع $paid من $total';
+  }
+
+  @override
+  String custCollectedOf(String collected, String total) {
+    return 'جُمع $collected من $total';
+  }
+
+  @override
+  String custPaidVia(String method) {
+    return 'دفع عبر $method';
+  }
+
+  @override
+  String get custPaidChip => 'مدفوع';
+
+  @override
+  String get custPendingChip => 'بالانتظار';
+
+  @override
+  String get custDeclinedChip => 'رفض';
+
+  @override
+  String get custCoveredChip => 'غطّاه المضيف';
+
+  @override
+  String custCoverRest(String amount) {
+    return 'غطِّ الباقي ($amount)';
+  }
+
+  @override
+  String get custReadyToPlace => 'اكتملت الحصص — أتمم الطلب';
+
+  @override
+  String get custContinueToCheckout => 'تابع إلى الدفع';
+
+  @override
+  String get custRemindBtn => 'ذكّر';
+
+  @override
+  String get custCancelSplit => 'ألغِ الطلب المشترك';
+
+  @override
+  String custInvitedYouToSplit(String name) {
+    return '$name دعاك لمشاركة طلب';
+  }
+
+  @override
+  String get custYourShareToPay => 'حصتك للدفع';
+
+  @override
+  String get custSelectPaymentMethod => 'اختر طريقة الدفع';
+
+  @override
+  String get custWhishShort => 'Whish Money';
+
+  @override
+  String get custOmtShort => 'OMT';
+
+  @override
+  String get custBobShort => 'BOB Finance';
+
+  @override
+  String get custCashAtDoor => 'نقداً عند الباب';
+
+  @override
+  String get custRiderCollectsFromYou => 'السائق سيحصّلها منك';
+
+  @override
+  String get custRecommendedChip => 'موصى بها';
+
+  @override
+  String custPayMyShare(String amount) {
+    return 'ادفع حصتي ($amount)';
+  }
+
+  @override
+  String get custDeclineInvitation => 'ارفض الدعوة';
+
+  @override
+  String get custAllSharesPaid => 'دُفعت كل الحصص!';
+
+  @override
+  String get custGroupSplitSummary => 'ملخص المجموعة';
+
+  @override
+  String custRiderCollectNote(String amount, String name) {
+    return 'السائق سيحصّل $amount من $name عند التسليم';
+  }
+
+  @override
+  String get custAddToOrder => 'أضف إلى الطلب';
+
+  @override
+  String get custSearchByUsername => 'ابحث باسم المستخدم...';
+
+  @override
+  String get custRecentlySplitWith => 'شاركت معهم مؤخراً';
+
+  @override
+  String get custQuickAdd => 'إضافة سريعة';
+
+  @override
+  String custAddAsGuest(String name) {
+    return 'أضف $name كضيف — يدفع نقداً عند الباب';
+  }
+
+  @override
+  String custSplitRequestBanner(String name) {
+    return '$name دعاك لمشاركة طلب';
+  }
+
+  @override
+  String get custPayYourShare => 'ادفع حصتك';
+
+  @override
+  String get riderCashChecklist => 'قائمة تحصيل النقد';
+
+  @override
+  String get riderAlreadyPaid => 'مدفوع رقمياً';
+
+  @override
+  String get riderTotalCashCollect => 'إجمالي النقد للتحصيل';
+
+  @override
+  String get riderSplitOrderTag => 'طلب مشترك';
+
+  @override
   String custMinOrderLine(String amount) {
     return 'الحد الأدنى للطلب: $amount';
   }

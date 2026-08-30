@@ -26,6 +26,7 @@ class CustomerShell extends StatefulWidget {
     required this.offerApi,
     this.promoApi,
     this.transferApi,
+    this.splitApi,
     this.geocodingApi,
     this.trackingApi,
     this.chatApi,
@@ -51,6 +52,9 @@ class CustomerShell extends StatefulWidget {
 
   /// Checkout's money surface — rate lock, USD/LBP split, wallet methods.
   final TransferApi? transferApi;
+
+  /// The group-split flow behind the basket's Split tab.
+  final SplitApi? splitApi;
   final GeocodingApi? geocodingApi;
   final TrackingApi? trackingApi;
   final ChatApi? chatApi;
@@ -153,6 +157,8 @@ class _CustomerShellState extends State<CustomerShell> {
           locale: widget.locale,
           session: widget.session,
           profileApi: widget.profileApi,
+          splitApi: widget.splitApi,
+          transferApi: widget.transferApi,
           onSignOut: widget.onSignOut,
         );
       case CustomerNavBar.ordersIndex:
@@ -183,6 +189,9 @@ class _CustomerShellState extends State<CustomerShell> {
           zoneApi: widget.zoneApi,
           promoApi: widget.promoApi,
           transferApi: widget.transferApi,
+          splitApi: widget.splitApi,
+          profileApi: widget.profileApi,
+          session: widget.session,
           geocodingApi: widget.geocodingApi,
           onOrderPlaced: () => _open(CustomerNavBar.ordersIndex),
         );

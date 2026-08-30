@@ -3357,6 +3357,213 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Your note travels with the order and is read out at the door.';
 
   @override
+  String get you => 'You';
+
+  @override
+  String get custSoloOrder => 'Solo Order';
+
+  @override
+  String get custSplitOrder => 'Split Order';
+
+  @override
+  String get custOrderParticipants => 'Order Participants';
+
+  @override
+  String get custAddFriend => 'Add Friend';
+
+  @override
+  String custAssignedTo(String name) {
+    return 'Assigned: $name';
+  }
+
+  @override
+  String get custPaymentSplitSummary => 'Payment Split Summary';
+
+  @override
+  String get custTotalOrderAmount => 'Total Order Amount';
+
+  @override
+  String get custSendPaymentRequests => 'Send Payment Requests';
+
+  @override
+  String get custSplitWithGroup => 'Split with Group';
+
+  @override
+  String get custHowManyPeople => 'How many people?';
+
+  @override
+  String get custIncludingYourself => 'Including yourself';
+
+  @override
+  String get custEvenBreakdown => 'Even split breakdown';
+
+  @override
+  String get custEachPays => 'Each pays';
+
+  @override
+  String custHostAbsorbs(String amount) {
+    return 'Host absorbs $amount remainder';
+  }
+
+  @override
+  String get custAddFriendsHdr => 'Add friends';
+
+  @override
+  String get custEnterUsername => 'Enter username';
+
+  @override
+  String get custYourShareYou => 'Your share (You)';
+
+  @override
+  String get cust15MinNote => 'Friends have 15 min to pay after the invite';
+
+  @override
+  String get custSendInvites => 'Send Invites';
+
+  @override
+  String get custWaitingGroupPayments => 'Waiting for group payments';
+
+  @override
+  String get custTimeRemaining => 'Time remaining';
+
+  @override
+  String custSplitNWays(String amount, int n) {
+    return '$amount split $n ways';
+  }
+
+  @override
+  String get custPaymentProgress => 'Payment progress';
+
+  @override
+  String custNPaid(int paid, int total) {
+    return '$paid / $total Paid';
+  }
+
+  @override
+  String custCollectedOf(String collected, String total) {
+    return '$collected of $total collected';
+  }
+
+  @override
+  String custPaidVia(String method) {
+    return 'Paid via $method';
+  }
+
+  @override
+  String get custPaidChip => 'Paid';
+
+  @override
+  String get custPendingChip => 'Pending';
+
+  @override
+  String get custDeclinedChip => 'Declined';
+
+  @override
+  String get custCoveredChip => 'Covered';
+
+  @override
+  String custCoverRest(String amount) {
+    return 'Cover the Rest ($amount)';
+  }
+
+  @override
+  String get custReadyToPlace => 'All shares are in — place the order';
+
+  @override
+  String get custContinueToCheckout => 'Continue to Checkout';
+
+  @override
+  String get custRemindBtn => 'Remind';
+
+  @override
+  String get custCancelSplit => 'Cancel Split Order';
+
+  @override
+  String custInvitedYouToSplit(String name) {
+    return '$name invited you to split';
+  }
+
+  @override
+  String get custYourShareToPay => 'Your share to pay';
+
+  @override
+  String get custSelectPaymentMethod => 'Select Payment Method';
+
+  @override
+  String get custWhishShort => 'Whish Money';
+
+  @override
+  String get custOmtShort => 'OMT';
+
+  @override
+  String get custBobShort => 'BOB Finance';
+
+  @override
+  String get custCashAtDoor => 'Cash at Door';
+
+  @override
+  String get custRiderCollectsFromYou => 'Rider will collect from you';
+
+  @override
+  String get custRecommendedChip => 'Recommended';
+
+  @override
+  String custPayMyShare(String amount) {
+    return 'Pay My Share ($amount)';
+  }
+
+  @override
+  String get custDeclineInvitation => 'Decline invitation';
+
+  @override
+  String get custAllSharesPaid => 'All Shares Paid!';
+
+  @override
+  String get custGroupSplitSummary => 'Group Split Summary';
+
+  @override
+  String custRiderCollectNote(String amount, String name) {
+    return 'Rider will collect $amount from $name at delivery';
+  }
+
+  @override
+  String get custAddToOrder => 'Add to Order';
+
+  @override
+  String get custSearchByUsername => 'Search by username...';
+
+  @override
+  String get custRecentlySplitWith => 'Recently split with';
+
+  @override
+  String get custQuickAdd => 'Quick Add';
+
+  @override
+  String custAddAsGuest(String name) {
+    return 'Add $name as guest — pays cash at the door';
+  }
+
+  @override
+  String custSplitRequestBanner(String name) {
+    return '$name invited you to split an order';
+  }
+
+  @override
+  String get custPayYourShare => 'Pay your share';
+
+  @override
+  String get riderCashChecklist => 'Cash Collection Checklist';
+
+  @override
+  String get riderAlreadyPaid => 'Already paid digitally';
+
+  @override
+  String get riderTotalCashCollect => 'Total Cash to Collect';
+
+  @override
+  String get riderSplitOrderTag => 'Split Order';
+
+  @override
   String custMinOrderLine(String amount) {
     return 'Min. Order: $amount';
   }

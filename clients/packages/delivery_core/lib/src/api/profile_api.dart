@@ -17,6 +17,19 @@ class ProfileApi {
   ///
   /// The URL is presigned and short-lived — the avatars bucket is private — so it is fetched
   /// when the screen opens rather than stored.
+  /// Username search for the split-payment friend picker: [{username, name}], capped small
+  /// server-side. Under two characters the server answers nothing on principle.
+  Future<List<Map<String, String>>> search(String query) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/profile/search',
+      queryParameters: <String, dynamic>{'q': query},
+    );
+    return (response.data as List<dynamic>)
+        .map((dynamic e) => (e as Map<String, dynamic>)
+            .map((String k, dynamic v) => MapEntry<String, String>(k, '$v')))
+        .toList();
+  }
+
   Future<String?> myAvatarUrl() async {
     final Response<dynamic> response = await _dio.get<dynamic>('/api/profile/me');
     return (response.data as Map<String, dynamic>)['avatarUrl'] as String?;

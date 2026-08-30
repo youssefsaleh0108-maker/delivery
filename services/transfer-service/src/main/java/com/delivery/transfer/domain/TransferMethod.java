@@ -10,5 +10,7 @@ public enum TransferMethod {
     /** Whish Money wallet transfer. */
     WHISH,
     /** OMT online money transfer. */
-    OMT
+    OMT,
+    /** BOB Finance wallet transfer. */
+    BOB
 }

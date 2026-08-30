@@ -344,6 +344,40 @@ public class KeycloakAdminClient {
      *
      * @param email already normalised (lower-cased, trimmed) by the caller
      */
+    /**
+     * Username search for the split-payment friend picker: prefix match, a handful of results,
+     * and only the two public fields a picker needs. No emails, no ids — the username IS the
+     * address the split flow speaks, and handing back anything more would make this a directory
+     * dump endpoint wearing a search box.
+     */
+    public java.util.List<java.util.Map<String, String>> searchByUsername(String prefix, int max) {
+        String bearer = adminToken();
+        JsonNode users = keycloak.get()
+                .uri("/admin/realms/{realm}/users?username={prefix}&max={max}",
+                        realm, prefix, Math.min(Math.max(max, 1), 10))
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+
+        java.util.List<java.util.Map<String, String>> out = new java.util.ArrayList<>();
+        if (users == null || !users.isArray()) {
+            return out;
+        }
+        for (JsonNode user : users) {
+            String username = user.path("username").asText(null);
+            if (username == null) {
+                continue;
+            }
+            String first = user.path("firstName").asText("");
+            String last = user.path("lastName").asText("");
+            String name = (first + " " + last).trim();
+            out.add(java.util.Map.of(
+                    "username", username,
+                    "name", name.isEmpty() ? username : name));
+        }
+        return out;
+    }
+
     public Optional<String> findUserIdByEmail(String email) {
         String bearer = adminToken();
 

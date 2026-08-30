@@ -6020,6 +6020,372 @@ abstract class DeliveryStrings {
   /// **'Your note travels with the order and is read out at the door.'**
   String get custGiftNoteRides;
 
+  /// No description provided for @you.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get you;
+
+  /// No description provided for @custSoloOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Solo Order'**
+  String get custSoloOrder;
+
+  /// No description provided for @custSplitOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Split Order'**
+  String get custSplitOrder;
+
+  /// No description provided for @custOrderParticipants.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Participants'**
+  String get custOrderParticipants;
+
+  /// No description provided for @custAddFriend.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Friend'**
+  String get custAddFriend;
+
+  /// No description provided for @custAssignedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned: {name}'**
+  String custAssignedTo(String name);
+
+  /// No description provided for @custPaymentSplitSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Split Summary'**
+  String get custPaymentSplitSummary;
+
+  /// No description provided for @custTotalOrderAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Order Amount'**
+  String get custTotalOrderAmount;
+
+  /// No description provided for @custSendPaymentRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Payment Requests'**
+  String get custSendPaymentRequests;
+
+  /// No description provided for @custSplitWithGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Split with Group'**
+  String get custSplitWithGroup;
+
+  /// No description provided for @custHowManyPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'How many people?'**
+  String get custHowManyPeople;
+
+  /// No description provided for @custIncludingYourself.
+  ///
+  /// In en, this message translates to:
+  /// **'Including yourself'**
+  String get custIncludingYourself;
+
+  /// No description provided for @custEvenBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Even split breakdown'**
+  String get custEvenBreakdown;
+
+  /// No description provided for @custEachPays.
+  ///
+  /// In en, this message translates to:
+  /// **'Each pays'**
+  String get custEachPays;
+
+  /// No description provided for @custHostAbsorbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Host absorbs {amount} remainder'**
+  String custHostAbsorbs(String amount);
+
+  /// No description provided for @custAddFriendsHdr.
+  ///
+  /// In en, this message translates to:
+  /// **'Add friends'**
+  String get custAddFriendsHdr;
+
+  /// No description provided for @custEnterUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter username'**
+  String get custEnterUsername;
+
+  /// No description provided for @custYourShareYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Your share (You)'**
+  String get custYourShareYou;
+
+  /// No description provided for @cust15MinNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends have 15 min to pay after the invite'**
+  String get cust15MinNote;
+
+  /// No description provided for @custSendInvites.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Invites'**
+  String get custSendInvites;
+
+  /// No description provided for @custWaitingGroupPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for group payments'**
+  String get custWaitingGroupPayments;
+
+  /// No description provided for @custTimeRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Time remaining'**
+  String get custTimeRemaining;
+
+  /// No description provided for @custSplitNWays.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} split {n} ways'**
+  String custSplitNWays(String amount, int n);
+
+  /// No description provided for @custPaymentProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment progress'**
+  String get custPaymentProgress;
+
+  /// No description provided for @custNPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'{paid} / {total} Paid'**
+  String custNPaid(int paid, int total);
+
+  /// No description provided for @custCollectedOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{collected} of {total} collected'**
+  String custCollectedOf(String collected, String total);
+
+  /// No description provided for @custPaidVia.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid via {method}'**
+  String custPaidVia(String method);
+
+  /// No description provided for @custPaidChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get custPaidChip;
+
+  /// No description provided for @custPendingChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get custPendingChip;
+
+  /// No description provided for @custDeclinedChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined'**
+  String get custDeclinedChip;
+
+  /// No description provided for @custCoveredChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Covered'**
+  String get custCoveredChip;
+
+  /// No description provided for @custCoverRest.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover the Rest ({amount})'**
+  String custCoverRest(String amount);
+
+  /// No description provided for @custReadyToPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'All shares are in — place the order'**
+  String get custReadyToPlace;
+
+  /// No description provided for @custContinueToCheckout.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to Checkout'**
+  String get custContinueToCheckout;
+
+  /// No description provided for @custRemindBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind'**
+  String get custRemindBtn;
+
+  /// No description provided for @custCancelSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Split Order'**
+  String get custCancelSplit;
+
+  /// No description provided for @custInvitedYouToSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you to split'**
+  String custInvitedYouToSplit(String name);
+
+  /// No description provided for @custYourShareToPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Your share to pay'**
+  String get custYourShareToPay;
+
+  /// No description provided for @custSelectPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Payment Method'**
+  String get custSelectPaymentMethod;
+
+  /// No description provided for @custWhishShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Whish Money'**
+  String get custWhishShort;
+
+  /// No description provided for @custOmtShort.
+  ///
+  /// In en, this message translates to:
+  /// **'OMT'**
+  String get custOmtShort;
+
+  /// No description provided for @custBobShort.
+  ///
+  /// In en, this message translates to:
+  /// **'BOB Finance'**
+  String get custBobShort;
+
+  /// No description provided for @custCashAtDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash at Door'**
+  String get custCashAtDoor;
+
+  /// No description provided for @custRiderCollectsFromYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider will collect from you'**
+  String get custRiderCollectsFromYou;
+
+  /// No description provided for @custRecommendedChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get custRecommendedChip;
+
+  /// No description provided for @custPayMyShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay My Share ({amount})'**
+  String custPayMyShare(String amount);
+
+  /// No description provided for @custDeclineInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline invitation'**
+  String get custDeclineInvitation;
+
+  /// No description provided for @custAllSharesPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'All Shares Paid!'**
+  String get custAllSharesPaid;
+
+  /// No description provided for @custGroupSplitSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Group Split Summary'**
+  String get custGroupSplitSummary;
+
+  /// No description provided for @custRiderCollectNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider will collect {amount} from {name} at delivery'**
+  String custRiderCollectNote(String amount, String name);
+
+  /// No description provided for @custAddToOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Order'**
+  String get custAddToOrder;
+
+  /// No description provided for @custSearchByUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by username...'**
+  String get custSearchByUsername;
+
+  /// No description provided for @custRecentlySplitWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently split with'**
+  String get custRecentlySplitWith;
+
+  /// No description provided for @custQuickAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Add'**
+  String get custQuickAdd;
+
+  /// No description provided for @custAddAsGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name} as guest — pays cash at the door'**
+  String custAddAsGuest(String name);
+
+  /// No description provided for @custSplitRequestBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you to split an order'**
+  String custSplitRequestBanner(String name);
+
+  /// No description provided for @custPayYourShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay your share'**
+  String get custPayYourShare;
+
+  /// No description provided for @riderCashChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash Collection Checklist'**
+  String get riderCashChecklist;
+
+  /// No description provided for @riderAlreadyPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Already paid digitally'**
+  String get riderAlreadyPaid;
+
+  /// No description provided for @riderTotalCashCollect.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Cash to Collect'**
+  String get riderTotalCashCollect;
+
+  /// No description provided for @riderSplitOrderTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Split Order'**
+  String get riderSplitOrderTag;
+
   /// No description provided for @custMinOrderLine.
   ///
   /// In en, this message translates to:

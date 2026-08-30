@@ -189,10 +189,15 @@ class Cart extends ChangeNotifier {
   /// and writing it onto a saved address is exactly the leak checkout once had to fix.
   String? giftNote;
 
+  /// The group split plan behind this basket, set once the host's payment requests went out.
+  /// Checkout attaches the placed order to it; same order-scoped lifetime as [giftNote].
+  String? splitPlanId;
+
   void clear() {
     _lines.clear();
     _releaseStore();
     giftNote = null;
+    splitPlanId = null;
     notifyListeners();
   }
 

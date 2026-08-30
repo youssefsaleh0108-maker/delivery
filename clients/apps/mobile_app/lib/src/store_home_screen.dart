@@ -12,6 +12,7 @@ import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
 import 'diaspora_screen.dart';
+import 'friend_split_screen.dart';
 import 'hyperlocal_screen.dart';
 import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
@@ -39,6 +40,8 @@ class StoreHomeScreen extends StatefulWidget {
     required this.locale,
     required this.session,
     this.profileApi,
+    this.splitApi,
+    this.transferApi,
     required this.onSignOut,
   });
 
@@ -66,6 +69,11 @@ class StoreHomeScreen extends StatefulWidget {
 
   /// The account's picture for the header avatar. Null keeps the monogram.
   final ProfileApi? profileApi;
+
+  /// The group-split invitations banner: polls for requests addressed to this account. Both
+  /// arrive together or the banner stays undrawn.
+  final SplitApi? splitApi;
+  final TransferApi? transferApi;
   final Future<void> Function() onSignOut;
 
   @override
@@ -116,6 +124,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     _stores.addListener(_onStoresChanged);
     _load();
     _loadHeaderAvatar();
+    _loadSplitRequests();
   }
 
   void _onStoresChanged() {
@@ -317,6 +326,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               controller: _scrollController,
               slivers: <Widget>[
                 SliverToBoxAdapter(child: _header()),
+                SliverToBoxAdapter(child: _splitRequestBanner(t)),
                 SliverToBoxAdapter(child: _categoryStrip()),
                 SliverToBoxAdapter(child: _lebaneseRail(t)),
                 if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
@@ -373,6 +383,91 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// The white `home-header`: the delivery address on one row, the search field under it.
   /// The header avatar's viewing URL. Fetched once; the monogram covers every failure.
   String? _headerAvatarUrl;
+
+  /// Split invitations waiting on this account — drives the banner under the header.
+  List<SplitPlan> _splitRequests = <SplitPlan>[];
+
+  Future<void> _loadSplitRequests() async {
+    final SplitApi? api = widget.splitApi;
+    if (api == null) return;
+    try {
+      final List<SplitPlan> requests = await api.requests();
+      if (!mounted) return;
+      setState(() => _splitRequests = requests);
+    } catch (_) {
+      // No banner; the requests screen is still reachable next load.
+    }
+  }
+
+  /// The frame's invitation banner: who invited you, one tap to your share.
+  Widget _splitRequestBanner(DeliveryStrings t) {
+    if (_splitRequests.isEmpty ||
+        widget.splitApi == null ||
+        widget.transferApi == null) {
+      return const SizedBox.shrink();
+    }
+    final SplitPlan plan = _splitRequests.first;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.sm, _gutter, 0),
+      child: Material(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          onTap: () async {
+            await Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => FriendSplitScreen(
+                splitApi: widget.splitApi!,
+                transferApi: widget.transferApi!,
+                plan: plan,
+                myUsername: widget.session.username ?? '',
+              ),
+            ));
+            _loadSplitRequests();
+          },
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.group_rounded,
+                    size: 20, color: DeliveryColors.brand),
+                const SizedBox(width: DeliverySpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        t.custSplitRequestBanner(plan.hostName),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.ink,
+                          height: 1.25,
+                        ),
+                      ),
+                      Text(
+                        t.custPayYourShare,
+                        style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: DeliveryColors.brand,
+                            height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right,
+                    size: 18, color: DeliveryColors.brand),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadHeaderAvatar() async {
     final ProfileApi? api = widget.profileApi;

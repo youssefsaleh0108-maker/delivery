@@ -43,6 +43,7 @@ class RiderHomeScreen extends StatefulWidget {
     this.statementsApi,
     this.documentsApi,
     this.chatApi,
+    this.splitApi,
     this.socket,
     this.prefsApi,
     this.pendingApproval = false,
@@ -77,6 +78,9 @@ class RiderHomeScreen extends StatefulWidget {
   /// The order chat, and the socket its live half rides on. Both null keeps the order-detail
   /// header exactly as it was — no chat button at all.
   final ChatApi? chatApi;
+
+  /// The group-split ledger, for the cash checklist on a split order's detail. Optional.
+  final SplitApi? splitApi;
   final UserQueueSocket? socket;
 
   /// Handed to the settings page's notification-preferences grid; null leaves the row undrawn.
@@ -331,6 +335,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         trackingApi: widget.trackingApi,
         chatApi: widget.chatApi,
         socket: widget.socket,
+        splitApi: widget.splitApi,
       ),
     ));
   }

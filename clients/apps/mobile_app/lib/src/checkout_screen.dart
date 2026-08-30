@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
+import 'split_complete_screen.dart';
 import 'cart.dart';
 import 'delivery_address.dart';
 
@@ -32,6 +33,7 @@ class CheckoutScreen extends StatefulWidget {
     this.geocodingApi,
     this.promo,
     this.transferApi,
+    this.splitApi,
   });
 
   final OrderApi api;
@@ -42,6 +44,11 @@ class CheckoutScreen extends StatefulWidget {
   /// intent is recorded after placement. Optional so a test can pump this screen without a
   /// server; the screen then falls back to the display rate and cash-only.
   final TransferApi? transferApi;
+
+  /// Closes the group split plan over the placed order and shows the All-Shares-Paid screen.
+  /// Optional like [transferApi]; without it a split basket still checks out, just without the
+  /// ceremony.
+  final SplitApi? splitApi;
 
   /// Passed straight through to the address sheet so the area picker appears when a new address is
   /// added from here. Optional so a test can pump this screen without a server.
@@ -276,6 +283,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           );
         } catch (_) {
           // The ledger missed one intent; the order and its payment method stand.
+        }
+      }
+      // A group split closes over its order and gets its All-Shares-Paid moment. Read before
+      // clear() wipes it with the rest of the basket's order-scoped state.
+      final String? planId = widget.cart.splitPlanId;
+      if (planId != null && widget.splitApi != null) {
+        try {
+          final SplitPlan plan =
+              await widget.splitApi!.attachOrder(planId, order.id);
+          if (mounted) {
+            await Navigator.of(context).push<void>(MaterialPageRoute<void>(
+              builder: (BuildContext ctx) => SplitCompleteScreen(
+                plan: plan,
+                onTrack: () => Navigator.of(ctx).pop(),
+              ),
+            ));
+          }
+        } catch (_) {
+          // The order stands; the ceremony can be skipped, the ledger cannot.
         }
       }
       widget.cart.clear();

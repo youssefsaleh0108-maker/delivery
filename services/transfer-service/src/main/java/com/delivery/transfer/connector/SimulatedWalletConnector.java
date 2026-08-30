@@ -37,7 +37,8 @@ public class SimulatedWalletConnector implements MoneyTransferConnector {
 
     @Override
     public boolean supports(TransferMethod method) {
-        return method == TransferMethod.WHISH || method == TransferMethod.OMT;
+        return method == TransferMethod.WHISH || method == TransferMethod.OMT
+                || method == TransferMethod.BOB;
     }
 
     @Override
