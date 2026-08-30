@@ -5696,6 +5696,114 @@ abstract class DeliveryStrings {
   /// **'Add to Basket'**
   String get custAddToBasket;
 
+  /// No description provided for @custProductDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Details'**
+  String get custProductDetails;
+
+  /// No description provided for @custYourOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Orders'**
+  String get custYourOrders;
+
+  /// No description provided for @custActiveOrdersTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Orders ({count})'**
+  String custActiveOrdersTab(int count);
+
+  /// No description provided for @custPastOrdersTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Past Orders'**
+  String get custPastOrdersTab;
+
+  /// No description provided for @custItemsCountLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String custItemsCountLine(int count);
+
+  /// No description provided for @custReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder'**
+  String get custReorder;
+
+  /// No description provided for @custActiveStoresNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Stores Nearby'**
+  String get custActiveStoresNearby;
+
+  /// No description provided for @custShowingShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {count, plural, =1{1 shop} other{{count} shops}}'**
+  String custShowingShops(int count);
+
+  /// No description provided for @custSortFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort / Filter'**
+  String get custSortFilter;
+
+  /// No description provided for @custTrackConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get custTrackConfirmed;
+
+  /// No description provided for @custTrackPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing'**
+  String get custTrackPreparing;
+
+  /// No description provided for @custTrackOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'On the Way'**
+  String get custTrackOnTheWay;
+
+  /// No description provided for @custTrackDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get custTrackDelivered;
+
+  /// No description provided for @custButlerBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'We buy or deliver anything!'**
+  String get custButlerBanner;
+
+  /// No description provided for @custButlerBannerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot something? Need keys retrieved, or shopping from a store not listed? Describe it and a YouDrop rider gets it done.'**
+  String get custButlerBannerBlurb;
+
+  /// No description provided for @custMinOrderLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Min. Order: {amount}'**
+  String custMinOrderLine(String amount);
+
+  /// No description provided for @custYesterdayAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday, {time}'**
+  String custYesterdayAt(String time);
+
+  /// No description provided for @custDualPriceMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Dual price mode'**
+  String get custDualPriceMode;
+
   /// No description provided for @custDeliveryTime.
   ///
   /// In en, this message translates to:

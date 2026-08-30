@@ -3132,6 +3132,90 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custAddToBasket => 'أضف إلى السلة';
 
   @override
+  String get custProductDetails => 'تفاصيل المنتج';
+
+  @override
+  String get custYourOrders => 'طلباتك';
+
+  @override
+  String custActiveOrdersTab(int count) {
+    return 'الطلبات الجارية ($count)';
+  }
+
+  @override
+  String get custPastOrdersTab => 'الطلبات السابقة';
+
+  @override
+  String custItemsCountLine(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عنصر',
+      many: '$count عنصرًا',
+      few: '$count عناصر',
+      two: 'عنصران',
+      one: 'عنصر واحد',
+      zero: 'لا عناصر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get custReorder => 'أعد الطلب';
+
+  @override
+  String get custActiveStoresNearby => 'متاجر نشطة قريبة';
+
+  @override
+  String custShowingShops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count متجر',
+      many: '$count متجرًا',
+      few: '$count متاجر',
+      two: 'متجرين',
+      one: 'متجر واحد',
+    );
+    return 'عرض $_temp0';
+  }
+
+  @override
+  String get custSortFilter => 'الترتيب / التصفية';
+
+  @override
+  String get custTrackConfirmed => 'مؤكَّد';
+
+  @override
+  String get custTrackPreparing => 'قيد التحضير';
+
+  @override
+  String get custTrackOnTheWay => 'في الطريق';
+
+  @override
+  String get custTrackDelivered => 'تم التوصيل';
+
+  @override
+  String get custButlerBanner => 'نشتري أو نوصّل أي شيء!';
+
+  @override
+  String get custButlerBannerBlurb =>
+      'نسيت شيئاً؟ تحتاج استلام مفاتيح أو شراء من متجر غير مدرج؟ صِفه وسيُنجزه سائق YouDrop.';
+
+  @override
+  String custMinOrderLine(String amount) {
+    return 'الحد الأدنى للطلب: $amount';
+  }
+
+  @override
+  String custYesterdayAt(String time) {
+    return 'أمس، $time';
+  }
+
+  @override
+  String get custDualPriceMode => 'سعر بعملتين';
+
+  @override
   String get custDeliveryTime => 'وقت التوصيل';
 
   @override

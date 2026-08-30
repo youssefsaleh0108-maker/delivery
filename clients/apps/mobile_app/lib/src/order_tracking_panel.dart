@@ -229,8 +229,73 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _mapCanvas(t),
+        _progressSteps(t),
         _sheet(t),
       ],
+    );
+  }
+
+  /// The frame's four-step bar under the map: Confirmed, Preparing, On the Way, Delivered — a
+  /// crimson bar per step reached, the border colour for the rest, the current one's label in
+  /// brand. Delivered never lights here only because a delivered order has no live panel at all.
+  Widget _progressSteps(DeliveryStrings t) {
+    final OrderStatus status = widget.order.status;
+    final int reached = switch (status) {
+      OrderStatus.accepted => 1,
+      OrderStatus.preparing || OrderStatus.ready => 2,
+      OrderStatus.pickedUp => 3,
+      OrderStatus.delivered => 4,
+      _ => 0,
+    };
+    final List<String> labels = <String>[
+      t.custTrackConfirmed,
+      t.custTrackPreparing,
+      t.custTrackOnTheWay,
+      t.custTrackDelivered,
+    ];
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          DeliverySpacing.lg, DeliverySpacing.md, DeliverySpacing.lg, 0),
+      child: Row(
+        children: <Widget>[
+          for (int i = 0; i < labels.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(width: DeliverySpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: i < reached
+                          ? DeliveryColors.brand
+                          : DeliveryColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: i == reached - 1
+                          ? DeliveryColors.brand
+                          : i < reached
+                              ? DeliveryColors.ink
+                              : DeliveryColors.faint,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

@@ -108,6 +108,7 @@ http:
       rule: >-
         PathPrefix(`/api/products`) || PathPrefix(`/api/categories`)
         || PathPrefix(`/api/stores`) || PathPrefix(`/api/banners`)
+        || PathPrefix(`/api/market`)
         || PathPrefix(`/api/delivery-zones`) || PathPrefix(`/api/admin/thumbnails`)
       service: product-service
       entryPoints: [web, https]

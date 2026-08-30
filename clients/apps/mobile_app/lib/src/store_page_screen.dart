@@ -828,15 +828,33 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text(
-                        product.price.toStringAsFixed(2),
+                      // The frame prices each row twice: the dollar figure in brand bold, and the
+                      // LBP conversion beside it in faint — the platform rate, not a second price.
+                      child: Text.rich(
+                        TextSpan(
+                          children: <InlineSpan>[
+                            TextSpan(
+                              text: '\$${product.price.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: DeliveryColors.brand,
+                              ),
+                            ),
+                            if (MarketRates.instance.lbpParen(product.price)
+                                case final String lbp)
+                              TextSpan(
+                                text: '  $lbp',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: DeliveryColors.faint,
+                                ),
+                              ),
+                          ],
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: DeliveryColors.brand,
-                        ),
                       ),
                     ),
                     // How many are already in the basket, and the way back out again. The frame

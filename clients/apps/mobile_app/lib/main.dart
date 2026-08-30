@@ -361,6 +361,8 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     // Fire and forget: the app renders in the device language and switches the moment the saved
     // preference arrives, rather than holding the first frame for a disk read.
     _locale.load();
+    // Likewise the LBP display rate: prices render USD-only until it lands, then twice.
+    MarketRates.instance.load(_dio);
   }
 
   Future<void> _signOut() async {

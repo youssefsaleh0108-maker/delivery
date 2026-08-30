@@ -192,6 +192,7 @@ class _ButlerScreenState extends State<ButlerScreen> {
         child: Column(
           children: <Widget>[
             _header(),
+            _promiseBanner(DeliveryStrings.of(context)),
             Expanded(
               child: Form(
                 key: _formKey,
@@ -267,6 +268,40 @@ class _ButlerScreenState extends State<ButlerScreen> {
             hintText: t.custSearchTasksHint,
             onChanged: (String value) => setState(() => _query = value),
             searchSemanticLabel: t.custSearchTasksHint,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The frame's promise banner: the headline in brand bold over the blurb, on the brand-soft
+  /// ground, full-width above the modes.
+  Widget _promiseBanner(DeliveryStrings t) {
+    return Container(
+      width: double.infinity,
+      color: DeliveryColors.brandSoft,
+      padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: _gutter, vertical: DeliverySpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            t.custButlerBanner,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: DeliveryColors.brand,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t.custButlerBannerBlurb,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: DeliveryColors.muted,
+              height: 1.4,
+            ),
           ),
         ],
       ),

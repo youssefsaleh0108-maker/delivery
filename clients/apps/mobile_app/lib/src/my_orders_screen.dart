@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import 'cart.dart';
 import 'order_details_screen.dart';
+import 'store_page_screen.dart';
 
 /// The customer's orders, and live tracking for the one currently out for delivery.
 ///
@@ -147,6 +148,30 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     }
   }
 
+  /// Which of the frame's two tabs is showing: false = Active, true = Past.
+  bool _past = false;
+
+  List<DeliveryOrder> get _active =>
+      _orders.where((DeliveryOrder o) => !o.status.isTerminal).toList();
+
+  List<DeliveryOrder> get _pastOrders =>
+      _orders.where((DeliveryOrder o) => o.status.isTerminal).toList();
+
+  /// "Reorder": back into the shop the order came from, basket-ready. The frame's button
+  /// re-starts the purchase; the shop page IS where that happens, one tap from the past order.
+  void _reorder(DeliveryOrder order) {
+    final String? storeId = order.storeId;
+    if (storeId == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => StorePageScreen(
+        storeApi: widget.storeApi,
+        orderApi: widget.api,
+        cart: widget.cart,
+        storeId: storeId,
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
@@ -156,9 +181,59 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          SafeArea(bottom: false, child: YdScreenHeader(title: t.navOrders)),
+          SafeArea(bottom: false, child: YdScreenHeader(title: t.custYourOrders)),
+          _tabBar(t),
           Expanded(child: _body(t)),
         ],
+      ),
+    );
+  }
+
+  /// The frame's underlined pair: "Active Orders (N)" and "Past Orders", the showing one in
+  /// brand with a 2px underline, the other muted.
+  Widget _tabBar(DeliveryStrings t) {
+    return Container(
+      color: DeliveryColors.white,
+      child: Row(
+        children: <Widget>[
+          _tab(t.custActiveOrdersTab(_active.length), selected: !_past,
+              onTap: () => setState(() => _past = false)),
+          _tab(t.custPastOrdersTab, selected: _past,
+              onTap: () => setState(() => _past = true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(String label, {required bool selected, required VoidCallback onTap}) {
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.md - 2),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: selected ? DeliveryColors.brand : DeliveryColors.border,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: selected ? DeliveryColors.brand : DeliveryColors.muted,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -180,7 +255,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     if (_loading && _orders.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
     }
-    if (_orders.isEmpty) {
+    final List<DeliveryOrder> showing = _past ? _pastOrders : _active;
+    if (showing.isEmpty) {
       return YdEmptyState(
         icon: Icons.receipt_long_outlined,
         title: t.noOrdersYet,
@@ -193,11 +269,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       onRefresh: () => _refresh(),
       child: ListView.separated(
         padding: const EdgeInsets.all(DeliverySpacing.lg),
-        itemCount: _orders.length,
+        itemCount: showing.length,
         separatorBuilder: (_, __) =>
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
         itemBuilder: (BuildContext context, int i) {
-          final DeliveryOrder order = _orders[i];
+          final DeliveryOrder order = showing[i];
           return _OrderCard(
             order: order,
             position: _positions[order.id],
@@ -205,6 +281,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             onCancel: order.availableActions.contains(OrderAction.cancel)
                 ? () => _cancel(order)
                 : null,
+            onReorder:
+                order.status.isTerminal ? () => _reorder(order) : null,
           );
         },
       ),
@@ -213,12 +291,33 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, this.position, this.onCancel, this.onTap});
+  const _OrderCard(
+      {required this.order, this.position, this.onCancel, this.onTap, this.onReorder});
 
   final DeliveryOrder order;
   final RiderPosition? position;
   final VoidCallback? onCancel;
   final VoidCallback? onTap;
+
+  /// The frame's Reorder button, drawn on the past-order cards only.
+  final VoidCallback? onReorder;
+
+  /// "8:45 PM" today, "Yesterday, 8:45 PM", then plain short dates — the way the frame stamps
+  /// its cards, without pretending to a fuzzier memory than the data has.
+  String _placedLabel(BuildContext context, DeliveryStrings t) {
+    final DateTime? at = order.placedAt?.toLocal();
+    if (at == null) return t.orderRefWithAddress(order.shortId, order.deliveryAddress);
+    final MaterialLocalizations dates = MaterialLocalizations.of(context);
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime day = DateTime(at.year, at.month, at.day);
+    final String time = dates.formatTimeOfDay(TimeOfDay.fromDateTime(at));
+    if (day == today) return time;
+    if (day == today.subtract(const Duration(days: 1))) {
+      return t.custYesterdayAt(time);
+    }
+    return dates.formatShortDate(at);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +348,7 @@ class _OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      t.orderRefWithAddress(order.shortId, order.deliveryAddress),
+                      _placedLabel(context, t),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -269,42 +368,66 @@ class _OrderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-          for (final OrderLine line in order.items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Text(
-                t.lineQuantity(line.qty, line.productName),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: DeliveryColors.muted,
-                  height: 1.35,
-                ),
-              ),
-            ),
-          const SizedBox(height: DeliverySpacing.sm),
+          const Divider(height: 1, color: DeliveryColors.borderFaint),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          // The frame sums the basket to one line — "2 items" over the dual-priced total — with
+          // Reorder beside it on the cards whose story is over. The full item list lives one tap
+          // away on the details page.
           Row(
             children: <Widget>[
-              Text(
-                t.total,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: DeliveryColors.faint,
-                  height: 1.3,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      t.custItemsCountLine(order.items.length),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DeliveryColors.muted,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text.rich(
+                      TextSpan(
+                        children: <InlineSpan>[
+                          TextSpan(
+                            text: '\$${order.totalAmount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: DeliveryColors.ink,
+                              height: 1.25,
+                            ),
+                          ),
+                          if (MarketRates.instance.lbpParen(order.totalAmount)
+                              case final String lbp)
+                            TextSpan(
+                              text: ' $lbp',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: DeliveryColors.faint,
+                              ),
+                            ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              Text(
-                order.totalAmount.toStringAsFixed(2),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: DeliveryColors.ink,
-                  height: 1.25,
+              if (onReorder != null) ...<Widget>[
+                const SizedBox(width: DeliverySpacing.sm),
+                YdPillButton(
+                  label: t.custReorder,
+                  expand: false,
+                  size: YdPillButtonSize.compact,
+                  onPressed: onReorder,
                 ),
-              ),
+              ],
             ],
           ),
 

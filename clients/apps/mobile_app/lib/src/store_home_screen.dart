@@ -7,11 +7,11 @@ import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
 import 'cart.dart';
-import 'categories_screen.dart';
 import 'delivery_address.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
+import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
 
@@ -198,16 +198,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     _reloadStoresOnly();
   }
 
-  /// The full directory, and back again with whatever was picked.
-  Future<void> _openCategories() async {
-    final StoreVertical? picked = await Navigator.of(context).push<StoreVertical>(
-      MaterialPageRoute<StoreVertical>(
-        builder: (BuildContext _) =>
-            CategoriesScreen(storeApi: widget.storeApi, chips: _chips),
-      ),
-    );
-    if (picked != null) _selectVertical(picked);
-  }
+  // The See-All directory chip left with the pill strip: the frame's category cards scroll the
+  // whole set right here and each opens its own listing, so the separate directory screen has no
+  // seat on this header any more.
 
   /// Patches BOTH of this screen's lists with a card whose favourite flag is the truth: the grid
   /// in place, and the "Your favourites" rail by insertion or removal. One method, because the two
@@ -343,7 +336,10 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       padding: const EdgeInsetsDirectional.fromSTEB(
                           _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.md - 4),
                       child: YdSectionHeader(
-                        title: _filters.vertical?.labelIn(t) ?? t.allStores,
+                        // The frame's own heading for the unfiltered list; a banner-driven
+                        // vertical filter still names the vertical.
+                        title: _filters.vertical?.labelIn(t) ??
+                            t.custActiveStoresNearby,
                         // Plural-aware via ICU. Arabic has six plural categories, not two, so a
                         // `count == 1 ? 'shop' : 'shops'` ternary cannot be translated correctly.
                         // The SERVER's total where it is truthful, so the number does not climb
@@ -565,44 +561,89 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   /// The horizontally scrolling pill strip. Ends in the door to the full directory — the design
   /// gives the categories screen no other entrance.
+  /// The frame's category CARDS — a white tile per vertical, the glyph in a brand-soft square
+  /// over the label — each opening that category's own listing screen rather than filtering the
+  /// grid in place, which is how the frame's flow reads (home → listing → shop).
   Widget _categoryStrip() {
-    final DeliveryStrings t = DeliveryStrings.of(context);
     final List<StoreVertical> verticals = _chipVerticals;
 
     return SizedBox(
-      height: YdChip.minHeight + DeliverySpacing.xl,
+      height: 96,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsetsDirectional.fromSTEB(
-            _gutter, DeliverySpacing.md, DeliverySpacing.md, DeliverySpacing.md),
+            _gutter, DeliverySpacing.md, DeliverySpacing.md, DeliverySpacing.xs),
         children: <Widget>[
-          YdChip(
-            label: t.all,
-            icon: Icons.apps,
-            elevated: true,
-            selected: _filters.vertical == null,
-            onTap: () => _selectVertical(null),
-          ),
           for (final StoreVertical vertical in verticals) ...<Widget>[
+            _categoryCard(vertical),
             const SizedBox(width: 10),
-            YdChip(
-              label: _chipLabel(vertical),
-              icon: iconForVertical(vertical),
-              elevated: true,
-              selected: _filters.vertical == vertical,
-              onTap: () => _selectVertical(vertical),
-            ),
           ],
-          const SizedBox(width: 10),
-          YdChip(
-            label: t.custSeeAll,
-            icon: Icons.grid_view_outlined,
-            elevated: true,
-            onTap: _openCategories,
-          ),
         ],
       ),
     );
+  }
+
+  Widget _categoryCard(StoreVertical vertical) {
+    return Semantics(
+      button: true,
+      label: _chipLabel(vertical),
+      child: Material(
+        color: DeliveryColors.white,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          onTap: () => _openListing(vertical),
+          child: Container(
+            width: 82,
+            padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              border: Border.all(color: DeliveryColors.borderFaint),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: DeliveryColors.brandSoft,
+                    borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
+                  ),
+                  child: Icon(iconForVertical(vertical),
+                      size: 20, color: DeliveryColors.brand),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _chipLabel(vertical),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openListing(StoreVertical? vertical) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ShopsListingScreen(
+        storeApi: widget.storeApi,
+        orderApi: widget.orderApi,
+        cart: widget.cart,
+        initialVertical: vertical,
+        chips: _chips,
+      ),
+    ));
   }
 
   /// The refine row the sliders glyph opens, in the same pill language as the strip above it.

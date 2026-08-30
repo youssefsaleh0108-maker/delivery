@@ -217,8 +217,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Scaffold(
       backgroundColor: DeliveryColors.background,
+      // The frame's own header — "Product Details" between the back circle and the overflow slot —
+      // replaces the glass button that used to float on the photo.
+      appBar: YdScreenHeader(
+        title: t.custProductDetails,
+        onBack: () => Navigator.of(context).maybePop(),
+        backSemanticLabel: t.back,
+      ),
       body: ListView(
         padding: EdgeInsets.zero,
         children: <Widget>[
@@ -266,21 +274,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: _galleryDots(images.length),
             ),
           ],
-          PositionedDirectional(
-            // The hero photo runs full-bleed under the transparent status bar by design; the back
-            // button must not, so it clears the bar on top of its own 24px inset.
-            top: DeliverySpacing.lg + MediaQuery.paddingOf(context).top,
-            start: DeliverySpacing.lg,
-            child: GlassCircleButton(
-              icon: Directionality.of(context) == TextDirection.rtl
-                  ? Icons.chevron_right
-                  : Icons.chevron_left,
-              // The product hero's button is a dark scrim disc, not the shop hero's white glass.
-              background: DeliveryColors.ink.withValues(alpha: 0.25),
-              semanticLabel: DeliveryStrings.of(context).back,
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
         ],
       ),
     );
@@ -340,19 +333,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               height: 1.2,
             ),
           ),
-          const SizedBox(height: DeliverySpacing.sm),
-          // The design pairs this with a struck-through "was" price. The catalog has no previous
-          // price to strike through, and inventing one would be inventing a discount, so only the
-          // live price is drawn.
-          Text(
-            _unitPrice.toStringAsFixed(2),
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: DeliveryColors.brand,
-              height: 1.2,
-            ),
-          ),
           if (description != null && description.isNotEmpty) ...<Widget>[
             const SizedBox(height: DeliverySpacing.sm),
             Text(
@@ -364,6 +344,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
           ],
+          const SizedBox(height: DeliverySpacing.md),
+          _dualPriceCard(),
           if (widget.groups.isNotEmpty) ...<Widget>[
             const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
             const Divider(height: 1, thickness: 1, color: DeliveryColors.border),
@@ -378,6 +360,90 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
           const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
           _actionRow(),
+        ],
+      ),
+    );
+  }
+
+  /// The frame's `DUAL PRICE MODE` card: the label in brand caps, the dollar figure large with
+  /// the LBP conversion beside it, and the USD chip naming the currency the platform actually
+  /// charges in. The LBP line is the platform rate (see MarketRates) — one market-wide number,
+  /// not a second price anybody set — and the card degrades to USD-only while no rate is known.
+  Widget _dualPriceCard() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final String? lbp = MarketRates.instance.lbp(_unitPrice);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  t.custDualPriceMode.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.brand,
+                    letterSpacing: 0.8,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text.rich(
+                  TextSpan(
+                    children: <InlineSpan>[
+                      TextSpan(
+                        text: '\$${_unitPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: DeliveryColors.ink,
+                          height: 1.15,
+                        ),
+                      ),
+                      if (lbp != null)
+                        TextSpan(
+                          text: '  / $lbp',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: DeliveryColors.muted,
+                            height: 1.2,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: DeliveryColors.brand,
+              borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+            ),
+            child: const Text(
+              // The settlement currency's own code, not a translated word.
+              'USD',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: DeliveryColors.white,
+                letterSpacing: 0.5,
+                height: 1.2,
+              ),
+            ),
+          ),
         ],
       ),
     );

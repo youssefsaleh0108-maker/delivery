@@ -3155,6 +3155,83 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custAddToBasket => 'Add to Basket';
 
   @override
+  String get custProductDetails => 'Product Details';
+
+  @override
+  String get custYourOrders => 'Your Orders';
+
+  @override
+  String custActiveOrdersTab(int count) {
+    return 'Active Orders ($count)';
+  }
+
+  @override
+  String get custPastOrdersTab => 'Past Orders';
+
+  @override
+  String custItemsCountLine(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get custReorder => 'Reorder';
+
+  @override
+  String get custActiveStoresNearby => 'Active Stores Nearby';
+
+  @override
+  String custShowingShops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shops',
+      one: '1 shop',
+    );
+    return 'Showing $_temp0';
+  }
+
+  @override
+  String get custSortFilter => 'Sort / Filter';
+
+  @override
+  String get custTrackConfirmed => 'Confirmed';
+
+  @override
+  String get custTrackPreparing => 'Preparing';
+
+  @override
+  String get custTrackOnTheWay => 'On the Way';
+
+  @override
+  String get custTrackDelivered => 'Delivered';
+
+  @override
+  String get custButlerBanner => 'We buy or deliver anything!';
+
+  @override
+  String get custButlerBannerBlurb =>
+      'Forgot something? Need keys retrieved, or shopping from a store not listed? Describe it and a YouDrop rider gets it done.';
+
+  @override
+  String custMinOrderLine(String amount) {
+    return 'Min. Order: $amount';
+  }
+
+  @override
+  String custYesterdayAt(String time) {
+    return 'Yesterday, $time';
+  }
+
+  @override
+  String get custDualPriceMode => 'Dual price mode';
+
+  @override
   String get custDeliveryTime => 'Delivery Time';
 
   @override

@@ -348,13 +348,31 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 ],
                 const SizedBox(height: DeliverySpacing.xs),
-                Text(
-                  line.unitPrice.toStringAsFixed(2),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: DeliveryColors.brand,
+                Text.rich(
+                  TextSpan(
+                    children: <InlineSpan>[
+                      TextSpan(
+                        text: '\$${line.unitPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: DeliveryColors.brand,
+                        ),
+                      ),
+                      if (MarketRates.instance.lbpParen(line.unitPrice)
+                          case final String lbp)
+                        TextSpan(
+                          text: ' $lbp',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: DeliveryColors.faint,
+                          ),
+                        ),
+                    ],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -588,7 +606,8 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             const SizedBox(height: DeliverySpacing.md),
-            _summaryRow(t.subtotal, widget.cart.subtotal.toStringAsFixed(2)),
+            _summaryRow(t.subtotal, '\$${widget.cart.subtotal.toStringAsFixed(2)}',
+                lbpOf: widget.cart.subtotal),
             if (store != null) ...<Widget>[
               const SizedBox(height: DeliverySpacing.sm),
               _summaryRow(
@@ -598,7 +617,10 @@ class _CartScreenState extends State<CartScreen> {
                 // "Free" is the thing worth reading; 0.00 makes the eye do arithmetic.
                 widget.cart.deliveryFeeCharged == 0
                     ? t.free
-                    : widget.cart.deliveryFeeCharged.toStringAsFixed(2),
+                    : '\$${widget.cart.deliveryFeeCharged.toStringAsFixed(2)}',
+                lbpOf: widget.cart.deliveryFeeCharged == 0
+                    ? null
+                    : widget.cart.deliveryFeeCharged,
               ),
               // The discounts line, and only when there is a real discount to put on it. Names the
               // promotion underneath: a customer who is not told why their delivery was free has
@@ -654,12 +676,28 @@ class _CartScreenState extends State<CartScreen> {
                     color: DeliveryColors.ink,
                   ),
                 ),
-                Text(
-                  payable.toStringAsFixed(2),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: DeliveryColors.brand,
+                Text.rich(
+                  TextSpan(
+                    children: <InlineSpan>[
+                      TextSpan(
+                        text: '\$${payable.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.brand,
+                        ),
+                      ),
+                      if (MarketRates.instance.lbpParen(payable)
+                          case final String lbp)
+                        TextSpan(
+                          text: ' $lbp',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: DeliveryColors.muted,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -697,18 +735,39 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _summaryRow(String label, String value, {Color? valueColor}) {
+  Widget _summaryRow(String label, String value,
+      {Color? valueColor, double? lbpOf}) {
+    // The frame prices the money rows twice — the dollar figure, then the LBP conversion in
+    // faint. `lbpOf` is the dollar amount to convert; rows whose value is a word ("Free") or a
+    // discount pass nothing and stay single.
+    final String? lbp =
+        lbpOf == null ? null : MarketRates.instance.lbpParen(lbpOf);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
         Text(label,
             style: const TextStyle(fontSize: 13, color: DeliveryColors.muted)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: valueColor ?? DeliveryColors.ink,
+        Text.rich(
+          TextSpan(
+            children: <InlineSpan>[
+              TextSpan(
+                text: value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ?? DeliveryColors.ink,
+                ),
+              ),
+              if (lbp != null)
+                TextSpan(
+                  text: ' $lbp',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: DeliveryColors.faint,
+                  ),
+                ),
+            ],
           ),
         ),
       ],
