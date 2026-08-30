@@ -1480,7 +1480,7 @@
   "registerStoreNow": "Register Store Now",
   "authAlreadyHaveAnAccount": "Already have an account?",
   "authDontHaveAnAccount": "Don't have an account?",
-  "authSignUp": "Sign up",
+  "authSignUp": "Sign Up",
   "authSignInSubtitle": "Please enter your credentials to log in.",
   "authSignInAccountSubtitle": "Sign in to your YouDrop account",
   "authTaglineLebanon": "Deliver everything in Lebanon",
@@ -1499,7 +1499,7 @@
       "total": { "type": "int" }
     }
   },
-  "authEmailOrPhone": "Email or phone number",
+  "authEmailOrPhone": "Email or Phone",
   "authEmailOrPhoneHint": "e.g. name@domain.com or +961…",
   "authPasscodeHint": "Your six-digit passcode",
   "authForgotPassword": "Forgot password?",

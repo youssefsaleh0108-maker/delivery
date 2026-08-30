@@ -2699,7 +2699,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get authDontHaveAnAccount => 'Don\'t have an account?';
 
   @override
-  String get authSignUp => 'Sign up';
+  String get authSignUp => 'Sign Up';
 
   @override
   String get authSignInSubtitle => 'Please enter your credentials to log in.';
@@ -2727,7 +2727,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String get authEmailOrPhone => 'Email or phone number';
+  String get authEmailOrPhone => 'Email or Phone';
 
   @override
   String get authEmailOrPhoneHint => 'e.g. name@domain.com or +961…';

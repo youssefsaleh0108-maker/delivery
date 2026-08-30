@@ -272,7 +272,10 @@ class _SignInScreenState extends State<SignInScreen> {
                       AuthErrorNote(message: _error!),
                     ],
                     if (onCredentials) ...<Widget>[
+                      // The frame floats the footer at the bottom of the screen, well clear of the
+                      // social row — the spacer is that gap.
                       const SizedBox(height: DeliverySpacing.lg),
+                      const Spacer(),
                       AuthFooterLink(
                         question: t.authDontHaveAnAccount,
                         action: t.authSignUp,
@@ -293,6 +296,8 @@ class _SignInScreenState extends State<SignInScreen> {
   // ------------------------------------------------------------------ the drawn login form
 
   List<Widget> _credentials(DeliveryStrings t) => <Widget>[
+        // Not in the frame, and kept anyway: this is the signed-out landing, and the pill is the
+        // one road to Arabic before anybody can read a settings screen.
         if (widget.locale != null)
           Align(
             alignment: AlignmentDirectional.centerEnd,
@@ -301,27 +306,6 @@ class _SignInScreenState extends State<SignInScreen> {
         const SizedBox(height: DeliverySpacing.sm),
         const _BrandLockup(),
         const SizedBox(height: DeliverySpacing.xl),
-        Text(
-          t.welcomeBack,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: DeliveryColors.ink,
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          t.authSignInAccountSubtitle,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 14,
-            color: DeliveryColors.muted,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: DeliverySpacing.lg),
         AuthField(
           label: t.authEmailOrPhone,
           hint: t.authEmailOrPhoneHint,
@@ -533,65 +517,46 @@ class AuthBrandRow extends StatelessWidget {
   }
 }
 
-/// The centred brand lockup at the head of the new sign-in (Figma `brand-header` 40:1036): the round
-/// mark, the two-tone wordmark, and the tagline in brand caps under it.
+/// The brand lockup at the head of the sign-in (Figma `logo-wrapper` 40:1037): the pin-drop badge
+/// beside the two-tone wordmark, one centred row, nothing under it. The updated frame dropped the
+/// tagline and the welcome copy — the form itself is the greeting now.
 ///
-/// The wordmark is split — ink "You", brand "Drop" — the way the design draws it. It is a fixed
-/// product name, not a localised string, so the two halves are literals here.
+/// The badge is the design's own export (`logo-mark` 69:29, at 4x). The wordmark is split — ink
+/// "You", brand "Drop" — the way the design draws it; a fixed product name, not a localised
+/// string, so the two halves are literals here.
 class _BrandLockup extends StatelessWidget {
   const _BrandLockup();
 
   @override
   Widget build(BuildContext context) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    return Column(
+    return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: DeliveryColors.brand,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text.rich(
-              TextSpan(
-                children: <InlineSpan>[
-                  TextSpan(
-                    text: 'You',
-                    style: TextStyle(color: DeliveryColors.ink),
-                  ),
-                  TextSpan(
-                    text: 'Drop',
-                    style: TextStyle(color: DeliveryColors.brand),
-                  ),
-                ],
-              ),
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                height: 1.0,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
+        Image.asset(
+          'assets/illustrations/brand_mark.png',
+          width: 40,
+          height: 40,
         ),
-        const SizedBox(height: 12),
-        Text(
-          t.authTaglineLebanon.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: DeliveryColors.brand,
-            letterSpacing: 1.5,
-            height: 1.2,
+        const SizedBox(width: 8),
+        const Text.rich(
+          TextSpan(
+            children: <InlineSpan>[
+              TextSpan(
+                text: 'You',
+                style: TextStyle(color: DeliveryColors.ink),
+              ),
+              TextSpan(
+                text: 'Drop',
+                style: TextStyle(color: DeliveryColors.brand),
+              ),
+            ],
+          ),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            height: 1.0,
+            letterSpacing: -0.5,
           ),
         ),
       ],

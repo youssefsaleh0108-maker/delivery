@@ -109,9 +109,13 @@ class _SplashScreenState extends State<SplashScreen>
                               ),
                             ],
                           ),
-                          child: const DeliveryLogo.mark(
-                            size: 48,
-                            foreground: DeliveryColors.brand,
+                          // The design's own pin-drop mark (`logo-mark` 69:19, exported at 4x) —
+                          // the same identity the sign-in badge carries, crimson here on the
+                          // white disc where the sign-in inverts it.
+                          child: Image.asset(
+                            'assets/illustrations/brand_mark_splash.png',
+                            width: 48,
+                            height: 48,
                           ),
                         ),
                       ),

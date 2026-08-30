@@ -4835,7 +4835,7 @@ abstract class DeliveryStrings {
   /// No description provided for @authSignUp.
   ///
   /// In en, this message translates to:
-  /// **'Sign up'**
+  /// **'Sign Up'**
   String get authSignUp;
 
   /// No description provided for @authSignInSubtitle.
@@ -4883,7 +4883,7 @@ abstract class DeliveryStrings {
   /// No description provided for @authEmailOrPhone.
   ///
   /// In en, this message translates to:
-  /// **'Email or phone number'**
+  /// **'Email or Phone'**
   String get authEmailOrPhone;
 
   /// No description provided for @authEmailOrPhoneHint.
