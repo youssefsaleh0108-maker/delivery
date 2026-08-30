@@ -3355,7 +3355,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get merchbManageAvailability => 'إدارة التوفر';
 
   @override
-  String get merchbSearchMenuItems => 'ابحث في أصناف القائمة...';
+  String get merchbSearchMenuItems => 'ابحث في المنتجات...';
 
   @override
   String get merchbAvailable => 'متاح';
@@ -3379,7 +3379,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get merchbProductImage => 'صورة المنتج';
 
   @override
-  String get merchbUploadImageCta => 'ارفع صورة شهية للطبق';
+  String get merchbUploadImageCta => 'ارفع صورة المنتج';
 
   @override
   String get merchbUploadHint => 'PNG أو JPG بحجم أقصاه 5 ميغابايت';
@@ -3482,7 +3482,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String get merchbSaveMenuItem => 'حفظ الصنف';
+  String get merchbSaveMenuItem => 'حفظ المنتج';
 
   @override
   String get merchbSoon => 'قريباً';

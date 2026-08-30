@@ -112,7 +112,21 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     _load();
   }
 
-  void _onStoresChanged() => setState(() {});
+  void _onStoresChanged() {
+    if (!mounted) return;
+    setState(() {});
+    // The offers chip filters CLIENT-side (see _visibleStores), so a fetched page can contribute
+    // zero visible rows. Left alone, the grid stops growing and the empty state shows while
+    // offer-bearing shops still exist on later pages — so keep pulling until something is visible
+    // or the pages genuinely run out. loadMore() is re-entry-guarded, so this cannot stack.
+    if (_filters.offersOnly &&
+        _visibleStores.isEmpty &&
+        _stores.hasMore &&
+        !_stores.isLoadingFirstPage &&
+        !_stores.isLoadingMore) {
+      _stores.loadMore();
+    }
+  }
 
   @override
   void dispose() {
@@ -191,17 +205,28 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     if (picked != null) _selectVertical(picked);
   }
 
+  /// Patches BOTH of this screen's lists with a card whose favourite flag is the truth: the grid
+  /// in place, and the "Your favourites" rail by insertion or removal. One method, because the two
+  /// used to be patched in one place and rolled back in another — a failed unfavourite restored
+  /// the star on the grid but left the card missing from the rail until the next refresh. It is
+  /// also the hook the store page calls, so a heart toggled THERE appears here immediately,
+  /// without refetching anything — this screen stays alive in the shell's IndexedStack, so the
+  /// setState lands on a live State.
+  void _applyFavorite(StoreCard store) {
+    _stores.replaceWhere((StoreCard s) => s.id == store.id, store);
+    if (!mounted) return;
+    setState(() {
+      final List<StoreCard> without =
+          _favorites.where((StoreCard s) => s.id != store.id).toList();
+      _favorites = store.favorite ? <StoreCard>[store, ...without] : without;
+    });
+  }
+
   /// Optimistic: the star fills immediately and is put back if the call fails. Both endpoints are
   /// idempotent, so a double tap cannot desynchronise anything.
   Future<void> _toggleFavorite(StoreCard store) async {
     final bool nowFavorite = !store.favorite;
-    _stores.replaceWhere(
-        (StoreCard s) => s.id == store.id, store.copyWith(favorite: nowFavorite));
-    setState(() {
-      _favorites = nowFavorite
-          ? <StoreCard>[store.copyWith(favorite: true), ..._favorites]
-          : _favorites.where((StoreCard s) => s.id != store.id).toList();
-    });
+    _applyFavorite(store.copyWith(favorite: nowFavorite));
 
     try {
       if (nowFavorite) {
@@ -211,8 +236,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      _stores.replaceWhere(
-          (StoreCard s) => s.id == store.id, store.copyWith(favorite: !nowFavorite));
+      _applyFavorite(store.copyWith(favorite: !nowFavorite));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(DeliveryStrings.of(context).couldNotUpdateFavourites)),
       );
@@ -227,6 +251,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        onFavoriteChanged: _applyFavorite,
       ),
     ));
   }
@@ -275,7 +300,14 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           onRefresh: _load,
           child: NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification notification) {
-              if (shouldLoadMore(notification.metrics)) {
+              // depth 0 only: notifications BUBBLE, so without it every horizontal rail on this
+              // screen — the category strip, banners, offers, favourites — reached here carrying
+              // its own metrics, and a rail a few hundred pixels long satisfies the near-the-end
+              // check at position zero. One sideways swipe on the chips was pulling store page
+              // after store page, which is what quietly turned this paged screen back into
+              // load-everything.
+              if (notification.depth == 0 &&
+                  shouldLoadMore(notification.metrics)) {
                 // Guarded inside PagedList: a scroll fires this many times per second and only the
                 // first one may start a request.
                 _stores.loadMore();
@@ -310,7 +342,12 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                         title: _filters.vertical?.labelIn(t) ?? t.allStores,
                         // Plural-aware via ICU. Arabic has six plural categories, not two, so a
                         // `count == 1 ? 'shop' : 'shops'` ternary cannot be translated correctly.
-                        subtitle: t.shopsDelivering(_visibleStores.length),
+                        // The SERVER's total where it is truthful, so the number does not climb
+                        // as pages arrive. The offers chip filters client-side, so under it the
+                        // only honest count is what is actually on screen.
+                        subtitle: t.shopsDelivering(_filters.offersOnly
+                            ? _visibleStores.length
+                            : _stores.totalElements ?? _visibleStores.length),
                         fontSize: 18,
                       ),
                     ),
@@ -740,6 +777,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             orderApi: widget.orderApi,
             cart: widget.cart,
             storeId: banner.linkTarget!,
+            onFavoriteChanged: _applyFavorite,
           ),
         ));
       case BannerLinkKind.category:

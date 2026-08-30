@@ -1715,7 +1715,7 @@
   "merchOpenOrder": "Open order",
   "merchbMenuItems": "Menu Items",
   "merchbManageAvailability": "Manage availability",
-  "merchbSearchMenuItems": "Search menu items...",
+  "merchbSearchMenuItems": "Search products...",
   "merchbAvailable": "Available",
   "merchbOffShelf": "Off-shelf",
   "merchbAddProduct": "Add Product",
@@ -1723,7 +1723,7 @@
   "merchbNoMatchingItems": "No matching items",
   "merchbAddNewProduct": "Add New Product",
   "merchbProductImage": "Product Image",
-  "merchbUploadImageCta": "Upload delicious food image",
+  "merchbUploadImageCta": "Upload a product photo",
   "merchbUploadHint": "PNG, JPG up to 5MB",
   "merchbVariantsOptions": "Variants & Options",
   "merchbAddOption": "+ Add option",
@@ -1792,7 +1792,7 @@
       }
     }
   },
-  "merchbSaveMenuItem": "Save Menu Item",
+  "merchbSaveMenuItem": "Save Product",
   "merchbSoon": "Soon",
   "merchbShopConfiguration": "Shop Configuration",
   "merchbShopStatus": "Shop status",

@@ -25,6 +25,7 @@ class PagedList<T> extends ChangeNotifier {
   bool _hasMore = true;
   bool _loading = false;
   bool _loadedOnce = false;
+  int? _totalElements;
   Object? _error;
 
   /// Incremented on every [refresh]. A page that comes back carrying an old token is discarded —
@@ -45,6 +46,11 @@ class PagedList<T> extends ChangeNotifier {
 
   bool get hasMore => _hasMore;
 
+  /// The server's count of EVERYTHING matching, not just what has arrived — for a header that
+  /// says "34 shops" while three pages of them are still unfetched. Null until the first page
+  /// answers.
+  int? get totalElements => _totalElements;
+
   Object? get error => _error;
 
   /// True once a load has completed and found nothing — distinct from "not loaded yet", so an
@@ -58,6 +64,7 @@ class PagedList<T> extends ChangeNotifier {
     _nextPage = 0;
     _hasMore = true;
     _loadedOnce = false;
+    _totalElements = null;
     _error = null;
     return _load(_generation);
   }
@@ -84,6 +91,7 @@ class PagedList<T> extends ChangeNotifier {
       }
       _items.addAll(page.content);
       _nextPage = page.page + 1;
+      _totalElements = page.totalElements;
       // Trust the reported page count, and stop anyway on a short page — a server that reports
       // totals loosely should not put this in a loop.
       _hasMore = page.page + 1 < page.totalPages && page.content.isNotEmpty;

@@ -3372,7 +3372,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get merchbManageAvailability => 'Manage availability';
 
   @override
-  String get merchbSearchMenuItems => 'Search menu items...';
+  String get merchbSearchMenuItems => 'Search products...';
 
   @override
   String get merchbAvailable => 'Available';
@@ -3396,7 +3396,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get merchbProductImage => 'Product Image';
 
   @override
-  String get merchbUploadImageCta => 'Upload delicious food image';
+  String get merchbUploadImageCta => 'Upload a product photo';
 
   @override
   String get merchbUploadHint => 'PNG, JPG up to 5MB';
@@ -3498,7 +3498,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String get merchbSaveMenuItem => 'Save Menu Item';
+  String get merchbSaveMenuItem => 'Save Product';
 
   @override
   String get merchbSoon => 'Soon';

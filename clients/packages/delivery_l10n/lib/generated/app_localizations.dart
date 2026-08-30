@@ -6095,7 +6095,7 @@ abstract class DeliveryStrings {
   /// No description provided for @merchbSearchMenuItems.
   ///
   /// In en, this message translates to:
-  /// **'Search menu items...'**
+  /// **'Search products...'**
   String get merchbSearchMenuItems;
 
   /// No description provided for @merchbAvailable.
@@ -6143,7 +6143,7 @@ abstract class DeliveryStrings {
   /// No description provided for @merchbUploadImageCta.
   ///
   /// In en, this message translates to:
-  /// **'Upload delicious food image'**
+  /// **'Upload a product photo'**
   String get merchbUploadImageCta;
 
   /// No description provided for @merchbUploadHint.
@@ -6305,7 +6305,7 @@ abstract class DeliveryStrings {
   /// No description provided for @merchbSaveMenuItem.
   ///
   /// In en, this message translates to:
-  /// **'Save Menu Item'**
+  /// **'Save Product'**
   String get merchbSaveMenuItem;
 
   /// No description provided for @merchbSoon.

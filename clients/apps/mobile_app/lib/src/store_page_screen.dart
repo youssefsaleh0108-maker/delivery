@@ -26,6 +26,7 @@ class StorePageScreen extends StatefulWidget {
     required this.storeId,
     this.preview,
     this.orderApi,
+    this.onFavoriteChanged,
   });
 
   final StoreApi storeApi;
@@ -38,6 +39,14 @@ class StorePageScreen extends StatefulWidget {
 
   /// Optional: without it the Buy Again tab explains it has no history rather than failing.
   final OrderApi? orderApi;
+
+  /// Told every time the heart here changes the store's favourite state (and again on a rollback),
+  /// with the card carrying the new truth. The home screen passes itself in so its grid and
+  /// favourites rail update the moment the heart is tapped — it stays alive under this route in
+  /// the shell's IndexedStack, so there is nothing to refetch and nothing to wait for. A callback
+  /// rather than a popped result because this page can leave by system back or edge swipe, which
+  /// return nothing.
+  final void Function(StoreCard store)? onFavoriteChanged;
 
   @override
   State<StorePageScreen> createState() => _StorePageScreenState();
@@ -322,6 +331,9 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     if (store == null) return;
     final bool nowFavorite = !store.favorite;
     setState(() => _store = store.copyWith(favorite: nowFavorite));
+    // The pusher hears about it NOW, not on pop: home is alive under this route and patches its
+    // own lists from this card, so the rail is already right when the customer goes back.
+    widget.onFavoriteChanged?.call(_card);
     try {
       if (nowFavorite) {
         await widget.storeApi.star(store.id);
@@ -331,6 +343,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     } catch (_) {
       if (!mounted) return;
       setState(() => _store = store.copyWith(favorite: !nowFavorite));
+      // And about the rollback, so a refused toggle does not leave the two screens disagreeing.
+      widget.onFavoriteChanged?.call(_card);
     }
   }
 
@@ -418,7 +432,9 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     final StoreCard card = _card;
     final Store? store = _store;
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final bool favorite = store?.favorite ?? false;
+    // From the card, not `_store`: before read() answers, `_store` is null and a heart that was
+    // filled on the home screen flashed empty here for the round trip.
+    final bool favorite = card.favorite;
     final bool rtl = Directionality.of(context) == TextDirection.rtl;
 
     return SliverAppBar(
