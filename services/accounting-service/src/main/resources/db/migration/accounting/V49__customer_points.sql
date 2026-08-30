@@ -9,6 +9,6 @@ ALTER TABLE points_ledger DROP CONSTRAINT chk_points_owner_kind;
 ALTER TABLE points_ledger ADD CONSTRAINT chk_points_owner_kind
     CHECK (owner_kind IN ('MERCHANT', 'CARRIER', 'RIDER', 'CUSTOMER'));
 
-ALTER TABLE points_redemptions DROP CONSTRAINT chk_redemption_owner_kind;
-ALTER TABLE points_redemptions ADD CONSTRAINT chk_redemption_owner_kind
+ALTER TABLE points_redemption DROP CONSTRAINT chk_redemption_owner_kind;
+ALTER TABLE points_redemption ADD CONSTRAINT chk_redemption_owner_kind
     CHECK (owner_kind IN ('MERCHANT', 'CARRIER', 'RIDER', 'CUSTOMER'));
