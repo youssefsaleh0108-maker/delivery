@@ -1674,6 +1674,8 @@
   "custPowerMains": "Mains Power",
   "custPowerGenerator": "Generator",
   "custPowerDark": "Currently Dark",
+  "custGeneratorBanner": "Generator hours — delivery may take longer",
+  "custDarkBanner": "This shop is dark right now — orders may wait for power",
   "custVerifiedLocal": "Verified Local",
   "custPowerDeclared": "Power status — declared by the shops themselves",
   "merchbPowerHeading": "Power status",

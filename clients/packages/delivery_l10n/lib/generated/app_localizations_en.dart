@@ -3282,6 +3282,14 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custPowerDark => 'Currently Dark';
 
   @override
+  String get custGeneratorBanner =>
+      'Generator hours — delivery may take longer';
+
+  @override
+  String get custDarkBanner =>
+      'This shop is dark right now — orders may wait for power';
+
+  @override
   String get custVerifiedLocal => 'Verified Local';
 
   @override

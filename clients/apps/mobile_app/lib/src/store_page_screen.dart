@@ -390,6 +390,7 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
         builder: (BuildContext context, _) => NestedScrollView(
           headerSliverBuilder: (BuildContext context, bool _) => <Widget>[
             _hero(),
+            SliverToBoxAdapter(child: _powerBanner()),
             SliverToBoxAdapter(child: _statStrip()),
             if (_searchOpen) SliverToBoxAdapter(child: _searchBar()),
             SliverPersistentHeader(
@@ -428,6 +429,52 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
 
   /// The 200px cover: the photo, a 40% scrim so white type survives it, three glass controls, and
   /// the shop's name pinned to the bottom.
+  /// The frame's `generator-banner` (58:225): the amber strip when the shop runs on its own
+  /// generator, a grey one when it is dark — drawn only from the merchant's own declaration,
+  /// never inferred. Mains and undeclared shops draw nothing.
+  Widget _powerBanner() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final StorePowerStatus status = _card.powerStatus;
+    final (String text, Color fg, Color bg) = switch (status) {
+      StorePowerStatus.generator => (
+          t.custGeneratorBanner,
+          const Color(0xFF8A6D0B),
+          const Color(0xFFFDF3D7),
+        ),
+      StorePowerStatus.dark => (
+          t.custDarkBanner,
+          DeliveryColors.muted,
+          DeliveryColors.border,
+        ),
+      _ => ('', Colors.transparent, Colors.transparent),
+    };
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      color: bg,
+      padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: DeliverySpacing.lg, vertical: DeliverySpacing.sm),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.bolt_rounded, size: 15, color: fg),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: fg,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _hero() {
     final StoreCard card = _card;
     final Store? store = _store;

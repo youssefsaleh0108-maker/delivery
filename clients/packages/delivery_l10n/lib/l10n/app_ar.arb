@@ -1205,6 +1205,8 @@
   "custPowerMains": "كهرباء الدولة",
   "custPowerGenerator": "مولّد",
   "custPowerDark": "مقطوعة حالياً",
+  "custGeneratorBanner": "ساعات المولّد — قد يتأخر التوصيل قليلاً",
+  "custDarkBanner": "الكهرباء مقطوعة عن المحل الآن — قد ينتظر طلبك عودتها",
   "custVerifiedLocal": "محل موثوق",
   "custPowerDeclared": "حالة الكهرباء — كما أعلنتها المحلات نفسها",
   "merchbPowerHeading": "حالة الكهرباء",

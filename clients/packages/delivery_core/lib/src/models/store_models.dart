@@ -436,6 +436,10 @@ class Store {
         coverThumbUrl: coverThumbUrl,
         favorite: favorite,
         topOffer: offers.isEmpty ? null : offers.first,
+        neighborhood: neighborhood,
+        verifiedLocal: verifiedLocal,
+        powerStatus: powerStatus,
+        powerNote: powerNote,
       );
 
   Store copyWith({bool? favorite}) => Store(
@@ -465,6 +469,10 @@ class Store {
         longitude: longitude,
         favorite: favorite ?? this.favorite,
         offers: offers,
+        neighborhood: neighborhood,
+        verifiedLocal: verifiedLocal,
+        powerStatus: powerStatus,
+        powerNote: powerNote,
       );
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(

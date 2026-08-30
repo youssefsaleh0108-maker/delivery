@@ -3266,6 +3266,13 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custPowerDark => 'مقطوعة حالياً';
 
   @override
+  String get custGeneratorBanner => 'ساعات المولّد — قد يتأخر التوصيل قليلاً';
+
+  @override
+  String get custDarkBanner =>
+      'الكهرباء مقطوعة عن المحل الآن — قد ينتظر طلبك عودتها';
+
+  @override
   String get custVerifiedLocal => 'محل موثوق';
 
   @override

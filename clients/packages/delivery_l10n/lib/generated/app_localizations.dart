@@ -5888,6 +5888,18 @@ abstract class DeliveryStrings {
   /// **'Currently Dark'**
   String get custPowerDark;
 
+  /// No description provided for @custGeneratorBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Generator hours — delivery may take longer'**
+  String get custGeneratorBanner;
+
+  /// No description provided for @custDarkBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop is dark right now — orders may wait for power'**
+  String get custDarkBanner;
+
   /// No description provided for @custVerifiedLocal.
   ///
   /// In en, this message translates to:
