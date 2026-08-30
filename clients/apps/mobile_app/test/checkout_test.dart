@@ -167,42 +167,36 @@ void main() {
     await pumpCheckout(
         tester, dio: recordingDio().dio, addresses: addresses, cart: cartWithOneItem());
 
-    expect(find.text('Payment method'), findsOneWidget);
-    expect(find.text('Cash on delivery'), findsOneWidget);
-    // Chosen, not merely asked about. Cash is the default because it is the one method that
-    // moves real money.
-    expect(isSelected(tester, 'Cash on delivery'), isTrue);
-    // Card and wallet are selectable now — they authorise against the DEV provider — and each
-    // says out loud that it is a test payment, so a dev authorisation can never be mistaken for
-    // a live charge.
-    expect(find.text('Card'), findsOneWidget);
-    expect(find.text('Wallet'), findsOneWidget);
-    expect(find.text('Test payment'), findsNWidgets(2));
-    expect(isSelected(tester, 'Card'), isFalse);
-    expect(isSelected(tester, 'Wallet'), isFalse);
+    // The Lebanese redesign: the section is the local-methods list, cash names both currencies,
+    // and it is chosen — not merely asked about — because it is the one method that moves real
+    // money.
+    expect(find.text('Local Payment Methods'), findsOneWidget);
+    expect(find.text('Cash on Delivery (USD/LBP)'), findsOneWidget);
+    expect(isSelected(tester, 'Cash on Delivery (USD/LBP)'), isTrue);
+    // The old dev card/wallet strip left with the redesign; wallet transfers (Whish/OMT) appear
+    // only when the transfer service says a connector carries them, and this test pumps the
+    // screen with no transfer service at all — so no wallet rows, and no test-payment caption.
+    expect(find.text('Card'), findsNothing);
+    expect(find.text('Wallet'), findsNothing);
     // The Apple Pay placeholder and its coming-soon chip are gone with the wiring.
     expect(find.text('Apple Pay'), findsNothing);
   });
 
-  testWidgets('picking the card sends the method, the dev token, and the fuller warning',
+  testWidgets('cash placement carries the split default: the whole total in USD',
       (WidgetTester tester) async {
     final ({Dio dio, List<RequestOptions> sent}) recorder = recordingDio();
     final DeliveryAddressStore addresses = await storeWithAddresses();
     await pumpCheckout(
         tester, dio: recorder.dio, addresses: addresses, cart: cartWithOneItem());
 
-    await tester.tap(find.text('Card'));
-    await tester.pumpAndSettle();
-    // Choosing a test method puts the fuller sentence under the strip.
-    expect(find.text('Test payment — no real money moves in this build'), findsOneWidget);
-
     await tester.tap(find.byType(YdPillButton));
     await tester.pumpAndSettle();
 
     final Map<String, dynamic> body = recorder.sent.single.data as Map<String, dynamic>;
-    expect(body['paymentMethod'], 'CARD');
-    // The DEV provider ignores the token by design; the contract still carries one.
-    expect(body['paymentInstrumentToken'], isNotEmpty);
+    // Cash stays the wire method; the USD/LBP split is the transfer ledger's business, recorded
+    // separately (and skipped entirely here, where no transfer service was provided).
+    expect(body['paymentMethod'], 'CASH');
+    expect(body['paymentInstrumentToken'], isNull);
   });
 
   testWidgets('placing sends the picked address, its area, and CASH',

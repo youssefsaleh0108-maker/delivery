@@ -25,6 +25,7 @@ class CustomerShell extends StatefulWidget {
     required this.zoneApi,
     required this.offerApi,
     this.promoApi,
+    this.transferApi,
     this.geocodingApi,
     this.trackingApi,
     this.chatApi,
@@ -47,6 +48,9 @@ class CustomerShell extends StatefulWidget {
   // main.dart to the customer screens, so a null here is a feature dark for every customer.
   // main.dart passes all five; the nullability exists for tests, not for the app.
   final PromoApi? promoApi;
+
+  /// Checkout's money surface — rate lock, USD/LBP split, wallet methods.
+  final TransferApi? transferApi;
   final GeocodingApi? geocodingApi;
   final TrackingApi? trackingApi;
   final ChatApi? chatApi;
@@ -178,6 +182,7 @@ class _CustomerShellState extends State<CustomerShell> {
           offerApi: widget.offerApi,
           zoneApi: widget.zoneApi,
           promoApi: widget.promoApi,
+          transferApi: widget.transferApi,
           geocodingApi: widget.geocodingApi,
           onOrderPlaced: () => _open(CustomerNavBar.ordersIndex),
         );

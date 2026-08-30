@@ -244,6 +244,13 @@ http:
       entryPoints: [web, https]
       middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
 
+    # ------------------------------------------------------------------ transfer-service (8118)
+    transfer-service:
+      rule: PathPrefix(`/api/transfers`)
+      service: transfer-service
+      entryPoints: [web, https]
+      middlewares: [platform-cors@file, platform-rate-limit@file, strip-identity-headers@file, security-headers@file]
+
     # ------------------------------------------------------------------ whatsapp-service (8116)
     whatsapp-service:
       rule: PathPrefix(`/api/whatsapp`)
@@ -396,6 +403,11 @@ http:
       loadBalancer:
         servers:
           - url: http://order-manager:8101
+
+    transfer-service:
+      loadBalancer:
+        servers:
+          - url: http://transfer-service:8118
 
     order-tracking:
       loadBalancer:

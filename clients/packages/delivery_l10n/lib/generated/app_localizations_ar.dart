@@ -3203,6 +3203,141 @@ class DeliveryStringsAr extends DeliveryStrings {
       'نسيت شيئاً؟ تحتاج استلام مفاتيح أو شراء من متجر غير مدرج؟ صِفه وسيُنجزه سائق YouDrop.';
 
   @override
+  String custPlatformRate(String rate) {
+    return 'سعر المنصة: 1\$ = $rate ل.ل.';
+  }
+
+  @override
+  String get custRateLocked =>
+      'سعر مثبّت — مبلغ الليرة الذي توافق عليه هو ما يُحصَّل.';
+
+  @override
+  String get custSplitPayment => 'الدفع اللبناني المقسّم';
+
+  @override
+  String get custSplitBlurb =>
+      'اخلط أوراقك! ادفع جزءاً بالدولار النقدي والباقي بالليرة اللبنانية.';
+
+  @override
+  String get custPayInUsd => 'ادفع بالدولار النقدي';
+
+  @override
+  String get custPayInLbp => 'ادفع بالليرة (ل.ل.)';
+
+  @override
+  String custRiderChange(String amount) {
+    return 'السائق يحمل فراطة حتى $amount ل.ل. ودولار نقدي.';
+  }
+
+  @override
+  String get custLocalPaymentMethods => 'طرق الدفع المحلية';
+
+  @override
+  String get custCashUsdLbp => 'نقداً عند التسليم (دولار/ليرة)';
+
+  @override
+  String get custWhishTransfer => 'تحويل Whish Money';
+
+  @override
+  String get custOmtTransfer => 'تحويل OMT';
+
+  @override
+  String custPlaceOrderAmount(String amount) {
+    return 'إتمام الطلب ($amount)';
+  }
+
+  @override
+  String custPctUsd(int pct) {
+    return '$pct٪ دولار';
+  }
+
+  @override
+  String custPctLbp(int pct) {
+    return '$pct٪ ليرة';
+  }
+
+  @override
+  String get custPowerMains => 'كهرباء الدولة';
+
+  @override
+  String get custPowerGenerator => 'مولّد';
+
+  @override
+  String get custPowerDark => 'مقطوعة حالياً';
+
+  @override
+  String get custVerifiedLocal => 'محل موثوق';
+
+  @override
+  String get custPowerDeclared => 'حالة الكهرباء — كما أعلنتها المحلات نفسها';
+
+  @override
+  String get merchbPowerHeading => 'حالة الكهرباء';
+
+  @override
+  String get merchbPowerHint =>
+      'أخبر الزبائن ماذا تفعل الكهرباء — تظهر على بطاقة متجرك.';
+
+  @override
+  String get custHyperlocalTitle => 'دكانة الحي';
+
+  @override
+  String get custHyperlocalSub => 'محلات شوارعك المحلية';
+
+  @override
+  String get custDistricts => 'المناطق';
+
+  @override
+  String get custSearchArabiziHint => 'ابحث: قهوة، منقوشة، كنافة...';
+
+  @override
+  String get custAllDistricts => 'كل المناطق';
+
+  @override
+  String get custDiasporaTitle => 'أرسل إلى لبنان';
+
+  @override
+  String get custDiasporaSub => 'بوابة هدايا المغتربين';
+
+  @override
+  String get custDiasporaBanner => 'الحوالة الحقيقية';
+
+  @override
+  String get custDiasporaBlurb =>
+      'ادفع بالدولار من الخارج — ونوصل البقالة الطازجة والدواء والطعام الساخن إلى بابهم في لبنان.';
+
+  @override
+  String get custFamilyRecipient => 'المستلم من العائلة';
+
+  @override
+  String get custPersonalNote => 'أرفق رسالة شخصية (تُسلَّم مع الطلب)';
+
+  @override
+  String get custPersonalNoteHint =>
+      'حبيبتي ماما، أتمنى لك أسبوعاً جميلاً — بعض الطعام والبقالة مع حبي!';
+
+  @override
+  String get custWhatToSend => 'ماذا تحب أن ترسل؟';
+
+  @override
+  String custRecentDeliveriesTo(String name) {
+    return 'توصيلات سابقة إلى $name';
+  }
+
+  @override
+  String get custStartOrder => 'اختر المنتجات وابدأ الطلب';
+
+  @override
+  String get custPickRecipient => 'اختر من يستلم';
+
+  @override
+  String get custNoRecipientYet =>
+      'احفظ عنوانهم أولاً — أضفه من دفتر العناوين واجعل الاسم هو التسمية.';
+
+  @override
+  String get custGiftNoteRides => 'رسالتك تسافر مع الطلب وتُقرأ عند الباب.';
+
+  @override
   String custMinOrderLine(String amount) {
     return 'الحد الأدنى للطلب: $amount';
   }

@@ -22,6 +22,7 @@ DECLARE
         ['file_service',          'files'],
         ['accounting_service',    'accounting'],
         ['connector_settings',    'settings'],
+        ['transfer_service',      'transfer'],
         -- Dev only. Deliberately has no grant on any platform schema: the simulator is an external
         -- system as far as this architecture is concerned, and it should be as unable to read the
         -- accounting tables as the real bank is.
@@ -66,5 +67,6 @@ BEGIN
 END
 $$;
 
-GRANT USAGE ON SCHEMA identity, product, orders, tracking, notification, files, accounting, settings
+GRANT USAGE ON SCHEMA identity, product, orders, tracking, notification, files, accounting, settings,
+    transfer
     TO delivery_readonly;

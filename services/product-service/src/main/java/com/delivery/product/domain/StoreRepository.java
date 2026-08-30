@@ -42,6 +42,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
               AND (:maxDeliveryFee IS NULL OR s.deliveryFee <= :maxDeliveryFee)
               AND (:maxEtaMinutes IS NULL OR s.etaMaxMinutes <= :maxEtaMinutes)
               AND (:minRating IS NULL OR s.rating >= :minRating)
+              AND (:neighborhood IS NULL OR s.neighborhood = :neighborhood)
             """)
     Page<Store> findStorefrontWithStatus(@Param("status") Store.Status status,
                                          @Param("vertical") Store.Vertical vertical,
@@ -49,7 +50,20 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                          @Param("maxDeliveryFee") BigDecimal maxDeliveryFee,
                                          @Param("maxEtaMinutes") Integer maxEtaMinutes,
                                          @Param("minRating") BigDecimal minRating,
+                                         @Param("neighborhood") String neighborhood,
                                          Pageable pageable);
+
+    /**
+     * The district chips, from the shops that actually declared one. Live shops only, so a draft
+     * in a district nobody serves cannot conjure an empty chip.
+     */
+    @Query("""
+            SELECT DISTINCT s.neighborhood FROM Store s
+            WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.neighborhood IS NOT NULL
+            ORDER BY s.neighborhood
+            """)
+    List<String> distinctNeighborhoods();
 
     /**
      * Live stores only. The ACTIVE filter is pinned here rather than left to callers: a DRAFT or
@@ -58,9 +72,10 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
      */
     default Page<Store> findStorefront(Store.Vertical vertical, String search,
                                        BigDecimal maxDeliveryFee, Integer maxEtaMinutes,
-                                       BigDecimal minRating, Pageable pageable) {
+                                       BigDecimal minRating, String neighborhood,
+                                       Pageable pageable) {
         return findStorefrontWithStatus(Store.Status.ACTIVE, vertical, search,
-                maxDeliveryFee, maxEtaMinutes, minRating, pageable);
+                maxDeliveryFee, maxEtaMinutes, minRating, neighborhood, pageable);
     }
 
     @Query("""

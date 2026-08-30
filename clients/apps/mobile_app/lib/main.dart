@@ -129,6 +129,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
   late final ProfileApi _profileApi = ProfileApi(_dio);
   late final PointsApi _pointsApi = PointsApi(_dio);
+  late final TransferApi _transferApi = TransferApi(_dio);
 
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
@@ -405,6 +406,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       prefsApi: _prefsApi,
       profileApi: _profileApi,
       pointsApi: _pointsApi,
+      transferApi: _transferApi,
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,

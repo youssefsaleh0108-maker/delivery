@@ -610,6 +610,49 @@ services:
   # SMS vendor still cannot stall email or push — but within a channel the two failure modes are
   # now one.
 
+  # Money movement for the Lebanese market: locked-rate quotes, the USD/LBP split, and the
+  # provider connectors (cash today, simulated Whish/OMT until the commercial integrations exist)
+  # behind one SPI inside this single service.
+  transfer-service:
+    image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}transfer-service:${IMAGE_TAG:-main}
+    container_name: delivery-transfer-service
+    mem_limit: 256m
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8118
+      # Heap tracks mem_limit, not the host. SerialGC and no C2 because these are small heaps on a
+      # shared box: the throughput collectors cost more in threads and metaspace than they return.
+      JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_IMPORT: configserver:http://config-server:8888
+      CONFIG_SERVER_USER: ${CONFIG_SERVER_USER:-config}
+      CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
+      # The one platform rate; the same env the storefront's display copy reads, so checkout and
+      # browse can never disagree by configuration accident.
+      MARKET_LBP_PER_USD: ${MARKET_LBP_PER_USD:-90000}
+      RIDER_CHANGE_LIMIT_LBP: ${RIDER_CHANGE_LIMIT_LBP:-100000}
+      # DEV: the wallet simulator answers for Whish/OMT. Set false in production until the real
+      # connectors exist — the methods then simply do not appear in the app.
+      SIMULATE_WALLETS: ${SIMULATE_WALLETS:-true}
+      OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_TRACING_ENABLED: "false"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks: [delivery]
+
   connector-settings:
     image: ${IMAGE_REPO:-ghcr.io/youssefsaleh0108-maker}/${IMAGE_NAME_PREFIX:-}connector-settings:${IMAGE_TAG:-main}
     container_name: delivery-connector-settings

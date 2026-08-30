@@ -3219,6 +3219,144 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Forgot something? Need keys retrieved, or shopping from a store not listed? Describe it and a YouDrop rider gets it done.';
 
   @override
+  String custPlatformRate(String rate) {
+    return 'Platform Rate: \$1 = $rate LBP';
+  }
+
+  @override
+  String get custRateLocked =>
+      'Locked rate — the lira total you approve is the lira total collected.';
+
+  @override
+  String get custSplitPayment => 'Lebanese Split Payment';
+
+  @override
+  String get custSplitBlurb =>
+      'Mix your bills! Pay part in USD cash and the rest in Lebanese Lira.';
+
+  @override
+  String get custPayInUsd => 'Pay in Fresh USD';
+
+  @override
+  String get custPayInLbp => 'Pay in LBP (Lira)';
+
+  @override
+  String custRiderChange(String amount) {
+    return 'Rider carries change for up to $amount LBP and cash USD.';
+  }
+
+  @override
+  String get custLocalPaymentMethods => 'Local Payment Methods';
+
+  @override
+  String get custCashUsdLbp => 'Cash on Delivery (USD/LBP)';
+
+  @override
+  String get custWhishTransfer => 'Whish Money Transfer';
+
+  @override
+  String get custOmtTransfer => 'OMT (Online Money Transfer)';
+
+  @override
+  String custPlaceOrderAmount(String amount) {
+    return 'Place Order ($amount)';
+  }
+
+  @override
+  String custPctUsd(int pct) {
+    return '$pct% USD';
+  }
+
+  @override
+  String custPctLbp(int pct) {
+    return '$pct% LBP';
+  }
+
+  @override
+  String get custPowerMains => 'Mains Power';
+
+  @override
+  String get custPowerGenerator => 'Generator';
+
+  @override
+  String get custPowerDark => 'Currently Dark';
+
+  @override
+  String get custVerifiedLocal => 'Verified Local';
+
+  @override
+  String get custPowerDeclared =>
+      'Power status — declared by the shops themselves';
+
+  @override
+  String get merchbPowerHeading => 'Power status';
+
+  @override
+  String get merchbPowerHint =>
+      'Tell customers what the lights are doing — it shows on your storefront card.';
+
+  @override
+  String get custHyperlocalTitle => 'Neighborhood Dekkane';
+
+  @override
+  String get custHyperlocalSub => 'The local shops of your streets';
+
+  @override
+  String get custDistricts => 'Districts';
+
+  @override
+  String get custSearchArabiziHint => 'Search: 2ahwe, man\'oushe, knefe...';
+
+  @override
+  String get custAllDistricts => 'All districts';
+
+  @override
+  String get custDiasporaTitle => 'Send to Lebanon';
+
+  @override
+  String get custDiasporaSub => 'Diaspora Gifting Portal';
+
+  @override
+  String get custDiasporaBanner => 'Remittance made real';
+
+  @override
+  String get custDiasporaBlurb =>
+      'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.';
+
+  @override
+  String get custFamilyRecipient => 'Family recipient';
+
+  @override
+  String get custPersonalNote =>
+      'Attach a personal note (delivered with the order)';
+
+  @override
+  String get custPersonalNoteHint =>
+      'Habibti Mom, wishing you a beautiful week — some food and groceries with love!';
+
+  @override
+  String get custWhatToSend => 'What would you like to send?';
+
+  @override
+  String custRecentDeliveriesTo(String name) {
+    return 'Recent deliveries to $name';
+  }
+
+  @override
+  String get custStartOrder => 'Select Items 0026 Start Order';
+
+  @override
+  String get custPickRecipient => 'Choose who receives it';
+
+  @override
+  String get custNoRecipientYet =>
+      'Save their address first — add it from the address book with their name as the label.';
+
+  @override
+  String get custGiftNoteRides =>
+      'Your note travels with the order and is read out at the door.';
+
+  @override
   String custMinOrderLine(String amount) {
     return 'Min. Order: $amount';
   }

@@ -58,6 +58,7 @@
     -->
     <module>services/order-tracking</module>
     <module>services/connector-settings</module>
+    <module>services/transfer-service</module>
 
     <!-- Phase 3, notification layer. Nine deployables rather than one: the workers render (CPU,
          fast) while the connectors block on third parties whose latency we do not control, and the

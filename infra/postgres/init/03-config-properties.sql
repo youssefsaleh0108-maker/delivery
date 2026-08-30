@@ -73,6 +73,9 @@ INSERT INTO config.config_properties (application, profile, label, prop_key, pro
   ('connector-settings',    'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=settings'),
   ('connector-settings',    'docker', 'main', 'spring.datasource.username', 'connector_settings'),
 
+  ('transfer-service',      'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=transfer'),
+  ('transfer-service',      'docker', 'main', 'spring.datasource.username', 'transfer_service'),
+
   ('notifications-manager', 'docker', 'main', 'spring.datasource.url',      'jdbc:postgresql://postgres:5432/delivery?currentSchema=notification'),
   ('notifications-manager', 'docker', 'main', 'spring.datasource.username', 'notification_service'),
 

@@ -71,6 +71,16 @@ public class Store {
         OPEN, BUSY, CLOSING_SOON, CLOSED
     }
 
+    /**
+     * What the lights are doing right now — the Lebanese storefront's first question.
+     *
+     * <p>Merchant-declared, like busy, and honestly defaulted: UNKNOWN draws no chip at all,
+     * because a shop that never said should not wear a green badge it did not earn.
+     */
+    public enum PowerStatus {
+        UNKNOWN, MAINS, GENERATOR, DARK
+    }
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -159,6 +169,26 @@ public class Store {
     /** Self-expiring "the kitchen is behind" flag. Null, or in the past, means not busy. */
     @Column(name = "busy_until")
     private Instant busyUntil;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "power_status", nullable = false, length = 16)
+    private PowerStatus powerStatus = PowerStatus.UNKNOWN;
+
+    /** The one-liner under the chip: "Ovens fully hot", "Cold storage active". */
+    @Column(name = "power_note", length = 160)
+    private String powerNote;
+
+    /** When the merchant last said — what "auto-updated" honestly means on the storefront. */
+    @Column(name = "power_updated_at")
+    private Instant powerUpdatedAt;
+
+    /** District identity for the hyperlocal browse: Mar Mikhael, Hamra, Badaro... */
+    @Column(name = "neighborhood", length = 80)
+    private String neighborhood;
+
+    /** The dekkane trust badge. Backoffice-set, never merchant-writable. */
+    @Column(name = "verified_local", nullable = false)
+    private boolean verifiedLocal;
 
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
@@ -466,6 +496,37 @@ public class Store {
 
     public String getAddress() {
         return address;
+    }
+
+    public PowerStatus getPowerStatus() {
+        return powerStatus;
+    }
+
+    public String getPowerNote() {
+        return powerNote;
+    }
+
+    public Instant getPowerUpdatedAt() {
+        return powerUpdatedAt;
+    }
+
+    /** The merchant's declaration, stamped so the storefront can say how fresh it is. */
+    public void declarePower(PowerStatus status, String note) {
+        this.powerStatus = status == null ? PowerStatus.UNKNOWN : status;
+        this.powerNote = note;
+        this.powerUpdatedAt = Instant.now();
+    }
+
+    public String getNeighborhood() {
+        return neighborhood;
+    }
+
+    public void setNeighborhood(String neighborhood) {
+        this.neighborhood = neighborhood;
+    }
+
+    public boolean isVerifiedLocal() {
+        return verifiedLocal;
     }
 
     public BigDecimal getLatitude() {

@@ -385,6 +385,55 @@ class _StoreScreenState extends State<StoreScreen> {
                 ),
             ],
           ),
+          const SizedBox(height: DeliverySpacing.md),
+          const Divider(height: 1, color: DeliveryColors.borderFaint),
+          const SizedBox(height: DeliverySpacing.md),
+          // The Lebanese power declaration: mains, generator, or dark — the storefront's chip and
+          // its one honest source. Declared like busy, one tap, and shown right back here.
+          Text(
+            t.merchbPowerHeading,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.ink,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t.merchbPowerHint,
+            style: const TextStyle(
+                fontSize: 11.5, color: DeliveryColors.faint, height: 1.35),
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          Wrap(
+            spacing: DeliverySpacing.sm,
+            runSpacing: DeliverySpacing.sm,
+            children: <Widget>[
+              for (final StorePowerStatus status in const <StorePowerStatus>[
+                StorePowerStatus.mains,
+                StorePowerStatus.generator,
+                StorePowerStatus.dark,
+              ])
+                YdChip(
+                  label: switch (status) {
+                    StorePowerStatus.mains => t.custPowerMains,
+                    StorePowerStatus.generator => t.custPowerGenerator,
+                    StorePowerStatus.dark => t.custPowerDark,
+                    StorePowerStatus.unknown => '',
+                  },
+                  selected: store.powerStatus == status,
+                  onTap: _saving
+                      ? null
+                      : () => _run(
+                            () => widget.api
+                                .declarePower(store.id, status)
+                                .then((_) {}),
+                            t.saved,
+                          ),
+                ),
+            ],
+          ),
         ],
       ),
     );

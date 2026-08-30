@@ -45,6 +45,7 @@ import com.delivery.product.api.dto.StoreDtos.ReviewRequest;
 import com.delivery.product.api.dto.StoreDtos.ReviewResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreCardResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
+import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
@@ -130,16 +131,23 @@ public class StoreController {
             @RequestParam(required = false) BigDecimal maxDeliveryFee,
             @RequestParam(required = false) Integer maxEtaMinutes,
             @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) String neighborhood,
             @PageableDefault(size = 20, sort = "rating", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
         Page<StoreView> page = storeService.storefront(vertical, search, maxDeliveryFee,
-                maxEtaMinutes, minRating, pageable);
+                maxEtaMinutes, minRating, neighborhood, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
 
         return PageResponse.of(page.map(v -> toCard(v, starred, offersByStore)));
+    }
+
+    /** The district chips for the hyperlocal browse — the distinct declared neighborhoods. */
+    @GetMapping("/neighborhoods")
+    public List<String> neighborhoods() {
+        return storeService.neighborhoods();
     }
 
     /**
@@ -356,6 +364,15 @@ public class StoreController {
                 .toList();
     }
 
+    /** The merchant declares what the lights are doing — the power chip's one source of truth. */
+    @PostMapping("/{id}/power")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public StoreResponse declarePower(@PathVariable UUID id,
+                                      @Valid @RequestBody PowerRequest request) {
+        return toResponse(storeService.declarePower(
+                id, CurrentUser.requireId(), request.status(), request.note()), Set.of());
+    }
+
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('MERCHANT')")
     public StoreResponse publish(@PathVariable UUID id) {
@@ -529,7 +546,11 @@ public class StoreController {
                 ImageUrl.thumbOf(logo),
                 ImageUrl.thumbOf(cover),
                 starred.contains(store.getId()),
-                storeOffers.isEmpty() ? null : toOffer(storeOffers.get(0)));
+                storeOffers.isEmpty() ? null : toOffer(storeOffers.get(0)),
+                store.getNeighborhood(),
+                store.isVerifiedLocal(),
+                store.getPowerStatus(),
+                store.getPowerNote());
     }
 
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
@@ -563,7 +584,12 @@ public class StoreController {
                 storeService.liveOffersFor(store.getId()).stream()
                         .map(StoreController::toOffer).toList(),
                 store.getStatus(),
-                store.getCreatedAt());
+                store.getCreatedAt(),
+                store.getNeighborhood(),
+                store.isVerifiedLocal(),
+                store.getPowerStatus(),
+                store.getPowerNote(),
+                store.getPowerUpdatedAt());
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {

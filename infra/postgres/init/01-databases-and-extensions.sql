@@ -29,6 +29,7 @@ CREATE SCHEMA IF NOT EXISTS notification;
 CREATE SCHEMA IF NOT EXISTS files;
 CREATE SCHEMA IF NOT EXISTS accounting;
 CREATE SCHEMA IF NOT EXISTS settings;
+CREATE SCHEMA IF NOT EXISTS transfer;
 -- The Core Banking Simulator's own storage (Phase 4). Not part of the platform's data model: it
 -- stands in for a system OUTSIDE the platform, and giving it a schema the platform's services can
 -- read would let a test assert against the bank's internals instead of through its API. Dev only -

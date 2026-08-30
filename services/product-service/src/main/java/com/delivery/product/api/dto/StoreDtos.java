@@ -89,7 +89,16 @@ public final class StoreDtos {
             boolean favorite,
             List<OfferResponse> offers,
             Store.Status status,
-            Instant createdAt) {
+            Instant createdAt,
+            /** District identity, or null when the shop never declared one. */
+            String neighborhood,
+            /** The Backoffice-granted dekkane trust badge. */
+            boolean verifiedLocal,
+            /** What the lights are doing. UNKNOWN draws no chip. */
+            Store.PowerStatus powerStatus,
+            String powerNote,
+            /** When the merchant last declared — what "auto-updated" honestly means. */
+            Instant powerUpdatedAt) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */
@@ -126,7 +135,11 @@ public final class StoreDtos {
             String coverThumbUrl,
             boolean favorite,
             /** The single best promotion, for the ribbon on the card. Null when there is none. */
-            OfferResponse topOffer) {
+            OfferResponse topOffer,
+            String neighborhood,
+            boolean verifiedLocal,
+            Store.PowerStatus powerStatus,
+            String powerNote) {
     }
 
     public record OfferResponse(
@@ -179,7 +192,15 @@ public final class StoreDtos {
             @Size(max = 4000) String description,
             List<@Size(max = 40) String> tags,
             @Size(max = 64) String timezone,
-            @Size(max = 400) String address) {
+            @Size(max = 400) String address,
+            /** District identity for the hyperlocal browse. Free text; the chips are distinct values. */
+            @Size(max = 80) String neighborhood) {
+    }
+
+    /** The merchant's power declaration — what the lights are doing, and the one-liner under it. */
+    public record PowerRequest(
+            @NotNull Store.PowerStatus status,
+            @Size(max = 160) String note) {
     }
 
     public record CommercialsRequest(

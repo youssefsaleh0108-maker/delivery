@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'cart.dart';
 import 'product_detail_screen.dart' show CustomerPhoto;
 import 'store_page_screen.dart';
+import 'store_power_chip.dart';
 import 'store_state_mapping.dart';
 
 /// The category's own listing (Figma `customer-shops` 58:105): the vertical's name in the header,
@@ -285,8 +286,16 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
   }
 
   /// One shop as the frame's tall card: the cover, then name against the rating, the vertical's
-  /// own line, and the delivery time in positive green against the minimum order.
+  /// own line, and the delivery time in positive green against the minimum order. A shop that
+  /// declared itself DARK dims — visible, honest, and not pretending to cook.
   Widget _shopCard(DeliveryStrings t, StoreCard store) {
+    final Widget card = _shopCardBody(t, store);
+    return store.powerStatus == StorePowerStatus.dark
+        ? Opacity(opacity: 0.55, child: card)
+        : card;
+  }
+
+  Widget _shopCardBody(DeliveryStrings t, StoreCard store) {
     return YdCard(
       onTap: () => _open(store),
       padding: EdgeInsets.zero,
@@ -322,6 +331,10 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
                         ),
                       ),
                     ),
+                    if (store.powerStatus != StorePowerStatus.unknown) ...<Widget>[
+                      const SizedBox(width: DeliverySpacing.sm),
+                      StorePowerChip(status: store.powerStatus, compact: true),
+                    ],
                     if (store.rating != null) ...<Widget>[
                       const SizedBox(width: DeliverySpacing.sm),
                       const Icon(Icons.star_rounded,

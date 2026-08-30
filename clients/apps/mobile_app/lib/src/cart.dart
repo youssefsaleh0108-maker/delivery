@@ -184,9 +184,15 @@ class Cart extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The diaspora gift note, set by the Send-to-Lebanon flow and carried until checkout folds it
+  /// into the order's notes. On the CART rather than an address: the note belongs to THIS order,
+  /// and writing it onto a saved address is exactly the leak checkout once had to fix.
+  String? giftNote;
+
   void clear() {
     _lines.clear();
     _releaseStore();
+    giftNote = null;
     notifyListeners();
   }
 

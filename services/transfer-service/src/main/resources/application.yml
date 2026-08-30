@@ -1,0 +1,94 @@
+server:
+  port: ${SERVER_PORT:8118}
+
+spring:
+  application:
+    name: transfer-service
+
+  config:
+    import: ${CONFIG_IMPORT:optional:configserver:http://localhost:8888}
+
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USER:config}
+      password: ${CONFIG_SERVER_PASSWORD:local-config-secret}
+      fail-fast: false
+      retry:
+        max-attempts: 6
+        initial-interval: 1000
+        max-interval: 5000
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=transfer}
+    username: ${DB_USER:transfer_service}
+    password: ${DB_PASSWORD:transfer_service_dev_pw}
+    hikari:
+      # Small on purpose: the shared Postgres allows 100 connections platform-wide and this
+      # service's work is short writes.
+      maximum-pool-size: 5
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/transfer
+    schemas: transfer
+    default-schema: transfer
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: transfer
+        jdbc:
+          time_zone: UTC
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:delivery}
+    password: ${RABBITMQ_PASSWORD:delivery}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/delivery-platform}
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
+
+delivery:
+  market:
+    # LBP per USD — the platform's one display-and-collection rate. The same key and default the
+    # storefront's market config serves, so the price a customer browsed and the price they are
+    # quoted at checkout can never disagree by configuration accident.
+    lbp-per-usd: ${MARKET_LBP_PER_USD:90000}
+  transfer:
+    # The rider-change promise printed on checkout. Operator-set.
+    rider-change-limit-lbp: ${RIDER_CHANGE_LIMIT_LBP:100000}
+    # DEV ONLY: the simulator that accepts Whish/OMT transfers. A production deployment sets this
+    # false until the real connectors exist, and the wallet methods simply do not appear.
+    simulate-wallets: ${SIMULATE_WALLETS:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: '%5p [${spring.application.name},%X{correlationId:-},%X{traceId:-},%X{spanId:-}]'

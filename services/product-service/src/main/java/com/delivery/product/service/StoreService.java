@@ -90,10 +90,26 @@ public class StoreService {
     @Transactional(readOnly = true)
     public Page<StoreView> storefront(Store.Vertical vertical, String search,
                                       BigDecimal maxDeliveryFee, Integer maxEtaMinutes,
-                                      BigDecimal minRating, Pageable pageable) {
+                                      BigDecimal minRating, String neighborhood,
+                                      Pageable pageable) {
         Instant now = clock.instant();
         return stores.findStorefront(vertical, SearchPatterns.like(search), maxDeliveryFee,
-                maxEtaMinutes, minRating, pageable).map(s -> view(s, now));
+                maxEtaMinutes, minRating, neighborhood, pageable).map(s -> view(s, now));
+    }
+
+    /** The district chips for the hyperlocal browse. */
+    @Transactional(readOnly = true)
+    public java.util.List<String> neighborhoods() {
+        return stores.distinctNeighborhoods();
+    }
+
+    /** The merchant says what the lights are doing. Same shape as busy: declared, stamped. */
+    @Transactional
+    public StoreView declarePower(UUID id, String merchantId,
+                                  Store.PowerStatus status, String note) {
+        Store store = requireOwned(id, merchantId);
+        store.declarePower(status, note);
+        return view(store, clock.instant());
     }
 
     @Transactional(readOnly = true)
@@ -413,6 +429,7 @@ public class StoreService {
         Store store = new Store(merchantId, request.name(), request.vertical());
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
+        store.setNeighborhood(request.neighborhood());
         return view(stores.save(store), clock.instant());
     }
 
@@ -421,6 +438,7 @@ public class StoreService {
         Store store = requireOwned(id, merchantId);
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
+        store.setNeighborhood(request.neighborhood());
         return view(store, clock.instant());
     }
 

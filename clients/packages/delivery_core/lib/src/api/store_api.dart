@@ -21,6 +21,7 @@ class StoreApi {
     double? maxDeliveryFee,
     int? maxEtaMinutes,
     double? minRating,
+    String? neighborhood,
     int page = 0,
     int size = 20,
   }) async {
@@ -32,6 +33,7 @@ class StoreApi {
         if (maxDeliveryFee != null) 'maxDeliveryFee': maxDeliveryFee,
         if (maxEtaMinutes != null) 'maxEtaMinutes': maxEtaMinutes,
         if (minRating != null) 'minRating': minRating,
+        if (neighborhood != null) 'neighborhood': neighborhood,
         'page': page,
         'size': size,
       },
@@ -47,9 +49,17 @@ class StoreApi {
       maxDeliveryFee: filters.maxDeliveryFee,
       maxEtaMinutes: filters.maxEtaMinutes,
       minRating: filters.minRating,
+      neighborhood: filters.neighborhood,
       page: page,
       size: size,
     );
+  }
+
+  /// The district chips for the hyperlocal browse — what shops actually declared.
+  Future<List<String>> neighborhoods() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/stores/neighborhoods');
+    return (response.data as List<dynamic>).cast<String>();
   }
 
   /// Live shops near a point, nearest first.
@@ -309,6 +319,20 @@ class StoreApi {
   /// them, so a store without them could never be open.
   Future<Store> publish(String storeId) async {
     final Response<dynamic> response = await _dio.post<dynamic>('/api/stores/$storeId/publish');
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// The merchant declares what the lights are doing — mains, generator, or dark — with the
+  /// optional one-liner the storefront prints under the chip.
+  Future<Store> declarePower(String storeId, StorePowerStatus status,
+      {String? note}) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/stores/$storeId/power',
+      data: <String, dynamic>{
+        'status': status.wire,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+    );
     return Store.fromJson(response.data as Map<String, dynamic>);
   }
 

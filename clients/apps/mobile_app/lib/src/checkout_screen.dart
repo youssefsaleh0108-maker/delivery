@@ -31,11 +31,17 @@ class CheckoutScreen extends StatefulWidget {
     this.zoneApi,
     this.geocodingApi,
     this.promo,
+    this.transferApi,
   });
 
   final OrderApi api;
   final Cart cart;
   final DeliveryAddressStore addresses;
+
+  /// The money surface: the locked rate, the wallet methods, and where the approved payment
+  /// intent is recorded after placement. Optional so a test can pump this screen without a
+  /// server; the screen then falls back to the display rate and cash-only.
+  final TransferApi? transferApi;
 
   /// Passed straight through to the address sheet so the area picker appears when a new address is
   /// added from here. Optional so a test can pump this screen without a server.
@@ -71,13 +77,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// nobody mistakes a dev authorisation for a charge.
   PaymentMethod _payment = PaymentMethod.cash;
 
-  /// What the checkout strip offers, in the design's order: cash first, then the two dev-provider
-  /// test methods.
-  static const List<PaymentMethod> _methods = <PaymentMethod>[
-    PaymentMethod.cash,
-    PaymentMethod.card,
-    PaymentMethod.wallet,
-  ];
+  // The old cash/card/wallet strip left with the Lebanese redesign: the method rows below offer
+  // cash and whichever wallet transfers a connector will actually carry.
+
+  // ------------------------------------------------------------- the Lebanese money surface
+
+  /// The transfer service's LOCKED rate and rider-change promise. Null until fetched; the
+  /// screen then leans on the display rate and draws no lock it cannot promise.
+  TransferRate? _rate;
+
+  /// Wallet methods some connector will actually carry (WHISH/OMT wire names). Empty until
+  /// fetched, and empty keeps those rows undrawn — a method that shows and then fails is worse
+  /// than one that never showed.
+  List<String> _walletMethods = const <String>[];
+
+  /// The wallet method chosen INSTEAD of a card/wallet row, or null when paying cash. Rides on
+  /// top of [_payment]: the order itself is placed as the dev-provider wallet payment, and the
+  /// transfer ledger records which instrument actually carried it.
+  String? _walletChoice;
+
+  /// The USD half of the cash split. Text so the field can be blank (= all USD).
+  final TextEditingController _splitUsd = TextEditingController();
+
+  Future<void> _loadMoney() async {
+    final TransferApi? api = widget.transferApi;
+    if (api == null) return;
+    try {
+      final TransferRate rate = await api.rate();
+      final List<String> methods = await api.methods();
+      if (!mounted) return;
+      setState(() {
+        _rate = rate;
+        _walletMethods = methods.where((String m) => m != 'CASH_ON_DELIVERY').toList();
+      });
+    } catch (_) {
+      // Cash-only, display rate. The screen stays usable.
+    }
+  }
 
   /// The opaque instrument handle a real processor's SDK would mint on the device. The DEV
   /// provider deliberately never reads it, so a fixed marker is the honest value — there is no
@@ -118,6 +154,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _notes.text = chosen.notes!;
     }
     widget.addresses.addListener(_onAddressesChanged);
+    _loadMoney();
   }
 
   @override
@@ -125,6 +162,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     widget.addresses.removeListener(_onAddressesChanged);
     _phone.dispose();
     _notes.dispose();
+    _splitUsd.dispose();
     super.dispose();
   }
 
@@ -180,8 +218,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Read before the await below: re-selecting the address notifies the store, which re-seeds this
     // field, and reading it afterwards would send the address's saved note instead of what the
-    // customer actually typed.
-    final String notes = _notes.text.trim();
+    // customer actually typed. The diaspora gift note, when one was written, rides in front — the
+    // order's notes are the only thing that reaches the door.
+    final String typed = _notes.text.trim();
+    final String? gift = widget.cart.giftNote?.trim();
+    final String notes = <String>[
+      if (gift != null && gift.isNotEmpty) '🎁 $gift',
+      if (typed.isNotEmpty) typed,
+    ].join('\n');
 
     setState(() => _placing = true);
     try {
@@ -216,6 +260,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         deliveryLatitude: address.latitude,
         deliveryLongitude: address.longitude,
       );
+      // The approved payment intent, into the transfer ledger with the locked rate — which
+      // instrument actually carries the money (cash split, Whish, OMT), a fact the order's own
+      // cash/wallet field is too coarse to hold. Best-effort by design: the order exists either
+      // way, and cash collection reads the ledger only when a row is there to read.
+      final TransferApi? transfers = widget.transferApi;
+      if (transfers != null) {
+        try {
+          await transfers.initiate(
+            orderId: order.id,
+            method: _walletChoice ?? 'CASH_ON_DELIVERY',
+            amountUsd: order.totalAmount,
+            splitUsd:
+                _payment == PaymentMethod.cash ? _splitUsdValue : null,
+          );
+        } catch (_) {
+          // The ledger missed one intent; the order and its payment method stand.
+        }
+      }
       widget.cart.clear();
       if (!mounted) return;
       Navigator.of(context).pop(order);
@@ -263,6 +325,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: ListView(
               padding: const EdgeInsets.all(DeliverySpacing.lg),
               children: <Widget>[
+                _rateBanner(t),
+                const SizedBox(height: _sectionGap),
                 _addressSection(t),
                 const SizedBox(height: _sectionGap),
                 _tierSection(t),
@@ -565,12 +629,251 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// sentence under the strip. Presenting a dev authorisation as a live charge would be a lie
   /// told in the shape of a feature; presenting it as a test payment is exactly what a tester
   /// needs.
+  /// The current LBP-per-USD figure the screen renders with: the transfer service's LOCKED rate
+  /// when it answered, the display rate until then.
+  double get _lbpRate => _rate?.lbpPerUsd ?? MarketRates.instance.lbpPerUsd;
+
+  /// The frame's amber lock banner: the platform rate, promised.
+  Widget _rateBanner(DeliveryStrings t) {
+    final double rate = _lbpRate;
+    if (rate <= 0) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF3D7),
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        border: Border.all(color: const Color(0xFFF2DFA4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Icon(Icons.lock_rounded, size: 18, color: Color(0xFFB8860B)),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  t.custPlatformRate(_groupLbp(rate)),
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  t.custRateLocked,
+                  style: const TextStyle(
+                      fontSize: 11.5, color: DeliveryColors.muted, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _groupLbp(double amount) {
+    final String digits = amount.round().toString();
+    final StringBuffer out = StringBuffer();
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) out.write(',');
+      out.write(digits[i]);
+    }
+    return out.toString();
+  }
+
+  double get _orderTotal {
+    final double promoDiscount = widget.promo?.discount ?? 0;
+    return (widget.cart.total - promoDiscount).clamp(0, double.infinity).toDouble();
+  }
+
+  /// The USD half of the cash split: what was typed, clamped into [0, total]. Blank = all USD.
+  double get _splitUsdValue {
+    final double total = _orderTotal;
+    final double typed = double.tryParse(_splitUsd.text.trim()) ?? total;
+    return typed.clamp(0, total).toDouble();
+  }
+
+  /// The frame's Lebanese Split Payment card, drawn for cash only — a wallet transfer has no
+  /// notes to mix. USD side is typed; the lira side is COMPUTED at the locked rate, because two
+  /// editable halves that must sum is an argument waiting to happen.
+  Widget _splitCard(DeliveryStrings t) {
+    final double total = _orderTotal;
+    final double rate = _lbpRate;
+    if (total <= 0 || rate <= 0) return const SizedBox.shrink();
+    final double usdPart = _splitUsdValue;
+    final double lbpInUsd = total - usdPart;
+    final double lbpFace = (lbpInUsd * rate / 1000).round() * 1000;
+    final int pctUsd = total == 0 ? 100 : ((usdPart / total) * 100).round();
+
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            t.custSplitPayment,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.ink,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t.custSplitBlurb,
+            style: const TextStyle(
+                fontSize: 12.5, color: DeliveryColors.muted, height: 1.4),
+          ),
+          const SizedBox(height: DeliverySpacing.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      t.custPayInUsd,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.muted,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _splitUsd,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        prefixText: '\$ ',
+                        hintText: total.toStringAsFixed(2),
+                        isDense: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      t.custPayInLbp,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.muted,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color: lbpInUsd > 0
+                                ? DeliveryColors.brand
+                                : DeliveryColors.border),
+                        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                      ),
+                      child: Text(
+                        'LBP ${_groupLbp(lbpFace)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: lbpInUsd > 0
+                              ? DeliveryColors.brand
+                              : DeliveryColors.faint,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DeliverySpacing.md),
+          Row(
+            children: <Widget>[
+              Text(
+                t.custPctUsd(pctUsd),
+                style: const TextStyle(
+                    fontSize: 11, color: DeliveryColors.faint, height: 1.2),
+              ),
+              const Spacer(),
+              Text(
+                t.custPctLbp(100 - pctUsd),
+                style: const TextStyle(
+                    fontSize: 11, color: DeliveryColors.faint, height: 1.2),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: total == 0 ? 1 : usdPart / total,
+              minHeight: 6,
+              backgroundColor: DeliveryColors.brandSoft,
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(DeliveryColors.brand),
+            ),
+          ),
+          if ((_rate?.riderChangeLimitLbp ?? 0) > 0) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsetsDirectional.all(DeliverySpacing.sm + 2),
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Icon(Icons.payments_outlined,
+                      size: 15, color: DeliveryColors.brand),
+                  const SizedBox(width: DeliverySpacing.sm),
+                  Expanded(
+                    child: Text(
+                      t.custRiderChange(
+                          _groupLbp(_rate!.riderChangeLimitLbp)),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: DeliveryColors.brand,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _paymentSection(DeliveryStrings t) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Text(
-          t.paymentMethod,
+          t.custLocalPaymentMethods,
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
@@ -579,30 +882,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
         const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            for (int i = 0; i < _methods.length; i++) ...<Widget>[
-              if (i > 0) const SizedBox(width: 10),
-              Expanded(
-                child: _payCard(
-                  icon: switch (_methods[i]) {
-                    PaymentMethod.cash => Icons.attach_money_rounded,
-                    PaymentMethod.card => Icons.credit_card,
-                    PaymentMethod.wallet => Icons.account_balance_wallet_outlined,
-                  },
-                  label: _methods[i] == PaymentMethod.wallet
-                      ? t.paymentWallet
-                      : _methods[i].labelIn(t),
-                  // The honesty caption: the dev provider moves no money, and the card says so.
-                  caption: _methods[i].needsProvider ? t.custTestPayment : null,
-                  selected: _payment == _methods[i],
-                  onTap: () => setState(() => _payment = _methods[i]),
-                ),
-              ),
-            ],
-          ],
+        // The frame's rows with radio circles: cash first, then whichever wallet transfers a
+        // connector will actually carry. Whish/OMT ride the dev provider's order rail while the
+        // transfer ledger records the real instrument — the test note below says so.
+        _methodRow(
+          t,
+          icon: Icons.payments_outlined,
+          label: t.custCashUsdLbp,
+          selected: _payment == PaymentMethod.cash,
+          onTap: () => setState(() {
+            _payment = PaymentMethod.cash;
+            _walletChoice = null;
+          }),
         ),
+        if (_walletMethods.contains('WHISH')) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          _methodRow(
+            t,
+            icon: Icons.account_balance_wallet_outlined,
+            label: t.custWhishTransfer,
+            selected: _walletChoice == 'WHISH',
+            onTap: () => setState(() {
+              _payment = PaymentMethod.wallet;
+              _walletChoice = 'WHISH';
+            }),
+          ),
+        ],
+        if (_walletMethods.contains('OMT')) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.sm),
+          _methodRow(
+            t,
+            icon: Icons.currency_exchange,
+            label: t.custOmtTransfer,
+            selected: _walletChoice == 'OMT',
+            onTap: () => setState(() {
+              _payment = PaymentMethod.wallet;
+              _walletChoice = 'OMT';
+            }),
+          ),
+        ],
+        if (_payment == PaymentMethod.cash) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md),
+          _splitCard(t),
+        ],
         if (_payment.needsProvider) ...<Widget>[
           const SizedBox(height: DeliverySpacing.sm),
           Row(
@@ -624,6 +946,62 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _methodRow(DeliveryStrings t,
+      {required IconData icon,
+      required String label,
+      required bool selected,
+      required VoidCallback onTap}) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: DeliveryColors.white,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: selected ? DeliveryColors.brand : DeliveryColors.border,
+                width: selected ? 1.5 : 1,
+              ),
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(icon,
+                    size: 20,
+                    color:
+                        selected ? DeliveryColors.brand : DeliveryColors.muted),
+                const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? DeliveryColors.ink : DeliveryColors.muted,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 20,
+                  color: selected ? DeliveryColors.brand : DeliveryColors.faint,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -780,7 +1158,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const Spacer(),
               YdPillButton(
-                label: t.custPlaceOrder,
+                // The frame prints the total on the button.
+                label: t.custPlaceOrderAmount(
+                    '\$${_orderTotal.toStringAsFixed(2)}'),
                 expand: false,
                 busy: _placing,
                 onPressed: _placing || lines.isEmpty ? null : _place,

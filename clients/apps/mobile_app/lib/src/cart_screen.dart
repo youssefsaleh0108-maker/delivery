@@ -31,6 +31,7 @@ class CartScreen extends StatefulWidget {
     required this.onOrderPlaced,
     this.zoneApi,
     this.promoApi,
+    this.transferApi,
     this.geocodingApi,
   });
 
@@ -47,6 +48,10 @@ class CartScreen extends StatefulWidget {
   /// Validates promo codes. Optional so the screen still builds where the shell has not been
   /// handed one; the promo row then stays the drawn-and-inert affordance it was.
   final PromoApi? promoApi;
+
+  /// Checkout's money surface (rate lock, split, wallet methods). Optional for the same reason
+  /// as [promoApi].
+  final TransferApi? transferApi;
 
   /// Handed through to checkout's address sheet for the place search. Optional for the same
   /// reason as [promoApi].
@@ -194,6 +199,7 @@ class _CartScreenState extends State<CartScreen> {
           addresses: widget.addresses,
           zoneApi: widget.zoneApi,
           geocodingApi: widget.geocodingApi,
+          transferApi: widget.transferApi,
           // The canonical stored code, never the raw field text — and only when the server said
           // it applies, because placing with a refused code fails the whole order.
           promo: quote != null && quote.valid ? quote : null,

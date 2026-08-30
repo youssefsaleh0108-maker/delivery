@@ -11,6 +11,8 @@ import 'delivery_address.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
+import 'diaspora_screen.dart';
+import 'hyperlocal_screen.dart';
 import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
@@ -316,6 +318,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               slivers: <Widget>[
                 SliverToBoxAdapter(child: _header()),
                 SliverToBoxAdapter(child: _categoryStrip()),
+                SliverToBoxAdapter(child: _lebaneseRail(t)),
                 if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
                 if (_stores.isLoadingFirstPage || _loadingRails)
                   const SliverFillRemaining(
@@ -619,11 +622,133 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   _chipLabel(vertical),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 11.5,
+                    // Smaller and a touch tighter than the shop-name scale — the tile is 82px
+                    // wide and the longer vertical names (Restaurants, Pharmacies) were riding
+                    // the ellipsis at 11.5. This fits them whole.
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     color: DeliveryColors.ink,
-                    height: 1.2,
+                    letterSpacing: -0.1,
+                    height: 1.15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The two Lebanese doors (Figma `diaspora-gift-order` and `neighborhood-browse`): send a
+  /// delivery to family from abroad, and the neighborhood dekkane with their power status.
+  Widget _lebaneseRail(DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.xs),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: _featureDoor(
+              icon: Icons.card_giftcard_rounded,
+              title: t.custDiasporaTitle,
+              subtitle: t.custDiasporaSub,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => DiasporaScreen(
+                  addresses: widget.addresses,
+                  orderApi: widget.orderApi,
+                  cart: widget.cart,
+                  zoneApi: widget.zoneApi,
+                  // This screen IS the home tab, so landing back here is the whole journey.
+                  onStartOrder: () {},
+                ),
+              )),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _featureDoor(
+              icon: Icons.storefront_rounded,
+              title: t.custHyperlocalTitle,
+              subtitle: t.custHyperlocalSub,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => HyperlocalScreen(
+                  storeApi: widget.storeApi,
+                  orderApi: widget.orderApi,
+                  cart: widget.cart,
+                ),
+              )),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _featureDoor({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      label: title,
+      child: Material(
+        color: DeliveryColors.white,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              border: Border.all(color: DeliveryColors.borderFaint),
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: DeliveryColors.brandSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 18, color: DeliveryColors.brand),
+                ),
+                const SizedBox(width: DeliverySpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: DeliveryColors.ink,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: DeliveryColors.muted,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

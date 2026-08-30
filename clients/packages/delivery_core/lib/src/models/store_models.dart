@@ -176,6 +176,10 @@ class StoreCard {
     this.coverThumbUrl,
     this.favorite = false,
     this.topOffer,
+    this.neighborhood,
+    this.verifiedLocal = false,
+    this.powerStatus = StorePowerStatus.unknown,
+    this.powerNote,
   });
 
   final String id;
@@ -203,6 +207,18 @@ class StoreCard {
   final String? coverThumbUrl;
   final bool favorite;
   final Offer? topOffer;
+
+  /// District identity for the hyperlocal browse, or null when the shop never declared one.
+  final String? neighborhood;
+
+  /// The Backoffice-granted dekkane trust badge.
+  final bool verifiedLocal;
+
+  /// What the lights are doing right now. [StorePowerStatus.unknown] draws no chip.
+  final StorePowerStatus powerStatus;
+
+  /// The merchant's one-liner under the chip: "Ovens fully hot", "Cold storage active".
+  final String? powerNote;
 
   /// The cover a card in a grid should load — small if the server has one, the original if not.
   String? get listCoverUrl => coverThumbUrl ?? coverUrl;
@@ -234,6 +250,10 @@ class StoreCard {
         coverThumbUrl: coverThumbUrl,
         favorite: favorite ?? this.favorite,
         topOffer: topOffer,
+        neighborhood: neighborhood,
+        verifiedLocal: verifiedLocal,
+        powerStatus: powerStatus,
+        powerNote: powerNote,
       );
 
   factory StoreCard.fromJson(Map<String, dynamic> json) => StoreCard(
@@ -258,6 +278,30 @@ class StoreCard {
         topOffer: json['topOffer'] == null
             ? null
             : Offer.fromJson(json['topOffer'] as Map<String, dynamic>),
+        neighborhood: json['neighborhood'] as String?,
+        verifiedLocal: json['verifiedLocal'] as bool? ?? false,
+        powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
+        powerNote: json['powerNote'] as String?,
+      );
+}
+
+/// What a shop's lights are doing right now, merchant-declared.
+///
+/// [unknown] is the honest default: the storefront draws NO chip for it, because a shop that
+/// never said should not wear a green badge it did not earn.
+enum StorePowerStatus {
+  unknown('UNKNOWN'),
+  mains('MAINS'),
+  generator('GENERATOR'),
+  dark('DARK');
+
+  const StorePowerStatus(this.wire);
+
+  final String wire;
+
+  static StorePowerStatus fromWire(String? wire) => values.firstWhere(
+        (StorePowerStatus s) => s.wire == wire,
+        orElse: () => StorePowerStatus.unknown,
       );
 }
 
@@ -289,6 +333,10 @@ class Store {
     this.longitude,
     this.favorite = false,
     this.offers = const <Offer>[],
+    this.neighborhood,
+    this.verifiedLocal = false,
+    this.powerStatus = StorePowerStatus.unknown,
+    this.powerNote,
   });
 
   final String id;
@@ -335,6 +383,18 @@ class Store {
 
   final bool favorite;
   final List<Offer> offers;
+
+  /// District identity, or null when the shop never declared one.
+  final String? neighborhood;
+
+  /// The Backoffice-granted dekkane trust badge.
+  final bool verifiedLocal;
+
+  /// What the lights are doing right now, merchant-declared. See [StorePowerStatus].
+  final StorePowerStatus powerStatus;
+
+  /// The one-liner the storefront prints under the power chip.
+  final String? powerNote;
 
   /// Whether there is a pin to draw or to measure "near me" from.
   bool get hasPin => latitude != null && longitude != null;
@@ -435,6 +495,10 @@ class Store {
         offers: (json['offers'] as List<dynamic>? ?? <dynamic>[])
             .map((dynamic o) => Offer.fromJson(o as Map<String, dynamic>))
             .toList(),
+        neighborhood: json['neighborhood'] as String?,
+        verifiedLocal: json['verifiedLocal'] as bool? ?? false,
+        powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
+        powerNote: json['powerNote'] as String?,
       );
 }
 
@@ -515,6 +579,7 @@ class StoreFilters {
     this.maxDeliveryFee,
     this.maxEtaMinutes,
     this.minRating,
+    this.neighborhood,
     this.offersOnly = false,
   });
 
@@ -523,6 +588,9 @@ class StoreFilters {
   final double? maxDeliveryFee;
   final int? maxEtaMinutes;
   final double? minRating;
+
+  /// District identity for the hyperlocal browse — an exact match on what shops declared.
+  final String? neighborhood;
 
   /// Applied client-side: "has a promotion" is a property of the offers attached to a card, not a
   /// column the storefront query can filter on.
@@ -544,12 +612,14 @@ class StoreFilters {
     double? maxDeliveryFee,
     int? maxEtaMinutes,
     double? minRating,
+    String? neighborhood,
     bool? offersOnly,
     bool clearVertical = false,
     bool clearSearch = false,
     bool clearFee = false,
     bool clearEta = false,
     bool clearRating = false,
+    bool clearNeighborhood = false,
   }) =>
       StoreFilters(
         vertical: clearVertical ? null : (vertical ?? this.vertical),
@@ -557,10 +627,12 @@ class StoreFilters {
         maxDeliveryFee: clearFee ? null : (maxDeliveryFee ?? this.maxDeliveryFee),
         maxEtaMinutes: clearEta ? null : (maxEtaMinutes ?? this.maxEtaMinutes),
         minRating: clearRating ? null : (minRating ?? this.minRating),
+        neighborhood: clearNeighborhood ? null : (neighborhood ?? this.neighborhood),
         offersOnly: offersOnly ?? this.offersOnly,
       );
 
-  StoreFilters cleared() => StoreFilters(vertical: vertical, search: search);
+  StoreFilters cleared() =>
+      StoreFilters(vertical: vertical, search: search, neighborhood: neighborhood);
 }
 
 // ---------------------------------------------------------------------------- product options

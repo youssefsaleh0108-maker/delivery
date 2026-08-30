@@ -61,6 +61,8 @@ vault kv put secret/order-manager      spring.datasource.password="order_manager
 vault kv put secret/order-tracking     spring.datasource.password="order_tracking_dev_pw" \
                                        spring.data.redis.password="${REDIS_PASSWORD:-delivery}"
 vault kv put secret/connector-settings spring.datasource.password="connector_settings_dev_pw"
+# Money movement (Lebanese market): the transfer manager and its provider connectors.
+vault kv put secret/transfer-service   spring.datasource.password="transfer_service_dev_pw"
 
 # The notification layer. Both services own tables in the `notification` schema and share its
 # database role; the Keycloak client secret lets Notifications Manager read user contact details

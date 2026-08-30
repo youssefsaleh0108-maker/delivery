@@ -5786,6 +5786,240 @@ abstract class DeliveryStrings {
   /// **'Forgot something? Need keys retrieved, or shopping from a store not listed? Describe it and a YouDrop rider gets it done.'**
   String get custButlerBannerBlurb;
 
+  /// No description provided for @custPlatformRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform Rate: \$1 = {rate} LBP'**
+  String custPlatformRate(String rate);
+
+  /// No description provided for @custRateLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked rate — the lira total you approve is the lira total collected.'**
+  String get custRateLocked;
+
+  /// No description provided for @custSplitPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Lebanese Split Payment'**
+  String get custSplitPayment;
+
+  /// No description provided for @custSplitBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Mix your bills! Pay part in USD cash and the rest in Lebanese Lira.'**
+  String get custSplitBlurb;
+
+  /// No description provided for @custPayInUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay in Fresh USD'**
+  String get custPayInUsd;
+
+  /// No description provided for @custPayInLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay in LBP (Lira)'**
+  String get custPayInLbp;
+
+  /// No description provided for @custRiderChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider carries change for up to {amount} LBP and cash USD.'**
+  String custRiderChange(String amount);
+
+  /// No description provided for @custLocalPaymentMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Payment Methods'**
+  String get custLocalPaymentMethods;
+
+  /// No description provided for @custCashUsdLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on Delivery (USD/LBP)'**
+  String get custCashUsdLbp;
+
+  /// No description provided for @custWhishTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Whish Money Transfer'**
+  String get custWhishTransfer;
+
+  /// No description provided for @custOmtTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'OMT (Online Money Transfer)'**
+  String get custOmtTransfer;
+
+  /// No description provided for @custPlaceOrderAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Place Order ({amount})'**
+  String custPlaceOrderAmount(String amount);
+
+  /// No description provided for @custPctUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'{pct}% USD'**
+  String custPctUsd(int pct);
+
+  /// No description provided for @custPctLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'{pct}% LBP'**
+  String custPctLbp(int pct);
+
+  /// No description provided for @custPowerMains.
+  ///
+  /// In en, this message translates to:
+  /// **'Mains Power'**
+  String get custPowerMains;
+
+  /// No description provided for @custPowerGenerator.
+  ///
+  /// In en, this message translates to:
+  /// **'Generator'**
+  String get custPowerGenerator;
+
+  /// No description provided for @custPowerDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently Dark'**
+  String get custPowerDark;
+
+  /// No description provided for @custVerifiedLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Local'**
+  String get custVerifiedLocal;
+
+  /// No description provided for @custPowerDeclared.
+  ///
+  /// In en, this message translates to:
+  /// **'Power status — declared by the shops themselves'**
+  String get custPowerDeclared;
+
+  /// No description provided for @merchbPowerHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Power status'**
+  String get merchbPowerHeading;
+
+  /// No description provided for @merchbPowerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell customers what the lights are doing — it shows on your storefront card.'**
+  String get merchbPowerHint;
+
+  /// No description provided for @custHyperlocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood Dekkane'**
+  String get custHyperlocalTitle;
+
+  /// No description provided for @custHyperlocalSub.
+  ///
+  /// In en, this message translates to:
+  /// **'The local shops of your streets'**
+  String get custHyperlocalSub;
+
+  /// No description provided for @custDistricts.
+  ///
+  /// In en, this message translates to:
+  /// **'Districts'**
+  String get custDistricts;
+
+  /// No description provided for @custSearchArabiziHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search: 2ahwe, man\'oushe, knefe...'**
+  String get custSearchArabiziHint;
+
+  /// No description provided for @custAllDistricts.
+  ///
+  /// In en, this message translates to:
+  /// **'All districts'**
+  String get custAllDistricts;
+
+  /// No description provided for @custDiasporaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to Lebanon'**
+  String get custDiasporaTitle;
+
+  /// No description provided for @custDiasporaSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Diaspora Gifting Portal'**
+  String get custDiasporaSub;
+
+  /// No description provided for @custDiasporaBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Remittance made real'**
+  String get custDiasporaBanner;
+
+  /// No description provided for @custDiasporaBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.'**
+  String get custDiasporaBlurb;
+
+  /// No description provided for @custFamilyRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Family recipient'**
+  String get custFamilyRecipient;
+
+  /// No description provided for @custPersonalNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach a personal note (delivered with the order)'**
+  String get custPersonalNote;
+
+  /// No description provided for @custPersonalNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Habibti Mom, wishing you a beautiful week — some food and groceries with love!'**
+  String get custPersonalNoteHint;
+
+  /// No description provided for @custWhatToSend.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to send?'**
+  String get custWhatToSend;
+
+  /// No description provided for @custRecentDeliveriesTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent deliveries to {name}'**
+  String custRecentDeliveriesTo(String name);
+
+  /// No description provided for @custStartOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Items 0026 Start Order'**
+  String get custStartOrder;
+
+  /// No description provided for @custPickRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose who receives it'**
+  String get custPickRecipient;
+
+  /// No description provided for @custNoRecipientYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Save their address first — add it from the address book with their name as the label.'**
+  String get custNoRecipientYet;
+
+  /// No description provided for @custGiftNoteRides.
+  ///
+  /// In en, this message translates to:
+  /// **'Your note travels with the order and is read out at the door.'**
+  String get custGiftNoteRides;
+
   /// No description provided for @custMinOrderLine.
   ///
   /// In en, this message translates to:

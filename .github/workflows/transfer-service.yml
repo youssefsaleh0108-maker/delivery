@@ -1,0 +1,36 @@
+name: transfer-service
+
+
+# A called workflow can never hold more than its caller was granted, and this repository's default
+# GITHUB_TOKEN is read-only. Without this block the reusable workflow's request for packages: write
+# and security-events: write exceeds the grant, and the run is refused before a single step starts —
+# reported as a startup failure with no job and no log, which reads like an outage rather than a
+# permissions problem. Every caller needs its own copy; there is no inheriting this downward.
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+  checks: write
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/transfer-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+      - '.github/workflows/reusable-service-ci.yml'
+      - '.github/workflows/transfer-service.yml'
+  pull_request:
+    paths:
+      - 'services/transfer-service/**'
+      - 'platform/**'
+      - 'pom.xml'
+
+jobs:
+  ci:
+    uses: ./.github/workflows/reusable-service-ci.yml
+    with:
+      service-name: transfer-service
+      service-path: services/transfer-service
+    secrets: inherit
