@@ -3297,6 +3297,19 @@ class DeliveryStringsAr extends DeliveryStrings {
       'أخبر الزبائن ماذا تفعل الكهرباء — تظهر على بطاقة متجرك.';
 
   @override
+  String get merchbDeliveryAreaOff => 'لا حدّ للتوصيل — المناطق وحدها تقرر';
+
+  @override
+  String merchbDeliverWithin(String km) {
+    return 'التوصيل ضمن $km كم';
+  }
+
+  @override
+  String custOutsideDeliveryArea(String store, String km) {
+    return '$store يوصّل ضمن $km كم من المتجر — هذا العنوان خارج نطاقه.';
+  }
+
+  @override
   String get custHyperlocalTitle => 'دكانة الحي';
 
   @override

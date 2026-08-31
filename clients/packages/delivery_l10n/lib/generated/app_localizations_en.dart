@@ -3316,6 +3316,19 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Tell customers what the lights are doing — it shows on your storefront card.';
 
   @override
+  String get merchbDeliveryAreaOff => 'No delivery limit — zones alone decide';
+
+  @override
+  String merchbDeliverWithin(String km) {
+    return 'Deliver within $km km';
+  }
+
+  @override
+  String custOutsideDeliveryArea(String store, String km) {
+    return '$store delivers within $km km of the shop — that address is outside its area.';
+  }
+
+  @override
   String get custHyperlocalTitle => 'Neighborhood Dekkane';
 
   @override

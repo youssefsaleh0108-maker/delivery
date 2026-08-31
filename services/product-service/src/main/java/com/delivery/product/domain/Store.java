@@ -190,6 +190,14 @@ public class Store {
     @Column(name = "verified_local", nullable = false)
     private boolean verifiedLocal;
 
+    /**
+     * How far from the pin this shop delivers, in metres. Null keeps the old behaviour — the
+     * platform's zones alone decide. Only meaningful with a pin; the service refuses to set it
+     * without one, because a circle needs a centre.
+     */
+    @Column(name = "delivery_radius_metres")
+    private Integer deliveryRadiusMetres;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -527,6 +535,14 @@ public class Store {
 
     public boolean isVerifiedLocal() {
         return verifiedLocal;
+    }
+
+    public Integer getDeliveryRadiusMetres() {
+        return deliveryRadiusMetres;
+    }
+
+    public void setDeliveryRadiusMetres(Integer metres) {
+        this.deliveryRadiusMetres = metres;
     }
 
     public BigDecimal getLatitude() {

@@ -103,6 +103,31 @@ public class StoreService {
         return stores.distinctNeighborhoods();
     }
 
+    /**
+     * The merchant draws their delivery circle: how far from the pin they will carry. Null
+     * clears it back to zones-only. Refused without a pin — a circle needs a centre, and
+     * accepting one that binds nothing would show the merchant a promise the storefront cannot
+     * keep.
+     */
+    @Transactional
+    public StoreView setDeliveryRadius(UUID id, String merchantId, Integer metres) {
+        Store store = requireOwned(id, merchantId);
+        if (metres != null && store.getLatitude() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Drop the shop's pin first — a delivery circle needs a centre.");
+        }
+        store.setDeliveryRadiusMetres(metres);
+        return view(store, clock.instant());
+    }
+
+    /** Whether the shop's circle covers the point. See the repository for the three answers. */
+    @Transactional(readOnly = true)
+    public boolean deliversTo(UUID id, double latitude, double longitude) {
+        Boolean answer = stores.deliversTo(id, latitude, longitude);
+        return answer == null || answer;
+    }
+
     /** The merchant says what the lights are doing. Same shape as busy: declared, stamped. */
     @Transactional
     public StoreView declarePower(UUID id, String merchantId,

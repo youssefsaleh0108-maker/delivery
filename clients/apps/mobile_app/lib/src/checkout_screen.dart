@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -222,6 +224,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
     if (!_form.currentState!.validate()) return;
+
+    // The merchant's delivery circle, honoured before promising: when the shop declared a radius
+    // and both pins exist, the spheroid decides. An address with no pin passes — the zones still
+    // gate it, and refusing over information nobody has would block real orders.
+    final StoreCard? shop = widget.cart.store;
+    if (shop != null &&
+        shop.deliveryRadiusMetres != null &&
+        shop.latitude != null &&
+        shop.longitude != null &&
+        address.latitude != null &&
+        address.longitude != null) {
+      final double metres = _distanceMetres(shop.latitude!, shop.longitude!,
+          address.latitude!, address.longitude!);
+      if (metres > shop.deliveryRadiusMetres!) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(t.custOutsideDeliveryArea(shop.name,
+                (shop.deliveryRadiusMetres! / 1000).toStringAsFixed(1)))));
+        return;
+      }
+    }
 
     // Read before the await below: re-selecting the address notifies the store, which re-seeds this
     // field, and reading it afterwards would send the address's saved note instead of what the
@@ -1198,3 +1220,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 }
+
+/// Great-circle distance in metres — the haversine, enough precision for a delivery circle.
+double _distanceMetres(double lat1, double lng1, double lat2, double lng2) {
+  const double earthRadius = 6371000;
+  final double dLat = _rad(lat2 - lat1);
+  final double dLng = _rad(lng2 - lng1);
+  final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(_rad(lat1)) * math.cos(_rad(lat2)) *
+          math.sin(dLng / 2) * math.sin(dLng / 2);
+  return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+}
+
+double _rad(double deg) => deg * math.pi / 180;

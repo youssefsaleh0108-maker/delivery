@@ -322,6 +322,28 @@ class StoreApi {
     return Store.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// The merchant draws (or clears, with null) their delivery circle.
+  Future<Store> setDeliveryRadius(String storeId, int? metres) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/stores/$storeId/delivery-radius',
+      data: <String, dynamic>{'metres': metres},
+    );
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Whether the shop's circle covers the point — what checkout asks before promising.
+  Future<bool> canDeliver(String storeId,
+      {required double latitude, required double longitude}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/stores/$storeId/can-deliver',
+      queryParameters: <String, dynamic>{
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+    );
+    return (response.data as Map<String, dynamic>)['canDeliver'] as bool? ?? true;
+  }
+
   /// The merchant declares what the lights are doing — mains, generator, or dark — with the
   /// optional one-liner the storefront prints under the chip.
   Future<Store> declarePower(String storeId, StorePowerStatus status,

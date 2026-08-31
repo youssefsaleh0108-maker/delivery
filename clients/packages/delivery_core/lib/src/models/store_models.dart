@@ -180,6 +180,9 @@ class StoreCard {
     this.verifiedLocal = false,
     this.powerStatus = StorePowerStatus.unknown,
     this.powerNote,
+    this.latitude,
+    this.longitude,
+    this.deliveryRadiusMetres,
   });
 
   final String id;
@@ -220,6 +223,13 @@ class StoreCard {
   /// The merchant's one-liner under the chip: "Ovens fully hot", "Cold storage active".
   final String? powerNote;
 
+  /// The pin, carried on the card so checkout can measure the door against the circle below.
+  final double? latitude;
+  final double? longitude;
+
+  /// The merchant's delivery circle in metres, or null for zones-only.
+  final int? deliveryRadiusMetres;
+
   /// The cover a card in a grid should load — small if the server has one, the original if not.
   String? get listCoverUrl => coverThumbUrl ?? coverUrl;
 
@@ -254,6 +264,9 @@ class StoreCard {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        latitude: latitude,
+        longitude: longitude,
+        deliveryRadiusMetres: deliveryRadiusMetres,
       );
 
   factory StoreCard.fromJson(Map<String, dynamic> json) => StoreCard(
@@ -282,6 +295,9 @@ class StoreCard {
         verifiedLocal: json['verifiedLocal'] as bool? ?? false,
         powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
         powerNote: json['powerNote'] as String?,
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
+        deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
       );
 }
 
@@ -337,6 +353,7 @@ class Store {
     this.verifiedLocal = false,
     this.powerStatus = StorePowerStatus.unknown,
     this.powerNote,
+    this.deliveryRadiusMetres,
   });
 
   final String id;
@@ -396,6 +413,9 @@ class Store {
   /// The one-liner the storefront prints under the power chip.
   final String? powerNote;
 
+  /// The merchant's delivery circle in metres, or null for zones-only.
+  final int? deliveryRadiusMetres;
+
   /// Whether there is a pin to draw or to measure "near me" from.
   bool get hasPin => latitude != null && longitude != null;
 
@@ -440,6 +460,9 @@ class Store {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        latitude: latitude,
+        longitude: longitude,
+        deliveryRadiusMetres: deliveryRadiusMetres,
       );
 
   Store copyWith({bool? favorite}) => Store(
@@ -473,6 +496,7 @@ class Store {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        deliveryRadiusMetres: deliveryRadiusMetres,
       );
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -507,6 +531,7 @@ class Store {
         verifiedLocal: json['verifiedLocal'] as bool? ?? false,
         powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
         powerNote: json['powerNote'] as String?,
+        deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
       );
 }
 

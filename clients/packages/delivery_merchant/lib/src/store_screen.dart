@@ -680,6 +680,7 @@ class _StoreScreenState extends State<StoreScreen> {
       context,
       latitude: store.latitude,
       longitude: store.longitude,
+      initialRadiusMetres: store.deliveryRadiusMetres,
       geocoding: widget.geocoding,
       // Whatever is in the address box now, not what was loaded — a merchant who has just typed
       // their street should find it offered, not the old one.
@@ -688,16 +689,25 @@ class _StoreScreenState extends State<StoreScreen> {
     if (choice == null || !mounted) return;
 
     switch (choice) {
-      case StorePinPlaced(point: final LatLng point):
+      case StorePinPlaced(point: final LatLng point, radiusMetres: final int? radius):
         await _run(
-          () => widget.api
-              .setPin(store.id, lat: point.latitude, lng: point.longitude)
-              .then((_) {}),
+          // Pin first, then the circle around it — the server refuses a radius on a store with
+          // no pin, which is why this order is not negotiable.
+          () async {
+            await widget.api
+                .setPin(store.id, lat: point.latitude, lng: point.longitude);
+            await widget.api.setDeliveryRadius(store.id, radius);
+          },
           t.merchPinSaved,
         );
       case StorePinRemoved():
         await _run(
-          () => widget.api.clearPin(store.id).then((_) {}),
+          // A removed pin takes its circle with it: a centre-less circle binds nothing and the
+          // server would refuse to keep it anyway.
+          () async {
+            await widget.api.setDeliveryRadius(store.id, null);
+            await widget.api.clearPin(store.id);
+          },
           t.merchPinCleared,
         );
     }

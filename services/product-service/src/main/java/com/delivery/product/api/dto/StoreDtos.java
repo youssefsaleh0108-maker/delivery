@@ -98,7 +98,9 @@ public final class StoreDtos {
             Store.PowerStatus powerStatus,
             String powerNote,
             /** When the merchant last declared — what "auto-updated" honestly means. */
-            Instant powerUpdatedAt) {
+            Instant powerUpdatedAt,
+            /** The merchant's delivery circle, or null for zones-only. */
+            Integer deliveryRadiusMetres) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */
@@ -139,7 +141,12 @@ public final class StoreDtos {
             String neighborhood,
             boolean verifiedLocal,
             Store.PowerStatus powerStatus,
-            String powerNote) {
+            String powerNote,
+            /** The pin, so checkout can measure the customer's door against the circle below. */
+            BigDecimal latitude,
+            BigDecimal longitude,
+            /** The merchant's delivery circle, or null for zones-only. */
+            Integer deliveryRadiusMetres) {
     }
 
     public record OfferResponse(
@@ -201,6 +208,11 @@ public final class StoreDtos {
     public record PowerRequest(
             @NotNull Store.PowerStatus status,
             @Size(max = 160) String note) {
+    }
+
+    /** The delivery circle's size. Null clears it — back to zones-only. */
+    public record RadiusRequest(
+            @Min(200) @Max(50000) Integer metres) {
     }
 
     public record CommercialsRequest(

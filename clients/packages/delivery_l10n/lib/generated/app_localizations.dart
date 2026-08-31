@@ -5942,6 +5942,24 @@ abstract class DeliveryStrings {
   /// **'Tell customers what the lights are doing — it shows on your storefront card.'**
   String get merchbPowerHint;
 
+  /// No description provided for @merchbDeliveryAreaOff.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivery limit — zones alone decide'**
+  String get merchbDeliveryAreaOff;
+
+  /// No description provided for @merchbDeliverWithin.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver within {km} km'**
+  String merchbDeliverWithin(String km);
+
+  /// No description provided for @custOutsideDeliveryArea.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} delivers within {km} km of the shop — that address is outside its area.'**
+  String custOutsideDeliveryArea(String store, String km);
+
   /// No description provided for @custHyperlocalTitle.
   ///
   /// In en, this message translates to:

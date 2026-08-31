@@ -72,18 +72,32 @@ class DeviceLocation {
         return const LocationDeniedForever();
       }
 
-      final Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          // High, not best: a shop pin and a delivery door both live at street precision, and
-          // `best` keeps the GPS hunting well past the point anybody is still watching a spinner.
-          accuracy: LocationAccuracy.high,
-          timeLimit: timeout,
-        ),
-      );
-      return LocationFix(position.latitude, position.longitude);
+      try {
+        final Position position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            // High, not best: a shop pin and a delivery door both live at street precision, and
+            // `best` keeps the GPS hunting well past the point anybody is still watching a
+            // spinner.
+            accuracy: LocationAccuracy.high,
+            timeLimit: timeout,
+          ),
+        );
+        return LocationFix(position.latitude, position.longitude);
+      } catch (_) {
+        // A fresh fix timing out is the NORMAL indoor case — under a roof, between Beirut
+        // buildings, in a basement shop. The phone's fused last-known position is usually
+        // minutes old and street-accurate, and a slightly stale pin the user can nudge beats a
+        // button that just fails. Only when the phone has never had a fix at all does this fall
+        // through to failure.
+        final Position? last = await Geolocator.getLastKnownPosition();
+        if (last != null) {
+          return LocationFix(last.latitude, last.longitude);
+        }
+        return const LocationFailed();
+      }
     } catch (_) {
-      // Timeout, a platform without the plugin, a browser that refused — all the same to the
-      // caller: no fix, carry on from the fallback view.
+      // A platform without the plugin, a browser that refused — all the same to the caller: no
+      // fix, carry on from the fallback view.
       return const LocationFailed();
     }
   }

@@ -438,11 +438,14 @@ sealed class StorePinChoice {
   const StorePinChoice();
 }
 
-/// Save this point.
+/// Save this point — and, when the merchant drew one, the delivery circle around it.
 class StorePinPlaced extends StorePinChoice {
-  const StorePinPlaced(this.point);
+  const StorePinPlaced(this.point, {this.radiusMetres});
 
   final LatLng point;
+
+  /// How far from the pin this shop delivers, or null for zones-only (the old behaviour).
+  final int? radiusMetres;
 }
 
 /// Remove whatever pin the shop had.
@@ -455,6 +458,7 @@ Future<StorePinChoice?> showStorePinPicker(
   BuildContext context, {
   double? latitude,
   double? longitude,
+  int? initialRadiusMetres,
   GeocodingApi? geocoding,
   String? addressHint,
 }) {
@@ -473,6 +477,7 @@ Future<StorePinChoice?> showStorePinPicker(
     builder: (BuildContext context) => _StorePinPicker(
       latitude: latitude,
       longitude: longitude,
+      initialRadiusMetres: initialRadiusMetres,
       geocoding: geocoding,
       addressHint: addressHint,
     ),
@@ -483,12 +488,16 @@ class _StorePinPicker extends StatefulWidget {
   const _StorePinPicker({
     this.latitude,
     this.longitude,
+    this.initialRadiusMetres,
     this.geocoding,
     this.addressHint,
   });
 
   final double? latitude;
   final double? longitude;
+
+  /// The circle the shop already had, so re-opening the picker starts from it.
+  final int? initialRadiusMetres;
 
   /// Optional. Without it the picker is still a picker — it just has no search box, and the
   /// merchant pans instead of typing.
@@ -508,6 +517,12 @@ class _StorePinPickerState extends State<_StorePinPicker> {
 
   LatLng? _picked;
   bool _tilesFailed = false;
+
+  /// The delivery circle in km, or null while the limit is off. Slider range 0.5–15 km covers a
+  /// dekkane's street and a city-wide kitchen alike; anything wider is what zones are for.
+  late double? _radiusKm = widget.initialRadiusMetres == null
+      ? null
+      : (widget.initialRadiusMetres! / 1000).clamp(0.5, 15).toDouble();
 
   late final MapTileWatch _watch = MapTileWatch(onGiveUp: _giveUp);
 
@@ -718,9 +733,60 @@ class _StorePinPickerState extends State<_StorePinPicker> {
               ),
             ],
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _radiusControls(t, picked),
             _actions(t, picked),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The delivery-circle controls: a switch to limit at all, and the slider that sizes it. Only
+  /// offered once a pin exists — a circle needs a centre, which is also the server's rule.
+  Widget _radiusControls(DeliveryStrings t, LatLng? picked) {
+    if (picked == null) return const SizedBox.shrink();
+    final double? km = _radiusKm;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  km == null
+                      ? t.merchbDeliveryAreaOff
+                      : t.merchbDeliverWithin(km.toStringAsFixed(1)),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              Switch(
+                value: km != null,
+                activeThumbColor: DeliveryColors.white,
+                activeTrackColor: DeliveryColors.brand,
+                onChanged: (bool on) =>
+                    setState(() => _radiusKm = on ? 3.0 : null),
+              ),
+            ],
+          ),
+          if (km != null)
+            Slider(
+              value: km,
+              min: 0.5,
+              max: 15,
+              divisions: 29,
+              activeColor: DeliveryColors.brand,
+              label: t.merchbDeliverWithin(km.toStringAsFixed(1)),
+              onChanged: (double value) => setState(() => _radiusKm = value),
+            ),
+        ],
       ),
     );
   }
@@ -753,6 +819,21 @@ class _StorePinPickerState extends State<_StorePinPicker> {
       ),
       children: <Widget>[
         osmTiles(_watch),
+        // The delivery circle, under the pin so the glyph stays crisp. Metres on the ground, not
+        // pixels — the whole point is that zooming shows the true reach.
+        if (picked != null && _radiusKm != null)
+          CircleLayer(
+            circles: <CircleMarker>[
+              CircleMarker(
+                point: picked,
+                radius: _radiusKm! * 1000,
+                useRadiusInMeter: true,
+                color: DeliveryColors.brand.withValues(alpha: 0.12),
+                borderColor: DeliveryColors.brand,
+                borderStrokeWidth: 2,
+              ),
+            ],
+          ),
         if (picked != null)
           MarkerLayer(
             markers: <Marker>[
@@ -924,7 +1005,12 @@ class _StorePinPickerState extends State<_StorePinPicker> {
             // snackbar after the fact.
             onPressed: picked == null
                 ? null
-                : () => Navigator.of(context).pop(StorePinPlaced(picked)),
+                : () => Navigator.of(context).pop(StorePinPlaced(
+                      picked,
+                      radiusMetres: _radiusKm == null
+                          ? null
+                          : (_radiusKm! * 1000).round(),
+                    )),
           ),
         ),
       ],

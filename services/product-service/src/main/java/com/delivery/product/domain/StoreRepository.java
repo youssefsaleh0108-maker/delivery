@@ -151,6 +151,28 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography)
              LIMIT :maxCandidates
             """, nativeQuery = true)
+    /**
+     * Whether this shop's delivery circle covers the point. Three honest answers folded into
+     * one: no radius set → yes (zones alone decide, the old behaviour); a radius but no pin →
+     * yes (a circle without a centre binds nothing — the service refuses to create that state,
+     * but data outlives rules); otherwise the spheroid says.
+     */
+    @Query(value = """
+            SELECT CASE
+                     WHEN s.delivery_radius_metres IS NULL THEN true
+                     WHEN s.location IS NULL THEN true
+                     ELSE public.ST_DWithin(
+                            s.location,
+                            public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography,
+                            s.delivery_radius_metres)
+                   END
+              FROM stores s
+             WHERE s.id = :id
+            """, nativeQuery = true)
+    Boolean deliversTo(@Param("id") UUID id,
+                       @Param("latitude") double latitude,
+                       @Param("longitude") double longitude);
+
     List<UUID> findActiveIdsNear(@Param("latitude") double latitude,
                                  @Param("longitude") double longitude,
                                  @Param("radiusMetres") double radiusMetres,

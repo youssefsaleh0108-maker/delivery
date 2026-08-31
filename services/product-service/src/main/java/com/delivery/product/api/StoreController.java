@@ -364,6 +364,27 @@ public class StoreController {
                 .toList();
     }
 
+    /** The merchant draws (or clears) their delivery circle. */
+    @PostMapping("/{id}/delivery-radius")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public StoreResponse setDeliveryRadius(@PathVariable UUID id,
+                                           @Valid @RequestBody StoreDtos.RadiusRequest request) {
+        return toResponse(storeService.setDeliveryRadius(
+                id, CurrentUser.requireId(), request.metres()), Set.of());
+    }
+
+    /**
+     * Whether this shop's circle covers a point — what checkout asks before promising a
+     * delivery the shop never offered. Any authenticated caller: the answer is as public as the
+     * storefront card that carries the radius.
+     */
+    @GetMapping("/{id}/can-deliver")
+    public Map<String, Object> canDeliver(@PathVariable UUID id,
+                                          @RequestParam double latitude,
+                                          @RequestParam double longitude) {
+        return Map.of("canDeliver", storeService.deliversTo(id, latitude, longitude));
+    }
+
     /** The merchant declares what the lights are doing — the power chip's one source of truth. */
     @PostMapping("/{id}/power")
     @PreAuthorize("hasRole('MERCHANT')")
@@ -550,7 +571,10 @@ public class StoreController {
                 store.getNeighborhood(),
                 store.isVerifiedLocal(),
                 store.getPowerStatus(),
-                store.getPowerNote());
+                store.getPowerNote(),
+                store.getLatitude(),
+                store.getLongitude(),
+                store.getDeliveryRadiusMetres());
     }
 
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
@@ -589,7 +613,8 @@ public class StoreController {
                 store.isVerifiedLocal(),
                 store.getPowerStatus(),
                 store.getPowerNote(),
-                store.getPowerUpdatedAt());
+                store.getPowerUpdatedAt(),
+                store.getDeliveryRadiusMetres());
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {
