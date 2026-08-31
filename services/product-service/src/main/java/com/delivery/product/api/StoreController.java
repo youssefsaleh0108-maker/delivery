@@ -46,6 +46,7 @@ import com.delivery.product.api.dto.StoreDtos.ReviewResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreCardResponse;
 import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
+import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
@@ -368,7 +369,7 @@ public class StoreController {
     @PostMapping("/{id}/delivery-radius")
     @PreAuthorize("hasRole('MERCHANT')")
     public StoreResponse setDeliveryRadius(@PathVariable UUID id,
-                                           @Valid @RequestBody StoreDtos.RadiusRequest request) {
+                                           @Valid @RequestBody RadiusRequest request) {
         return toResponse(storeService.setDeliveryRadius(
                 id, CurrentUser.requireId(), request.metres()), Set.of());
     }

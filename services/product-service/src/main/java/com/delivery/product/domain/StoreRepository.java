@@ -151,6 +151,11 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography)
              LIMIT :maxCandidates
             """, nativeQuery = true)
+    List<UUID> findActiveIdsNear(@Param("latitude") double latitude,
+                                 @Param("longitude") double longitude,
+                                 @Param("radiusMetres") double radiusMetres,
+                                 @Param("maxCandidates") int maxCandidates);
+
     /**
      * Whether this shop's delivery circle covers the point. Three honest answers folded into
      * one: no radius set → yes (zones alone decide, the old behaviour); a radius but no pin →
@@ -172,9 +177,4 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     Boolean deliversTo(@Param("id") UUID id,
                        @Param("latitude") double latitude,
                        @Param("longitude") double longitude);
-
-    List<UUID> findActiveIdsNear(@Param("latitude") double latitude,
-                                 @Param("longitude") double longitude,
-                                 @Param("radiusMetres") double radiusMetres,
-                                 @Param("maxCandidates") int maxCandidates);
 }
