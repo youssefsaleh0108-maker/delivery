@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'net_image.dart';
 import 'tokens.dart';
 
 /// A product photo, with all four states it can actually be in.
@@ -48,8 +49,8 @@ class DeliveryProductImage extends StatelessWidget {
         label: 'No photo',
       );
     } else {
-      content = Image.network(
-        url!,
+      content = Image(
+        image: DeliveryImages.provider(url!),
         fit: fit,
         width: width,
         height: height,

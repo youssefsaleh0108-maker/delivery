@@ -276,8 +276,8 @@ class _AccountScreenState extends State<AccountScreen> {
     final Widget face = url == null
         ? StoreMonogram(name: s.displayName, size: 64, radius: 32)
         : ClipOval(
-            child: Image.network(
-              url,
+            child: Image(
+              image: DeliveryImages.provider(url),
               width: 64,
               height: 64,
               fit: BoxFit.cover,

@@ -459,8 +459,8 @@ class _StoreScreenState extends State<StoreScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(DeliveryRadius.lg),
                 child: hasCover
-                    ? Image.network(
-                        store.coverUrl!,
+                    ? Image(
+                        image: DeliveryImages.provider(store.coverUrl!),
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => StoreMonogram(name: store.name, radius: 0),
                       )

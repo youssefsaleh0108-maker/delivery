@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Disk cache for network images. The platform serves photos through PRESIGNED urls whose
+  # signature rotates per request, so the default url-keyed cache missed on every refresh and the
+  # same cover downloaded again and again; DeliveryImages keys the cache on the url PATH instead.
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

@@ -654,8 +654,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               height: 32,
               child: thumbnail == null
                   ? StoreMonogram(name: line.productName, radius: 0)
-                  : Image.network(
-                      thumbnail,
+                  : Image(
+                      image: DeliveryImages.provider(thumbnail),
                       fit: BoxFit.cover,
                       errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
                           StoreMonogram(name: line.productName, radius: 0),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'net_image.dart';
 import 'product_image.dart';
 import 'tokens.dart';
 
@@ -253,8 +254,8 @@ class StoreAvatar extends StatelessWidget {
         height: size,
         child: url == null || url.isEmpty
             ? StoreMonogram(name: name, size: size)
-            : Image.network(
-                url,
+            : Image(
+                image: DeliveryImages.provider(url),
                 fit: BoxFit.cover,
                 errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
                     StoreMonogram(name: name, size: size),
@@ -495,8 +496,8 @@ class _Chip extends StatelessWidget {
                 ),
               ),
               child: _hasImage
-                  ? Image.network(
-                      imageUrl!,
+                  ? Image(
+                      image: DeliveryImages.provider(imageUrl!),
                       fit: BoxFit.cover,
                       errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
                           Center(child: _fallbackIcon(22, onFill: false)),
@@ -549,8 +550,8 @@ class _Chip extends StatelessWidget {
                   child: SizedBox(
                     width: 22,
                     height: 22,
-                    child: Image.network(
-                      imageUrl!,
+                    child: Image(
+                      image: DeliveryImages.provider(imageUrl!),
                       fit: BoxFit.cover,
                       errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
                           _fallbackIcon(15),
@@ -752,8 +753,8 @@ class StorefrontCard extends StatelessWidget {
           if (url == null || url.isEmpty)
             StoreMonogram(name: name, radius: 0)
           else
-            Image.network(
-              url,
+            Image(
+              image: DeliveryImages.provider(url),
               fit: BoxFit.cover,
               errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
                   StoreMonogram(name: name, radius: 0),

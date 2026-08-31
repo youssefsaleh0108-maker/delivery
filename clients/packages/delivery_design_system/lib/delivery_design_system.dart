@@ -8,6 +8,7 @@ library;
 export 'src/logo.dart';
 export 'src/order_status_badge.dart';
 export 'src/panels.dart';
+export 'src/net_image.dart';
 export 'src/product_image.dart';
 export 'src/status_badge.dart';
 export 'src/storefront.dart';

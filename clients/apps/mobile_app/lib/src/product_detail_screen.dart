@@ -1034,8 +1034,8 @@ class CustomerPhoto extends StatelessWidget {
     if (url == null || url!.isEmpty) {
       content = placeholder;
     } else {
-      content = Image.network(
-        url!,
+      content = Image(
+        image: DeliveryImages.provider(url!),
         width: width,
         height: height,
         fit: BoxFit.cover,

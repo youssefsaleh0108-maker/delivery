@@ -585,8 +585,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     final Widget face = url == null
         ? StoreMonogram(name: widget.session.displayName, size: 40, radius: 20)
         : ClipOval(
-            child: Image.network(
-              url,
+            child: Image(
+              image: DeliveryImages.provider(url),
               width: 40,
               height: 40,
               fit: BoxFit.cover,
@@ -1014,8 +1014,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   ),
                 )
               else
-                Image.network(
-                  image,
+                Image(
+                  image: DeliveryImages.provider(image),
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const DecoratedBox(
                     decoration: BoxDecoration(color: DeliveryColors.brand),

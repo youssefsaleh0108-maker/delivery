@@ -1087,8 +1087,8 @@ class _ImageTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(DeliveryRadius.md),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Image.network(
-            url,
+          child: Image(
+            image: DeliveryImages.provider(url),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) =>
                 const Icon(Icons.broken_image_outlined, color: DeliveryColors.muted),

@@ -331,8 +331,8 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
     final Widget face = url == null
         ? StoreMonogram(name: s.displayName, size: 56, radius: 28)
         : ClipOval(
-            child: Image.network(
-              url,
+            child: Image(
+              image: DeliveryImages.provider(url),
               width: 56,
               height: 56,
               fit: BoxFit.cover,
