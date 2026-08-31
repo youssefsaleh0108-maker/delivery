@@ -243,12 +243,81 @@ class AuthService {
     return _adopt(await _oidc.refresh(_config, token));
   }
 
-  Future<void> signOut() async {
+  /// Signs out.
+  ///
+  /// With [keepForBiometrics] the refresh token is MOVED into the biometric stash instead of
+  /// being revoked — the "use fingerprint next time" promise made concrete. The sign-in screen
+  /// then offers "Continue as {name}" behind the system prompt, and redeeming the stash is an
+  /// ordinary refresh grant. Only ever passed true when the account's biometric toggle is on:
+  /// that toggle is the user's explicit consent to a sign-out that is not a revocation.
+  Future<void> signOut({bool keepForBiometrics = false}) async {
     final String? refreshToken =
         _session?.refreshToken ?? await _storage.read(key: _refreshTokenKey);
+    final AuthSession? leaving = _session;
     _session = null;
     await _storage.delete(key: _refreshTokenKey);
+    if (keepForBiometrics && refreshToken != null && leaving != null) {
+      await _storage.write(key: _bioRefreshKey, value: refreshToken);
+      await _storage.write(key: _bioSubjectKey, value: leaving.subject ?? '');
+      await _storage.write(
+          key: _bioUsernameKey, value: leaving.username ?? leaving.displayName);
+      await _storage.write(key: _bioNameKey, value: leaving.displayName);
+      return; // NOT revoked — that is the whole point.
+    }
+    await clearBiometricStash();
     await _oidc.signOut(_config, refreshToken);
+  }
+
+  // ------------------------------------------------------------- remembered sign-in
+
+  static const String _lastUsernameKey = 'delivery.last_username';
+  static const String _bioRefreshKey = 'delivery.bio.refresh';
+  static const String _bioSubjectKey = 'delivery.bio.subject';
+  static const String _bioUsernameKey = 'delivery.bio.username';
+  static const String _bioNameKey = 'delivery.bio.name';
+
+  /// The identifier typed at the last successful sign-in — a convenience, not a secret. The
+  /// sign-in screen prefills it so a returning user types only their passcode.
+  Future<void> rememberLastLogin(String identifier) =>
+      _storage.write(key: _lastUsernameKey, value: identifier);
+
+  Future<String?> lastLogin() => _storage.read(key: _lastUsernameKey);
+
+  /// Who the fingerprint could sign back in, or null when nobody is stashed.
+  Future<BiometricCandidate?> biometricCandidate() async {
+    final String? refresh = await _storage.read(key: _bioRefreshKey);
+    if (refresh == null) return null;
+    return BiometricCandidate(
+      subject: await _storage.read(key: _bioSubjectKey) ?? '',
+      username: await _storage.read(key: _bioUsernameKey) ?? '',
+      displayName: await _storage.read(key: _bioNameKey) ?? '',
+    );
+  }
+
+  /// Redeems the stash — an ordinary refresh grant with the kept token. The stash is cleared
+  /// either way: on success it is spent (the grant rotated it and [_adopt] persisted the new
+  /// pair), and on failure it is dead (revoked, expired, realm rebuilt) and keeping a corpse
+  /// would show the "Continue as" card forever with nothing behind it.
+  Future<AuthSession> redeemBiometricStash() async {
+    final String? token = await _storage.read(key: _bioRefreshKey);
+    if (token == null) {
+      throw StateError('No biometric session is stashed.');
+    }
+    try {
+      final AuthSession session = await refresh(token);
+      await clearBiometricStash();
+      return session;
+    } catch (_) {
+      await clearBiometricStash();
+      rethrow;
+    }
+  }
+
+  Future<void> clearBiometricStash() async {
+    await _storage.delete(key: _bioRefreshKey);
+    await _storage.delete(key: _bioSubjectKey);
+    await _storage.delete(key: _bioUsernameKey);
+    await _storage.delete(key: _bioNameKey);
   }
 
   Future<AuthSession> _adopt(TokenSet tokens) async {
@@ -268,4 +337,17 @@ class AuthService {
     _session = session;
     return session;
   }
+}
+
+/// Who the sign-in screen's "Continue as" card names — the stashed identity, never the token.
+class BiometricCandidate {
+  const BiometricCandidate({
+    required this.subject,
+    required this.username,
+    required this.displayName,
+  });
+
+  final String subject;
+  final String username;
+  final String displayName;
 }

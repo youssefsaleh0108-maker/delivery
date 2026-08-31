@@ -368,7 +368,13 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   }
 
   Future<void> _signOut() async {
-    await _authService.signOut();
+    // The fingerprint toggle is the user's standing consent to a sign-out that keeps a way back:
+    // with it on, the refresh token moves into the biometric stash instead of being revoked, and
+    // the sign-in screen offers "Continue as {name}" behind the system prompt. Toggle off means
+    // sign-out is a revocation, exactly as before.
+    final bool keep =
+        await _biometrics.isEnabledFor(_authService.session?.subject);
+    await _authService.signOut(keepForBiometrics: keep);
     setState(() {
       // Re-armed. Without this the next person to sign in on this phone walks straight past the
       // lock, because _locked would still be false from the session that just ended.

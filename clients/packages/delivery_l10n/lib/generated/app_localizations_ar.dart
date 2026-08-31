@@ -3273,6 +3273,17 @@ class DeliveryStringsAr extends DeliveryStrings {
       'الكهرباء مقطوعة عن المحل الآن — قد ينتظر طلبك عودتها';
 
   @override
+  String custContinueAs(String name) {
+    return 'تابع باسم $name';
+  }
+
+  @override
+  String get custNotYou => 'لست أنت؟ سجّل الدخول بحساب آخر';
+
+  @override
+  String get custBioExpired => 'انتهت صلاحية الدخول المحفوظ — أدخل رمزك السري.';
+
+  @override
   String get custVerifiedLocal => 'محل موثوق';
 
   @override

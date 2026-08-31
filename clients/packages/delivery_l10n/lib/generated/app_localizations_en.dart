@@ -3290,6 +3290,18 @@ class DeliveryStringsEn extends DeliveryStrings {
       'This shop is dark right now — orders may wait for power';
 
   @override
+  String custContinueAs(String name) {
+    return 'Continue as $name';
+  }
+
+  @override
+  String get custNotYou => 'Not you? Sign in with another account';
+
+  @override
+  String get custBioExpired =>
+      'That saved sign-in expired — enter your passcode.';
+
+  @override
   String get custVerifiedLocal => 'Verified Local';
 
   @override

@@ -5900,6 +5900,24 @@ abstract class DeliveryStrings {
   /// **'This shop is dark right now — orders may wait for power'**
   String get custDarkBanner;
 
+  /// No description provided for @custContinueAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue as {name}'**
+  String custContinueAs(String name);
+
+  /// No description provided for @custNotYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Not you? Sign in with another account'**
+  String get custNotYou;
+
+  /// No description provided for @custBioExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'That saved sign-in expired — enter your passcode.'**
+  String get custBioExpired;
+
   /// No description provided for @custVerifiedLocal.
   ///
   /// In en, this message translates to:

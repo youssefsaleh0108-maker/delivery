@@ -73,18 +73,75 @@ class _SignInScreenState extends State<SignInScreen> {
   /// produce — it proves who is holding the phone, it does not fetch a token from the server.
   bool _fingerprintOffered = false;
 
+  /// The stashed identity a fingerprint could sign back in AFTER a sign-out, or null when the
+  /// offer comes from a still-live session (or there is no offer at all).
+  BiometricCandidate? _candidate;
+
+  /// The name on the "Continue as" card, whichever path put it there.
+  String? _bioName;
+
   @override
   void initState() {
     super.initState();
     _checkFingerprint();
+    _prefillLastLogin();
+  }
+
+  /// The identifier typed at the last successful sign-in — a returning user types only their
+  /// passcode. A convenience, not a secret, so it survives sign-out on purpose.
+  Future<void> _prefillLastLogin() async {
+    final String? last = await widget.authService.lastLogin();
+    if (!mounted || last == null || last.isEmpty) return;
+    if (_username.text.trim().isEmpty) {
+      setState(() => _username.text = last);
+    }
   }
 
   Future<void> _checkFingerprint() async {
     if (!await _biometrics.isAvailable) return;
-    if (!await _biometrics.isEnabledForAnyone()) return;
-    final AuthSession? stored = await widget.authService.restore();
+    // A still-live session first — the pre-sign-out case this screen always handled.
+    if (await _biometrics.isEnabledForAnyone()) {
+      final AuthSession? stored = await widget.authService.restore();
+      if (!mounted) return;
+      if (stored != null) {
+        setState(() {
+          _fingerprintOffered = true;
+          _bioName = stored.displayName;
+        });
+        return;
+      }
+    }
+    // Then the stash: the identity kept through a sign-out because its owner turned the
+    // fingerprint toggle on. Offered only while that toggle still holds.
+    final BiometricCandidate? candidate =
+        await widget.authService.biometricCandidate();
+    if (candidate == null || !mounted) return;
+    if (!await _biometrics.isEnabledFor(candidate.subject)) {
+      // The toggle went off since the stash was made; the stash goes with it.
+      await widget.authService.clearBiometricStash();
+      return;
+    }
     if (!mounted) return;
-    setState(() => _fingerprintOffered = stored != null);
+    setState(() {
+      _fingerprintOffered = true;
+      _candidate = candidate;
+      _bioName = candidate.displayName;
+      if (_username.text.trim().isEmpty && candidate.username.isNotEmpty) {
+        _username.text = candidate.username;
+      }
+    });
+  }
+
+  /// The "Not you?" link: forget the stashed identity and sign in plainly.
+  Future<void> _forgetCandidate() async {
+    await widget.authService.clearBiometricStash();
+    if (!mounted) return;
+    setState(() {
+      _fingerprintOffered = _candidate == null && _fingerprintOffered;
+      _candidate = null;
+      _bioName = null;
+      _username.clear();
+    });
   }
 
   /// Unlocks the stored session instead of typing the passcode.
@@ -109,7 +166,28 @@ class _SignInScreenState extends State<SignInScreen> {
       return;
     }
 
-    final AuthSession? session = await widget.authService.restore();
+    // Two doors behind the same fingerprint: a still-live session restores; a stashed one — kept
+    // through sign-out by the owner's own toggle — redeems as an ordinary refresh grant.
+    AuthSession? session;
+    if (_candidate != null) {
+      try {
+        session = await widget.authService.redeemBiometricStash();
+      } catch (_) {
+        // Revoked, expired, or the realm was rebuilt. The stash is already cleared; the passcode
+        // is the way in, and the message says so rather than blaming the finger.
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _fingerprintOffered = false;
+          _candidate = null;
+          _bioName = null;
+          _error = t.custBioExpired;
+        });
+        return;
+      }
+    } else {
+      session = await widget.authService.restore();
+    }
     if (!mounted) return;
     if (session == null) {
       // The session went away between offering the key and pressing it — a sign-out elsewhere, or
@@ -177,6 +255,8 @@ class _SignInScreenState extends State<SignInScreen> {
     try {
       final AuthSession session =
           await widget.authService.signInWithPassword(_username.text, passcode);
+      // The identifier that just worked, kept so next time only the passcode is typed.
+      await widget.authService.rememberLastLogin(_username.text.trim());
       if (!mounted) return;
       widget.onSignedIn(session);
     } on AuthException catch (e) {
@@ -306,6 +386,68 @@ class _SignInScreenState extends State<SignInScreen> {
         const SizedBox(height: DeliverySpacing.sm),
         const _BrandLockup(),
         const SizedBox(height: DeliverySpacing.xl),
+        // The remembered face: one fingerprint back in, or "not you" to sign in plainly. Only
+        // drawn when there is genuinely a session behind it — see _checkFingerprint.
+        if (_fingerprintOffered && _bioName != null) ...<Widget>[
+          Semantics(
+            button: true,
+            label: t.custContinueAs(_bioName!),
+            child: Material(
+              color: DeliveryColors.white,
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(DeliveryRadius.md),
+                onTap: _busy ? null : _useFingerprint,
+                child: Container(
+                  padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: DeliveryColors.brand, width: 1.2),
+                    borderRadius: BorderRadius.circular(DeliveryRadius.md),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      StoreMonogram(name: _bioName!, size: 40, radius: 20),
+                      const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+                      Expanded(
+                        child: Text(
+                          t.custContinueAs(_bioName!),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: DeliveryColors.ink,
+                            height: 1.25,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.fingerprint,
+                          size: 26, color: DeliveryColors.brand),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_candidate != null)
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: _busy ? null : _forgetCandidate,
+                child: Text(
+                  t.custNotYou,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.muted,
+                  ),
+                ),
+              ),
+            )
+          else
+            const SizedBox(height: DeliverySpacing.sm),
+          const SizedBox(height: DeliverySpacing.sm),
+        ],
         AuthField(
           label: t.authEmailOrPhone,
           hint: t.authEmailOrPhoneHint,
