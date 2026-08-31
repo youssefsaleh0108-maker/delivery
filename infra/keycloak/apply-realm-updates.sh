@@ -190,6 +190,15 @@ set_contact() {
   echo "    $username -> $phone (verified) / $account"
 }
 
+echo "==> Session lifetimes: a consumer app stays signed in"
+# 30 min idle logged people out of their groceries mid-day and made the biometric stash die with
+# it. Idle 30 days, max 90: the interceptor's silent refresh keeps the 5-minute access token
+# fresh, and the refresh token underneath now lives as long as a shopping habit does. Mirrors the
+# realm json — keep the two in step.
+$KCADM update realms/$REALM \
+  -s ssoSessionIdleTimeout=2592000 \
+  -s ssoSessionMaxLifespan=7776000
+
 echo "==> Contact and settlement attributes on dev users"
 set_contact customer "+15550100001" "dev-fcm-token-customer-0000000000000000000000000000" "ACC-CUSTOMER"
 set_contact rider    "+15550100002" "dev-fcm-token-rider-0000000000000000000000000000000" "ACC-RIDER"

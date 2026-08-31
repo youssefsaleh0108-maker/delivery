@@ -80,9 +80,23 @@ class _AuthInterceptor extends QueuedInterceptor {
   final Dio _dio;
 
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final AuthSession? session = _authService.session;
-    if (session != null && options.extra[ApiClient.skipAuth] != true) {
+  Future<void> onRequest(
+      RequestOptions options, RequestInterceptorHandler handler) async {
+    AuthSession? current = _authService.session;
+    if (current != null && options.extra[ApiClient.skipAuth] != true) {
+      AuthSession session = current;
+      // Refresh BEFORE sending a token we already know is stale, rather than spending a round
+      // trip on a guaranteed 401. isExpired has a 30-second head start built in, and
+      // QueuedInterceptor serialises this, so a burst of requests triggers one refresh. The 401
+      // path below stays as the safety net for a token revoked server-side mid-flight.
+      if (session.isExpired) {
+        try {
+          session = await _authService.refresh();
+        } catch (_) {
+          // Send the stale token anyway: the 401 handler gets one more try, and if the session
+          // is genuinely gone the caller sees the same 401 it always did.
+        }
+      }
       options.headers['Authorization'] = 'Bearer ${session.accessToken}';
     }
     handler.next(options);

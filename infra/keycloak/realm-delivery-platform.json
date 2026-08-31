@@ -13,8 +13,8 @@
   "maxFailureWaitSeconds": 900,
   "failureFactor": 10,
   "accessTokenLifespan": 300,
-  "ssoSessionIdleTimeout": 1800,
-  "ssoSessionMaxLifespan": 36000,
+  "ssoSessionIdleTimeout": 2592000,
+  "ssoSessionMaxLifespan": 7776000,
   "offlineSessionIdleTimeout": 2592000,
   "roles": {
     "realm": [
