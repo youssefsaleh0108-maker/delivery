@@ -367,8 +367,11 @@ http:
     #
     # No rate-limit middleware: one product page pulls a gallery's worth of objects, and the
     # platform limiter is sized for API calls, not images.
+    #
+    # /apk is the dev-build download drop. The bucket itself is anonymous-download and holds
+    # nothing but the installable app, which every phone that installs it gets anyway.
     minio-objects:
-      rule: Host(`api-dev.youdrop.shop`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`))
+      rule: Host(`api-dev.youdrop.shop`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`) || PathPrefix(`/apk`))
       service: minio-s3
       priority: 90
       entryPoints: [web, https]
