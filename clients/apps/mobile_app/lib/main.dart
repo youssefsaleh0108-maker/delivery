@@ -655,13 +655,14 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
           // the server refuses only the committing acts, publishing and claiming, until APPLICANT
           // comes off. The banner on those screens says so.
           //
-          // Only somebody carrying APPLICANT and nothing else lands on the status screen, which is
-          // the case where there is genuinely no surface to show.
+          // Somebody carrying APPLICANT with no explorable surface lands on the status screen.
+          // A pending carrier is in that case despite their role: every carrier screen is drawn
+          // from the company record, and the company is registered at approval — before that the
+          // shell has literally nothing to load.
           final bool pending = session.hasRole(DeliveryRole.applicant);
           if (pending &&
               !session.hasRole(DeliveryRole.merchant) &&
-              !session.hasRole(DeliveryRole.delivery) &&
-              !session.hasRole(DeliveryRole.carrier)) {
+              !session.hasRole(DeliveryRole.delivery)) {
             return PendingApplicationScreen(
               // Bumped when the explore route pops, which re-creates the State and re-reads the
               // application. See [_exploreAsCustomer].
