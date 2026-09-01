@@ -47,6 +47,10 @@ enum PartnerKind {
   /// A rider. Either applies to a delivery company, or to YouDrop's own fleet when no company
   /// is chosen — see [_PartnerApplicationScreenState._company].
   rider,
+
+  /// A delivery company (Figma 86:*): brings a fleet and dispatches YouDrop orders. A business
+  /// applicant like the merchant — same documents, same payout — with the fleet's own step.
+  carrier,
 }
 
 /// What a rider drives (Figma `vehicle-grid` 22:503).
@@ -229,10 +233,47 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   bool get _isRider => widget.kind == PartnerKind.rider;
 
+  bool get _isCarrier => widget.kind == PartnerKind.carrier;
+
+  // ---------------------------------------------------------------- carrier answers
+
+  /// The CR number the reviewer verifies against the registry.
+  final TextEditingController _crNumber = TextEditingController();
+  final TextEditingController _hoursWeekdays =
+      TextEditingController(text: '08:00 - 23:00');
+  final TextEditingController _hoursWeekends =
+      TextEditingController(text: '09:00 - 01:00');
+
+  String _companyType = 'Registered LLC';
+  static const List<String> _companyTypes = <String>[
+    'Registered LLC', 'SARL', 'Sole proprietorship', 'Cooperative',
+  ];
+
+  String _fleetBand = '10 - 25 riders';
+  static const List<String> _fleetBands = <String>[
+    '1 - 9 riders', '10 - 25 riders', '26 - 60 riders', '60+ riders',
+  ];
+
+  static const List<String> _lebanonAreas = <String>[
+    'Beirut', 'Mount Lebanon', 'North', 'South', 'Bekaa',
+  ];
+  final Set<String> _coverage = <String>{'Beirut'};
+
+  /// Vehicle counts, per the frame's steppers.
+  final Map<String, int> _vehicles = <String, int>{
+    'MOTORCYCLE': 0, 'CAR': 0, 'VAN': 0, 'TRUCK': 0,
+  };
+
+  final Set<String> _capabilities = <String>{'FOOD', 'GROCERY'};
+
+  /// The partnership agreement tick — the carrier's submit stays disabled without it.
+  bool _agreed = false;
+
   List<TextEditingController> get _allControllers => <TextEditingController>[
         _name, _business, _email, _emailCode, _phone, _phoneCode, _notes,
         _passcode, _dateOfBirth, _nationalId, _vehicleModel, _plate,
         _vehicleYear, _preferredArea, _accountHolder, _iban,
+        _crNumber, _hoursWeekdays, _hoursWeekends,
       ];
 
   @override
@@ -266,12 +307,16 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// different because a half-answer or an IBAN that fails its own check digits must not travel;
   /// leaving both fields empty remains a deliberate skip.
   bool get _stepComplete {
-    if (!_isRider && _step == 2) {
-      return PayoutDetailsStep.complete(
+    // The bank step's own rule, wherever it sits: merchant step 2, carrier step 3 — where the
+    // carrier's also carries the agreement tick, without which there is nothing to submit.
+    final int bankStep = _isCarrier ? 3 : 2;
+    if (!_isRider && _step == bankStep) {
+      final bool payoutOk = PayoutDetailsStep.complete(
         DeliveryStrings.of(context),
         accountHolder: _accountHolder.text,
         iban: _iban.text,
       );
+      return _isCarrier ? payoutOk && _agreed : payoutOk;
     }
     if (_step != 0) return true;
     final bool identity = _name.text.trim().isNotEmpty &&
@@ -436,6 +481,19 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       if (value.trim().isNotEmpty) details[key] = value.trim();
     }
 
+    if (_isCarrier) {
+      put('crNumber', _crNumber.text);
+      details['companyType'] = _companyType;
+      details['fleetBand'] = _fleetBand;
+      details['coverage'] = _coverage.toList();
+      details['vehicles'] = Map<String, int>.of(_vehicles)
+        ..removeWhere((String _, int count) => count == 0);
+      put('hoursWeekdays', _hoursWeekdays.text);
+      put('hoursWeekends', _hoursWeekends.text);
+      details['capabilities'] = _capabilities.toList();
+      return details;
+    }
+
     if (_isRider) {
       if (_vehicle != null) details['vehicleType'] = _vehicle!.wire;
       put('vehicleModel', _vehicleModel.text);
@@ -481,16 +539,27 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
               notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
               details: _details,
             )
-          : await widget.api.applyAsMerchant(
-              businessName: _business.text.trim(),
-              contactName: _name.text.trim(),
-              email: _verifiedEmail!,
-              emailVerificationToken: _emailToken!,
-              phone: _verifiedPhone,
-              phoneVerificationToken: _phoneToken,
-              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-              details: _details,
-            );
+          : _isCarrier
+              ? await widget.api.applyAsCarrier(
+                  companyName: _business.text.trim(),
+                  contactName: _name.text.trim(),
+                  email: _verifiedEmail!,
+                  emailVerificationToken: _emailToken!,
+                  phone: _verifiedPhone,
+                  phoneVerificationToken: _phoneToken,
+                  notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                  details: _details,
+                )
+              : await widget.api.applyAsMerchant(
+                  businessName: _business.text.trim(),
+                  contactName: _name.text.trim(),
+                  email: _verifiedEmail!,
+                  emailVerificationToken: _emailToken!,
+                  phone: _verifiedPhone,
+                  phoneVerificationToken: _phoneToken,
+                  notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                  details: _details,
+                );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -631,6 +700,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     if (_phase == _Phase.intro) {
       return _Intro(
         isRider: _isRider,
+        isCarrier: _isCarrier,
         onBack: widget.onClose,
         onStart: () => setState(() => _phase = _Phase.wizard),
       );
@@ -797,6 +867,14 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         _ => t.authSelectDeliveryZone,
       };
     }
+    if (_isCarrier) {
+      return switch (_step) {
+        0 => t.carrCompanyInformation,
+        1 => t.carrFleetDetails,
+        2 => t.authDocuments,
+        _ => t.carrPayoutSetup,
+      };
+    }
     return switch (_step) {
       0 => t.authBusinessInformation,
       1 => t.authDocuments,
@@ -812,6 +890,14 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         1 => t.authVehicleDetailsBlurb,
         2 => t.authDocumentsBlurb,
         _ => t.authSelectDeliveryZoneBlurb,
+      };
+    }
+    if (_isCarrier) {
+      return switch (_step) {
+        0 => t.carrCompanyInformationBlurb,
+        1 => t.carrFleetDetailsBlurb,
+        2 => t.authDocumentsBlurb,
+        _ => t.carrPayoutSetupBlurb,
       };
     }
     return switch (_step) {
@@ -831,12 +917,302 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         _ => _riderZone(t),
       };
     }
+    if (_isCarrier) {
+      return switch (_step) {
+        0 => _carrierCompany(t),
+        1 => _carrierFleet(t),
+        2 => _documentsStep(t),
+        _ => _carrierPayout(t),
+      };
+    }
     return switch (_step) {
       0 => _merchantBusiness(t),
       1 => _documentsStep(t),
       2 => _bankStep(t),
       _ => _review(t),
     };
+  }
+
+  // ---------------------------------------------------------------- carrier steps (Figma 86:*)
+
+  /// Step 1: who the platform is signing with. The account block (name, email, passcode) is the
+  /// same one every applicant fills; the company block is the carrier's own.
+  List<Widget> _carrierCompany(DeliveryStrings t) => <Widget>[
+        AuthField(
+          label: t.carrCompanyName,
+          hint: t.carrCompanyNameHint,
+          controller: _business,
+          textCapitalization: TextCapitalization.words,
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        AuthField(
+          label: t.carrCrNumber,
+          hint: '1004562 / B',
+          controller: _crNumber,
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        _carrierDropdown(t.carrCompanyType, _companyTypes, _companyType,
+            (String v) => setState(() => _companyType = v)),
+        const SizedBox(height: DeliverySpacing.md),
+        _carrierDropdown(t.carrFleetSizeBand, _fleetBands, _fleetBand,
+            (String v) => setState(() => _fleetBand = v)),
+        const SizedBox(height: DeliverySpacing.md),
+        _fieldLabel(t.carrCoverageArea),
+        const SizedBox(height: DeliverySpacing.sm),
+        Wrap(
+          spacing: DeliverySpacing.sm,
+          runSpacing: DeliverySpacing.sm,
+          children: <Widget>[
+            for (final String area in _lebanonAreas)
+              YdChip(
+                label: area,
+                selected: _coverage.contains(area),
+                onTap: () => setState(() => _coverage.contains(area)
+                    ? _coverage.remove(area)
+                    : _coverage.add(area)),
+              ),
+          ],
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        AuthField(
+          label: t.carrContactPerson,
+          hint: t.authOwnerFullNameHint,
+          controller: _name,
+          textCapitalization: TextCapitalization.words,
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        AuthField(
+          label: t.authContactEmail,
+          hint: t.authEmailHint,
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        AuthField(
+          label: t.authPhoneNumber,
+          hint: t.authPhoneHint,
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        _passcodeField(t),
+      ];
+
+  /// Step 2: the fleet itself — counts, hours, and what it can carry.
+  List<Widget> _carrierFleet(DeliveryStrings t) => <Widget>[
+        _fieldLabel(t.carrActiveVehicles.toUpperCase()),
+        const SizedBox(height: DeliverySpacing.sm),
+        _vehicleCounter(t.carrMotorcycles, Icons.two_wheeler, 'MOTORCYCLE'),
+        _vehicleCounter(t.carrCars, Icons.directions_car_outlined, 'CAR'),
+        _vehicleCounter(t.carrVans, Icons.airport_shuttle_outlined, 'VAN'),
+        _vehicleCounter(t.carrTrucks, Icons.local_shipping_outlined, 'TRUCK'),
+        const SizedBox(height: DeliverySpacing.md),
+        _fieldLabel(t.carrOperatingHours.toUpperCase()),
+        const SizedBox(height: DeliverySpacing.sm),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: AuthField(
+                label: t.carrWeekdays,
+                hint: '08:00 - 23:00',
+                controller: _hoursWeekdays,
+              ),
+            ),
+            const SizedBox(width: DeliverySpacing.md),
+            Expanded(
+              child: AuthField(
+                label: t.carrWeekends,
+                hint: '09:00 - 01:00',
+                controller: _hoursWeekends,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        _fieldLabel(t.carrCapabilities.toUpperCase()),
+        const SizedBox(height: DeliverySpacing.sm),
+        _capabilityRow(t.carrCapColdChain, 'COLD_CHAIN'),
+        _capabilityRow(t.carrCapFood, 'FOOD'),
+        _capabilityRow(t.carrCapGrocery, 'GROCERY'),
+        _capabilityRow(t.carrCapPharmacy, 'PHARMACY'),
+        _capabilityRow(t.carrCapParcel, 'PARCEL'),
+        _capabilityRow(t.carrCapButler, 'BUTLER'),
+      ];
+
+  /// Step 4: how the company gets paid — the shared bank step, plus the frame's commission card
+  /// and the agreement tick that arms Submit.
+  List<Widget> _carrierPayout(DeliveryStrings t) => <Widget>[
+        ..._bankStep(t),
+        const SizedBox(height: DeliverySpacing.md),
+        Container(
+          padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+          decoration: BoxDecoration(
+            color: DeliveryColors.brandSoft,
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          ),
+          child: Column(
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(t.carrCommissionRate,
+                        style: const TextStyle(
+                            fontSize: 13, color: DeliveryColors.muted)),
+                  ),
+                  const Text(
+                    // The platform's standing rate; the agreement below is what makes it binding.
+                    '15%',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: DeliveryColors.brand,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(t.carrPayoutSchedule,
+                        style: const TextStyle(
+                            fontSize: 13, color: DeliveryColors.muted)),
+                  ),
+                  Text(t.carrEveryMonday,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DeliverySpacing.md),
+        Semantics(
+          checked: _agreed,
+          child: InkWell(
+            onTap: () => setState(() => _agreed = !_agreed),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Checkbox(
+                  value: _agreed,
+                  activeColor: DeliveryColors.brand,
+                  onChanged: (bool? v) => setState(() => _agreed = v ?? false),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      t.carrAgreement,
+                      style: const TextStyle(
+                          fontSize: 12.5,
+                          color: DeliveryColors.muted,
+                          height: 1.4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ];
+
+  Widget _fieldLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: DeliveryColors.muted,
+          letterSpacing: 0.3,
+          height: 1.3,
+        ),
+      );
+
+  Widget _carrierDropdown(String label, List<String> options, String value,
+      ValueChanged<String> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _fieldLabel(label),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          items: <DropdownMenuItem<String>>[
+            for (final String option in options)
+              DropdownMenuItem<String>(value: option, child: Text(option)),
+          ],
+          onChanged: (String? v) {
+            if (v != null) onChanged(v);
+          },
+          decoration: const InputDecoration(isDense: true),
+        ),
+      ],
+    );
+  }
+
+  Widget _vehicleCounter(String label, IconData icon, String key) {
+    final int count = _vehicles[key] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
+      child: Container(
+        padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: DeliverySpacing.md, vertical: DeliverySpacing.sm),
+        decoration: BoxDecoration(
+          color: DeliveryColors.white,
+          border: Border.all(color: DeliveryColors.border),
+          borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(icon, size: 20, color: DeliveryColors.muted),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+            IconButton(
+              onPressed: count == 0
+                  ? null
+                  : () => setState(() => _vehicles[key] = count - 1),
+              icon: const Icon(Icons.remove, size: 18),
+            ),
+            SizedBox(
+              width: 28,
+              child: Text('$count',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w800)),
+            ),
+            IconButton(
+              onPressed: count >= 999
+                  ? null
+                  : () => setState(() => _vehicles[key] = count + 1),
+              icon: const Icon(Icons.add, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _capabilityRow(String label, String key) {
+    final bool on = _capabilities.contains(key);
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(label,
+              style: const TextStyle(fontSize: 13.5, height: 1.3)),
+        ),
+        Switch(
+          value: on,
+          activeThumbColor: DeliveryColors.white,
+          activeTrackColor: DeliveryColors.brand,
+          onChanged: (bool v) => setState(
+              () => v ? _capabilities.add(key) : _capabilities.remove(key)),
+        ),
+      ],
+    );
   }
 
   // ---------------------------------------------------------------- rider steps
@@ -1540,11 +1916,15 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 class _Intro extends StatelessWidget {
   const _Intro({
     required this.isRider,
+    this.isCarrier = false,
     required this.onBack,
     required this.onStart,
   });
 
   final bool isRider;
+
+  /// The third kind rides the business branch with its own words.
+  final bool isCarrier;
   final VoidCallback onBack;
   final VoidCallback onStart;
 
@@ -1558,11 +1938,17 @@ class _Intro extends StatelessWidget {
             (Icons.account_balance_wallet_outlined, t.authRiderBenefitPay),
             (Icons.navigation_outlined, t.authRiderBenefitNavigation),
           ]
-        : <(IconData, String)>[
-            (Icons.groups_outlined, t.authMerchantBenefitReach),
-            (Icons.inventory_2_outlined, t.authMerchantBenefitManage),
-            (Icons.bar_chart, t.authMerchantBenefitAnalytics),
-          ];
+        : isCarrier
+            ? <(IconData, String)>[
+                (Icons.markunread_mailbox_outlined, t.carrBenefitOrders),
+                (Icons.location_on_outlined, t.carrBenefitTracking),
+                (Icons.payments_outlined, t.carrBenefitPayouts),
+              ]
+            : <(IconData, String)>[
+                (Icons.groups_outlined, t.authMerchantBenefitReach),
+                (Icons.inventory_2_outlined, t.authMerchantBenefitManage),
+                (Icons.bar_chart, t.authMerchantBenefitAnalytics),
+              ];
 
     final List<(IconData, String)> requirements = isRider
         ? <(IconData, String)>[
@@ -1630,7 +2016,7 @@ class _Intro extends StatelessWidget {
                 padding: const EdgeInsets.all(DeliverySpacing.lg),
                 children: <Widget>[
                   Text(
-                    isRider ? t.authRiderIntroTitle : t.authMerchantIntroTitle,
+                    isCarrier ? t.carrPartnerTitle : (isRider ? t.authRiderIntroTitle : t.authMerchantIntroTitle),
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
@@ -1640,7 +2026,7 @@ class _Intro extends StatelessWidget {
                   ),
                   const SizedBox(height: DeliverySpacing.sm),
                   Text(
-                    isRider ? t.authRiderIntroBlurb : t.authMerchantIntroBlurb,
+                    isCarrier ? t.carrPartnerBlurb : (isRider ? t.authRiderIntroBlurb : t.authMerchantIntroBlurb),
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -1733,7 +2119,7 @@ class _Intro extends StatelessWidget {
                     top: BorderSide(color: DeliveryColors.brandSoft)),
               ),
               child: AuthPrimaryButton(
-                label: t.authGetStarted,
+                label: isCarrier ? t.carrRegisterCompany : t.authGetStarted,
                 height: 56,
                 onPressed: onStart,
               ),

@@ -5918,6 +5918,408 @@ abstract class DeliveryStrings {
   /// **'That saved sign-in expired — enter your passcode.'**
   String get custBioExpired;
 
+  /// No description provided for @carrForCarriers.
+  ///
+  /// In en, this message translates to:
+  /// **'For carriers'**
+  String get carrForCarriers;
+
+  /// No description provided for @carrPartnerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner with YouDrop'**
+  String get carrPartnerTitle;
+
+  /// No description provided for @carrPartnerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Grow your delivery business across Lebanon with our unified B2B carrier logistics engine.'**
+  String get carrPartnerBlurb;
+
+  /// No description provided for @carrBenefitOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Guaranteed daily orders'**
+  String get carrBenefitOrders;
+
+  /// No description provided for @carrBenefitOrdersBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Instant access to on-demand local partner streams.'**
+  String get carrBenefitOrdersBlurb;
+
+  /// No description provided for @carrBenefitTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time fleet tracking'**
+  String get carrBenefitTracking;
+
+  /// No description provided for @carrBenefitTrackingBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart dashboard for route optimisation and dispatch.'**
+  String get carrBenefitTrackingBlurb;
+
+  /// No description provided for @carrBenefitPayouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly payouts in Fresh USD'**
+  String get carrBenefitPayouts;
+
+  /// No description provided for @carrBenefitPayoutsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Reliable settlements, every week.'**
+  String get carrBenefitPayoutsBlurb;
+
+  /// No description provided for @carrRegisterCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Register Your Company'**
+  String get carrRegisterCompany;
+
+  /// No description provided for @carrChoiceCard.
+  ///
+  /// In en, this message translates to:
+  /// **'I run a delivery company'**
+  String get carrChoiceCard;
+
+  /// No description provided for @carrChoiceCardBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring your fleet and dispatch YouDrop orders'**
+  String get carrChoiceCardBlurb;
+
+  /// No description provided for @carrCompanyInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Information'**
+  String get carrCompanyInformation;
+
+  /// No description provided for @carrCompanyInformationBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Who the platform is signing with.'**
+  String get carrCompanyInformationBlurb;
+
+  /// No description provided for @carrCompanyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Name'**
+  String get carrCompanyName;
+
+  /// No description provided for @carrCompanyNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Beirut Express Delivery'**
+  String get carrCompanyNameHint;
+
+  /// No description provided for @carrCrNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial Registration (CR) Number'**
+  String get carrCrNumber;
+
+  /// No description provided for @carrCompanyType.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Type'**
+  String get carrCompanyType;
+
+  /// No description provided for @carrFleetSizeBand.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet Size'**
+  String get carrFleetSizeBand;
+
+  /// No description provided for @carrCoverageArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage Area (Lebanon)'**
+  String get carrCoverageArea;
+
+  /// No description provided for @carrContactPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Person'**
+  String get carrContactPerson;
+
+  /// No description provided for @carrFleetDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet 0026 Vehicle Details'**
+  String get carrFleetDetails;
+
+  /// No description provided for @carrFleetDetailsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'What your fleet can actually carry.'**
+  String get carrFleetDetailsBlurb;
+
+  /// No description provided for @carrActiveVehicles.
+  ///
+  /// In en, this message translates to:
+  /// **'Active vehicles count'**
+  String get carrActiveVehicles;
+
+  /// No description provided for @carrMotorcycles.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorcycles'**
+  String get carrMotorcycles;
+
+  /// No description provided for @carrCars.
+  ///
+  /// In en, this message translates to:
+  /// **'Cars'**
+  String get carrCars;
+
+  /// No description provided for @carrVans.
+  ///
+  /// In en, this message translates to:
+  /// **'Vans'**
+  String get carrVans;
+
+  /// No description provided for @carrTrucks.
+  ///
+  /// In en, this message translates to:
+  /// **'Trucks'**
+  String get carrTrucks;
+
+  /// No description provided for @carrOperatingHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Operating hours'**
+  String get carrOperatingHours;
+
+  /// No description provided for @carrWeekdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekdays'**
+  String get carrWeekdays;
+
+  /// No description provided for @carrWeekends.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekends'**
+  String get carrWeekends;
+
+  /// No description provided for @carrCapabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet capabilities'**
+  String get carrCapabilities;
+
+  /// No description provided for @carrCapColdChain.
+  ///
+  /// In en, this message translates to:
+  /// **'Generator-equipped cold chain'**
+  String get carrCapColdChain;
+
+  /// No description provided for @carrCapFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Food delivery'**
+  String get carrCapFood;
+
+  /// No description provided for @carrCapGrocery.
+  ///
+  /// In en, this message translates to:
+  /// **'Grocery delivery'**
+  String get carrCapGrocery;
+
+  /// No description provided for @carrCapPharmacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Pharmacy delivery'**
+  String get carrCapPharmacy;
+
+  /// No description provided for @carrCapParcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Parcel delivery'**
+  String get carrCapParcel;
+
+  /// No description provided for @carrCapButler.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Butler services'**
+  String get carrCapButler;
+
+  /// No description provided for @carrPayoutSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout 0026 Financial Setup'**
+  String get carrPayoutSetup;
+
+  /// No description provided for @carrPayoutSetupBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'How your company gets paid.'**
+  String get carrPayoutSetupBlurb;
+
+  /// No description provided for @carrCommissionRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission rate'**
+  String get carrCommissionRate;
+
+  /// No description provided for @carrPayoutSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout schedule'**
+  String get carrPayoutSchedule;
+
+  /// No description provided for @carrEveryMonday.
+  ///
+  /// In en, this message translates to:
+  /// **'Every Monday'**
+  String get carrEveryMonday;
+
+  /// No description provided for @carrAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree to the YouDrop Carrier Partnership 0026 Service Agreement. Commission rates and payout periods are subject to monthly volume audits.'**
+  String get carrAgreement;
+
+  /// No description provided for @carrSubmitApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Application'**
+  String get carrSubmitApplication;
+
+  /// No description provided for @carrDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get carrDashboard;
+
+  /// No description provided for @carrOrdersTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get carrOrdersTab;
+
+  /// No description provided for @carrFleetTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet'**
+  String get carrFleetTab;
+
+  /// No description provided for @carrEarningsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Earnings'**
+  String get carrEarningsTab;
+
+  /// No description provided for @carrSettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get carrSettingsTab;
+
+  /// No description provided for @carrActiveDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'Active deliveries'**
+  String get carrActiveDeliveries;
+
+  /// No description provided for @carrPendingOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending orders'**
+  String get carrPendingOrders;
+
+  /// No description provided for @carrRidersOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders on fleet'**
+  String get carrRidersOnline;
+
+  /// No description provided for @carrWindowEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned ({days}d)'**
+  String carrWindowEarned(int days);
+
+  /// No description provided for @carrRecentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent activity'**
+  String get carrRecentActivity;
+
+  /// No description provided for @carrFleetManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet Management'**
+  String get carrFleetManagement;
+
+  /// No description provided for @carrDeliveriesToday.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} deliveries in window'**
+  String carrDeliveriesToday(int count);
+
+  /// No description provided for @carrCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get carrCall;
+
+  /// No description provided for @carrTotalRevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total revenue'**
+  String get carrTotalRevenue;
+
+  /// No description provided for @carrNetEarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Net earnings'**
+  String get carrNetEarnings;
+
+  /// No description provided for @carrCommissionPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission paid to YouDrop'**
+  String get carrCommissionPaid;
+
+  /// No description provided for @carrCompanyPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Company paused — no new work is offered'**
+  String get carrCompanyPaused;
+
+  /// No description provided for @carrPauseCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause company'**
+  String get carrPauseCompany;
+
+  /// No description provided for @carrResumeCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume company'**
+  String get carrResumeCompany;
+
+  /// No description provided for @carrScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrier score'**
+  String get carrScore;
+
+  /// No description provided for @carrCompletionRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion rate'**
+  String get carrCompletionRate;
+
+  /// No description provided for @carrOrdersDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders delivered'**
+  String get carrOrdersDelivered;
+
   /// No description provided for @custVerifiedLocal.
   ///
   /// In en, this message translates to:

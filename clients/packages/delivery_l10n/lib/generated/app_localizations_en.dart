@@ -3302,6 +3302,216 @@ class DeliveryStringsEn extends DeliveryStrings {
       'That saved sign-in expired — enter your passcode.';
 
   @override
+  String get carrForCarriers => 'For carriers';
+
+  @override
+  String get carrPartnerTitle => 'Partner with YouDrop';
+
+  @override
+  String get carrPartnerBlurb =>
+      'Grow your delivery business across Lebanon with our unified B2B carrier logistics engine.';
+
+  @override
+  String get carrBenefitOrders => 'Guaranteed daily orders';
+
+  @override
+  String get carrBenefitOrdersBlurb =>
+      'Instant access to on-demand local partner streams.';
+
+  @override
+  String get carrBenefitTracking => 'Real-time fleet tracking';
+
+  @override
+  String get carrBenefitTrackingBlurb =>
+      'Smart dashboard for route optimisation and dispatch.';
+
+  @override
+  String get carrBenefitPayouts => 'Weekly payouts in Fresh USD';
+
+  @override
+  String get carrBenefitPayoutsBlurb => 'Reliable settlements, every week.';
+
+  @override
+  String get carrRegisterCompany => 'Register Your Company';
+
+  @override
+  String get carrChoiceCard => 'I run a delivery company';
+
+  @override
+  String get carrChoiceCardBlurb =>
+      'Bring your fleet and dispatch YouDrop orders';
+
+  @override
+  String get carrCompanyInformation => 'Company Information';
+
+  @override
+  String get carrCompanyInformationBlurb => 'Who the platform is signing with.';
+
+  @override
+  String get carrCompanyName => 'Company Name';
+
+  @override
+  String get carrCompanyNameHint => 'e.g. Beirut Express Delivery';
+
+  @override
+  String get carrCrNumber => 'Commercial Registration (CR) Number';
+
+  @override
+  String get carrCompanyType => 'Company Type';
+
+  @override
+  String get carrFleetSizeBand => 'Fleet Size';
+
+  @override
+  String get carrCoverageArea => 'Coverage Area (Lebanon)';
+
+  @override
+  String get carrContactPerson => 'Contact Person';
+
+  @override
+  String get carrFleetDetails => 'Fleet 0026 Vehicle Details';
+
+  @override
+  String get carrFleetDetailsBlurb => 'What your fleet can actually carry.';
+
+  @override
+  String get carrActiveVehicles => 'Active vehicles count';
+
+  @override
+  String get carrMotorcycles => 'Motorcycles';
+
+  @override
+  String get carrCars => 'Cars';
+
+  @override
+  String get carrVans => 'Vans';
+
+  @override
+  String get carrTrucks => 'Trucks';
+
+  @override
+  String get carrOperatingHours => 'Operating hours';
+
+  @override
+  String get carrWeekdays => 'Weekdays';
+
+  @override
+  String get carrWeekends => 'Weekends';
+
+  @override
+  String get carrCapabilities => 'Fleet capabilities';
+
+  @override
+  String get carrCapColdChain => 'Generator-equipped cold chain';
+
+  @override
+  String get carrCapFood => 'Food delivery';
+
+  @override
+  String get carrCapGrocery => 'Grocery delivery';
+
+  @override
+  String get carrCapPharmacy => 'Pharmacy delivery';
+
+  @override
+  String get carrCapParcel => 'Parcel delivery';
+
+  @override
+  String get carrCapButler => 'Custom Butler services';
+
+  @override
+  String get carrPayoutSetup => 'Payout 0026 Financial Setup';
+
+  @override
+  String get carrPayoutSetupBlurb => 'How your company gets paid.';
+
+  @override
+  String get carrCommissionRate => 'Commission rate';
+
+  @override
+  String get carrPayoutSchedule => 'Payout schedule';
+
+  @override
+  String get carrEveryMonday => 'Every Monday';
+
+  @override
+  String get carrAgreement =>
+      'I agree to the YouDrop Carrier Partnership 0026 Service Agreement. Commission rates and payout periods are subject to monthly volume audits.';
+
+  @override
+  String get carrSubmitApplication => 'Submit Application';
+
+  @override
+  String get carrDashboard => 'Dashboard';
+
+  @override
+  String get carrOrdersTab => 'Orders';
+
+  @override
+  String get carrFleetTab => 'Fleet';
+
+  @override
+  String get carrEarningsTab => 'Earnings';
+
+  @override
+  String get carrSettingsTab => 'Settings';
+
+  @override
+  String get carrActiveDeliveries => 'Active deliveries';
+
+  @override
+  String get carrPendingOrders => 'Pending orders';
+
+  @override
+  String get carrRidersOnline => 'Riders on fleet';
+
+  @override
+  String carrWindowEarned(int days) {
+    return 'Earned (${days}d)';
+  }
+
+  @override
+  String get carrRecentActivity => 'Recent activity';
+
+  @override
+  String get carrFleetManagement => 'Fleet Management';
+
+  @override
+  String carrDeliveriesToday(int count) {
+    return '$count deliveries in window';
+  }
+
+  @override
+  String get carrCall => 'Call';
+
+  @override
+  String get carrTotalRevenue => 'Total revenue';
+
+  @override
+  String get carrNetEarnings => 'Net earnings';
+
+  @override
+  String get carrCommissionPaid => 'Commission paid to YouDrop';
+
+  @override
+  String get carrCompanyPaused => 'Company paused — no new work is offered';
+
+  @override
+  String get carrPauseCompany => 'Pause company';
+
+  @override
+  String get carrResumeCompany => 'Resume company';
+
+  @override
+  String get carrScore => 'Carrier score';
+
+  @override
+  String get carrCompletionRate => 'Completion rate';
+
+  @override
+  String get carrOrdersDelivered => 'Orders delivered';
+
+  @override
   String get custVerifiedLocal => 'Verified Local';
 
   @override

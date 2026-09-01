@@ -64,6 +64,13 @@ class PartnerChoiceScreen extends StatelessWidget {
               blurb: t.applyAsRiderBlurb,
               onTap: () => onChoose(PartnerKind.rider),
             ),
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _RoleCard(
+              icon: Icons.local_shipping_outlined,
+              title: t.carrChoiceCard,
+              blurb: t.carrChoiceCardBlurb,
+              onTap: () => onChoose(PartnerKind.carrier),
+            ),
             const SizedBox(height: DeliverySpacing.lg),
             SoftNote(
               text: t.guestApplicationExplainer,

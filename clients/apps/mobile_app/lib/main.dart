@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import 'src/biometric_lock.dart';
 import 'src/biometric_lock_screen.dart';
+import 'src/carrier_shell.dart';
 import 'src/customer_shell.dart';
 import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
@@ -131,6 +132,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final PointsApi _pointsApi = PointsApi(_dio);
   late final TransferApi _transferApi = TransferApi(_dio);
   late final SplitApi _splitApi = SplitApi(_dio);
+  late final DeliveryProviderApi _deliveryProviderApi = DeliveryProviderApi(_dio);
 
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
@@ -354,7 +356,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
         _applyingAsPartner = true;
         _partnerKind = kind;
         _forkedByChoice = kind == null;
-        _partnerIntroDone = false;
+        // The generic intro speaks rider and merchant; the carrier wizard opens on its own
+        // For-Carriers pitch, so the extra screen would just say the wrong things first.
+        _partnerIntroDone = kind == PartnerKind.carrier;
       });
 
   /// Adopts a session from either form. Shared so the two screens cannot drift on what "signed in"
@@ -544,7 +548,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                 return PartnerChoiceScreen(
                   onChoose: (PartnerKind kind) => setState(() {
                     _partnerKind = kind;
-                    _partnerIntroDone = false;
+                    // The generic intro speaks rider and merchant; the carrier wizard opens on
+                    // its own For-Carriers pitch.
+                    _partnerIntroDone = kind == PartnerKind.carrier;
                   }),
                   onClose: () => setState(() => _applyingAsPartner = false),
                 );
@@ -671,6 +677,18 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
           // The role branch. A rider's queue wins when an account holds both, because the delivery
           // flow is the one with a time-critical task attached.
+          // The carrier's company surface (Figma 87:*). Before the rider branch: an account
+          // holding both runs the company; the rider queue is their staff's job, not theirs.
+          if (session.hasRole(DeliveryRole.carrier)) {
+            return CarrierShell(
+              session: session,
+              providerApi: _deliveryProviderApi,
+              orderApi: _orderApi,
+              locale: _locale,
+              onSignOut: _signOut,
+            );
+          }
+
           if (session.hasRole(DeliveryRole.delivery)) {
             return RiderHomeScreen(
               api: _orderApi,

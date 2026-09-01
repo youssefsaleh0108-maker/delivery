@@ -3284,6 +3284,214 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custBioExpired => 'انتهت صلاحية الدخول المحفوظ — أدخل رمزك السري.';
 
   @override
+  String get carrForCarriers => 'لشركات التوصيل';
+
+  @override
+  String get carrPartnerTitle => 'كن شريك YouDrop';
+
+  @override
+  String get carrPartnerBlurb =>
+      'نمِّ شركة التوصيل الخاصة بك في كل لبنان عبر محرك اللوجستيات الموحد للشركات.';
+
+  @override
+  String get carrBenefitOrders => 'طلبات يومية مضمونة';
+
+  @override
+  String get carrBenefitOrdersBlurb =>
+      'وصول فوري إلى تدفق طلبات الشركاء المحليين.';
+
+  @override
+  String get carrBenefitTracking => 'تتبع الأسطول لحظياً';
+
+  @override
+  String get carrBenefitTrackingBlurb => 'لوحة ذكية لتحسين المسارات والإرسال.';
+
+  @override
+  String get carrBenefitPayouts => 'دفعات أسبوعية بالدولار النقدي';
+
+  @override
+  String get carrBenefitPayoutsBlurb => 'تسويات موثوقة كل أسبوع.';
+
+  @override
+  String get carrRegisterCompany => 'سجّل شركتك';
+
+  @override
+  String get carrChoiceCard => 'أدير شركة توصيل';
+
+  @override
+  String get carrChoiceCardBlurb => 'أحضر أسطولك ووزّع طلبات YouDrop';
+
+  @override
+  String get carrCompanyInformation => 'معلومات الشركة';
+
+  @override
+  String get carrCompanyInformationBlurb => 'مع من توقّع المنصة.';
+
+  @override
+  String get carrCompanyName => 'اسم الشركة';
+
+  @override
+  String get carrCompanyNameHint => 'مثال: بيروت إكسبرس للتوصيل';
+
+  @override
+  String get carrCrNumber => 'رقم السجل التجاري';
+
+  @override
+  String get carrCompanyType => 'نوع الشركة';
+
+  @override
+  String get carrFleetSizeBand => 'حجم الأسطول';
+
+  @override
+  String get carrCoverageArea => 'مناطق التغطية (لبنان)';
+
+  @override
+  String get carrContactPerson => 'الشخص المسؤول';
+
+  @override
+  String get carrFleetDetails => 'تفاصيل الأسطول والمركبات';
+
+  @override
+  String get carrFleetDetailsBlurb => 'ما يستطيع أسطولك حمله فعلاً.';
+
+  @override
+  String get carrActiveVehicles => 'عدد المركبات العاملة';
+
+  @override
+  String get carrMotorcycles => 'دراجات نارية';
+
+  @override
+  String get carrCars => 'سيارات';
+
+  @override
+  String get carrVans => 'فانات';
+
+  @override
+  String get carrTrucks => 'شاحنات';
+
+  @override
+  String get carrOperatingHours => 'ساعات العمل';
+
+  @override
+  String get carrWeekdays => 'أيام الأسبوع';
+
+  @override
+  String get carrWeekends => 'نهاية الأسبوع';
+
+  @override
+  String get carrCapabilities => 'قدرات الأسطول';
+
+  @override
+  String get carrCapColdChain => 'سلسلة تبريد بمولّد';
+
+  @override
+  String get carrCapFood => 'توصيل طعام';
+
+  @override
+  String get carrCapGrocery => 'توصيل بقالة';
+
+  @override
+  String get carrCapPharmacy => 'توصيل صيدلية';
+
+  @override
+  String get carrCapParcel => 'توصيل طرود';
+
+  @override
+  String get carrCapButler => 'خدمات بتلر مخصصة';
+
+  @override
+  String get carrPayoutSetup => 'الدفعات والإعداد المالي';
+
+  @override
+  String get carrPayoutSetupBlurb => 'كيف تُدفع شركتك.';
+
+  @override
+  String get carrCommissionRate => 'نسبة العمولة';
+
+  @override
+  String get carrPayoutSchedule => 'جدول الدفعات';
+
+  @override
+  String get carrEveryMonday => 'كل يوم اثنين';
+
+  @override
+  String get carrAgreement =>
+      'أوافق على اتفاقية شراكة وخدمة YouDrop للناقلين. نسب العمولة وفترات الدفع خاضعة لتدقيق حجم شهري.';
+
+  @override
+  String get carrSubmitApplication => 'أرسل الطلب';
+
+  @override
+  String get carrDashboard => 'اللوحة';
+
+  @override
+  String get carrOrdersTab => 'الطلبات';
+
+  @override
+  String get carrFleetTab => 'الأسطول';
+
+  @override
+  String get carrEarningsTab => 'الأرباح';
+
+  @override
+  String get carrSettingsTab => 'الإعدادات';
+
+  @override
+  String get carrActiveDeliveries => 'توصيلات جارية';
+
+  @override
+  String get carrPendingOrders => 'طلبات منتظرة';
+
+  @override
+  String get carrRidersOnline => 'سائقو الأسطول';
+
+  @override
+  String carrWindowEarned(int days) {
+    return 'المكتسب ($days يوم)';
+  }
+
+  @override
+  String get carrRecentActivity => 'النشاط الأخير';
+
+  @override
+  String get carrFleetManagement => 'إدارة الأسطول';
+
+  @override
+  String carrDeliveriesToday(int count) {
+    return '$count توصيلة في الفترة';
+  }
+
+  @override
+  String get carrCall => 'اتصل';
+
+  @override
+  String get carrTotalRevenue => 'إجمالي الإيرادات';
+
+  @override
+  String get carrNetEarnings => 'صافي الأرباح';
+
+  @override
+  String get carrCommissionPaid => 'العمولة المدفوعة لYouDrop';
+
+  @override
+  String get carrCompanyPaused => 'الشركة متوقفة — لا يُعرض عمل جديد';
+
+  @override
+  String get carrPauseCompany => 'أوقف الشركة مؤقتاً';
+
+  @override
+  String get carrResumeCompany => 'استأنف الشركة';
+
+  @override
+  String get carrScore => 'تقييم الناقل';
+
+  @override
+  String get carrCompletionRate => 'نسبة الإكمال';
+
+  @override
+  String get carrOrdersDelivered => 'طلبات موصلة';
+
+  @override
   String get custVerifiedLocal => 'محل موثوق';
 
   @override

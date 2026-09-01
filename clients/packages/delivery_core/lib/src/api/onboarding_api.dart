@@ -107,6 +107,36 @@ class OnboardingApi {
   ///
   /// [details] carries the wizard's free-form answers — business type and the like. See
   /// [OnboardingApplication.details].
+  /// Applies to run a delivery company on YouDrop.
+  ///
+  /// Same wire as the other kinds; everything the carrier wizard collects beyond the contact
+  /// block — CR number, company type, fleet counts, operating hours, capabilities, coverage —
+  /// rides in [details], which the application record stores for the reviewer.
+  Future<String> applyAsCarrier({
+    required String companyName,
+    required String contactName,
+    required String email,
+    required String emailVerificationToken,
+    String? phone,
+    String? phoneVerificationToken,
+    String? notes,
+    Map<String, dynamic>? details,
+  }) async {
+    final Response<dynamic> response =
+        await _dio.post<dynamic>('/api/onboarding/applications', data: <String, dynamic>{
+      'kind': 'CARRIER',
+      'businessName': companyName,
+      'contactName': contactName,
+      'contactEmail': email,
+      'emailVerificationToken': emailVerificationToken,
+      'contactPhone': phone,
+      'phoneVerificationToken': phoneVerificationToken,
+      'notes': notes,
+      'details': details,
+    });
+    return (response.data as Map<String, dynamic>)['reference'] as String;
+  }
+
   Future<String> applyAsMerchant({
     required String businessName,
     required String contactName,
