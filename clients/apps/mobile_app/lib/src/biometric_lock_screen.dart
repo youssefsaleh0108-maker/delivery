@@ -35,33 +35,65 @@ class BiometricLockScreen extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(DeliverySpacing.xl),
+          // ONE fingerprint, dead centre. The old layout drew a decorative fingerprint up top
+          // and pushed the tappable one into the bottom half, which read as off-centre because
+          // it was; the thing to touch now sits exactly where the eye lands.
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.all(DeliverySpacing.lg),
-                decoration: const BoxDecoration(
-                  color: DeliveryColors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.fingerprint,
-                    size: 56, color: DeliveryColors.brand),
-              ),
-              const SizedBox(height: DeliverySpacing.lg),
+              const Spacer(flex: 2),
               Text(
                 t.appTitle,
+                textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall
                     ?.copyWith(color: DeliveryColors.white, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: DeliverySpacing.xs),
               Text(
                 t.locked,
+                textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: DeliveryColors.white.withValues(alpha: 0.85)),
               ),
+              const Spacer(),
+              Center(
+                child: Semantics(
+                  button: true,
+                  label: t.unlockWithFingerprint,
+                  child: InkWell(
+                    onTap: busy ? null : onUnlock,
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      height: 112,
+                      width: 112,
+                      decoration: BoxDecoration(
+                        color: DeliveryColors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: DeliveryColors.white, width: 2),
+                      ),
+                      child: Center(
+                        child: busy
+                            ? const SizedBox(
+                                height: 32,
+                                width: 32,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: DeliveryColors.white))
+                            : const Icon(Icons.fingerprint,
+                                size: 60, color: DeliveryColors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: DeliverySpacing.md),
+              Text(
+                t.unlockWithFingerprint,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: DeliveryColors.white),
+              ),
               if (error != null) ...<Widget>[
-                const SizedBox(height: DeliverySpacing.md),
+                const SizedBox(height: DeliverySpacing.sm),
                 Text(
                   error!,
                   textAlign: TextAlign.center,
@@ -69,41 +101,7 @@ class BiometricLockScreen extends StatelessWidget {
                       ?.copyWith(color: DeliveryColors.white),
                 ),
               ],
-              const Spacer(),
-              // An icon, not a wide button. It sits where the passcode would be typed and is the
-              // one thing on this screen worth tapping, so it reads as "put your finger here"
-              // rather than as one option among several.
-              Semantics(
-                button: true,
-                label: t.unlockWithFingerprint,
-                child: InkWell(
-                  onTap: busy ? null : onUnlock,
-                  customBorder: const CircleBorder(),
-                  child: Container(
-                    height: 96,
-                    width: 96,
-                    decoration: BoxDecoration(
-                      color: DeliveryColors.white.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: DeliveryColors.white, width: 2),
-                    ),
-                    child: Center(
-                      child: busy
-                          ? const SizedBox(
-                              height: 28,
-                              width: 28,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: DeliveryColors.white))
-                          : const Icon(Icons.fingerprint,
-                              size: 52, color: DeliveryColors.white),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: DeliverySpacing.sm),
-              Text(t.unlockWithFingerprint,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: DeliveryColors.white)),
+              const Spacer(flex: 2),
               TextButton(
                 onPressed: busy ? null : onUsePasscode,
                 child: Text(t.signInWithPasscodeInstead,
