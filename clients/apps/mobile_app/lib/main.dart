@@ -243,9 +243,30 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       _unlocking = true;
       _lockError = null;
     });
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    final BiometricResult result =
-        await _biometrics.authenticate(t.unlockWithFingerprint);
+    // The strings live INSIDE the MaterialApp this State builds, so this State's own context
+    // sits above them and `DeliveryStrings.of(context)` threw — after _unlocking was already
+    // true, which left the lock screen spinning forever the first time anybody enabled the
+    // fingerprint. The navigator's context is inside the app; a plain literal covers the one
+    // frame where even that does not exist yet.
+    final BuildContext? inApp = _navigator.currentContext;
+    final DeliveryStrings? t =
+        inApp == null ? null : Localizations.of<DeliveryStrings>(inApp, DeliveryStrings);
+    final BiometricResult result;
+    try {
+      result = await _biometrics
+          .authenticate(t?.unlockWithFingerprint ?? 'Unlock YouDrop')
+          // The OS prompt normally answers or is dismissed; a hung platform channel must not
+          // hold the lock screen's spinner hostage.
+          .timeout(const Duration(seconds: 45),
+              onTimeout: () => BiometricResult.refused);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _unlocking = false;
+        _lockError = t?.couldNotVerifyYou ?? 'Could not verify you.';
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _unlocking = false;
@@ -258,7 +279,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
           // phone's own lock screen is still between a stranger and this app.
           _locked = false;
         case BiometricResult.refused:
-          _lockError = t.couldNotVerifyYou;
+          _lockError = t?.couldNotVerifyYou ?? 'Could not verify you.';
       }
     });
   }

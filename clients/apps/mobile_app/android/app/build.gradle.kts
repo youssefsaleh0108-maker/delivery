@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -37,9 +39,10 @@ android {
         // meta-data is present either way, and the map surfaces simply stay on OSM until the
         // key exists. An Android Maps key ships inside the APK by design; its real protection
         // is the package+SHA-1 restriction set in the Google Cloud console, not secrecy.
-        val localProps = java.util.Properties().apply {
-            val f = rootProject.file("local.properties")
-            if (f.exists()) f.inputStream().use { load(it) }
+        val localProps = Properties()
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            localPropsFile.inputStream().use { localProps.load(it) }
         }
         manifestPlaceholders["googleMapsApiKey"] =
             (localProps.getProperty("googleMapsApiKey")
