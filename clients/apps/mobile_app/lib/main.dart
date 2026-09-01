@@ -589,8 +589,26 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   });
                   _adoptSession(session);
                 },
-                // Back from the form returns to the role's intro, not out of the flow.
-                onClose: () => setState(() => _partnerIntroDone = false),
+                // Back from the form returns to the role's intro, not out of the flow — except
+                // the carrier, whose pitch lives inside the wizard: back from it leaves the flow
+                // (to the fork if they came through it), never to the rider-and-merchant intro.
+                onClose: () => setState(() {
+                  if (_partnerKind == PartnerKind.carrier) {
+                    if (_forkedByChoice) {
+                      _partnerKind = null;
+                    } else {
+                      _applyingAsPartner = false;
+                    }
+                  } else {
+                    _partnerIntroDone = false;
+                  }
+                }),
+                // "Already a partner? Sign In" on the carrier pitch (86:15).
+                onLogIn: () => setState(() {
+                  _applyingAsPartner = false;
+                  _partnerKind = null;
+                  _gate = _Gate.signIn;
+                }),
               );
             }
             switch (_gate) {

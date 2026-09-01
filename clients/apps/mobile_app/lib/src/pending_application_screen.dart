@@ -2,6 +2,7 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'application_documents_step.dart';
 import 'one_time_code.dart';
@@ -121,7 +122,9 @@ class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
   /// What the papers this kind of applicant is expected to produce are — riders one list,
   /// everybody else the registered-business list, mirroring the service's `DocumentKind`.
   List<ApplicantDocumentKind> _expectedKinds(OnboardingApplication a) =>
-      expectedDocumentKinds(rider: a.kind == OnboardingKind.rider);
+      expectedDocumentKinds(
+          rider: a.kind == OnboardingKind.rider,
+          carrier: a.kind == OnboardingKind.carrier);
 
   /// How the checklist's documents line stands, read from the real documents rather than
   /// illustrated. No data (still loading, or the fetch failed) renders as locked — the state the
@@ -250,11 +253,13 @@ class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
           return _approved(t);
         }
 
-        // A shop is shown the checklist, a rider the timeline. `OnboardingKind` names the two the
-        // server distinguishes; anything that is not a shop is somebody who wants to ride.
-        return application.kind == OnboardingKind.merchant
-            ? _merchantReview(t, application)
-            : _riderSubmitted(t, application);
+        // A shop is shown the checklist, a rider the crimson timeline, and a delivery company
+        // the light carrier status screen (86:359) — each frame is its own drawing.
+        return switch (application.kind) {
+          OnboardingKind.merchant => _merchantReview(t, application),
+          OnboardingKind.carrier => _carrierSubmitted(t, application),
+          OnboardingKind.rider => _riderSubmitted(t, application),
+        };
       },
     );
   }
@@ -431,6 +436,259 @@ class _PendingApplicationScreenState extends State<PendingApplicationScreen> {
   }
 
   // ------------------------------------------------------------------ the brand one
+
+  // ------------------------------------------------------------------ the carrier one
+
+  /// The 86:359 frame: a light surface, a green submitted check, the App ID pill, and a
+  /// four-stage carrier timeline with a connecting line — then the same live documents and
+  /// payout cards the other pending surfaces carry, because the papers are what the first
+  /// waiting stage is actually about.
+  Widget _carrierSubmitted(DeliveryStrings t, OnboardingApplication a) {
+    final bool reading = a.status == OnboardingStatus.submitted ||
+        a.status == OnboardingStatus.inReview;
+    final bool decided = a.status == OnboardingStatus.approved ||
+        a.status == OnboardingStatus.provisioned;
+
+    final String submittedOn = a.createdAt == null
+        ? ''
+        : MaterialLocalizations.of(context)
+            .formatMediumDate(a.createdAt!.toLocal());
+
+    // The support link mirrors HelpSupportScreen: WhatsApp when configured, mail when
+    // configured, and no dead control when neither is.
+    const String whatsAppRaw = String.fromEnvironment('SUPPORT_WHATSAPP');
+    const String emailRaw = String.fromEnvironment('SUPPORT_EMAIL');
+    final String whatsAppDigits =
+        whatsAppRaw.replaceAll(RegExp(r'[^0-9]'), '');
+    final Uri? supportUri = whatsAppDigits.isNotEmpty
+        ? Uri.parse('https://wa.me/$whatsAppDigits')
+        : (emailRaw.trim().isNotEmpty
+            ? Uri(scheme: 'mailto', path: emailRaw.trim())
+            : null);
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.all(DeliverySpacing.lg),
+                    child: Column(
+                      children: <Widget>[
+                        Container(
+                          width: 88,
+                          height: 88,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE7F6EC),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.check_rounded,
+                              size: 44, color: Color(0xFF10B981)),
+                        ),
+                        const SizedBox(height: DeliverySpacing.lg),
+                        Text(
+                          t.carrSubmittedTitle,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: DeliveryColors.ink,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                        Container(
+                          padding: const EdgeInsetsDirectional.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: DeliveryColors.borderFaint,
+                            borderRadius: BorderRadius.circular(999),
+                            border:
+                                Border.all(color: DeliveryColors.border),
+                          ),
+                          child: Text(
+                            t.carrAppId(a.reference),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: DeliveryColors.muted,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: DeliverySpacing.lg),
+                        Container(
+                          padding: const EdgeInsets.all(DeliverySpacing.md),
+                          decoration: BoxDecoration(
+                            color: DeliveryColors.white,
+                            borderRadius:
+                                BorderRadius.circular(DeliveryRadius.lg),
+                            border: Border.all(color: DeliveryColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                t.carrApplicationStatus.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: DeliveryColors.muted,
+                                  letterSpacing: 0.4,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: DeliverySpacing.md),
+                              _CarrierStage(
+                                label: t.carrStageReceived,
+                                sublabel: submittedOn.isEmpty
+                                    ? null
+                                    : t.carrStageReceivedSub(submittedOn),
+                                state: _StageState.done,
+                              ),
+                              _CarrierStage(
+                                label: t.carrStageDocs,
+                                sublabel: t.carrStageDocsSub,
+                                state: decided
+                                    ? _StageState.done
+                                    : (reading
+                                        ? _StageState.current
+                                        : _StageState.locked),
+                              ),
+                              _CarrierStage(
+                                label: t.carrStageInspection,
+                                sublabel: t.carrStageInspectionSub,
+                                state: decided
+                                    ? _StageState.current
+                                    : _StageState.locked,
+                              ),
+                              _CarrierStage(
+                                label: t.carrStageActivation,
+                                sublabel: t.carrStageActivationSub,
+                                state: _StageState.locked,
+                                last: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: DeliverySpacing.md),
+                        Container(
+                          padding: const EdgeInsets.all(DeliverySpacing.md),
+                          decoration: BoxDecoration(
+                            color: DeliveryColors.borderFaint,
+                            borderRadius:
+                                BorderRadius.circular(DeliveryRadius.md),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                t.carrPendingSupportBlurb,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: DeliveryColors.muted,
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (supportUri != null) ...<Widget>[
+                                const SizedBox(height: DeliverySpacing.sm),
+                                InkWell(
+                                  onTap: () => launchUrl(supportUri,
+                                      mode: LaunchMode.externalApplication),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: <Widget>[
+                                      const Icon(Icons.support_agent,
+                                          size: 18,
+                                          color: DeliveryColors.brand),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        t.carrChatSupport,
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: DeliveryColors.brand,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: DeliverySpacing.md),
+                        Builder(builder: (BuildContext context) {
+                          _documents ??= widget.documentsApi.myDocuments();
+                          return FutureBuilder<List<ApplicantDocument>>(
+                            future: _documents,
+                            builder: (BuildContext context,
+                                    AsyncSnapshot<List<ApplicantDocument>>
+                                        snapshot) =>
+                                _documentsSection(t, a, snapshot,
+                                    onBrand: false),
+                          );
+                        }),
+                        const SizedBox(height: DeliverySpacing.md),
+                        _payoutSection(t, a, onBrand: false),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(DeliverySpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        // The frame's outlined Return to Home; the explore route is the
+                        // nearest thing "home" means before there is a company.
+                        OutlinedButton(
+                          onPressed: widget.onExplore ?? _refresh,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: DeliveryColors.brand,
+                            side: const BorderSide(
+                                color: DeliveryColors.brand, width: 1.5),
+                            minimumSize: const Size.fromHeight(52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(DeliveryRadius.pill),
+                            ),
+                          ),
+                          child: Text(
+                            widget.onExplore == null
+                                ? t.checkAgain
+                                : t.carrReturnHome,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: DeliverySpacing.sm),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => widget.onSignOut(),
+                            style: TextButton.styleFrom(
+                                foregroundColor: DeliveryColors.muted),
+                            child: Text(t.signOut),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _riderSubmitted(DeliveryStrings t, OnboardingApplication a) {
     final bool reading = a.status == OnboardingStatus.submitted ||
@@ -883,5 +1141,113 @@ class _StatusCard extends StatelessWidget {
     );
 
     return bare ? body : YdCard.bordered(child: body);
+  }
+}
+
+/// How one stage of the carrier timeline stands.
+enum _StageState { done, current, locked }
+
+/// One node of the carrier status timeline (86:359): a state-coloured dot, a connecting line down
+/// to the next node, the stage's name and its one-line explanation.
+class _CarrierStage extends StatelessWidget {
+  const _CarrierStage({
+    required this.label,
+    required this.state,
+    this.sublabel,
+    this.last = false,
+  });
+
+  final String label;
+  final String? sublabel;
+  final _StageState state;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    const Color green = Color(0xFF10B981);
+    const Color amber = Color(0xFFF59E0B);
+
+    final (Color dot, Widget mark) = switch (state) {
+      _StageState.done => (
+          green,
+          const Icon(Icons.check, size: 13, color: DeliveryColors.white)
+        ),
+      _StageState.current => (
+          amber,
+          const SizedBox.square(
+            dimension: 11,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: DeliveryColors.white),
+          )
+        ),
+      _StageState.locked => (
+          DeliveryColors.border,
+          const SizedBox.shrink()
+        ),
+    };
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Column(
+            children: <Widget>[
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                child: mark,
+              ),
+              if (!last)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    color: state == _StageState.done
+                        ? green
+                        : DeliveryColors.border,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: last ? 0 : DeliverySpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: state == _StageState.locked
+                          ? DeliveryColors.faint
+                          : DeliveryColors.ink,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (sublabel != null) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Text(
+                      sublabel!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: state == _StageState.locked
+                            ? DeliveryColors.faint
+                            : DeliveryColors.muted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -3329,7 +3329,8 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get carrBenefitPayouts => 'Weekly payouts in Fresh USD';
 
   @override
-  String get carrBenefitPayoutsBlurb => 'Reliable settlements, every week.';
+  String get carrBenefitPayoutsBlurb =>
+      'Reliable financial integrations with instant settlements.';
 
   @override
   String get carrRegisterCompany => 'Register Your Company';
@@ -3369,7 +3370,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get carrContactPerson => 'Contact Person';
 
   @override
-  String get carrFleetDetails => 'Fleet 0026 Vehicle Details';
+  String get carrFleetDetails => 'Fleet & Vehicle Details';
 
   @override
   String get carrFleetDetailsBlurb => 'What your fleet can actually carry.';
@@ -3405,22 +3406,22 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get carrCapColdChain => 'Generator-equipped cold chain';
 
   @override
-  String get carrCapFood => 'Food delivery';
+  String get carrCapFood => 'Food Delivery Support';
 
   @override
-  String get carrCapGrocery => 'Grocery delivery';
+  String get carrCapGrocery => 'Grocery Delivery Support';
 
   @override
-  String get carrCapPharmacy => 'Pharmacy delivery';
+  String get carrCapPharmacy => 'Pharmacy Delivery Support';
 
   @override
-  String get carrCapParcel => 'Parcel delivery';
+  String get carrCapParcel => 'Parcel Delivery Support';
 
   @override
   String get carrCapButler => 'Custom Butler services';
 
   @override
-  String get carrPayoutSetup => 'Payout 0026 Financial Setup';
+  String get carrPayoutSetup => 'Payout & Financial Setup';
 
   @override
   String get carrPayoutSetupBlurb => 'How your company gets paid.';
@@ -3436,7 +3437,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get carrAgreement =>
-      'I agree to the YouDrop Carrier Partnership 0026 Service Agreement. Commission rates and payout periods are subject to monthly volume audits.';
+      'I agree to the YouDrop Carrier Partnership & Service Agreement. Commission rates and payout periods are subject to monthly volume audits.';
 
   @override
   String get carrSubmitApplication => 'Submit Application';
@@ -3510,6 +3511,262 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get carrOrdersDelivered => 'Orders delivered';
+
+  @override
+  String get carrAlreadyPartner => 'Already a partner?';
+
+  @override
+  String get carrBusinessEmail => 'Business Email';
+
+  @override
+  String get carrBusinessEmailHint => 'partner@company.com';
+
+  @override
+  String get carrContactPersonHint => 'Full name of representative';
+
+  @override
+  String get carrPhoneHint => '+961 70 123 456';
+
+  @override
+  String get carrDocsTitle => 'Upload Verification Documents';
+
+  @override
+  String get carrVerificationNote =>
+      'Documents are reviewed by the YouDrop Operations Desk. Verification typically completes within 24–48 hours.';
+
+  @override
+  String get carrPayoutMethod => 'Preferred payout method';
+
+  @override
+  String get carrPayoutCash => 'Fresh USD Cash (Office pickup)';
+
+  @override
+  String get carrPayoutCashBlurb =>
+      'No service charges, weekly cash settlement';
+
+  @override
+  String get carrPayoutWhish => 'Whish Money transfer';
+
+  @override
+  String get carrPayoutWhishBlurb => 'Standard Lebanese local wallet payout';
+
+  @override
+  String get carrPayoutOmt => 'OMT Cash Out';
+
+  @override
+  String get carrPayoutOmtBlurb => 'Payout sent directly via the OMT network';
+
+  @override
+  String get carrPayoutBank => 'USD Bank Transfer';
+
+  @override
+  String get carrPayoutBankBlurb => 'Fresh USD wire to a Lebanese bank account';
+
+  @override
+  String carrFlatFee(int rate) {
+    return '$rate% flat fee';
+  }
+
+  @override
+  String get carrSubmittedTitle => 'Application Submitted!';
+
+  @override
+  String carrAppId(String reference) {
+    return 'App ID: $reference';
+  }
+
+  @override
+  String get carrApplicationStatus => 'Application status';
+
+  @override
+  String get carrStageReceived => 'Application Received';
+
+  @override
+  String carrStageReceivedSub(String date) {
+    return 'Submitted on $date';
+  }
+
+  @override
+  String get carrStageDocs => 'Document Verification';
+
+  @override
+  String get carrStageDocsSub => 'Under review (takes 24–48 hours)';
+
+  @override
+  String get carrStageInspection => 'Fleet Inspection';
+
+  @override
+  String get carrStageInspectionSub => 'Scheduled at your vehicle yard';
+
+  @override
+  String get carrStageActivation => 'Account Activation';
+
+  @override
+  String get carrStageActivationSub => 'Access to YouDrop carrier dispatch';
+
+  @override
+  String get carrPendingSupportBlurb =>
+      'We have sent you a confirmation email. Need urgent help with your submission?';
+
+  @override
+  String get carrChatSupport => 'Chat with Partner Support';
+
+  @override
+  String get carrReturnHome => 'Return to Home';
+
+  @override
+  String get carrBadgeLive => 'LIVE';
+
+  @override
+  String get carrBadgeWaiting => 'WAITING';
+
+  @override
+  String get carrBadgeFleet => 'FLEET';
+
+  @override
+  String get carrBadgeUsd => 'USD';
+
+  @override
+  String get carrTodayRevenue => 'Today\'s revenue';
+
+  @override
+  String get carrCoverageMapBlurb =>
+      'The circles your riders work. Tap to edit.';
+
+  @override
+  String get carrIncoming => 'Incoming';
+
+  @override
+  String get carrCompleted => 'Completed';
+
+  @override
+  String get carrUnassigned => 'Unassigned order';
+
+  @override
+  String get carrWaitingDispatch => 'Waiting for dispatch';
+
+  @override
+  String carrShowingRiders(int count) {
+    return '$count riders on the fleet';
+  }
+
+  @override
+  String get carrNoRiders =>
+      'No riders on the fleet yet — the platform assigns riders after onboarding.';
+
+  @override
+  String carrDelivering(String id) {
+    return 'Delivering #$id';
+  }
+
+  @override
+  String get carrAvailable => 'Available';
+
+  @override
+  String get carrWeeklySummary => 'Weekly summary';
+
+  @override
+  String get carrDeliveriesBreakdown => 'Deliveries breakdown';
+
+  @override
+  String carrCommissionPct(int rate) {
+    return 'Commission paid to YouDrop ($rate%)';
+  }
+
+  @override
+  String get carrNextPayout => 'Next payout scheduled';
+
+  @override
+  String get carrPickupFrom => 'Pickup from';
+
+  @override
+  String get carrDeliverTo => 'Deliver to';
+
+  @override
+  String get carrPaymentCommission => 'Payment & commission';
+
+  @override
+  String get carrDeliveryFee => 'Delivery total (Fresh USD)';
+
+  @override
+  String carrLbpRate(String rate) {
+    return 'LBP conversion rate ($rate)';
+  }
+
+  @override
+  String carrPlatformFee(int rate) {
+    return 'YouDrop platform fee ($rate%)';
+  }
+
+  @override
+  String get carrStepReceived => 'Received';
+
+  @override
+  String get carrStepAssigned => 'Assigned';
+
+  @override
+  String get carrStepPickingUp => 'Picking up';
+
+  @override
+  String get carrStepEnRoute => 'En route';
+
+  @override
+  String get carrStepDelivered => 'Delivered';
+
+  @override
+  String get carrOperations => 'Operations';
+
+  @override
+  String get carrPayments => 'Payments';
+
+  @override
+  String get carrAccountSection => 'Account';
+
+  @override
+  String get carrHelpSupport => 'Help & Support';
+
+  @override
+  String carrVersionCaption(String version) {
+    return 'YouDrop Carrier v$version';
+  }
+
+  @override
+  String get carrCoverageZones => 'Coverage Zones';
+
+  @override
+  String get carrAddZone => 'Add zone';
+
+  @override
+  String get carrZoneName => 'Zone name';
+
+  @override
+  String get carrZoneNameHint => 'e.g. Central Beirut';
+
+  @override
+  String carrZoneRadiusKm(String km) {
+    return 'Radius: $km km';
+  }
+
+  @override
+  String get carrZoneActive => 'ACTIVE';
+
+  @override
+  String get carrZonePaused => 'PAUSED';
+
+  @override
+  String carrDeleteZoneAsk(String name) {
+    return 'Remove $name? Riders keep working the other zones.';
+  }
+
+  @override
+  String get carrNoZones =>
+      'No zones yet. Draw the first circle your riders work.';
+
+  @override
+  String get carrEditZone => 'Edit zone';
+
+  @override
+  String get carrNewZone => 'New zone';
 
   @override
   String get custVerifiedLocal => 'Verified Local';
@@ -4705,6 +4962,15 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get docCommercialRegistration => 'Commercial registration';
+
+  @override
+  String get docTradeLicence => 'Trade License (Certified)';
+
+  @override
+  String get docFleetInsurance => 'Fleet Insurance Certificate';
+
+  @override
+  String get docFleetRegistration => 'Rider & Fleet Registrations';
 
   @override
   String get docWaitingReview => 'Waiting for review';

@@ -5969,7 +5969,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrBenefitPayoutsBlurb.
   ///
   /// In en, this message translates to:
-  /// **'Reliable settlements, every week.'**
+  /// **'Reliable financial integrations with instant settlements.'**
   String get carrBenefitPayoutsBlurb;
 
   /// No description provided for @carrRegisterCompany.
@@ -6047,7 +6047,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrFleetDetails.
   ///
   /// In en, this message translates to:
-  /// **'Fleet 0026 Vehicle Details'**
+  /// **'Fleet & Vehicle Details'**
   String get carrFleetDetails;
 
   /// No description provided for @carrFleetDetailsBlurb.
@@ -6119,25 +6119,25 @@ abstract class DeliveryStrings {
   /// No description provided for @carrCapFood.
   ///
   /// In en, this message translates to:
-  /// **'Food delivery'**
+  /// **'Food Delivery Support'**
   String get carrCapFood;
 
   /// No description provided for @carrCapGrocery.
   ///
   /// In en, this message translates to:
-  /// **'Grocery delivery'**
+  /// **'Grocery Delivery Support'**
   String get carrCapGrocery;
 
   /// No description provided for @carrCapPharmacy.
   ///
   /// In en, this message translates to:
-  /// **'Pharmacy delivery'**
+  /// **'Pharmacy Delivery Support'**
   String get carrCapPharmacy;
 
   /// No description provided for @carrCapParcel.
   ///
   /// In en, this message translates to:
-  /// **'Parcel delivery'**
+  /// **'Parcel Delivery Support'**
   String get carrCapParcel;
 
   /// No description provided for @carrCapButler.
@@ -6149,7 +6149,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrPayoutSetup.
   ///
   /// In en, this message translates to:
-  /// **'Payout 0026 Financial Setup'**
+  /// **'Payout & Financial Setup'**
   String get carrPayoutSetup;
 
   /// No description provided for @carrPayoutSetupBlurb.
@@ -6179,7 +6179,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrAgreement.
   ///
   /// In en, this message translates to:
-  /// **'I agree to the YouDrop Carrier Partnership 0026 Service Agreement. Commission rates and payout periods are subject to monthly volume audits.'**
+  /// **'I agree to the YouDrop Carrier Partnership & Service Agreement. Commission rates and payout periods are subject to monthly volume audits.'**
   String get carrAgreement;
 
   /// No description provided for @carrSubmitApplication.
@@ -6319,6 +6319,462 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Orders delivered'**
   String get carrOrdersDelivered;
+
+  /// No description provided for @carrAlreadyPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Already a partner?'**
+  String get carrAlreadyPartner;
+
+  /// No description provided for @carrBusinessEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Email'**
+  String get carrBusinessEmail;
+
+  /// No description provided for @carrBusinessEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'partner@company.com'**
+  String get carrBusinessEmailHint;
+
+  /// No description provided for @carrContactPersonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name of representative'**
+  String get carrContactPersonHint;
+
+  /// No description provided for @carrPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'+961 70 123 456'**
+  String get carrPhoneHint;
+
+  /// No description provided for @carrDocsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Verification Documents'**
+  String get carrDocsTitle;
+
+  /// No description provided for @carrVerificationNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents are reviewed by the YouDrop Operations Desk. Verification typically completes within 24–48 hours.'**
+  String get carrVerificationNote;
+
+  /// No description provided for @carrPayoutMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred payout method'**
+  String get carrPayoutMethod;
+
+  /// No description provided for @carrPayoutCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh USD Cash (Office pickup)'**
+  String get carrPayoutCash;
+
+  /// No description provided for @carrPayoutCashBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'No service charges, weekly cash settlement'**
+  String get carrPayoutCashBlurb;
+
+  /// No description provided for @carrPayoutWhish.
+  ///
+  /// In en, this message translates to:
+  /// **'Whish Money transfer'**
+  String get carrPayoutWhish;
+
+  /// No description provided for @carrPayoutWhishBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Lebanese local wallet payout'**
+  String get carrPayoutWhishBlurb;
+
+  /// No description provided for @carrPayoutOmt.
+  ///
+  /// In en, this message translates to:
+  /// **'OMT Cash Out'**
+  String get carrPayoutOmt;
+
+  /// No description provided for @carrPayoutOmtBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout sent directly via the OMT network'**
+  String get carrPayoutOmtBlurb;
+
+  /// No description provided for @carrPayoutBank.
+  ///
+  /// In en, this message translates to:
+  /// **'USD Bank Transfer'**
+  String get carrPayoutBank;
+
+  /// No description provided for @carrPayoutBankBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh USD wire to a Lebanese bank account'**
+  String get carrPayoutBankBlurb;
+
+  /// No description provided for @carrFlatFee.
+  ///
+  /// In en, this message translates to:
+  /// **'{rate}% flat fee'**
+  String carrFlatFee(int rate);
+
+  /// No description provided for @carrSubmittedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Application Submitted!'**
+  String get carrSubmittedTitle;
+
+  /// No description provided for @carrAppId.
+  ///
+  /// In en, this message translates to:
+  /// **'App ID: {reference}'**
+  String carrAppId(String reference);
+
+  /// No description provided for @carrApplicationStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Application status'**
+  String get carrApplicationStatus;
+
+  /// No description provided for @carrStageReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Application Received'**
+  String get carrStageReceived;
+
+  /// No description provided for @carrStageReceivedSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted on {date}'**
+  String carrStageReceivedSub(String date);
+
+  /// No description provided for @carrStageDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Verification'**
+  String get carrStageDocs;
+
+  /// No description provided for @carrStageDocsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Under review (takes 24–48 hours)'**
+  String get carrStageDocsSub;
+
+  /// No description provided for @carrStageInspection.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet Inspection'**
+  String get carrStageInspection;
+
+  /// No description provided for @carrStageInspectionSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled at your vehicle yard'**
+  String get carrStageInspectionSub;
+
+  /// No description provided for @carrStageActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Activation'**
+  String get carrStageActivation;
+
+  /// No description provided for @carrStageActivationSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Access to YouDrop carrier dispatch'**
+  String get carrStageActivationSub;
+
+  /// No description provided for @carrPendingSupportBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'We have sent you a confirmation email. Need urgent help with your submission?'**
+  String get carrPendingSupportBlurb;
+
+  /// No description provided for @carrChatSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with Partner Support'**
+  String get carrChatSupport;
+
+  /// No description provided for @carrReturnHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Home'**
+  String get carrReturnHome;
+
+  /// No description provided for @carrBadgeLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get carrBadgeLive;
+
+  /// No description provided for @carrBadgeWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'WAITING'**
+  String get carrBadgeWaiting;
+
+  /// No description provided for @carrBadgeFleet.
+  ///
+  /// In en, this message translates to:
+  /// **'FLEET'**
+  String get carrBadgeFleet;
+
+  /// No description provided for @carrBadgeUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'USD'**
+  String get carrBadgeUsd;
+
+  /// No description provided for @carrTodayRevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s revenue'**
+  String get carrTodayRevenue;
+
+  /// No description provided for @carrCoverageMapBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'The circles your riders work. Tap to edit.'**
+  String get carrCoverageMapBlurb;
+
+  /// No description provided for @carrIncoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming'**
+  String get carrIncoming;
+
+  /// No description provided for @carrCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get carrCompleted;
+
+  /// No description provided for @carrUnassigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Unassigned order'**
+  String get carrUnassigned;
+
+  /// No description provided for @carrWaitingDispatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for dispatch'**
+  String get carrWaitingDispatch;
+
+  /// No description provided for @carrShowingRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} riders on the fleet'**
+  String carrShowingRiders(int count);
+
+  /// No description provided for @carrNoRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'No riders on the fleet yet — the platform assigns riders after onboarding.'**
+  String get carrNoRiders;
+
+  /// No description provided for @carrDelivering.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivering #{id}'**
+  String carrDelivering(String id);
+
+  /// No description provided for @carrAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get carrAvailable;
+
+  /// No description provided for @carrWeeklySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly summary'**
+  String get carrWeeklySummary;
+
+  /// No description provided for @carrDeliveriesBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries breakdown'**
+  String get carrDeliveriesBreakdown;
+
+  /// No description provided for @carrCommissionPct.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission paid to YouDrop ({rate}%)'**
+  String carrCommissionPct(int rate);
+
+  /// No description provided for @carrNextPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Next payout scheduled'**
+  String get carrNextPayout;
+
+  /// No description provided for @carrPickupFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup from'**
+  String get carrPickupFrom;
+
+  /// No description provided for @carrDeliverTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver to'**
+  String get carrDeliverTo;
+
+  /// No description provided for @carrPaymentCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment & commission'**
+  String get carrPaymentCommission;
+
+  /// No description provided for @carrDeliveryFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery total (Fresh USD)'**
+  String get carrDeliveryFee;
+
+  /// No description provided for @carrLbpRate.
+  ///
+  /// In en, this message translates to:
+  /// **'LBP conversion rate ({rate})'**
+  String carrLbpRate(String rate);
+
+  /// No description provided for @carrPlatformFee.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop platform fee ({rate}%)'**
+  String carrPlatformFee(int rate);
+
+  /// No description provided for @carrStepReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Received'**
+  String get carrStepReceived;
+
+  /// No description provided for @carrStepAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned'**
+  String get carrStepAssigned;
+
+  /// No description provided for @carrStepPickingUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Picking up'**
+  String get carrStepPickingUp;
+
+  /// No description provided for @carrStepEnRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'En route'**
+  String get carrStepEnRoute;
+
+  /// No description provided for @carrStepDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get carrStepDelivered;
+
+  /// No description provided for @carrOperations.
+  ///
+  /// In en, this message translates to:
+  /// **'Operations'**
+  String get carrOperations;
+
+  /// No description provided for @carrPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments'**
+  String get carrPayments;
+
+  /// No description provided for @carrAccountSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get carrAccountSection;
+
+  /// No description provided for @carrHelpSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get carrHelpSupport;
+
+  /// No description provided for @carrVersionCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop Carrier v{version}'**
+  String carrVersionCaption(String version);
+
+  /// No description provided for @carrCoverageZones.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage Zones'**
+  String get carrCoverageZones;
+
+  /// No description provided for @carrAddZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Add zone'**
+  String get carrAddZone;
+
+  /// No description provided for @carrZoneName.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone name'**
+  String get carrZoneName;
+
+  /// No description provided for @carrZoneNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Central Beirut'**
+  String get carrZoneNameHint;
+
+  /// No description provided for @carrZoneRadiusKm.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius: {km} km'**
+  String carrZoneRadiusKm(String km);
+
+  /// No description provided for @carrZoneActive.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE'**
+  String get carrZoneActive;
+
+  /// No description provided for @carrZonePaused.
+  ///
+  /// In en, this message translates to:
+  /// **'PAUSED'**
+  String get carrZonePaused;
+
+  /// No description provided for @carrDeleteZoneAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}? Riders keep working the other zones.'**
+  String carrDeleteZoneAsk(String name);
+
+  /// No description provided for @carrNoZones.
+  ///
+  /// In en, this message translates to:
+  /// **'No zones yet. Draw the first circle your riders work.'**
+  String get carrNoZones;
+
+  /// No description provided for @carrEditZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit zone'**
+  String get carrEditZone;
+
+  /// No description provided for @carrNewZone.
+  ///
+  /// In en, this message translates to:
+  /// **'New zone'**
+  String get carrNewZone;
 
   /// No description provided for @custVerifiedLocal.
   ///
@@ -8407,6 +8863,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Commercial registration'**
   String get docCommercialRegistration;
+
+  /// No description provided for @docTradeLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Trade License (Certified)'**
+  String get docTradeLicence;
+
+  /// No description provided for @docFleetInsurance.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleet Insurance Certificate'**
+  String get docFleetInsurance;
+
+  /// No description provided for @docFleetRegistration.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider & Fleet Registrations'**
+  String get docFleetRegistration;
 
   /// No description provided for @docWaitingReview.
   ///

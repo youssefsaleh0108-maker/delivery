@@ -174,7 +174,16 @@ enum ApplicantDocumentKind {
   vehicleRegistration('VEHICLE_REGISTRATION', 'Vehicle registration'),
 
   /// A registered business: a shop, or a delivery company.
-  commercialRegistration('COMMERCIAL_REGISTRATION', 'Commercial registration');
+  commercialRegistration('COMMERCIAL_REGISTRATION', 'Commercial registration'),
+
+  /// A delivery company's certified trade licence.
+  tradeLicence('TRADE_LICENCE', 'Trade licence (certified)'),
+
+  /// Liability coverage for a fleet on the road.
+  fleetInsurance('FLEET_INSURANCE', 'Fleet insurance certificate'),
+
+  /// The registration papers for the fleet's vehicles, bundled as one upload.
+  fleetRegistration('FLEET_REGISTRATION', 'Rider & fleet registrations');
 
   const ApplicantDocumentKind(this.wire, this.label);
 

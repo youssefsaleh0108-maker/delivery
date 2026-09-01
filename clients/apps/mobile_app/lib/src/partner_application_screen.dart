@@ -110,6 +110,7 @@ class PartnerApplicationScreen extends StatefulWidget {
     required this.authService,
     required this.onSignedIn,
     required this.onClose,
+    this.onLogIn,
   });
 
   final OnboardingApi api;
@@ -127,6 +128,10 @@ class PartnerApplicationScreen extends StatefulWidget {
   final void Function(AuthSession session) onSignedIn;
 
   final VoidCallback onClose;
+
+  /// Leaves the application flow for Sign In — the carrier intro's "Already a partner?" line
+  /// (86:15). Null keeps the line off that screen.
+  final VoidCallback? onLogIn;
 
   @override
   State<PartnerApplicationScreen> createState() =>
@@ -239,10 +244,18 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   /// The CR number the reviewer verifies against the registry.
   final TextEditingController _crNumber = TextEditingController();
-  final TextEditingController _hoursWeekdays =
-      TextEditingController(text: '08:00 - 23:00');
-  final TextEditingController _hoursWeekends =
-      TextEditingController(text: '09:00 - 01:00');
+
+  /// Operating hours as picked ranges, not typed text (86:127 draws dropdowns). The presets
+  /// cover the shapes a Lebanese fleet actually runs; a reviewer reads them as prose either way.
+  String _hoursWeekdays = '08:00 AM - 11:00 PM';
+  String _hoursWeekends = '09:00 AM - 01:00 AM';
+  static const List<String> _weekdayHourOptions = <String>[
+    '07:00 AM - 10:00 PM', '08:00 AM - 11:00 PM', '09:00 AM - 12:00 AM',
+    '24 hours',
+  ];
+  static const List<String> _weekendHourOptions = <String>[
+    '09:00 AM - 01:00 AM', '10:00 AM - 12:00 AM', '24 hours', 'Closed',
+  ];
 
   String _companyType = 'Registered LLC';
   static const List<String> _companyTypes = <String>[
@@ -257,7 +270,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   static const List<String> _lebanonAreas = <String>[
     'Beirut', 'Mount Lebanon', 'North', 'South', 'Bekaa',
   ];
-  final Set<String> _coverage = <String>{'Beirut'};
+  final Set<String> _coverage = <String>{'Beirut', 'Mount Lebanon'};
 
   /// Vehicle counts, per the frame's steppers.
   final Map<String, int> _vehicles = <String, int>{
@@ -269,11 +282,15 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// The partnership agreement tick — the carrier's submit stays disabled without it.
   bool _agreed = false;
 
+  /// How the company wants to be paid (86:295): four radio cards, Fresh USD cash selected by
+  /// default. Bank details are asked for only when the answer is the bank.
+  String _payoutMethod = 'CASH';
+
   List<TextEditingController> get _allControllers => <TextEditingController>[
         _name, _business, _email, _emailCode, _phone, _phoneCode, _notes,
         _passcode, _dateOfBirth, _nationalId, _vehicleModel, _plate,
         _vehicleYear, _preferredArea, _accountHolder, _iban,
-        _crNumber, _hoursWeekdays, _hoursWeekends,
+        _crNumber,
       ];
 
   @override
@@ -316,7 +333,12 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         accountHolder: _accountHolder.text,
         iban: _iban.text,
       );
-      return _isCarrier ? payoutOk && _agreed : payoutOk;
+      if (_isCarrier) {
+        // The bank fields only exist when the bank is the chosen method; the other three
+        // methods need nothing typed, and the agreement arms Submit either way.
+        return (_payoutMethod == 'BANK' ? payoutOk : true) && _agreed;
+      }
+      return payoutOk;
     }
     if (_step != 0) return true;
     final bool identity = _name.text.trim().isNotEmpty &&
@@ -488,9 +510,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       details['coverage'] = _coverage.toList();
       details['vehicles'] = Map<String, int>.of(_vehicles)
         ..removeWhere((String _, int count) => count == 0);
-      put('hoursWeekdays', _hoursWeekdays.text);
-      put('hoursWeekends', _hoursWeekends.text);
+      put('hoursWeekdays', _hoursWeekdays);
+      put('hoursWeekends', _hoursWeekends);
       details['capabilities'] = _capabilities.toList();
+      details['payoutMethod'] = _payoutMethod;
       return details;
     }
 
@@ -703,6 +726,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         isCarrier: _isCarrier,
         onBack: widget.onClose,
         onStart: () => setState(() => _phase = _Phase.wizard),
+        onLogIn: widget.onLogIn,
       );
     }
 
@@ -785,8 +809,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         return const SizedBox.shrink();
       case _Phase.wizard:
         return AuthPrimaryButton(
-          label: _step + 1 == totalSteps ? t.authSubmitApplication : t.authNext,
-          trailingIcon: _isRider || _step + 1 == totalSteps
+          // The carrier frames label the advance "Continue", plain (86:59-86:295).
+          label: _step + 1 == totalSteps
+              ? t.authSubmitApplication
+              : (_isCarrier ? t.continueLabel : t.authNext),
+          trailingIcon: _isRider || _isCarrier || _step + 1 == totalSteps
               ? null
               : Icons.arrow_forward,
           busy: _busy,
@@ -871,7 +898,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       return switch (_step) {
         0 => t.carrCompanyInformation,
         1 => t.carrFleetDetails,
-        2 => t.authDocuments,
+        2 => t.carrDocsTitle,
         _ => t.carrPayoutSetup,
       };
     }
@@ -976,23 +1003,24 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         const SizedBox(height: DeliverySpacing.md),
         AuthField(
           label: t.carrContactPerson,
-          hint: t.authOwnerFullNameHint,
+          hint: t.carrContactPersonHint,
           controller: _name,
           textCapitalization: TextCapitalization.words,
         ),
         const SizedBox(height: DeliverySpacing.md),
+        // Phone before email, and "Business Email" last, as 86:59 orders the form.
         AuthField(
-          label: t.authContactEmail,
-          hint: t.authEmailHint,
-          controller: _email,
-          keyboardType: TextInputType.emailAddress,
+          label: t.authPhoneNumber,
+          hint: t.carrPhoneHint,
+          controller: _phone,
+          keyboardType: TextInputType.phone,
         ),
         const SizedBox(height: DeliverySpacing.md),
         AuthField(
-          label: t.authPhoneNumber,
-          hint: t.authPhoneHint,
-          controller: _phone,
-          keyboardType: TextInputType.phone,
+          label: t.carrBusinessEmail,
+          hint: t.carrBusinessEmailHint,
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: DeliverySpacing.md),
         _passcodeField(t),
@@ -1010,39 +1038,66 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         _fieldLabel(t.carrOperatingHours.toUpperCase()),
         const SizedBox(height: DeliverySpacing.sm),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
-              child: AuthField(
-                label: t.carrWeekdays,
-                hint: '08:00 - 23:00',
-                controller: _hoursWeekdays,
-              ),
+              child: _carrierDropdown(t.carrWeekdays, _weekdayHourOptions,
+                  _hoursWeekdays, (String v) => setState(() => _hoursWeekdays = v)),
             ),
             const SizedBox(width: DeliverySpacing.md),
             Expanded(
-              child: AuthField(
-                label: t.carrWeekends,
-                hint: '09:00 - 01:00',
-                controller: _hoursWeekends,
-              ),
+              child: _carrierDropdown(t.carrWeekends, _weekendHourOptions,
+                  _hoursWeekends, (String v) => setState(() => _hoursWeekends = v)),
             ),
           ],
         ),
         const SizedBox(height: DeliverySpacing.md),
         _fieldLabel(t.carrCapabilities.toUpperCase()),
         const SizedBox(height: DeliverySpacing.sm),
-        _capabilityRow(t.carrCapColdChain, 'COLD_CHAIN'),
-        _capabilityRow(t.carrCapFood, 'FOOD'),
-        _capabilityRow(t.carrCapGrocery, 'GROCERY'),
-        _capabilityRow(t.carrCapPharmacy, 'PHARMACY'),
-        _capabilityRow(t.carrCapParcel, 'PARCEL'),
-        _capabilityRow(t.carrCapButler, 'BUTLER'),
+        // One white card with hairline dividers, as the frame draws the toggle list.
+        Container(
+          padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: DeliverySpacing.md, vertical: DeliverySpacing.xs),
+          decoration: BoxDecoration(
+            color: DeliveryColors.white,
+            border: Border.all(color: DeliveryColors.border),
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+          ),
+          child: Column(
+            children: <Widget>[
+              _capabilityRow(t.carrCapColdChain, 'COLD_CHAIN'),
+              const Divider(height: 1, color: DeliveryColors.border),
+              _capabilityRow(t.carrCapFood, 'FOOD'),
+              const Divider(height: 1, color: DeliveryColors.border),
+              _capabilityRow(t.carrCapGrocery, 'GROCERY'),
+              const Divider(height: 1, color: DeliveryColors.border),
+              _capabilityRow(t.carrCapPharmacy, 'PHARMACY'),
+              const Divider(height: 1, color: DeliveryColors.border),
+              _capabilityRow(t.carrCapParcel, 'PARCEL'),
+              const Divider(height: 1, color: DeliveryColors.border),
+              _capabilityRow(t.carrCapButler, 'BUTLER'),
+            ],
+          ),
+        ),
       ];
 
-  /// Step 4: how the company gets paid — the shared bank step, plus the frame's commission card
-  /// and the agreement tick that arms Submit.
+  /// Step 4: how the company gets paid (86:295) — four payout-method cards, the bank fields only
+  /// when the bank is the answer, the commission card, and the agreement tick that arms Submit.
   List<Widget> _carrierPayout(DeliveryStrings t) => <Widget>[
-        ..._bankStep(t),
+        _fieldLabel(t.carrPayoutMethod.toUpperCase()),
+        const SizedBox(height: DeliverySpacing.sm),
+        _payoutMethodCard(t.carrPayoutCash, t.carrPayoutCashBlurb,
+            Icons.payments_outlined, 'CASH'),
+        _payoutMethodCard(t.carrPayoutWhish, t.carrPayoutWhishBlurb,
+            Icons.account_balance_wallet_outlined, 'WHISH'),
+        _payoutMethodCard(t.carrPayoutOmt, t.carrPayoutOmtBlurb,
+            Icons.storefront_outlined, 'OMT'),
+        _payoutMethodCard(t.carrPayoutBank, t.carrPayoutBankBlurb,
+            Icons.account_balance_outlined, 'BANK'),
+        if (_payoutMethod == 'BANK') ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md),
+          ..._bankStep(t),
+        ],
         const SizedBox(height: DeliverySpacing.md),
         Container(
           padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
@@ -1059,10 +1114,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                         style: const TextStyle(
                             fontSize: 13, color: DeliveryColors.muted)),
                   ),
-                  const Text(
+                  Text(
                     // The platform's standing rate; the agreement below is what makes it binding.
-                    '15%',
-                    style: TextStyle(
+                    t.carrFlatFee(15),
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: DeliveryColors.brand,
@@ -1191,6 +1246,78 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
               icon: const Icon(Icons.add, size: 18),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// One of the four payout radio cards (86:295): icon in a soft-red circle, bold title, muted
+  /// subtitle, radio at the end; a crimson border when it is the chosen one.
+  Widget _payoutMethodCard(
+      String title, String blurb, IconData icon, String key) {
+    final bool selected = _payoutMethod == key;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: Material(
+          color: DeliveryColors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DeliveryRadius.md),
+            side: BorderSide(
+              color: selected ? DeliveryColors.brand : DeliveryColors.border,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => setState(() => _payoutMethod = key),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: DeliverySpacing.md, vertical: DeliverySpacing.sm),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: DeliveryColors.brandSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 18, color: DeliveryColors.brand),
+                  ),
+                  const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text(blurb,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: DeliveryColors.muted,
+                                height: 1.3)),
+                      ],
+                    ),
+                  ),
+                  Radio<String>(
+                    value: key,
+                    // ignore: deprecated_member_use
+                    groupValue: _payoutMethod,
+                    activeColor: DeliveryColors.brand,
+                    // ignore: deprecated_member_use
+                    onChanged: (String? v) =>
+                        setState(() => _payoutMethod = v ?? _payoutMethod),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1739,7 +1866,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   List<Widget> _documentsStep(DeliveryStrings t) => <Widget>[
         ApplicationDocumentsStep(
-          kinds: expectedDocumentKinds(rider: _isRider),
+          kinds: expectedDocumentKinds(rider: _isRider, carrier: _isCarrier),
           picked: _pickedDocs,
           enabled: !_busy,
           onPicked: (ApplicantDocumentKind kind, PickedDocument document) =>
@@ -1747,6 +1874,36 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           onRemoved: (ApplicantDocumentKind kind) =>
               setState(() => _pickedDocs.remove(kind)),
         ),
+        // The frame's amber verification note: who reads the papers and how long it takes.
+        if (_isCarrier) ...<Widget>[
+          const SizedBox(height: DeliverySpacing.md),
+          Container(
+            padding: const EdgeInsets.all(DeliverySpacing.md),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7E6),
+              borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              border: Border.all(color: const Color(0xFFF2DDAE)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Icon(Icons.info_outline,
+                    size: 18, color: Color(0xFFB07B0F)),
+                const SizedBox(width: DeliverySpacing.sm),
+                Expanded(
+                  child: Text(
+                    t.carrVerificationNote,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF7A5A12),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: DeliverySpacing.lg),
         AuthField(
           label: _isRider
@@ -1919,6 +2076,7 @@ class _Intro extends StatelessWidget {
     this.isCarrier = false,
     required this.onBack,
     required this.onStart,
+    this.onLogIn,
   });
 
   final bool isRider;
@@ -1927,6 +2085,10 @@ class _Intro extends StatelessWidget {
   final bool isCarrier;
   final VoidCallback onBack;
   final VoidCallback onStart;
+
+  /// "Already a partner? Sign In" (86:15). Null leaves the line off — only the carrier frame
+  /// draws it, and a link that silently went nowhere would be worse than none.
+  final VoidCallback? onLogIn;
 
   @override
   Widget build(BuildContext context) {
@@ -1949,6 +2111,16 @@ class _Intro extends StatelessWidget {
                 (Icons.inventory_2_outlined, t.authMerchantBenefitManage),
                 (Icons.bar_chart, t.authMerchantBenefitAnalytics),
               ];
+
+    // The carrier frame gives each benefit a one-line description under its title; the rider and
+    // merchant frames do not.
+    final List<String> benefitBlurbs = isCarrier
+        ? <String>[
+            t.carrBenefitOrdersBlurb,
+            t.carrBenefitTrackingBlurb,
+            t.carrBenefitPayoutsBlurb,
+          ]
+        : const <String>[];
 
     final List<(IconData, String)> requirements = isRider
         ? <(IconData, String)>[
@@ -1983,7 +2155,7 @@ class _Intro extends StatelessWidget {
                   ),
                   Expanded(
                     child: Center(
-                      child: isRider
+                      child: isRider || isCarrier
                           ? Container(
                               width: 40,
                               height: 40,
@@ -1992,8 +2164,12 @@ class _Intro extends StatelessWidget {
                                 color: DeliveryColors.brand,
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: const Icon(Icons.shopping_bag_outlined,
-                                  size: 22, color: DeliveryColors.white),
+                              child: Icon(
+                                  isCarrier
+                                      ? Icons.local_shipping_outlined
+                                      : Icons.shopping_bag_outlined,
+                                  size: 22,
+                                  color: DeliveryColors.white),
                             )
                           : Text(
                               t.authMerchantSignUp,
@@ -2015,6 +2191,31 @@ class _Intro extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(DeliverySpacing.lg),
                 children: <Widget>[
+                  // The frame's dark FOR CARRIERS pill, identifying the flow above the headline.
+                  if (isCarrier) ...<Widget>[
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Container(
+                        padding: const EdgeInsetsDirectional.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: DeliveryColors.ink,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          t.carrForCarriers.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: DeliveryColors.white,
+                            letterSpacing: 1,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.md),
+                  ],
                   Text(
                     isCarrier ? t.carrPartnerTitle : (isRider ? t.authRiderIntroTitle : t.authMerchantIntroTitle),
                     style: const TextStyle(
@@ -2035,73 +2236,92 @@ class _Intro extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
-                  Container(
-                    padding: const EdgeInsets.all(DeliverySpacing.md),
-                    decoration: BoxDecoration(
-                      color: DeliveryColors.brandSoft,
-                      borderRadius:
-                          BorderRadius.circular(DeliveryRadius.lg),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        if (!isRider) ...<Widget>[
-                          Text(
-                            t.authWhatYouGet,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: DeliveryColors.brand,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                        ],
-                        for (int i = 0; i < benefits.length; i++) ...<Widget>[
-                          if (i > 0)
-                            const SizedBox(
-                                height: DeliverySpacing.md - DeliverySpacing.xs),
-                          _IntroRow(
-                            icon: benefits[i].$1,
-                            label: benefits[i].$2,
-                            tileColor: DeliveryColors.brand,
-                            iconColor: DeliveryColors.white,
-                            bold: isRider,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
-                  Text(
-                    isRider ? t.authWhatYouNeedToSignUp : t.authWhatYouNeed,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: DeliveryColors.ink,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                  for (int i = 0; i < requirements.length; i++) ...<Widget>[
-                    if (i > 0)
-                      const SizedBox(
-                          height: DeliverySpacing.md - DeliverySpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: DeliveryColors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: DeliveryColors.brandSoft),
-                      ),
-                      child: _IntroRow(
-                        icon: requirements[i].$1,
-                        label: requirements[i].$2,
+                  // The carrier frame lays its three benefits straight on the white page, each a
+                  // soft-pink tile with a red icon and a one-line description; the rider and
+                  // merchant frames keep the pink card.
+                  if (isCarrier)
+                    for (int i = 0; i < benefits.length; i++) ...<Widget>[
+                      if (i > 0) const SizedBox(height: DeliverySpacing.md),
+                      _IntroRow(
+                        icon: benefits[i].$1,
+                        label: benefits[i].$2,
+                        blurb: benefitBlurbs[i],
                         tileColor: DeliveryColors.brandSoft,
                         iconColor: DeliveryColors.brand,
                         bold: true,
                       ),
+                    ]
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(DeliverySpacing.md),
+                      decoration: BoxDecoration(
+                        color: DeliveryColors.brandSoft,
+                        borderRadius:
+                            BorderRadius.circular(DeliveryRadius.lg),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          if (!isRider) ...<Widget>[
+                            Text(
+                              t.authWhatYouGet,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: DeliveryColors.brand,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                          ],
+                          for (int i = 0; i < benefits.length; i++) ...<Widget>[
+                            if (i > 0)
+                              const SizedBox(
+                                  height: DeliverySpacing.md - DeliverySpacing.xs),
+                            _IntroRow(
+                              icon: benefits[i].$1,
+                              label: benefits[i].$2,
+                              tileColor: DeliveryColors.brand,
+                              iconColor: DeliveryColors.white,
+                              bold: isRider,
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
+                  // No "what you'll need" on the carrier frame — it goes straight to the CTA.
+                  if (!isCarrier) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                    Text(
+                      isRider ? t.authWhatYouNeedToSignUp : t.authWhatYouNeed,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                    for (int i = 0; i < requirements.length; i++) ...<Widget>[
+                      if (i > 0)
+                        const SizedBox(
+                            height: DeliverySpacing.md - DeliverySpacing.xs),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: DeliveryColors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: DeliveryColors.brandSoft),
+                        ),
+                        child: _IntroRow(
+                          icon: requirements[i].$1,
+                          label: requirements[i].$2,
+                          tileColor: DeliveryColors.brandSoft,
+                          iconColor: DeliveryColors.brand,
+                          bold: true,
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -2118,10 +2338,26 @@ class _Intro extends StatelessWidget {
                 border: Border(
                     top: BorderSide(color: DeliveryColors.brandSoft)),
               ),
-              child: AuthPrimaryButton(
-                label: isCarrier ? t.carrRegisterCompany : t.authGetStarted,
-                height: 56,
-                onPressed: onStart,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  AuthPrimaryButton(
+                    label: isCarrier ? t.carrRegisterCompany : t.authGetStarted,
+                    height: 56,
+                    onPressed: onStart,
+                  ),
+                  if (isCarrier && onLogIn != null) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                    Center(
+                      child: AuthFooterLink(
+                        question: t.carrAlreadyPartner,
+                        action: t.authLogIn,
+                        onTap: onLogIn,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -2131,11 +2367,13 @@ class _Intro extends StatelessWidget {
   }
 }
 
-/// One line of the intro's benefit or requirement lists: a small tinted tile, then the label.
+/// One line of the intro's benefit or requirement lists: a small tinted tile, then the label —
+/// and, on the carrier frame, a muted one-line description under it.
 class _IntroRow extends StatelessWidget {
   const _IntroRow({
     required this.icon,
     required this.label,
+    this.blurb,
     required this.tileColor,
     required this.iconColor,
     required this.bold,
@@ -2143,14 +2381,19 @@ class _IntroRow extends StatelessWidget {
 
   final IconData icon;
   final String label;
+  final String? blurb;
   final Color tileColor;
   final Color iconColor;
   final bool bold;
 
   @override
   Widget build(BuildContext context) {
-    final double tile = bold ? 28 : 24;
+    // The two-line form gets the frame's larger rounded-square tile; the one-liner keeps its dot.
+    final double tile = blurb != null ? 44 : (bold ? 28 : 24);
     return Row(
+      crossAxisAlignment: blurb != null
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
       children: <Widget>[
         Container(
           width: tile,
@@ -2158,21 +2401,47 @@ class _IntroRow extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: tileColor,
-            borderRadius: BorderRadius.circular(tile / 2),
+            borderRadius:
+                BorderRadius.circular(blurb != null ? 14 : tile / 2),
           ),
-          child: Icon(icon, size: bold ? 16 : 14, color: iconColor),
+          child: Icon(icon,
+              size: blurb != null ? 20 : (bold ? 16 : 14), color: iconColor),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-              color: DeliveryColors.ink,
-              height: 1.5,
-            ),
-          ),
+          child: blurb == null
+              ? Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+                    color: DeliveryColors.ink,
+                    height: 1.5,
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      blurb!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: DeliveryColors.muted,
+                        height: 18 / 13,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ],
     );

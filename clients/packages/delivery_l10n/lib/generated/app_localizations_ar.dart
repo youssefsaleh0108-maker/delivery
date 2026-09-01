@@ -3310,7 +3310,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get carrBenefitPayouts => 'دفعات أسبوعية بالدولار النقدي';
 
   @override
-  String get carrBenefitPayoutsBlurb => 'تسويات موثوقة كل أسبوع.';
+  String get carrBenefitPayoutsBlurb => 'تكاملات مالية موثوقة مع تسويات فورية.';
 
   @override
   String get carrRegisterCompany => 'سجّل شركتك';
@@ -3385,16 +3385,16 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get carrCapColdChain => 'سلسلة تبريد بمولّد';
 
   @override
-  String get carrCapFood => 'توصيل طعام';
+  String get carrCapFood => 'دعم توصيل الطعام';
 
   @override
-  String get carrCapGrocery => 'توصيل بقالة';
+  String get carrCapGrocery => 'دعم توصيل البقالة';
 
   @override
-  String get carrCapPharmacy => 'توصيل صيدلية';
+  String get carrCapPharmacy => 'دعم توصيل الصيدلية';
 
   @override
-  String get carrCapParcel => 'توصيل طرود';
+  String get carrCapParcel => 'دعم توصيل الطرود';
 
   @override
   String get carrCapButler => 'خدمات بتلر مخصصة';
@@ -3490,6 +3490,260 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get carrOrdersDelivered => 'طلبات موصلة';
+
+  @override
+  String get carrAlreadyPartner => 'شريك معنا من قبل؟';
+
+  @override
+  String get carrBusinessEmail => 'البريد الإلكتروني للشركة';
+
+  @override
+  String get carrBusinessEmailHint => 'partner@company.com';
+
+  @override
+  String get carrContactPersonHint => 'الاسم الكامل لممثل الشركة';
+
+  @override
+  String get carrPhoneHint => '+961 70 123 456';
+
+  @override
+  String get carrDocsTitle => 'رفع مستندات التحقق';
+
+  @override
+  String get carrVerificationNote =>
+      'تُراجع المستندات من قبل مكتب عمليات YouDrop. يكتمل التحقق عادةً خلال 24–48 ساعة.';
+
+  @override
+  String get carrPayoutMethod => 'طريقة الدفع المفضلة';
+
+  @override
+  String get carrPayoutCash => 'دولار نقدي (استلام من المكتب)';
+
+  @override
+  String get carrPayoutCashBlurb => 'بدون رسوم خدمة، تسوية نقدية أسبوعية';
+
+  @override
+  String get carrPayoutWhish => 'تحويل Whish Money';
+
+  @override
+  String get carrPayoutWhishBlurb => 'دفع عبر المحفظة اللبنانية المعتادة';
+
+  @override
+  String get carrPayoutOmt => 'سحب نقدي OMT';
+
+  @override
+  String get carrPayoutOmtBlurb => 'الدفع مباشرةً عبر شبكة OMT';
+
+  @override
+  String get carrPayoutBank => 'حوالة مصرفية بالدولار';
+
+  @override
+  String get carrPayoutBankBlurb => 'حوالة دولار نقدي إلى حساب مصرفي لبناني';
+
+  @override
+  String carrFlatFee(int rate) {
+    return '$rate% رسم ثابت';
+  }
+
+  @override
+  String get carrSubmittedTitle => 'تم إرسال الطلب!';
+
+  @override
+  String carrAppId(String reference) {
+    return 'رقم الطلب: $reference';
+  }
+
+  @override
+  String get carrApplicationStatus => 'حالة الطلب';
+
+  @override
+  String get carrStageReceived => 'استلمنا الطلب';
+
+  @override
+  String carrStageReceivedSub(String date) {
+    return 'أُرسل في $date';
+  }
+
+  @override
+  String get carrStageDocs => 'التحقق من المستندات';
+
+  @override
+  String get carrStageDocsSub => 'قيد المراجعة (خلال 24–48 ساعة)';
+
+  @override
+  String get carrStageInspection => 'معاينة الأسطول';
+
+  @override
+  String get carrStageInspectionSub => 'تُحدد في مرأب مركباتكم';
+
+  @override
+  String get carrStageActivation => 'تفعيل الحساب';
+
+  @override
+  String get carrStageActivationSub => 'الوصول إلى منصة توزيع YouDrop للناقلين';
+
+  @override
+  String get carrPendingSupportBlurb =>
+      'أرسلنا لك بريداً للتأكيد. تحتاج مساعدة عاجلة بخصوص طلبك؟';
+
+  @override
+  String get carrChatSupport => 'تحدث مع دعم الشركاء';
+
+  @override
+  String get carrReturnHome => 'العودة إلى الرئيسية';
+
+  @override
+  String get carrBadgeLive => 'مباشر';
+
+  @override
+  String get carrBadgeWaiting => 'بالانتظار';
+
+  @override
+  String get carrBadgeFleet => 'أسطول';
+
+  @override
+  String get carrBadgeUsd => 'دولار';
+
+  @override
+  String get carrTodayRevenue => 'إيراد اليوم';
+
+  @override
+  String get carrCoverageMapBlurb =>
+      'الدوائر التي يعمل فيها سائقوكم. اضغط للتعديل.';
+
+  @override
+  String get carrIncoming => 'واردة';
+
+  @override
+  String get carrCompleted => 'مكتملة';
+
+  @override
+  String get carrUnassigned => 'طلب غير مُسند';
+
+  @override
+  String get carrWaitingDispatch => 'بانتظار الإسناد';
+
+  @override
+  String carrShowingRiders(int count) {
+    return '$count سائقاً في الأسطول';
+  }
+
+  @override
+  String get carrNoRiders =>
+      'لا سائقين في الأسطول بعد — تُسند المنصة السائقين بعد التسجيل.';
+
+  @override
+  String carrDelivering(String id) {
+    return 'يوصل #$id';
+  }
+
+  @override
+  String get carrAvailable => 'متاح';
+
+  @override
+  String get carrWeeklySummary => 'ملخص الأسبوع';
+
+  @override
+  String get carrDeliveriesBreakdown => 'تفصيل التوصيلات';
+
+  @override
+  String carrCommissionPct(int rate) {
+    return 'عمولة YouDrop ($rate%)';
+  }
+
+  @override
+  String get carrNextPayout => 'الدفعة القادمة';
+
+  @override
+  String get carrPickupFrom => 'الاستلام من';
+
+  @override
+  String get carrDeliverTo => 'التوصيل إلى';
+
+  @override
+  String get carrPaymentCommission => 'الدفع والعمولة';
+
+  @override
+  String get carrDeliveryFee => 'إجمالي التوصيل (دولار نقدي)';
+
+  @override
+  String carrLbpRate(String rate) {
+    return 'سعر التحويل بالليرة ($rate)';
+  }
+
+  @override
+  String carrPlatformFee(int rate) {
+    return 'رسوم منصة YouDrop ($rate%)';
+  }
+
+  @override
+  String get carrStepReceived => 'استُلم';
+
+  @override
+  String get carrStepAssigned => 'أُسند';
+
+  @override
+  String get carrStepPickingUp => 'قيد الاستلام';
+
+  @override
+  String get carrStepEnRoute => 'في الطريق';
+
+  @override
+  String get carrStepDelivered => 'وصل';
+
+  @override
+  String get carrOperations => 'العمليات';
+
+  @override
+  String get carrPayments => 'الدفعات';
+
+  @override
+  String get carrAccountSection => 'الحساب';
+
+  @override
+  String get carrHelpSupport => 'المساعدة والدعم';
+
+  @override
+  String carrVersionCaption(String version) {
+    return 'YouDrop للناقلين، إصدار $version';
+  }
+
+  @override
+  String get carrCoverageZones => 'مناطق التغطية';
+
+  @override
+  String get carrAddZone => 'أضف منطقة';
+
+  @override
+  String get carrZoneName => 'اسم المنطقة';
+
+  @override
+  String get carrZoneNameHint => 'مثلاً: وسط بيروت';
+
+  @override
+  String carrZoneRadiusKm(String km) {
+    return 'نصف القطر: $km كلم';
+  }
+
+  @override
+  String get carrZoneActive => 'فعالة';
+
+  @override
+  String get carrZonePaused => 'موقوفة';
+
+  @override
+  String carrDeleteZoneAsk(String name) {
+    return 'حذف $name؟ يبقى السائقون يعملون في بقية المناطق.';
+  }
+
+  @override
+  String get carrNoZones => 'لا مناطق بعد. ارسم أول دائرة يعمل فيها سائقوكم.';
+
+  @override
+  String get carrEditZone => 'تعديل المنطقة';
+
+  @override
+  String get carrNewZone => 'منطقة جديدة';
 
   @override
   String get custVerifiedLocal => 'محل موثوق';
@@ -4700,6 +4954,15 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get docCommercialRegistration => 'السجل التجاري';
+
+  @override
+  String get docTradeLicence => 'رخصة تجارية (مصدّقة)';
+
+  @override
+  String get docFleetInsurance => 'شهادة تأمين الأسطول';
+
+  @override
+  String get docFleetRegistration => 'تسجيلات السائقين والأسطول';
 
   @override
   String get docWaitingReview => 'بانتظار المراجعة';

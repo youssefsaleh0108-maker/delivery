@@ -77,6 +77,53 @@ class DeliveryProviderApi {
   Future<DeliveryProviderInfo> resumeMyCompany() =>
       _post('/api/delivery-providers/my-company/resume');
 
+  /// The circles this company works (Figma 88:107). Oldest first, as the server keeps them.
+  Future<List<CoverageZone>> myZones() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/delivery-providers/my-company/zones');
+    return (response.data as List<dynamic>)
+        .map((dynamic j) => CoverageZone.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<CoverageZone> drawZone({
+    required String name,
+    required double latitude,
+    required double longitude,
+    required int radiusMetres,
+    bool active = true,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/delivery-providers/my-company/zones',
+      data: <String, dynamic>{
+        'name': name,
+        'latitude': latitude,
+        'longitude': longitude,
+        'radiusMetres': radiusMetres,
+        'active': active,
+      },
+    );
+    return CoverageZone.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// A full replace: name, pin, radius and the on/off switch travel together.
+  Future<CoverageZone> redrawZone(CoverageZone zone) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/delivery-providers/my-company/zones/${zone.id}',
+      data: <String, dynamic>{
+        'name': zone.name,
+        'latitude': zone.latitude,
+        'longitude': zone.longitude,
+        'radiusMetres': zone.radiusMetres,
+        'active': zone.active,
+      },
+    );
+    return CoverageZone.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<void> eraseZone(String zoneId) =>
+      _dio.delete<void>('/api/delivery-providers/my-company/zones/$zoneId');
+
   /// The whole register's scores. BACKOFFICE only.
   Future<List<CarrierScore>> scores() async {
     final Response<dynamic> response =

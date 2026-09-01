@@ -27,16 +27,30 @@ import 'one_time_code.dart';
 /// `DocumentKind.expectedFor` — the one list the wizard, the reviewer's checklist and the pending
 /// screen all agree on. "Expected", not "must": a missing document blocks nothing, it is simply
 /// shown as outstanding.
-List<ApplicantDocumentKind> expectedDocumentKinds({required bool rider}) => rider
-    ? const <ApplicantDocumentKind>[
-        ApplicantDocumentKind.nationalId,
-        ApplicantDocumentKind.drivingLicence,
-        ApplicantDocumentKind.vehicleRegistration,
-      ]
-    : const <ApplicantDocumentKind>[
-        ApplicantDocumentKind.nationalId,
-        ApplicantDocumentKind.commercialRegistration,
-      ];
+List<ApplicantDocumentKind> expectedDocumentKinds(
+    {required bool rider, bool carrier = false}) {
+  if (rider) {
+    return const <ApplicantDocumentKind>[
+      ApplicantDocumentKind.nationalId,
+      ApplicantDocumentKind.drivingLicence,
+      ApplicantDocumentKind.vehicleRegistration,
+    ];
+  }
+  // A delivery company files company papers, not personal ones (86:241): no national ID, and the
+  // fleet's insurance and registrations beside the trade licence and CR.
+  if (carrier) {
+    return const <ApplicantDocumentKind>[
+      ApplicantDocumentKind.tradeLicence,
+      ApplicantDocumentKind.commercialRegistration,
+      ApplicantDocumentKind.fleetInsurance,
+      ApplicantDocumentKind.fleetRegistration,
+    ];
+  }
+  return const <ApplicantDocumentKind>[
+    ApplicantDocumentKind.nationalId,
+    ApplicantDocumentKind.commercialRegistration,
+  ];
+}
 
 /// The kind's name in the reader's language, falling back to the wire string for a kind this build
 /// does not know rather than inventing one.
@@ -46,6 +60,9 @@ String documentKindLabel(DeliveryStrings t, ApplicantDocumentKind? kind, String 
       ApplicantDocumentKind.drivingLicence => t.docDrivingLicence,
       ApplicantDocumentKind.vehicleRegistration => t.docVehicleRegistration,
       ApplicantDocumentKind.commercialRegistration => t.docCommercialRegistration,
+      ApplicantDocumentKind.tradeLicence => t.docTradeLicence,
+      ApplicantDocumentKind.fleetInsurance => t.docFleetInsurance,
+      ApplicantDocumentKind.fleetRegistration => t.docFleetRegistration,
       null => wire,
     };
 
@@ -54,6 +71,9 @@ IconData _documentKindIcon(ApplicantDocumentKind kind) => switch (kind) {
       ApplicantDocumentKind.drivingLicence => Icons.card_membership_outlined,
       ApplicantDocumentKind.vehicleRegistration => Icons.two_wheeler_outlined,
       ApplicantDocumentKind.commercialRegistration => Icons.storefront_outlined,
+      ApplicantDocumentKind.tradeLicence => Icons.description_outlined,
+      ApplicantDocumentKind.fleetInsurance => Icons.verified_user_outlined,
+      ApplicantDocumentKind.fleetRegistration => Icons.local_shipping_outlined,
     };
 
 /// A file somebody picked but that has not reached the server yet.

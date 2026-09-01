@@ -262,3 +262,49 @@ class CarrierEarnings {
         windowDays: (json['windowDays'] as num?)?.toInt() ?? 30,
       );
 }
+
+/// One circle of a carrier's working area, as the company draws it (Figma 88:107).
+class CoverageZone {
+  const CoverageZone({
+    required this.id,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    required this.radiusMetres,
+    required this.active,
+  });
+
+  final String id;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final int radiusMetres;
+
+  /// Off means "not tonight", not "gone" — a paused zone keeps its circle for the morning.
+  final bool active;
+
+  factory CoverageZone.fromJson(Map<String, dynamic> json) => CoverageZone(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? '',
+        latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+        longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+        radiusMetres: (json['radiusMetres'] as num?)?.toInt() ?? 0,
+        active: json['active'] as bool? ?? true,
+      );
+
+  CoverageZone copyWith({
+    String? name,
+    double? latitude,
+    double? longitude,
+    int? radiusMetres,
+    bool? active,
+  }) =>
+      CoverageZone(
+        id: id,
+        name: name ?? this.name,
+        latitude: latitude ?? this.latitude,
+        longitude: longitude ?? this.longitude,
+        radiusMetres: radiusMetres ?? this.radiusMetres,
+        active: active ?? this.active,
+      );
+}
