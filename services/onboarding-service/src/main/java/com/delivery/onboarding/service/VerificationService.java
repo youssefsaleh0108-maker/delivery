@@ -67,6 +67,7 @@ public class VerificationService {
     private final PlatformClient platform;
     private final Duration resendCooldown;
     private final int dailyCap;
+    private final int resetDailyCap;
     private final String defaultDialCode;
 
     public VerificationService(
@@ -74,11 +75,13 @@ public class VerificationService {
             PlatformClient platform,
             @Value("${delivery.onboarding.verification.resend-cooldown:60s}") Duration resendCooldown,
             @Value("${delivery.onboarding.verification.daily-cap:8}") int dailyCap,
+            @Value("${delivery.onboarding.verification.reset-daily-cap:3}") int resetDailyCap,
             @Value("${delivery.onboarding.verification.default-dial-code:+961}") String defaultDialCode) {
         this.verifications = verifications;
         this.platform = platform;
         this.resendCooldown = resendCooldown;
         this.dailyCap = dailyCap;
+        this.resetDailyCap = resetDailyCap;
         String code = defaultDialCode == null ? "" : defaultDialCode.trim();
         if (!DIAL_CODE.matcher(code).matches()) {
             // Refused at startup rather than at the first signup. A bad value here makes every
@@ -165,6 +168,19 @@ public class VerificationService {
         if (today >= dailyCap) {
             throw new TooManyRequestsException(
                     "That address has been sent too many codes today. Try again tomorrow.");
+        }
+
+        // Password resets carry their own, tighter daily budget beside the shared one. Counted
+        // and refused for unknown addresses exactly like known ones — see requestPasswordReset:
+        // a cap that only fired on real accounts would itself be an account-existence oracle.
+        if (purpose == Purpose.PASSWORD_RESET) {
+            long resetsToday = verifications.countByDestinationAndPurposeAndCreatedAtAfter(
+                    destination, Purpose.PASSWORD_RESET, now.minus(Duration.ofDays(1)));
+            if (resetsToday >= resetDailyCap) {
+                throw new TooManyRequestsException(
+                        "That address has asked to reset its passcode too many times today."
+                                + " Try again tomorrow.");
+            }
         }
 
         ContactVerification.Issued issued = ContactVerification.issue(channel, destination, purpose);

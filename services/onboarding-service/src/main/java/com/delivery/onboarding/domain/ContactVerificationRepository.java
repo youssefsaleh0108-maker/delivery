@@ -36,4 +36,16 @@ public interface ContactVerificationRepository extends JpaRepository<ContactVeri
      * whoever owns the address being hammered.
      */
     long countByDestinationAndCreatedAtAfter(String destination, Instant since);
+
+    /**
+     * How many codes this address has been sent recently for one purpose.
+     *
+     * <p>Password resets get their own, tighter budget on top of the shared one above. A reset
+     * request is rarer and riskier than a sign-up resend — a person genuinely locked out asks two
+     * or three times and then contacts support, while a stream of them is somebody probing the
+     * account — so the reset cap can sit well below the shared cap without ever refusing a real
+     * person.
+     */
+    long countByDestinationAndPurposeAndCreatedAtAfter(
+            String destination, ContactVerification.Purpose purpose, Instant since);
 }

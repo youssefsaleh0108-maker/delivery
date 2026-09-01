@@ -195,6 +195,9 @@ delivery:
       # And the ceiling for a whole day. Past this, an address is being used as a target rather
       # than being verified.
       daily-cap: ${VERIFICATION_DAILY_CAP:8}
+      # Password resets alone sit under a tighter budget inside that ceiling: a person locked out
+      # asks a couple of times and then calls support; a stream of resets is probing.
+      reset-daily-cap: ${VERIFICATION_RESET_DAILY_CAP:3}
 
     documents:
       # What the wizard's documents step accepts. Narrower than the storage list above is allowed;

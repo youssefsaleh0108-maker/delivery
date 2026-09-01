@@ -54,7 +54,7 @@ class PasswordResetServiceTest {
         platform = mock(PlatformClient.class);
         keycloak = mock(KeycloakAdminClient.class);
         verificationService = new VerificationService(
-                verifications, platform, Duration.ofSeconds(60), 8, "+961");
+                verifications, platform, Duration.ofSeconds(60), 8, 3, "+961");
         service = new PasswordResetService(verificationService, keycloak);
 
         when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))
@@ -212,6 +212,35 @@ class PasswordResetServiceTest {
                     .hasMessageContaining("too many codes today");
 
             verify(keycloak, never()).findUserIdByEmail(anyString());
+        }
+
+        /**
+         * Resets carry their own budget of three a day, refused even when the shared cap still
+         * has room — and, like every other limit here, before the account lookup, so hitting it
+         * reveals nothing about whether the address has an account.
+         */
+        @Test
+        void the_third_reset_of_the_day_is_the_last() {
+            when(verifications.countByDestinationAndCreatedAtAfter(eq(EMAIL), any()))
+                    .thenReturn(3L);
+            when(verifications.countByDestinationAndPurposeAndCreatedAtAfter(
+                    eq(EMAIL), eq(Purpose.PASSWORD_RESET), any())).thenReturn(3L);
+
+            assertThatThrownBy(() -> service.request(EMAIL))
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .hasMessageContaining("reset its passcode too many times");
+
+            verify(keycloak, never()).findUserIdByEmail(anyString());
+        }
+
+        /** Two resets so far leaves room for a third: the cap is three sent, not three asked. */
+        @Test
+        void a_second_or_third_reset_still_goes_through() {
+            when(verifications.countByDestinationAndPurposeAndCreatedAtAfter(
+                    eq(EMAIL), eq(Purpose.PASSWORD_RESET), any())).thenReturn(2L);
+            when(keycloak.findUserIdByEmail(EMAIL)).thenReturn(Optional.of(USER_REF));
+
+            assertThatCode(() -> service.request(EMAIL)).doesNotThrowAnyException();
         }
 
         private void setCreatedAt(ContactVerification verification, java.time.Instant at) {

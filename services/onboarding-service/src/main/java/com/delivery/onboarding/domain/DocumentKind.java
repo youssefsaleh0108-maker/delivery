@@ -30,13 +30,27 @@ public enum DocumentKind {
     VEHICLE_REGISTRATION,
 
     /** A registered business: a shop, or a delivery company. */
-    COMMERCIAL_REGISTRATION;
+    COMMERCIAL_REGISTRATION,
+
+    /** A delivery company's certified trade licence (Figma 86:241). */
+    TRADE_LICENCE,
+
+    /** Liability coverage for a fleet on the road. The one paper an ops desk will not waive. */
+    FLEET_INSURANCE,
+
+    /** The registration papers for the fleet's vehicles, bundled as one upload. */
+    FLEET_REGISTRATION;
 
     private static final Set<DocumentKind> MERCHANT_DOCUMENTS =
             EnumSet.of(NATIONAL_ID, COMMERCIAL_REGISTRATION);
 
+    /**
+     * The carrier set follows the 86:241 frame: company papers, not personal ones. No NATIONAL_ID
+     * here — the applicant signs as a company, and the person's identity is the contact details.
+     */
     private static final Set<DocumentKind> CARRIER_DOCUMENTS =
-            EnumSet.of(NATIONAL_ID, COMMERCIAL_REGISTRATION);
+            EnumSet.of(TRADE_LICENCE, COMMERCIAL_REGISTRATION, FLEET_INSURANCE,
+                    FLEET_REGISTRATION);
 
     private static final Set<DocumentKind> RIDER_DOCUMENTS =
             EnumSet.of(NATIONAL_ID, DRIVING_LICENCE, VEHICLE_REGISTRATION);

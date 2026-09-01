@@ -46,7 +46,7 @@ class VerificationServiceTest {
     void setUp() {
         verifications = mock(ContactVerificationRepository.class);
         platform = mock(PlatformClient.class);
-        service = new VerificationService(verifications, platform, Duration.ofSeconds(60), 8, "+961");
+        service = new VerificationService(verifications, platform, Duration.ofSeconds(60), 8, 3, "+961");
 
         when(verifications.findFirstByChannelAndDestinationOrderByCreatedAtDesc(any(), anyString()))
                 .thenReturn(Optional.empty());
@@ -149,7 +149,7 @@ class VerificationServiceTest {
         @Test
         void the_default_dialling_code_is_configurable() {
             VerificationService saudi = new VerificationService(
-                    verifications, platform, Duration.ofSeconds(60), 8, "+966");
+                    verifications, platform, Duration.ofSeconds(60), 8, 3, "+966");
             assertThat(saudi.normalise(Channel.PHONE, "512345678")).isEqualTo("+966512345678");
             assertThat(saudi.normalise(Channel.PHONE, "0512345678")).isEqualTo("+966512345678");
             // A number that already says which country it is stays in that country.
@@ -164,7 +164,7 @@ class VerificationServiceTest {
         void an_unusable_default_dialling_code_refuses_to_start() {
             for (String bad : java.util.List.of("961", "+", "", "lebanon", "+0")) {
                 assertThatThrownBy(() -> new VerificationService(
-                        verifications, platform, Duration.ofSeconds(60), 8, bad))
+                        verifications, platform, Duration.ofSeconds(60), 8, 3, bad))
                         .as("dial code \"%s\"", bad)
                         .isInstanceOf(IllegalStateException.class)
                         .hasMessageContaining("default-dial-code");
