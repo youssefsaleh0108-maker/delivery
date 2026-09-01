@@ -631,6 +631,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   // arrives without a kind.
                   onJoinAsRider: () => _applyAs(PartnerKind.rider),
                   onJoinAsMerchant: () => _applyAs(PartnerKind.merchant),
+                  onJoinAsCarrier: () => _applyAs(PartnerKind.carrier),
                 );
             }
           }

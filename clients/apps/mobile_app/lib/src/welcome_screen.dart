@@ -29,6 +29,7 @@ class WelcomeScreen extends StatefulWidget {
     this.onBack,
     this.onJoinAsRider,
     this.onJoinAsMerchant,
+    this.onJoinAsCarrier,
     this.onGoogle,
     this.busy = false,
   });
@@ -51,6 +52,11 @@ class WelcomeScreen extends StatefulWidget {
 
   /// Straight into the merchant intro, skipping the fork. Null falls back to [onJoinAsPartner].
   final VoidCallback? onJoinAsMerchant;
+
+  /// Straight into the carrier wizard's pitch. Null leaves the card off the screen entirely
+  /// rather than falling back to the fork: a company card that opened a "rider or merchant?"
+  /// question would promise something the path behind it cannot keep.
+  final VoidCallback? onJoinAsCarrier;
 
   /// Opens the browser on Google, or null when Google sign-in is not configured. The redesign moves
   /// social sign-in onto the login screen, so this screen no longer draws a Google button; the hook
@@ -78,6 +84,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         (widget.onJoinAsRider ?? widget.onJoinAsPartner)();
       case 2:
         (widget.onJoinAsMerchant ?? widget.onJoinAsPartner)();
+      case 3:
+        widget.onJoinAsCarrier?.call();
     }
   }
 
@@ -182,6 +190,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       selected: _selected == 2,
                       onTap: () => setState(() => _selected = 2),
                     ),
+                    if (widget.onJoinAsCarrier != null) ...<Widget>[
+                      const SizedBox(
+                          height: DeliverySpacing.md - DeliverySpacing.xs),
+                      _RoleOption(
+                        icon: Icons.local_shipping_outlined,
+                        title: t.carrChoiceCard,
+                        subtitle: t.carrChoiceCardBlurb,
+                        selected: _selected == 3,
+                        onTap: () => setState(() => _selected = 3),
+                      ),
+                    ],
                     const SizedBox(height: DeliverySpacing.lg),
                     const Spacer(),
                     AuthPrimaryButton(
