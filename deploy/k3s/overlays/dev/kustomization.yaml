@@ -8,19 +8,18 @@ resources:
 - ../../base
 - ingress.yaml
 
-configMapGenerator:
-- name: platform-env
-  literals:
-  - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
-  - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
-  - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
-  - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://app-dev.youdrop.shop,http://localhost:*,http://127.0.0.1:*
   # DEV SENDS REAL MAIL through the operator's relay — these override platform-common's
   # mailpit sink (envFrom: the later source wins). qa deliberately keeps the sink: a test
   # environment that can mail whatever address somebody typed is the failure mode.
   # SMTP_PASSWORD is the Gmail app password, living only in platform-secrets on the box.
   # SMS_TEST_INBOX must be a mailbox the operator owns once the relay is real — every
   # simulated SMS becomes an actual email to it.
+configMapGenerator:
+- literals:
+  - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
+  - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
+  - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
+  - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://app-dev.youdrop.shop,http://localhost:*,http://127.0.0.1:*
   - SMTP_HOST=smtp.office365.com
   - SMTP_PORT=587
   - SMTP_USER=noreply@youdrop.shop
@@ -28,6 +27,7 @@ configMapGenerator:
   - SMTP_STARTTLS=true
   - EMAIL_FROM=noreply@youdrop.shop
   - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+  name: platform-env
 
 generatorOptions:
   disableNameSuffixHash: true
@@ -60,7 +60,8 @@ images:
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newTag: sha-d8612ab55c370d21ac8748ad14413652dac51df2
 - name: ghcr.io/youssefsaleh0108-maker/product-service
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
