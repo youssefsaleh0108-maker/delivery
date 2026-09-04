@@ -190,7 +190,8 @@
       "redirectUris": [
         "http://localhost:5010/*",
         "http://127.0.0.1:5010/*",
-        "https://portal-dev.youdrop.shop/*"
+        "https://portal-dev.youdrop.shop/*",
+        "https://portal-qa.youdrop.shop/*"
       ],
       "webOrigins": [
         "+"
