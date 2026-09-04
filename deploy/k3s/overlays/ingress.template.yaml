@@ -1,0 +1,212 @@
+# The edge, translated from infra/traefik/dynamic/routes.yml. One difference is load-bearing:
+# in compose the API routers matched by path alone; here every rule carries this environment's
+# hostname, because dev and qa share the one Traefik.
+#
+# GENERATED per overlay from overlays/ingress.template.yaml — edit the template, then run
+# scripts/render-overlays.sh to regenerate both environments in lockstep.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: ops-auth
+spec:
+  basicAuth:
+    # The CRD takes a Secret, not inline users; gen-secrets.sh creates ops-auth-users with the
+    # same ops login the compose stack used.
+    secret: ops-auth-users
+---
+# RabbitMQ and MinIO are mounted under a path but believe they own the root of their origin.
+# MAILPIT IS NOT IN THIS LIST, deliberately — it is told its webroot (MP_WEBROOT) instead.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-ops-prefix
+spec:
+  stripPrefix:
+    prefixes:
+      - /rabbitmq
+      - /minio
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: platform-cors
+spec:
+  headers:
+    accessControlAllowOriginListRegex:
+      - '^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$'
+      - '^https://(www\.)?youdrop\.shop$'
+      - '^https://[a-z0-9-]+\.youdrop\.shop$'
+    accessControlAllowMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+    accessControlAllowHeaders: ["*"]
+    accessControlExposeHeaders: [X-Correlation-Id]
+    accessControlAllowCredentials: true
+    accessControlMaxAge: 3600
+    addVaryHeader: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: platform-rate-limit
+spec:
+  rateLimit:
+    average: 20
+    burst: 40
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-identity-headers
+spec:
+  headers:
+    customRequestHeaders:
+      X-User-Id: ""
+      X-User-Roles: ""
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+spec:
+  headers:
+    contentTypeNosniff: true
+    frameDeny: true
+    referrerPolicy: no-referrer
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/products`) || PathPrefix(`/api/categories`) || PathPrefix(`/api/stores`) || PathPrefix(`/api/banners`) || PathPrefix(`/api/market`) || PathPrefix(`/api/delivery-zones`) || PathPrefix(`/api/admin/thumbnails`) || PathPrefix(`/api/geocoding`))
+      services: [{ name: product-service, port: 8103 }]
+      middlewares: &api-mw
+        - { name: platform-cors }
+        - { name: platform-rate-limit }
+        - { name: strip-identity-headers }
+        - { name: security-headers }
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/orders`) || PathPrefix(`/api/butler`) || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`) || PathPrefix(`/api/partner-keys`) || PathPrefix(`/api/partner`) || PathPrefix(`/api/promotions`))
+      services: [{ name: order-manager, port: 8101 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/tracking`) || PathPrefix(`/ws/tracking`))
+      services: [{ name: order-tracking, port: 8102 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/notifications`) || PathPrefix(`/ws/notifications`) || PathPrefix(`/api/chat`))
+      services: [{ name: app-notification, port: 8108 }]
+      middlewares: *api-mw
+    # Notifications Manager owns the direct-send endpoints beneath the in-app prefix; explicit
+    # priority so an edit to either rule cannot silently shadow it again.
+    - kind: Rule
+      match: Host(`__API_HOST__`) && PathPrefix(`/api/notifications/direct`)
+      priority: 100
+      services: [{ name: notifications-manager, port: 8104 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`) || PathPrefix(`/api/notification-preferences`))
+      services: [{ name: notifications-manager, port: 8104 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/accounting`) || PathPrefix(`/api/points`) || PathPrefix(`/api/rider`))
+      services: [{ name: accounting-service, port: 8115 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && PathPrefix(`/api/settings/connectors`)
+      services: [{ name: connector-settings, port: 8109 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && PathPrefix(`/api/transfers`)
+      services: [{ name: transfer-service, port: 8118 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/whatsapp`) || PathPrefix(`/webhooks/whatsapp`))
+      services: [{ name: whatsapp-service, port: 8116 }]
+      middlewares: *api-mw
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/onboarding`) || PathPrefix(`/api/profile`))
+      services: [{ name: onboarding-service, port: 8117 }]
+      middlewares: *api-mw
+    # The DLR callback: authenticated by signature, not token. This routes ONE path to the sms
+    # connector; /api/connector/** stays unrouted, deliberately.
+    - kind: Rule
+      match: Host(`__API_HOST__`) && PathPrefix(`/webhooks/dlr`)
+      services: [{ name: sms-connector, port: 8112 }]
+      middlewares: *api-mw
+    # Object storage over the API hostname. The prefix is NOT stripped: an S3 signature covers
+    # host and path, and the bucket name is the first path segment. Only the public buckets and
+    # the APK drop are routed — merchant-kyc, receipts and delivery-proof stay unreachable.
+    - kind: Rule
+      match: Host(`__API_HOST__`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`) || PathPrefix(`/apk`))
+      priority: 90
+      services: [{ name: minio, port: 9000 }]
+      middlewares:
+        - { name: security-headers }
+---
+# Keycloak owns its whole origin: /realms, /resources, the account and admin consoles.
+# KEYCLOAK_PUBLIC_URL must match this hostname exactly or every token's issuer is refused.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: keycloak
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    - kind: Rule
+      match: Host(`__IAM_HOST__`)
+      services: [{ name: keycloak, port: 8080 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: portal
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    - kind: Rule
+      match: Host(`__PORTAL_HOST__`)
+      services: [{ name: portal, port: 8200 }]
+---
+# The ops tools, all behind the shared basic auth: the mail sink holds every verification code
+# the platform issues, the broker console can purge queues, the object console can read and
+# delete every file. Basic auth over TLS is the floor for a dev box, not a good answer.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: monitoring
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    - kind: Rule
+      match: Host(`__MON_HOST__`) && PathPrefix(`/rabbitmq`)
+      services: [{ name: rabbitmq, port: 15672 }]
+      middlewares:
+        - { name: ops-auth }
+        - { name: strip-ops-prefix }
+    - kind: Rule
+      match: Host(`__MON_HOST__`) && PathPrefix(`/mailpit`)
+      services: [{ name: mailpit, port: 8025 }]
+      middlewares:
+        - { name: ops-auth }
+    - kind: Rule
+      match: Host(`__MON_HOST__`) && PathPrefix(`/minio`)
+      services: [{ name: minio, port: 9001 }]
+      middlewares:
+        - { name: ops-auth }
+        - { name: strip-ops-prefix }
+    - kind: Rule
+      match: Host(`__MON_HOST__`) && Path(`/`)
+      services: [{ name: portal, port: 8200 }]
+      middlewares:
+        - { name: ops-auth }

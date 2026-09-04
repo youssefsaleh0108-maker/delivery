@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - configmap-common.yaml
+  - data-layer.yaml
+  - identity.yaml
+  - services.yaml
+  - portal.yaml
+
+configMapGenerator:
+  - name: postgres-init
+    files:
+      - assets/postgres-init/01-databases-and-extensions.sql
+      - assets/postgres-init/02-service-roles.sql
+      - assets/postgres-init/03-config-properties.sql
+      - assets/postgres-init/04-config-role-password.sh
+  - name: keycloak-realm
+    files:
+      - assets/keycloak/realm-delivery-platform.json
+  - name: keycloak-theme
+    files:
+      - assets/keycloak/theme.properties
+      - assets/keycloak/delivery.css
+  - name: minio-bootstrap
+    files:
+      - assets/minio/bootstrap.sh
+  - name: vault-bootstrap
+    files:
+      - assets/vault/bootstrap.sh
+  - name: vault-policies
+    files:
+      - assets/vault/policies/config-server.hcl
+      - assets/vault/policies/corebanking-connector.hcl
+  - name: portal-nginx
+    files:
+      - nginx.conf=assets/portal-nginx.conf
+
+# Generated ConfigMaps keep stable names: the Jobs and mounts reference them by name, and a
+# content change should roll the pods through the overlay apply, not create orphans.
+generatorOptions:
+  disableNameSuffixHash: true

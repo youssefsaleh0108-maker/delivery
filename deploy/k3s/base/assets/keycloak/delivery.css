@@ -1,0 +1,336 @@
+/*
+ * Delivery login theme.
+ *
+ * Restyles Keycloak's stock login to match the apps: the same brand colour, the same card, the same
+ * rounded-input language. It is CSS over the inherited markup rather than a rewritten template,
+ * so a Keycloak upgrade cannot break the form itself — at worst a selector stops matching and the
+ * page falls back to looking plain.
+ *
+ * The tokens below are the literal values from delivery_design_system/tokens.dart. Keeping them in
+ * sync by hand is the cost of the login page living outside the Flutter apps.
+ */
+:root {
+  /* 2026-08 Figma redesign (figma.com/design/4lIJm9HXkQtTQHqhBIpNfB). */
+  --delivery-brand: #e11d48;
+  --delivery-brand-dark: #9f1239;
+  --delivery-brand-soft: #fff1f2;
+  --delivery-brand-line: #fda4af;
+  --delivery-ink: #0f172a;
+  --delivery-muted: #475569;
+  --delivery-border: #e2e8f0;
+  --delivery-bg: #f8fafc;
+  --delivery-radius: 16px;
+  --delivery-radius-sm: 12px;
+}
+
+html,
+body,
+body.login-pf {
+  background: var(--delivery-bg) !important;
+  height: 100%;
+  /* Rubik matches the apps; the system stack stands in when the login page cannot load it.
+     No @font-face here on purpose — Keycloak's CSP blocks third-party font hosts, and bundling
+     font binaries into the theme is a heavier change than a fallback stack justifies today. */
+  font-family: Rubik, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--delivery-ink);
+}
+
+/* Kills the stock background image and its dark overlay. */
+body.login-pf,
+.login-pf body {
+  background-image: none !important;
+}
+
+.login-pf-page {
+  padding-top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* ---------------------------------------------------------------- the brand mark */
+
+/*
+ * Keycloak renders the realm name into #kc-header-wrapper. It is replaced here with a generated
+ * wordmark rather than an image file: no asset to serve, nothing to go stale, and it scales.
+ */
+#kc-header {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+#kc-header-wrapper {
+  font-size: 0;             /* hides the realm name text */
+  padding: 0 0 20px;
+  letter-spacing: 0;
+}
+
+#kc-header-wrapper::after {
+  content: "Delivery";
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--delivery-brand);
+  text-transform: none;
+}
+
+/* ---------------------------------------------------------------- the card */
+
+.card-pf {
+  background: #fff;
+  border: 1px solid var(--delivery-border);
+  border-radius: var(--delivery-radius);
+  box-shadow: 0 8px 28px rgba(36, 20, 20, 0.07);
+  padding: 32px 30px 28px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+#kc-form-wrapper {
+  margin-top: 0;
+}
+
+#kc-page-title {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--delivery-ink);
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- fields */
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.pf-c-form__label,
+.control-label,
+label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--delivery-ink);
+  margin-bottom: 6px;
+  display: block;
+}
+
+/*
+ * The `:not()` guards are load-bearing. `#kc-form-login input` is specificity (1,0,1) and the
+ * submit button is an <input type="submit"> inside that form — so without them this rule beats
+ * `#kc-login` at (1,0,0) and paints the primary button white with a text-field border.
+ */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+.pf-c-form-control,
+#kc-form-login input:not([type="submit"]):not([type="button"]):not([type="checkbox"]) {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--delivery-ink);
+  background: #fff;
+  border: 1px solid var(--delivery-border);
+  border-radius: var(--delivery-radius-sm);
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+.pf-c-form-control:focus {
+  outline: none;
+  border-color: var(--delivery-brand);
+  /* A ring rather than a colour change alone: focus has to be visible to someone who cannot
+     distinguish red from grey. */
+  box-shadow: 0 0 0 3px var(--delivery-brand-soft);
+}
+
+/* The show/hide password control the stock theme injects. */
+.pf-c-input-group button,
+#kc-form-login .pf-c-button.pf-m-control {
+  border: 1px solid var(--delivery-border);
+  border-left: none;
+  border-radius: 0 var(--delivery-radius-sm) var(--delivery-radius-sm) 0;
+  background: #fff;
+  color: var(--delivery-muted);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+/*
+ * PatternFly styles the primary button through `.pf-c-button.pf-m-primary` (0,2,0), so the class
+ * pairing is matched here too rather than relying on the id alone.
+ */
+.btn-primary,
+input[type="submit"],
+#kc-login,
+#kc-form-login input[type="submit"],
+.pf-c-button.pf-m-primary {
+  width: 100%;
+  height: 48px;
+  background-color: var(--delivery-brand);
+  border: none;
+  border-radius: var(--delivery-radius-sm);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  background-image: none;
+  text-shadow: none;
+}
+
+.btn-primary:hover,
+#kc-login:hover {
+  background: var(--delivery-brand-dark);
+}
+
+.btn-primary:focus-visible,
+#kc-login:focus-visible {
+  outline: 3px solid var(--delivery-brand-soft);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- links, checkbox, footer */
+
+a,
+#kc-registration a,
+#kc-info-wrapper a,
+.login-pf-settings a {
+  color: var(--delivery-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--delivery-brand-dark);
+  text-decoration: underline;
+}
+
+#kc-form-options .checkbox label {
+  font-weight: 500;
+  color: var(--delivery-muted);
+  font-size: 13.5px;
+}
+
+.login-pf-settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  font-size: 13.5px;
+}
+
+#kc-info-wrapper,
+#kc-registration {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--delivery-border);
+  font-size: 13.5px;
+  color: var(--delivery-muted);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- feedback */
+
+.alert,
+.pf-c-alert,
+#kc-content .alert-error {
+  border-radius: var(--delivery-radius-sm);
+  border: 1px solid var(--delivery-brand-line);
+  background: var(--delivery-brand-soft);
+  color: var(--delivery-brand-dark);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  margin-bottom: 18px;
+}
+
+.alert-success,
+.pf-c-alert.pf-m-success {
+  border-color: #c8e6c9;
+  background: #edf7ed;
+  color: #2e7d32;
+}
+
+.pf-c-form__helper-text.pf-m-error,
+.input-error,
+#input-error,
+#input-error-username,
+#input-error-password {
+  color: var(--delivery-brand-dark);
+  font-size: 12.5px;
+  margin-top: 6px;
+  display: block;
+}
+
+/* ---------------------------------------------------------------- phones */
+
+@media (max-width: 520px) {
+  .card-pf {
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 24px 20px;
+    background: transparent;
+  }
+
+  .login-pf-page {
+    justify-content: flex-start;
+    padding-top: 48px;
+  }
+}
+
+/* ---------------------------------------------------------------- right-to-left */
+
+/*
+ * Keycloak's base template sets dir="rtl" on <html> for a right-to-left locale, so the layout
+ * mirrors itself. These are the few places that need explicit help because they were written with
+ * a physical direction rather than a logical one.
+ *
+ * Everything using margin/padding shorthand or flexbox already flips on its own — only asymmetric
+ * one-sided rules and hard-coded text alignment are listed here.
+ */
+[dir="rtl"] #kc-page-title,
+[dir="rtl"] .pf-c-form__label,
+[dir="rtl"] .control-label,
+[dir="rtl"] label {
+  text-align: right;
+}
+
+[dir="rtl"] .pf-c-input-group button,
+[dir="rtl"] #kc-form-login .pf-c-button.pf-m-control {
+  /* The show/hide password control sits at the other end of the field. */
+  border-left: 1px solid var(--delivery-border);
+  border-right: none;
+  border-radius: var(--delivery-radius-sm) 0 0 var(--delivery-radius-sm);
+}
+
+[dir="rtl"] .login-pf-settings {
+  flex-direction: row-reverse;
+}
+
+/*
+ * Arabic numerals and Latin text inside an otherwise RTL paragraph — an account number, a code —
+ * need an isolation boundary or the bidi algorithm reorders their punctuation.
+ */
+[dir="rtl"] input[type="text"],
+[dir="rtl"] input[type="password"],
+[dir="rtl"] input[type="email"] {
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+/*
+ * The wordmark is generated by CSS content, so it does not translate with the rest of the page.
+ * In Arabic it becomes the Arabic name rather than a transliteration.
+ */
+[dir="rtl"] #kc-header-wrapper::after {
+  content: "توصيل";
+}

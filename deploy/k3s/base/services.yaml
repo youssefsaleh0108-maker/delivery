@@ -1,0 +1,662 @@
+# The Spring services, one Deployment + ClusterIP Service each, replicas pinned to 1 (single
+# node, two environments). Generated from infra/docker-compose.dev.yml — the shared environment
+# comes from platform-common + platform-env + platform-secrets; only what is service-specific
+# is spelled out per Deployment.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  labels: { app: product-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: product-service }
+  template:
+    metadata:
+      labels: { app: product-service }
+    spec:
+      containers:
+        - name: product-service
+          image: ghcr.io/youssefsaleh0108-maker/product-service:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8103"
+          ports:
+            - containerPort: 8103
+          startupProbe:
+            tcpSocket: { port: 8103 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8103 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8103 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+spec:
+  selector: { app: product-service }
+  ports:
+    - port: 8103
+      targetPort: 8103
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-manager
+  labels: { app: order-manager }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: order-manager }
+  template:
+    metadata:
+      labels: { app: order-manager }
+    spec:
+      containers:
+        - name: order-manager
+          image: docker.io/youssefsaleh0108/delivery-order-manager:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8101"
+          ports:
+            - containerPort: 8101
+          startupProbe:
+            tcpSocket: { port: 8101 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8101 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8101 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-manager
+spec:
+  selector: { app: order-manager }
+  ports:
+    - port: 8101
+      targetPort: 8101
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-tracking
+  labels: { app: order-tracking }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: order-tracking }
+  template:
+    metadata:
+      labels: { app: order-tracking }
+    spec:
+      containers:
+        - name: order-tracking
+          image: ghcr.io/youssefsaleh0108-maker/order-tracking:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8102"
+          ports:
+            - containerPort: 8102
+          startupProbe:
+            tcpSocket: { port: 8102 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8102 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8102 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-tracking
+spec:
+  selector: { app: order-tracking }
+  ports:
+    - port: 8102
+      targetPort: 8102
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transfer-service
+  labels: { app: transfer-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: transfer-service }
+  template:
+    metadata:
+      labels: { app: transfer-service }
+    spec:
+      containers:
+        - name: transfer-service
+          image: ghcr.io/youssefsaleh0108-maker/transfer-service:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8118"
+          ports:
+            - containerPort: 8118
+          startupProbe:
+            tcpSocket: { port: 8118 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8118 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8118 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transfer-service
+spec:
+  selector: { app: transfer-service }
+  ports:
+    - port: 8118
+      targetPort: 8118
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connector-settings
+  labels: { app: connector-settings }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: connector-settings }
+  template:
+    metadata:
+      labels: { app: connector-settings }
+    spec:
+      containers:
+        - name: connector-settings
+          image: ghcr.io/youssefsaleh0108-maker/connector-settings:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8109"
+          ports:
+            - containerPort: 8109
+          startupProbe:
+            tcpSocket: { port: 8109 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8109 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8109 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connector-settings
+spec:
+  selector: { app: connector-settings }
+  ports:
+    - port: 8109
+      targetPort: 8109
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-manager
+  labels: { app: notifications-manager }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notifications-manager }
+  template:
+    metadata:
+      labels: { app: notifications-manager }
+    spec:
+      containers:
+        - name: notifications-manager
+          image: ghcr.io/youssefsaleh0108-maker/notifications-manager:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8104"
+          ports:
+            - containerPort: 8104
+          startupProbe:
+            tcpSocket: { port: 8104 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8104 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8104 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-manager
+spec:
+  selector: { app: notifications-manager }
+  ports:
+    - port: 8104
+      targetPort: 8104
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-notification
+  labels: { app: app-notification }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: app-notification }
+  template:
+    metadata:
+      labels: { app: app-notification }
+    spec:
+      containers:
+        - name: app-notification
+          image: ghcr.io/youssefsaleh0108-maker/app-notification:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8108"
+          ports:
+            - containerPort: 8108
+          startupProbe:
+            tcpSocket: { port: 8108 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8108 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8108 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-notification
+spec:
+  selector: { app: app-notification }
+  ports:
+    - port: 8108
+      targetPort: 8108
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email-connector
+  labels: { app: email-connector }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: email-connector }
+  template:
+    metadata:
+      labels: { app: email-connector }
+    spec:
+      containers:
+        - name: email-connector
+          image: ghcr.io/youssefsaleh0108-maker/email-connector:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8110"
+          ports:
+            - containerPort: 8110
+          startupProbe:
+            tcpSocket: { port: 8110 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8110 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8110 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-connector
+spec:
+  selector: { app: email-connector }
+  ports:
+    - port: 8110
+      targetPort: 8110
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-connector
+  labels: { app: push-connector }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: push-connector }
+  template:
+    metadata:
+      labels: { app: push-connector }
+    spec:
+      containers:
+        - name: push-connector
+          image: ghcr.io/youssefsaleh0108-maker/push-connector:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8111"
+          ports:
+            - containerPort: 8111
+          startupProbe:
+            tcpSocket: { port: 8111 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8111 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8111 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: push-connector
+spec:
+  selector: { app: push-connector }
+  ports:
+    - port: 8111
+      targetPort: 8111
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sms-connector
+  labels: { app: sms-connector }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: sms-connector }
+  template:
+    metadata:
+      labels: { app: sms-connector }
+    spec:
+      containers:
+        - name: sms-connector
+          image: ghcr.io/youssefsaleh0108-maker/sms-connector:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8112"
+          ports:
+            - containerPort: 8112
+          startupProbe:
+            tcpSocket: { port: 8112 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8112 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8112 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sms-connector
+spec:
+  selector: { app: sms-connector }
+  ports:
+    - port: 8112
+      targetPort: 8112
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounting-service
+  labels: { app: accounting-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: accounting-service }
+  template:
+    metadata:
+      labels: { app: accounting-service }
+    spec:
+      containers:
+        - name: accounting-service
+          image: ghcr.io/youssefsaleh0108-maker/accounting-service:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8115"
+          ports:
+            - containerPort: 8115
+          startupProbe:
+            tcpSocket: { port: 8115 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8115 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8115 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounting-service
+spec:
+  selector: { app: accounting-service }
+  ports:
+    - port: 8115
+      targetPort: 8115
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-service
+  labels: { app: whatsapp-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: whatsapp-service }
+  template:
+    metadata:
+      labels: { app: whatsapp-service }
+    spec:
+      containers:
+        - name: whatsapp-service
+          image: ghcr.io/youssefsaleh0108-maker/whatsapp-service:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8116"
+          ports:
+            - containerPort: 8116
+          startupProbe:
+            tcpSocket: { port: 8116 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8116 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8116 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whatsapp-service
+spec:
+  selector: { app: whatsapp-service }
+  ports:
+    - port: 8116
+      targetPort: 8116
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: onboarding-service
+  labels: { app: onboarding-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: onboarding-service }
+  template:
+    metadata:
+      labels: { app: onboarding-service }
+    spec:
+      containers:
+        - name: onboarding-service
+          image: ghcr.io/youssefsaleh0108-maker/onboarding-service:main
+          envFrom:
+            - configMapRef: { name: platform-common }
+            - configMapRef: { name: platform-env }
+            - secretRef: { name: platform-secrets }
+          env:
+            - name: SERVER_PORT
+              value: "8117"
+            - name: KEYCLOAK_CLIENT_ID
+              value: onboarding-service
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: ONBOARDING_CLIENT_SECRET } }
+            - name: MINIO_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_USER } }
+            - name: MINIO_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_PASSWORD } }
+          ports:
+            - containerPort: 8117
+          startupProbe:
+            tcpSocket: { port: 8117 }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: 8117 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 8117 }
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests: { memory: 256Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: onboarding-service
+spec:
+  selector: { app: onboarding-service }
+  ports:
+    - port: 8117
+      targetPort: 8117

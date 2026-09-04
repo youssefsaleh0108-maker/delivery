@@ -1,0 +1,27 @@
+# k3s ships Traefik as its ingress; this teaches it the three things our compose Traefik knew:
+# an ACME resolver for youdrop.shop certificates, a web->https redirect, and somewhere persistent
+# to keep acme.json so a pod restart does not re-issue and spend the Let's Encrypt rate limit.
+#
+# Applied once per cluster (kubectl apply -f), not per environment: both delivery-dev and
+# delivery-qa share this one edge, and their IngressRoutes carry the per-environment hostnames.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - --certificatesresolvers.letsencrypt.acme.email=youssef.saleh0108@gmail.com
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      # The ACME challenge is answered before this redirect applies, so port 80 still validates.
+      - --entrypoints.web.http.redirections.entrypoint.to=:443
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    persistence:
+      enabled: true
+      size: 128Mi
+      path: /data
+    podSecurityContext:
+      fsGroup: 65532
+    # One edge on a one-node cluster; the deployment keeps its default single replica.
