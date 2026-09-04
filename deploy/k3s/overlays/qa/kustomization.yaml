@@ -4,66 +4,67 @@ kind: Kustomization
 namespace: delivery-qa
 
 resources:
-  - namespace.yaml
-  - ../../base
-  - ingress.yaml
+- namespace.yaml
+- ../../base
+- ingress.yaml
 
-configMapGenerator:
-  - name: platform-env
-    literals:
-      - KEYCLOAK_PUBLIC_URL=https://iam-qa.youdrop.shop
-      - KEYCLOAK_ISSUER_URI=https://iam-qa.youdrop.shop/realms/delivery-platform
-      - MINIO_PUBLIC_ENDPOINT=https://api-qa.youdrop.shop
-      - CORS_ALLOWED_ORIGINS=https://portal-qa.youdrop.shop,https://app-qa.youdrop.shop,http://localhost:*,http://127.0.0.1:*
       # QA SENDS REAL MAIL like dev, at the operator's request - same relay, same noreply
       # sender. The password lives in delivery-qa's platform-secrets on the box.
-      - SMTP_HOST=smtp.office365.com
-      - SMTP_PORT=587
-      - SMTP_USER=noreply@youdrop.shop
-      - SMTP_AUTH=true
-      - SMTP_STARTTLS=true
-      - EMAIL_FROM=noreply@youdrop.shop
-      - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+configMapGenerator:
+- literals:
+  - KEYCLOAK_PUBLIC_URL=https://iam-qa.youdrop.shop
+  - KEYCLOAK_ISSUER_URI=https://iam-qa.youdrop.shop/realms/delivery-platform
+  - MINIO_PUBLIC_ENDPOINT=https://api-qa.youdrop.shop
+  - CORS_ALLOWED_ORIGINS=https://portal-qa.youdrop.shop,https://app-qa.youdrop.shop,http://localhost:*,http://127.0.0.1:*
+  - SMTP_HOST=smtp.office365.com
+  - SMTP_PORT=587
+  - SMTP_USER=noreply@youdrop.shop
+  - SMTP_AUTH=true
+  - SMTP_STARTTLS=true
+  - EMAIL_FROM=noreply@youdrop.shop
+  - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
+  name: platform-env
 
 generatorOptions:
   disableNameSuffixHash: true
 
 patches:
-  - target:
-      kind: Deployment
-      name: portal
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/1/hostPath/path
-        value: /opt/delivery/sites/qa/portal
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/1/hostPath/path
+      value: /opt/delivery/sites/qa/portal
+  target:
+    kind: Deployment
+    name: portal
 
 # Which build each service runs. CI rewrites these lines after every image build on this
 # environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
 # deploys the result — edit by merge, not by hand.
 images:
-  - name: ghcr.io/youssefsaleh0108-maker/product-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/order-tracking
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/transfer-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/connector-settings
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/app-notification
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/email-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/push-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/sms-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/accounting-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/config-server
-    newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/accounting-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/app-notification
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/config-server
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/connector-settings
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/email-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/notifications-manager
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/onboarding-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/product-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/push-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/sms-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newName: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newTag: sha-70bcc69a6b9f14ab8492c8ea125db41527206420
+- name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+  newTag: main
