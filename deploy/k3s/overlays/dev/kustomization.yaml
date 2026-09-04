@@ -4,57 +4,58 @@ kind: Kustomization
 namespace: delivery-dev
 
 resources:
-  - namespace.yaml
-  - ../../base
-  - ingress.yaml
+- namespace.yaml
+- ../../base
+- ingress.yaml
 
 configMapGenerator:
-  - name: platform-env
-    literals:
-      - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
-      - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
-      - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
-      - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://app-dev.youdrop.shop,http://localhost:*,http://127.0.0.1:*
+- literals:
+  - KEYCLOAK_PUBLIC_URL=https://iam-dev.youdrop.shop
+  - KEYCLOAK_ISSUER_URI=https://iam-dev.youdrop.shop/realms/delivery-platform
+  - MINIO_PUBLIC_ENDPOINT=https://api-dev.youdrop.shop
+  - CORS_ALLOWED_ORIGINS=https://portal-dev.youdrop.shop,https://app-dev.youdrop.shop,http://localhost:*,http://127.0.0.1:*
+  name: platform-env
 
 generatorOptions:
   disableNameSuffixHash: true
 
 patches:
-  - target:
-      kind: Deployment
-      name: portal
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/1/hostPath/path
-        value: /opt/delivery/sites/dev/portal
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/1/hostPath/path
+      value: /opt/delivery/sites/dev/portal
+  target:
+    kind: Deployment
+    name: portal
 
 # Which build each service runs. CI rewrites these lines after every image build on this
 # environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
 # deploys the result — edit by merge, not by hand.
 images:
-  - name: ghcr.io/youssefsaleh0108-maker/product-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/order-tracking
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/transfer-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/connector-settings
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/app-notification
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/email-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/push-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/sms-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/accounting-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/config-server
-    newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/accounting-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/app-notification
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/config-server
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/connector-settings
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/email-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/notifications-manager
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/onboarding-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/product-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/push-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/sms-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newName: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newTag: sha-97aedd885d806bd73dcd12b53304ec7c351deaa0
+- name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+  newTag: main
