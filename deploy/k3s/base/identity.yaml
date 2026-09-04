@@ -176,8 +176,14 @@ spec:
               valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_PASSWORD } }
             - name: POSTGRES_PASSWORD
               valueFrom: { secretKeyRef: { name: platform-secrets, key: POSTGRES_PASSWORD } }
+            # From the platform secret, never a literal: this Job re-runs after every vault
+            # restart, and a hardcoded "" would ERASE the relay password each time — mail then
+            # fails with "relay authentication failed" for no change anybody made.
             - name: SMTP_PASSWORD
-              value: ""
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: SMTP_PASSWORD
           volumeMounts:
             - name: bootstrap
               mountPath: /bootstrap
