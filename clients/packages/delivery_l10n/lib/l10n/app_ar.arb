@@ -1158,6 +1158,7 @@
   "custShowLess": "عرض أقل",
   "custAllCategories": "كل الفئات",
   "custFilters": "عوامل التصفية",
+  "custSearchInCategory": "ابحث في {name}",
   "custMyBasket": "سلّتي",
   "custPromoCode": "رمز الخصم",
   "custApply": "تطبيق",

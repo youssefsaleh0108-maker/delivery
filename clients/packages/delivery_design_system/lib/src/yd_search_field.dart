@@ -27,10 +27,16 @@ class YdSearchField extends StatelessWidget {
     this.filterIcon = Icons.tune,
     this.filterSemanticLabel,
     this.searchSemanticLabel,
+    this.animatedHint,
   });
 
   /// Placeholder text, already localised by the caller.
   final String hintText;
+
+  /// An optional live placeholder — e.g. an [AnimatedSwitcher] cycling suggestions — painted in
+  /// the hint's spot while the field is empty. It replaces [hintText] whenever it is non-null
+  /// and needs a [controller] to know when the field has text.
+  final Widget? animatedHint;
 
   final TextEditingController? controller;
   final FocusNode? focusNode;
@@ -53,6 +59,10 @@ class YdSearchField extends StatelessWidget {
   final String? filterSemanticLabel;
   final String? searchSemanticLabel;
 
+  /// Stand-in listenable when [animatedHint] is used without a [controller]; the field then has
+  /// no way to gain text we could observe, so a permanently-empty value is the truth.
+  static final TextEditingController _emptyController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -71,35 +81,62 @@ class YdSearchField extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              onChanged: onChanged,
-              onSubmitted: onSubmitted,
-              onTap: onTap,
-              readOnly: readOnly,
-              autofocus: autofocus,
-              textInputAction: textInputAction,
-              style: const TextStyle(
-                fontSize: 14,
-                color: DeliveryColors.ink,
-                height: 1.2,
-              ),
-              cursorColor: DeliveryColors.brand,
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                hintText: hintText,
-                hintStyle: const TextStyle(
-                  fontSize: 14,
-                  color: DeliveryColors.faint,
-                  height: 1.2,
+            child: Stack(
+              alignment: AlignmentDirectional.centerStart,
+              children: <Widget>[
+                if (animatedHint != null)
+                  Positioned.fill(
+                    child: ExcludeSemantics(
+                      child: IgnorePointer(
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable:
+                              controller ?? _emptyController,
+                          builder: (BuildContext context,
+                              TextEditingValue value, Widget? hint) {
+                            return Visibility(
+                              visible: value.text.isEmpty,
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: hint,
+                              ),
+                            );
+                          },
+                          child: animatedHint,
+                        ),
+                      ),
+                    ),
+                  ),
+                TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: onChanged,
+                  onSubmitted: onSubmitted,
+                  onTap: onTap,
+                  readOnly: readOnly,
+                  autofocus: autofocus,
+                  textInputAction: textInputAction,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: DeliveryColors.ink,
+                    height: 1.2,
+                  ),
+                  cursorColor: DeliveryColors.brand,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: animatedHint == null ? hintText : null,
+                    hintStyle: const TextStyle(
+                      fontSize: 14,
+                      color: DeliveryColors.faint,
+                      height: 1.2,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           if (onFilterTap != null) ...<Widget>[

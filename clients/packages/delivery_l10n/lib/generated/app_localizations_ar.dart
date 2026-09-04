@@ -3108,6 +3108,11 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custFilters => 'عوامل التصفية';
 
   @override
+  String custSearchInCategory(String name) {
+    return 'ابحث في $name';
+  }
+
+  @override
   String get custMyBasket => 'سلّتي';
 
   @override
