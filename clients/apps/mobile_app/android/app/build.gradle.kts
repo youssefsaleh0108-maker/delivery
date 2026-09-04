@@ -49,6 +49,24 @@ android {
                 ?: System.getenv("GOOGLE_MAPS_API_KEY") ?: "")
     }
 
+    // One codebase, two installable apps: the dev flavor keeps the original applicationId so
+    // every phone that already has YouDrop keeps updating in place, and the qa flavor takes a
+    // suffixed id and its own name so both environments can sit on one phone side by side.
+    // Which backend each talks to still comes from --dart-define at build time; the flavor is
+    // only identity (package id, launcher label).
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            manifestPlaceholders["appLabel"] = "YouDrop"
+        }
+        create("qa") {
+            dimension = "environment"
+            applicationIdSuffix = ".qa"
+            manifestPlaceholders["appLabel"] = "YouDrop QA"
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
