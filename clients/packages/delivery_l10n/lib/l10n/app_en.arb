@@ -1627,6 +1627,8 @@
   "custShowLess": "Show Less",
   "custAllCategories": "All Categories",
   "custFilters": "Filters",
+  "custSearchInCategory": "Search in {name}",
+  "@custSearchInCategory": { "placeholders": { "name": { "type": "String" } } },
   "custMyBasket": "My Basket",
   "custPromoCode": "Promo Code",
   "custApply": "Apply",

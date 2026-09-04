@@ -11,9 +11,7 @@ import 'delivery_address.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
-import 'diaspora_screen.dart';
 import 'friend_split_screen.dart';
-import 'hyperlocal_screen.dart';
 import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
@@ -102,7 +100,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   );
 
   List<StoreCard> _favorites = <StoreCard>[];
-  List<Offer> _platformOffers = <Offer>[];
 
   /// Designed banners from the Backoffice, and the category strip. Both are small curated lists —
   /// a rail nobody can reach the end of does not need paging.
@@ -125,7 +122,30 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     _load();
     _loadHeaderAvatar();
     _loadSplitRequests();
+    // The search hint cycles categories; the banner pager advances itself. Both are paused by
+    // nothing and cost one setState — cheap enough to just run for the screen's life.
+    _hintTimer = Timer.periodic(const Duration(milliseconds: 2800), (_) {
+      if (mounted && _chips.isNotEmpty && _searchController.text.isEmpty) {
+        setState(() => _hintIndex++);
+      }
+    });
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || _banners.length < 2 || !_bannerController.hasClients) {
+        return;
+      }
+      final int next = (_bannerPage + 1) % _banners.length;
+      _bannerController.animateToPage(next,
+          duration: const Duration(milliseconds: 450), curve: Curves.easeOut);
+    });
   }
+
+  Timer? _hintTimer;
+  int _hintIndex = 0;
+
+  final PageController _bannerController =
+      PageController(viewportFraction: 0.92);
+  Timer? _bannerTimer;
+  int _bannerPage = 0;
 
   void _onStoresChanged() {
     if (!mounted) return;
@@ -145,6 +165,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   @override
   void dispose() {
+    _hintTimer?.cancel();
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
     _searchDebounce?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
@@ -167,16 +190,14 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       final List<Object?> results = await Future.wait(<Future<Object?>>[
         _stores.refresh(),
         widget.storeApi.favorites(size: _railPageSize),
-        widget.storeApi.platformOffers(size: _railPageSize),
         widget.storeApi.banners(),
         widget.storeApi.categoryChips(),
       ]);
       if (!mounted) return;
       setState(() {
         _favorites = (results[1]! as Paged<StoreCard>).content;
-        _platformOffers = (results[2]! as Paged<Offer>).content;
-        _banners = results[3]! as List<HomeBanner>;
-        _chips = results[4]! as List<CategoryChip>;
+        _banners = results[2]! as List<HomeBanner>;
+        _chips = results[3]! as List<CategoryChip>;
         _loadingRails = false;
       });
     } catch (e) {
@@ -306,7 +327,37 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         child: RefreshIndicator(
           color: DeliveryColors.brand,
           onRefresh: _load,
-          child: NotificationListener<ScrollNotification>(
+          child: Stack(
+            children: <Widget>[
+              _feed(t),
+              // The labels-only category row rides in over the feed once the tile strip has
+              // scrolled under the pinned search bar — so at rest there is one category row,
+              // not two stacked copies of the same names.
+              PositionedDirectional(
+                top: _searchBarExtent,
+                start: 0,
+                end: 0,
+                child: IgnorePointer(
+                  ignoring: !_labelsPinned,
+                  child: AnimatedOpacity(
+                    opacity: _labelsPinned ? 1 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    child: SizedBox(
+                      height: _labelsExtent,
+                      child: _categoryLabelsBar(t),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _feed(DeliveryStrings t) {
+    return NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification notification) {
               // depth 0 only: notifications BUBBLE, so without it every horizontal rail on this
               // screen — the category strip, banners, offers, favourites — reached here carrying
@@ -320,15 +371,25 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 // first one may start a request.
                 _stores.loadMore();
               }
+              if (notification.depth == 0) {
+                _updateLabelsPinned();
+              }
               return false;
             },
             child: CustomScrollView(
               controller: _scrollController,
               slivers: <Widget>[
-                SliverToBoxAdapter(child: _header()),
+                SliverToBoxAdapter(child: _greetingHeader()),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _PinnedBoxDelegate(
+                    height: _searchBarExtent,
+                    child: KeyedSubtree(key: _searchKey, child: _searchBar(t)),
+                  ),
+                ),
                 SliverToBoxAdapter(child: _splitRequestBanner(t)),
-                SliverToBoxAdapter(child: _categoryStrip()),
-                SliverToBoxAdapter(child: _lebaneseRail(t)),
+                SliverToBoxAdapter(
+                    child: KeyedSubtree(key: _stripKey, child: _categoryStrip())),
                 if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
                 if (_stores.isLoadingFirstPage || _loadingRails)
                   const SliverFillRemaining(
@@ -341,7 +402,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
-                  if (_platformOffers.isNotEmpty) SliverToBoxAdapter(child: _offersRail()),
                   if (_favorites.isNotEmpty)
                     SliverToBoxAdapter(child: _featuredSection()),
                   SliverToBoxAdapter(
@@ -374,10 +434,36 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 const SliverToBoxAdapter(child: SizedBox(height: DeliverySpacing.lg)),
               ],
             ),
-          ),
-        ),
-      ),
     );
+  }
+
+  /// Whether the labels-only category overlay is riding over the feed. True exactly while the
+  /// tile strip is scrolled up underneath the pinned search bar.
+  bool _labelsPinned = false;
+  final GlobalKey _stripKey = GlobalKey();
+  final GlobalKey _searchKey = GlobalKey();
+
+  void _updateLabelsPinned() {
+    bool pinned;
+    final RenderObject? strip = _stripKey.currentContext?.findRenderObject();
+    final RenderObject? search = _searchKey.currentContext?.findRenderObject();
+    if (strip is! RenderBox || !strip.attached) {
+      // The strip's sliver has been recycled, which only happens once it is well off-screen
+      // above; at rest it is always attached.
+      pinned = _scrollController.hasClients &&
+          _scrollController.offset > _searchBarExtent;
+    } else if (search is! RenderBox || !search.attached) {
+      pinned = false;
+    } else {
+      final double stripBottom =
+          strip.localToGlobal(Offset.zero).dy + strip.size.height;
+      final double searchBottom =
+          search.localToGlobal(Offset.zero).dy + search.size.height;
+      pinned = stripBottom <= searchBottom;
+    }
+    if (pinned != _labelsPinned) {
+      setState(() => _labelsPinned = pinned);
+    }
   }
 
   /// The white `home-header`: the delivery address on one row, the search field under it.
@@ -487,7 +573,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// The bell is the one departure from the frame, which puts a brand chip there instead: the
   /// unread count is load-bearing on the tab the customer lives in, and a decoration is not.
   /// Settings lost its seat because the drawer now carries everything it opened.
-  Widget _header() {
+  Widget _greetingHeader() {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final String firstName = widget.session.displayName.split(' ').first;
 
@@ -563,16 +649,98 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: DeliverySpacing.md),
-          YdSearchField(
-            controller: _searchController,
-            hintText: t.searchShops,
-            onChanged: _onSearchChanged,
-            searchSemanticLabel: t.searchShops,
-            filterSemanticLabel: t.custFilters,
-            filterIcon: Icons.tune,
-            onFilterTap: () => setState(() => _filtersOpen = !_filtersOpen),
-          ),
+        ],
+      ),
+    );
+  }
+
+  /// The pinned search bar. The hint cycles through the live category names — an invitation,
+  /// not a label — and freezes the moment the customer types.
+  static const double _searchBarExtent = 64;
+
+  Widget _searchBar(DeliveryStrings t) {
+    return Container(
+      color: DeliveryColors.white,
+      padding: const EdgeInsetsDirectional.fromSTEB(_gutter, 6, _gutter, 10),
+      alignment: Alignment.center,
+      child: YdSearchField(
+        controller: _searchController,
+        hintText: t.searchShops,
+        animatedHint: _chips.isEmpty
+            ? null
+            : AnimatedSwitcher(
+                duration: const Duration(milliseconds: 350),
+                transitionBuilder: (Widget child, Animation<double> a) =>
+                    FadeTransition(
+                  opacity: a,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.6),
+                      end: Offset.zero,
+                    ).animate(a),
+                    child: child,
+                  ),
+                ),
+                child: Text(
+                  t.custSearchInCategory(
+                      _chips[_hintIndex % _chips.length].name),
+                  key: ValueKey<int>(_hintIndex % _chips.length),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: DeliveryColors.faint,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+        onChanged: _onSearchChanged,
+        searchSemanticLabel: t.searchShops,
+        filterSemanticLabel: t.custFilters,
+        filterIcon: Icons.tune,
+        onFilterTap: () => setState(() => _filtersOpen = !_filtersOpen),
+      ),
+    );
+  }
+
+  /// The compact category row that stays pinned under the search once the photo tiles scroll
+  /// away — labels only, per the operator's ask; the photo strip remains the rich version above.
+  static const double _labelsExtent = 44;
+
+  Widget _categoryLabelsBar(DeliveryStrings t) {
+    final List<StoreVertical> verticals = _chipVerticals;
+    return Container(
+      color: DeliveryColors.white,
+      alignment: AlignmentDirectional.centerStart,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: _gutter, vertical: 8),
+        children: <Widget>[
+          for (final StoreVertical vertical in verticals) ...<Widget>[
+            InkWell(
+              borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+              onTap: () => _openListing(vertical),
+              child: Container(
+                padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: DeliveryColors.background,
+                  borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+                ),
+                child: Text(
+                  _chipLabel(vertical),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.ink,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
         ],
       ),
     );
@@ -681,8 +849,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     );
   }
 
-  /// The tinted-glyph tile: the fallback for a category with no curated image, and the error
-  /// state when its image will not load.
+  /// The tinted-glyph tile: every category renders this — brand glyph on the soft brand fill.
   Widget _categoryIconTile(StoreVertical vertical) => Container(
         width: 44,
         height: 44,
@@ -696,11 +863,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       );
 
   Widget _categoryCard(StoreVertical vertical) {
-    // The curated image, when the platform has set one — a real photo, cover-cropped into the
-    // tile, which is what makes the strip read like a marketplace instead of a row of tinted
-    // glyphs. The icon tile stays as the fallback for a category nobody has dressed yet.
-    final String? image = _chipFor(vertical)?.imageUrl;
-
     return Semantics(
       button: true,
       label: _chipLabel(vertical),
@@ -720,20 +882,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                if (image != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
-                    child: Image(
-                      image: DeliveryImages.provider(image),
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                      errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
-                          _categoryIconTile(vertical),
-                    ),
-                  )
-                else
-                  _categoryIconTile(vertical),
+                _categoryIconTile(vertical),
                 const SizedBox(height: 6),
                 Text(
                   _chipLabel(vertical),
@@ -749,123 +898,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     color: DeliveryColors.ink,
                     letterSpacing: -0.1,
                     height: 1.15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// The two Lebanese doors (Figma `diaspora-gift-order` and `neighborhood-browse`): send a
-  /// delivery to family from abroad, and the neighborhood dekkane with their power status.
-  Widget _lebaneseRail(DeliveryStrings t) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.xs),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: _featureDoor(
-              icon: Icons.card_giftcard_rounded,
-              title: t.custDiasporaTitle,
-              subtitle: t.custDiasporaSub,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => DiasporaScreen(
-                  addresses: widget.addresses,
-                  orderApi: widget.orderApi,
-                  cart: widget.cart,
-                  zoneApi: widget.zoneApi,
-                  // This screen IS the home tab, so landing back here is the whole journey.
-                  onStartOrder: () {},
-                ),
-              )),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _featureDoor(
-              icon: Icons.storefront_rounded,
-              title: t.custHyperlocalTitle,
-              subtitle: t.custHyperlocalSub,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => HyperlocalScreen(
-                  storeApi: widget.storeApi,
-                  orderApi: widget.orderApi,
-                  cart: widget.cart,
-                ),
-              )),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _featureDoor({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Semantics(
-      button: true,
-      label: title,
-      child: Material(
-        color: DeliveryColors.white,
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 2),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(DeliveryRadius.md),
-              border: Border.all(color: DeliveryColors.borderFaint),
-            ),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: DeliveryColors.brandSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 18, color: DeliveryColors.brand),
-                ),
-                const SizedBox(width: DeliverySpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: DeliveryColors.ink,
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: DeliveryColors.muted,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -990,22 +1022,48 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     return const SizedBox.shrink();
   }
 
-  /// The banner carousel: full-bleed artwork the Backoffice curates.
-  ///
-  /// A horizontally paged strip rather than an auto-rotating carousel. Auto-rotation moves the
-  /// thing a customer is reading out from under them, and it steals the first tap.
+  /// The banner carousel: full-bleed artwork the Backoffice curates, advancing on its own
+  /// every four seconds at the operator's request. Swiping by hand still works and the timer
+  /// picks up from wherever the customer left it.
   Widget _bannerRail() {
     return Padding(
       padding: const EdgeInsetsDirectional.only(bottom: DeliverySpacing.sm),
-      child: SizedBox(
-        height: 150,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
-          itemCount: _banners.length,
-          separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
-          itemBuilder: (BuildContext context, int i) => _bannerCard(_banners[i]),
-        ),
+      child: Column(
+        children: <Widget>[
+          SizedBox(
+            height: 150,
+            child: PageView.builder(
+              controller: _bannerController,
+              itemCount: _banners.length,
+              onPageChanged: (int i) => setState(() => _bannerPage = i),
+              itemBuilder: (BuildContext context, int i) => Padding(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 5),
+                child: _bannerCard(_banners[i]),
+              ),
+            ),
+          ),
+          if (_banners.length > 1) ...<Widget>[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                for (int i = 0; i < _banners.length; i++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: i == _bannerPage ? 16 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: i == _bannerPage
+                          ? DeliveryColors.brand
+                          : DeliveryColors.border,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1013,7 +1071,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   Widget _bannerCard(HomeBanner banner) {
     final String? image = banner.imageUrl;
     return SizedBox(
-      width: 300,
+      width: double.infinity,
       child: Material(
         color: DeliveryColors.brand,
         borderRadius: BorderRadius.circular(DeliveryRadius.lg),
@@ -1127,81 +1185,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       case BannerLinkKind.none:
         break;
     }
-  }
-
-  Widget _offersRail() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              _gutter, DeliverySpacing.md, _gutter, DeliverySpacing.md - 4),
-          child: YdSectionHeader(
-              title: DeliveryStrings.of(context).offersForYou, fontSize: 18),
-        ),
-        SizedBox(
-          height: 96,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
-            itemCount: _platformOffers.length,
-            separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
-            itemBuilder: (BuildContext context, int i) {
-              final Offer offer = _platformOffers[i];
-              return Container(
-                width: 258,
-                padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: <Color>[DeliveryColors.brand, DeliveryColors.brandDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(DeliveryRadius.lg),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text(
-                            offer.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: DeliveryColors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          if (offer.subtitle != null) ...<Widget>[
-                            const SizedBox(height: DeliverySpacing.xs),
-                            Text(
-                              offer.subtitle!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: DeliveryColors.white.withValues(alpha: 0.82),
-                                fontSize: 12,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.local_offer_outlined,
-                        color: DeliveryColors.white.withValues(alpha: 0.25), size: 40),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
   }
 
   /// The `featured-section`: a Bold 18 heading with a text action, over a rail of 260px shop
@@ -1503,4 +1486,29 @@ class _MetaBullet extends StatelessWidget {
       child: Text('•', style: TextStyle(fontSize: 12, color: DeliveryColors.faint)),
     );
   }
+}
+
+/// A fixed-extent pinned header: the search bar and the labels row don't shrink or float,
+/// they simply hold their line while the feed scrolls beneath.
+class _PinnedBoxDelegate extends SliverPersistentHeaderDelegate {
+  _PinnedBoxDelegate({required this.height, required this.child});
+
+  final double height;
+  final Widget child;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox(height: height, child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedBoxDelegate oldDelegate) =>
+      oldDelegate.height != height || oldDelegate.child != child;
 }

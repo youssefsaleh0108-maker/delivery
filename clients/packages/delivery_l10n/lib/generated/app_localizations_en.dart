@@ -3131,6 +3131,11 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custFilters => 'Filters';
 
   @override
+  String custSearchInCategory(String name) {
+    return 'Search in $name';
+  }
+
+  @override
   String get custMyBasket => 'My Basket';
 
   @override

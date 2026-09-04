@@ -5648,6 +5648,12 @@ abstract class DeliveryStrings {
   /// **'Filters'**
   String get custFilters;
 
+  /// No description provided for @custSearchInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in {name}'**
+  String custSearchInCategory(String name);
+
   /// No description provided for @custMyBasket.
   ///
   /// In en, this message translates to:
