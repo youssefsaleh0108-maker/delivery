@@ -25,6 +25,7 @@ class ButlerRequestsList extends StatefulWidget {
     required this.orderApi,
     required this.storeApi,
     this.trackingApi,
+    this.trackingSocket,
     this.chatApi,
     required this.cart,
     this.version = 0,
@@ -35,6 +36,9 @@ class ButlerRequestsList extends StatefulWidget {
   final OrderApi orderApi;
   final StoreApi storeApi;
   final TrackingApi? trackingApi;
+
+  /// The tracking service socket, threaded to the tracking panel for pushed positions.
+  final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final Cart cart;
 
@@ -292,6 +296,7 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
                   orderApi: widget.orderApi,
                   storeApi: widget.storeApi,
                   trackingApi: widget.trackingApi,
+                  trackingSocket: widget.trackingSocket,
                   chatApi: widget.chatApi,
                   cart: widget.cart,
                 ),

@@ -31,6 +31,7 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.cart,
     required this.orderId,
     this.trackingApi,
+    this.trackingSocket,
     this.chatApi,
     this.preview,
   });
@@ -43,6 +44,10 @@ class OrderDetailsScreen extends StatefulWidget {
   /// The ETA endpoint, handed through to the tracking panel. Optional so call sites that have
   /// not been wired yet keep compiling; the panel then shows what it always showed.
   final TrackingApi? trackingApi;
+
+  /// The tracking service's live socket, handed through for pushed rider positions. Optional:
+  /// without it the panel polls, exactly as before.
+  final UserQueueSocket? trackingSocket;
 
   /// The order conversation, handed through to the tracking panel's message entry. Optional for
   /// the same reason.
@@ -289,6 +294,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     api: widget.orderApi,
                     order: order,
                     trackingApi: widget.trackingApi,
+                    liveSocket: widget.trackingSocket,
                     chatApi: widget.chatApi,
                   ),
                   // After delivery, the rating takes the tracking panel's slot: the sheet once,
