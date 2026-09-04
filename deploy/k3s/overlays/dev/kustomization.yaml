@@ -21,12 +21,12 @@ configMapGenerator:
   # SMTP_PASSWORD is the Gmail app password, living only in platform-secrets on the box.
   # SMS_TEST_INBOX must be a mailbox the operator owns once the relay is real — every
   # simulated SMS becomes an actual email to it.
-  - SMTP_HOST=smtp.gmail.com
+  - SMTP_HOST=smtp.office365.com
   - SMTP_PORT=587
-  - SMTP_USER=youssef.saleh0108@gmail.com
+  - SMTP_USER=noreply@youdrop.shop
   - SMTP_AUTH=true
   - SMTP_STARTTLS=true
-  - EMAIL_FROM=youssef.saleh0108@gmail.com
+  - EMAIL_FROM=noreply@youdrop.shop
   - SMS_TEST_INBOX=youssef.saleh0108@gmail.com
 
 generatorOptions:
