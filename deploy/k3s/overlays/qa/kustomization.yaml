@@ -56,7 +56,8 @@ images:
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newTag: sha-b0b3f2f738058100872b8a5852f9fe422891128e
 - name: ghcr.io/youssefsaleh0108-maker/product-service
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
