@@ -70,6 +70,21 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
 
 delivery:
+  # Setting this list REPLACES the library defaults, so they are restated (the same shape
+  # app-notification uses). The socket is permitted at the HTTP layer because a WebSocket
+  # upgrade cannot carry an Authorization header; the STOMP CONNECT frame inside the socket is
+  # where the token is actually checked (WebSocketConfiguration), and SUBSCRIBE re-checks per
+  # order.
+  security:
+    permit-all:
+      - /actuator/health
+      - /actuator/health/**
+      - /actuator/info
+      - /actuator/prometheus
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /ws/tracking/**
+
   outbox:
     exchange: delivery.events
 

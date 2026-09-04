@@ -29,6 +29,7 @@ class CustomerShell extends StatefulWidget {
     this.splitApi,
     this.geocodingApi,
     this.trackingApi,
+    this.trackingSocket,
     this.chatApi,
     this.prefsApi,
     this.profileApi,
@@ -57,6 +58,9 @@ class CustomerShell extends StatefulWidget {
   final SplitApi? splitApi;
   final GeocodingApi? geocodingApi;
   final TrackingApi? trackingApi;
+
+  /// The tracking service socket, threaded to the tracking panel for pushed positions.
+  final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final NotificationPrefsApi? prefsApi;
 
@@ -166,6 +170,7 @@ class _CustomerShellState extends State<CustomerShell> {
           api: widget.orderApi,
           storeApi: widget.storeApi,
           trackingApi: widget.trackingApi,
+          trackingSocket: widget.trackingSocket,
           chatApi: widget.chatApi,
           cart: _cart,
         );
@@ -177,6 +182,7 @@ class _CustomerShellState extends State<CustomerShell> {
           orderApi: widget.orderApi,
           storeApi: widget.storeApi,
           trackingApi: widget.trackingApi,
+          trackingSocket: widget.trackingSocket,
           chatApi: widget.chatApi,
           cart: _cart,
         );

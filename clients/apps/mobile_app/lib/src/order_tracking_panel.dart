@@ -42,11 +42,18 @@ class OrderTrackingPanel extends StatefulWidget {
     required this.api,
     required this.order,
     this.trackingApi,
+    this.liveSocket,
     this.chatApi,
   });
 
   final OrderApi api;
   final DeliveryOrder order;
+
+  /// The tracking service's STOMP socket, for pushed positions. Optional: without it the panel
+  /// polls exactly as it always has, so the map degrades to five-second updates rather than
+  /// breaking. With it, each rider ping lands here the moment the server records it, and the
+  /// poll stretches out into a slow safety net.
+  final UserQueueSocket? liveSocket;
 
   /// The ETA endpoint. Optional so the panel still builds where the shell has not been handed
   /// one; the headline then stays the status sentence it was. Never used to invent a number —
@@ -61,9 +68,14 @@ class OrderTrackingPanel extends StatefulWidget {
   State<OrderTrackingPanel> createState() => _OrderTrackingPanelState();
 }
 
-class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
+class _OrderTrackingPanelState extends State<OrderTrackingPanel>
+    with SingleTickerProviderStateMixin {
   /// Matches the rider app's own ping cadence; polling faster only burns requests.
   static const Duration _pollInterval = Duration(seconds: 5);
+
+  /// The poll while the live socket is delivering: a slow refetch that heals any missed frame,
+  /// not the update path.
+  static const Duration _safetyPollInterval = Duration(seconds: 30);
 
   /// The height the design gives the map canvas.
   static const double _canvasHeight = 520;
@@ -112,18 +124,71 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
   bool get _afterPickup =>
       widget.order.status.wire == 'READY' || widget.order.status.wire == 'PICKED_UP';
 
+  /// The pushed-position subscription, when a socket was handed in.
+  StreamSubscription<Map<String, dynamic>>? _live;
+
+  /// The marker's glide between fixes. Without it a pushed position teleports the marker, which
+  /// reads as glitching; an 800ms slide reads as a rider moving.
+  late final AnimationController _glide = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 800))
+    ..addListener(() => setState(() {}));
+  LatLng? _glideFrom;
+
   @override
   void initState() {
     super.initState();
     _refresh();
     _resolveDestination();
     if (_isLive) {
-      _poll = Timer.periodic(_pollInterval, (_) => _refresh());
+      _startPoll(_pollInterval);
+      final UserQueueSocket? socket = widget.liveSocket;
+      if (socket != null) {
+        _live = socket
+            .subscribe('/topic/orders/${widget.order.id}/position')
+            .listen(_onPushedFix);
+        // While frames are being pushed the poll is only a safety net; the moment the socket
+        // drops, the old five-second cadence takes over again.
+        socket.connected.addListener(_onSocketState);
+        _onSocketState();
+      }
+    }
+  }
+
+  void _onSocketState() {
+    if (!mounted || !_isLive) return;
+    final bool live = widget.liveSocket?.connected.value ?? false;
+    _startPoll(live ? _safetyPollInterval : _pollInterval);
+  }
+
+  void _startPoll(Duration every) {
+    _poll?.cancel();
+    _poll = Timer.periodic(every, (_) => _refresh());
+  }
+
+  void _onPushedFix(Map<String, dynamic> frame) {
+    if (!mounted) return;
+    final RiderPosition fix;
+    try {
+      fix = RiderPosition.fromJson(frame);
+    } catch (_) {
+      return; // Not a position; the durable copy arrives on the next refetch.
+    }
+    setState(() {
+      _glideFrom = _latest == null ? null : LatLng(_latest!.lat, _latest!.lng);
+      _trail = <RiderPosition>[..._trail, fix];
+      _latest = fix;
+      _loaded = true;
+    });
+    if (_glideFrom != null) {
+      _glide.forward(from: 0);
     }
   }
 
   @override
   void dispose() {
+    widget.liveSocket?.connected.removeListener(_onSocketState);
+    _live?.cancel();
+    _glide.dispose();
     _poll?.cancel();
     _map.dispose();
     super.dispose();
@@ -388,7 +453,7 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
                 ),
               if (_latest case final RiderPosition fix)
                 Marker(
-                  point: LatLng(fix.lat, fix.lng),
+                  point: _glidingPoint(LatLng(fix.lat, fix.lng)),
                   width: 34,
                   height: 34,
                   child: _riderMarker(t),
@@ -400,6 +465,18 @@ class _OrderTrackingPanelState extends State<OrderTrackingPanel> {
         fallback: _styledSurface(),
         overlay: (bool _) => _mapOverlay(t),
       ),
+    );
+  }
+
+  /// The rider marker's position mid-glide: a straight lerp from the previous fix, eased. Once
+  /// the animation completes (or when there is nothing to glide from) it is simply the fix.
+  LatLng _glidingPoint(LatLng to) {
+    final LatLng? from = _glideFrom;
+    if (from == null || _glide.isCompleted || !_glide.isAnimating) return to;
+    final double u = Curves.easeInOut.transform(_glide.value);
+    return LatLng(
+      from.latitude + (to.latitude - from.latitude) * u,
+      from.longitude + (to.longitude - from.longitude) * u,
     );
   }
 
