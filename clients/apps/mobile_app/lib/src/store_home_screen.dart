@@ -681,7 +681,26 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     );
   }
 
+  /// The tinted-glyph tile: the fallback for a category with no curated image, and the error
+  /// state when its image will not load.
+  Widget _categoryIconTile(StoreVertical vertical) => Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: DeliveryColors.brandSoft,
+          borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
+        ),
+        child: Icon(iconForVertical(vertical),
+            size: 20, color: DeliveryColors.brand),
+      );
+
   Widget _categoryCard(StoreVertical vertical) {
+    // The curated image, when the platform has set one — a real photo, cover-cropped into the
+    // tile, which is what makes the strip read like a marketplace instead of a row of tinted
+    // glyphs. The icon tile stays as the fallback for a category nobody has dressed yet.
+    final String? image = _chipFor(vertical)?.imageUrl;
+
     return Semantics(
       button: true,
       label: _chipLabel(vertical),
@@ -701,17 +720,20 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: DeliveryColors.brandSoft,
+                if (image != null)
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
-                  ),
-                  child: Icon(iconForVertical(vertical),
-                      size: 20, color: DeliveryColors.brand),
-                ),
+                    child: Image(
+                      image: DeliveryImages.provider(image),
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorBuilder: (BuildContext _, Object __, StackTrace? ___) =>
+                          _categoryIconTile(vertical),
+                    ),
+                  )
+                else
+                  _categoryIconTile(vertical),
                 const SizedBox(height: 6),
                 Text(
                   _chipLabel(vertical),
