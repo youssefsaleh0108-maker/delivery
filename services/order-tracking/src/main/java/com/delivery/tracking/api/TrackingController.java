@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import com.delivery.platform.security.CurrentUser;
 import com.delivery.tracking.service.EtaService;
 import com.delivery.tracking.service.EtaService.EtaResult;
@@ -34,10 +36,13 @@ public class TrackingController {
 
     private final TrackingService tracking;
     private final EtaService eta;
+    private final SimpMessagingTemplate live;
 
-    public TrackingController(TrackingService tracking, EtaService eta) {
+    public TrackingController(TrackingService tracking, EtaService eta,
+                              SimpMessagingTemplate live) {
         this.tracking = tracking;
         this.eta = eta;
+        this.live = live;
     }
 
     /**
@@ -51,8 +56,14 @@ public class TrackingController {
     @PreAuthorize("hasRole('DELIVERY')")
     public ResponseEntity<Void> ping(@PathVariable UUID orderId,
                                      @Valid @RequestBody PingRequest request) {
-        tracking.ping(orderId, CurrentUser.requireId(),
+        Position recorded = tracking.ping(orderId, CurrentUser.requireId(),
                 request.lat(), request.lng(), request.accuracyM());
+        // The live push. Fire-and-forget by design: the position is already durable, and a
+        // subscriber that misses this frame gets it on its next history fetch. Authorisation
+        // happened at SUBSCRIBE (WebSocketConfiguration), so everyone on the topic may see it.
+        live.convertAndSend("/topic/orders/" + orderId + "/position",
+                new PositionResponse(recorded.orderId(), recorded.riderId(), recorded.lat(),
+                        recorded.lng(), recorded.accuracyM(), recorded.recordedAt()));
         return ResponseEntity.accepted().build();
     }
 

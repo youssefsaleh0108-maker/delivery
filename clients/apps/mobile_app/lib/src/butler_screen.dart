@@ -36,6 +36,7 @@ class ButlerScreen extends StatefulWidget {
     required this.orderApi,
     required this.storeApi,
     this.trackingApi,
+    this.trackingSocket,
     this.chatApi,
     required this.cart,
   });
@@ -54,6 +55,9 @@ class ButlerScreen extends StatefulWidget {
   /// Handed through the request list to the ordinary order screen an approved errand opens —
   /// the live ETA and the rider chat live there, same as for a shop order.
   final TrackingApi? trackingApi;
+
+  /// The tracking service socket, threaded to the tracking panel for pushed positions.
+  final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final Cart cart;
 
@@ -215,6 +219,7 @@ class _ButlerScreenState extends State<ButlerScreen> {
                     const SizedBox(height: DeliverySpacing.md),
                     ButlerRequestsList(
                       trackingApi: widget.trackingApi,
+                      trackingSocket: widget.trackingSocket,
                       chatApi: widget.chatApi,
                       api: widget.api,
                       orderApi: widget.orderApi,

@@ -27,16 +27,22 @@ import '../auth/auth_service.dart';
 /// cannot set headers on the upgrade request, and a token in the query string would sit in access
 /// logs. The CONNECT frame carries it as a header on every platform alike.
 class UserQueueSocket {
-  UserQueueSocket({required Uri apiBaseUrl, required AuthService auth})
-      : _endpoint = _wsEndpoint(apiBaseUrl),
+  UserQueueSocket({
+    required Uri apiBaseUrl,
+    required AuthService auth,
+    // The default is the notifications socket this class was born for; the tracking panel opens
+    // a second instance on `/ws/tracking` for the live rider line. Same STOMP, same CONNECT
+    // auth, different endpoint and topics — the class never needed to know whose frames these are.
+    String wsPath = '/ws/notifications/websocket',
+  })  : _endpoint = _wsEndpoint(apiBaseUrl, wsPath),
         _auth = auth;
 
   /// The raw-WebSocket transport of the server's SockJS endpoint. SockJS exists for networks that
   /// block WebSocket upgrades; a native client has no such network stack quirks, so it takes the
   /// direct transport and skips the SockJS protocol entirely.
-  static Uri _wsEndpoint(Uri apiBaseUrl) => apiBaseUrl.replace(
+  static Uri _wsEndpoint(Uri apiBaseUrl, String path) => apiBaseUrl.replace(
         scheme: apiBaseUrl.scheme == 'https' ? 'wss' : 'ws',
-        path: '/ws/notifications/websocket',
+        path: path,
       );
 
   final Uri _endpoint;

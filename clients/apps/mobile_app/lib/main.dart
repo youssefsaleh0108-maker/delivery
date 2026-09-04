@@ -171,6 +171,14 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// build that never reaches a chat screen never opens a connection.
   late final UserQueueSocket _socket =
       UserQueueSocket(apiBaseUrl: Uri.parse(_apiBaseUrl), auth: _authService);
+
+  /// The tracking service's own socket, for the live rider line on the order map. A second
+  /// instance rather than a second subscription because it is a different backend service with
+  /// its own endpoint; same STOMP, same lazy-open-on-first-subscribe behaviour.
+  late final UserQueueSocket _trackingSocket = UserQueueSocket(
+      apiBaseUrl: Uri.parse(_apiBaseUrl),
+      auth: _authService,
+      wsPath: '/ws/tracking/websocket');
   late final ButlerApi _butlerApi = ButlerApi(_dio);
   /// The area list the address sheet offers. Nullable nowhere: a deployment with no areas
   /// configured simply gets an empty list and no picker.
@@ -434,6 +442,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       promoApi: _promoApi,
       geocodingApi: _geocodingApi,
       trackingApi: _trackingApi,
+      trackingSocket: _trackingSocket,
       chatApi: _chatApi,
       prefsApi: _prefsApi,
       profileApi: _profileApi,

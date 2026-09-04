@@ -22,6 +22,7 @@ class MyOrdersScreen extends StatefulWidget {
     required this.api,
     required this.storeApi,
     this.trackingApi,
+    this.trackingSocket,
     this.chatApi,
     required this.cart,
   });
@@ -34,6 +35,9 @@ class MyOrdersScreen extends StatefulWidget {
   /// Handed to the details page too: the live ETA and the chat with the rider live there, and
   /// this list is the road every order takes to reach it.
   final TrackingApi? trackingApi;
+
+  /// The tracking service socket, threaded to the tracking panel for pushed positions.
+  final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final Cart cart;
 
@@ -107,6 +111,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         orderApi: widget.api,
         storeApi: widget.storeApi,
         trackingApi: widget.trackingApi,
+        trackingSocket: widget.trackingSocket,
         chatApi: widget.chatApi,
         cart: widget.cart,
         orderId: order.id,
