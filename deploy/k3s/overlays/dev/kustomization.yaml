@@ -45,6 +45,8 @@ patches:
 # environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
 # deploys the result — edit by merge, not by hand.
 images:
+- name: docker.io/youssefsaleh0108/delivery-order-manager
+  newTag: develop
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/app-notification

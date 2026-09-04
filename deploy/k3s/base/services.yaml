@@ -78,6 +78,9 @@ spec:
       containers:
         - name: order-manager
           image: docker.io/youssefsaleh0108/delivery-order-manager:main
+          # The one service on a MUTABLE branch tag (its own repo cannot bump our overlays
+          # without a cross-repo token), so every pull must really pull.
+          imagePullPolicy: Always
           envFrom:
             - configMapRef: { name: platform-common }
             - configMapRef: { name: platform-env }
