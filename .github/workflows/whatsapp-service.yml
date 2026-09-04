@@ -7,14 +7,14 @@ name: whatsapp-service
 # reported as a startup failure with no job and no log, which reads like an outage rather than a
 # permissions problem. Every caller needs its own copy; there is no inheriting this downward.
 permissions:
-  contents: read
+  contents: write
   packages: write
   security-events: write
   checks: write
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop, qa]
     paths:
       - 'services/whatsapp-service/**'
       - 'platform/**'

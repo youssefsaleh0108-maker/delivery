@@ -1,0 +1,66 @@
+# Argo CD's edge and its two Applications. The install itself comes from the upstream manifest
+# (scripts/setup-argocd.sh applies it); this file is what makes it OURS: the hostname, TLS at
+# the shared Traefik (the server runs --insecure behind it), and the two Applications that turn
+# branches into environments:
+#
+#   merge to develop  ->  CI builds + bumps overlays/dev on develop  ->  delivery-dev syncs
+#   merge develop->qa ->  CI builds + bumps overlays/qa  on qa       ->  delivery-qa syncs
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  entryPoints: [websecure]
+  tls:
+    certResolver: letsencrypt
+  routes:
+    - kind: Rule
+      match: Host(`argocd.youdrop.shop`)
+      services:
+        - name: argocd-server
+          port: 80
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: delivery-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/youssefsaleh0108-maker/delivery.git
+    targetRevision: develop
+    path: deploy/k3s/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: delivery-dev
+  syncPolicy:
+    automated:
+      # selfHeal reverts drift; prune stays off — the secrets and Jobs created on the box are
+      # not Argo's to delete.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: delivery-qa
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/youssefsaleh0108-maker/delivery.git
+    targetRevision: qa
+    path: deploy/k3s/overlays/qa
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: delivery-qa
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true

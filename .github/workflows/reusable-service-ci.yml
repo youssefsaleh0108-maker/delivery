@@ -167,6 +167,52 @@ jobs:
           cache-from: type=gha,scope=${{ inputs.service-name }}
           cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
 
+  # GitOps hand-off: after a successful build on an environment branch, point that environment's
+  # overlay at the immutable sha- tag this run just pushed. Argo CD watches the branch and does
+  # the deploying — CI never touches the cluster.
+  #
+  #   develop -> deploy/k3s/overlays/dev   (namespace delivery-dev)
+  #   qa      -> deploy/k3s/overlays/qa    (namespace delivery-qa)
+  #
+  # The commit touches deploy/k3s only, which no service workflow lists in its paths filter, so
+  # it cannot retrigger CI. Fifteen services can land in one merge and race this push, hence the
+  # rebase-and-retry loop and the concurrency group serialising per branch.
+  update-environment-manifest:
+    needs: build
+    if: >-
+      inputs.push-image && github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/qa')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: env-manifest-${{ github.ref }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Point the overlay at this build
+        run: |
+          set -eu
+          ENV=dev
+          [ "${{ github.ref_name }}" = "qa" ] && ENV=qa
+          cd deploy/k3s/overlays/$ENV
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar xz
+          IMG="ghcr.io/${{ github.repository_owner }}/${{ inputs.service-name }}"
+          ./kustomize edit set image "$IMG=$IMG:sha-${{ github.sha }}"
+          rm -f kustomize
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kustomization.yaml
+          git commit -m "deploy($ENV): ${{ inputs.service-name }} at sha-${{ github.sha }}" || { echo "nothing to change"; exit 0; }
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git pull --rebase
+          done
+          echo "could not push the manifest bump after 5 attempts" >&2
+          exit 1
+
   deploy-staging:
     needs: build
     if: github.ref == 'refs/heads/main'

@@ -1,7 +1,8 @@
 # The Spring services, one Deployment + ClusterIP Service each, replicas pinned to 1 (single
 # node, two environments). Generated from infra/docker-compose.dev.yml — the shared environment
 # comes from platform-common + platform-env + platform-secrets; only what is service-specific
-# is spelled out per Deployment.
+# is spelled out per Deployment. The prometheus.io annotations are what the monitoring stack
+# discovers scrape targets by.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -15,6 +16,10 @@ spec:
   template:
     metadata:
       labels: { app: product-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8103"
     spec:
       containers:
         - name: product-service
@@ -65,6 +70,10 @@ spec:
   template:
     metadata:
       labels: { app: order-manager }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8101"
     spec:
       containers:
         - name: order-manager
@@ -115,6 +124,10 @@ spec:
   template:
     metadata:
       labels: { app: order-tracking }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8102"
     spec:
       containers:
         - name: order-tracking
@@ -165,6 +178,10 @@ spec:
   template:
     metadata:
       labels: { app: transfer-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8118"
     spec:
       containers:
         - name: transfer-service
@@ -215,6 +232,10 @@ spec:
   template:
     metadata:
       labels: { app: connector-settings }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8109"
     spec:
       containers:
         - name: connector-settings
@@ -265,6 +286,10 @@ spec:
   template:
     metadata:
       labels: { app: notifications-manager }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8104"
     spec:
       containers:
         - name: notifications-manager
@@ -315,6 +340,10 @@ spec:
   template:
     metadata:
       labels: { app: app-notification }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8108"
     spec:
       containers:
         - name: app-notification
@@ -365,6 +394,10 @@ spec:
   template:
     metadata:
       labels: { app: email-connector }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8110"
     spec:
       containers:
         - name: email-connector
@@ -415,6 +448,10 @@ spec:
   template:
     metadata:
       labels: { app: push-connector }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8111"
     spec:
       containers:
         - name: push-connector
@@ -465,6 +502,10 @@ spec:
   template:
     metadata:
       labels: { app: sms-connector }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8112"
     spec:
       containers:
         - name: sms-connector
@@ -515,6 +556,10 @@ spec:
   template:
     metadata:
       labels: { app: accounting-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8115"
     spec:
       containers:
         - name: accounting-service
@@ -565,6 +610,10 @@ spec:
   template:
     metadata:
       labels: { app: whatsapp-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8116"
     spec:
       containers:
         - name: whatsapp-service
@@ -615,6 +664,10 @@ spec:
   template:
     metadata:
       labels: { app: onboarding-service }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8117"
     spec:
       containers:
         - name: onboarding-service

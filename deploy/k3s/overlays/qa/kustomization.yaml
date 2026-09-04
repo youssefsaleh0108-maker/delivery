@@ -27,3 +27,34 @@ patches:
       - op: replace
         path: /spec/template/spec/volumes/1/hostPath/path
         value: /opt/delivery/sites/qa/portal
+
+# Which build each service runs. CI rewrites these lines after every image build on this
+# environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
+# deploys the result — edit by merge, not by hand.
+images:
+  - name: ghcr.io/youssefsaleh0108-maker/product-service
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/order-tracking
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/transfer-service
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/connector-settings
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/app-notification
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/email-connector
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/push-connector
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/sms-connector
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/accounting-service
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
+    newTag: main
+  - name: ghcr.io/youssefsaleh0108-maker/config-server
+    newTag: main
