@@ -646,6 +646,9 @@ public class StoreController {
                 resolved.stream().map(ImageUrl::full).toList(),
                 resolved.stream().map(ImageUrl::thumb).toList(),
                 product.getStatus(),
+                product.getSku(),
+                product.getBarcode(),
+                product.isInStock(),
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }

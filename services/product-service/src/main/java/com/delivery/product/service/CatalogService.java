@@ -130,6 +130,7 @@ public class CatalogService {
                 request.description(),
                 request.price(),
                 request.categoryId());
+        product.assignCodes(request.sku(), request.barcode());
         products.save(product);
 
         // Same transaction as the insert above: the event and the row commit together or not at
@@ -146,7 +147,8 @@ public class CatalogService {
         Product product = requireOwned(id, merchantId);
         validateCategory(request.categoryId());
 
-        product.update(request.name(), request.description(), request.price(), request.categoryId());
+        product.update(request.name(), request.description(), request.price(), request.categoryId(),
+                request.sku(), request.barcode());
 
         outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
                 CatalogEvents.PRODUCT_UPDATED, CatalogEvents.ProductSnapshot.of(product));

@@ -37,7 +37,14 @@ public final class CatalogDtos {
              * store never needs to say. Ownership is still checked — unlike merchantId this cannot
              * simply be ignored, because a merchant may legitimately have more than one store.
              */
-            UUID storeId) {
+            UUID storeId,
+            /**
+             * The merchant's own code for the item, unique within the store when set. Optional:
+             * blank is stored as absent, so several untagged products do not collide.
+             */
+            @Size(max = 64) String sku,
+            /** Scanned at the till. Not unique — the same EAN legitimately appears in two stores. */
+            @Size(max = 32) String barcode) {
     }
 
     public record ProductResponse(
@@ -70,6 +77,16 @@ public final class CatalogDtos {
              */
             List<String> imageThumbUrls,
             Product.Status status,
+            /** The merchant's own item code; null when the catalogue was never tagged. */
+            String sku,
+            /** Till-scannable code; null when unset. */
+            String barcode,
+            /**
+             * Whether inventory-service currently believes the item is sellable. Always true for a
+             * product the merchant has not opted into stock tracking, so clients can read it
+             * unconditionally without knowing whether inventory is in play.
+             */
+            boolean inStock,
             Instant createdAt,
             Instant updatedAt) {
     }

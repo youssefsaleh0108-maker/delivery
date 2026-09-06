@@ -41,6 +41,10 @@
       {
         "name": "APPLICANT",
         "description": "Applied to sell, carry or deliver and is waiting on a decision. Grants nothing: it exists so a token can say who somebody is without saying they are a merchant yet."
+      },
+      {
+        "name": "MERCHANT_STAFF",
+        "description": "Works at a shop. Grants nothing by itself: the shop's staff record decides what they may do."
       }
     ]
   },
