@@ -197,8 +197,11 @@ spec:
               mountPath: /policies
               readOnly: true
           resources:
-            requests: { memory: 24Mi, cpu: 10m }
-            limits: { memory: 64Mi }
+            # The vault CLI spikes while bootstrap.sh runs its ~16 kv puts; 64Mi OOM-killed the
+            # sidecar (exit 137) under post-reboot memory pressure, so give it real headroom. It
+            # mostly sleeps, so requests stay small.
+            requests: { memory: 32Mi, cpu: 10m }
+            limits: { memory: 160Mi }
       volumes:
         # The whole vault-bootstrap CM (bootstrap.sh + reconcile.sh), not a single item.
         - name: bootstrap
