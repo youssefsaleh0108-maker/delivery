@@ -93,8 +93,15 @@ spec:
     - port: 8080
       targetPort: 8080
 ---
-# Vault in dev mode: in-memory, auto-unsealed, root token from the secret. Environment-grade for
-# dev and qa; a production Vault is its own project.
+# Vault in dev mode: in-memory, auto-unsealed, root token pinned from platform-secrets.
+#
+# Reboot survival does NOT need persistent storage: every value Vault holds is a projection of
+# platform-secrets (which lives in the k3s datastore and survives a reboot) plus the dev literals
+# in bootstrap.sh, and no service writes Vault at runtime. The `vault-reseed` sidecar re-seeds
+# AppRole + policies + KV from platform-secrets on every pod start (and re-heals a vault-container
+# restart), replacing the one-shot vault-init Job — a Job is immutable, Completes once, and never
+# re-runs on reboot, which is exactly what took the platform down on 2026-09-05. A production Vault
+# (raft + KMS auto-unseal + off-box backups) is its own project.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -102,6 +109,9 @@ metadata:
   labels: { app: vault }
 spec:
   replicas: 1
+  # Single node, no PVC: never run two in-memory dev vaults behind one Service at once, or
+  # config-server can hit a fresh unseeded pod mid-rollout. Recreate = old pod gone before new.
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app: vault }
   template:
@@ -109,6 +119,7 @@ spec:
       labels: { app: vault }
     spec:
       containers:
+        # 1) The dev-mode server — unchanged from before except it no longer runs alone in the pod.
         - name: vault
           image: hashicorp/vault:1.18
           args: ["server", "-dev", "-dev-listen-address=0.0.0.0:8200"]
@@ -123,43 +134,26 @@ spec:
           ports:
             - containerPort: 8200
           readinessProbe:
-            httpGet: { path: /v1/sys/health, port: 8200 }
+            httpGet: { path: /v1/sys/health, port: 8200 }   # dev mode → 200 immediately (unsealed)
             periodSeconds: 10
           resources:
             requests: { memory: 64Mi, cpu: 20m }
             limits: { memory: 192Mi }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: vault
-spec:
-  selector: { app: vault }
-  ports:
-    - port: 8200
-      targetPort: 8200
----
-# Enables AppRole, writes the Config Server's read-only policy, seeds the dev secrets. Vault is
-# in-memory, so this re-runs after every vault restart — re-apply the overlay (or just this Job)
-# whenever the vault pod is recreated.
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: vault-init
-spec:
-  backoffLimit: 10
-  template:
-    metadata:
-      labels: { app: vault-init }
-    spec:
-      restartPolicy: OnFailure
-      containers:
-        - name: vault-init
+        # 2) The reconcile sidecar. Seeds on start; re-heals on a vault-container restart. The pod
+        #    (and therefore the vault Service endpoint) becomes Ready ONLY once THIS container's
+        #    readiness probe passes — i.e. only after the seed has run to its completion marker — so
+        #    config-server's AppRole login cannot race ahead of the seed on a cold boot. Seeding and
+        #    probing talk to Vault over loopback, never the Service, so the sidecar's own readiness
+        #    never gates its work (no deadlock).
+        - name: vault-reseed
           image: hashicorp/vault:1.18
-          command: ["/bin/sh", "/bootstrap/bootstrap.sh"]
+          command: ["/bin/sh", "/bootstrap/reconcile.sh"]
           env:
             - name: VAULT_ADDR
-              value: http://vault:8200
+              value: http://127.0.0.1:8200
+            - name: RESEED_INTERVAL
+              value: "15"
+            # Identical credential wiring to the retired vault-init Job — proven, low-risk.
             - name: VAULT_TOKEN
               valueFrom: { secretKeyRef: { name: platform-secrets, key: VAULT_ROOT_TOKEN } }
             - name: CONFIG_SERVER_ROLE_ID
@@ -176,14 +170,25 @@ spec:
               valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_PASSWORD } }
             - name: POSTGRES_PASSWORD
               valueFrom: { secretKeyRef: { name: platform-secrets, key: POSTGRES_PASSWORD } }
-            # From the platform secret, never a literal: this Job re-runs after every vault
-            # restart, and a hardcoded "" would ERASE the relay password each time — mail then
-            # fails with "relay authentication failed" for no change anybody made.
+            # From platform-secrets, never a literal: bootstrap.sh writes secret/email-connector
+            # with this value, and a hardcoded "" would ERASE the relay password on every reseed.
+            # Safe only because the value comes from the datastore (survives reboot).
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: platform-secrets
                   key: SMTP_PASSWORD
+          # Ready only when Vault is fully seeded (AppRole present AND the completion marker written).
+          # Uses VAULT_ADDR + VAULT_TOKEN from this container's env; redirects hide secret output.
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "vault read auth/approle/role/config-server >/dev/null 2>&1 && vault kv get secret/_seed_complete >/dev/null 2>&1"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: bootstrap
               mountPath: /bootstrap
@@ -191,16 +196,30 @@ spec:
             - name: policies
               mountPath: /policies
               readOnly: true
+          resources:
+            requests: { memory: 24Mi, cpu: 10m }
+            limits: { memory: 64Mi }
       volumes:
+        # The whole vault-bootstrap CM (bootstrap.sh + reconcile.sh), not a single item.
         - name: bootstrap
           configMap:
             name: vault-bootstrap
-            items:
-              - key: bootstrap.sh
-                path: bootstrap.sh
         - name: policies
           configMap:
             name: vault-policies
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+spec:
+  selector: { app: vault }
+  ports:
+    - port: 8200
+      targetPort: 8200
+# NOTE: the vault-init Job is intentionally gone — the reseed sidecar subsumes it. Argo prune is
+# OFF, so the already-Completed live Jobs (vault-init, and any hand-made vault-reseed-boot) are not
+# deleted by this change; the migration deletes them by hand once per namespace.
 ---
 # The Config Server: JDBC + Vault composite backend. Everything else waits on it in practice —
 # a service that cannot resolve its configuration restarts until this is Ready.

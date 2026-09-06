@@ -28,6 +28,7 @@ configMapGenerator:
   - name: vault-bootstrap
     files:
       - assets/vault/bootstrap.sh
+      - assets/vault/reconcile.sh
   - name: vault-policies
     files:
       - assets/vault/policies/config-server.hcl
