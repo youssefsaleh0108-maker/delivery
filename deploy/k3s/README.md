@@ -49,8 +49,11 @@ invent is the onboarding client secret, which must match what the realm import c
 
 ## What to know
 
-- **Vault is dev-mode and in-memory**: after a vault pod restart, re-run its seeding —
-  `kubectl -n <ns> delete job vault-init && kubectl apply -k overlays/<env>`.
+- **Vault is dev-mode and in-memory, but reboot-safe**: the `vault-reseed` sidecar in the vault pod
+  re-seeds AppRole + policies + KV from `platform-secrets` on every pod start (and re-heals a vault
+  container restart), and its readiness probe gates the vault Service until the seed reaches its
+  completion marker. Nothing to do on reboot. All Vault state derives from `platform-secrets` (the
+  datastore) — add new secret material there, never by hand in Vault (the reseed would overwrite it).
 - **Mail goes to mailpit** (monitoring-<env>/mailpit, behind the ops basic-auth). Real SMTP means
   putting relay credentials in `platform-secrets` and pointing `SMTP_*` in `platform-common` at
   the relay — a deliberate act, since test data then reaches real inboxes.
