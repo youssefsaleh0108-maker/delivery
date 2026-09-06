@@ -43,29 +43,29 @@ patches:
 images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
   newTag: qa
-  - name: ghcr.io/youssefsaleh0108-maker/product-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/order-tracking
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/transfer-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/connector-settings
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/app-notification
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/email-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/push-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/sms-connector
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/accounting-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
-    newTag: main
-  - name: ghcr.io/youssefsaleh0108-maker/config-server
-    newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/product-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/order-tracking
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/transfer-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/connector-settings
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/notifications-manager
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/app-notification
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/email-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/push-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/sms-connector
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/accounting-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/onboarding-service
+  newTag: main
+- name: ghcr.io/youssefsaleh0108-maker/config-server
+  newTag: main
