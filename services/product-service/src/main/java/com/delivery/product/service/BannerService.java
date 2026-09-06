@@ -173,7 +173,9 @@ public class BannerService {
     /** The home strip: categories tagged with a vertical, so each chip can filter the storefront. */
     @Transactional(readOnly = true)
     public List<Category> verticalCategories() {
-        return categories.findAll().stream()
+        // Platform rows only: a shop's own section never carries a vertical, and reading every row
+        // here would scan the whole merchant-authored tail for nothing.
+        return categories.findByStoreIdIsNull().stream()
                 .filter(c -> c.getVertical() != null)
                 .sorted(java.util.Comparator.comparing(Category::getName))
                 .toList();

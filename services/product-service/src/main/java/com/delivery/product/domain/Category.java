@@ -40,8 +40,26 @@ public class Category {
     @Column(name = "vertical", length = 24)
     private Store.Vertical vertical;
 
+    /**
+     * The shop that authored this section, or null for platform taxonomy.
+     *
+     * <p>This is the whole ownership distinction: a null row is the platform's own category and is
+     * what the customer app's vertical picker reads; a non-null row is one shop's shelf and is
+     * visible only inside that shop.
+     */
+    @Column(name = "store_id")
+    private UUID storeId;
+
+    /** Display order within the owning store. Meaningless (and left at 0) for platform rows. */
+    @Column(name = "position", nullable = false)
+    private short position;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
+
+    /** Maintained by a database trigger, so it cannot drift when a writer forgets to set it. */
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
+    private Instant updatedAt;
 
     protected Category() {
         // for JPA
@@ -53,8 +71,29 @@ public class Category {
         this.parentId = parentId;
     }
 
+    /** A section owned by one shop, appended at the given display position. */
+    public Category(UUID storeId, String name, short position) {
+        this.id = UUID.randomUUID();
+        this.storeId = storeId;
+        this.name = name;
+        this.position = position;
+    }
+
     public void rename(String name) {
         this.name = name;
+    }
+
+    public void moveTo(short position) {
+        this.position = position;
+    }
+
+    /** True for platform taxonomy, which only BACKOFFICE may write. */
+    public boolean isPlatformOwned() {
+        return storeId == null;
+    }
+
+    public boolean isOwnedByStore(UUID storeId) {
+        return this.storeId != null && this.storeId.equals(storeId);
     }
 
     public UUID getId() {
@@ -69,8 +108,20 @@ public class Category {
         return parentId;
     }
 
+    public UUID getStoreId() {
+        return storeId;
+    }
+
+    public short getPosition() {
+        return position;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public String getImageRef() {

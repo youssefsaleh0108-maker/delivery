@@ -197,9 +197,16 @@ public class CatalogService {
         return categories.findByParentIdOrderByName(parentId);
     }
 
+    /**
+     * The platform taxonomy — deliberately NOT every row.
+     *
+     * <p>Merchants author their own sections against the same table (V26). Returning those here
+     * would put one shop's shelf in every client's category picker, so this reads only the rows
+     * with no owning store.
+     */
     @Transactional(readOnly = true)
     public java.util.List<Category> allCategories() {
-        return categories.findAll();
+        return categories.findByStoreIdIsNull();
     }
 
     @Transactional
