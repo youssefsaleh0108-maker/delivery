@@ -130,5 +130,12 @@ vault kv put secret/corebanking-connector \
   delivery.corebanking.real.client-id="" \
   delivery.corebanking.real.client-secret=""
 
+# Completion marker - the LAST write, on purpose. The reseed sidecar treats the presence of this
+# path as "the seed ran to the end". Every kv put above must have succeeded to reach this line
+# (the script is `set -eu`), so a bootstrap that dies partway leaves this absent and the sidecar
+# re-runs the whole idempotent script until it truly finishes - closing the partial-seed trap
+# where an early path (secret/application) existing made a half-seeded Vault look complete.
+vault kv put secret/_seed_complete complete=true
+
 echo "==> Vault bootstrap complete"
 vault kv list secret/
