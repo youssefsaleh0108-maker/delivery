@@ -64,6 +64,29 @@ public class Product {
     @Column(name = "category_id")
     private UUID categoryId;
 
+    /**
+     * The merchant's own code for this item, unique within the store when set.
+     *
+     * <p>Optional: most catalogues arrive without one, and the till can fall back to search.
+     */
+    @Column(name = "sku", length = 64)
+    private String sku;
+
+    /** Scanned at the till. Not unique — the same EAN legitimately appears in two stores. */
+    @Column(name = "barcode", length = 32)
+    private String barcode;
+
+    /**
+     * Whether inventory-service currently believes this item can be sold.
+     *
+     * <p>A read-only projection of {@code inventory.level_changed}, never set from a request: the
+     * stock ledger is owned by inventory-service and this column only exists so the storefront can
+     * filter without a cross-service call on its hot path. Products the merchant has not opted into
+     * tracking have no ledger row and stay {@code true} forever.
+     */
+    @Column(name = "in_stock", nullable = false)
+    private boolean inStock = true;
+
     /** Object keys in the {@code product-images} bucket, in display order. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "image_refs", nullable = false, columnDefinition = "jsonb")
@@ -107,11 +130,38 @@ public class Product {
         return this.merchantId.equals(userId);
     }
 
-    public void update(String name, String description, BigDecimal price, UUID categoryId) {
+    public void update(String name, String description, BigDecimal price, UUID categoryId,
+                       String sku, String barcode) {
         this.name = name;
         this.description = description;
         this.price = price;
         this.categoryId = categoryId;
+        assignCodes(sku, barcode);
+    }
+
+    /**
+     * Sets the merchant's own item codes.
+     *
+     * <p>Blank is how a form says "cleared", so it is stored as absent: the partial unique index on
+     * {@code (store_id, sku)} would otherwise treat several empty strings as a collision.
+     */
+    public void assignCodes(String sku, String barcode) {
+        this.sku = blankToNull(sku);
+        this.barcode = blankToNull(barcode);
+    }
+
+    /**
+     * Applies inventory-service's view of whether this item is sellable.
+     *
+     * <p>Separate from {@link #update} because it arrives on the event bus, not from the merchant,
+     * and must never be writable through the product API.
+     */
+    public void applyStockProjection(boolean inStock) {
+        this.inStock = inStock;
+    }
+
+    private static String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value.trim();
     }
 
     public void publish() {
@@ -167,6 +217,18 @@ public class Product {
 
     public UUID getCategoryId() {
         return categoryId;
+    }
+
+    public String getSku() {
+        return sku;
+    }
+
+    public String getBarcode() {
+        return barcode;
+    }
+
+    public boolean isInStock() {
+        return inStock;
     }
 
     public List<String> getImageRefs() {

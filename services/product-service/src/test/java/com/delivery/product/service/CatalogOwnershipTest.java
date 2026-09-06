@@ -82,7 +82,7 @@ class CatalogOwnershipTest {
 
     private static ProductRequest request(UUID storeId) {
         return new ProductRequest("Falafel wrap", "With pickles", new BigDecimal("6.50"),
-                null, storeId);
+                null, storeId, null, null);
     }
 
     @Nested
@@ -250,7 +250,7 @@ class CatalogOwnershipTest {
                     .thenReturn(new Store(MERCHANT, "My Store", Store.Vertical.RESTAURANT));
 
             assertThatThrownBy(() -> catalog.create(MERCHANT,
-                    new ProductRequest("n", "d", BigDecimal.ONE, unknown, null)))
+                    new ProductRequest("n", "d", BigDecimal.ONE, unknown, null, null, null)))
                     .isInstanceOf(CatalogRuleViolationException.class);
 
             verify(products, never()).save(any(Product.class));
