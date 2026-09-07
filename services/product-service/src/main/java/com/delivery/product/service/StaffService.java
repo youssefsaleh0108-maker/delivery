@@ -21,11 +21,14 @@ import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.domain.staff.Permission;
 import com.delivery.product.domain.staff.StaffInvite;
+import com.delivery.product.domain.staff.StaffInviteRepository;
 import com.delivery.product.domain.staff.StaffMember;
-import com.delivery.product.domain.staff.StaffRepositories;
+import com.delivery.product.domain.staff.StaffMemberRepository;
 import com.delivery.product.domain.staff.StaffRole;
 import com.delivery.product.domain.staff.StaffShift;
+import com.delivery.product.domain.staff.StaffShiftRepository;
 import com.delivery.product.domain.staff.StoreRolePermission;
+import com.delivery.product.domain.staff.StoreRolePermissionRepository;
 import com.delivery.product.event.StaffEvents;
 
 /**
@@ -40,17 +43,17 @@ public class StaffService {
 
     private static final Logger log = LoggerFactory.getLogger(StaffService.class);
 
-    private final StaffRepositories.Members members;
-    private final StaffRepositories.RolePermissions rolePermissions;
-    private final StaffRepositories.Invites invites;
-    private final StaffRepositories.Shifts shifts;
+    private final StaffMemberRepository members;
+    private final StoreRolePermissionRepository rolePermissions;
+    private final StaffInviteRepository invites;
+    private final StaffShiftRepository shifts;
     private final StoreRepository stores;
     private final OutboxRecorder outbox;
 
-    public StaffService(StaffRepositories.Members members,
-                        StaffRepositories.RolePermissions rolePermissions,
-                        StaffRepositories.Invites invites,
-                        StaffRepositories.Shifts shifts,
+    public StaffService(StaffMemberRepository members,
+                        StoreRolePermissionRepository rolePermissions,
+                        StaffInviteRepository invites,
+                        StaffShiftRepository shifts,
                         StoreRepository stores,
                         OutboxRecorder outbox) {
         this.members = members;
