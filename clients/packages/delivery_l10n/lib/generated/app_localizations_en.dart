@@ -5833,4 +5833,1199 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get riderStatementUnclearNote =>
       'This app could not tell which way this balance points. Ask the platform before acting on it.';
+
+  @override
+  String get navPos => 'POS';
+
+  @override
+  String get navInventory => 'Inventory';
+
+  @override
+  String get navReports => 'Reports';
+
+  @override
+  String get navStaff => 'Staff';
+
+  @override
+  String get dashSwitchToPos => 'Switch to POS mode';
+
+  @override
+  String get dashWalkInSalesToday => 'Walk-in sales today';
+
+  @override
+  String get dashCashPayouts => 'Cash taken';
+
+  @override
+  String get dashCardPayouts => 'Card taken';
+
+  @override
+  String get dashLowStockAlerts => 'Low stock alerts';
+
+  @override
+  String get dashQuickActions => 'Quick actions';
+
+  @override
+  String get dashNewSale => 'New sale';
+
+  @override
+  String get dashAddProduct => 'Add product';
+
+  @override
+  String get dashStockCount => 'Stock count';
+
+  @override
+  String get dashViewReports => 'View reports';
+
+  @override
+  String get posTitle => 'Point of sale';
+
+  @override
+  String get posSearchProducts => 'Search products, SKU or barcode';
+
+  @override
+  String get posScanBarcode => 'Scan barcode';
+
+  @override
+  String get posNoProducts => 'No products to sell yet';
+
+  @override
+  String get posNoProductsHint =>
+      'Add a product to your catalogue and it appears here.';
+
+  @override
+  String get posCouldNotLoadCatalogue => 'Could not load the catalogue';
+
+  @override
+  String get posCart => 'Current sale';
+
+  @override
+  String get posCartEmpty => 'Nothing rung up yet';
+
+  @override
+  String get posCartEmptyHint => 'Tap a product to start the sale.';
+
+  @override
+  String posLinesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+      zero: 'No items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get posSubtotal => 'Subtotal';
+
+  @override
+  String get posDiscount => 'Discount';
+
+  @override
+  String get posTax => 'VAT';
+
+  @override
+  String get posTotal => 'Total';
+
+  @override
+  String get posPaid => 'Paid';
+
+  @override
+  String get posOutstanding => 'Still due';
+
+  @override
+  String get posRefundedAmount => 'Refunded';
+
+  @override
+  String posUsd(String amount) {
+    return '\$$amount';
+  }
+
+  @override
+  String posLbp(String amount) {
+    return '$amount LBP';
+  }
+
+  @override
+  String posRate(String rate) {
+    return '1 USD = $rate LBP';
+  }
+
+  @override
+  String get posCharge => 'Charge';
+
+  @override
+  String get posClearSale => 'Clear sale';
+
+  @override
+  String get posQuantity => 'Quantity';
+
+  @override
+  String get posRemoveLine => 'Remove';
+
+  @override
+  String get posAddOpenItem => 'Add open item';
+
+  @override
+  String get posOpenItem => 'Open item';
+
+  @override
+  String get posOpenItemName => 'What is it?';
+
+  @override
+  String get posOpenItemPrice => 'Price';
+
+  @override
+  String get posDiscountTitle => 'Apply a discount';
+
+  @override
+  String get posDiscountAmount => 'Discount amount';
+
+  @override
+  String get posDiscountNote => 'Why? (optional)';
+
+  @override
+  String get posApplyDiscount => 'Apply discount';
+
+  @override
+  String get posDiscountTooLarge =>
+      'That is more than you may discount. Ask a manager.';
+
+  @override
+  String get posCouldNotLoadSale => 'Could not load this sale';
+
+  @override
+  String get posTerminalUnavailable => 'The register is not available yet.';
+
+  @override
+  String get posCheckout => 'Payment';
+
+  @override
+  String get posTenderMethod => 'How are they paying?';
+
+  @override
+  String get posCashUsd => 'Cash (USD)';
+
+  @override
+  String get posCashLbp => 'Cash (LBP)';
+
+  @override
+  String get posCard => 'Card';
+
+  @override
+  String get posWallet => 'YouDrop wallet';
+
+  @override
+  String get posWalletComingSoon => 'Coming soon';
+
+  @override
+  String get posAmountTendered => 'Amount given';
+
+  @override
+  String get posCardReference => 'Reference (optional)';
+
+  @override
+  String get posChangeIn => 'Change in';
+
+  @override
+  String get posChangeDue => 'Change due';
+
+  @override
+  String get posChangePreview =>
+      'Preview — the till confirms the final figure.';
+
+  @override
+  String get posRoundingLbp => 'Rounded to the nearest note';
+
+  @override
+  String get posSplitPayment => 'Split payment';
+
+  @override
+  String get posAddTender => 'Add another payment';
+
+  @override
+  String posRemainingAmount(String amount) {
+    return 'Remaining $amount';
+  }
+
+  @override
+  String get posCompleteSale => 'Complete sale';
+
+  @override
+  String get posSaleCompleted => 'Sale completed';
+
+  @override
+  String get posTendersShort => 'The payments do not cover the total yet.';
+
+  @override
+  String get posReceipt => 'Receipt';
+
+  @override
+  String get posReceiptChannel => 'Send the receipt';
+
+  @override
+  String get posReceiptPrint => 'Print';
+
+  @override
+  String get posReceiptSms => 'SMS';
+
+  @override
+  String get posReceiptWhatsapp => 'WhatsApp';
+
+  @override
+  String get posReceiptEmail => 'Email';
+
+  @override
+  String get posReceiptNone => 'No receipt';
+
+  @override
+  String get posReceiptContact => 'Where to send it';
+
+  @override
+  String get posReceiptSent => 'Receipt sent';
+
+  @override
+  String posReceiptNo(String label) {
+    return 'Receipt $label';
+  }
+
+  @override
+  String get posPrintReceipt => 'Print receipt';
+
+  @override
+  String get posShareReceipt => 'Share receipt';
+
+  @override
+  String get posNewSale => 'New sale';
+
+  @override
+  String get posCashier => 'Cashier';
+
+  @override
+  String get posThankYou => 'Thank you';
+
+  @override
+  String get posShift => 'Shift';
+
+  @override
+  String posShiftActive(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Shift open · $count sales',
+      one: 'Shift open · 1 sale',
+      zero: 'Shift open',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get posOpenShift => 'Open shift';
+
+  @override
+  String get posCloseShift => 'Close shift';
+
+  @override
+  String get posOpeningFloat => 'Cash in the drawer (USD)';
+
+  @override
+  String get posOpeningFloatLbp => 'Cash in the drawer (LBP)';
+
+  @override
+  String get posCountedCash => 'Counted (USD)';
+
+  @override
+  String get posCountedCashLbp => 'Counted (LBP)';
+
+  @override
+  String get posExpected => 'Expected';
+
+  @override
+  String get posCounted => 'Counted';
+
+  @override
+  String get posVariance => 'Difference';
+
+  @override
+  String get posShiftClosed => 'Shift closed';
+
+  @override
+  String get posShiftSummary => 'Shift summary';
+
+  @override
+  String get posNoShift => 'No shift open';
+
+  @override
+  String get posNoShiftHint => 'Open a shift before ringing up sales.';
+
+  @override
+  String get posRegister => 'Register';
+
+  @override
+  String get posRegisters => 'Registers';
+
+  @override
+  String get posAddRegister => 'Add register';
+
+  @override
+  String get posRegisterName => 'Register name';
+
+  @override
+  String get posSelectRegister => 'Choose a register';
+
+  @override
+  String get posSalesCount => 'Sales';
+
+  @override
+  String get posByMethod => 'By payment method';
+
+  @override
+  String get posStatusOpen => 'Open';
+
+  @override
+  String get posStatusCompleted => 'Completed';
+
+  @override
+  String get posStatusVoided => 'Voided';
+
+  @override
+  String get posStatusPartiallyRefunded => 'Partly refunded';
+
+  @override
+  String get posStatusRefunded => 'Refunded';
+
+  @override
+  String get posActionComplete => 'Charge';
+
+  @override
+  String get posActionVoid => 'Void';
+
+  @override
+  String get posActionRefund => 'Refund';
+
+  @override
+  String get posActionReprint => 'Reprint receipt';
+
+  @override
+  String get posVoidSale => 'Void this sale';
+
+  @override
+  String get posVoidReason => 'Why is it being voided?';
+
+  @override
+  String get posVoidConfirm => 'Void sale';
+
+  @override
+  String get posVoided => 'Sale voided';
+
+  @override
+  String get posRefundTitle => 'Refund items';
+
+  @override
+  String get posRefundQty => 'How many back?';
+
+  @override
+  String get posRefundMethod => 'Refund as';
+
+  @override
+  String get posRefundRestock => 'Put the items back on the shelf';
+
+  @override
+  String get posRefundReason => 'Reason (optional)';
+
+  @override
+  String get posRefundConfirm => 'Refund';
+
+  @override
+  String get posRefundDone => 'Refunded';
+
+  @override
+  String get invTitle => 'Inventory';
+
+  @override
+  String get invSearch => 'Search by name, SKU or barcode';
+
+  @override
+  String get invFilterAll => 'All';
+
+  @override
+  String get invFilterLowStock => 'Low stock';
+
+  @override
+  String get invFilterOutOfStock => 'Out of stock';
+
+  @override
+  String get invFilterActive => 'Active';
+
+  @override
+  String get invFilterHidden => 'Hidden';
+
+  @override
+  String get invOnHand => 'On hand';
+
+  @override
+  String get invReserved => 'Reserved';
+
+  @override
+  String get invAvailable => 'Available';
+
+  @override
+  String get invThreshold => 'Low-stock level';
+
+  @override
+  String invSku(String sku) {
+    return 'SKU $sku';
+  }
+
+  @override
+  String get invBarcode => 'Barcode';
+
+  @override
+  String get invNotTracked => 'Not tracked';
+
+  @override
+  String get invTrackStock => 'Track stock';
+
+  @override
+  String get invTrackStockHint => 'YouDrop hides the item when it runs out.';
+
+  @override
+  String get invInitialStock => 'Stock on hand now';
+
+  @override
+  String get invStatusOk => 'In stock';
+
+  @override
+  String get invStatusWarning => 'Low';
+
+  @override
+  String get invStatusCritical => 'Critical';
+
+  @override
+  String get invStatusOut => 'Out of stock';
+
+  @override
+  String get invEmpty => 'Nothing in inventory yet';
+
+  @override
+  String get invEmptyHint =>
+      'Add products to your catalogue and they appear here.';
+
+  @override
+  String get invCouldNotLoad => 'Could not load inventory';
+
+  @override
+  String get invSyncing => 'Bringing your catalogue in…';
+
+  @override
+  String invSynced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count products added',
+      one: '1 product added',
+      zero: 'Nothing to bring in',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get invProducts => 'Products';
+
+  @override
+  String get invCategories => 'Sections';
+
+  @override
+  String get invAlerts => 'Alerts';
+
+  @override
+  String get invAdjust => 'Adjust stock';
+
+  @override
+  String get invAdjustAdd => 'Add';
+
+  @override
+  String get invAdjustRemove => 'Remove';
+
+  @override
+  String get invAdjustSetTo => 'Set to';
+
+  @override
+  String get invAdjustQuantity => 'How many?';
+
+  @override
+  String get invAdjustReason => 'Why?';
+
+  @override
+  String get invAdjustNote => 'Note (optional)';
+
+  @override
+  String get invAdjustSave => 'Save adjustment';
+
+  @override
+  String get invAdjusted => 'Stock updated';
+
+  @override
+  String get invReasonReceived => 'Received';
+
+  @override
+  String get invReasonDamaged => 'Damaged';
+
+  @override
+  String get invReasonExpired => 'Expired';
+
+  @override
+  String get invReasonTheft => 'Theft or loss';
+
+  @override
+  String get invReasonCorrection => 'Correction';
+
+  @override
+  String get invReasonOther => 'Other';
+
+  @override
+  String get invMovements => 'Stock history';
+
+  @override
+  String get invNoMovements => 'Nothing has moved yet';
+
+  @override
+  String get invKindReceipt => 'Received';
+
+  @override
+  String get invKindAdjustment => 'Adjusted';
+
+  @override
+  String get invKindCount => 'Stock count';
+
+  @override
+  String get invKindSale => 'Sold';
+
+  @override
+  String get invKindReturn => 'Returned';
+
+  @override
+  String get invKindOrderReserve => 'Held for an order';
+
+  @override
+  String get invKindOrderRelease => 'Released';
+
+  @override
+  String get invKindOrderFulfil => 'Order handed over';
+
+  @override
+  String get invSettings => 'Stock settings';
+
+  @override
+  String get invAlertsEnabled => 'Low-stock alerts';
+
+  @override
+  String get invWhatsappAlerts => 'Send alerts on WhatsApp';
+
+  @override
+  String get invAlertsTitle => 'Stock alerts';
+
+  @override
+  String invAlertsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items need restocking',
+      one: '1 item needs restocking',
+      zero: 'Nothing needs restocking',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get invAlertsEmpty => 'Every shelf is stocked';
+
+  @override
+  String get invAlertsEmptyHint =>
+      'We will tell you here when something runs low.';
+
+  @override
+  String get invAlertsCouldNotLoad => 'Could not load stock alerts';
+
+  @override
+  String invVelocity(String perDay) {
+    return 'Sells about $perDay a day';
+  }
+
+  @override
+  String invHoursOfCover(String hours) {
+    return 'About $hours hours left';
+  }
+
+  @override
+  String invLastSold(Object when) {
+    return 'Last sold $when';
+  }
+
+  @override
+  String get invNoVelocityYet => 'Not enough sales yet to say';
+
+  @override
+  String get invRestock => 'Restock';
+
+  @override
+  String get invCountTitle => 'Stock count';
+
+  @override
+  String get invCountNew => 'Start a count';
+
+  @override
+  String get invCountName => 'Name this count';
+
+  @override
+  String get invCountNameHint => 'Friday shelf check';
+
+  @override
+  String get invCountScope => 'What are you counting?';
+
+  @override
+  String get invCountAllProducts => 'Everything';
+
+  @override
+  String get invCountByCategory => 'One section';
+
+  @override
+  String get invCountStart => 'Start counting';
+
+  @override
+  String invCountProgress(int count, int total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count of $total counted',
+      one: '1 of $total counted',
+      zero: 'Nothing counted of $total',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get invCountSystem => 'System says';
+
+  @override
+  String get invCountCounted => 'You counted';
+
+  @override
+  String get invCountVariance => 'Difference';
+
+  @override
+  String get invCountSubmit => 'Submit count';
+
+  @override
+  String get invCountCancelCount => 'Cancel count';
+
+  @override
+  String get invCountSubmitted => 'Count applied to stock';
+
+  @override
+  String get invCountCancelled => 'Count cancelled';
+
+  @override
+  String get invCountDiscrepancies => 'Differences found';
+
+  @override
+  String get invCountNoDiscrepancies => 'Everything matches';
+
+  @override
+  String get invCountLeaveWarning => 'Leave this count?';
+
+  @override
+  String get invCountLeaveWarningBody =>
+      'What you have counted is saved, and the count stays open.';
+
+  @override
+  String get invCountKeepCounting => 'Keep counting';
+
+  @override
+  String get invCountDiscard => 'Leave';
+
+  @override
+  String get invCountEmpty => 'No counts yet';
+
+  @override
+  String get invCountOpenExists => 'A count is already open. Finish it first.';
+
+  @override
+  String get invCountStatusOpen => 'In progress';
+
+  @override
+  String get invCountStatusSubmitted => 'Submitted';
+
+  @override
+  String get invCountStatusCancelled => 'Cancelled';
+
+  @override
+  String get catTitle => 'Sections';
+
+  @override
+  String get catSubtitle => 'How your shop is arranged for customers';
+
+  @override
+  String get catAdd => 'Add a section';
+
+  @override
+  String get catName => 'Section name';
+
+  @override
+  String get catNameHint => 'Drinks';
+
+  @override
+  String get catParent => 'Sits under';
+
+  @override
+  String get catNoParent => 'Top level';
+
+  @override
+  String get catDragToReorder =>
+      'Drag rows to change display order on the YouDrop app.';
+
+  @override
+  String catProductsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count products',
+      one: '1 product',
+      zero: 'No products',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catRename => 'Rename';
+
+  @override
+  String get catDelete => 'Delete section';
+
+  @override
+  String get catDeleteConfirm =>
+      'Delete this section? Its products stay in your catalogue.';
+
+  @override
+  String catCannotDeleteNonEmpty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'This section still holds $count products',
+      one: 'This section still holds 1 product',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catEmpty => 'No sections yet';
+
+  @override
+  String get catEmptyHint => 'Sections group your products on the shop page.';
+
+  @override
+  String get catCouldNotLoad => 'Could not load sections';
+
+  @override
+  String get catOrderSaved => 'Order saved';
+
+  @override
+  String get catOrderFailed => 'The order could not be saved';
+
+  @override
+  String get catImage => 'Section picture';
+
+  @override
+  String get catChangeImage => 'Change picture';
+
+  @override
+  String get catYourSections => 'Your sections';
+
+  @override
+  String get catPlatformCategories => 'YouDrop categories';
+
+  @override
+  String get staffTitle => 'Staff';
+
+  @override
+  String get staffSubtitle => 'Who works here and what they can do';
+
+  @override
+  String get staffRoleOwner => 'Owner';
+
+  @override
+  String get staffRoleManager => 'Manager';
+
+  @override
+  String get staffRoleCashier => 'Cashier';
+
+  @override
+  String get staffRoleStockkeeper => 'Stockkeeper';
+
+  @override
+  String get staffPermPosSales => 'Sell at the register';
+
+  @override
+  String get staffPermPosSalesDesc => 'Ring up walk-in sales and take payment.';
+
+  @override
+  String get staffPermPosRefundsVoids => 'Refunds and voids';
+
+  @override
+  String get staffPermPosRefundsVoidsDesc =>
+      'Give money back, cancel a sale, discount past the limit.';
+
+  @override
+  String get staffPermModifyInventoryPricing => 'Products and stock';
+
+  @override
+  String get staffPermModifyInventoryPricingDesc =>
+      'Edit products, prices and stock levels.';
+
+  @override
+  String get staffPermManageOrders => 'Delivery orders';
+
+  @override
+  String get staffPermManageOrdersDesc =>
+      'Accept, reject and move YouDrop orders along.';
+
+  @override
+  String get staffPermViewReports => 'Reports';
+
+  @override
+  String get staffPermViewReportsDesc =>
+      'See sales figures and the dashboard money.';
+
+  @override
+  String get staffPermAccessSettings => 'Store settings';
+
+  @override
+  String get staffPermAccessSettingsDesc =>
+      'Change hours, delivery areas and the shop profile.';
+
+  @override
+  String get staffPermManageStaff => 'Staff';
+
+  @override
+  String get staffPermManageStaffDesc =>
+      'Add and remove members, and set what each may do.';
+
+  @override
+  String get staffStatusActive => 'Active';
+
+  @override
+  String get staffStatusInactive => 'Suspended';
+
+  @override
+  String get staffOnShift => 'On shift';
+
+  @override
+  String get staffOffShift => 'Off shift';
+
+  @override
+  String staffLastSeen(Object when) {
+    return 'Last seen $when';
+  }
+
+  @override
+  String staffShiftMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'On shift $count minutes',
+      one: 'On shift 1 minute',
+      zero: 'Just clocked in',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get staffInvite => 'Invite someone';
+
+  @override
+  String get staffInviteRole => 'Their role';
+
+  @override
+  String get staffInviteName => 'Their name';
+
+  @override
+  String get staffInviteEmail => 'Email (optional)';
+
+  @override
+  String get staffInvitePhone => 'Phone (optional)';
+
+  @override
+  String get staffInviteCreate => 'Create invite code';
+
+  @override
+  String get staffInviteCode => 'Invite code';
+
+  @override
+  String get staffInviteCodeHint =>
+      'They sign in to YouDrop and enter this code. You never set their password.';
+
+  @override
+  String get staffInviteShare => 'Share code';
+
+  @override
+  String get staffInviteCopied => 'Code copied';
+
+  @override
+  String staffInviteExpires(Object when) {
+    return 'Expires $when';
+  }
+
+  @override
+  String get staffPendingInvites => 'Waiting to be redeemed';
+
+  @override
+  String get staffNoPendingInvites => 'No codes outstanding';
+
+  @override
+  String get staffAcceptTitle => 'Join a shop';
+
+  @override
+  String get staffAcceptCode => 'Enter your invite code';
+
+  @override
+  String get staffAcceptJoin => 'Join';
+
+  @override
+  String get staffAcceptFailed => 'That code did not work';
+
+  @override
+  String staffJoined(String store) {
+    return 'You now work at $store';
+  }
+
+  @override
+  String get staffEditPermissions => 'What they can do';
+
+  @override
+  String get staffRoleDefaults => 'Defaults for this role';
+
+  @override
+  String get staffCustomised => 'Changed for this person';
+
+  @override
+  String get staffResetToRole => 'Back to the role default';
+
+  @override
+  String get staffChangeRole => 'Change role';
+
+  @override
+  String get staffDeactivate => 'Suspend';
+
+  @override
+  String get staffActivate => 'Reinstate';
+
+  @override
+  String get staffRemove => 'Remove from shop';
+
+  @override
+  String get staffRemoveConfirm =>
+      'Remove this person? Their past shifts and sales stay on the record.';
+
+  @override
+  String get staffRemoved => 'Removed';
+
+  @override
+  String get staffClockIn => 'Clock in';
+
+  @override
+  String get staffClockOut => 'Clock out';
+
+  @override
+  String get staffClockedIn => 'You are on shift';
+
+  @override
+  String get staffClockedOut => 'Shift ended';
+
+  @override
+  String get staffSalesToday => 'Sales today';
+
+  @override
+  String get staffNoPosSalesYet =>
+      'Sales appear here once the register is live.';
+
+  @override
+  String get staffEmpty => 'You work alone so far';
+
+  @override
+  String get staffEmptyHint =>
+      'Invite a manager or a cashier and they show up here.';
+
+  @override
+  String get staffCouldNotLoad => 'Could not load the team';
+
+  @override
+  String get staffNoShopYet => 'You are not on a shop\'s team yet';
+
+  @override
+  String get staffYou => 'You';
+
+  @override
+  String get staffOwnerBadge => 'Owner';
+
+  @override
+  String get staffCannotEditOwner => 'The owner always has every permission.';
+
+  @override
+  String get staffNoPermission => 'You cannot change this';
+
+  @override
+  String get repTitle => 'Sales reports';
+
+  @override
+  String get repRangeToday => 'Today';
+
+  @override
+  String get repRangeWeek => 'Last 7 days';
+
+  @override
+  String get repRangeMonth => 'Last 30 days';
+
+  @override
+  String get repRangeCustom => 'Pick dates';
+
+  @override
+  String get repCompareToPrevious => 'Compare with the period before';
+
+  @override
+  String repRangeTooLong(int days) {
+    return 'Reports cover at most $days days at a time';
+  }
+
+  @override
+  String get repRevenue => 'Revenue';
+
+  @override
+  String get repNetRevenue => 'Net revenue';
+
+  @override
+  String get repGrossValue => 'Gross sales';
+
+  @override
+  String get repRefunded => 'Refunded';
+
+  @override
+  String get repOrders => 'Orders';
+
+  @override
+  String get repItemsSold => 'Items sold';
+
+  @override
+  String get repAverageOrder => 'Average sale';
+
+  @override
+  String get repDailyRevenue => 'Revenue by day';
+
+  @override
+  String get repByCategory => 'Sales by section';
+
+  @override
+  String get repTopProducts => 'Best sellers';
+
+  @override
+  String get repUncategorised => 'No section';
+
+  @override
+  String get repBySource => 'Where the sales came from';
+
+  @override
+  String get repByPaymentMethod => 'How customers paid';
+
+  @override
+  String get repSourceDelivery => 'YouDrop';
+
+  @override
+  String get repSourceWalkIn => 'Walk-in';
+
+  @override
+  String repSoldCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sold',
+      one: '1 sold',
+      zero: 'None sold',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String repOrdersTotal(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sales',
+      one: '1 sale',
+      zero: 'No sales',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repEmpty => 'Nothing sold in this period';
+
+  @override
+  String get repEmptyHint =>
+      'Pick a wider range, or bring in the history from before reports existed.';
+
+  @override
+  String get repSyncHistory => 'Bring in past sales';
+
+  @override
+  String get repSyncStarted => 'Working through your history…';
+
+  @override
+  String get repCouldNotLoad => 'Could not load the report';
+
+  @override
+  String get repExportCsv => 'Export CSV';
+
+  @override
+  String get repExported => 'Report exported';
+
+  @override
+  String repGeneratedAt(Object when) {
+    return 'Worked out $when';
+  }
+
+  @override
+  String get repNoChange => '—';
+
+  @override
+  String get repHistoryTitle => 'Sales history';
+
+  @override
+  String get repHistorySubtitle => 'View and manage sales receipts';
+
+  @override
+  String get repHistorySearch => 'Search by receipt number or item';
+
+  @override
+  String get repHistoryEmpty => 'No receipts in this period';
+
+  @override
+  String get repHistoryCouldNotLoad => 'Could not load sales history';
+
+  @override
+  String get repStatusCompleted => 'Completed';
+
+  @override
+  String get repStatusPartiallyRefunded => 'Partly refunded';
+
+  @override
+  String get repStatusRefunded => 'Refunded';
+
+  @override
+  String get repStatusVoided => 'Voided';
+
+  @override
+  String get repViewReceipt => 'View receipt';
+
+  @override
+  String get repFilterAll => 'All';
 }

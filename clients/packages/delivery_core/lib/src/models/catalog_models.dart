@@ -37,6 +37,9 @@ class Product {
     this.imageRefs = const <String>[],
     this.imageUrls = const <String>[],
     this.imageThumbUrls = const <String>[],
+    this.sku,
+    this.barcode,
+    this.inStock = true,
   });
 
   final String id;
@@ -69,6 +72,25 @@ class Product {
 
   final ProductStatus status;
 
+  /// The merchant's own code for the item, unique within the store when set.
+  ///
+  /// Null on every product that predates the inventory work, which is all of them today — so no
+  /// screen may assume it exists, and the till's scanner path treats "no such SKU" as an answer
+  /// rather than an error.
+  final String? sku;
+
+  /// The code scanned at the till. Deliberately not unique: the same EAN legitimately appears in
+  /// two different shops.
+  final String? barcode;
+
+  /// Whether inventory-service currently believes the item is sellable.
+  ///
+  /// READ-ONLY — it is a projection of a stock level, never something the product form writes, so
+  /// it is absent from [toRequestJson]. Defaults to **true** when the server does not send it,
+  /// because a product nobody has opted into stock tracking is always sellable, and an older
+  /// service that has never heard of the field must not make an entire catalogue look sold out.
+  final bool inStock;
+
   /// The photo a list row should load: small if there is one, the original if not.
   ///
   /// The server already substitutes the full-size URL per image when a derivative is missing. The
@@ -98,6 +120,9 @@ class Product {
         imageThumbUrls:
             (json['imageThumbUrls'] as List<dynamic>? ?? <dynamic>[]).cast<String>(),
         status: ProductStatus.fromWire(json['status'] as String?),
+        sku: json['sku'] as String?,
+        barcode: json['barcode'] as String?,
+        inStock: json['inStock'] as bool? ?? true,
       );
 
   /// Note the absence of `merchantId` and `status`: the service derives the first from the token
@@ -110,6 +135,12 @@ class Product {
         // Optional. A merchant with a single store never needs to send it; the service
         // auto-provisions one and files the product there.
         if (storeId != null) 'storeId': storeId,
+        // Both optional and both omitted when unset rather than sent as null: blank is stored as
+        // absent so several untagged products do not collide on the store's unique SKU index.
+        if (sku != null) 'sku': sku,
+        if (barcode != null) 'barcode': barcode,
+        // `inStock` is deliberately absent — it belongs to inventory-service, and a product form
+        // that could write it would let a merchant mark a sold-out shelf as full.
       };
 }
 
@@ -121,11 +152,33 @@ class Category {
     this.imageUrl,
     this.vertical,
     this.children = const <Category>[],
+    this.storeId,
+    this.position = 0,
+    this.productCount = 0,
+    this.activeCount = 0,
   });
 
   final String id;
   final String name;
   final String? parentId;
+
+  /// Which shop owns this section, or null for a PLATFORM category.
+  ///
+  /// The platform taxonomy (`/api/categories`) is everybody's and always sends null here; a
+  /// merchant's own sections carry their store's id. The product form lists the store's own first
+  /// and the platform tree beneath, which is only possible because the two are distinguishable.
+  final String? storeId;
+
+  /// Display order within the store, ascending. Always 0 for platform categories, which are
+  /// ordered by name — so a screen must not sort by this unless it is showing store sections.
+  final int position;
+
+  /// How many products sit in this section, in any status. The delete confirmation needs it: the
+  /// server answers 409 rather than orphaning products, and saying so up front is kinder.
+  final int productCount;
+
+  /// The subset of [productCount] that customers can actually see.
+  final int activeCount;
 
   /// Null until the Backoffice uploads artwork for it.
   final String? imageUrl;
@@ -144,6 +197,31 @@ class Category {
         children: (json['children'] as List<dynamic>? ?? <dynamic>[])
             .map((dynamic child) => Category.fromJson(child as Map<String, dynamic>))
             .toList(),
+        // All four tolerate a server that has never heard of store-owned sections: it simply
+        // returns platform categories, which is exactly what null/0 mean here.
+        storeId: json['storeId'] as String?,
+        position: (json['position'] as num?)?.toInt() ?? 0,
+        productCount: (json['productCount'] as num?)?.toInt() ?? 0,
+        activeCount: (json['activeCount'] as num?)?.toInt() ?? 0,
+      );
+
+  /// A shop's own section rather than a platform one.
+  bool get isStoreOwned => storeId != null;
+
+  /// For the optimistic drag on the categories screen: move the row locally, then persist the
+  /// whole order, then revert to the server's list if that fails.
+  Category copyWith({String? name, String? parentId, String? imageUrl, int? position}) =>
+      Category(
+        id: id,
+        name: name ?? this.name,
+        parentId: parentId ?? this.parentId,
+        imageUrl: imageUrl ?? this.imageUrl,
+        vertical: vertical,
+        children: children,
+        storeId: storeId,
+        position: position ?? this.position,
+        productCount: productCount,
+        activeCount: activeCount,
       );
 
   /// Flattens the tree for a dropdown, indenting descendants so hierarchy stays legible.

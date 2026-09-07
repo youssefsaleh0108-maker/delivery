@@ -12,6 +12,17 @@ library;
 
 export 'src/dashboard_screen.dart';
 export 'src/delivery_screen.dart';
+// The merchant suite: the register, the shelves and the people who work them. Each of these is
+// mounted by both hosts like the screens above, and the POS trio is exported together because a
+// sale walks terminal -> checkout -> receipt and a host has to be able to name all three.
+export 'src/inventory_screen.dart';
+export 'src/merchant_categories_screen.dart';
+export 'src/pos/pos_checkout_screen.dart';
+export 'src/pos/pos_receipt_screen.dart';
+export 'src/pos/pos_terminal_screen.dart';
+export 'src/staff_screen.dart';
+export 'src/stock_alerts_screen.dart';
+export 'src/stock_count_screen.dart';
 // The shop's own daily series as a page. Exported as well as reachable from settings, so a host
 // with room for it in a rail can mount it directly instead of hiding it one tap into a menu.
 export 'src/merchant_analytics_screen.dart';

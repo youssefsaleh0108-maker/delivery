@@ -45,6 +45,9 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.accountContact,
     this.onEditAccount,
     this.onShopProfile,
+    this.onCategories,
+    this.onStaff,
+    this.onStockCount,
     this.onNotificationSettings,
     this.aggregates,
     this.documents,
@@ -67,6 +70,15 @@ class MerchantSettingsScreen extends StatelessWidget {
 
   /// Opens the shop's own configuration — `StoreScreen` in this package.
   final VoidCallback? onShopProfile;
+
+  /// The merchant suite's three management pages, hung off Settings rather than given a tab
+  /// each: a shop reorganises its shelves and its roster a few times a year, not a few times a
+  /// day, and the nav is for the few-times-a-day things. Each row is absent, not disabled, when
+  /// its host does not wire it — the same contract the statement row keeps — so an employee
+  /// without the permission never sees a door they cannot open.
+  final VoidCallback? onCategories;
+  final VoidCallback? onStaff;
+  final VoidCallback? onStockCount;
 
   /// Opens the host's notification preferences. Null marks the row as not yet available rather
   /// than hiding it, because the frame draws it.
@@ -242,6 +254,30 @@ class MerchantSettingsScreen extends StatelessWidget {
             title: t.merchbShopProfile,
             onTap: onShopProfile,
           ),
+          if (onCategories != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.category_outlined,
+              title: t.navCategories,
+              onTap: onCategories,
+            ),
+          ],
+          if (onStockCount != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.fact_check_outlined,
+              title: t.invCountTitle,
+              onTap: onStockCount,
+            ),
+          ],
+          if (onStaff != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.badge_outlined,
+              title: t.navStaff,
+              onTap: onStaff,
+            ),
+          ],
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           // Live. The chip that stood here rested on "no payout or bank record exists anywhere in
           // the platform yet", and the record was there the whole time — filed against the

@@ -138,6 +138,12 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// exists, and the pending screen reads and corrects them while the application waits.
   late final DocumentsApi _documentsApi = DocumentsApi(_dio);
   late final NotificationApi _notificationApi = NotificationApi(_dio);
+  // The merchant suite's four clients. inventory/pos/reports talk to services that are not yet
+  // deployed; their screens render a calm unavailable state until they are. Staff is live.
+  late final PosApi _posApi = PosApi(_dio);
+  late final InventoryApi _inventoryApi = InventoryApi(_dio);
+  late final StoreStaffApi _storeStaffApi = StoreStaffApi(_dio);
+  late final ReportsApi _reportsApi = ReportsApi(_dio);
 
   // The capability APIs. Every screen takes these as OPTIONAL parameters — null renders the
   // feature's honest inert state — which is what let the screens land in parallel without breaking
@@ -756,6 +762,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               // The same client the rider shell is handed two branches down. Its absence here is
               // what left the merchant statement screen unreachable in the shipping app.
               statementsApi: _statementsApi,
+              posApi: _posApi,
+              inventoryApi: _inventoryApi,
+              staffApi: _storeStaffApi,
+              reportsApi: _reportsApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,

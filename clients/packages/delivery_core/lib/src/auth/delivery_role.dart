@@ -9,6 +9,15 @@ enum DeliveryRole {
   customer('CUSTOMER'),
   delivery('DELIVERY'),
   merchant('MERCHANT'),
+
+  /// Somebody who works AT a shop without owning it — a cashier, a manager, a stockkeeper.
+  ///
+  /// Grants nothing on its own: what they may actually do is decided per store by
+  /// `StoreStaffApi.access`, which is why an account holding only this role must resolve a
+  /// membership before any merchant screen is built. Product-service admits it alongside
+  /// [merchant] on every store endpoint.
+  merchantStaff('MERCHANT_STAFF'),
+
   /// Staff of a delivery company: administers their own carrier, not the platform.
   carrier('CARRIER'),
   backoffice('BACKOFFICE'),

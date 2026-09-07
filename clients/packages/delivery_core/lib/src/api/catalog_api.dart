@@ -113,6 +113,74 @@ class CatalogApi {
     return Category.fromJson(response.data as Map<String, dynamic>);
   }
 
+  // ------------------------------------------------------ store categories
+
+  /// A shop's own sections, in display order (the server sorts by `position` ascending).
+  ///
+  /// Distinct from [categories], which is the platform taxonomy every client shares: these rows
+  /// carry a `storeId` and are written by the merchant who owns them. A shop that has never made
+  /// a section gets an empty list, not a 404.
+  Future<List<Category>> storeCategories(String storeId) async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/stores/$storeId/categories');
+    return (response.data as List<dynamic>)
+        .map((dynamic json) => Category.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Creates one section. `parentId` must name a PLATFORM category — a section may hang under the
+  /// taxonomy, never under another shop's row. A duplicate name under the same parent is 409.
+  Future<Category> createStoreCategory(
+    String storeId, {
+    required String name,
+    String? parentId,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/stores/$storeId/categories',
+      data: <String, dynamic>{'name': name, if (parentId != null) 'parentId': parentId},
+    );
+    return Category.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Renames a section, and optionally re-parents it. Sends `parentId` unconditionally, because
+  /// null is the value that moves a section back to the top level.
+  Future<Category> updateStoreCategory(
+    String storeId,
+    String categoryId, {
+    required String name,
+    String? parentId,
+  }) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/stores/$storeId/categories/$categoryId',
+      data: <String, dynamic>{'name': name, 'parentId': parentId},
+    );
+    return Category.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Rewrites the whole display order and answers with the shop's sections as they now stand.
+  ///
+  /// A REPLACE, the [setProductOptions] idiom: the server rewrites positions `0..n-1` in one
+  /// transaction and refuses (422) a list that is not exactly the shop's section ids, each once.
+  /// So callers send the complete order they want to end up with, never a single moved row.
+  Future<List<Category>> reorderStoreCategories(
+    String storeId,
+    List<String> categoryIds,
+  ) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/stores/$storeId/categories/order',
+      data: <String, dynamic>{'categoryIds': categoryIds},
+    );
+    return (response.data as List<dynamic>)
+        .map((dynamic json) => Category.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Deletes a section. 409 when it still holds products — the server will not orphan a listing,
+  /// and its `detail` carries the count the screen shows.
+  Future<void> deleteStoreCategory(String storeId, String categoryId) {
+    return _dio.delete<void>('/api/stores/$storeId/categories/$categoryId');
+  }
+
   // ---------------------------------------------------------------- images
 
   /// Uploads one product image, following the three-step flow from Section 5.
