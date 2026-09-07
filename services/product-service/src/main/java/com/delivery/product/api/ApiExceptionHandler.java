@@ -11,8 +11,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingPathVariableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.platform.storage.StorageException;
@@ -129,15 +132,45 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * A missing or unparseable query parameter is the caller's mistake, and telling them so is the
-     * whole fix. These were falling through to the catch-all 500 — noticed when a reverse-geocode
-     * call spelled the parameters {@code lat}/{@code lng} and got "Internal error" back, which
-     * reads as our fault and sends the caller debugging the wrong side of the wire.
+     * A missing query parameter is the caller's mistake, and telling them so is the whole fix.
+     * These were falling through to the catch-all 500 — noticed when a reverse-geocode call
+     * spelled the parameters {@code lat}/{@code lng} and got "Internal error" back, which reads
+     * as our fault and sends the caller debugging the wrong side of the wire.
      */
-    @ExceptionHandler({org.springframework.web.bind.MissingServletRequestParameterException.class,
-            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
-    public ProblemDetail onBadParameter(Exception e) {
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail onBadParameter(MissingServletRequestParameterException e) {
         return problem(HttpStatus.BAD_REQUEST, "Bad request", e.getMessage());
+    }
+
+    /**
+     * A path variable or query parameter that cannot be converted to the type the endpoint
+     * declares — the observed case was a word landing in a {@code UUID} store-id slot.
+     *
+     * <p>400, with a detail written here rather than Spring's own. The framework message names
+     * Java classes ("Failed to convert value of type 'java.lang.String' to required type
+     * 'java.util.UUID'"), which describes our implementation and nothing about the request.
+     * Naming the parameter and the type it should have been is the whole of what a caller can
+     * act on.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail onTypeMismatch(MethodArgumentTypeMismatchException e) {
+        Class<?> requiredType = e.getRequiredType();
+        String detail = requiredType == null
+                ? "Parameter '" + e.getName() + "' has an invalid value"
+                : "Parameter '" + e.getName() + "' is not a valid " + requiredType.getSimpleName();
+        return problem(HttpStatus.BAD_REQUEST, "Bad request", detail);
+    }
+
+    /**
+     * A path variable the handler declares but the matched URI did not supply.
+     *
+     * <p>Mapped alongside the type mismatch above so that no request which fails to bind a path
+     * variable can reach the catch-all and become a 500 with nothing in it for the caller to fix.
+     */
+    @ExceptionHandler(MissingPathVariableException.class)
+    public ProblemDetail onMissingPathVariable(MissingPathVariableException e) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad request",
+                "Path variable '" + e.getVariableName() + "' is required");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
