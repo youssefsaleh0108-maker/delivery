@@ -66,7 +66,7 @@ images:
   newTag: sha-d8612ab55c370d21ac8748ad14413652dac51df2
 - name: ghcr.io/youssefsaleh0108-maker/product-service
   newName: ghcr.io/youssefsaleh0108-maker/product-service
-  newTag: sha-86fb0ce32304a353bca0d8fdb26d91adcdc92a43
+  newTag: sha-d7bbed453634590d1f2d95b2c24fa248f92a4681
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/sms-connector
