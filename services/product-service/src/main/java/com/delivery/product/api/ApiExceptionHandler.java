@@ -10,12 +10,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.platform.storage.StorageException;
@@ -173,6 +175,34 @@ public class ApiExceptionHandler {
                 "Path variable '" + e.getVariableName() + "' is required");
     }
 
+    /**
+     * A body the parser could not read: malformed JSON, or a value outside an enum.
+     *
+     * <p>Sending {@code {"role":"JANITOR"}} was answered with a 500, which tells a caller their
+     * request was our fault and invites a retry that can never succeed. Jackson's own message
+     * names our Java classes and the accepted constants, so it is deliberately not echoed —
+     * the field is enough for a caller to find the typo.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail onUnreadableBody(HttpMessageNotReadableException e) {
+        String field = fieldOf(e);
+        return problem(HttpStatus.BAD_REQUEST, "Bad request", field == null
+                ? "The request body could not be read"
+                : "Field '" + field + "' has a value this endpoint does not accept");
+    }
+
+    /**
+     * A URL this service does not route.
+     *
+     * <p>Without this, a typo in a path fell through to the catch-all and came back as a 500,
+     * so a client could not tell a wrong address from a broken server.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail onNoResource(NoResourceFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Not found",
+                "No endpoint at " + e.getHttpMethod() + " /" + e.getResourcePath());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail onValidationFailure(MethodArgumentNotValidException e) {
         ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed",
@@ -216,6 +246,23 @@ public class ApiExceptionHandler {
         // Never echo an internal message: stack traces and SQL leak schema details to callers.
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error",
                 "The request could not be completed");
+    }
+
+    /**
+     * The offending field name out of a Jackson binding failure, or null.
+     *
+     * <p>Only the path is taken; the message itself names our classes and is never surfaced.
+     */
+    private static String fieldOf(HttpMessageNotReadableException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof com.fasterxml.jackson.databind.exc.MismatchedInputException mismatch) {
+            return mismatch.getPath().stream()
+                    .map(com.fasterxml.jackson.databind.JsonMappingException.Reference::getFieldName)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce((first, second) -> first + "." + second)
+                    .orElse(null);
+        }
+        return null;
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

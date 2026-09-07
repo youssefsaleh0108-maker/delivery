@@ -71,11 +71,18 @@ public class Category {
         this.parentId = parentId;
     }
 
-    /** A section owned by one shop, appended at the given display position. */
-    public Category(UUID storeId, String name, short position) {
+    /**
+     * A section owned by one shop, appended at the given display position.
+     *
+     * <p>{@code parentId} is a parameter and not an afterthought: the first version of this
+     * constructor omitted it, so a section created under a platform category silently came back
+     * with no parent and the caller's validated input was discarded.
+     */
+    public Category(UUID storeId, String name, UUID parentId, short position) {
         this.id = UUID.randomUUID();
         this.storeId = storeId;
         this.name = name;
+        this.parentId = parentId;
         this.position = position;
     }
 

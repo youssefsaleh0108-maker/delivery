@@ -48,14 +48,14 @@ public class StoreCategoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public List<StoreCategoryResponse> list(@PathVariable UUID storeId) {
         require(storeId, null);
         return sections.sectionsOf(storeId).stream().map(this::toResponse).toList();
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<StoreCategoryResponse> create(@PathVariable UUID storeId,
                                                         @Valid @RequestBody SectionRequest request) {
         require(storeId, Permission.MODIFY_INVENTORY_PRICING);
@@ -64,7 +64,7 @@ public class StoreCategoryController {
     }
 
     @PutMapping("/{categoryId}")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public StoreCategoryResponse rename(@PathVariable UUID storeId, @PathVariable UUID categoryId,
                                         @Valid @RequestBody SectionRequest request) {
         require(storeId, Permission.MODIFY_INVENTORY_PRICING);
@@ -73,7 +73,7 @@ public class StoreCategoryController {
 
     /** The drag-to-reorder result: the full ordered list of this shop's section ids. */
     @PutMapping("/order")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public List<StoreCategoryResponse> reorder(@PathVariable UUID storeId,
                                                @Valid @RequestBody ReorderRequest request) {
         require(storeId, Permission.MODIFY_INVENTORY_PRICING);
@@ -84,7 +84,7 @@ public class StoreCategoryController {
 
     @DeleteMapping("/{categoryId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void delete(@PathVariable UUID storeId, @PathVariable UUID categoryId) {
         require(storeId, Permission.MODIFY_INVENTORY_PRICING);
         sections.delete(storeId, categoryId);

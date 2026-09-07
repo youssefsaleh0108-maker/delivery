@@ -42,6 +42,14 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     long countByCategoryId(UUID categoryId);
 
     /**
+     * Products in a section that a customer could still be shown.
+     *
+     * <p>Products are archived, never deleted, so an unfiltered count keeps a section pinned open
+     * for goods that left the shelf months ago and can never be un-counted.
+     */
+    long countByCategoryIdAndStatusNot(UUID categoryId, Product.Status status);
+
+    /**
      * A store's shelf: the ACTIVE products in one store, optionally narrowed to one aisle.
      *
      * <p>The store landing page's main query, and the reason V11 adds a partial index on

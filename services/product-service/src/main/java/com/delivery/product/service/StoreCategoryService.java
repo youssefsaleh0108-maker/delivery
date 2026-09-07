@@ -1,7 +1,9 @@
 package com.delivery.product.service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -11,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.product.domain.Category;
 import com.delivery.product.domain.CategoryRepository;
+import com.delivery.product.domain.Product;
 import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 
@@ -45,7 +48,7 @@ public class StoreCategoryService {
     /** How many live products sit in each section — the "28 products" line on every row. */
     @Transactional(readOnly = true)
     public long productCount(UUID categoryId) {
-        return products.countByCategoryId(categoryId);
+        return products.countByCategoryIdAndStatusNot(categoryId, Product.Status.ARCHIVED);
     }
 
     @Transactional
@@ -71,7 +74,7 @@ public class StoreCategoryService {
             }
         }
         short position = (short) Math.min(categories.countByStoreId(storeId), Short.MAX_VALUE);
-        Category section = categories.save(new Category(storeId, trimmed, position));
+        Category section = categories.save(new Category(storeId, trimmed, parentId, position));
         log.info("Store {} created section {}", storeId, section.getId());
         return section;
     }
@@ -79,7 +82,16 @@ public class StoreCategoryService {
     @Transactional
     public Category rename(UUID storeId, UUID categoryId, String name) {
         Category section = requireSection(storeId, categoryId);
-        section.rename(requireName(name));
+        String trimmed = requireName(name);
+        // The same rule create enforces. Without it a rename could park two sections on names that
+        // differ only by case — which create rejects, so the list ended up in a state its own
+        // create path would never have produced.
+        if (!section.getName().equalsIgnoreCase(trimmed)
+                && categories.existsByStoreIdAndNameIgnoreCase(storeId, trimmed)) {
+            throw new CatalogRuleViolationException(
+                    "This shop already has a section called " + trimmed);
+        }
+        section.rename(trimmed);
         return section;
     }
 
@@ -93,7 +105,11 @@ public class StoreCategoryService {
     @Transactional
     public List<Category> reorder(UUID storeId, List<UUID> orderedIds) {
         List<Category> sections = new ArrayList<>(sectionsOf(storeId));
-        if (orderedIds.size() != sections.size()) {
+        // "Exactly once" has to mean it: comparing only the list LENGTH let a duplicated id through,
+        // which moved one section twice and left another silently holding its old position — the
+        // precise drift this whole full-list contract exists to prevent.
+        Set<UUID> distinct = new LinkedHashSet<>(orderedIds);
+        if (distinct.size() != orderedIds.size() || distinct.size() != sections.size()) {
             throw new CatalogRuleViolationException(
                     "The new order must list every section exactly once");
         }
@@ -112,7 +128,7 @@ public class StoreCategoryService {
     @Transactional
     public void delete(UUID storeId, UUID categoryId) {
         Category section = requireSection(storeId, categoryId);
-        long inUse = products.countByCategoryId(categoryId);
+        long inUse = products.countByCategoryIdAndStatusNot(categoryId, Product.Status.ARCHIVED);
         if (inUse > 0) {
             // Refuse rather than orphan: silently nulling categoryId on live products would move
             // goods off the shelf a customer is browsing with no way to tell what happened.
