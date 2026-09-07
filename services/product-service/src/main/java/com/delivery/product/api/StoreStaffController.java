@@ -60,7 +60,7 @@ public class StoreStaffController {
      * the owner too, who has no {@code staff_members} row.
      */
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public AccessResponse me(@PathVariable UUID storeId) {
         StoreAccess access = staff.accessFor(storeId, CurrentUser.requireId());
         return new AccessResponse(
@@ -72,7 +72,7 @@ public class StoreStaffController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public RosterResponse roster(@PathVariable UUID storeId) {
         StoreAccess access = require(storeId);
         access.require(Permission.MANAGE_STAFF);
@@ -105,7 +105,7 @@ public class StoreStaffController {
     // ---------------------------------------------------------------- invites
 
     @PostMapping("/invites")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<InviteResponse> invite(@PathVariable UUID storeId,
                                                  @Valid @RequestBody InviteRequest request) {
         StaffInvite invite = staff.invite(storeId, request.role(), request.displayName(),
@@ -118,14 +118,14 @@ public class StoreStaffController {
     // ---------------------------------------------------------------- member writes
 
     @PutMapping("/{memberId}/role")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void changeRole(@PathVariable UUID storeId, @PathVariable UUID memberId,
                            @Valid @RequestBody RoleRequest request) {
         staff.changeRole(storeId, memberId, request.role(), require(storeId));
     }
 
     @PutMapping("/{memberId}/status")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void setStatus(@PathVariable UUID storeId, @PathVariable UUID memberId,
                           @Valid @RequestBody StatusRequest request) {
         staff.setStatus(storeId, memberId, request.status(), require(storeId));
@@ -138,7 +138,7 @@ public class StoreStaffController {
      * the only way back to "whatever a cashier gets here" once someone has been special-cased.
      */
     @PutMapping("/{memberId}/permissions")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void overridePermission(@PathVariable UUID storeId, @PathVariable UUID memberId,
                                    @Valid @RequestBody PermissionRequest request) {
         staff.overridePermission(storeId, memberId, request.permission(), request.granted(),
@@ -146,14 +146,14 @@ public class StoreStaffController {
     }
 
     @DeleteMapping("/{memberId}")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void remove(@PathVariable UUID storeId, @PathVariable UUID memberId) {
         staff.remove(storeId, memberId, require(storeId));
     }
 
     /** Edit the store's band for a whole role — the "Edit All" column on the permissions panel. */
     @PutMapping("/roles/{role}/permissions")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void setBand(@PathVariable UUID storeId, @PathVariable StaffRole role,
                         @Valid @RequestBody BandRequest request) {
         staff.setBand(storeId, role, request.permission(), request.granted(), require(storeId));
@@ -162,13 +162,13 @@ public class StoreStaffController {
     // ---------------------------------------------------------------- shifts
 
     @PostMapping("/shifts")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void clockIn(@PathVariable UUID storeId) {
         staff.clockIn(storeId, require(storeId));
     }
 
     @DeleteMapping("/{memberId}/shifts")
-    @PreAuthorize("hasAnyRole('MERCHANT','MERCHANT_STAFF')")
+    @PreAuthorize("isAuthenticated()")
     public void clockOut(@PathVariable UUID storeId, @PathVariable UUID memberId) {
         staff.clockOut(storeId, memberId, require(storeId));
     }
