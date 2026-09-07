@@ -124,6 +124,10 @@ public class StaffInvite {
         return phone;
     }
 
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

@@ -54,6 +54,32 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A staff member who lacks one permission.
+     *
+     * <p>The permission is named in the body on purpose: "you cannot do that" sends a cashier to
+     * their manager with nothing to act on, while naming the grant tells the manager which toggle
+     * to flip.
+     */
+    @ExceptionHandler(com.delivery.product.service.StoreAccess.StoreAccessDeniedException.class)
+    public ProblemDetail onPermissionDenied(
+            com.delivery.product.service.StoreAccess.StoreAccessDeniedException e) {
+        ProblemDetail detail = problem(HttpStatus.FORBIDDEN, "Permission required", e.getMessage());
+        detail.setProperty("permission", e.getPermission().name());
+        return detail;
+    }
+
+    /**
+     * A store the caller has no relationship to.
+     *
+     * <p>404 rather than 403: someone poking at store ids should not be able to learn which ones
+     * exist by the shape of the refusal.
+     */
+    @ExceptionHandler(StoreStaffController.StoreNotVisibleException.class)
+    public ProblemDetail onStoreNotVisible(StoreStaffController.StoreNotVisibleException e) {
+        return problem(HttpStatus.NOT_FOUND, "Store not found", e.getMessage());
+    }
+
+    /**
      * A delivery area that does not exist, and one that already does.
      *
      * <p>Mapped explicitly for the same reason the store cases above are: without a handler these
