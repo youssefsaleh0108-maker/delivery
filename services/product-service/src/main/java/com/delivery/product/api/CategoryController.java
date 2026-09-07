@@ -68,7 +68,7 @@ public class CategoryController {
         Category created = catalog.createCategory(request.name(), request.parentId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new CategoryResponse(created.getId(), created.getName(),
-                        created.getParentId(), null, null, List.of()));
+                        created.getParentId(), null, null, created.getStoreId(), List.of()));
     }
 
     private CategoryResponse toResponse(Category category, Map<UUID, List<Category>> byParent) {
@@ -79,6 +79,6 @@ public class CategoryController {
 
         return new CategoryResponse(category.getId(), category.getName(),
                 category.getParentId(), images.resolveUrl(category.getImageRef()),
-                category.getVertical(), children);
+                category.getVertical(), category.getStoreId(), children);
     }
 }

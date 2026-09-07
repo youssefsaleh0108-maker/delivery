@@ -102,6 +102,14 @@ public final class CatalogDtos {
              * what puts them in the customer app's home strip.
              */
             Store.Vertical vertical,
+            /**
+             * The shop that owns this section, or null for platform taxonomy.
+             *
+             * <p>Always null on this endpoint, which serves the platform tree only. It is present so
+             * a client can tell the two apart from the payload alone rather than from which URL it
+             * happened to call.
+             */
+            UUID storeId,
             List<CategoryResponse> children) {
     }
 

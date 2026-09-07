@@ -114,14 +114,15 @@ public class CatalogService {
 
     @Transactional
     public Product create(String merchantId, ProductRequest request) {
-        validateCategory(request.categoryId());
-
         // Every product lives in a store. A merchant who has not set one up yet gets one created
         // here rather than a not-null violation, so "add your first product" never needs "but first
         // go and create a store" wired into the client.
         UUID storeId = request.storeId() != null
                 ? requireOwnedStore(merchantId, request.storeId())
                 : storeService.requireStoreFor(merchantId).getId();
+
+        // After the store is known, not before: a shop section is only valid for its own store.
+        validateCategory(request.categoryId(), storeId);
 
         Product product = new Product(
                 merchantId,
@@ -145,7 +146,7 @@ public class CatalogService {
     @Transactional
     public Product update(UUID id, String merchantId, ProductRequest request) {
         Product product = requireOwned(id, merchantId);
-        validateCategory(request.categoryId());
+        validateCategory(request.categoryId(), product.getStoreId());
 
         product.update(request.name(), request.description(), request.price(), request.categoryId(),
                 request.sku(), request.barcode());
@@ -254,9 +255,23 @@ public class CatalogService {
         return storeId;
     }
 
-    private void validateCategory(UUID categoryId) {
-        if (categoryId != null && !categories.existsById(categoryId)) {
-            throw new CatalogRuleViolationException("Category " + categoryId + " does not exist");
+    /**
+     * A product may sit in a platform category, or in a section owned by its own store — never in
+     * another shop's section.
+     *
+     * <p>Without the store check a merchant could file their goods under a competitor's shelf by
+     * pasting an id, and that shelf's product count would then include stock its owner cannot see.
+     */
+    private void validateCategory(UUID categoryId, UUID storeId) {
+        if (categoryId == null) {
+            return;
+        }
+        Category category = categories.findById(categoryId)
+                .orElseThrow(() -> new CatalogRuleViolationException(
+                        "Category " + categoryId + " does not exist"));
+        if (!category.isPlatformOwned() && !category.isOwnedByStore(storeId)) {
+            throw new CatalogRuleViolationException(
+                    "Category " + categoryId + " does not exist");
         }
     }
 
