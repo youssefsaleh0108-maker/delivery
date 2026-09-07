@@ -2782,5 +2782,529 @@
   "riderStatementDebtNote": "This is normal. Cash you take at the door belongs to the platform until you hand it over — it is not a deduction from your pay.",
   "riderStatementCreditNote": "This is your money, still to reach you.",
   "riderStatementSettledNote": "Everything you have collected has been accounted for.",
-  "riderStatementUnclearNote": "This app could not tell which way this balance points. Ask the platform before acting on it."
+  "riderStatementUnclearNote": "This app could not tell which way this balance points. Ask the platform before acting on it.",
+  "navPos": "POS",
+  "navInventory": "Inventory",
+  "navReports": "Reports",
+  "navStaff": "Staff",
+  "dashSwitchToPos": "Switch to POS mode",
+  "dashWalkInSalesToday": "Walk-in sales today",
+  "dashCashPayouts": "Cash taken",
+  "dashCardPayouts": "Card taken",
+  "dashLowStockAlerts": "Low stock alerts",
+  "dashQuickActions": "Quick actions",
+  "dashNewSale": "New sale",
+  "dashAddProduct": "Add product",
+  "dashStockCount": "Stock count",
+  "dashViewReports": "View reports",
+  "posTitle": "Point of sale",
+  "posSearchProducts": "Search products, SKU or barcode",
+  "posScanBarcode": "Scan barcode",
+  "posNoProducts": "No products to sell yet",
+  "posNoProductsHint": "Add a product to your catalogue and it appears here.",
+  "posCouldNotLoadCatalogue": "Could not load the catalogue",
+  "posCart": "Current sale",
+  "posCartEmpty": "Nothing rung up yet",
+  "posCartEmptyHint": "Tap a product to start the sale.",
+  "posLinesCount": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
+  "@posLinesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "posSubtotal": "Subtotal",
+  "posDiscount": "Discount",
+  "posTax": "VAT",
+  "posTotal": "Total",
+  "posPaid": "Paid",
+  "posOutstanding": "Still due",
+  "posRefundedAmount": "Refunded",
+  "posUsd": "${amount}",
+  "@posUsd": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "posLbp": "{amount} LBP",
+  "@posLbp": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "posRate": "1 USD = {rate} LBP",
+  "@posRate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "posCharge": "Charge",
+  "posClearSale": "Clear sale",
+  "posQuantity": "Quantity",
+  "posRemoveLine": "Remove",
+  "posAddOpenItem": "Add open item",
+  "posOpenItem": "Open item",
+  "posOpenItemName": "What is it?",
+  "posOpenItemPrice": "Price",
+  "posDiscountTitle": "Apply a discount",
+  "posDiscountAmount": "Discount amount",
+  "posDiscountNote": "Why? (optional)",
+  "posApplyDiscount": "Apply discount",
+  "posDiscountTooLarge": "That is more than you may discount. Ask a manager.",
+  "posCouldNotLoadSale": "Could not load this sale",
+  "posTerminalUnavailable": "The register is not available yet.",
+  "posCheckout": "Payment",
+  "posTenderMethod": "How are they paying?",
+  "posCashUsd": "Cash (USD)",
+  "posCashLbp": "Cash (LBP)",
+  "posCard": "Card",
+  "posWallet": "YouDrop wallet",
+  "posWalletComingSoon": "Coming soon",
+  "posAmountTendered": "Amount given",
+  "posCardReference": "Reference (optional)",
+  "posChangeIn": "Change in",
+  "posChangeDue": "Change due",
+  "posChangePreview": "Preview — the till confirms the final figure.",
+  "posRoundingLbp": "Rounded to the nearest note",
+  "posSplitPayment": "Split payment",
+  "posAddTender": "Add another payment",
+  "posRemainingAmount": "Remaining {amount}",
+  "@posRemainingAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "posCompleteSale": "Complete sale",
+  "posSaleCompleted": "Sale completed",
+  "posTendersShort": "The payments do not cover the total yet.",
+  "posReceipt": "Receipt",
+  "posReceiptChannel": "Send the receipt",
+  "posReceiptPrint": "Print",
+  "posReceiptSms": "SMS",
+  "posReceiptWhatsapp": "WhatsApp",
+  "posReceiptEmail": "Email",
+  "posReceiptNone": "No receipt",
+  "posReceiptContact": "Where to send it",
+  "posReceiptSent": "Receipt sent",
+  "posReceiptNo": "Receipt {label}",
+  "@posReceiptNo": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "posPrintReceipt": "Print receipt",
+  "posShareReceipt": "Share receipt",
+  "posNewSale": "New sale",
+  "posCashier": "Cashier",
+  "posThankYou": "Thank you",
+  "posShift": "Shift",
+  "posShiftActive": "{count, plural, =0{Shift open} =1{Shift open · 1 sale} other{Shift open · {count} sales}}",
+  "@posShiftActive": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "posOpenShift": "Open shift",
+  "posCloseShift": "Close shift",
+  "posOpeningFloat": "Cash in the drawer (USD)",
+  "posOpeningFloatLbp": "Cash in the drawer (LBP)",
+  "posCountedCash": "Counted (USD)",
+  "posCountedCashLbp": "Counted (LBP)",
+  "posExpected": "Expected",
+  "posCounted": "Counted",
+  "posVariance": "Difference",
+  "posShiftClosed": "Shift closed",
+  "posShiftSummary": "Shift summary",
+  "posNoShift": "No shift open",
+  "posNoShiftHint": "Open a shift before ringing up sales.",
+  "posRegister": "Register",
+  "posRegisters": "Registers",
+  "posAddRegister": "Add register",
+  "posRegisterName": "Register name",
+  "posSelectRegister": "Choose a register",
+  "posSalesCount": "Sales",
+  "posByMethod": "By payment method",
+  "posStatusOpen": "Open",
+  "posStatusCompleted": "Completed",
+  "posStatusVoided": "Voided",
+  "posStatusPartiallyRefunded": "Partly refunded",
+  "posStatusRefunded": "Refunded",
+  "posActionComplete": "Charge",
+  "posActionVoid": "Void",
+  "posActionRefund": "Refund",
+  "posActionReprint": "Reprint receipt",
+  "posVoidSale": "Void this sale",
+  "posVoidReason": "Why is it being voided?",
+  "posVoidConfirm": "Void sale",
+  "posVoided": "Sale voided",
+  "posRefundTitle": "Refund items",
+  "posRefundQty": "How many back?",
+  "posRefundMethod": "Refund as",
+  "posRefundRestock": "Put the items back on the shelf",
+  "posRefundReason": "Reason (optional)",
+  "posRefundConfirm": "Refund",
+  "posRefundDone": "Refunded",
+  "invTitle": "Inventory",
+  "invSearch": "Search by name, SKU or barcode",
+  "invFilterAll": "All",
+  "invFilterLowStock": "Low stock",
+  "invFilterOutOfStock": "Out of stock",
+  "invFilterActive": "Active",
+  "invFilterHidden": "Hidden",
+  "invOnHand": "On hand",
+  "invReserved": "Reserved",
+  "invAvailable": "Available",
+  "invThreshold": "Low-stock level",
+  "invSku": "SKU {sku}",
+  "@invSku": {
+    "placeholders": {
+      "sku": {
+        "type": "String"
+      }
+    }
+  },
+  "invBarcode": "Barcode",
+  "invNotTracked": "Not tracked",
+  "invTrackStock": "Track stock",
+  "invTrackStockHint": "YouDrop hides the item when it runs out.",
+  "invInitialStock": "Stock on hand now",
+  "invStatusOk": "In stock",
+  "invStatusWarning": "Low",
+  "invStatusCritical": "Critical",
+  "invStatusOut": "Out of stock",
+  "invEmpty": "Nothing in inventory yet",
+  "invEmptyHint": "Add products to your catalogue and they appear here.",
+  "invCouldNotLoad": "Could not load inventory",
+  "invSyncing": "Bringing your catalogue in…",
+  "invSynced": "{count, plural, =0{Nothing to bring in} =1{1 product added} other{{count} products added}}",
+  "@invSynced": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "invProducts": "Products",
+  "invCategories": "Sections",
+  "invAlerts": "Alerts",
+  "invAdjust": "Adjust stock",
+  "invAdjustAdd": "Add",
+  "invAdjustRemove": "Remove",
+  "invAdjustSetTo": "Set to",
+  "invAdjustQuantity": "How many?",
+  "invAdjustReason": "Why?",
+  "invAdjustNote": "Note (optional)",
+  "invAdjustSave": "Save adjustment",
+  "invAdjusted": "Stock updated",
+  "invReasonReceived": "Received",
+  "invReasonDamaged": "Damaged",
+  "invReasonExpired": "Expired",
+  "invReasonTheft": "Theft or loss",
+  "invReasonCorrection": "Correction",
+  "invReasonOther": "Other",
+  "invMovements": "Stock history",
+  "invNoMovements": "Nothing has moved yet",
+  "invKindReceipt": "Received",
+  "invKindAdjustment": "Adjusted",
+  "invKindCount": "Stock count",
+  "invKindSale": "Sold",
+  "invKindReturn": "Returned",
+  "invKindOrderReserve": "Held for an order",
+  "invKindOrderRelease": "Released",
+  "invKindOrderFulfil": "Order handed over",
+  "invSettings": "Stock settings",
+  "invAlertsEnabled": "Low-stock alerts",
+  "invWhatsappAlerts": "Send alerts on WhatsApp",
+  "invAlertsTitle": "Stock alerts",
+  "invAlertsCount": "{count, plural, =0{Nothing needs restocking} =1{1 item needs restocking} other{{count} items need restocking}}",
+  "@invAlertsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "invAlertsEmpty": "Every shelf is stocked",
+  "invAlertsEmptyHint": "We will tell you here when something runs low.",
+  "invAlertsCouldNotLoad": "Could not load stock alerts",
+  "invVelocity": "Sells about {perDay} a day",
+  "@invVelocity": {
+    "placeholders": {
+      "perDay": {
+        "type": "String"
+      }
+    }
+  },
+  "invHoursOfCover": "About {hours} hours left",
+  "@invHoursOfCover": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "invLastSold": "Last sold {when}",
+  "@invLastSold": {
+    "placeholders": {
+      "when": {
+        "type": "Object"
+      }
+    }
+  },
+  "invNoVelocityYet": "Not enough sales yet to say",
+  "invRestock": "Restock",
+  "invCountTitle": "Stock count",
+  "invCountNew": "Start a count",
+  "invCountName": "Name this count",
+  "invCountNameHint": "Friday shelf check",
+  "invCountScope": "What are you counting?",
+  "invCountAllProducts": "Everything",
+  "invCountByCategory": "One section",
+  "invCountStart": "Start counting",
+  "invCountProgress": "{count, plural, =0{Nothing counted of {total}} =1{1 of {total} counted} other{{count} of {total} counted}}",
+  "@invCountProgress": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "invCountSystem": "System says",
+  "invCountCounted": "You counted",
+  "invCountVariance": "Difference",
+  "invCountSubmit": "Submit count",
+  "invCountCancelCount": "Cancel count",
+  "invCountSubmitted": "Count applied to stock",
+  "invCountCancelled": "Count cancelled",
+  "invCountDiscrepancies": "Differences found",
+  "invCountNoDiscrepancies": "Everything matches",
+  "invCountLeaveWarning": "Leave this count?",
+  "invCountLeaveWarningBody": "What you have counted is saved, and the count stays open.",
+  "invCountKeepCounting": "Keep counting",
+  "invCountDiscard": "Leave",
+  "invCountEmpty": "No counts yet",
+  "invCountOpenExists": "A count is already open. Finish it first.",
+  "invCountStatusOpen": "In progress",
+  "invCountStatusSubmitted": "Submitted",
+  "invCountStatusCancelled": "Cancelled",
+  "catTitle": "Sections",
+  "catSubtitle": "How your shop is arranged for customers",
+  "catAdd": "Add a section",
+  "catName": "Section name",
+  "catNameHint": "Drinks",
+  "catParent": "Sits under",
+  "catNoParent": "Top level",
+  "catDragToReorder": "Drag rows to change display order on the YouDrop app.",
+  "catProductsCount": "{count, plural, =0{No products} =1{1 product} other{{count} products}}",
+  "@catProductsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catRename": "Rename",
+  "catDelete": "Delete section",
+  "catDeleteConfirm": "Delete this section? Its products stay in your catalogue.",
+  "catCannotDeleteNonEmpty": "{count, plural, =1{This section still holds 1 product} other{This section still holds {count} products}}",
+  "@catCannotDeleteNonEmpty": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catEmpty": "No sections yet",
+  "catEmptyHint": "Sections group your products on the shop page.",
+  "catCouldNotLoad": "Could not load sections",
+  "catOrderSaved": "Order saved",
+  "catOrderFailed": "The order could not be saved",
+  "catImage": "Section picture",
+  "catChangeImage": "Change picture",
+  "catYourSections": "Your sections",
+  "catPlatformCategories": "YouDrop categories",
+  "staffTitle": "Staff",
+  "staffSubtitle": "Who works here and what they can do",
+  "staffRoleOwner": "Owner",
+  "staffRoleManager": "Manager",
+  "staffRoleCashier": "Cashier",
+  "staffRoleStockkeeper": "Stockkeeper",
+  "staffPermPosSales": "Sell at the register",
+  "staffPermPosSalesDesc": "Ring up walk-in sales and take payment.",
+  "staffPermPosRefundsVoids": "Refunds and voids",
+  "staffPermPosRefundsVoidsDesc": "Give money back, cancel a sale, discount past the limit.",
+  "staffPermModifyInventoryPricing": "Products and stock",
+  "staffPermModifyInventoryPricingDesc": "Edit products, prices and stock levels.",
+  "staffPermManageOrders": "Delivery orders",
+  "staffPermManageOrdersDesc": "Accept, reject and move YouDrop orders along.",
+  "staffPermViewReports": "Reports",
+  "staffPermViewReportsDesc": "See sales figures and the dashboard money.",
+  "staffPermAccessSettings": "Store settings",
+  "staffPermAccessSettingsDesc": "Change hours, delivery areas and the shop profile.",
+  "staffPermManageStaff": "Staff",
+  "staffPermManageStaffDesc": "Add and remove members, and set what each may do.",
+  "staffStatusActive": "Active",
+  "staffStatusInactive": "Suspended",
+  "staffOnShift": "On shift",
+  "staffOffShift": "Off shift",
+  "staffLastSeen": "Last seen {when}",
+  "@staffLastSeen": {
+    "placeholders": {
+      "when": {
+        "type": "Object"
+      }
+    }
+  },
+  "staffShiftMinutes": "{count, plural, =0{Just clocked in} =1{On shift 1 minute} other{On shift {count} minutes}}",
+  "@staffShiftMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "staffInvite": "Invite someone",
+  "staffInviteRole": "Their role",
+  "staffInviteName": "Their name",
+  "staffInviteEmail": "Email (optional)",
+  "staffInvitePhone": "Phone (optional)",
+  "staffInviteCreate": "Create invite code",
+  "staffInviteCode": "Invite code",
+  "staffInviteCodeHint": "They sign in to YouDrop and enter this code. You never set their password.",
+  "staffInviteShare": "Share code",
+  "staffInviteCopied": "Code copied",
+  "staffInviteExpires": "Expires {when}",
+  "@staffInviteExpires": {
+    "placeholders": {
+      "when": {
+        "type": "Object"
+      }
+    }
+  },
+  "staffPendingInvites": "Waiting to be redeemed",
+  "staffNoPendingInvites": "No codes outstanding",
+  "staffAcceptTitle": "Join a shop",
+  "staffAcceptCode": "Enter your invite code",
+  "staffAcceptJoin": "Join",
+  "staffAcceptFailed": "That code did not work",
+  "staffJoined": "You now work at {store}",
+  "@staffJoined": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "staffEditPermissions": "What they can do",
+  "staffRoleDefaults": "Defaults for this role",
+  "staffCustomised": "Changed for this person",
+  "staffResetToRole": "Back to the role default",
+  "staffChangeRole": "Change role",
+  "staffDeactivate": "Suspend",
+  "staffActivate": "Reinstate",
+  "staffRemove": "Remove from shop",
+  "staffRemoveConfirm": "Remove this person? Their past shifts and sales stay on the record.",
+  "staffRemoved": "Removed",
+  "staffClockIn": "Clock in",
+  "staffClockOut": "Clock out",
+  "staffClockedIn": "You are on shift",
+  "staffClockedOut": "Shift ended",
+  "staffSalesToday": "Sales today",
+  "staffNoPosSalesYet": "Sales appear here once the register is live.",
+  "staffEmpty": "You work alone so far",
+  "staffEmptyHint": "Invite a manager or a cashier and they show up here.",
+  "staffCouldNotLoad": "Could not load the team",
+  "staffNoShopYet": "You are not on a shop's team yet",
+  "staffYou": "You",
+  "staffOwnerBadge": "Owner",
+  "staffCannotEditOwner": "The owner always has every permission.",
+  "staffNoPermission": "You cannot change this",
+  "repTitle": "Sales reports",
+  "repRangeToday": "Today",
+  "repRangeWeek": "Last 7 days",
+  "repRangeMonth": "Last 30 days",
+  "repRangeCustom": "Pick dates",
+  "repCompareToPrevious": "Compare with the period before",
+  "repRangeTooLong": "Reports cover at most {days} days at a time",
+  "@repRangeTooLong": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "repRevenue": "Revenue",
+  "repNetRevenue": "Net revenue",
+  "repGrossValue": "Gross sales",
+  "repRefunded": "Refunded",
+  "repOrders": "Orders",
+  "repItemsSold": "Items sold",
+  "repAverageOrder": "Average sale",
+  "repDailyRevenue": "Revenue by day",
+  "repByCategory": "Sales by section",
+  "repTopProducts": "Best sellers",
+  "repUncategorised": "No section",
+  "repBySource": "Where the sales came from",
+  "repByPaymentMethod": "How customers paid",
+  "repSourceDelivery": "YouDrop",
+  "repSourceWalkIn": "Walk-in",
+  "repSoldCount": "{count, plural, =0{None sold} =1{1 sold} other{{count} sold}}",
+  "@repSoldCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "repOrdersTotal": "{count, plural, =0{No sales} =1{1 sale} other{{count} sales}}",
+  "@repOrdersTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "repEmpty": "Nothing sold in this period",
+  "repEmptyHint": "Pick a wider range, or bring in the history from before reports existed.",
+  "repSyncHistory": "Bring in past sales",
+  "repSyncStarted": "Working through your history…",
+  "repCouldNotLoad": "Could not load the report",
+  "repExportCsv": "Export CSV",
+  "repExported": "Report exported",
+  "repGeneratedAt": "Worked out {when}",
+  "@repGeneratedAt": {
+    "placeholders": {
+      "when": {
+        "type": "Object"
+      }
+    }
+  },
+  "repNoChange": "—",
+  "repHistoryTitle": "Sales history",
+  "repHistorySubtitle": "View and manage sales receipts",
+  "repHistorySearch": "Search by receipt number or item",
+  "repHistoryEmpty": "No receipts in this period",
+  "repHistoryCouldNotLoad": "Could not load sales history",
+  "repStatusCompleted": "Completed",
+  "repStatusPartiallyRefunded": "Partly refunded",
+  "repStatusRefunded": "Refunded",
+  "repStatusVoided": "Voided",
+  "repViewReceipt": "View receipt",
+  "repFilterAll": "All"
 }

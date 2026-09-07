@@ -5818,4 +5818,1221 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get riderStatementUnclearNote =>
       'تعذّر على التطبيق تحديد اتجاه هذا الرصيد. راجع المنصة قبل التصرّف بناءً عليه.';
+
+  @override
+  String get navPos => 'نقطة البيع';
+
+  @override
+  String get navInventory => 'المخزون';
+
+  @override
+  String get navReports => 'التقارير';
+
+  @override
+  String get navStaff => 'الفريق';
+
+  @override
+  String get dashSwitchToPos => 'التبديل إلى وضع نقطة البيع';
+
+  @override
+  String get dashWalkInSalesToday => 'مبيعات المحل اليوم';
+
+  @override
+  String get dashCashPayouts => 'المقبوض نقداً';
+
+  @override
+  String get dashCardPayouts => 'المقبوض بالبطاقة';
+
+  @override
+  String get dashLowStockAlerts => 'تنبيهات نقص المخزون';
+
+  @override
+  String get dashQuickActions => 'إجراءات سريعة';
+
+  @override
+  String get dashNewSale => 'بيع جديد';
+
+  @override
+  String get dashAddProduct => 'إضافة منتج';
+
+  @override
+  String get dashStockCount => 'جرد المخزون';
+
+  @override
+  String get dashViewReports => 'عرض التقارير';
+
+  @override
+  String get posTitle => 'نقطة البيع';
+
+  @override
+  String get posSearchProducts => 'ابحث عن منتج أو رمز أو باركود';
+
+  @override
+  String get posScanBarcode => 'مسح الباركود';
+
+  @override
+  String get posNoProducts => 'لا منتجات للبيع بعد';
+
+  @override
+  String get posNoProductsHint => 'أضف منتجاً إلى كتالوجك ليظهر هنا.';
+
+  @override
+  String get posCouldNotLoadCatalogue => 'تعذّر تحميل الكتالوج';
+
+  @override
+  String get posCart => 'البيع الحالي';
+
+  @override
+  String get posCartEmpty => 'لم يُسجَّل أي صنف بعد';
+
+  @override
+  String get posCartEmptyHint => 'اضغط على منتج لبدء عملية البيع.';
+
+  @override
+  String posLinesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صنف',
+      many: '$count صنفاً',
+      few: '$count أصناف',
+      two: 'صنفان',
+      one: 'صنف واحد',
+      zero: 'لا أصناف',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get posSubtotal => 'المجموع الفرعي';
+
+  @override
+  String get posDiscount => 'الخصم';
+
+  @override
+  String get posTax => 'الضريبة';
+
+  @override
+  String get posTotal => 'الإجمالي';
+
+  @override
+  String get posPaid => 'المدفوع';
+
+  @override
+  String get posOutstanding => 'المتبقي';
+
+  @override
+  String get posRefundedAmount => 'المُعاد';
+
+  @override
+  String posUsd(String amount) {
+    return '$amount \$';
+  }
+
+  @override
+  String posLbp(String amount) {
+    return '$amount ل.ل.';
+  }
+
+  @override
+  String posRate(String rate) {
+    return '1 دولار = $rate ل.ل.';
+  }
+
+  @override
+  String get posCharge => 'تحصيل';
+
+  @override
+  String get posClearSale => 'إلغاء البيع';
+
+  @override
+  String get posQuantity => 'الكمية';
+
+  @override
+  String get posRemoveLine => 'إزالة';
+
+  @override
+  String get posAddOpenItem => 'إضافة صنف مفتوح';
+
+  @override
+  String get posOpenItem => 'صنف مفتوح';
+
+  @override
+  String get posOpenItemName => 'ما هو الصنف؟';
+
+  @override
+  String get posOpenItemPrice => 'السعر';
+
+  @override
+  String get posDiscountTitle => 'تطبيق خصم';
+
+  @override
+  String get posDiscountAmount => 'قيمة الخصم';
+
+  @override
+  String get posDiscountNote => 'السبب (اختياري)';
+
+  @override
+  String get posApplyDiscount => 'تطبيق الخصم';
+
+  @override
+  String get posDiscountTooLarge =>
+      'هذا الخصم يتجاوز صلاحيتك. اطلب موافقة المسؤول.';
+
+  @override
+  String get posCouldNotLoadSale => 'تعذّر تحميل هذه العملية';
+
+  @override
+  String get posTerminalUnavailable => 'نقطة البيع غير متاحة بعد.';
+
+  @override
+  String get posCheckout => 'الدفع';
+
+  @override
+  String get posTenderMethod => 'كيف سيدفع الزبون؟';
+
+  @override
+  String get posCashUsd => 'نقداً (دولار)';
+
+  @override
+  String get posCashLbp => 'نقداً (ليرة)';
+
+  @override
+  String get posCard => 'بطاقة';
+
+  @override
+  String get posWallet => 'محفظة YouDrop';
+
+  @override
+  String get posWalletComingSoon => 'قريباً';
+
+  @override
+  String get posAmountTendered => 'المبلغ المستلم';
+
+  @override
+  String get posCardReference => 'رقم المرجع (اختياري)';
+
+  @override
+  String get posChangeIn => 'الفكة بعملة';
+
+  @override
+  String get posChangeDue => 'الفكة المستحقة';
+
+  @override
+  String get posChangePreview => 'معاينة — الصندوق يثبّت الرقم النهائي.';
+
+  @override
+  String get posRoundingLbp => 'مقرَّب إلى أقرب ورقة نقدية';
+
+  @override
+  String get posSplitPayment => 'تقسيم الدفع';
+
+  @override
+  String get posAddTender => 'إضافة دفعة أخرى';
+
+  @override
+  String posRemainingAmount(String amount) {
+    return 'المتبقي $amount';
+  }
+
+  @override
+  String get posCompleteSale => 'إتمام البيع';
+
+  @override
+  String get posSaleCompleted => 'تم إتمام البيع';
+
+  @override
+  String get posTendersShort => 'الدفعات لا تغطي الإجمالي بعد.';
+
+  @override
+  String get posReceipt => 'الإيصال';
+
+  @override
+  String get posReceiptChannel => 'إرسال الإيصال';
+
+  @override
+  String get posReceiptPrint => 'طباعة';
+
+  @override
+  String get posReceiptSms => 'رسالة نصية';
+
+  @override
+  String get posReceiptWhatsapp => 'واتساب';
+
+  @override
+  String get posReceiptEmail => 'بريد إلكتروني';
+
+  @override
+  String get posReceiptNone => 'بدون إيصال';
+
+  @override
+  String get posReceiptContact => 'إلى أين نرسله';
+
+  @override
+  String get posReceiptSent => 'تم إرسال الإيصال';
+
+  @override
+  String posReceiptNo(String label) {
+    return 'إيصال $label';
+  }
+
+  @override
+  String get posPrintReceipt => 'طباعة الإيصال';
+
+  @override
+  String get posShareReceipt => 'مشاركة الإيصال';
+
+  @override
+  String get posNewSale => 'بيع جديد';
+
+  @override
+  String get posCashier => 'أمين الصندوق';
+
+  @override
+  String get posThankYou => 'شكراً لك';
+
+  @override
+  String get posShift => 'الوردية';
+
+  @override
+  String posShiftActive(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'الوردية مفتوحة · $count عملية',
+      many: 'الوردية مفتوحة · $count عملية',
+      few: 'الوردية مفتوحة · $count عمليات',
+      two: 'الوردية مفتوحة · عمليتان',
+      one: 'الوردية مفتوحة · عملية واحدة',
+      zero: 'الوردية مفتوحة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get posOpenShift => 'فتح وردية';
+
+  @override
+  String get posCloseShift => 'إغلاق الوردية';
+
+  @override
+  String get posOpeningFloat => 'النقد في الدرج (دولار)';
+
+  @override
+  String get posOpeningFloatLbp => 'النقد في الدرج (ليرة)';
+
+  @override
+  String get posCountedCash => 'المعدود (دولار)';
+
+  @override
+  String get posCountedCashLbp => 'المعدود (ليرة)';
+
+  @override
+  String get posExpected => 'المتوقع';
+
+  @override
+  String get posCounted => 'المعدود';
+
+  @override
+  String get posVariance => 'الفرق';
+
+  @override
+  String get posShiftClosed => 'أُغلقت الوردية';
+
+  @override
+  String get posShiftSummary => 'ملخص الوردية';
+
+  @override
+  String get posNoShift => 'لا توجد وردية مفتوحة';
+
+  @override
+  String get posNoShiftHint => 'افتح وردية قبل بدء البيع.';
+
+  @override
+  String get posRegister => 'الصندوق';
+
+  @override
+  String get posRegisters => 'الصناديق';
+
+  @override
+  String get posAddRegister => 'إضافة صندوق';
+
+  @override
+  String get posRegisterName => 'اسم الصندوق';
+
+  @override
+  String get posSelectRegister => 'اختر صندوقاً';
+
+  @override
+  String get posSalesCount => 'المبيعات';
+
+  @override
+  String get posByMethod => 'حسب طريقة الدفع';
+
+  @override
+  String get posStatusOpen => 'مفتوحة';
+
+  @override
+  String get posStatusCompleted => 'مكتملة';
+
+  @override
+  String get posStatusVoided => 'ملغاة';
+
+  @override
+  String get posStatusPartiallyRefunded => 'مُعادة جزئياً';
+
+  @override
+  String get posStatusRefunded => 'مُعادة';
+
+  @override
+  String get posActionComplete => 'تحصيل';
+
+  @override
+  String get posActionVoid => 'إلغاء';
+
+  @override
+  String get posActionRefund => 'إرجاع';
+
+  @override
+  String get posActionReprint => 'إعادة طباعة الإيصال';
+
+  @override
+  String get posVoidSale => 'إلغاء هذه العملية';
+
+  @override
+  String get posVoidReason => 'سبب الإلغاء';
+
+  @override
+  String get posVoidConfirm => 'تأكيد الإلغاء';
+
+  @override
+  String get posVoided => 'أُلغيت العملية';
+
+  @override
+  String get posRefundTitle => 'إرجاع أصناف';
+
+  @override
+  String get posRefundQty => 'كم صنفاً يُعاد؟';
+
+  @override
+  String get posRefundMethod => 'طريقة الإرجاع';
+
+  @override
+  String get posRefundRestock => 'إعادة الأصناف إلى الرف';
+
+  @override
+  String get posRefundReason => 'السبب (اختياري)';
+
+  @override
+  String get posRefundConfirm => 'تنفيذ الإرجاع';
+
+  @override
+  String get posRefundDone => 'تم الإرجاع';
+
+  @override
+  String get invTitle => 'المخزون';
+
+  @override
+  String get invSearch => 'ابحث بالاسم أو الرمز أو الباركود';
+
+  @override
+  String get invFilterAll => 'الكل';
+
+  @override
+  String get invFilterLowStock => 'مخزون منخفض';
+
+  @override
+  String get invFilterOutOfStock => 'نفد المخزون';
+
+  @override
+  String get invFilterActive => 'معروضة';
+
+  @override
+  String get invFilterHidden => 'مخفية';
+
+  @override
+  String get invOnHand => 'المتوفر بالمستودع';
+
+  @override
+  String get invReserved => 'محجوز لطلبات';
+
+  @override
+  String get invAvailable => 'المتاح للبيع';
+
+  @override
+  String get invThreshold => 'حد التنبيه';
+
+  @override
+  String invSku(String sku) {
+    return 'الرمز $sku';
+  }
+
+  @override
+  String get invBarcode => 'الباركود';
+
+  @override
+  String get invNotTracked => 'غير متتبَّع';
+
+  @override
+  String get invTrackStock => 'تتبّع المخزون';
+
+  @override
+  String get invTrackStockHint => 'يخفي YouDrop الصنف عند نفاده.';
+
+  @override
+  String get invInitialStock => 'الكمية الحالية';
+
+  @override
+  String get invStatusOk => 'متوفر';
+
+  @override
+  String get invStatusWarning => 'منخفض';
+
+  @override
+  String get invStatusCritical => 'حرِج';
+
+  @override
+  String get invStatusOut => 'نفد';
+
+  @override
+  String get invEmpty => 'لا شيء في المخزون بعد';
+
+  @override
+  String get invEmptyHint => 'أضف منتجات إلى كتالوجك لتظهر هنا.';
+
+  @override
+  String get invCouldNotLoad => 'تعذّر تحميل المخزون';
+
+  @override
+  String get invSyncing => 'يجري إحضار كتالوجك…';
+
+  @override
+  String invSynced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'أُضيف $count منتج',
+      many: 'أُضيف $count منتجاً',
+      few: 'أُضيفت $count منتجات',
+      two: 'أُضيف منتجان',
+      one: 'أُضيف منتج واحد',
+      zero: 'لا شيء لإضافته',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get invProducts => 'المنتجات';
+
+  @override
+  String get invCategories => 'الأقسام';
+
+  @override
+  String get invAlerts => 'التنبيهات';
+
+  @override
+  String get invAdjust => 'تعديل المخزون';
+
+  @override
+  String get invAdjustAdd => 'إضافة';
+
+  @override
+  String get invAdjustRemove => 'خصم';
+
+  @override
+  String get invAdjustSetTo => 'ضبط على';
+
+  @override
+  String get invAdjustQuantity => 'كم الكمية؟';
+
+  @override
+  String get invAdjustReason => 'السبب';
+
+  @override
+  String get invAdjustNote => 'ملاحظة (اختياري)';
+
+  @override
+  String get invAdjustSave => 'حفظ التعديل';
+
+  @override
+  String get invAdjusted => 'تم تحديث المخزون';
+
+  @override
+  String get invReasonReceived => 'بضاعة واردة';
+
+  @override
+  String get invReasonDamaged => 'تالف';
+
+  @override
+  String get invReasonExpired => 'منتهي الصلاحية';
+
+  @override
+  String get invReasonTheft => 'سرقة أو فقدان';
+
+  @override
+  String get invReasonCorrection => 'تصحيح';
+
+  @override
+  String get invReasonOther => 'أخرى';
+
+  @override
+  String get invMovements => 'سجل الحركة';
+
+  @override
+  String get invNoMovements => 'لا حركة بعد';
+
+  @override
+  String get invKindReceipt => 'استلام';
+
+  @override
+  String get invKindAdjustment => 'تعديل';
+
+  @override
+  String get invKindCount => 'جرد';
+
+  @override
+  String get invKindSale => 'بيع';
+
+  @override
+  String get invKindReturn => 'إرجاع';
+
+  @override
+  String get invKindOrderReserve => 'حجز لطلب';
+
+  @override
+  String get invKindOrderRelease => 'فك الحجز';
+
+  @override
+  String get invKindOrderFulfil => 'تسليم طلب';
+
+  @override
+  String get invSettings => 'إعدادات المخزون';
+
+  @override
+  String get invAlertsEnabled => 'تنبيهات نقص المخزون';
+
+  @override
+  String get invWhatsappAlerts => 'إرسال التنبيهات عبر واتساب';
+
+  @override
+  String get invAlertsTitle => 'تنبيهات المخزون';
+
+  @override
+  String invAlertsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صنف يحتاج تعبئة',
+      many: '$count صنفاً يحتاج تعبئة',
+      few: '$count أصناف تحتاج تعبئة',
+      two: 'صنفان يحتاجان تعبئة',
+      one: 'صنف واحد يحتاج تعبئة',
+      zero: 'لا شيء يحتاج تعبئة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get invAlertsEmpty => 'كل الرفوف ممتلئة';
+
+  @override
+  String get invAlertsEmptyHint => 'سننبّهك هنا عندما يقارب صنف على النفاد.';
+
+  @override
+  String get invAlertsCouldNotLoad => 'تعذّر تحميل تنبيهات المخزون';
+
+  @override
+  String invVelocity(String perDay) {
+    return 'يُباع نحو $perDay يومياً';
+  }
+
+  @override
+  String invHoursOfCover(String hours) {
+    return 'يكفي نحو $hours ساعة';
+  }
+
+  @override
+  String invLastSold(Object when) {
+    return 'آخر بيع $when';
+  }
+
+  @override
+  String get invNoVelocityYet => 'لا توجد مبيعات كافية للتقدير';
+
+  @override
+  String get invRestock => 'تعبئة';
+
+  @override
+  String get invCountTitle => 'جرد المخزون';
+
+  @override
+  String get invCountNew => 'بدء جرد';
+
+  @override
+  String get invCountName => 'اسم الجرد';
+
+  @override
+  String get invCountNameHint => 'جرد رفوف الجمعة';
+
+  @override
+  String get invCountScope => 'ماذا ستجرد؟';
+
+  @override
+  String get invCountAllProducts => 'كل المنتجات';
+
+  @override
+  String get invCountByCategory => 'قسم واحد';
+
+  @override
+  String get invCountStart => 'ابدأ الجرد';
+
+  @override
+  String invCountProgress(int count, int total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'جُرد $count صنف من $total',
+      many: 'جُرد $count صنفاً من $total',
+      few: 'جُردت $count أصناف من $total',
+      two: 'جُرد صنفان من $total',
+      one: 'جُرد صنف واحد من $total',
+      zero: 'لم يُجرد شيء من $total',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get invCountSystem => 'حسب النظام';
+
+  @override
+  String get invCountCounted => 'ما عددته';
+
+  @override
+  String get invCountVariance => 'الفرق';
+
+  @override
+  String get invCountSubmit => 'اعتماد الجرد';
+
+  @override
+  String get invCountCancelCount => 'إلغاء الجرد';
+
+  @override
+  String get invCountSubmitted => 'طُبِّق الجرد على المخزون';
+
+  @override
+  String get invCountCancelled => 'أُلغي الجرد';
+
+  @override
+  String get invCountDiscrepancies => 'فروقات مرصودة';
+
+  @override
+  String get invCountNoDiscrepancies => 'كل شيء مطابق';
+
+  @override
+  String get invCountLeaveWarning => 'مغادرة الجرد؟';
+
+  @override
+  String get invCountLeaveWarningBody => 'ما جردته محفوظ، ويبقى الجرد مفتوحاً.';
+
+  @override
+  String get invCountKeepCounting => 'متابعة الجرد';
+
+  @override
+  String get invCountDiscard => 'مغادرة';
+
+  @override
+  String get invCountEmpty => 'لا عمليات جرد بعد';
+
+  @override
+  String get invCountOpenExists => 'هناك جرد مفتوح. أنهِه أولاً.';
+
+  @override
+  String get invCountStatusOpen => 'قيد التنفيذ';
+
+  @override
+  String get invCountStatusSubmitted => 'معتمد';
+
+  @override
+  String get invCountStatusCancelled => 'ملغى';
+
+  @override
+  String get catTitle => 'الأقسام';
+
+  @override
+  String get catSubtitle => 'كيف يُرتَّب متجرك أمام الزبائن';
+
+  @override
+  String get catAdd => 'إضافة قسم';
+
+  @override
+  String get catName => 'اسم القسم';
+
+  @override
+  String get catNameHint => 'المشروبات';
+
+  @override
+  String get catParent => 'يندرج تحت';
+
+  @override
+  String get catNoParent => 'المستوى الأعلى';
+
+  @override
+  String get catDragToReorder =>
+      'اسحب الصفوف لتغيير ترتيب العرض في تطبيق YouDrop.';
+
+  @override
+  String catProductsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count منتج',
+      many: '$count منتجاً',
+      few: '$count منتجات',
+      two: 'منتجان',
+      one: 'منتج واحد',
+      zero: 'لا منتجات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catRename => 'إعادة تسمية';
+
+  @override
+  String get catDelete => 'حذف القسم';
+
+  @override
+  String get catDeleteConfirm => 'حذف هذا القسم؟ ستبقى منتجاته في كتالوجك.';
+
+  @override
+  String catCannotDeleteNonEmpty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ما زال هذا القسم يضم $count منتج',
+      many: 'ما زال هذا القسم يضم $count منتجاً',
+      few: 'ما زال هذا القسم يضم $count منتجات',
+      two: 'ما زال هذا القسم يضم منتجين',
+      one: 'ما زال هذا القسم يضم منتجاً واحداً',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catEmpty => 'لا أقسام بعد';
+
+  @override
+  String get catEmptyHint => 'تجمع الأقسام منتجاتك في صفحة المتجر.';
+
+  @override
+  String get catCouldNotLoad => 'تعذّر تحميل الأقسام';
+
+  @override
+  String get catOrderSaved => 'حُفظ الترتيب';
+
+  @override
+  String get catOrderFailed => 'تعذّر حفظ الترتيب';
+
+  @override
+  String get catImage => 'صورة القسم';
+
+  @override
+  String get catChangeImage => 'تغيير الصورة';
+
+  @override
+  String get catYourSections => 'أقسامك';
+
+  @override
+  String get catPlatformCategories => 'تصنيفات YouDrop';
+
+  @override
+  String get staffTitle => 'الفريق';
+
+  @override
+  String get staffSubtitle => 'من يعمل هنا وما الذي يمكنه فعله';
+
+  @override
+  String get staffRoleOwner => 'المالك';
+
+  @override
+  String get staffRoleManager => 'مدير';
+
+  @override
+  String get staffRoleCashier => 'أمين صندوق';
+
+  @override
+  String get staffRoleStockkeeper => 'أمين مستودع';
+
+  @override
+  String get staffPermPosSales => 'البيع على الصندوق';
+
+  @override
+  String get staffPermPosSalesDesc => 'تسجيل مبيعات المحل وقبض المبالغ.';
+
+  @override
+  String get staffPermPosRefundsVoids => 'الإرجاع والإلغاء';
+
+  @override
+  String get staffPermPosRefundsVoidsDesc =>
+      'إعادة الأموال وإلغاء عملية بيع ومنح خصم يتجاوز الحد.';
+
+  @override
+  String get staffPermModifyInventoryPricing => 'المنتجات والمخزون';
+
+  @override
+  String get staffPermModifyInventoryPricingDesc =>
+      'تعديل المنتجات والأسعار وكميات المخزون.';
+
+  @override
+  String get staffPermManageOrders => 'طلبات التوصيل';
+
+  @override
+  String get staffPermManageOrdersDesc =>
+      'قبول طلبات YouDrop ورفضها ومتابعتها.';
+
+  @override
+  String get staffPermViewReports => 'التقارير';
+
+  @override
+  String get staffPermViewReportsDesc =>
+      'الاطلاع على أرقام المبيعات وأموال اللوحة.';
+
+  @override
+  String get staffPermAccessSettings => 'إعدادات المتجر';
+
+  @override
+  String get staffPermAccessSettingsDesc =>
+      'تغيير ساعات العمل ومناطق التوصيل وملف المتجر.';
+
+  @override
+  String get staffPermManageStaff => 'الفريق';
+
+  @override
+  String get staffPermManageStaffDesc =>
+      'إضافة الأعضاء وإزالتهم وتحديد صلاحياتهم.';
+
+  @override
+  String get staffStatusActive => 'نشط';
+
+  @override
+  String get staffStatusInactive => 'موقوف';
+
+  @override
+  String get staffOnShift => 'على الوردية';
+
+  @override
+  String get staffOffShift => 'خارج الوردية';
+
+  @override
+  String staffLastSeen(Object when) {
+    return 'آخر ظهور $when';
+  }
+
+  @override
+  String staffShiftMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'على الوردية منذ $count دقيقة',
+      many: 'على الوردية منذ $count دقيقة',
+      few: 'على الوردية منذ $count دقائق',
+      two: 'على الوردية منذ دقيقتين',
+      one: 'على الوردية منذ دقيقة',
+      zero: 'بدأ الوردية للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get staffInvite => 'دعوة شخص';
+
+  @override
+  String get staffInviteRole => 'الدور';
+
+  @override
+  String get staffInviteName => 'الاسم';
+
+  @override
+  String get staffInviteEmail => 'البريد الإلكتروني (اختياري)';
+
+  @override
+  String get staffInvitePhone => 'الهاتف (اختياري)';
+
+  @override
+  String get staffInviteCreate => 'إنشاء رمز دعوة';
+
+  @override
+  String get staffInviteCode => 'رمز الدعوة';
+
+  @override
+  String get staffInviteCodeHint =>
+      'يسجّل الشخص دخوله إلى YouDrop ويدخل هذا الرمز. أنت لا تضع كلمة مروره.';
+
+  @override
+  String get staffInviteShare => 'مشاركة الرمز';
+
+  @override
+  String get staffInviteCopied => 'نُسخ الرمز';
+
+  @override
+  String staffInviteExpires(Object when) {
+    return 'ينتهي $when';
+  }
+
+  @override
+  String get staffPendingInvites => 'بانتظار الاستخدام';
+
+  @override
+  String get staffNoPendingInvites => 'لا رموز معلّقة';
+
+  @override
+  String get staffAcceptTitle => 'الانضمام إلى متجر';
+
+  @override
+  String get staffAcceptCode => 'أدخل رمز الدعوة';
+
+  @override
+  String get staffAcceptJoin => 'انضمام';
+
+  @override
+  String get staffAcceptFailed => 'هذا الرمز غير صالح';
+
+  @override
+  String staffJoined(String store) {
+    return 'أصبحت تعمل في $store';
+  }
+
+  @override
+  String get staffEditPermissions => 'الصلاحيات';
+
+  @override
+  String get staffRoleDefaults => 'الافتراضي لهذا الدور';
+
+  @override
+  String get staffCustomised => 'مُخصَّص لهذا الشخص';
+
+  @override
+  String get staffResetToRole => 'العودة إلى افتراضي الدور';
+
+  @override
+  String get staffChangeRole => 'تغيير الدور';
+
+  @override
+  String get staffDeactivate => 'إيقاف';
+
+  @override
+  String get staffActivate => 'إعادة تفعيل';
+
+  @override
+  String get staffRemove => 'إزالة من المتجر';
+
+  @override
+  String get staffRemoveConfirm =>
+      'إزالة هذا الشخص؟ تبقى ورديّاته ومبيعاته في السجل.';
+
+  @override
+  String get staffRemoved => 'تمت الإزالة';
+
+  @override
+  String get staffClockIn => 'تسجيل حضور';
+
+  @override
+  String get staffClockOut => 'تسجيل انصراف';
+
+  @override
+  String get staffClockedIn => 'أنت على الوردية';
+
+  @override
+  String get staffClockedOut => 'انتهت الوردية';
+
+  @override
+  String get staffSalesToday => 'مبيعات اليوم';
+
+  @override
+  String get staffNoPosSalesYet => 'ستظهر المبيعات هنا بعد تشغيل نقطة البيع.';
+
+  @override
+  String get staffEmpty => 'تعمل وحدك حتى الآن';
+
+  @override
+  String get staffEmptyHint => 'ادعُ مديراً أو أمين صندوق ليظهر هنا.';
+
+  @override
+  String get staffCouldNotLoad => 'تعذّر تحميل الفريق';
+
+  @override
+  String get staffNoShopYet => 'لست ضمن فريق أي متجر بعد';
+
+  @override
+  String get staffYou => 'أنت';
+
+  @override
+  String get staffOwnerBadge => 'المالك';
+
+  @override
+  String get staffCannotEditOwner => 'المالك يملك كل الصلاحيات دائماً.';
+
+  @override
+  String get staffNoPermission => 'لا يمكنك تغيير هذا';
+
+  @override
+  String get repTitle => 'تقارير المبيعات';
+
+  @override
+  String get repRangeToday => 'اليوم';
+
+  @override
+  String get repRangeWeek => 'آخر 7 أيام';
+
+  @override
+  String get repRangeMonth => 'آخر 30 يوماً';
+
+  @override
+  String get repRangeCustom => 'اختيار التواريخ';
+
+  @override
+  String get repCompareToPrevious => 'المقارنة بالفترة السابقة';
+
+  @override
+  String repRangeTooLong(int days) {
+    return 'يغطي التقرير $days يوماً كحد أقصى في المرة الواحدة';
+  }
+
+  @override
+  String get repRevenue => 'الإيرادات';
+
+  @override
+  String get repNetRevenue => 'صافي الإيرادات';
+
+  @override
+  String get repGrossValue => 'إجمالي المبيعات';
+
+  @override
+  String get repRefunded => 'المُعاد';
+
+  @override
+  String get repOrders => 'الطلبات';
+
+  @override
+  String get repItemsSold => 'الأصناف المباعة';
+
+  @override
+  String get repAverageOrder => 'متوسط العملية';
+
+  @override
+  String get repDailyRevenue => 'الإيرادات حسب اليوم';
+
+  @override
+  String get repByCategory => 'المبيعات حسب القسم';
+
+  @override
+  String get repTopProducts => 'الأكثر مبيعاً';
+
+  @override
+  String get repUncategorised => 'بلا قسم';
+
+  @override
+  String get repBySource => 'مصدر المبيعات';
+
+  @override
+  String get repByPaymentMethod => 'طريقة الدفع';
+
+  @override
+  String get repSourceDelivery => 'YouDrop';
+
+  @override
+  String get repSourceWalkIn => 'من المحل';
+
+  @override
+  String repSoldCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بيع $count صنف',
+      many: 'بيع $count صنفاً',
+      few: 'بيعت $count أصناف',
+      two: 'بيع صنفان',
+      one: 'بيع صنف واحد',
+      zero: 'لم يُبع شيء',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String repOrdersTotal(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عملية',
+      many: '$count عملية',
+      few: '$count عمليات',
+      two: 'عمليتان',
+      one: 'عملية واحدة',
+      zero: 'لا مبيعات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repEmpty => 'لا مبيعات في هذه الفترة';
+
+  @override
+  String get repEmptyHint =>
+      'وسّع الفترة، أو استورد السجل السابق لبدء التقارير.';
+
+  @override
+  String get repSyncHistory => 'استيراد المبيعات السابقة';
+
+  @override
+  String get repSyncStarted => 'يجري تجهيز سجلك…';
+
+  @override
+  String get repCouldNotLoad => 'تعذّر تحميل التقرير';
+
+  @override
+  String get repExportCsv => 'تصدير CSV';
+
+  @override
+  String get repExported => 'تم تصدير التقرير';
+
+  @override
+  String repGeneratedAt(Object when) {
+    return 'احتُسب $when';
+  }
+
+  @override
+  String get repNoChange => '—';
+
+  @override
+  String get repHistoryTitle => 'سجل المبيعات';
+
+  @override
+  String get repHistorySubtitle => 'عرض إيصالات المبيعات وإدارتها';
+
+  @override
+  String get repHistorySearch => 'ابحث برقم الإيصال أو الصنف';
+
+  @override
+  String get repHistoryEmpty => 'لا إيصالات في هذه الفترة';
+
+  @override
+  String get repHistoryCouldNotLoad => 'تعذّر تحميل سجل المبيعات';
+
+  @override
+  String get repStatusCompleted => 'مكتملة';
+
+  @override
+  String get repStatusPartiallyRefunded => 'مُعادة جزئياً';
+
+  @override
+  String get repStatusRefunded => 'مُعادة';
+
+  @override
+  String get repStatusVoided => 'ملغاة';
+
+  @override
+  String get repViewReceipt => 'عرض الإيصال';
+
+  @override
+  String get repFilterAll => 'الكل';
 }

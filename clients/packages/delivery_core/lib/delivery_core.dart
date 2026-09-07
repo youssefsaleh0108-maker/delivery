@@ -76,3 +76,14 @@ export 'src/auth/delivery_role.dart';
 export 'src/models/catalog_models.dart';
 export 'src/network/api_client.dart';
 export 'src/network/paged_list.dart';
+// The merchant suite: the till, the shelf, the roster and the numbers. Every one of these must be
+// listed here — a model that is not exported fails `flutter analyze` in delivery_merchant, not in
+// this package, which is a confusing place to learn about it.
+export 'src/api/inventory_api.dart';
+export 'src/models/inventory_models.dart';
+export 'src/api/pos_api.dart';
+export 'src/models/pos_models.dart';
+export 'src/api/store_staff_api.dart';
+export 'src/models/staff_models.dart';
+export 'src/api/reports_api.dart';
+export 'src/models/report_models.dart';

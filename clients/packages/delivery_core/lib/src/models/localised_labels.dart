@@ -1,7 +1,11 @@
 import 'package:delivery_l10n/delivery_l10n.dart';
 
+import 'inventory_models.dart';
 import 'order_models.dart';
+import 'pos_models.dart';
 import 'provider_models.dart';
+import 'report_models.dart';
+import 'staff_models.dart';
 import 'store_models.dart';
 
 /// Translated labels for the enums the apps put on screen.
@@ -99,5 +103,164 @@ extension StoreAvailabilityLabel on StoreAvailability {
         StoreAvailability.busy => t.statusBusy,
         StoreAvailability.closingSoon => t.statusClosingSoon,
         StoreAvailability.closed => t.statusClosed,
+      };
+}
+
+// ---------------------------------------------------------------------------- staff
+
+extension StaffRoleLabel on StaffRole {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        StaffRole.manager => t.staffRoleManager,
+        StaffRole.cashier => t.staffRoleCashier,
+        StaffRole.stockkeeper => t.staffRoleStockkeeper,
+      };
+}
+
+extension StoreStaffAccessLabel on StoreStaffAccess {
+  /// The owner has no role, so there is no enum to ask — this is the one place that fills the gap,
+  /// for a sidebar footer or a card badge that must always name somebody's standing.
+  String roleLabelIn(DeliveryStrings t) => role?.labelIn(t) ?? t.staffRoleOwner;
+}
+
+extension StorePermissionLabel on StorePermission {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        StorePermission.posSales => t.staffPermPosSales,
+        StorePermission.posRefundsVoids => t.staffPermPosRefundsVoids,
+        StorePermission.modifyInventoryPricing => t.staffPermModifyInventoryPricing,
+        StorePermission.manageOrders => t.staffPermManageOrders,
+        StorePermission.viewReports => t.staffPermViewReports,
+        StorePermission.accessSettings => t.staffPermAccessSettings,
+        StorePermission.manageStaff => t.staffPermManageStaff,
+      };
+
+  /// The second line under each toggle. Both staff frames draw two lines per permission, and a
+  /// toggle labelled only "Refunds and voids" does not tell a shopkeeper what they are handing
+  /// over.
+  String descriptionIn(DeliveryStrings t) => switch (this) {
+        StorePermission.posSales => t.staffPermPosSalesDesc,
+        StorePermission.posRefundsVoids => t.staffPermPosRefundsVoidsDesc,
+        StorePermission.modifyInventoryPricing => t.staffPermModifyInventoryPricingDesc,
+        StorePermission.manageOrders => t.staffPermManageOrdersDesc,
+        StorePermission.viewReports => t.staffPermViewReportsDesc,
+        StorePermission.accessSettings => t.staffPermAccessSettingsDesc,
+        StorePermission.manageStaff => t.staffPermManageStaffDesc,
+      };
+}
+
+extension StaffStatusLabel on StaffStatus {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        StaffStatus.active => t.staffStatusActive,
+        StaffStatus.inactive => t.staffStatusInactive,
+      };
+}
+
+// ---------------------------------------------------------------------------- inventory
+
+extension InventoryFilterLabel on InventoryFilter {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        InventoryFilter.all => t.invFilterAll,
+        InventoryFilter.lowStock => t.invFilterLowStock,
+        InventoryFilter.outOfStock => t.invFilterOutOfStock,
+        InventoryFilter.active => t.invFilterActive,
+        InventoryFilter.hidden => t.invFilterHidden,
+      };
+}
+
+extension StockSeverityLabel on StockSeverity {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        StockSeverity.ok => t.invStatusOk,
+        StockSeverity.warning => t.invStatusWarning,
+        StockSeverity.critical => t.invStatusCritical,
+        StockSeverity.out => t.invStatusOut,
+      };
+}
+
+extension MovementKindLabel on MovementKind {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        MovementKind.receipt => t.invKindReceipt,
+        MovementKind.adjustment => t.invKindAdjustment,
+        MovementKind.count => t.invKindCount,
+        MovementKind.sale => t.invKindSale,
+        MovementKind.returned => t.invKindReturn,
+        MovementKind.orderReserve => t.invKindOrderReserve,
+        MovementKind.orderRelease => t.invKindOrderRelease,
+        MovementKind.orderFulfil => t.invKindOrderFulfil,
+      };
+}
+
+extension AdjustmentReasonLabel on AdjustmentReason {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        AdjustmentReason.received => t.invReasonReceived,
+        AdjustmentReason.damaged => t.invReasonDamaged,
+        AdjustmentReason.expired => t.invReasonExpired,
+        AdjustmentReason.theft => t.invReasonTheft,
+        AdjustmentReason.correction => t.invReasonCorrection,
+        AdjustmentReason.other => t.invReasonOther,
+      };
+}
+
+extension StockCountStatusLabel on StockCountStatus {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        StockCountStatus.open => t.invCountStatusOpen,
+        StockCountStatus.submitted => t.invCountStatusSubmitted,
+        StockCountStatus.cancelled => t.invCountStatusCancelled,
+      };
+}
+
+// ---------------------------------------------------------------------------- the till
+
+extension PosSaleStatusLabel on PosSaleStatus {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        PosSaleStatus.open => t.posStatusOpen,
+        PosSaleStatus.completed => t.posStatusCompleted,
+        PosSaleStatus.voided => t.posStatusVoided,
+        PosSaleStatus.partiallyRefunded => t.posStatusPartiallyRefunded,
+        PosSaleStatus.refunded => t.posStatusRefunded,
+      };
+}
+
+extension PosSaleActionLabel on PosSaleAction {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        PosSaleAction.complete => t.posActionComplete,
+        PosSaleAction.voidSale => t.posActionVoid,
+        PosSaleAction.refund => t.posActionRefund,
+        PosSaleAction.reprint => t.posActionReprint,
+      };
+}
+
+extension PosTenderMethodLabel on PosTenderMethod {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        PosTenderMethod.cashUsd => t.posCashUsd,
+        PosTenderMethod.cashLbp => t.posCashLbp,
+        PosTenderMethod.card => t.posCard,
+        PosTenderMethod.wallet => t.posWallet,
+      };
+}
+
+extension ReceiptChannelLabel on ReceiptChannel {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        ReceiptChannel.print_ => t.posReceiptPrint,
+        ReceiptChannel.sms => t.posReceiptSms,
+        ReceiptChannel.whatsapp => t.posReceiptWhatsapp,
+        ReceiptChannel.email => t.posReceiptEmail,
+        ReceiptChannel.none => t.posReceiptNone,
+      };
+}
+
+// ---------------------------------------------------------------------------- reports
+
+extension SaleSourceLabel on SaleSource {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        SaleSource.delivery => t.repSourceDelivery,
+        SaleSource.pos => t.repSourceWalkIn,
+      };
+}
+
+extension SaleFactStatusLabel on SaleFactStatus {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        SaleFactStatus.completed => t.repStatusCompleted,
+        SaleFactStatus.partiallyRefunded => t.repStatusPartiallyRefunded,
+        SaleFactStatus.refunded => t.repStatusRefunded,
+        SaleFactStatus.voided => t.repStatusVoided,
       };
 }

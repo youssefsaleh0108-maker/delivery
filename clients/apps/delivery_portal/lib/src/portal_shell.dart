@@ -64,6 +64,10 @@ class PortalApis {
     required this.partnerManagement,
     required this.autoApproval,
     required this.statements,
+    required this.pos,
+    required this.inventory,
+    required this.staff,
+    required this.reports,
   });
 
   final CatalogApi catalog;
@@ -103,6 +107,13 @@ class PortalApis {
   /// Counterparty statements. The Backoffice reads everybody's and sends them; a carrier reads only
   /// its own, through a route that takes no ref at all.
   final StatementsApi statements;
+
+  /// The merchant suite. The register, the shelves and the reports talk to services that are not
+  /// yet deployed and their screens say so calmly; staff is served by product-service today.
+  final PosApi pos;
+  final InventoryApi inventory;
+  final StoreStaffApi staff;
+  final ReportsApi reports;
 }
 
 /// One destination in a rail.
@@ -230,8 +241,71 @@ class PortalArea {
         label: (DeliveryStrings t) => t.navMyShop,
         build: (PortalApis a, _, __, ___) => StoreScreen(api: a.store),
       ),
+      // The merchant suite, APPENDED after the seven above and never reordered: the dashboard's
+      // "see all orders" link is `jump(2)` and must keep meaning Orders. The portal is owner-only
+      // today (the MERCHANT role), so access is the owner's without a lookup.
+      PortalDestination(
+        icon: Icons.inventory_outlined,
+        selectedIcon: Icons.inventory,
+        label: (DeliveryStrings t) => t.navInventory,
+        build: (PortalApis a, _, __, ___) => _withStore(a, (String? storeId) => InventoryScreen(
+          api: a.inventory,
+          catalogApi: a.catalog,
+          storeApi: a.store,
+          storeId: storeId,
+        )),
+      ),
+      PortalDestination(
+        icon: Icons.point_of_sale_outlined,
+        selectedIcon: Icons.point_of_sale,
+        label: (DeliveryStrings t) => t.navPos,
+        build: (PortalApis a, _, __, ___) => _withStore(a, (String? storeId) => PosTerminalScreen(
+          api: a.pos,
+          catalogApi: a.catalog,
+          storeId: storeId,
+          storeApi: a.store,
+          inventoryApi: a.inventory,
+          onCheckout: (BuildContext ctx, PosSale sale) =>
+              PosCheckoutScreen.show(ctx, sale: sale, api: a.pos),
+        )),
+      ),
+      PortalDestination(
+        icon: Icons.category_outlined,
+        selectedIcon: Icons.category,
+        label: (DeliveryStrings t) => t.navCategories,
+        build: (PortalApis a, _, __, ___) => _withStore(a,
+            (String? storeId) => MerchantCategoriesScreen(api: a.catalog, storeId: storeId)),
+      ),
+      PortalDestination(
+        icon: Icons.badge_outlined,
+        selectedIcon: Icons.badge,
+        label: (DeliveryStrings t) => t.navStaff,
+        build: (PortalApis a, _, __, ___) => _withStore(a, (String? storeId) => StaffScreen(
+          api: a.staff,
+          storeId: storeId,
+          access: const MerchantAccess.owner(),
+        )),
+      ),
     ],
   );
+
+  /// Resolves the signed-in merchant's shop once and hands its id to [child].
+  ///
+  /// The suite's screens are keyed on a store, and the rail builds synchronously; this is the one
+  /// place the portal looks the shop up so no screen has to. A merchant with no shop yet gets a
+  /// null, which every one of those screens renders as "no shop yet" rather than as a failure.
+  static Widget _withStore(PortalApis a, Widget Function(String? storeId) child) {
+    return FutureBuilder<Paged<Store>>(
+      future: a.store.mine(size: 1),
+      builder: (BuildContext context, AsyncSnapshot<Paged<Store>> snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
+        }
+        final List<Store>? stores = snap.data?.content;
+        return child(stores == null || stores.isEmpty ? null : stores.first.id);
+      },
+    );
+  }
 
   // ------------------------------------------------------------------- carrier
   //

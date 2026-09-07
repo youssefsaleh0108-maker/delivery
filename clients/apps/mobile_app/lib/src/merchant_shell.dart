@@ -9,18 +9,25 @@ import 'package:flutter/material.dart';
 import 'notifications_screen.dart' show NotificationPrefsScreen;
 import 'settings_screen.dart';
 
-/// The shop owner's surface: the four-tab app the redesign draws.
+/// The shop's surface: the five-tab app the merchant suite draws.
 ///
-/// Figma `merchant-dashboard` (3:1742), `merchant-orders` (3:1822), `merchant-products` (3:1893)
-/// and `merchant-settings` (3:2194) all share one `bottom-nav` (3:1799) — Dashboard, Orders,
-/// Products, Settings, with a live count badge on Orders. That is the whole navigation, and it is
-/// the owner's explicit ask: the menus the web portal has, on the phone.
+/// Figma `merchant-dashboard` (94:9) and its siblings share one bottom nav — Dashboard, POS,
+/// Inventory, Orders, Settings. Inventory is where Products went: the product list with stock on
+/// every row is the same list a merchant used to edit, so a sixth tab would have been the same
+/// screen twice. The product form is still one tap from any inventory row.
 ///
-/// Before this a merchant on a phone got one screen — an order queue and nothing else — so a shop
-/// that had only a phone could not add a product, set its hours or change its language without
-/// finding a desktop. The screens themselves are not new and are not copies: they live in
-/// `delivery_merchant` and the portal mounts the same ones, so a change to the catalogue page
-/// lands in both. This file is only the framing that package deliberately does not carry.
+/// Two things this shell decides that the screens deliberately do not. First, who is standing at
+/// the phone: the owner, or an employee with a subset of the owner's permissions. The screens take
+/// that as a value; this file resolves it once, from the staff API, and never lets it regress
+/// below "owner" for an account that carries the MERCHANT role. Second, which tabs that person may
+/// see. Until order-manager learns about staff (step 22 of the suite plan), its merchant endpoints
+/// are keyed on the caller's own subject and refuse every employee token, so Orders and the
+/// order-backed dashboard are owner-only — gated on ownership, not on a permission that would only
+/// produce a 403.
+///
+/// Tabs are built on first visit rather than eagerly. The register and the inventory each open a
+/// socket and a poll; building all five at start-up would have every merchant paying for screens
+/// they may not open that day.
 class MerchantShell extends StatefulWidget {
   const MerchantShell({
     super.key,
@@ -31,6 +38,10 @@ class MerchantShell extends StatefulWidget {
     this.documentsApi,
     this.prefsApi,
     this.statementsApi,
+    this.posApi,
+    this.inventoryApi,
+    this.staffApi,
+    this.reportsApi,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -42,15 +53,10 @@ class MerchantShell extends StatefulWidget {
   /// The shop record behind the dashboard's publish switch and the shop-configuration page.
   final StoreApi storeApi;
 
-  /// The catalogue behind the Products tab.
+  /// The catalogue behind the Inventory tab and the register's product grid.
   final CatalogApi catalogApi;
 
   /// The shop's own daily series: the dashboard's period comparisons and the analytics page.
-  ///
-  /// The portal handed this to the same two screens from the day they landed and the phone did
-  /// not, so a merchant with only a phone — the exact person this shell exists for — got tiles
-  /// with no movement on them and an Analytics row wearing a "coming soon" chip for a page that
-  /// was already written.
   final AggregatesApi? aggregatesApi;
 
   /// The onboarding documents-and-payout client, behind the Settings tab bank row.
@@ -60,14 +66,21 @@ class MerchantShell extends StatefulWidget {
   final NotificationPrefsApi? prefsApi;
 
   /// The shop's own statement — what the ledger says they are owed for a period they choose.
-  ///
-  /// Optional in the same way the three above are, and for the same reason: a host without one
-  /// draws no row rather than a dead one. Worth stating why it is here at all, though. The screen,
-  /// its Arabic strings and its "this is not a payment" notice were written and tested and then
-  /// reached nobody, because this shell — the only thing that builds a merchant settings page on
-  /// the phone — never took the client. The row hides itself when unwired, so nothing failed and
-  /// no test went red; the most carefully written screen of the four simply shipped dead.
   final StatementsApi? statementsApi;
+
+  /// The register. Null, or a service that is not deployed yet, gives a calm unavailable state
+  /// on the POS tab rather than a crash — the tab is still drawn so the shape of the app is honest.
+  final PosApi? posApi;
+
+  /// Stock levels, alerts and counts behind the Inventory tab. Same null contract as [posApi].
+  final InventoryApi? inventoryApi;
+
+  /// Who works here and what they may do. Null means "assume the owner", which is the only kind
+  /// of account that reached this shell before the suite existed.
+  final StoreStaffApi? staffApi;
+
+  /// Sales reports. Wired now so the dashboard can take it the day the service lands.
+  final ReportsApi? reportsApi;
 
   final AuthSession session;
 
@@ -75,10 +88,6 @@ class MerchantShell extends StatefulWidget {
   final LocaleController locale;
 
   /// True while the application behind this account is still being decided.
-  ///
-  /// Passed to the dashboard, which is where the design puts the banner (`pending-banner`, 3:1758)
-  /// and which is the tab this shell opens on. The server is what refuses the committing act; this
-  /// only means nobody discovers that from a snackbar after building a whole shop.
   final bool pendingApproval;
 
   final Future<void> Function() onSignOut;
@@ -87,23 +96,29 @@ class MerchantShell extends StatefulWidget {
   State<MerchantShell> createState() => _MerchantShellState();
 }
 
-class _MerchantShellState extends State<MerchantShell> {
-  /// The tab order, named — the same discipline the customer bar keeps. The dashboard's pending
-  /// card jumps to Orders, and it says so by name.
-  static const int _dashboardTab = 0;
-  static const int _ordersTab = 1;
-  static const int _productsTab = 2;
-  static const int _settingsTab = 3;
-  static const int _tabCount = 4;
+/// The tabs, named. The dashboard's pending card jumps to Orders and says so by name, and the
+/// visibility rules below read far better against a name than against an index.
+enum MerchantTab { dashboard, pos, inventory, orders, settings }
 
-  int _tab = _dashboardTab;
+class _MerchantShellState extends State<MerchantShell> {
+  MerchantTab _tab = MerchantTab.dashboard;
+
+  /// Which tabs have been opened at least once. Only those are built; see the class doc.
+  final Set<MerchantTab> _visited = <MerchantTab>{MerchantTab.dashboard};
+
+  /// The shop this person is standing in. Resolved once from the store API; the register and the
+  /// shelves cannot open without it, so they show a waiting state until it lands.
+  String? _storeId;
+
+  /// What this person may do here. Starts as the owner for a MERCHANT account — the account that
+  /// has always reached this shell — and is refined, never demoted below that, once the staff API
+  /// answers. An employee's token carries MERCHANT_STAFF instead, starts with nothing, and gains
+  /// exactly what the staff record grants.
+  late MerchantAccess _access = widget.session.hasRole(DeliveryRole.merchant)
+      ? const MerchantAccess.owner()
+      : const MerchantAccess.none();
 
   /// Orders placed and not yet accepted — the number on the Orders badge.
-  ///
-  /// Real, not decorative: it is `awaitingYou` off the merchant summary the dashboard already
-  /// reads, so the badge and the dashboard's own "Pending Orders" card cannot disagree. Null until
-  /// the first read lands, and left alone on a failure — a badge that invents a zero because the
-  /// network blinked is worse than a badge that has not appeared yet.
   int? _awaitingYou;
 
   Timer? _poll;
@@ -111,16 +126,54 @@ class _MerchantShellState extends State<MerchantShell> {
   @override
   void initState() {
     super.initState();
-    _refreshBadge();
-    // Slower than the rider's board on purpose: this is a count on a tab, not a job somebody is
-    // racing another rider for, and the queue itself refreshes when it is opened.
-    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBadge());
+    _resolveStore();
+    if (_access.isOwner) {
+      _refreshBadge();
+      // Slower than the rider's board on purpose: this is a count on a tab, not a job somebody is
+      // racing another rider for, and the queue itself refreshes when it is opened.
+      _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBadge());
+    }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
     super.dispose();
+  }
+
+  Future<void> _resolveStore() async {
+    String? storeId;
+    try {
+      final Paged<Store> mine = await widget.storeApi.mine(size: 1);
+      if (mine.content.isNotEmpty) storeId = mine.content.first.id;
+    } catch (_) {
+      // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
+    }
+    if (storeId == null && widget.staffApi != null) {
+      // An employee owns no store, so `mine` is empty for them; their membership names the shop.
+      try {
+        final StaffMembership membership = await widget.staffApi!.myMembership();
+        storeId = membership.storeId;
+      } catch (_) {
+        // Same contract as above.
+      }
+    }
+    if (!mounted) return;
+    setState(() => _storeId = storeId);
+
+    if (storeId == null || widget.staffApi == null) return;
+    try {
+      final StoreStaffAccess resolved = await widget.staffApi!.access(storeId);
+      if (!mounted) return;
+      setState(() {
+        // Never demote an owner on the word of a failed or partial lookup: the worst outcome of
+        // a bad answer here is a shop locked out of its own register.
+        _access = (_access.isOwner && !resolved.isOwner) ? _access : resolved;
+        if (!_visibleTabs().contains(_tab)) _tab = _visibleTabs().first;
+      });
+    } catch (_) {
+      // Keep whatever we started with.
+    }
   }
 
   Future<void> _refreshBadge() async {
@@ -134,61 +187,95 @@ class _MerchantShellState extends State<MerchantShell> {
     }
   }
 
-  void _open(int tab) {
-    setState(() => _tab = tab);
-    // Opening the queue is the moment the count stops being true, so re-ask rather than waiting
-    // out the rest of the interval.
-    if (tab == _ordersTab) _refreshBadge();
+  /// The tabs this person may see, in nav order.
+  ///
+  /// Owners see all five. An employee sees the register if they may sell, the shelves if they may
+  /// touch stock, and always Settings — which is where the language toggle and sign-out live, so
+  /// nobody is ever handed an app with no way out of it.
+  List<MerchantTab> _visibleTabs() {
+    if (_access.isOwner) return MerchantTab.values;
+    return <MerchantTab>[
+      if (_access.can(StorePermission.posSales)) MerchantTab.pos,
+      if (_access.can(StorePermission.modifyInventoryPricing)) MerchantTab.inventory,
+      MerchantTab.settings,
+    ];
   }
 
-  Widget _tabAt(int tab) {
+  void _open(MerchantTab tab) {
+    setState(() {
+      _tab = tab;
+      _visited.add(tab);
+    });
+    // Opening the queue is the moment the count stops being true, so re-ask rather than waiting
+    // out the rest of the interval.
+    if (tab == MerchantTab.orders) _refreshBadge();
+  }
+
+  Widget _tabAt(MerchantTab tab) {
+    if (!_visited.contains(tab)) return const SizedBox.shrink();
     switch (tab) {
-      case _dashboardTab:
+      case MerchantTab.dashboard:
         return MerchantDashboardScreen(
           api: widget.orderApi,
           storeApi: widget.storeApi,
           aggregates: widget.aggregatesApi,
           pendingApproval: widget.pendingApproval,
-          onShowOrders: () => _open(_ordersTab),
+          onShowOrders: () => _open(MerchantTab.orders),
         );
-      case _ordersTab:
-        return OrdersScreen(api: widget.orderApi);
-      case _productsTab:
-        return ProductListScreen(
-          api: widget.catalogApi,
+      case MerchantTab.pos:
+        return PosTerminalScreen(
+          api: widget.posApi,
+          catalogApi: widget.catalogApi,
+          storeId: _storeId,
           storeApi: widget.storeApi,
+          inventoryApi: widget.inventoryApi,
+          // The register runs full-screen and hands the tender step to a pushed route, so the nav
+          // is out of thumb's reach during the one moment a mis-tap costs money.
+          onCheckout: (BuildContext ctx, PosSale sale) => PosCheckoutScreen.show(
+            ctx,
+            sale: sale,
+            api: widget.posApi,
+          ),
+          onExit: () => _open(_access.isOwner ? MerchantTab.dashboard : MerchantTab.settings),
         );
-      case _settingsTab:
+      case MerchantTab.inventory:
+        return InventoryScreen(
+          api: widget.inventoryApi,
+          catalogApi: widget.catalogApi,
+          storeApi: widget.storeApi,
+          storeId: _storeId,
+          onOpenAlerts: _openStockAlerts,
+        );
+      case MerchantTab.orders:
+        return OrdersScreen(api: widget.orderApi);
+      case MerchantTab.settings:
         return MerchantSettingsScreen(
           locale: widget.locale,
           accountName: widget.session.displayName,
           accountContact: widget.session.email ?? widget.session.username,
-          // The frame's Edit chip. There is no merchant profile endpoint to edit against, so it
-          // opens the account preferences this app does own — language and fingerprint unlock.
-          // That route existed on the old single-screen merchant surface and would otherwise have
-          // disappeared with it, taking the only way to turn the lock on or off with it.
           onEditAccount: _openAccountPreferences,
-          onShopProfile: _openShopProfile,
-          // Wired. The row carried a "Soon" chip on the claim that a merchant has no notification
-          // preferences on any service — and that was never true of this shell: preferences are
-          // per *account*, keyed on the signed-in subject, and this same file has been opening
-          // that very screen from the Edit chip all along. The row now goes straight to it
-          // instead of by way of account preferences, because that is what its label promises.
+          onShopProfile: _access.isOwner ? _openShopProfile : null,
           onNotificationSettings:
               widget.prefsApi == null ? null : _openNotificationPreferences,
-          // The dashboard's other half: the shop's own daily series, behind the Analytics row.
-          aggregates: widget.aggregatesApi,
-          // The bank record on this account, read from the onboarding application.
-          documents: widget.documentsApi,
-          // What the ledger says this shop is owed. Without this line the statement row hides
-          // itself and the screen behind it is unreachable — which is exactly what shipped.
-          statements: widget.statementsApi,
+          aggregates: _access.isOwner ? widget.aggregatesApi : null,
+          documents: _access.isOwner ? widget.documentsApi : null,
+          statements: _access.isOwner ? widget.statementsApi : null,
+          // The suite's three management pages hang off Settings rather than taking a tab each:
+          // a shop reorganises its shelves and its roster a few times a year, not a few times a
+          // day, and the nav is for the few-times-a-day things.
+          onCategories: _access.can(StorePermission.modifyInventoryPricing)
+              ? _openCategories
+              : null,
+          onStaff: _access.can(StorePermission.manageStaff) ? _openStaff : null,
+          onStockCount: _access.can(StorePermission.modifyInventoryPricing) && _storeId != null
+              ? _openStockCount
+              : null,
           onSignOut: () => widget.onSignOut(),
         );
-      default:
-        return const SizedBox.shrink();
     }
   }
+
+  // ---------------------------------------------------------------- pushed routes
 
   void _openAccountPreferences() {
     Navigator.of(context).push(MaterialPageRoute<void>(
@@ -200,7 +287,6 @@ class _MerchantShellState extends State<MerchantShell> {
     ));
   }
 
-  /// The Settings tab's notification row, straight to the grid it names.
   void _openNotificationPreferences() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => NotificationPrefsScreen(api: widget.prefsApi!),
@@ -214,52 +300,109 @@ class _MerchantShellState extends State<MerchantShell> {
     ));
   }
 
+  void _openStockAlerts() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => StockAlertsScreen(
+        api: widget.inventoryApi,
+        storeId: _storeId,
+        onBack: navigator.pop,
+      ),
+    ));
+  }
+
+  void _openStockCount() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => StockCountScreen(
+        api: widget.inventoryApi,
+        storeId: _storeId!,
+        catalogApi: widget.catalogApi,
+      ),
+    ));
+  }
+
+  void _openCategories() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => MerchantCategoriesScreen(
+        api: widget.catalogApi,
+        storeId: _storeId,
+        onBack: navigator.pop,
+      ),
+    ));
+  }
+
+  void _openStaff() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => StaffScreen(
+        api: widget.staffApi,
+        storeId: _storeId,
+        access: _access,
+      ),
+    ));
+  }
+
+  // ---------------------------------------------------------------- layout
+
+  YdBottomNavItem _itemFor(MerchantTab tab, DeliveryStrings t) {
+    switch (tab) {
+      case MerchantTab.dashboard:
+        return YdBottomNavItem(
+          icon: Icons.home_outlined,
+          activeIcon: Icons.home_rounded,
+          label: t.navDashboard,
+        );
+      case MerchantTab.pos:
+        return YdBottomNavItem(
+          icon: Icons.point_of_sale_outlined,
+          activeIcon: Icons.point_of_sale,
+          label: t.navPos,
+        );
+      case MerchantTab.inventory:
+        return YdBottomNavItem(
+          icon: Icons.inventory_2_outlined,
+          activeIcon: Icons.inventory_2,
+          label: t.navInventory,
+        );
+      case MerchantTab.orders:
+        return YdBottomNavItem(
+          icon: Icons.receipt_long_outlined,
+          activeIcon: Icons.receipt_long,
+          label: t.navOrders,
+          badgeCount: _awaitingYou,
+        );
+      case MerchantTab.settings:
+        return YdBottomNavItem(
+          icon: Icons.person_outline_rounded,
+          activeIcon: Icons.person_rounded,
+          label: t.navSettings,
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<MerchantTab> tabs = _visibleTabs();
+    final int current = tabs.indexOf(_tab).clamp(0, tabs.length - 1);
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       // Edge-to-edge: the shell paints its background behind the now-transparent status bar, and
-      // this keeps every tab's content clear of it. Tabs that already wrap themselves in a SafeArea
-      // see the inset already consumed and become no-ops; none of the merchant tabs use an AppBar,
-      // so nothing is double-inset. The bottom stays open — the nav bar below handles that edge.
+      // this keeps every tab's content clear of it. The bottom stays open — the nav bar below
+      // handles that edge.
       body: SafeArea(
         top: true,
         bottom: false,
         child: IndexedStack(
-          index: _tab,
-          children: <Widget>[
-            for (int tab = 0; tab < _tabCount; tab++) _tabAt(tab),
-          ],
+          index: current,
+          children: <Widget>[for (final MerchantTab tab in tabs) _tabAt(tab)],
         ),
       ),
       bottomNavigationBar: YdBottomNav(
-        currentIndex: _tab,
-        onTap: _open,
-        items: <YdBottomNavItem>[
-          YdBottomNavItem(
-            icon: Icons.home_outlined,
-            activeIcon: Icons.home_rounded,
-            label: t.navDashboard,
-          ),
-          YdBottomNavItem(
-            icon: Icons.receipt_long_outlined,
-            activeIcon: Icons.receipt_long,
-            label: t.navOrders,
-            badgeCount: _awaitingYou,
-          ),
-          YdBottomNavItem(
-            icon: Icons.shopping_bag_outlined,
-            activeIcon: Icons.shopping_bag,
-            label: t.navProducts,
-          ),
-          YdBottomNavItem(
-            icon: Icons.person_outline_rounded,
-            activeIcon: Icons.person_rounded,
-            label: t.navSettings,
-          ),
-        ],
+        currentIndex: current,
+        onTap: (int index) => _open(tabs[index]),
+        items: <YdBottomNavItem>[for (final MerchantTab tab in tabs) _itemFor(tab, t)],
       ),
     );
   }

@@ -114,6 +114,10 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     partnerManagement: PartnerManagementApi(_dio),
     autoApproval: AutoApprovalApi(_dio),
     statements: StatementsApi(_dio),
+    pos: PosApi(_dio),
+    inventory: InventoryApi(_dio),
+    staff: StoreStaffApi(_dio),
+    reports: ReportsApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives
