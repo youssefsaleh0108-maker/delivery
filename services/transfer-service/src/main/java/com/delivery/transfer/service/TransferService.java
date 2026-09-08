@@ -1,7 +1,6 @@
 package com.delivery.transfer.service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 
@@ -62,9 +61,8 @@ public class TransferService {
 
     /** What a USD split leaves to pay in lira, at the locked rate, rounded to the 1,000 note. */
     public BigDecimal lbpFaceFor(BigDecimal usdPart) {
-        return usdPart.multiply(lbpPerUsd)
-                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(1000));
+        // Delegates rather than repeats: the quote and the stored record must name the same note.
+        return MoneyTransfer.lbpFaceOf(usdPart, lbpPerUsd);
     }
 
     @Transactional

@@ -261,7 +261,13 @@ public class VerificationService {
      *
      * @return the token an application presents to show this address was verified
      */
-    @Transactional
+    // noRollbackFor is what makes the attempt cap real. A wrong guess increments the attempt
+    // counter and then refuses by throwing, and VerificationException is a RuntimeException, so
+    // Spring's default rollback discarded the increment along with the refusal: every guess was
+    // the first attempt, forever, and ContactVerification.MAX_ATTEMPTS could never be reached.
+    // A six-digit code with no cap is brute-forceable. The only write in this transaction is the
+    // verification row itself, so committing it on a refusal is exactly what we want.
+    @Transactional(noRollbackFor = VerificationException.class)
     public Confirmed confirm(Channel channel, String rawDestination, String code) {
         return confirm(channel, rawDestination, code, Purpose.SIGNUP);
     }
@@ -272,7 +278,13 @@ public class VerificationService {
      * the wrong purpose simply finds no challenge, and is refused in the same words as a wrong
      * code so the caller learns nothing from the difference.
      */
-    @Transactional
+    // noRollbackFor is what makes the attempt cap real. A wrong guess increments the attempt
+    // counter and then refuses by throwing, and VerificationException is a RuntimeException, so
+    // Spring's default rollback discarded the increment along with the refusal: every guess was
+    // the first attempt, forever, and ContactVerification.MAX_ATTEMPTS could never be reached.
+    // A six-digit code with no cap is brute-forceable. The only write in this transaction is the
+    // verification row itself, so committing it on a refusal is exactly what we want.
+    @Transactional(noRollbackFor = VerificationException.class)
     public Confirmed confirm(Channel channel, String rawDestination, String code, Purpose purpose) {
         String destination = normalise(channel, rawDestination);
 
