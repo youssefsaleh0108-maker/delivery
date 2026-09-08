@@ -1,6 +1,7 @@
 package com.delivery.transfer.domain;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -115,9 +116,29 @@ public class MoneyTransfer {
         this.status = newStatus;
     }
 
-    /** The lira face value the rider collects (or the wallet debits): split × locked rate. */
+    /**
+     * The smallest lira note the payer can physically hand over.
+     *
+     * <p>Lebanon's circulating notes start at 1,000 LBP, so a raw split x rate names an amount
+     * nobody can pay: the rider cannot make 900 out of notes, and there is no coinage to settle
+     * the difference. Rounding to the nearest 1,000 is therefore part of the amount, not a
+     * presentation detail.
+     *
+     * <p>Static and shared on purpose. This rule previously existed twice — here without the
+     * rounding and in TransferService with it — so the figure a customer approved on the quote
+     * was not the figure recorded for the rider to collect, and the two agreed only when the
+     * product happened to already be a multiple of 1,000. One definition cannot drift from
+     * itself.
+     */
+    public static BigDecimal lbpFaceOf(BigDecimal usdPart, BigDecimal rate) {
+        return usdPart.multiply(rate)
+                .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(1000));
+    }
+
+    /** The lira face value the rider collects (or the wallet debits). */
     public BigDecimal lbpFaceValue() {
-        return splitLbpInUsd.multiply(rateUsed);
+        return lbpFaceOf(splitLbpInUsd, rateUsed);
     }
 
     public UUID getId() { return id; }
