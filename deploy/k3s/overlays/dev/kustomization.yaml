@@ -60,7 +60,8 @@ images:
 - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/onboarding-service
+  newTag: sha-a4297f6cfea146d7aa5db97cb3cbf5607e5639a0
 - name: ghcr.io/youssefsaleh0108-maker/order-tracking
   newName: ghcr.io/youssefsaleh0108-maker/order-tracking
   newTag: sha-d8612ab55c370d21ac8748ad14413652dac51df2
