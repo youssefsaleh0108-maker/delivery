@@ -84,4 +84,5 @@ images:
   newName: ghcr.io/youssefsaleh0108-maker/transfer-service
   newTag: sha-78705d667e62fcd5494ff72a879904123cb3a4c8
 - name: ghcr.io/youssefsaleh0108-maker/whatsapp-service
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/whatsapp-service
+  newTag: sha-1e8ceaab789eecd76c032aff89520988488da9cc
