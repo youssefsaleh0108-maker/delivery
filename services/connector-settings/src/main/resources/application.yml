@@ -35,6 +35,16 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/delivery?currentSchema=settings}
     username: ${DB_USER:connector_settings}
     password: ${DB_PASSWORD:connector_settings_dev_pw}
+    hikari:
+      # minimum-idle is set on every pool in the platform for one reason: Hikari defaults it to the
+      # MAXIMUM, so a pool that never names it never shrinks. Its configured ceiling becomes its
+      # permanent footprint, held against a shared Postgres whose 200 connections are the budget
+      # for eleven services — this one sat at 10 of 10 idle around the clock.
+      #
+      # Four is generous here: this service answers connector configuration reads that are cached
+      # for five minutes on the far side, and writes them rarely.
+      maximum-pool-size: 4
+      minimum-idle: 1
 
   flyway:
     enabled: true

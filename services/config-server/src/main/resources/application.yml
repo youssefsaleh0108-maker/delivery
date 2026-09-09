@@ -56,6 +56,14 @@ spring:
       # This pool serves config reads only, and they are short. Two is enough and leaves
       # connections for the services, which share the same instance.
       maximum-pool-size: 2
+      # minimum-idle is set on every pool in the platform for one reason: Hikari defaults it to the
+      # MAXIMUM, so a pool that never names it never shrinks. Its configured ceiling becomes its
+      # permanent footprint, held against a shared Postgres whose 200 connections are the budget
+      # for eleven services — this one sat at 10 of 10 idle around the clock.
+      #
+      # One here rather than none: every service asks this on startup, and they all start at once
+      # after a node reboot.
+      minimum-idle: 1
 
   cloud:
     config:
