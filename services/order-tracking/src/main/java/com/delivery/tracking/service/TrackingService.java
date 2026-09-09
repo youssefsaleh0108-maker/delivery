@@ -61,6 +61,11 @@ public class TrackingService {
      *
      * <p>The rider must be the one assigned to the order - otherwise any rider could write a
      * position onto someone else's delivery, and the customer's map would show a stranger.
+     *
+     * <p>The order must also still be running. A handset that keeps pinging after hand-over is the
+     * normal case rather than the rare one - the app is backgrounded, the queued pings drain - and
+     * accepting them would follow the rider away from the customer's door on the customer's own
+     * map.
      */
     @Transactional
     public Position ping(UUID orderId, String riderId, double lat, double lng, Float accuracyM) {
@@ -70,6 +75,12 @@ public class TrackingService {
         if (!riderId.equals(order.getRiderId())) {
             // 404, not 403: a rider probing order ids should not learn which ones exist.
             throw new TrackingNotFoundException(orderId);
+        }
+
+        if (order.isComplete()) {
+            // Checked after the rider match, so that the order's state is only ever observable by
+            // the rider who is already known to be on it.
+            throw new TrackingClosedException();
         }
 
         events.save(new TrackingEvent(orderId, riderId, lat, lng, accuracyM));
@@ -166,6 +177,19 @@ public class TrackingService {
     public static class TrackingNotFoundException extends RuntimeException {
         public TrackingNotFoundException(UUID orderId) {
             super("No tracking information for order " + orderId);
+        }
+    }
+
+    /**
+     * A ping on a delivery that has already finished.
+     *
+     * <p>Deliberately not a "not found": the caller is the assigned rider and already knows the
+     * order exists, so answering 404 would tell them their own delivery had vanished and invite the
+     * app to retry it forever.
+     */
+    public static class TrackingClosedException extends RuntimeException {
+        public TrackingClosedException() {
+            super("This delivery is complete; positions are no longer recorded for it");
         }
     }
 }

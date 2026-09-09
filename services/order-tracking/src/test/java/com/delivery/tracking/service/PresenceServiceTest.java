@@ -64,6 +64,7 @@ class PresenceServiceTest {
     private RiderDutyEventRepository dutyEvents;
     private DutySessionRepository dutySessions;
     private CarrierMembershipRepository memberships;
+    private CarrierScopeResolver carrierScope;
     private OrderParticipantsRepository participants;
     private StringRedisTemplate redis;
     private ValueOperations<String, String> values;
@@ -83,10 +84,23 @@ class PresenceServiceTest {
         when(presenceRepo.save(any(RiderPresence.class))).thenAnswer(c -> c.getArgument(0));
         when(presenceRepo.findById(anyString())).thenReturn(Optional.empty());
         when(memberships.findById(anyString())).thenReturn(Optional.empty());
+
+        // The resolver stands in for the membership table plus a directory lookup. Here it is the
+        // table alone: what the directory adds has its own suite in CarrierScopeResolverTest, and
+        // every case below is about a caller whose fleet is already known or genuinely absent.
+        carrierScope = mock(CarrierScopeResolver.class);
+        when(carrierScope.scopeFor(anyString())).thenAnswer(call ->
+                memberships.findById(call.getArgument(0, String.class))
+                        .map(CarrierMembership::getCarrierId));
+        when(carrierScope.requireScopeFor(anyString())).thenAnswer(call ->
+                memberships.findById(call.getArgument(0, String.class))
+                        .map(CarrierMembership::getCarrierId)
+                        .orElseThrow(() -> new PresenceService.NoCarrierException(
+                                "You are not a member of any delivery company")));
         when(dutySessions.findByRiderIdAndEndedAtIsNull(anyString())).thenReturn(Optional.empty());
 
         presence = new PresenceService(presenceRepo, dutyEvents, dutySessions, memberships,
-                participants, redis, new ObjectMapper().registerModule(new JavaTimeModule()),
+                carrierScope, participants, redis, new ObjectMapper().registerModule(new JavaTimeModule()),
                 PRESENCE_WINDOW, Duration.ofSeconds(30));
     }
 

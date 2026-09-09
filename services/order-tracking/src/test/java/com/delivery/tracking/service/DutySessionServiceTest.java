@@ -56,6 +56,7 @@ class DutySessionServiceTest {
     private DutySessionRepository sessions;
     private RiderPresenceRepository presenceRows;
     private CarrierMembershipRepository memberships;
+    private CarrierScopeResolver carrierScope;
     private PresenceService presence;
     private DutySessionService service;
 
@@ -70,7 +71,20 @@ class DutySessionServiceTest {
         when(presenceRows.findById(anyString())).thenReturn(Optional.empty());
         when(memberships.findById(anyString())).thenReturn(Optional.empty());
 
-        service = new DutySessionService(sessions, presenceRows, memberships, presence,
+        // The resolver stands in for the membership table plus a directory lookup. Here it is the
+        // table alone: what the directory adds has its own suite in CarrierScopeResolverTest, and
+        // every case below is about a caller whose fleet is already known or genuinely absent.
+        carrierScope = mock(CarrierScopeResolver.class);
+        when(carrierScope.scopeFor(anyString())).thenAnswer(call ->
+                memberships.findById(call.getArgument(0, String.class))
+                        .map(CarrierMembership::getCarrierId));
+        when(carrierScope.requireScopeFor(anyString())).thenAnswer(call ->
+                memberships.findById(call.getArgument(0, String.class))
+                        .map(CarrierMembership::getCarrierId)
+                        .orElseThrow(() -> new PresenceService.NoCarrierException(
+                                "You are not a member of any delivery company")));
+
+        service = new DutySessionService(sessions, presenceRows, carrierScope, presence,
                 "UTC", PRESENCE_WINDOW, EXPIRE_AFTER);
     }
 

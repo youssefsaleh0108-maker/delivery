@@ -80,6 +80,11 @@ class TrackingServiceTest {
                 new OrderParticipants(ORDER, CUSTOMER, MERCHANT, riderId, "PICKED_UP")));
     }
 
+    private void orderInStatus(String status) {
+        when(participants.findById(ORDER)).thenReturn(Optional.of(
+                new OrderParticipants(ORDER, CUSTOMER, MERCHANT, RIDER, status)));
+    }
+
     private TrackingEvent event(double lat, double lng) {
         return new TrackingEvent(ORDER, RIDER, lat, lng, 5.0f);
     }
@@ -171,6 +176,69 @@ class TrackingServiceTest {
             tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f);
 
             verify(presence).recordFix(RIDER, 33.89, 35.50, 5.0f);
+        }
+
+        /**
+         * The trail closes when the delivery does. A handset that keeps pinging after hand-over is
+         * the ordinary case rather than the odd one — the app is backgrounded and its queue drains
+         * — and every one of those points would extend the customer's view of the rider past the
+         * door, and grow the record a dispute is later settled from.
+         */
+        @Test
+        void on_a_delivered_order_is_refused() {
+            orderInStatus("DELIVERED");
+
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f))
+                    .isInstanceOf(TrackingService.TrackingClosedException.class);
+
+            verify(events, never()).save(any(TrackingEvent.class));
+        }
+
+        /** Cancelled is just as over as delivered; nothing is being carried anywhere. */
+        @Test
+        void on_a_cancelled_order_is_refused() {
+            orderInStatus("CANCELLED");
+
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f))
+                    .isInstanceOf(TrackingService.TrackingClosedException.class);
+
+            verify(events, never()).save(any(TrackingEvent.class));
+        }
+
+        /** Refused before the cache is touched, or the map would keep the last stale point warm. */
+        @Test
+        void on_a_finished_order_does_not_refresh_the_hot_read_cache() {
+            orderInStatus("DELIVERED");
+
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f))
+                    .isInstanceOf(TrackingService.TrackingClosedException.class);
+
+            verify(values, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        /**
+         * A rider on their way to the counter has not collected anything yet, but their position is
+         * exactly what the customer's map is for. Only the terminal statuses close the trail.
+         */
+        @Test
+        void before_collection_is_still_accepted() {
+            orderInStatus("READY");
+
+            assertThat(tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f)).isNotNull();
+
+            verify(events).save(any(TrackingEvent.class));
+        }
+
+        /**
+         * A stranger must not be able to read an order's state off the shape of the refusal — the
+         * rider check runs first, so probing an id still only ever answers "not found".
+         */
+        @Test
+        void on_a_delivered_order_from_a_stranger_is_still_a_not_found() {
+            orderInStatus("DELIVERED");
+
+            assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", 33.89, 35.50, null))
+                    .isInstanceOf(TrackingService.TrackingNotFoundException.class);
         }
 
         /** A refused ping is not evidence of anything, least of all that the rider is on duty. */

@@ -88,8 +88,26 @@ delivery:
   outbox:
     exchange: delivery.events
 
+  services:
+    # Order Manager owns delivery-company membership; this service asks it which fleet a carrier
+    # staff account belongs to. See CarrierDirectoryClient.
+    order-manager: ${ORDER_MANAGER_URL:http://localhost:8101}
+
+  clients:
+    # Short, because the call sits in front of a roster a console polls every few seconds: a slow
+    # Order Manager must fail the poll rather than hold a thread that should be serving pings.
+    connect-timeout: 2s
+    read-timeout: 5s
+
   tracking:
     order-events-queue: tracking.order-events
+
+    carrier-scope:
+      # How long a fleet membership read from Order Manager stands before it is checked again.
+      # A read cannot report a departure that happens after it, so this is the window in which a
+      # dispatcher who has left can still see the fleet. Short enough to bound that, long enough
+      # that a console polling every few seconds is not asking Order Manager every time.
+      ttl: 15m
     # How long a cached position stays valid. Slightly longer than the rider ping interval so a
     # single dropped ping does not push every watcher through to Postgres.
     location-cache-ttl: 60s
