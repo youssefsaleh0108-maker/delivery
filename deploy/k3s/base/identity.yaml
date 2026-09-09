@@ -273,15 +273,20 @@ spec:
               value: secret
           ports:
             - containerPort: 8888
+          # The same change as every service in services.yaml, and it matters most here: the
+          # Config Server is a hard startup dependency of all thirteen of them, so a copy that
+          # binds its port before it can reach Postgres was declared Ready and then failed every
+          # config request behind it. /actuator/health is deliberately permitAll on this service
+          # (ConfigServerSecurityConfiguration) precisely so a probe can ask.
           startupProbe:
-            tcpSocket: { port: 8888 }
+            httpGet: { path: /actuator/health/readiness, port: 8888 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8888 }
+            httpGet: { path: /actuator/health/readiness, port: 8888 }
             periodSeconds: 10
           livenessProbe:
-            tcpSocket: { port: 8888 }
+            httpGet: { path: /actuator/health/liveness, port: 8888 }
             periodSeconds: 30
             failureThreshold: 6
           resources:

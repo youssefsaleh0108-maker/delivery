@@ -21,6 +21,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8103"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: product-service
           image: ghcr.io/youssefsaleh0108-maker/product-service:main
@@ -33,15 +36,27 @@ spec:
               value: "8103"
           ports:
             - containerPort: 8103
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8103 }
+            httpGet: { path: /actuator/health/readiness, port: 8103 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8103 }
+            httpGet: { path: /actuator/health/readiness, port: 8103 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8103 }
+            httpGet: { path: /actuator/health/liveness, port: 8103 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -75,6 +90,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8101"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: order-manager
           image: docker.io/youssefsaleh0108/delivery-order-manager:main
@@ -90,15 +108,27 @@ spec:
               value: "8101"
           ports:
             - containerPort: 8101
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8101 }
+            httpGet: { path: /actuator/health/readiness, port: 8101 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8101 }
+            httpGet: { path: /actuator/health/readiness, port: 8101 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8101 }
+            httpGet: { path: /actuator/health/liveness, port: 8101 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -132,6 +162,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8102"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: order-tracking
           image: ghcr.io/youssefsaleh0108-maker/order-tracking:main
@@ -144,15 +177,27 @@ spec:
               value: "8102"
           ports:
             - containerPort: 8102
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8102 }
+            httpGet: { path: /actuator/health/readiness, port: 8102 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8102 }
+            httpGet: { path: /actuator/health/readiness, port: 8102 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8102 }
+            httpGet: { path: /actuator/health/liveness, port: 8102 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -186,6 +231,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8118"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: transfer-service
           image: ghcr.io/youssefsaleh0108-maker/transfer-service:main
@@ -198,15 +246,27 @@ spec:
               value: "8118"
           ports:
             - containerPort: 8118
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8118 }
+            httpGet: { path: /actuator/health/readiness, port: 8118 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8118 }
+            httpGet: { path: /actuator/health/readiness, port: 8118 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8118 }
+            httpGet: { path: /actuator/health/liveness, port: 8118 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -240,6 +300,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8109"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: connector-settings
           image: ghcr.io/youssefsaleh0108-maker/connector-settings:main
@@ -252,15 +315,27 @@ spec:
               value: "8109"
           ports:
             - containerPort: 8109
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8109 }
+            httpGet: { path: /actuator/health/readiness, port: 8109 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8109 }
+            httpGet: { path: /actuator/health/readiness, port: 8109 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8109 }
+            httpGet: { path: /actuator/health/liveness, port: 8109 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -294,6 +369,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8104"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: notifications-manager
           image: ghcr.io/youssefsaleh0108-maker/notifications-manager:main
@@ -306,15 +384,27 @@ spec:
               value: "8104"
           ports:
             - containerPort: 8104
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8104 }
+            httpGet: { path: /actuator/health/readiness, port: 8104 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8104 }
+            httpGet: { path: /actuator/health/readiness, port: 8104 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8104 }
+            httpGet: { path: /actuator/health/liveness, port: 8104 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -348,6 +438,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8108"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: app-notification
           image: ghcr.io/youssefsaleh0108-maker/app-notification:main
@@ -360,15 +453,27 @@ spec:
               value: "8108"
           ports:
             - containerPort: 8108
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8108 }
+            httpGet: { path: /actuator/health/readiness, port: 8108 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8108 }
+            httpGet: { path: /actuator/health/readiness, port: 8108 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8108 }
+            httpGet: { path: /actuator/health/liveness, port: 8108 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -402,6 +507,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8110"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: email-connector
           image: ghcr.io/youssefsaleh0108-maker/email-connector:main
@@ -414,15 +522,27 @@ spec:
               value: "8110"
           ports:
             - containerPort: 8110
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8110 }
+            httpGet: { path: /actuator/health/readiness, port: 8110 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8110 }
+            httpGet: { path: /actuator/health/readiness, port: 8110 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8110 }
+            httpGet: { path: /actuator/health/liveness, port: 8110 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -456,6 +576,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8111"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: push-connector
           image: ghcr.io/youssefsaleh0108-maker/push-connector:main
@@ -468,15 +591,27 @@ spec:
               value: "8111"
           ports:
             - containerPort: 8111
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8111 }
+            httpGet: { path: /actuator/health/readiness, port: 8111 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8111 }
+            httpGet: { path: /actuator/health/readiness, port: 8111 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8111 }
+            httpGet: { path: /actuator/health/liveness, port: 8111 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -510,6 +645,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8112"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: sms-connector
           image: ghcr.io/youssefsaleh0108-maker/sms-connector:main
@@ -522,15 +660,27 @@ spec:
               value: "8112"
           ports:
             - containerPort: 8112
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8112 }
+            httpGet: { path: /actuator/health/readiness, port: 8112 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8112 }
+            httpGet: { path: /actuator/health/readiness, port: 8112 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8112 }
+            httpGet: { path: /actuator/health/liveness, port: 8112 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -564,6 +714,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8115"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: accounting-service
           image: ghcr.io/youssefsaleh0108-maker/accounting-service:main
@@ -576,15 +729,27 @@ spec:
               value: "8115"
           ports:
             - containerPort: 8115
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8115 }
+            httpGet: { path: /actuator/health/readiness, port: 8115 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8115 }
+            httpGet: { path: /actuator/health/readiness, port: 8115 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8115 }
+            httpGet: { path: /actuator/health/liveness, port: 8115 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -618,6 +783,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8116"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: whatsapp-service
           image: ghcr.io/youssefsaleh0108-maker/whatsapp-service:main
@@ -630,15 +798,27 @@ spec:
               value: "8116"
           ports:
             - containerPort: 8116
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8116 }
+            httpGet: { path: /actuator/health/readiness, port: 8116 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8116 }
+            httpGet: { path: /actuator/health/readiness, port: 8116 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8116 }
+            httpGet: { path: /actuator/health/liveness, port: 8116 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
@@ -672,6 +852,9 @@ spec:
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: "8117"
     spec:
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase, so a draining pod finishes on
+      # its own terms rather than being cut off mid-request.
+      terminationGracePeriodSeconds: 40
       containers:
         - name: onboarding-service
           image: ghcr.io/youssefsaleh0108-maker/onboarding-service:main
@@ -692,15 +875,27 @@ spec:
               valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_PASSWORD } }
           ports:
             - containerPort: 8117
+          # Ask the application, not the socket.
+          #
+          # A tcpSocket check passes as soon as Tomcat's acceptor binds, which it does before the
+          # context has finished starting and keeps doing after the connection pool has died. So
+          # readiness never removed a sick pod from the Service and liveness never restarted a
+          # wedged one — and every rolling update declared the replacement Ready the instant the
+          # port opened, then sent it traffic it could not yet serve. The actuator groups these
+          # point at have been answering correctly the whole time; the manifests simply did not
+          # ask. See each service's management.endpoint.health.group for what readiness includes.
           startupProbe:
-            tcpSocket: { port: 8117 }
+            httpGet: { path: /actuator/health/readiness, port: 8117 }
             periodSeconds: 10
             failureThreshold: 60
           readinessProbe:
-            tcpSocket: { port: 8117 }
+            httpGet: { path: /actuator/health/readiness, port: 8117 }
             periodSeconds: 10
+          # Liveness asks only whether the JVM is still a working application — never whether its
+          # dependencies are up. A restart cannot fix somebody else's database, and conflating the
+          # two would kill every pod on the platform during a blip it would otherwise ride out.
           livenessProbe:
-            tcpSocket: { port: 8117 }
+            httpGet: { path: /actuator/health/liveness, port: 8117 }
             periodSeconds: 30
             failureThreshold: 6
           resources:
