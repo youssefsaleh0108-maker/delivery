@@ -25,7 +25,9 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
 /**
@@ -198,9 +200,17 @@ public class Store {
     @Column(name = "delivery_radius_metres")
     private Integer deliveryRadiusMetres;
 
+    /**
+     * Written by the column default, and read straight back — see {@link Product#getCreatedAt}.
+     * Without {@code @Generated} a store serialised in the same transaction it was created in
+     * carries the null it was constructed with, because the column is not insertable.
+     */
+    @Generated(event = EventType.INSERT)
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
+    /** Maintained by a database trigger, so it cannot drift when a writer forgets to set it. */
+    @Generated(event = {EventType.INSERT, EventType.UPDATE})
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private Instant updatedAt;
 

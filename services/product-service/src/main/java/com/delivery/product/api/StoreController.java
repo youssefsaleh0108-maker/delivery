@@ -358,8 +358,13 @@ public class StoreController {
 
     @PutMapping("/{id}/hours")
     @PreAuthorize("hasRole('MERCHANT')")
+    // @Valid on the element rather than on the list, so what is cascaded into is stated rather than
+    // inferred from the parameter's type. The 500 this endpoint used to answer for day 0 was never
+    // the constraints failing to run — they ran, and the refusal they raise had no mapping in
+    // ApiExceptionHandler, so it reached the catch-all. Both halves are fixed; this is the half
+    // that says what the endpoint means.
     public List<HoursResponse> setHours(@PathVariable UUID id,
-                                        @Valid @RequestBody List<HoursRequest> windows) {
+                                        @RequestBody List<@Valid HoursRequest> windows) {
         return storeService.replaceHours(id, CurrentUser.requireId(), windows).store().getHours().stream()
                 .map(h -> new HoursResponse(h.getDay().getValue(), h.getOpensAt(), h.getClosesAt()))
                 .toList();
@@ -381,8 +386,11 @@ public class StoreController {
      */
     @GetMapping("/{id}/can-deliver")
     public Map<String, Object> canDeliver(@PathVariable UUID id,
-                                          @RequestParam double latitude,
-                                          @RequestParam double longitude) {
+                                          @RequestParam BigDecimal latitude,
+                                          @RequestParam BigDecimal longitude) {
+        // BigDecimal rather than double so the pair goes through GeoPoint's rules in the service,
+        // exactly as /nearby's does. As two loose doubles an impossible coordinate was answered
+        // rather than refused.
         return Map.of("canDeliver", storeService.deliversTo(id, latitude, longitude));
     }
 

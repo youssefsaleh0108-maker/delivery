@@ -118,6 +118,44 @@ public class Thumbnailer {
     }
 
     /**
+     * Whether a derivative can be produced from this format at all.
+     *
+     * <p>Asked of ImageIO rather than answered from a list, so it cannot drift: the readers this
+     * JVM has <em>are</em> the formats that can be shrunk, and the day a decoder for one more is on
+     * the classpath the answer changes with it.
+     *
+     * <p>This is the load-bearing half of the WebP decision. Storage accepts {@code image/webp} and
+     * no stock JDK can decode it, so a WebP upload was taken, stored, and then silently denied a
+     * derivative forever — the list surfaces went on serving the full-size original to an 80 dp row,
+     * which is the whole problem this class exists to fix, and nothing told the merchant. The
+     * alternative was to add a WebP decoder; it was not taken, because that puts a new native-backed
+     * image parser on the request path of an endpoint anyone with a merchant token can reach, to
+     * support a format nothing on the platform produces. Refusing the upload is the smaller cost and
+     * it is visible: the merchant is told at the point they choose the file, not never.
+     */
+    public static boolean canRender(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        // Content types arrive with parameters and in whatever case the client sent.
+        String mime = contentType.split(";", 2)[0].trim().toLowerCase(java.util.Locale.ROOT);
+        return !mime.isEmpty() && ImageIO.getImageReadersByMIMEType(mime).hasNext();
+    }
+
+    /**
+     * The gate every presign runs before a URL exists.
+     *
+     * <p>Refused before the upload rather than after: once the bytes are in the bucket the only
+     * honest thing left to tell the merchant is that their photo will load slowly forever.
+     */
+    public static void requireRenderable(String contentType) {
+        if (!canRender(contentType)) {
+            throw new CatalogService.CatalogRuleViolationException(
+                    "That image format cannot be used here — upload a JPEG or a PNG");
+        }
+    }
+
+    /**
      * The object key a given original's thumbnail lives at.
      *
      * <p>Replaces the extension rather than appending to it, because the output is JPEG regardless

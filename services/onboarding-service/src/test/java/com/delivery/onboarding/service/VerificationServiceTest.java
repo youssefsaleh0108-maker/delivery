@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.domain.ContactVerification;
@@ -312,10 +313,37 @@ class VerificationServiceTest {
 
             assertThatThrownBy(() -> service.request(Channel.EMAIL, "sam@example.test"))
                     .isInstanceOf(TooManyRequestsException.class)
-                    .hasMessageContaining("too many codes today");
+                    .hasMessageContaining("too many codes in the last 24 hours");
 
             verify(platform, never()).notifyDirect(anyString(), anyString(), any(), anyString(),
                     anyString());
+        }
+
+        /**
+         * The sentence and the window it describes, asserted together.
+         *
+         * <p>They drifted apart once and the symptom was somebody being refused after doing exactly
+         * what they were told: the count is taken from {@code now} minus twenty-four hours, so a
+         * cap spent at 18:00 is still spent at 00:05, and "try again tomorrow" was a promise the
+         * limit did not keep. Whichever half moves next, the other has to move with it.
+         */
+        @Test
+        void the_cap_refusal_describes_the_window_that_is_actually_counted() {
+            when(verifications.countByDestinationAndCreatedAtAfter(eq("sam@example.test"), any()))
+                    .thenReturn(8L);
+
+            assertThatThrownBy(() -> service.request(Channel.EMAIL, "sam@example.test"))
+                    .hasMessageContaining("last 24 hours")
+                    .hasMessageNotContaining("tomorrow")
+                    .hasMessageNotContaining("today");
+
+            ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
+            verify(verifications).countByDestinationAndCreatedAtAfter(
+                    eq("sam@example.test"), since.capture());
+            assertThat(Duration.between(since.getValue(), Instant.now()))
+                    .as("the cap counts over a rolling twenty-four hours")
+                    .isBetween(Duration.ofHours(24).minusMinutes(1),
+                            Duration.ofHours(24).plusMinutes(1));
         }
 
         @Test

@@ -64,6 +64,7 @@ public class ConnectorSetting {
                             + " (expected one of " + connectorType.providers() + ")");
         }
         assertNoSecrets(config);
+        assertNothingEnvironmentOwned(config);
         assertCanaryIsValid(config);
 
         this.provider = provider;
@@ -95,6 +96,32 @@ public class ConnectorSetting {
                 throw new IllegalArgumentException(
                         "'" + key + "' looks like a secret. Secrets belong in Vault; store only the "
                                 + "vault path here (Section 8).");
+            }
+        }
+    }
+
+    /**
+     * Refuses a value this table does not actually control.
+     *
+     * <p>{@code testInbox} is the one that was found: the row carried it, the Backoffice showed it,
+     * and the SMS connector's dev passthrough never read it — it takes the address from the
+     * {@code SMS_TEST_INBOX} environment variable set per environment. An operator could change the
+     * value, see it saved, see it audited, and have every test message keep going to the old
+     * mailbox. A settings screen that shows a value nobody obeys is worse than one that does not
+     * show it at all, because it is believed.
+     *
+     * <p>Refused rather than dropped: the operator is told where the value really comes from, which
+     * is the only form of this that ends with the right mailbox receiving the message.
+     */
+    void assertNothingEnvironmentOwned(Map<String, Object> config) {
+        if (connectorType == ConnectorType.SMS) {
+            for (String key : config.keySet()) {
+                if ("testInbox".equalsIgnoreCase(key.trim())) {
+                    throw new IllegalArgumentException(
+                            "The dev test inbox is set per environment through SMS_TEST_INBOX, not "
+                                    + "here. Storing it in this row would show a value the SMS "
+                                    + "connector never reads.");
+                }
             }
         }
     }

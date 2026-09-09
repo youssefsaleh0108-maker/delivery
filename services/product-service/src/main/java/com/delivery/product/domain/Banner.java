@@ -59,7 +59,7 @@ public class Banner {
     private short position;
 
     @Column(name = "active", nullable = false)
-    private boolean active = true;
+    private boolean active;
 
     @Column(name = "starts_at", nullable = false)
     private Instant startsAt;
@@ -78,13 +78,21 @@ public class Banner {
         // for JPA
     }
 
+    /**
+     * A new banner, running or held back exactly as the caller asked.
+     *
+     * <p>{@code active} is a parameter and not a constant. It was hardcoded true here, so a banner
+     * saved as a draft — artwork still being agreed, a campaign dated for next month — went out to
+     * every customer's home screen the moment it was created, and the only way back was for
+     * somebody to notice and withdraw it.
+     */
     public Banner(String title, String subtitle, LinkKind linkKind, String linkTarget,
-                  int position) {
+                  int position, boolean active) {
         this.id = UUID.randomUUID();
         this.title = title;
         this.subtitle = subtitle;
         this.startsAt = Instant.now();
-        this.active = true;
+        this.active = active;
         applyLink(linkKind, linkTarget);
         this.position = (short) position;
     }

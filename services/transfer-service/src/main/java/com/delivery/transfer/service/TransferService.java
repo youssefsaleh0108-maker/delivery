@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.delivery.transfer.client.OrderManagerClient;
 import com.delivery.transfer.connector.ConnectorRegistry;
 import com.delivery.transfer.connector.MoneyTransferConnector;
+import com.delivery.transfer.domain.Money;
 import com.delivery.transfer.domain.MoneyTransfer;
 import com.delivery.transfer.domain.MoneyTransferRepository;
 import com.delivery.transfer.domain.TransferMethod;
@@ -30,11 +32,13 @@ public class TransferService {
 
     private final MoneyTransferRepository transfers;
     private final ConnectorRegistry registry;
+    private final OrderManagerClient orders;
     private final BigDecimal lbpPerUsd;
     private final BigDecimal riderChangeLimitLbp;
 
     public TransferService(MoneyTransferRepository transfers,
                            ConnectorRegistry registry,
+                           OrderManagerClient orders,
                            // One platform-wide display-and-collection rate, operator-set. The same
                            // default the storefront's market config carries, on purpose.
                            @Value("${delivery.market.lbp-per-usd:90000}") BigDecimal lbpPerUsd,
@@ -43,8 +47,11 @@ public class TransferService {
                            @Value("${delivery.transfer.rider-change-limit-lbp:100000}") BigDecimal riderChangeLimitLbp) {
         this.transfers = transfers;
         this.registry = registry;
-        this.lbpPerUsd = lbpPerUsd;
-        this.riderChangeLimitLbp = riderChangeLimitLbp;
+        this.orders = orders;
+        // Normalised once, here, so no caller has to care whether the operator wrote 90000 or
+        // 90000.00 in config: every figure derived from the rate then has one shape.
+        this.lbpPerUsd = Money.lbp(lbpPerUsd);
+        this.riderChangeLimitLbp = Money.lbp(riderChangeLimitLbp);
     }
 
     public BigDecimal rate() {
@@ -59,29 +66,56 @@ public class TransferService {
         return registry.availableMethods();
     }
 
-    /** What a USD split leaves to pay in lira, at the locked rate, rounded to the 1,000 note. */
-    public BigDecimal lbpFaceFor(BigDecimal usdPart) {
-        // Delegates rather than repeats: the quote and the stored record must name the same note.
-        return MoneyTransfer.lbpFaceOf(usdPart, lbpPerUsd);
+    /** A priced split: what the customer is asked to approve, and what initiate will store. */
+    public record Quote(BigDecimal amountUsd, BigDecimal splitUsd, BigDecimal splitLbpInUsd,
+                        BigDecimal lbpPerUsd, BigDecimal splitLbpFace) {
+    }
+
+    /**
+     * The split arithmetic behind {@code POST /quote} — and, because initiate calls it too, the
+     * money rules in one place so both endpoints answer the same way.
+     *
+     * <p>They did not: quote took any numbers at all and returned a 200 for a negative amount or a
+     * USD part larger than the whole, which the POST behind it then refused with a 422. A quote
+     * whose figures cannot be paid is worse than a refusal — the customer approves it and the
+     * refusal arrives at the last screen.
+     *
+     * <p>Rounding comes before the checks, not after: the columns hold two decimals, so $0.001 is
+     * $0.00 by the time it is stored and must be refused as the zero amount it becomes rather than
+     * pass as positive and record an obligation for nothing.
+     */
+    public Quote quote(BigDecimal amountUsd, BigDecimal splitUsd) {
+        BigDecimal amount = Money.usd(amountUsd);
+        if (amount == null || amount.signum() <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "amountUsd must be positive");
+        }
+        BigDecimal usdPart = splitUsd == null ? amount : Money.usd(splitUsd);
+        if (usdPart.signum() < 0 || usdPart.compareTo(amount) > 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "splitUsd must be between 0 and amountUsd");
+        }
+        BigDecimal lbpInUsd = amount.subtract(usdPart);
+        return new Quote(amount, usdPart, lbpInUsd, lbpPerUsd,
+                MoneyTransfer.lbpFaceOf(lbpInUsd, lbpPerUsd));
     }
 
     @Transactional
     public MoneyTransfer record(UUID orderId, String payerRef, TransferMethod method,
                                 BigDecimal amountUsd, BigDecimal splitUsd) {
-        if (amountUsd == null || amountUsd.signum() <= 0) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "amountUsd must be positive");
-        }
-        BigDecimal usdPart = splitUsd == null ? amountUsd : splitUsd;
-        if (usdPart.signum() < 0 || usdPart.compareTo(amountUsd) > 0) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "splitUsd must be between 0 and amountUsd");
-        }
+        Quote quote = quote(amountUsd, splitUsd);
         MoneyTransferConnector connector = registry.forMethod(method)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "No provider currently carries " + method));
 
-        BigDecimal lbpInUsd = amountUsd.subtract(usdPart);
+        // Before anything is written: an order id is only a UUID until Order Manager says whose it
+        // is. Unasked, this recorded an intent — and issued a connector reference — against orders
+        // that existed nowhere, and let whoever recorded first lock the real customer out of
+        // paying for their own order, since one order holds one intent.
+        OrderManagerClient.OrderSummary order = orders.fetch(orderId);
+        if (!payerRef.equals(order.customerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your order");
+        }
 
         // One payment intent per order: re-choosing a method before the rider leaves replaces the
         // old intent rather than stacking a second obligation on the same order.
@@ -94,7 +128,8 @@ public class TransferService {
         });
 
         MoneyTransfer transfer = new MoneyTransfer(
-                orderId, payerRef, method, amountUsd, usdPart, lbpInUsd, lbpPerUsd);
+                orderId, payerRef, method, quote.amountUsd(), quote.splitUsd(),
+                quote.splitLbpInUsd(), lbpPerUsd);
         connector.initiate(transfer);
         return transfers.save(transfer);
     }

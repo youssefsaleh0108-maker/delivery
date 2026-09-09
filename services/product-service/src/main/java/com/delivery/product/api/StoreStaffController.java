@@ -56,13 +56,19 @@ public class StoreStaffController {
     /**
      * Who am I here, and what may I do?
      *
-     * <p>The call every merchant shell makes on start-up to decide which tabs to draw. Answers for
-     * the owner too, who has no {@code staff_members} row.
+     * <p>The call every merchant shell makes on start-up to decide which tabs to draw, and the sync
+     * fallback the enforcing services use on a projection miss. Answers for the owner too, who has
+     * no {@code staff_members} row.
+     *
+     * <p>Through {@link #require} like every other call on this controller, so a store the caller
+     * has nothing to do with is a 404 — the shape the spec tabulates and the shape its siblings
+     * already had. It used to answer 200 with an empty permission list for <em>any</em> store id,
+     * which let anyone with a token walk the id space and read back which shops exist.
      */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public AccessResponse me(@PathVariable UUID storeId) {
-        StoreAccess access = staff.accessFor(storeId, CurrentUser.requireId());
+        StoreAccess access = require(storeId);
         return new AccessResponse(
                 access.isAnything(),
                 access.isOwner(),

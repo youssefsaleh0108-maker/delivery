@@ -22,6 +22,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.platform.storage.StorageException;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
+import com.delivery.product.service.CatalogService.CategoryNotFoundException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
 import com.delivery.product.service.StoreService.StoreNotFoundException;
 
@@ -51,6 +52,51 @@ public class ApiExceptionHandler {
     @ExceptionHandler(StoreNotFoundException.class)
     public ProblemDetail onStoreNotFound(StoreNotFoundException e) {
         return problem(HttpStatus.NOT_FOUND, "Store not found", e.getMessage());
+    }
+
+    /**
+     * A category id that names nothing the caller may file under.
+     *
+     * <p>404, like every other unknown id here. It came back as a 422 for a while, which told a
+     * client its payload broke a rule when what had actually happened was a mistyped id — and left
+     * the same request answered two different ways depending on which id was wrong.
+     */
+    @ExceptionHandler(CategoryNotFoundException.class)
+    public ProblemDetail onCategoryNotFound(CategoryNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Category not found", e.getMessage());
+    }
+
+    /**
+     * An order the caller cannot rate.
+     *
+     * <p>Its own mapping because this used to be raised as a store not-found carrying an order id:
+     * a customer looking at a shop that plainly exists was told the shop did not. The message is
+     * the service's own and is deliberately silent about whether the order exists.
+     */
+    @ExceptionHandler(com.delivery.product.service.ReviewService.OrderNotFoundException.class)
+    public ProblemDetail onOrderNotFound(
+            com.delivery.product.service.ReviewService.OrderNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Order not found", e.getMessage());
+    }
+
+    /** A promotion this shop does not have — withdrawing one used to answer 204 either way. */
+    @ExceptionHandler(com.delivery.product.service.StoreService.OfferNotFoundException.class)
+    public ProblemDetail onOfferNotFound(
+            com.delivery.product.service.StoreService.OfferNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Offer not found", e.getMessage());
+    }
+
+    /**
+     * Two categories cannot stand for one vertical.
+     *
+     * <p>409 as before, but raised before the write instead of falling out of
+     * {@code uq_category_vertical}, so the detail names the category in the way rather than a
+     * uniqueness rule the caller has no way to look up.
+     */
+    @ExceptionHandler(com.delivery.product.service.BannerService.VerticalTakenException.class)
+    public ProblemDetail onVerticalTaken(
+            com.delivery.product.service.BannerService.VerticalTakenException e) {
+        return problem(HttpStatus.CONFLICT, "Vertical already represented", e.getMessage());
     }
 
     @ExceptionHandler(CatalogRuleViolationException.class)
@@ -201,6 +247,42 @@ public class ApiExceptionHandler {
     public ProblemDetail onNoResource(NoResourceFoundException e) {
         return problem(HttpStatus.NOT_FOUND, "Not found",
                 "No endpoint at " + e.getHttpMethod() + " /" + e.getResourcePath());
+    }
+
+    /**
+     * A constraint declared on the element of a body collection, rather than on the body itself.
+     *
+     * <p>Spring reports these as a different exception from the one above, and that exception is a
+     * {@code ResponseStatusException} — which the catch-all at the bottom of this class would have
+     * swallowed into a 500. So the day {@code List<@Valid HoursRequest>} started actually checking
+     * each window, an out-of-range day would have gone from one unhelpful 500 to another. The
+     * position in the list is reported because "one of these seven windows is wrong" is not
+     * something a merchant can act on.
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    public ProblemDetail onElementValidationFailure(
+            org.springframework.web.method.annotation.HandlerMethodValidationException e) {
+        ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "Validation failed",
+                "One or more fields are invalid");
+
+        Map<String, String> errors = new LinkedHashMap<>();
+        e.getParameterValidationResults().forEach(result -> {
+            String at = result.getContainerIndex() == null
+                    ? result.getMethodParameter().getParameterName()
+                    : "[" + result.getContainerIndex() + "]";
+            result.getResolvableErrors().forEach(error ->
+                    errors.put(at + fieldOf(error), error.getDefaultMessage()));
+        });
+        detail.setProperty("errors", errors);
+        return detail;
+    }
+
+    /** The offending field out of one element error, as a suffix, or "" when it names none. */
+    private static String fieldOf(org.springframework.context.MessageSourceResolvable error) {
+        if (error instanceof org.springframework.validation.FieldError field) {
+            return "." + field.getField();
+        }
+        return "";
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

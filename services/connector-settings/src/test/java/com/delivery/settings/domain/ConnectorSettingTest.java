@@ -170,6 +170,86 @@ class ConnectorSettingTest {
     }
 
     @Nested
+    @DisplayName("values the environment owns are not stored here")
+    class EnvironmentOwned {
+
+        /**
+         * The SMS dev passthrough reads its test inbox from SMS_TEST_INBOX, so a testInbox stored
+         * here is a value the Backoffice displays and the connector ignores — an operator changes
+         * the address, sees it saved and audited, and every test message keeps going to the old
+         * mailbox.
+         */
+        @Test
+        void a_test_inbox_is_refused_and_says_where_it_really_comes_from() {
+            ConnectorSetting sms = settingFor(ConnectorType.SMS, "DEV_PASSTHROUGH");
+
+            assertThatThrownBy(() -> sms.update("DEV_PASSTHROUGH",
+                    config("testInbox", "qa@example.com"), "admin"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("SMS_TEST_INBOX");
+        }
+
+        /** Spelling it differently does not make it a different field. */
+        @Test
+        void the_check_does_not_depend_on_how_it_is_spelled() {
+            ConnectorSetting sms = settingFor(ConnectorType.SMS, "DEV_PASSTHROUGH");
+
+            assertThatThrownBy(() -> sms.update("DEV_PASSTHROUGH",
+                    config("TestInbox", "qa@example.com"), "admin"))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        /** A refused change leaves the row alone, like every other refusal on this entity. */
+        @Test
+        void a_refused_change_does_not_alter_the_row() {
+            ConnectorSetting sms = settingFor(ConnectorType.SMS, "DEV_PASSTHROUGH");
+
+            assertThatThrownBy(() -> sms.update("TWILIO",
+                    config("testInbox", "qa@example.com"), "admin"))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            assertThat(sms.getProvider()).isEqualTo("DEV_PASSTHROUGH");
+            assertThat(sms.getConfig()).isEmpty();
+        }
+
+        /** Only the connector that has one. Nothing else on the platform reads a test inbox. */
+        @Test
+        void other_connectors_are_not_second_guessed() {
+            ConnectorSetting email = settingFor(ConnectorType.EMAIL, "SMTP");
+
+            email.update("SMTP", config("testInbox", "qa@example.com"), "admin");
+
+            assertThat(email.getConfig()).containsEntry("testInbox", "qa@example.com");
+        }
+
+        /** The rest of the SMS row is ordinary configuration and still saves. */
+        @Test
+        void the_other_sms_settings_still_save() {
+            ConnectorSetting sms = settingFor(ConnectorType.SMS, "DEV_PASSTHROUGH");
+
+            sms.update("DEV_PASSTHROUGH", config("senderId", "Delivery"), "admin");
+
+            assertThat(sms.getConfig()).containsEntry("senderId", "Delivery");
+        }
+
+        /**
+         * The rows already seeded by V10 carry the key, and no unit test in this module can run
+         * Flyway — there is no Spring context and no database here. The cheapest guard that does
+         * work is to assert the migration that removes it is present and still says so.
+         */
+        @Test
+        void a_migration_removes_the_key_from_rows_that_already_have_it() throws Exception {
+            java.net.URL migration = getClass().getClassLoader()
+                    .getResource("db/migration/settings/V11__drop_sms_test_inbox.sql");
+
+            assertThat(migration).as("V11 migration on the classpath").isNotNull();
+            String sql = new String(migration.openStream().readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            assertThat(sql).contains("config_json - 'testInbox'").contains("'SMS'");
+        }
+    }
+
+    @Nested
     @DisplayName("the canary is validated like the primary")
     class Canary {
 

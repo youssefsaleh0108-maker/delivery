@@ -163,20 +163,20 @@ public class AutoApprovalPolicy {
     /**
      * Records the backoffice's decision for all three kinds, auditing each one that moves.
      *
-     * <p>A kind whose recorded position already matches what was asked for is left alone and leaves
-     * no audit row — a trail padded with no-ops is one nobody reads. A kind with <em>no</em>
-     * recorded position is written even when the requested value equals the deployment default,
-     * because that is not a no-op: it pins the kind to a decision somebody signed for, and a later
-     * change to the environment variable will no longer move it. The audit row for that case has
-     * the same old and new value and {@code oldSource = CONFIG}, which reads exactly as what
-     * happened.
+     * <p>A kind whose position did not move is left alone: no row is written and no audit row is
+     * added — a trail padded with no-ops is one nobody reads. "Did not move" is measured against
+     * what was <em>in force</em>, not against what happens to be in the table, so confirming a
+     * value the deployment supplied does not become a portal decision and the kind keeps answering
+     * to CONFIG.
      *
-     * <p><strong>The consequence is that the first PUT moves all three kinds to PORTAL</strong>,
-     * not only the one the operator dragged. That is deliberate and it is the safe direction: this
-     * is a whole-page PUT, so the caller looked at three positions and sent three back, and the
-     * deployment must not be able to change one of them underneath a person who just approved what
-     * the screen said. It does mean an environment variable stops being consulted the first time
-     * anybody opens this screen and saves, which is what {@code source} exists to make visible.
+     * <p><strong>Only the kinds the operator actually changed become PORTAL.</strong> That is the
+     * safe direction rather than the tidy one: this is a whole-page PUT, so somebody who came to
+     * switch carriers off also sends back the two values they were merely shown, and recording
+     * those would take two kinds nobody touched out of the deployment's hands. A later
+     * {@code AUTO_APPROVE_MERCHANT=false} — shipped in a hurry, precisely because something is
+     * going wrong — has to keep working, and the portal is not a substitute for it: it needs a
+     * reachable backoffice and a working Keycloak login. Each audit row names where the old value
+     * came from in {@code oldSource}, so "was it already on, and who said so" stays answerable.
      *
      * <p>The audit row is written in the same transaction as the position it describes, so a
      * history with a gap in it is not possible.

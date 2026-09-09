@@ -18,7 +18,9 @@ import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.event.CatalogEvents;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
+import com.delivery.product.service.CatalogService.CategoryNotFoundException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
+import com.delivery.product.service.StoreService.StoreNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -226,10 +228,23 @@ class CatalogOwnershipTest {
             when(storeService.ownedBy(MERCHANT)).thenReturn(List.of());
 
             assertThatThrownBy(() -> catalog.create(MERCHANT, request(theirs.getId())))
-                    .isInstanceOf(CatalogRuleViolationException.class)
-                    .hasMessageContaining("not yours");
+                    .isInstanceOf(StoreNotFoundException.class);
 
             verify(products, never()).save(any(Product.class));
+        }
+
+        /**
+         * "Not yours" was an answer only a real store id could earn, so it confirmed a competitor's
+         * shop existed to anyone who guessed one. Every other store-scoped write already answered
+         * "not found" for both cases; this one is now the same.
+         */
+        @Test
+        void a_store_the_merchant_does_not_own_is_never_confirmed_to_exist() {
+            Store theirs = new Store(OTHER, "Their shop", Store.Vertical.RESTAURANT);
+            when(storeService.ownedBy(MERCHANT)).thenReturn(List.of());
+
+            assertThatThrownBy(() -> catalog.create(MERCHANT, request(theirs.getId())))
+                    .hasMessageNotContainingAny("yours", "not yours");
         }
 
         /** "Add your first product" must not need "but first create a store" wired into the client. */
@@ -242,6 +257,7 @@ class CatalogOwnershipTest {
                     .isEqualTo(provisioned.getId());
         }
 
+        /** Not found, like every other unknown id here — a 422 read as "rewrite your payload". */
         @Test
         void a_category_that_does_not_exist_is_refused() {
             UUID unknown = UUID.randomUUID();
@@ -251,7 +267,7 @@ class CatalogOwnershipTest {
 
             assertThatThrownBy(() -> catalog.create(MERCHANT,
                     new ProductRequest("n", "d", BigDecimal.ONE, unknown, null, null, null)))
-                    .isInstanceOf(CatalogRuleViolationException.class);
+                    .isInstanceOf(CategoryNotFoundException.class);
 
             verify(products, never()).save(any(Product.class));
         }
@@ -308,8 +324,8 @@ class CatalogOwnershipTest {
             when(categories.existsById(missing)).thenReturn(false);
 
             assertThatThrownBy(() -> catalog.createCategory("Wraps", missing))
-                    .isInstanceOf(CatalogRuleViolationException.class)
-                    .hasMessageContaining("does not exist");
+                    .isInstanceOf(CategoryNotFoundException.class)
+                    .hasMessageContaining(missing.toString());
         }
 
         @Test

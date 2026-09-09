@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -70,6 +71,18 @@ public class InAppMessageService {
     @Transactional(readOnly = true)
     public List<InAppMessage> inbox(String userId, int limit) {
         return messages.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit));
+    }
+
+    /**
+     * One page of the inbox, with the total.
+     *
+     * <p>The total is what lets a client stop asking. Without it the only way to learn there is
+     * nothing after the newest fifty is to fetch them all, which is what the inbox screen was
+     * doing on every open.
+     */
+    @Transactional(readOnly = true)
+    public Page<InAppMessage> inbox(String userId, int page, int size) {
+        return messages.findPageByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size));
     }
 
     @Transactional(readOnly = true)

@@ -57,6 +57,16 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8180/realms/delivery-platform/protocol/openid-connect/certs}
 
 delivery:
+  services:
+    # Order Manager answers whether an order exists and whose it is, which is the one thing this
+    # service cannot know: an order id is a client-supplied UUID and no order lives in the transfer
+    # schema.
+    order-manager: ${ORDER_MANAGER_URL:http://localhost:8101}
+  clients:
+    # Short: the check stands between a customer and their checkout, and nothing is written until
+    # it answers, so a refusal they can retry beats a request thread held open.
+    connect-timeout: ${CLIENT_CONNECT_TIMEOUT:2s}
+    read-timeout: ${CLIENT_READ_TIMEOUT:5s}
   market:
     # LBP per USD — the platform's one display-and-collection rate. The same key and default the
     # storefront's market config serves, so the price a customer browsed and the price they are

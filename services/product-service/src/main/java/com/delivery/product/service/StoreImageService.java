@@ -55,6 +55,7 @@ public class StoreImageService {
     @Transactional
     public PresignedUpload presign(UUID storeId, String merchantId, Slot slot, String contentType) {
         requireOwned(storeId, merchantId);
+        Thumbnailer.requireRenderable(contentType);
         return storage.presignUpload(merchantId, FilePurpose.PRODUCT_IMAGE, contentType,
                 "stores/" + storeId + "/" + slot.name().toLowerCase(java.util.Locale.ROOT));
     }

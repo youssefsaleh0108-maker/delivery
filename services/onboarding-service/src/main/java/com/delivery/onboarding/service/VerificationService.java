@@ -30,10 +30,11 @@ import com.delivery.onboarding.domain.ContactVerificationRepository;
  *
  * <p><strong>This endpoint sends mail to addresses strangers type, which makes it a spam engine if
  * it is not held down.</strong> Three limits do that: a cooldown so the same address cannot be
- * asked to receive a code every second, a daily cap per destination so it cannot be used to bury
- * somebody's inbox, and an attempt cap on each code so guessing six digits is not a strategy. The
- * limits are counted per destination rather than per caller on purpose — the caller has no account
- * and can change address, but the cost always lands on whoever owns the inbox being hammered.
+ * asked to receive a code every second, a cap per destination over any rolling 24 hours so it
+ * cannot be used to bury somebody's inbox, and an attempt cap on each code so guessing six digits
+ * is not a strategy. The limits are counted per destination rather than per caller on purpose —
+ * the caller has no account and can change address, but the cost always lands on whoever owns the
+ * inbox being hammered.
  */
 @Service
 public class VerificationService {
@@ -62,6 +63,18 @@ public class VerificationService {
 
     /** What a configured dialling code may look like: a plus and one to three digits. */
     private static final Pattern DIAL_CODE = Pattern.compile("^\\+[1-9]\\d{0,3}$");
+
+    /**
+     * The window both destination caps count over, and it is rolling rather than a calendar day.
+     *
+     * <p>A midnight reset hands the whole budget back at a moment anybody can predict, so a sender
+     * spends the cap at 23:59 and spends it again at 00:01 — twice the burst into one inbox, at the
+     * hour least likely to be watched. And "which midnight" is a question this request cannot
+     * answer: a destination carries no timezone, and the platform's screens serve two countries
+     * that are not in the same one. So the window slides, and the refusals below say so rather than
+     * promising a fresh start tomorrow that never arrives.
+     */
+    private static final Duration CAP_WINDOW = Duration.ofDays(1);
 
     private final ContactVerificationRepository verifications;
     private final PlatformClient platform;
@@ -163,23 +176,29 @@ public class VerificationService {
                     }
                 });
 
-        long today = verifications.countByDestinationAndCreatedAtAfter(
-                destination, now.minus(Duration.ofDays(1)));
-        if (today >= dailyCap) {
+        long recent = verifications.countByDestinationAndCreatedAtAfter(
+                destination, now.minus(CAP_WINDOW));
+        if (recent >= dailyCap) {
+            // Worded to the window that is actually enforced — see CAP_WINDOW. "Try again
+            // tomorrow" sent people back at midnight to be refused again, and being refused by a
+            // limit you were told you had cleared is how a real applicant decides the platform is
+            // broken and stops trying.
             throw new TooManyRequestsException(
-                    "That address has been sent too many codes today. Try again tomorrow.");
+                    "That address has been sent too many codes in the last 24 hours."
+                            + " Try again later.");
         }
 
-        // Password resets carry their own, tighter daily budget beside the shared one. Counted
-        // and refused for unknown addresses exactly like known ones — see requestPasswordReset:
-        // a cap that only fired on real accounts would itself be an account-existence oracle.
+        // Password resets carry their own, tighter budget beside the shared one, over the same
+        // window. Counted and refused for unknown addresses exactly like known ones — see
+        // requestPasswordReset: a cap that only fired on real accounts would itself be an
+        // account-existence oracle.
         if (purpose == Purpose.PASSWORD_RESET) {
-            long resetsToday = verifications.countByDestinationAndPurposeAndCreatedAtAfter(
-                    destination, Purpose.PASSWORD_RESET, now.minus(Duration.ofDays(1)));
-            if (resetsToday >= resetDailyCap) {
+            long recentResets = verifications.countByDestinationAndPurposeAndCreatedAtAfter(
+                    destination, Purpose.PASSWORD_RESET, now.minus(CAP_WINDOW));
+            if (recentResets >= resetDailyCap) {
                 throw new TooManyRequestsException(
-                        "That address has asked to reset its passcode too many times today."
-                                + " Try again tomorrow.");
+                        "That address has asked to reset its passcode too many times in the"
+                                + " last 24 hours. Try again later.");
             }
         }
 
@@ -190,13 +209,14 @@ public class VerificationService {
 
         if (deliverable.getAsBoolean()) {
             deliver(channel, destination, purpose, issued.code());
-            log.info("{} code sent on {} (attempt {} today)", purpose, channel, today + 1);
+            log.info("{} code sent on {} (attempt {} in the last 24 hours)",
+                    purpose, channel, recent + 1);
         } else {
             // A reset asked for on an address with no account. The challenge above was still
             // recorded so the limits and the response stay identical either way; the code it holds
             // was never sent and cannot be guessed, so nothing can be done with the row.
-            log.info("{} code recorded but not sent on {} (attempt {} today)",
-                    purpose, channel, today + 1);
+            log.info("{} code recorded but not sent on {} (attempt {} in the last 24 hours)",
+                    purpose, channel, recent + 1);
         }
         return issued.verification().getExpiresAt();
     }

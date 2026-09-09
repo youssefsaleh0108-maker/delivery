@@ -35,6 +35,7 @@ import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -473,6 +474,54 @@ class ImageThumbnailFlowTest {
             productImages.removeImage(PRODUCT, MERCHANT, legacy);
 
             assertThat(product.getImageRefs()).isEmpty();
+        }
+    }
+
+    /**
+     * What may be uploaded in the first place.
+     *
+     * <p>The upload gate and the derivative step have to agree, and they did not: storage took
+     * {@code image/webp}, no reader here decodes it, and every WebP that landed was denied a
+     * thumbnail for good — so the list surfaces went on pulling a full-size original into an 80 dp
+     * row, silently and permanently. Refusing the format at the presign is the half that is visible
+     * to the merchant: they are told while they still have the file open, rather than never.
+     */
+    @Nested
+    @DisplayName("asking for an upload URL")
+    class Presigning {
+
+        @Test
+        void a_format_no_derivative_can_be_made_from_never_gets_a_url() {
+            product();
+
+            assertThatThrownBy(() -> productImages.presign(PRODUCT, MERCHANT, "image/webp"))
+                    .isInstanceOf(CatalogService.CatalogRuleViolationException.class);
+
+            org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
+                    .presignUpload(anyString(), any(), anyString(), anyString());
+        }
+
+        @Test
+        void a_jpeg_is_waved_through() {
+            product();
+
+            productImages.presign(PRODUCT, MERCHANT, "image/jpeg");
+
+            org.mockito.Mockito.verify(storage)
+                    .presignUpload(anyString(), any(), anyString(), anyString());
+        }
+
+        /** Store artwork goes through the same gate — it gains the same derivative, or none. */
+        @Test
+        void a_shopfront_logo_is_held_to_the_same_rule() {
+            store();
+
+            assertThatThrownBy(() -> storeImages.presign(
+                    STORE, MERCHANT, StoreImageService.Slot.LOGO, "image/webp"))
+                    .isInstanceOf(CatalogService.CatalogRuleViolationException.class);
+
+            org.mockito.Mockito.verify(storage, org.mockito.Mockito.never())
+                    .presignUpload(anyString(), any(), anyString(), anyString());
         }
     }
 }

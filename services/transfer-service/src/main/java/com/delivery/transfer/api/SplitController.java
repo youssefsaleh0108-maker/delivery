@@ -16,10 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.transfer.domain.Money;
 import com.delivery.transfer.domain.SplitPlan;
 import com.delivery.transfer.domain.SplitShare;
 import com.delivery.transfer.service.SplitService;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 /**
@@ -44,14 +46,20 @@ public class SplitController {
                                @NotNull BigDecimal amountUsd, Integer itemsCount) {
     }
 
+    /**
+     * {@code @Valid} on the element, not just the list: validation does not descend into a
+     * collection unless it is asked to, so a share with no {@code amountUsd} satisfied every
+     * constraint here and was then summed with {@code BigDecimal::add} — a 500 over a field the
+     * caller left out.
+     */
     public record CreateRequest(@NotNull SplitPlan.Mode mode, @NotNull BigDecimal totalUsd,
-                                String storeName, @NotNull List<ShareRequest> shares) {
+                                String storeName, @NotNull List<@Valid ShareRequest> shares) {
     }
 
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     public Map<String, Object> create(@AuthenticationPrincipal Jwt jwt,
-                                      @RequestBody CreateRequest request) {
+                                      @Valid @RequestBody CreateRequest request) {
         SplitPlan plan = service.create(
                 jwt.getSubject(), username(jwt), displayName(jwt), request.storeName(),
                 request.mode(), request.totalUsd(),
@@ -89,7 +97,7 @@ public class SplitController {
     @PostMapping("/{id}/answer")
     @PreAuthorize("hasRole('CUSTOMER')")
     public Map<String, Object> answer(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                      @RequestBody AnswerRequest request) {
+                                      @Valid @RequestBody AnswerRequest request) {
         return payload(service.answer(id, jwt.getSubject(), username(jwt),
                 request.accept(), request.method()));
     }
@@ -118,7 +126,7 @@ public class SplitController {
     @PostMapping("/{id}/attach-order")
     @PreAuthorize("hasRole('CUSTOMER')")
     public Map<String, Object> attach(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                      @RequestBody AttachRequest request) {
+                                      @Valid @RequestBody AttachRequest request) {
         return payload(service.attachOrder(id, jwt.getSubject(), request.orderId()));
     }
 
@@ -151,8 +159,8 @@ public class SplitController {
         out.put("orderId", plan.getOrderId());
         out.put("mode", plan.getMode());
         out.put("status", plan.getStatus());
-        out.put("totalUsd", plan.getTotalUsd());
-        out.put("rateUsed", plan.getRateUsed());
+        out.put("totalUsd", Money.usd(plan.getTotalUsd()));
+        out.put("rateUsed", Money.lbp(plan.getRateUsed()));
         out.put("expiresAt", plan.getExpiresAt());
         out.put("createdAt", plan.getCreatedAt());
         out.put("shares", plan.getShares().stream().map(s -> {
@@ -160,7 +168,7 @@ public class SplitController {
             share.put("id", s.getId());
             share.put("username", s.getPayeeUsername());
             share.put("name", s.getPayeeName());
-            share.put("amountUsd", s.getAmountUsd());
+            share.put("amountUsd", Money.usd(s.getAmountUsd()));
             share.put("itemsCount", s.getItemsCount());
             share.put("status", s.getStatus());
             share.put("method", s.getMethod());
