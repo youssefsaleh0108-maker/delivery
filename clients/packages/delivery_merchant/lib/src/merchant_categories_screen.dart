@@ -675,7 +675,11 @@ class _SectionRow extends StatelessWidget {
           else
             handle,
           const SizedBox(width: DeliverySpacing.xs),
-          _SectionThumbnail(section: section, label: t.catImage),
+          _SectionThumbnail(
+            section: section,
+            label: t.catImage,
+            unavailableLabel: t.imageUnavailable,
+          ),
           const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
           Expanded(
             child: Column(
@@ -746,12 +750,19 @@ class _SectionRow extends StatelessWidget {
 /// height than this 48px slot has — so an artwork-less section falls back to the glyph alone, with
 /// the sentence on the semantic label instead.
 class _SectionThumbnail extends StatelessWidget {
-  const _SectionThumbnail({required this.section, required this.label});
+  const _SectionThumbnail({
+    required this.section,
+    required this.label,
+    required this.unavailableLabel,
+  });
 
   final Category section;
 
   /// Already localised by the caller.
   final String label;
+
+  /// What artwork whose presigned link has expired says instead. Also already localised.
+  final String unavailableLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -781,7 +792,11 @@ class _SectionThumbnail extends StatelessWidget {
 
     return SizedBox.square(
       dimension: size,
-      child: DeliveryProductImage(url: url, borderRadius: corners),
+      child: DeliveryProductImage(
+        url: url,
+        borderRadius: corners,
+        unavailableLabel: unavailableLabel,
+      ),
     );
   }
 }

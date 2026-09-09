@@ -4,6 +4,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'order_detail_screen.dart';
 import 'product_form_screen.dart';
 
 /// The merchant's own catalog: everything this shop owns, in any status.
@@ -496,10 +497,13 @@ class _ProductRow extends StatelessWidget {
                       // photo they uploaded is any good.
                       url: product.listImageUrl,
                       borderRadius: BorderRadius.circular(DeliveryRadius.md),
+                      unavailableLabel: t.imageUnavailable,
+                      openLabel: t.openFullSizePhoto,
                       onTap: () => showProductImagePreview(
                         context,
                         urls: product.imageUrls,
                         title: product.name,
+                        words: productPreviewWords(t),
                       ),
                     ),
                   ),

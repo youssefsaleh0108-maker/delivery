@@ -9230,6 +9230,12 @@ abstract class DeliveryStrings {
   /// **'Available to cash out'**
   String get riderCashOutAvailable;
 
+  /// No description provided for @riderCashOutHeldNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} of it is cash you are still carrying — hand it in to free it up'**
+  String riderCashOutHeldNote(Object amount);
+
   /// No description provided for @riderCashOutMinimum.
   ///
   /// In en, this message translates to:
@@ -12493,6 +12499,60 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'All'**
   String get repFilterAll;
+
+  /// What the signed-in person is, on the portal sidebar's footer card. Their access, not their job title.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant partner'**
+  String get merchantPartner;
+
+  /// No description provided for @carrierPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrier partner'**
+  String get carrierPartner;
+
+  /// No description provided for @backofficeOperator.
+  ///
+  /// In en, this message translates to:
+  /// **'Backoffice operator'**
+  String get backofficeOperator;
+
+  /// Shown in place of a product photo whose link has expired or whose file has gone.
+  ///
+  /// In en, this message translates to:
+  /// **'Image unavailable'**
+  String get imageUnavailable;
+
+  /// No description provided for @openFullSizePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Open full-size photo'**
+  String get openFullSizePhoto;
+
+  /// Which photo of a product's set is showing in the full-size preview.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {count}'**
+  String photoPosition(int index, int count);
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @previous.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get previous;
+
+  /// No description provided for @next.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get next;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

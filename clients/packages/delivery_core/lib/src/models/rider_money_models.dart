@@ -235,10 +235,23 @@ class RiderBalance {
   /// What the platform owes before anything is netted off.
   final double balance;
 
-  /// What can actually be asked for, after cash the rider is still carrying. Negative means they
-  /// are holding more of the platform's money than it owes them — shown that way rather than
-  /// clamped, because a zero would read as having earned nothing.
+  /// What can actually be asked for, after cash the rider is still carrying.
+  ///
+  /// Goes negative whenever a rider is holding more of the platform's money than it owes them,
+  /// which in a cash-first market is the ordinary state of anybody who has worked today. Kept
+  /// signed because the arithmetic needs it; see [withdrawable] for the figure a screen may show.
   final double available;
+
+  /// The same figure as a screen must render it: never below zero.
+  ///
+  /// A rider carrying cash was shown a minus sign under "Available to cash out", growing as they
+  /// worked — a number that reads as personal debt for having done the job. The server never
+  /// quotes one; it clamps in its own refusal text, and only the app put it on screen.
+  ///
+  /// Zero on its own would be its own lie — it reads as having earned nothing — so the screens
+  /// that show this also show [cashFloatHeld] beside it, which is the actual reason nothing can
+  /// be drawn: the money is already in the rider's pocket.
+  double get withdrawable => available > 0 ? available : 0;
 
   /// The difference: platform cash the rider is carrying.
   final double cashFloatHeld;

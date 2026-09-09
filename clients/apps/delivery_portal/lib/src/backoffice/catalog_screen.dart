@@ -122,6 +122,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 }
 
+/// The photo preview's chrome. English constants, like the rest of the Backoffice — written here
+/// rather than defaulted inside the shared widget, so the merchant portal cannot inherit them.
+const ProductPreviewWords _previewWords = ProductPreviewWords(
+  untitled: 'Photo',
+  unavailable: 'Image unavailable',
+  close: 'Close',
+  previous: 'Previous',
+  next: 'Next',
+  position: _photoPosition,
+);
+
+String _photoPosition(int index, int count) => '$index of $count';
+
 /// One live product, as a customer would see it.
 ///
 /// No actions: the Backoffice looks at the catalog, it does not edit it. A merchant's own portal is
@@ -151,12 +164,19 @@ class _CatalogCard extends StatelessWidget {
                 height: 168,
                 width: double.infinity,
                 borderRadius: BorderRadius.zero,
+                // Spelled out here rather than defaulted inside the widget: the design system
+                // carries no words of its own, and the Backoffice is English by decision — so this
+                // is the one console where the English is written down on purpose.
+                emptyLabel: 'No photo',
+                unavailableLabel: 'Image unavailable',
+                openLabel: 'Open full-size photo',
                 onTap: product.imageUrls.isEmpty
                     ? null
                     : () => showProductImagePreview(
                           context,
                           urls: product.imageUrls,
                           title: product.name,
+                          words: _previewWords,
                         ),
               ),
               const Positioned(

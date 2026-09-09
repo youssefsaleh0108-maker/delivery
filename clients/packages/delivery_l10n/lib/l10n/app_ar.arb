@@ -1806,6 +1806,7 @@
   "riderEarningsBreakdown": "{earnings} أجرة توصيل · {tips} إكراميات",
   "riderCashOutTitle": "سحب الرصيد",
   "riderCashOutAvailable": "المتاح للسحب",
+  "riderCashOutHeldNote": "{amount} منها نقد لا يزال بحوزتك — سلّمه ليصبح متاحاً",
   "riderCashOutMinimum": "الحد الأدنى {amount}",
   "riderCashOutManualNote": "تُسلَّم الدفعات يدوياً من فريق المنصة — لا يُحوَّل شيء تلقائياً.",
   "riderCashOutRequest": "طلب سحب",
@@ -2350,5 +2351,14 @@
   "repStatusRefunded": "مُعادة",
   "repStatusVoided": "ملغاة",
   "repViewReceipt": "عرض الإيصال",
-  "repFilterAll": "الكل"
+  "repFilterAll": "الكل",
+  "merchantPartner": "شريك تاجر",
+  "carrierPartner": "شريك توصيل",
+  "backofficeOperator": "مشغّل الإدارة",
+  "imageUnavailable": "الصورة غير متاحة",
+  "openFullSizePhoto": "افتح الصورة بالحجم الكامل",
+  "photoPosition": "{index} من {count}",
+  "close": "إغلاق",
+  "previous": "السابق",
+  "next": "التالي"
 }

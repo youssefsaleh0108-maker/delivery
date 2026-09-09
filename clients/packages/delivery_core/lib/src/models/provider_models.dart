@@ -227,6 +227,8 @@ class CarrierEarnings {
   const CarrierEarnings({
     required this.delivered,
     required this.active,
+    required this.grossEarned,
+    required this.commission,
     required this.earned,
     required this.expected,
     required this.savedByOffers,
@@ -236,6 +238,21 @@ class CarrierEarnings {
 
   final int delivered;
   final int active;
+
+  /// What finished work was worth before the platform took anything.
+  final double grossEarned;
+
+  /// What the platform actually took.
+  ///
+  /// Both of these come from the server rather than being derived here. The card used to compute
+  /// the commission as `earned * cut`, but [earned] is ALREADY net — so it deducted the cut a
+  /// second time and showed a company less than the ledger owed it, by exactly the cut, growing
+  /// with every delivery. And no arithmetic on this side could have got it right anyway: a waived
+  /// order is added back at full value with no cut taken, so the relationship between the gross
+  /// and the net is not a fixed rate.
+  ///
+  /// Holds exactly: `grossEarned - commission == earned`.
+  final double commission;
 
   /// What the company keeps on finished work, after the platform's cut.
   final double earned;
@@ -255,6 +272,8 @@ class CarrierEarnings {
   factory CarrierEarnings.fromJson(Map<String, dynamic> json) => CarrierEarnings(
         delivered: (json['delivered'] as num?)?.toInt() ?? 0,
         active: (json['active'] as num?)?.toInt() ?? 0,
+        grossEarned: (json['grossEarned'] as num?)?.toDouble() ?? 0,
+        commission: (json['commission'] as num?)?.toDouble() ?? 0,
         earned: (json['earned'] as num?)?.toDouble() ?? 0,
         expected: (json['expected'] as num?)?.toDouble() ?? 0,
         savedByOffers: (json['savedByOffers'] as num?)?.toDouble() ?? 0,

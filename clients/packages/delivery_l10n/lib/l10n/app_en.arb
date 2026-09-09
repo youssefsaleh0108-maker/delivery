@@ -2409,6 +2409,12 @@
   },
   "riderCashOutTitle": "Cash out",
   "riderCashOutAvailable": "Available to cash out",
+  "riderCashOutHeldNote": "{amount} of it is cash you are still carrying — hand it in to free it up",
+  "@riderCashOutHeldNote": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
   "riderCashOutMinimum": "Minimum {amount}",
   "@riderCashOutMinimum": {
     "placeholders": {
@@ -3306,5 +3312,31 @@
   "repStatusRefunded": "Refunded",
   "repStatusVoided": "Voided",
   "repViewReceipt": "View receipt",
-  "repFilterAll": "All"
+  "repFilterAll": "All",
+  "merchantPartner": "Merchant partner",
+  "@merchantPartner": {
+    "description": "What the signed-in person is, on the portal sidebar's footer card. Their access, not their job title."
+  },
+  "carrierPartner": "Carrier partner",
+  "backofficeOperator": "Backoffice operator",
+  "imageUnavailable": "Image unavailable",
+  "@imageUnavailable": {
+    "description": "Shown in place of a product photo whose link has expired or whose file has gone."
+  },
+  "openFullSizePhoto": "Open full-size photo",
+  "photoPosition": "{index} of {count}",
+  "@photoPosition": {
+    "description": "Which photo of a product's set is showing in the full-size preview.",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "close": "Close",
+  "previous": "Previous",
+  "next": "Next"
 }

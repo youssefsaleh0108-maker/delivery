@@ -397,7 +397,7 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
           Text(
             t.riderBalanceLine(
               balance.balance.toStringAsFixed(2),
-              balance.available.toStringAsFixed(2),
+              balance.withdrawable.toStringAsFixed(2),
             ),
             style: const TextStyle(
               fontSize: 11,
@@ -1362,8 +1362,8 @@ class _CashOutSheet extends StatefulWidget {
 
 class _CashOutSheetState extends State<_CashOutSheet> {
   late final TextEditingController _amount = TextEditingController(
-    text: widget.balance.available > 0
-        ? widget.balance.available.toStringAsFixed(2)
+    text: widget.balance.withdrawable > 0
+        ? widget.balance.withdrawable.toStringAsFixed(2)
         : '',
   );
   bool _busy = false;
@@ -1440,7 +1440,7 @@ class _CashOutSheetState extends State<_CashOutSheet> {
                     ),
                   ),
                   Text(
-                    balance.available.toStringAsFixed(2),
+                    balance.withdrawable.toStringAsFixed(2),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -1450,6 +1450,20 @@ class _CashOutSheetState extends State<_CashOutSheet> {
                   ),
                 ],
               ),
+              // Why it is zero, when it is. Without this the clamp above trades one wrong
+              // reading for another: a rider who has worked all day sees 0.00 and no reason.
+              if (balance.cashFloatHeld > 0) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.xs),
+                Text(
+                  t.riderCashOutHeldNote(
+                      balance.cashFloatHeld.toStringAsFixed(2)),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: DeliveryColors.faint,
+                    height: 1.4,
+                  ),
+                ),
+              ],
               const SizedBox(height: DeliverySpacing.xs),
               Text(
                 t.riderCashOutMinimum(

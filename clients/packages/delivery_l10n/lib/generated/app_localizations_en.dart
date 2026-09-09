@@ -5159,6 +5159,11 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get riderCashOutAvailable => 'Available to cash out';
 
   @override
+  String riderCashOutHeldNote(Object amount) {
+    return '$amount of it is cash you are still carrying — hand it in to free it up';
+  }
+
+  @override
   String riderCashOutMinimum(Object amount) {
     return 'Minimum $amount';
   }
@@ -7028,4 +7033,33 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get repFilterAll => 'All';
+
+  @override
+  String get merchantPartner => 'Merchant partner';
+
+  @override
+  String get carrierPartner => 'Carrier partner';
+
+  @override
+  String get backofficeOperator => 'Backoffice operator';
+
+  @override
+  String get imageUnavailable => 'Image unavailable';
+
+  @override
+  String get openFullSizePhoto => 'Open full-size photo';
+
+  @override
+  String photoPosition(int index, int count) {
+    return '$index of $count';
+  }
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get previous => 'Previous';
+
+  @override
+  String get next => 'Next';
 }

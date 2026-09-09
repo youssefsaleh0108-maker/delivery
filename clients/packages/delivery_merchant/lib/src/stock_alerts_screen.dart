@@ -606,6 +606,7 @@ class _AlertRow extends StatelessWidget {
       child: DeliveryProductImage(
         url: alert.listImageUrl,
         borderRadius: BorderRadius.circular(merchantChipRadius),
+        unavailableLabel: t.imageUnavailable,
       ),
     );
   }

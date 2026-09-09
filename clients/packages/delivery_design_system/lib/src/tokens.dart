@@ -205,16 +205,21 @@ enum DeliveryStatusColor {
 /// The colours carry the meaning and must not be re-picked per screen — `busy` is amber because it
 /// is a warning you can proceed through, `closed` is grey because it is not a warning at all, it is
 /// an absence.
+///
+/// Colour only, and no `label`. This enum used to carry one, and it was English: an enum constant is
+/// built at compile time while a translation is resolved at render time against the reader's locale,
+/// so a shop in an Arabic session read "Open" on its own status pill. The words come from the caller
+/// — `StoreAvailability.labelIn(DeliveryStrings)` in `delivery_core` — and passing them is what stops
+/// that happening again.
 enum DeliveryStoreState {
-  open(Color(0xFF2E7D32), 'Open'),
-  busy(Color(0xFFF59E0B), 'Busy'),
-  closingSoon(Color(0xFFEF6C00), 'Closing soon'),
-  closed(Color(0xFF9E9E9E), 'Closed');
+  open(Color(0xFF2E7D32)),
+  busy(Color(0xFFF59E0B)),
+  closingSoon(Color(0xFFEF6C00)),
+  closed(Color(0xFF9E9E9E));
 
-  const DeliveryStoreState(this.color, this.label);
+  const DeliveryStoreState(this.color);
 
   final Color color;
-  final String label;
 
   /// Closed is the only state that stops a basket. The other two are advisory.
   bool get acceptsOrders => this != DeliveryStoreState.closed;

@@ -13,9 +13,18 @@ import 'tokens.dart';
 
 /// Open / Busy / Closing soon / Closed.
 class StoreStatePill extends StatelessWidget {
-  const StoreStatePill({super.key, required this.state, this.compact = false});
+  const StoreStatePill({
+    super.key,
+    required this.state,
+    required this.label,
+    this.compact = false,
+  });
 
   final DeliveryStoreState state;
+
+  /// Already localised by the caller. The state carries the colour and nothing else, so the only
+  /// way a pill can read English in an Arabic session is for the caller to hand it English.
+  final String label;
 
   /// Drops the dot and tightens the padding, for overlaying on a cover image.
   final bool compact;
@@ -44,7 +53,7 @@ class StoreStatePill extends StatelessWidget {
             const SizedBox(width: DeliverySpacing.xs + 2),
           ],
           Text(
-            state.label,
+            label,
             style: TextStyle(
               color: state.color,
               fontSize: compact ? 11 : 12,
@@ -63,9 +72,20 @@ class StoreStatePill extends StatelessWidget {
 /// The count is not decoration: 4.8 from 12 people and 4.8 from 12,000 are different claims, and
 /// showing the star alone flatters the first one.
 class RatingChip extends StatelessWidget {
-  const RatingChip({super.key, required this.rating, this.ratingCount = 0, this.dense = false});
+  const RatingChip({
+    super.key,
+    required this.rating,
+    required this.unratedLabel,
+    this.ratingCount = 0,
+    this.dense = false,
+  });
 
   final double? rating;
+
+  /// What an unrated shop says instead of a score, already localised. The word used to be an
+  /// English constant here, which is the same mistake the status pill made.
+  final String unratedLabel;
+
   final int ratingCount;
   final bool dense;
 
@@ -76,7 +96,7 @@ class RatingChip extends StatelessWidget {
       // Never render "0.0" for a shop nobody has rated — no data and a bad score must not look
       // the same.
       return Text(
-        'New',
+        unratedLabel,
         style: TextStyle(
           color: DeliveryColors.muted,
           fontSize: dense ? 12 : 13,
@@ -591,6 +611,8 @@ class StorefrontCard extends StatelessWidget {
     super.key,
     required this.name,
     required this.state,
+    required this.stateLabel,
+    required this.unratedLabel,
     required this.etaLabel,
     required this.feeLabel,
     this.tagline,
@@ -603,6 +625,8 @@ class StorefrontCard extends StatelessWidget {
     this.favorite = false,
     this.onTap,
     this.onFavoriteToggled,
+    this.favoriteLabel,
+    this.unfavoriteLabel,
     this.coverHeight = 132,
   });
 
@@ -610,6 +634,13 @@ class StorefrontCard extends StatelessWidget {
   final String? tagline;
   final List<String> tags;
   final DeliveryStoreState state;
+
+  /// Already localised by the caller, like every other string this card is handed.
+  final String stateLabel;
+
+  /// What the rating slot says for a shop nobody has rated yet. Also already localised.
+  final String unratedLabel;
+
   final String etaLabel;
   final String feeLabel;
   final double? rating;
@@ -620,6 +651,13 @@ class StorefrontCard extends StatelessWidget {
   final bool favorite;
   final VoidCallback? onTap;
   final VoidCallback? onFavoriteToggled;
+
+  /// The heart's tooltip in each direction, already localised. Null leaves the button untooltipped
+  /// rather than falling back to English — a missing hint is a smaller failure than a hint the
+  /// reader cannot read.
+  final String? favoriteLabel;
+  final String? unfavoriteLabel;
+
   final double coverHeight;
 
   @override
@@ -685,7 +723,11 @@ class StorefrontCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: DeliverySpacing.sm),
                                   RatingChip(
-                                      rating: rating, ratingCount: ratingCount, dense: true),
+                                    rating: rating,
+                                    ratingCount: ratingCount,
+                                    unratedLabel: unratedLabel,
+                                    dense: true,
+                                  ),
                                 ],
                               ),
                               if (tags.isNotEmpty || tagline != null)
@@ -768,7 +810,7 @@ class StorefrontCard extends StatelessWidget {
           Positioned(
             left: DeliverySpacing.sm,
             top: DeliverySpacing.sm,
-            child: StoreStatePill(state: state, compact: true),
+            child: StoreStatePill(state: state, label: stateLabel, compact: true),
           ),
           if (offerLabel != null)
             Positioned(
@@ -787,7 +829,7 @@ class StorefrontCard extends StatelessWidget {
                   onPressed: onFavoriteToggled,
                   visualDensity: VisualDensity.compact,
                   iconSize: 19,
-                  tooltip: favorite ? 'Remove from favourites' : 'Add to favourites',
+                  tooltip: favorite ? unfavoriteLabel : favoriteLabel,
                   icon: Icon(
                     favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                     color: favorite ? DeliveryColors.brand : DeliveryColors.white,
@@ -807,6 +849,8 @@ class StorefrontMiniCard extends StatelessWidget {
     super.key,
     required this.name,
     required this.state,
+    required this.stateLabel,
+    required this.unratedLabel,
     required this.etaLabel,
     this.logoUrl,
     this.rating,
@@ -816,6 +860,13 @@ class StorefrontMiniCard extends StatelessWidget {
 
   final String name;
   final DeliveryStoreState state;
+
+  /// Already localised by the caller, like every other string this card is handed.
+  final String stateLabel;
+
+  /// What the rating slot says for a shop nobody has rated yet. Also already localised.
+  final String unratedLabel;
+
   final String etaLabel;
   final String? logoUrl;
   final double? rating;
@@ -848,7 +899,7 @@ class StorefrontMiniCard extends StatelessWidget {
                   children: <Widget>[
                     StoreAvatar(name: name, logoUrl: logoUrl, size: 36),
                     const Spacer(),
-                    StoreStatePill(state: state, compact: true),
+                    StoreStatePill(state: state, label: stateLabel, compact: true),
                   ],
                 ),
                 const SizedBox(height: DeliverySpacing.sm),
@@ -865,7 +916,7 @@ class StorefrontMiniCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Row(
                   children: <Widget>[
-                    RatingChip(rating: rating, dense: true),
+                    RatingChip(rating: rating, unratedLabel: unratedLabel, dense: true),
                     const Spacer(),
                     Text(etaLabel,
                         style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
@@ -892,13 +943,16 @@ class StickyBasketBar extends StatelessWidget {
     required this.itemCount,
     required this.total,
     required this.onTap,
-    this.label = 'View basket',
+    required this.label,
     this.blockedReason,
   });
 
   final int itemCount;
   final String total;
   final VoidCallback onTap;
+
+  /// Already localised by the caller. This defaulted to "View basket" and the default is gone: a
+  /// default is only ever taken when a caller forgot, which is precisely when English leaks.
   final String label;
 
   /// When set, the bar explains why checkout is unavailable instead of offering it — a minimum
