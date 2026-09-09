@@ -77,7 +77,7 @@ images:
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/sms-connector
   newName: ghcr.io/youssefsaleh0108-maker/sms-connector
-  newTag: sha-8c6a71ef2fa8f040aae4e5dc3fcdb78ca2303fe0
+  newTag: sha-c90cc218bcc958f237b531a2c99e7a6b5f90008d
 - name: ghcr.io/youssefsaleh0108-maker/transfer-service
   newName: ghcr.io/youssefsaleh0108-maker/transfer-service
   newTag: sha-8c6a71ef2fa8f040aae4e5dc3fcdb78ca2303fe0
