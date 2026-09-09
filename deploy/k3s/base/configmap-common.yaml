@@ -10,20 +10,29 @@ metadata:
 data:
   # Heap tracks the container limit, not the node.
   #
-  # This line used to carry -XX:TieredStopAtLevel=1 and -XX:+UseSerialGC, on the reasoning that
-  # small heaps on a shared box do not repay a throughput collector. The measurement disagreed,
-  # and by a lot. TieredStopAtLevel=1 stops the JIT at C1, so no method is ever promoted to C2 and
-  # the hot path stays interpreted-ish forever: benchmarked inside the real container on
-  # response-rendering work, C1-only managed 17-22k renders/s against 48-51k with full tiering —
-  # 2.73x, paid on every request for the life of the process. SerialGC then pinned collection to
-  # one thread on an 8-vCPU node. The visible symptoms were product-service scaling NEGATIVELY
-  # above 16 concurrent requests (384 rps falling to 269, p99 4.6x worse) and order-manager
-  # plateauing with two cores idle.
+  # DO NOT swap the collector or the JIT here without changing the two numbers around them. This
+  # line briefly read "-XX:+UseG1GC" with no other change, on the strength of a benchmark showing
+  # C1-only costs 2.73x throughput against full tiering. That measurement is real, and it was
+  # taken on ONE service in isolation. This box runs twenty-two JVMs on eight vCPUs, and the two
+  # flags that were removed were the only thing bounding what each of them took:
   #
-  # These are fast-startup development flags. They belong in a laptop's compose file, not in front
-  # of the only copy of each service; and they were overriding the per-service Dockerfiles, which
-  # already ask for the sane defaults. Startup is a few seconds slower per pod, once.
-  JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:+UseG1GC -Xss512k"
+  #   * There are no CPU limits on these pods, so every JVM sees all 8 cores and sizes its GC and
+  #     compiler thread pools for 8. SerialGC meant one collection thread; G1 means roughly eight,
+  #     times twenty-two processes, each with its own native stack.
+  #   * MaxRAMPercentage=70 of a 512Mi limit leaves ~154Mi for everything outside the heap. That
+  #     fits C1 and SerialGC. It does not fit G1's region metadata and remembered sets plus a
+  #     C2-sized code cache plus those extra threads — so pods drift past the limit, get
+  #     OOMKilled, restart, and twenty-two of them doing that at once takes the node with it.
+  #
+  # Which is what happened: the platform ran healthily for hours and then stopped answering
+  # entirely — TCP accepted on 80/443 by the host-port listener while neither Traefik nor sshd
+  # could get scheduled. Reverted to the configuration that had been up for days.
+  #
+  # The throughput win is still worth having. Taking it needs CPU limits on the pods, or
+  # -XX:ActiveProcessorCount=2 so each JVM sizes itself for its share, AND a lower heap fraction
+  # to leave room for G1's own memory — trialled on qa and watched, not applied to both
+  # environments at once. See SCALE-05 and SCALE-19, which are the same problem from two ends.
+  JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
   SPRING_PROFILES_ACTIVE: docker
   CONFIG_IMPORT: configserver:http://config-server:8888
   # Issuer must match what Keycloak stamps into the token (per-env, in platform-env); JWKS is
