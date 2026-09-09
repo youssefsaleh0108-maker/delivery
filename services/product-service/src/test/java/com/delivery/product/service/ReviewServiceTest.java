@@ -16,6 +16,7 @@ import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.domain.StoreReviewRepository;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
+import com.delivery.product.service.ReviewService.OrderNotFoundException;
 import com.delivery.product.service.StoreService.StoreNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,7 +95,7 @@ class ReviewServiceTest {
             when(reviewableOrders.findById(ORDER)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.rate(STORE, CUSTOMER, ORDER, 5, "Padding my own shop"))
-                    .isInstanceOf(StoreNotFoundException.class);
+                    .isInstanceOf(OrderNotFoundException.class);
 
             verify(reviews, never()).save(any(StoreReview.class));
         }
@@ -105,7 +106,7 @@ class ReviewServiceTest {
             deliveredTo("someone-else", STORE);
 
             assertThatThrownBy(() -> service.rate(STORE, CUSTOMER, ORDER, 1, "Sabotage"))
-                    .isInstanceOf(StoreNotFoundException.class);
+                    .isInstanceOf(OrderNotFoundException.class);
 
             verify(reviews, never()).save(any(StoreReview.class));
         }
@@ -119,7 +120,7 @@ class ReviewServiceTest {
             deliveredTo(CUSTOMER, UUID.randomUUID());
 
             assertThatThrownBy(() -> service.rate(STORE, CUSTOMER, ORDER, 1, "Competitor"))
-                    .isInstanceOf(StoreNotFoundException.class);
+                    .isInstanceOf(OrderNotFoundException.class);
 
             verify(reviews, never()).save(any(StoreReview.class));
         }
@@ -130,8 +131,46 @@ class ReviewServiceTest {
             deliveredTo("someone-else", STORE);
 
             assertThatThrownBy(() -> service.rate(STORE, CUSTOMER, ORDER, 1, null))
-                    .isInstanceOf(StoreNotFoundException.class)
+                    .isInstanceOf(OrderNotFoundException.class)
                     .hasMessageContaining(ORDER.toString());
+        }
+
+        /**
+         * The refusal is about the order, and the shop is not dragged into it.
+         *
+         * <p>It used to be raised as a store not-found carrying the order's id, so a customer
+         * looking straight at a shop that exists was told "Store &lt;some other uuid&gt; was not
+         * found" — the wrong entity, an id that names no store, and nothing to act on.
+         */
+        @Test
+        void names_the_order_and_never_the_shop() {
+            deliveredTo("someone-else", STORE);
+
+            assertThatThrownBy(() -> service.rate(STORE, CUSTOMER, ORDER, 1, null))
+                    .hasMessageContaining("Order")
+                    .hasMessageNotContainingAny("Store", STORE.toString());
+        }
+
+        /**
+         * And it stays silent about whether that order exists at all. A message that separated
+         * "no such order" from "not your order" would confirm somebody else's order by its shape.
+         */
+        @Test
+        void reads_the_same_whether_the_order_exists_or_not() {
+            deliveredTo("someone-else", STORE);
+            String notTheirs = messageFromRating();
+
+            when(reviewableOrders.findById(ORDER)).thenReturn(Optional.empty());
+            assertThat(messageFromRating()).isEqualTo(notTheirs);
+        }
+
+        private String messageFromRating() {
+            try {
+                service.rate(STORE, CUSTOMER, ORDER, 1, null);
+                throw new AssertionError("the review was not refused");
+            } catch (OrderNotFoundException e) {
+                return e.getMessage();
+            }
         }
 
         @Test
@@ -179,7 +218,7 @@ class ReviewServiceTest {
             deliveredTo("someone-else", STORE);
 
             assertThatThrownBy(() -> service.rate(STORE, CUSTOMER, ORDER, 1, "Sabotage"))
-                    .isInstanceOf(StoreNotFoundException.class);
+                    .isInstanceOf(OrderNotFoundException.class);
         }
     }
 
@@ -256,7 +295,7 @@ class ReviewServiceTest {
             when(reviews.findByOrderId(ORDER)).thenReturn(Optional.of(review));
 
             assertThatThrownBy(() -> service.delete(ORDER, CUSTOMER))
-                    .isInstanceOf(StoreNotFoundException.class);
+                    .isInstanceOf(OrderNotFoundException.class);
 
             verify(reviews, never()).delete(any(StoreReview.class));
         }

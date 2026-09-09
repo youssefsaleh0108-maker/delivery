@@ -33,14 +33,45 @@ public class InAppNotificationController {
     /** Enough for the inbox screen; the client asks for fewer if it wants a preview. */
     private static final int MAX_LIMIT = 100;
 
+    /**
+     * A screenful, not an inbox. Someone with two days of orders behind them was being sent fifty
+     * rendered messages to fill a list that shows a handful.
+     */
+    private static final int DEFAULT_SIZE = 20;
+
     private final InAppMessageService messages;
 
     public InAppNotificationController(InAppMessageService messages) {
         this.messages = messages;
     }
 
+    /**
+     * One page of the caller's inbox, in the envelope every other list on the platform returns.
+     *
+     * <p>{@code page} and {@code size} were previously accepted and ignored, so a client that asked
+     * for the second page silently got the first one again.
+     */
     @GetMapping
-    public List<MessageResponse> inbox(@RequestParam(defaultValue = "50") int limit) {
+    public PageResponse<MessageResponse> inbox(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
+
+        return PageResponse.of(messages
+                .inbox(CurrentUser.requireId(), Math.max(0, page),
+                        Math.max(1, Math.min(size, MAX_LIMIT)))
+                .map(InAppNotificationController::toResponse));
+    }
+
+    /**
+     * The same inbox as a bare array, for a caller that asks with {@code limit}.
+     *
+     * <p>The shipped app parses this response as a list and would fail on an envelope, so the old
+     * shape is kept for the old parameter rather than broken from under phones that are already in
+     * pockets. Nothing new should use it: it cannot say how many messages there are, which is the
+     * reason the paged form above exists.
+     */
+    @GetMapping(params = "limit")
+    public List<MessageResponse> inbox(@RequestParam int limit) {
         int capped = Math.max(1, Math.min(limit, MAX_LIMIT));
         return messages.inbox(CurrentUser.requireId(), capped).stream()
                 .map(InAppNotificationController::toResponse)
@@ -85,6 +116,24 @@ public class InAppNotificationController {
                 message.getReadAt() != null,
                 message.getReadAt(),
                 message.getCreatedAt());
+    }
+
+    /** Envelope for paged results, so clients aren't coupled to Spring's Page serialisation. */
+    public record PageResponse<T>(
+            List<T> content,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages) {
+
+        public static <T> PageResponse<T> of(org.springframework.data.domain.Page<T> page) {
+            return new PageResponse<>(
+                    page.getContent(),
+                    page.getNumber(),
+                    page.getSize(),
+                    page.getTotalElements(),
+                    page.getTotalPages());
+        }
     }
 
     public record MessageResponse(

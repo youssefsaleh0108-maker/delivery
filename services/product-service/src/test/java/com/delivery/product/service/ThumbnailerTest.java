@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import com.delivery.product.service.Thumbnailer.ThumbnailUnavailableException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -326,6 +327,55 @@ class ThumbnailerTest {
             assertThat(Thumbnailer.isThumbKey("products/a/b-thumb.jpg")).isTrue();
             assertThat(Thumbnailer.isThumbKey("products/a/b.jpg")).isFalse();
             assertThat(Thumbnailer.isThumbKey(null)).isFalse();
+        }
+    }
+
+    /**
+     * Which formats may be uploaded at all.
+     *
+     * <p>Storage accepted WebP that no reader here can decode, so four uploads were taken and then
+     * quietly denied a derivative forever — the list surfaces went on serving the full-size
+     * original, which is the exact cost this class exists to remove, and nothing said so. The
+     * question is asked of ImageIO rather than a list, so the day a decoder is on the classpath the
+     * answer moves with it.
+     */
+    @Nested
+    @DisplayName("formats it will accept an upload of")
+    class Renderable {
+
+        @Test
+        void the_two_formats_every_jvm_decodes_are_accepted() {
+            assertThat(Thumbnailer.canRender("image/jpeg")).isTrue();
+            assertThat(Thumbnailer.canRender("image/png")).isTrue();
+        }
+
+        @Test
+        void a_format_nothing_here_can_decode_is_not() {
+            assertThat(Thumbnailer.canRender("image/webp")).isFalse();
+        }
+
+        @Test
+        void a_charset_parameter_or_odd_casing_does_not_change_the_answer() {
+            assertThat(Thumbnailer.canRender("IMAGE/JPEG")).isTrue();
+            assertThat(Thumbnailer.canRender("image/png; charset=binary")).isTrue();
+        }
+
+        @Test
+        void nothing_at_all_is_not_a_format() {
+            assertThat(Thumbnailer.canRender(null)).isFalse();
+            assertThat(Thumbnailer.canRender("")).isFalse();
+        }
+
+        /** The message names what to upload instead; "unsupported" leaves the merchant guessing. */
+        @Test
+        void the_refusal_says_what_to_upload_instead() {
+            assertThatThrownBy(() -> Thumbnailer.requireRenderable("image/webp"))
+                    .isInstanceOf(CatalogService.CatalogRuleViolationException.class)
+                    .hasMessageContaining("JPEG")
+                    .hasMessageContaining("PNG");
+
+            assertThatCode(() -> Thumbnailer.requireRenderable("image/jpeg"))
+                    .doesNotThrowAnyException();
         }
     }
 

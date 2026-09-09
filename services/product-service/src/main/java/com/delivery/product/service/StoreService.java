@@ -121,10 +121,19 @@ public class StoreService {
         return view(store, clock.instant());
     }
 
-    /** Whether the shop's circle covers the point. See the repository for the three answers. */
+    /**
+     * Whether the shop's circle covers the point. See the repository for the three answers.
+     *
+     * <p>Through {@link GeoPoint} for the same reason {@link #nearby} is: a latitude of 999 or a
+     * dropped form field arriving as (0, 0) is not a place, and this endpoint used to answer
+     * {@code canDeliver: true} for both — the "no circle drawn, so everywhere" answer, given about
+     * a point that does not exist. Checkout then promised a delivery on the strength of it.
+     */
     @Transactional(readOnly = true)
-    public boolean deliversTo(UUID id, double latitude, double longitude) {
-        Boolean answer = stores.deliversTo(id, latitude, longitude);
+    public boolean deliversTo(UUID id, BigDecimal latitude, BigDecimal longitude) {
+        GeoPoint where = new GeoPoint(latitude, longitude);
+        Boolean answer = stores.deliversTo(id,
+                where.latitude().doubleValue(), where.longitude().doubleValue());
         return answer == null || answer;
     }
 
@@ -510,11 +519,28 @@ public class StoreService {
         return view(store, clock.instant());
     }
 
+    /**
+     * Swaps the whole week.
+     *
+     * <p>The day is range-checked here and not left to {@code DayOfWeek.of}. Day 0 and day 8 are
+     * what a client written against a zero-based or a Sunday-first calendar sends, and the enum
+     * lookup answers them by throwing a date-time exception no handler maps — so the merchant got
+     * "Internal error" for a request they could have fixed by reading one sentence. The bean
+     * constraints on the request are the other half of this and cannot be the whole of it: element
+     * constraints on a list body only run when the element itself is marked, so this method must
+     * not assume anything checked the day before it arrived.
+     */
     @Transactional
     public StoreView replaceHours(UUID id, String merchantId, List<HoursRequest> windows) {
         Store store = requireOwned(id, merchantId);
         List<StoreHours> replacement = new ArrayList<>(windows.size());
         for (HoursRequest window : windows) {
+            if (window.dayOfWeek() < DayOfWeek.MONDAY.getValue()
+                    || window.dayOfWeek() > DayOfWeek.SUNDAY.getValue()) {
+                throw new CatalogService.CatalogRuleViolationException(
+                        "A day is 1 (Monday) through 7 (Sunday); " + window.dayOfWeek()
+                                + " is not one of them");
+            }
             try {
                 replacement.add(new StoreHours(DayOfWeek.of(window.dayOfWeek()),
                         window.opensAt(), window.closesAt()));
@@ -566,12 +592,21 @@ public class StoreService {
                 request.subtitle(), request.value(), request.minSubtotal()));
     }
 
+    /**
+     * Takes a promotion down.
+     *
+     * <p>A miss is refused, not ignored. This used to end in {@code ifPresent}, so a merchant who
+     * pasted the wrong id — or another shop's — was answered 204 and reasonably concluded the offer
+     * was gone, while it went on discounting every basket. The two misses give the same answer on
+     * purpose: which of them happened is a fact about another shop's promotions.
+     */
     @Transactional
     public void withdrawOffer(UUID storeId, UUID offerId, String merchantId) {
         requireOwned(storeId, merchantId);
         offers.findById(offerId)
                 .filter(o -> storeId.equals(o.getStoreId()))
-                .ifPresent(StoreOffer::withdraw);
+                .orElseThrow(() -> new OfferNotFoundException(offerId))
+                .withdraw();
     }
 
     /**
@@ -617,6 +652,13 @@ public class StoreService {
     public static class StoreNotFoundException extends RuntimeException {
         public StoreNotFoundException(String idOrSlug) {
             super("Store " + idOrSlug + " was not found");
+        }
+    }
+
+    /** An offer id this shop does not have. Mapped to 404. */
+    public static class OfferNotFoundException extends RuntimeException {
+        public OfferNotFoundException(UUID offerId) {
+            super("Offer " + offerId + " was not found");
         }
     }
 }

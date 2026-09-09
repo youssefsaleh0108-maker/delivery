@@ -192,11 +192,13 @@ delivery:
       # somebody whose first message went to spam, long enough that this is not a way to send
       # somebody a message every second.
       resend-cooldown: ${VERIFICATION_RESEND_COOLDOWN:60s}
-      # And the ceiling for a whole day. Past this, an address is being used as a target rather
-      # than being verified.
+      # And the ceiling over any rolling twenty-four hours — not a calendar day, so it cannot be
+      # spent twice around midnight. Past this, an address is being used as a target rather than
+      # being verified.
       daily-cap: ${VERIFICATION_DAILY_CAP:8}
-      # Password resets alone sit under a tighter budget inside that ceiling: a person locked out
-      # asks a couple of times and then calls support; a stream of resets is probing.
+      # Password resets alone sit under a tighter budget inside that ceiling, over the same window:
+      # a person locked out asks a couple of times and then calls support; a stream of resets is
+      # probing.
       reset-daily-cap: ${VERIFICATION_RESET_DAILY_CAP:3}
 
     documents:

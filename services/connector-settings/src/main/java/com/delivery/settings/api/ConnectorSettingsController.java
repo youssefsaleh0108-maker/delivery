@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.platform.security.CurrentUser;
@@ -127,6 +128,26 @@ public class ConnectorSettingsController {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail onInvalid(IllegalArgumentException e) {
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid setting", e.getMessage());
+    }
+
+    /**
+     * A path value that is not one of the connectors, e.g. {@code /api/settings/connectors/NOPE}.
+     *
+     * <p>Mapped explicitly because without it the failure reaches the handler above through its
+     * cause chain — Spring looks at an exception's cause when nothing matches the exception itself
+     * — and answered 422 with Jackson's "No enum constant
+     * com.delivery.settings.domain.ConnectorType.NOPE". That names a package, a class and the
+     * accepted constants, which is our implementation described to a caller who asked about a URL.
+     *
+     * <p>400 rather than 404, and the 404 above keeps its own meaning: "there is no such connector
+     * at all" is a different thing to tell an operator than "that connector exists and has no
+     * settings row". The supplied value is not echoed back — it is untrusted input and an error
+     * body gets rendered somewhere eventually.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail onUnknownConnector(MethodArgumentTypeMismatchException e) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad request",
+                "Parameter '" + e.getName() + "' is not a connector this service manages");
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

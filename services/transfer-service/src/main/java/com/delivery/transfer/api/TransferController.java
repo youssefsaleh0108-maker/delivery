@@ -16,10 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.transfer.domain.Money;
 import com.delivery.transfer.domain.MoneyTransfer;
 import com.delivery.transfer.domain.TransferMethod;
 import com.delivery.transfer.service.TransferService;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 /**
@@ -45,8 +47,8 @@ public class TransferController {
     @PreAuthorize("isAuthenticated()")
     public Map<String, Object> rate() {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("lbpPerUsd", service.rate());
-        payload.put("riderChangeLimitLbp", service.riderChangeLimitLbp());
+        payload.put("lbpPerUsd", Money.lbp(service.rate()));
+        payload.put("riderChangeLimitLbp", Money.lbp(service.riderChangeLimitLbp()));
         return payload;
     }
 
@@ -62,17 +64,15 @@ public class TransferController {
     /** The split arithmetic, done once, server-side, at the rate that will bind. */
     @PostMapping("/quote")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public Map<String, Object> quote(@RequestBody QuoteRequest request) {
-        BigDecimal amount = request.amountUsd();
-        BigDecimal usdPart = request.splitUsd() == null ? amount : request.splitUsd();
-        BigDecimal lbpInUsd = amount.subtract(usdPart);
+    public Map<String, Object> quote(@Valid @RequestBody QuoteRequest request) {
+        TransferService.Quote quote = service.quote(request.amountUsd(), request.splitUsd());
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("lbpPerUsd", service.rate());
-        payload.put("amountUsd", amount);
-        payload.put("splitUsd", usdPart);
-        payload.put("splitLbpFace", service.lbpFaceFor(lbpInUsd.max(BigDecimal.ZERO)));
-        payload.put("riderChangeLimitLbp", service.riderChangeLimitLbp());
+        payload.put("lbpPerUsd", Money.lbp(quote.lbpPerUsd()));
+        payload.put("amountUsd", Money.usd(quote.amountUsd()));
+        payload.put("splitUsd", Money.usd(quote.splitUsd()));
+        payload.put("splitLbpFace", Money.lbp(quote.splitLbpFace()));
+        payload.put("riderChangeLimitLbp", Money.lbp(service.riderChangeLimitLbp()));
         return payload;
     }
 
@@ -83,7 +83,7 @@ public class TransferController {
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     public Map<String, Object> initiate(@AuthenticationPrincipal Jwt jwt,
-                                        @RequestBody InitiateRequest request) {
+                                        @Valid @RequestBody InitiateRequest request) {
         MoneyTransfer transfer = service.record(
                 request.orderId(), jwt.getSubject(), request.method(),
                 request.amountUsd(), request.splitUsd());
@@ -111,11 +111,14 @@ public class TransferController {
         payload.put("orderId", t.getOrderId());
         payload.put("method", t.getMethod());
         payload.put("status", t.getStatus());
-        payload.put("amountUsd", t.getAmountUsd());
-        payload.put("splitUsd", t.getSplitUsd());
-        payload.put("splitLbpInUsd", t.getSplitLbpInUsd());
-        payload.put("splitLbpFace", t.lbpFaceValue());
-        payload.put("rateUsed", t.getRateUsed());
+        // Normalised on the way out, not trusted from the row: the same figure arrives here with
+        // the scale of a config value on the POST and the scale of a numeric(12,2) column on the
+        // GET that follows, and a client comparing the two must not see them differ.
+        payload.put("amountUsd", Money.usd(t.getAmountUsd()));
+        payload.put("splitUsd", Money.usd(t.getSplitUsd()));
+        payload.put("splitLbpInUsd", Money.usd(t.getSplitLbpInUsd()));
+        payload.put("splitLbpFace", Money.lbp(t.lbpFaceValue()));
+        payload.put("rateUsed", Money.lbp(t.getRateUsed()));
         payload.put("connector", t.getConnector());
         payload.put("connectorRef", t.getConnectorRef());
         payload.put("createdAt", t.getCreatedAt());

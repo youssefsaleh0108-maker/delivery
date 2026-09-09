@@ -14,7 +14,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 
 @Entity
@@ -96,10 +98,20 @@ public class Product {
     @Column(name = "status", nullable = false, length = 16)
     private Status status = Status.DRAFT;
 
+    /**
+     * Written by the column default, and read straight back.
+     *
+     * <p>{@code @Generated} is what makes the 201 on a create honest. Without it the entity is
+     * serialised holding the null it was constructed with — the column is not insertable, so
+     * nothing in Java ever knows what the database wrote — and every freshly created product came
+     * back with {@code createdAt: null}. With it, Hibernate re-reads the row after the insert.
+     */
+    @Generated(event = EventType.INSERT)
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
     /** Maintained by a database trigger, so it cannot drift when a writer forgets to set it. */
+    @Generated(event = {EventType.INSERT, EventType.UPDATE})
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private Instant updatedAt;
 

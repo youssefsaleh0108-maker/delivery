@@ -209,7 +209,7 @@ class PasswordResetServiceTest {
 
             assertThatThrownBy(() -> service.request(EMAIL))
                     .isInstanceOf(TooManyRequestsException.class)
-                    .hasMessageContaining("too many codes today");
+                    .hasMessageContaining("too many codes in the last 24 hours");
 
             verify(keycloak, never()).findUserIdByEmail(anyString());
         }
@@ -228,7 +228,11 @@ class PasswordResetServiceTest {
 
             assertThatThrownBy(() -> service.request(EMAIL))
                     .isInstanceOf(TooManyRequestsException.class)
-                    .hasMessageContaining("reset its passcode too many times");
+                    .hasMessageContaining("reset its passcode too many times")
+                    // The reset budget slides with the shared one, and its refusal says so rather
+                    // than sending a locked-out person back at midnight to be refused again.
+                    .hasMessageContaining("last 24 hours")
+                    .hasMessageNotContaining("tomorrow");
 
             verify(keycloak, never()).findUserIdByEmail(anyString());
         }

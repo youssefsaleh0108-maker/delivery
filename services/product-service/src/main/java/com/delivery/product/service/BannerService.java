@@ -21,6 +21,7 @@ import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
+import com.delivery.product.service.CatalogService.CategoryNotFoundException;
 
 /**
  * Home-screen banners, and the artwork behind the category strip.
@@ -77,7 +78,7 @@ public class BannerService {
     public Banner create(BannerRequest request) {
         try {
             Banner banner = new Banner(request.title(), request.subtitle(), request.linkKind(),
-                    request.linkTarget(), request.position());
+                    request.linkTarget(), request.position(), request.active());
             validateTarget(banner);
             return banners.save(banner);
         } catch (IllegalArgumentException e) {
@@ -137,6 +138,7 @@ public class BannerService {
     @Transactional
     public PresignedUpload presignBanner(UUID bannerId, String userId, String contentType) {
         read(bannerId);
+        Thumbnailer.requireRenderable(contentType);
         return storage.presignUpload(userId, FilePurpose.PRODUCT_IMAGE, contentType,
                 "banners/" + bannerId);
     }
@@ -151,6 +153,7 @@ public class BannerService {
     @Transactional
     public PresignedUpload presignCategory(UUID categoryId, String userId, String contentType) {
         requireCategory(categoryId);
+        Thumbnailer.requireRenderable(contentType);
         return storage.presignUpload(userId, FilePurpose.PRODUCT_IMAGE, contentType,
                 "categories/" + categoryId);
     }
@@ -162,10 +165,26 @@ public class BannerService {
         return category;
     }
 
-    /** Sets or clears which vertical a category represents on the home strip. */
+    /**
+     * Sets or clears which vertical a category represents on the home strip.
+     *
+     * <p>The clash is checked here rather than left to {@code uq_category_vertical}. That index is
+     * deliberate — two chips filtering by the same vertical is a strip that looks broken — but the
+     * violation surfaced as a bare 409 saying a uniqueness rule had been broken, which names
+     * neither the rule nor the row in the way. The editor cannot act on that; the name of the
+     * category currently holding the vertical is the whole of what they need.
+     */
     @Transactional
     public Category setVertical(UUID categoryId, Store.Vertical vertical) {
         Category category = requireCategory(categoryId);
+        if (vertical != null) {
+            categories.findFirstByVertical(vertical)
+                    // Re-tagging a category with the vertical it already has is a no-op, not a clash.
+                    .filter(holder -> !holder.getId().equals(categoryId))
+                    .ifPresent(holder -> {
+                        throw new VerticalTakenException(holder.getName());
+                    });
+        }
         category.setVertical(vertical);
         return category;
     }
@@ -182,14 +201,25 @@ public class BannerService {
     }
 
     private Category requireCategory(UUID id) {
-        return categories.findById(id)
-                .orElseThrow(() -> new CatalogRuleViolationException(
-                        "Category " + id + " does not exist"));
+        return categories.findById(id).orElseThrow(() -> new CategoryNotFoundException(id));
     }
 
     public static class BannerNotFoundException extends RuntimeException {
         public BannerNotFoundException(UUID id) {
             super("Banner " + id + " was not found");
+        }
+    }
+
+    /**
+     * Refused because another category already stands for that vertical. Mapped to 409.
+     *
+     * <p>The holder is named rather than the constraint: an editor who is told which chip is in the
+     * way can clear it, while a constraint name sends them to whoever has database access.
+     */
+    public static class VerticalTakenException extends RuntimeException {
+        public VerticalTakenException(String heldBy) {
+            super("\"" + heldBy + "\" already stands for that vertical on the home strip — "
+                    + "clear it there first");
         }
     }
 }

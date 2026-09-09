@@ -90,6 +90,8 @@ public class ProductImageService {
                     "A product may have at most " + maxImagesPerProduct + " images");
         }
 
+        Thumbnailer.requireRenderable(contentType);
+
         // Namespacing the key by product id keeps the bucket browsable and makes an orphaned-object
         // sweep straightforward later.
         return storage.presignUpload(

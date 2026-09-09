@@ -65,6 +65,10 @@ public class UserAvatarService {
      * <p>{@code confirmUpload} verifies the file belongs to the caller; the prefix check verifies
      * it was presigned for the caller's own folder — the same two-sided check the provider logo
      * runs, so one account cannot confirm its upload onto another's profile.
+     *
+     * <p>The picture being replaced is discarded, for the same reason {@link #remove} discards one:
+     * somebody who changes their photo has stopped consenting to the old one, and a private object
+     * nobody points at is still readable by whoever holds a presigned URL for it.
      */
     @Transactional
     public UserProfile confirm(String userRef, UUID fileId) {
@@ -78,21 +82,58 @@ public class UserAvatarService {
 
         UserProfile profile = profiles.findById(userRef)
                 .orElseGet(() -> new UserProfile(userRef));
+        String replaced = profile.getAvatarObjectKey();
         profile.updateAvatar(metadata.getObjectKey());
         profiles.save(profile);
+
+        // Only when it is a different object. Confirming the same upload twice is how a retried
+        // request arrives, and deleting the object this call just adopted would leave the account
+        // pointing at nothing.
+        if (!metadata.getObjectKey().equals(replaced)) {
+            discard(userRef, replaced);
+        }
 
         log.info("User {} avatar updated", userRef);
         return profile;
     }
 
-    /** Removes the picture from the profile. The object stays in the bucket — cost, not a leak. */
+    /**
+     * Removes the picture — from the profile, from {@code file_metadata} and from the bucket.
+     *
+     * <p>Clearing the reference alone was not deletion, whatever the account screen said. Reads of
+     * this bucket are presigned GETs that stay valid for their whole TTL, so a URL minted just
+     * before the click keeps serving the face for minutes afterwards, and the object and its row
+     * outlive the account itself — a picture of a person we were asked to stop holding. Removing
+     * the object is what makes the promise on the button true, and it is why this is a privacy
+     * matter rather than the storage-cost one the provider logo can afford to be.
+     *
+     * <p>Deleting is possible here precisely because an avatar's uploader is always its subject:
+     * the storage layer's ownership check passes for the account itself, where a company logo
+     * uploaded by one staff member and removed by another would rightly be refused.
+     */
     @Transactional
     public void remove(String userRef) {
         profiles.findById(userRef).ifPresent(profile -> {
+            String removed = profile.getAvatarObjectKey();
             profile.clearAvatar();
             profiles.save(profile);
+            discard(userRef, removed);
             log.info("User {} avatar removed", userRef);
         });
+    }
+
+    /**
+     * Drops one avatar object and its metadata row.
+     *
+     * <p>A key with no row is not an error worth failing a removal over: it means the upload was
+     * never confirmed or was cleaned up already, and either way there is nothing left to serve.
+     */
+    private void discard(String userRef, String objectKey) {
+        if (objectKey == null) {
+            return;
+        }
+        files.findByBucketAndObjectKey(FilePurpose.USER_AVATAR.bucket(), objectKey)
+                .ifPresent(metadata -> storage.softDelete(metadata.getId(), userRef));
     }
 
     @Transactional(readOnly = true)

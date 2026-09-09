@@ -132,15 +132,18 @@ public class CatalogService {
                 request.price(),
                 request.categoryId());
         product.assignCodes(request.sku(), request.barcode());
-        products.save(product);
+        // The saved instance, not the one handed in. An entity with a client-assigned id is not
+        // "new" to Spring Data, so save() merges and the managed copy — the only one the database
+        // ever writes back into, timestamps included — is the one it returns.
+        Product saved = products.save(product);
 
         // Same transaction as the insert above: the event and the row commit together or not at
         // all, which is the whole point of the outbox (Section 7).
-        outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
-                CatalogEvents.PRODUCT_CREATED, CatalogEvents.ProductSnapshot.of(product));
+        outbox.record(CatalogEvents.AGGREGATE_TYPE, saved.getId().toString(),
+                CatalogEvents.PRODUCT_CREATED, CatalogEvents.ProductSnapshot.of(saved));
 
-        log.info("Merchant {} created product {}", merchantId, product.getId());
-        return product;
+        log.info("Merchant {} created product {}", merchantId, saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -213,7 +216,7 @@ public class CatalogService {
     @Transactional
     public Category createCategory(String name, UUID parentId) {
         if (parentId != null && !categories.existsById(parentId)) {
-            throw new CatalogRuleViolationException("Parent category " + parentId + " does not exist");
+            throw new CategoryNotFoundException(parentId);
         }
         return categories.save(new Category(name, parentId));
     }
@@ -250,7 +253,10 @@ public class CatalogService {
         boolean owned = storeService.ownedBy(merchantId).stream()
                 .anyMatch(s -> s.getId().equals(storeId));
         if (!owned) {
-            throw new CatalogRuleViolationException("Store " + storeId + " is not yours");
+            // "Not found", the same answer every other store-scoped write gives, and for the same
+            // reason: "that store is not yours" confirms the id belongs to somebody, which is a
+            // fact about a competitor obtainable by guessing.
+            throw new StoreService.StoreNotFoundException(storeId.toString());
         }
         return storeId;
     }
@@ -267,11 +273,11 @@ public class CatalogService {
             return;
         }
         Category category = categories.findById(categoryId)
-                .orElseThrow(() -> new CatalogRuleViolationException(
-                        "Category " + categoryId + " does not exist"));
+                .orElseThrow(() -> new CategoryNotFoundException(categoryId));
         if (!category.isPlatformOwned() && !category.isOwnedByStore(storeId)) {
-            throw new CatalogRuleViolationException(
-                    "Category " + categoryId + " does not exist");
+            // The identical refusal, so a competitor's shelf is indistinguishable from an id that
+            // was never issued.
+            throw new CategoryNotFoundException(categoryId);
         }
     }
 
@@ -280,6 +286,19 @@ public class CatalogService {
     public static class ProductNotFoundException extends RuntimeException {
         public ProductNotFoundException(UUID id) {
             super("Product " + id + " was not found");
+        }
+    }
+
+    /**
+     * A category id that names nothing this caller may file under. Mapped to 404.
+     *
+     * <p>Its own type rather than a rule violation, because that is what it is: every other unknown
+     * id in this service answers "not found", and a 422 on this one alone left a client unable to
+     * tell a mistyped id from a payload it had to rewrite.
+     */
+    public static class CategoryNotFoundException extends RuntimeException {
+        public CategoryNotFoundException(UUID id) {
+            super("Category " + id + " was not found");
         }
     }
 

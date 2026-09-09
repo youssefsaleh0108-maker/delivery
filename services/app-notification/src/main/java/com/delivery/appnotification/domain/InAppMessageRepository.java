@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,6 +14,15 @@ import org.springframework.data.repository.query.Param;
 public interface InAppMessageRepository extends JpaRepository<InAppMessage, UUID> {
 
     List<InAppMessage> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+
+    /**
+     * The same query, plus the total the inbox screen needs to know there is a page two.
+     *
+     * <p>A second method rather than a changed return type on the one above: the count query it
+     * adds is wasted on the callers that only want the first N rows, and the shipped app is one of
+     * them.
+     */
+    Page<InAppMessage> findPageByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
 
     List<InAppMessage> findByUserIdAndReadAtIsNullOrderByCreatedAtDesc(String userId);
 

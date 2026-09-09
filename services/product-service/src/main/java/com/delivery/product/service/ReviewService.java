@@ -90,7 +90,7 @@ public class ReviewService {
                 if (!review.isBy(customerId)) {
                     // Someone else's order. 404-shaped rather than 403: confirming the order exists
                     // would leak that it does.
-                    throw new StoreNotFoundException(orderId.toString());
+                    throw new OrderNotFoundException(orderId);
                 }
                 review.revise(rating, comment);
             }
@@ -106,7 +106,7 @@ public class ReviewService {
     public void delete(UUID orderId, String customerId) {
         reviews.findByOrderId(orderId).ifPresent(review -> {
             if (!review.isBy(customerId)) {
-                throw new StoreNotFoundException(orderId.toString());
+                throw new OrderNotFoundException(orderId);
             }
             UUID storeId = review.getStoreId();
             reviews.delete(review);
@@ -122,18 +122,23 @@ public class ReviewService {
      * <p>Refused as a not-found on the order rather than a forbidden, matching the rest of this
      * service: telling a caller that an order id exists but is not theirs is itself a fact about
      * somebody else, and it is obtainable by guessing.
+     *
+     * <p>It answered about the <em>store</em> for a while — "Store &lt;orderId&gt; was not found" —
+     * which was wrong twice over: the shop is right there in the storefront the customer is looking
+     * at, and the id in the message was the order's. A customer told their shop does not exist has
+     * nothing to do about an order they cannot rate.
      */
     private void requireDeliveredOrder(UUID storeId, String customerId, UUID orderId) {
         ReviewableOrder delivered = reviewableOrders.findById(orderId)
                 .orElseThrow(() -> {
                     log.warn("Refusing a review for order {}: no delivered order on record", orderId);
-                    return new StoreNotFoundException(orderId.toString());
+                    return new OrderNotFoundException(orderId);
                 });
 
         if (!delivered.allowsReviewBy(customerId, storeId)) {
             log.warn("Refusing a review for order {}: it is not this customer's order from this shop",
                     orderId);
-            throw new StoreNotFoundException(orderId.toString());
+            throw new OrderNotFoundException(orderId);
         }
     }
 
@@ -145,5 +150,19 @@ public class ReviewService {
         store.applyRating(average == null ? null : BigDecimal.valueOf(average), (int) count);
         log.debug("Store {} now rated {} from {} review(s)",
                 store.getId(), store.getRating(), count);
+    }
+
+    /**
+     * An order this customer cannot rate. Mapped to 404.
+     *
+     * <p>The wording is the careful part. It says the order was not found <em>among the caller's
+     * own delivered orders</em>, which is true of a mistyped id, of an order still in the kitchen
+     * and of somebody else's order alike — so the response is the same in all three cases and
+     * cannot be used to discover that an id belongs to another customer.
+     */
+    public static class OrderNotFoundException extends RuntimeException {
+        public OrderNotFoundException(UUID orderId) {
+            super("Order " + orderId + " was not found among your delivered orders");
+        }
     }
 }
