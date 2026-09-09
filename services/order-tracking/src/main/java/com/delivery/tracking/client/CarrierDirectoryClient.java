@@ -100,7 +100,11 @@ public class CarrierDirectoryClient {
             return Optional.of(UUID.fromString(id));
 
         } catch (RestClientResponseException e) {
-            if (e.getStatusCode().value() == 404) {
+            // 404: Order Manager has no company for this account. 403: its own role gate refused
+            // the question, which is the same fact arriving in a different envelope — the caller
+            // is not carrier staff. Neither is an outage, and calling either one would turn a
+            // perfectly good answer into a 503 on somebody else's screen.
+            if (e.getStatusCode().value() == 404 || e.getStatusCode().value() == 403) {
                 return Optional.empty();
             }
             log.error("Could not resolve the caller's delivery company: {} {}",

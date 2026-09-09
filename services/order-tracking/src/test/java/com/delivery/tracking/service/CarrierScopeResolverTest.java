@@ -79,13 +79,17 @@ class CarrierScopeResolverTest {
     }
 
     private static void signedInAs(String subject, String tokenValue) {
+        signedInAs(subject, tokenValue, "CARRIER");
+    }
+
+    private static void signedInAs(String subject, String tokenValue, String role) {
         Jwt jwt = Jwt.withTokenValue(tokenValue)
                 .header("alg", "none")
                 .subject(subject)
-                .claim("realm_access", Map.of("roles", List.of("CARRIER")))
+                .claim("realm_access", Map.of("roles", List.of(role)))
                 .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(
-                jwt, List.of(new SimpleGrantedAuthority("ROLE_CARRIER"))));
+                jwt, List.of(new SimpleGrantedAuthority("ROLE_" + role))));
     }
 
     private static CarrierMembership row(UUID company, CarrierMembership.Kind kind,
@@ -150,6 +154,23 @@ class CarrierScopeResolverTest {
         @Test
         void is_not_looked_up_when_the_caller_is_somebody_else() {
             signedInAs("a-different-person", TOKEN);
+            when(memberships.findById(STAFF)).thenReturn(Optional.empty());
+
+            assertThat(resolver.scopeFor(STAFF)).isEmpty();
+            verifyNoInteractions(directory);
+        }
+
+        /**
+         * The customer watching their own delivery.
+         *
+         * <p>locationOf asks whose fleet the CALLER belongs to for every caller, so without this
+         * gate a customer refreshing a tracking screen sent a lookup to Order Manager every few
+         * seconds — which its own role gate answers 403 to, which arrived back as a 503 on the
+         * customer's map. Found on the live environment, not here, which is why it is here now.
+         */
+        @Test
+        void is_not_looked_up_at_all_for_a_caller_who_is_not_carrier_staff() {
+            signedInAs(STAFF, TOKEN, "CUSTOMER");
             when(memberships.findById(STAFF)).thenReturn(Optional.empty());
 
             assertThat(resolver.scopeFor(STAFF)).isEmpty();

@@ -169,6 +169,14 @@ public class CarrierScopeResolver {
      * an Optional rather than reaching for a service credential that would answer for anybody.
      */
     private Optional<String> tokenOf(String callerId) {
+        // The CARRIER role first, and it is not belt-and-braces. locationOf asks this question
+        // about EVERY caller — including the customer watching their own delivery — and without
+        // the role check each of those became a cross-service call that Order Manager answers 403
+        // to, on a screen a customer refreshes every few seconds. Holding the role does not mean a
+        // caller belongs to a company; it means asking is a question worth asking.
+        if (!CurrentUser.hasRole("CARRIER")) {
+            return Optional.empty();
+        }
         return CurrentUser.jwt()
                 .filter(jwt -> callerId.equals(jwt.getSubject()))
                 .map(Jwt::getTokenValue);
