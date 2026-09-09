@@ -957,11 +957,11 @@ class _CarrierShellState extends State<CarrierShell> {
                       // could not have been right: a waived order carries no cut at all, so the
                       // gross is not the net over a fixed rate.
                       _moneyRow(t.carrTotalRevenue,
-                          '\${earnings.grossEarned.toStringAsFixed(2)}'),
+                          '\$${earnings.grossEarned.toStringAsFixed(2)}'),
                       // The deduction in money, not just the rate — 87:350 writes the dollars.
                       _moneyRow(
                         t.carrCommissionPct(earnings.cutPercentage.round()),
-                        '-\${earnings.commission.toStringAsFixed(2)}',
+                        '-\$${earnings.commission.toStringAsFixed(2)}',
                         color: DeliveryColors.brand,
                       ),
                       const SizedBox(height: DeliverySpacing.sm),
@@ -987,7 +987,7 @@ class _CarrierShellState extends State<CarrierShell> {
                                   )),
                             ),
                             Text(
-                              '\${earnings.earned.toStringAsFixed(2)}',
+                              '\$${earnings.earned.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
