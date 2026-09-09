@@ -53,7 +53,8 @@ images:
   newName: ghcr.io/youssefsaleh0108-maker/app-notification
   newTag: sha-8c6a71ef2fa8f040aae4e5dc3fcdb78ca2303fe0
 - name: ghcr.io/youssefsaleh0108-maker/config-server
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/config-server
+  newTag: sha-8c6a71ef2fa8f040aae4e5dc3fcdb78ca2303fe0
 - name: ghcr.io/youssefsaleh0108-maker/connector-settings
   newName: ghcr.io/youssefsaleh0108-maker/connector-settings
   newTag: sha-8c6a71ef2fa8f040aae4e5dc3fcdb78ca2303fe0
