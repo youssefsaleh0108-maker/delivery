@@ -51,6 +51,8 @@ data:
     global:
       scrape_interval: 30s
       evaluation_interval: 30s
+    rule_files:
+      - /etc/prometheus/rules/*.yaml
     scrape_configs:
       # Anything, in any namespace, that carries the prometheus.io annotations. The environment
       # is readable on every series as the `namespace` label — delivery-dev vs delivery-qa.
@@ -61,6 +63,12 @@ data:
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
             regex: "true"
+          # The Config Server's actuator is behind basic auth, and this job sends none — scraped
+          # here it is a target that answers 401 forever. It has its own job per environment
+          # below, because the credential is per environment.
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: drop
+            regex: config-server
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
             action: replace
             target_label: __metrics_path__
@@ -79,9 +87,96 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
+      # The Config Server, one job per environment. It is the component every service blocks on at
+      # boot, so it is the one that most needs to be observable — and it is also the component that
+      # hands out every service's Vault-resolved secrets, so its actuator is not going to be opened
+      # up to anything that can reach the pod IP. The job authenticates instead, with the same
+      # basic-auth login the config clients use.
+      #
+      # The credential is minted per namespace by gen-secrets.sh and copied into monitoring by
+      # setup-monitoring.sh; hence two jobs rather than one, and files rather than literals —
+      # password_file is re-read on every scrape, so a rotated password takes effect when the
+      # mounted Secret updates, with no Prometheus restart and no password in this ConfigMap.
+      - job_name: config-server-dev
+        metrics_path: /actuator/prometheus
+        basic_auth:
+          username_file: /etc/prometheus/config-server-auth/username
+          password_file: /etc/prometheus/config-server-auth/dev-password
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [delivery-dev] }
+        relabel_configs: &config-server-relabel
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: config-server
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+      - job_name: config-server-qa
+        metrics_path: /actuator/prometheus
+        basic_auth:
+          # Spelled out rather than merged from the job above: this block is a string inside a
+          # ConfigMap, so a dangling YAML alias here is not a manifest error — kubectl and
+          # kustomize both accept it — it is a Prometheus that refuses to start, with the whole
+          # of monitoring down and nothing left to alert on it.
+          username_file: /etc/prometheus/config-server-auth/username
+          password_file: /etc/prometheus/config-server-auth/qa-password
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces: { names: [delivery-qa] }
+        relabel_configs: *config-server-relabel
       - job_name: prometheus
         static_configs:
           - targets: ["localhost:9090"]
+---
+# Alerting rules. There is no Alertmanager on this box, so nothing pages: a firing alert is
+# visible in the Prometheus UI and as the `ALERTS` series in Grafana, which is what an operator
+# looking at either will see. Adding a notification path means adding Alertmanager and a relay
+# credential, and is a deliberate next step rather than something to imply here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  platform.yaml: |
+    groups:
+      - name: platform
+        rules:
+          # A dead-lettered notification is a message somebody was waiting for that will never
+          # arrive, and nothing consumes these queues by design — they are a parking lot an
+          # operator drains by hand (deploy/k3s/README.md, "Draining a dead-letter queue").
+          # Without this the only way to learn they are filling is to open the broker console.
+          - alert: NotificationDeadLettersParked
+            expr: rabbitmq_queue_messages_ready{queue=~".+\\.dlq"} > 0
+            for: 15m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $value }} dead-lettered messages in {{ $labels.queue }} ({{ $labels.namespace }})"
+              description: >-
+                Nothing consumes this queue. Read the messages and their x-dead-letter-reason
+                header before anyone purges it — see "Draining a dead-letter queue" in
+                deploy/k3s/README.md.
+          # A target that has been down for a quarter of an hour is either a pod that never came
+          # back or a scrape that cannot authenticate. The Config Server spent both environments'
+          # lifetimes in the second state, unnoticed, because nothing watched for it.
+          - alert: ScrapeTargetDown
+            expr: up == 0
+            for: 15m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.job }} target {{ $labels.instance }} has been unscrapable for 15m"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -123,6 +218,16 @@ spec:
             - name: config
               mountPath: /etc/prometheus
               readOnly: true
+            - name: rules
+              mountPath: /etc/prometheus/rules
+              readOnly: true
+            # Not part of `config`: a ConfigMap mount is read-only-but-refreshed, and the scrape
+            # jobs read these two files on every scrape so a rotated password lands without a
+            # restart. Created by setup-monitoring.sh — the pod stays Pending until it exists,
+            # the same way it already does for grafana-admin.
+            - name: config-server-auth
+              mountPath: /etc/prometheus/config-server-auth
+              readOnly: true
             - name: data
               mountPath: /prometheus
           readinessProbe:
@@ -134,6 +239,10 @@ spec:
       volumes:
         - name: config
           configMap: { name: prometheus-config }
+        - name: rules
+          configMap: { name: prometheus-rules }
+        - name: config-server-auth
+          secret: { secretName: config-server-scrape }
         - name: data
           persistentVolumeClaim: { claimName: prometheus-data }
 ---
@@ -166,6 +275,15 @@ data:
         type: loki
         access: proxy
         url: http://loki:3100
+    # Provisioning does not remove what it did not create, so a datasource added by hand in the UI
+    # outlives every redeploy of this file and there is no diff anywhere that shows it. One was:
+    # a `jaeger` datasource pointing at a tracing backend this platform does not run (tracing is
+    # off cluster-wide — OTEL_SDK_DISABLED in platform-common), permanently failing its health
+    # check next to the two real ones, so the first thing anyone opening Grafana saw was a broken
+    # datasource. Naming it here is what deletes it on the next start, and keeps it deleted.
+    deleteDatasources:
+      - name: jaeger
+        orgId: 1
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

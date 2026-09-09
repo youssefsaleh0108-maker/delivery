@@ -8,10 +8,22 @@ kind: ConfigMap
 metadata:
   name: platform-common
 data:
-  # Heap tracks the container limit, not the node. SerialGC and no C2 because these are small
-  # heaps on a shared box: the throughput collectors cost more in threads and metaspace than
-  # they return.
-  JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xss512k"
+  # Heap tracks the container limit, not the node.
+  #
+  # This line used to carry -XX:TieredStopAtLevel=1 and -XX:+UseSerialGC, on the reasoning that
+  # small heaps on a shared box do not repay a throughput collector. The measurement disagreed,
+  # and by a lot. TieredStopAtLevel=1 stops the JIT at C1, so no method is ever promoted to C2 and
+  # the hot path stays interpreted-ish forever: benchmarked inside the real container on
+  # response-rendering work, C1-only managed 17-22k renders/s against 48-51k with full tiering —
+  # 2.73x, paid on every request for the life of the process. SerialGC then pinned collection to
+  # one thread on an 8-vCPU node. The visible symptoms were product-service scaling NEGATIVELY
+  # above 16 concurrent requests (384 rps falling to 269, p99 4.6x worse) and order-manager
+  # plateauing with two cores idle.
+  #
+  # These are fast-startup development flags. They belong in a laptop's compose file, not in front
+  # of the only copy of each service; and they were overriding the per-service Dockerfiles, which
+  # already ask for the sane defaults. Startup is a few seconds slower per pod, once.
+  JAVA_OPTS: "-XX:MaxRAMPercentage=70 -XX:+UseContainerSupport -XX:+UseG1GC -Xss512k"
   SPRING_PROFILES_ACTIVE: docker
   CONFIG_IMPORT: configserver:http://config-server:8888
   # Issuer must match what Keycloak stamps into the token (per-env, in platform-env); JWKS is

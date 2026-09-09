@@ -66,3 +66,67 @@ invent is the onboarding client secret, which must match what the realm import c
   in the repository. Routes for it can join the template when the content exists.
 - **probes are TCP**, matching what the compose stack verified; actuator-based HTTP probes are a
   cheap later upgrade if /actuator/health is permitted unauthenticated.
+
+## Monitoring
+
+`scripts/setup-monitoring.sh` installs `cluster/monitoring.yaml` — one Prometheus and one Grafana
+in the `monitoring` namespace, watching both environments. **Run it again after `gen-secrets.sh`
+creates or rotates an environment's `platform-secrets`**: it copies that environment's Config
+Server basic-auth login into the `config-server-scrape` Secret, and the scrape job cannot
+authenticate without a current copy.
+
+Grafana's datasources are provisioned from that file and provisioning is the only place they may
+be added. A datasource created by hand in the UI is invisible to every review and survives every
+redeploy; the only way to remove one is to name it under `deleteDatasources`, which the file now
+does for the `jaeger` datasource somebody added against a tracing backend this platform does not
+run.
+
+Alert rules live in the `prometheus-rules` ConfigMap. **There is no Alertmanager**, so nothing
+pages: a firing alert shows in the Prometheus UI and as the `ALERTS` series in Grafana. Two rules
+today — a dead-letter queue with anything in it, and any scrape target down for 15 minutes.
+
+## Draining a dead-letter queue
+
+A notification that exhausts its retries is *parked*, not dropped: `DeadLetterPublisher` publishes
+the whole command plus the reason it failed onto `notification.dlq` through the default exchange.
+That queue is bound to nothing and has no consumer **on purpose** — it is a parking lot, and the
+bodies in it are the only record of what was never sent. `NotificationDeadLettersParked` fires
+while it is non-empty.
+
+Read it without consuming it (`reject_requeue_true` puts every message back):
+
+```bash
+NS=delivery-dev
+U=$(kubectl -n $NS get secret platform-secrets -o jsonpath='{.data.RABBITMQ_USER}' | base64 -d)
+P=$(kubectl -n $NS get secret platform-secrets -o jsonpath='{.data.RABBITMQ_PASSWORD}' | base64 -d)
+# Through env, not argv: the broker password would otherwise stand in the pod's process list.
+kubectl -n $NS exec rabbitmq-0 -- env RU="$U" RP="$P" sh -c \
+  'rabbitmqadmin -u "$RU" -p "$RP" -f raw_json \
+     get queue=notification.dlq count=100 ackmode=reject_requeue_true'
+```
+
+`count` is a ceiling, not a page: each result carries `message_count`, the number still behind the
+last one returned, so raise it until that reaches zero.
+
+Each message is `{"command": …, "reason": …}`. The same reason is on an `x-dead-letter-reason`
+header, alongside `x-dead-lettered-at` and `channel`; `message_id` is the idempotency key and
+`correlation_id` is the correlation id of the request that caused it, so a body can be traced back
+to a log line. All of that is kept out of the body precisely so the command can be replayed
+unchanged.
+
+The reason says which of three things happened, and they want different responses:
+
+- a preparer's rejection (`recipient is not a valid E.164 number: …`, `empty email body`,
+  `payload exceeds the FCM 4KB limit`) — the command is malformed and replaying it changes nothing;
+- `connector unreachable: …` or a provider error — retries were exhausted against something that
+  was down, and a replay after it is back is the whole point of keeping the body;
+- `worker error: …` — a bug in the worker itself, so the message is evidence for a fix rather than
+  something to resend.
+
+To retry one once the cause is fixed, publish its `command` object back onto the dispatch queue
+for its channel (`notification.dispatch.email` / `.sms` / `.push` / `.in_app`); the idempotency
+key travels with it, so a message that did in fact go out will not go out twice.
+
+**Do not purge until the messages have been read and their reasons recorded.** A purge is the one
+irreversible operation here, and it destroys the evidence of an outage rather than the outage.
+

@@ -150,6 +150,14 @@ spec:
   template:
     metadata:
       labels: { app: rabbitmq }
+      annotations:
+        # rabbitmq_prometheus is enabled in the official image already; this only points the
+        # scrape at it. /metrics/per-object rather than /metrics: the plain endpoint aggregates,
+        # and an alert on a dead-letter queue filling up needs the per-queue series. The extra
+        # cardinality is a few dozen queues per namespace on a one-node box.
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics/per-object
+        prometheus.io/port: "15692"
     spec:
       containers:
         - name: rabbitmq
@@ -162,6 +170,7 @@ spec:
           ports:
             - containerPort: 5672
             - containerPort: 15672
+            - containerPort: 15692
           volumeMounts:
             - name: data
               mountPath: /var/lib/rabbitmq
