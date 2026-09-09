@@ -3,7 +3,6 @@ package com.delivery.tracking.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -39,9 +38,6 @@ import com.delivery.tracking.service.TrackingService.TrackingNotFoundException;
  */
 @Service
 public class EtaService {
-
-    /** Nothing is arriving; the delivery is over one way or the other. */
-    private static final Set<String> TERMINAL_STATUSES = Set.of("DELIVERED", "CANCELLED");
 
     private final TrackingService tracking;
     private final OrderParticipantsRepository participants;
@@ -81,7 +77,7 @@ public class EtaService {
         Instant now = Instant.now();
         String provider = providers.active().name();
 
-        if (TERMINAL_STATUSES.contains(order.getStatus())) {
+        if (order.isComplete()) {
             return EtaResult.unavailable(orderId, Reason.ORDER_COMPLETE, provider, null, now);
         }
 

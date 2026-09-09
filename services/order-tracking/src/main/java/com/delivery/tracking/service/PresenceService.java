@@ -70,6 +70,8 @@ public class PresenceService {
     private final RiderDutyEventRepository dutyEvents;
     private final DutySessionRepository dutySessions;
     private final CarrierMembershipRepository memberships;
+    /** Resolves the caller's own fleet, asking Order Manager when this service does not know. */
+    private final CarrierScopeResolver carrierScope;
     private final OrderParticipantsRepository participants;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
@@ -80,6 +82,7 @@ public class PresenceService {
                            RiderDutyEventRepository dutyEvents,
                            DutySessionRepository dutySessions,
                            CarrierMembershipRepository memberships,
+                           CarrierScopeResolver carrierScope,
                            OrderParticipantsRepository participants,
                            StringRedisTemplate redis,
                            ObjectMapper objectMapper,
@@ -89,6 +92,7 @@ public class PresenceService {
         this.dutyEvents = dutyEvents;
         this.dutySessions = dutySessions;
         this.memberships = memberships;
+        this.carrierScope = carrierScope;
         this.participants = participants;
         this.redis = redis;
         this.objectMapper = objectMapper;
@@ -273,7 +277,10 @@ public class PresenceService {
         if (callerId.equals(riderId) || isBackoffice) {
             return true;
         }
-        Optional<UUID> callerCarrier = carrierOf(callerId);
+        // Resolved rather than merely looked up: a dispatcher asking where their own rider is has
+        // no row here until somebody asks Order Manager for one. The RIDER's fleet is only ever
+        // read — we hold no token for them, and an order event is how a rider's row appears.
+        Optional<UUID> callerCarrier = carrierScope.scopeFor(callerId);
         if (callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))) {
             return true;
         }
@@ -302,8 +309,7 @@ public class PresenceService {
         if (isBackoffice) {
             scope = requestedCarrierId;
         } else {
-            scope = carrierOf(callerId).orElseThrow(() -> new NoCarrierException(
-                    "You are not a member of any delivery company"));
+            scope = carrierScope.requireScopeFor(callerId);
         }
 
         List<RiderPresence> rows;

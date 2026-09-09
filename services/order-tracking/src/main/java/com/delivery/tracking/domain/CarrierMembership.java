@@ -44,13 +44,43 @@ public class CarrierMembership {
         ORDER_EVENT,
 
         /**
+         * Read from Order Manager's directory, with the caller's own token, at the moment they
+         * asked.
+         *
+         * <p>How office staff get a row at all. They carry nothing, so no order event will ever
+         * mention them, and before this source existed a delivery company could not see its own
+         * fleet by any route.
+         *
+         * <p>Stronger than an inference — Order Manager owns the membership and answered for this
+         * exact person — but weaker than an event, because a read cannot tell us about a departure
+         * that happens afterwards. That is why a row from here is re-validated on a window rather
+         * than trusted forever, and why the resolver deletes it when the directory stops placing
+         * that caller in a company. See {@code CarrierScopeResolver}.
+         */
+        DIRECTORY,
+
+        /**
          * Told to us directly by a {@code carrier.member_*} event.
          *
-         * <p>Authoritative, including departures. This event does not exist yet — the contract is
-         * requested of Order Manager, which owns delivery-company membership. Until it lands, no
-         * row in this table has this source and carrier office staff can see nothing.
+         * <p>Authoritative, including departures the moment they happen. This event does not exist
+         * yet — the contract is requested of Order Manager, which owns delivery-company
+         * membership. {@link #DIRECTORY} is what serves the console until it lands; when it does,
+         * it outranks both of the others and needs no re-validation window.
          */
-        MEMBERSHIP
+        MEMBERSHIP;
+
+        /**
+         * How much this source is worth against another, so a weaker one cannot overwrite a
+         * stronger.
+         *
+         * <p>Without an ordering, one stale order event replayed off the bus could demote a fact
+         * to a guess, and — once the real event exists — undo a departure that had already been
+         * processed. Access would then outlive employment, which is the one failure mode this
+         * table must not have.
+         */
+        int rank() {
+            return ordinal();
+        }
     }
 
     @Id
@@ -84,17 +114,14 @@ public class CarrierMembership {
     }
 
     /**
-     * Applies a newly learned membership, refusing to let a guess overwrite a fact.
+     * Applies a newly learned membership, refusing to let a weaker source overwrite a stronger one.
      *
-     * <p>Without the source check, one stale order event replayed off the bus could demote an
-     * authoritative membership row back to an inference — and, once the real event exists, undo a
-     * departure that had already been processed. Access would then outlive employment, which is the
-     * one failure mode this table must not have.
+     * <p>See {@link Source#rank()} for why the ordering exists.
      *
      * @return true if the row changed
      */
     public boolean apply(UUID carrierId, Kind kind, Source source) {
-        if (this.source == Source.MEMBERSHIP && source == Source.ORDER_EVENT) {
+        if (source.rank() < this.source.rank()) {
             return false;
         }
         if (carrierId.equals(this.carrierId) && kind == this.memberKind && source == this.source) {
@@ -105,6 +132,24 @@ public class CarrierMembership {
         this.source = source;
         this.updatedAt = Instant.now();
         return true;
+    }
+
+    /**
+     * Marks the row as confirmed again, without changing what it says.
+     *
+     * <p>Separate from {@link #apply} because {@code apply} deliberately reports "nothing changed"
+     * for a re-statement of the same facts, and leaves {@code updatedAt} alone so it keeps meaning
+     * "when this last changed". A {@link Source#DIRECTORY} row needs the other reading — when it
+     * was last <em>checked</em> — because that is what its re-validation window is measured from,
+     * and without this a row would go stale on a schedule no confirmation could reset.
+     */
+    public void confirmed() {
+        this.updatedAt = Instant.now();
+    }
+
+    /** Whether this row was last written before {@code cutoff} and is due to be checked again. */
+    public boolean staleAsOf(Instant cutoff) {
+        return this.updatedAt.isBefore(cutoff);
     }
 
     public String getUserId() {

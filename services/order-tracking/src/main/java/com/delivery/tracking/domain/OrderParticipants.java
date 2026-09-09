@@ -73,6 +73,9 @@ public class OrderParticipants {
     /** Past this point the rider is carrying the goods, so the remaining leg is to the customer. */
     private static final String CARRYING_STATUS = "PICKED_UP";
 
+    /** Nothing is arriving; the delivery is over one way or the other. */
+    private static final Set<String> TERMINAL_STATUSES = Set.of("DELIVERED", "CANCELLED");
+
     protected OrderParticipants() {
         // for JPA
     }
@@ -148,6 +151,17 @@ public class OrderParticipants {
     /** True once the rider is carrying the goods, i.e. the remaining leg is to the customer. */
     public boolean isCarrying() {
         return CARRYING_STATUS.equals(status);
+    }
+
+    /**
+     * True once the delivery is over, delivered or cancelled.
+     *
+     * <p>The trail is closed at this point. Everything a rider's phone reports afterwards is the
+     * rider's own movements, not the delivery's, and appending it would both extend a customer's
+     * view of a worker past the job and grow the record a dispute is settled from after the fact.
+     */
+    public boolean isComplete() {
+        return TERMINAL_STATUSES.contains(status);
     }
 
     public UUID getCarrierId() {

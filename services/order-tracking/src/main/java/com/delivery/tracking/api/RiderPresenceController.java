@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.security.CurrentUser;
+import com.delivery.tracking.client.CarrierDirectoryClient;
 import com.delivery.tracking.domain.DutyState;
 import com.delivery.tracking.domain.RiderDutyEvent;
 import com.delivery.tracking.service.DutySessionService;
@@ -189,6 +190,22 @@ public class RiderPresenceController {
     @ExceptionHandler(NoCarrierException.class)
     public ProblemDetail onNoCarrier(NoCarrierException e) {
         return TrackingProblems.of(HttpStatus.FORBIDDEN, "No delivery company", e.getMessage());
+    }
+
+    /**
+     * 503, and never an empty roster.
+     *
+     * <p>Order Manager owns which company a caller is staff of, so when it cannot be reached and
+     * this service holds no cached answer, the fleet is unknown. Unknown must not render as "you
+     * belong to no company" — that reads to a dispatcher as a fault in their own account and sends
+     * them looking for a fix that does not exist — nor as an empty fleet, which reads as every
+     * rider having gone offline at once.
+     */
+    @ExceptionHandler(CarrierDirectoryClient.DirectoryUnavailableException.class)
+    public ProblemDetail onDirectoryUnavailable(
+            CarrierDirectoryClient.DirectoryUnavailableException e) {
+        return TrackingProblems.of(HttpStatus.SERVICE_UNAVAILABLE, "Fleet unavailable",
+                "Your delivery company could not be confirmed just now. Please try again.");
     }
 
     /** Same shape and same bounds as the order-scoped ping — one handset sends both. */

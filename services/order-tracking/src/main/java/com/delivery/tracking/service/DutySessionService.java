@@ -15,8 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.delivery.tracking.domain.CarrierMembership;
-import com.delivery.tracking.domain.CarrierMembershipRepository;
 import com.delivery.tracking.domain.DutySession;
 import com.delivery.tracking.domain.DutySessionRepository;
 import com.delivery.tracking.domain.DutyState;
@@ -58,7 +56,7 @@ public class DutySessionService {
 
     private final DutySessionRepository sessions;
     private final RiderPresenceRepository presenceRows;
-    private final CarrierMembershipRepository memberships;
+    private final CarrierScopeResolver carrierScope;
     private final PresenceService presence;
     private final ZoneId dayZone;
     private final Duration presenceWindow;
@@ -66,14 +64,14 @@ public class DutySessionService {
 
     public DutySessionService(DutySessionRepository sessions,
                               RiderPresenceRepository presenceRows,
-                              CarrierMembershipRepository memberships,
+                              CarrierScopeResolver carrierScope,
                               PresenceService presence,
                               @Value("${delivery.tracking.duty-session.day-zone:UTC}") String dayZone,
                               @Value("${delivery.tracking.presence.ttl:120s}") Duration presenceWindow,
                               @Value("${delivery.tracking.duty-session.expire-after:4h}") Duration expireAfter) {
         this.sessions = sessions;
         this.presenceRows = presenceRows;
-        this.memberships = memberships;
+        this.carrierScope = carrierScope;
         this.presence = presence;
         this.dayZone = ZoneId.of(dayZone);
         this.presenceWindow = presenceWindow;
@@ -110,10 +108,9 @@ public class DutySessionService {
                 throw new PresenceNotFoundException(riderId);
             }
         } else {
-            UUID scope = memberships.findById(callerId)
-                    .map(CarrierMembership::getCarrierId)
-                    .orElseThrow(() -> new NoCarrierException(
-                            "You are not a member of any delivery company"));
+            // Same resolution as the roster this column sits beside: a carrier's own fleet comes
+            // from Order Manager when this service has not learned it yet, never from the request.
+            UUID scope = carrierScope.requireScopeFor(callerId);
             boolean owned = presenceRows.findById(riderId)
                     .map(row -> scope.equals(row.getCarrierId()))
                     .orElse(false);

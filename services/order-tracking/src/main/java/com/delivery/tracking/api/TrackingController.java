@@ -28,6 +28,7 @@ import com.delivery.tracking.service.EtaService;
 import com.delivery.tracking.service.EtaService.EtaResult;
 import com.delivery.tracking.service.TrackingService;
 import com.delivery.tracking.service.TrackingService.Position;
+import com.delivery.tracking.service.TrackingService.TrackingClosedException;
 import com.delivery.tracking.service.TrackingService.TrackingNotFoundException;
 
 @RestController
@@ -118,6 +119,17 @@ public class TrackingController {
     @ExceptionHandler(TrackingNotFoundException.class)
     public ProblemDetail onNotFound(TrackingNotFoundException e) {
         return TrackingProblems.of(HttpStatus.NOT_FOUND, "Tracking not found", e.getMessage());
+    }
+
+    /**
+     * 409, not 404 and not a silent 202. The rider's app is entitled to learn that its pings are
+     * being dropped so it can stop sending them; an accepted response would keep a finished
+     * delivery's ping queue draining for as long as the handset stayed awake, and a 404 would
+     * claim the rider's own delivery had vanished.
+     */
+    @ExceptionHandler(TrackingClosedException.class)
+    public ProblemDetail onClosed(TrackingClosedException e) {
+        return TrackingProblems.of(HttpStatus.CONFLICT, "Delivery complete", e.getMessage());
     }
 
     public record PingRequest(
