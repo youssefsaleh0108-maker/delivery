@@ -56,7 +56,8 @@ images:
 - name: ghcr.io/youssefsaleh0108-maker/connector-settings
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/email-connector
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/email-connector
+  newTag: sha-8c6a71ef2fa8f040aae4e5dc3fcdb78ca2303fe0
 - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
