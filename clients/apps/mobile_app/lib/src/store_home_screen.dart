@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
 import 'cart.dart';
+import 'category_strip.dart';
 import 'delivery_address.dart';
 import 'notification_inbox.dart';
 import 'notifications_screen.dart';
@@ -316,6 +317,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// The page gutter every section in the design sits on.
   static const double _gutter = DeliverySpacing.lg;
 
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
@@ -389,7 +391,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
                 SliverToBoxAdapter(child: _splitRequestBanner(t)),
                 SliverToBoxAdapter(
-                    child: KeyedSubtree(key: _stripKey, child: _categoryStrip())),
+                    child: KeyedSubtree(key: _stripKey, child: _categoryStrip(context))),
                 if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
                 if (_stores.isLoadingFirstPage || _loadingRails)
                   const SliverFillRemaining(
@@ -830,81 +832,12 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// The frame's category CARDS — a white tile per vertical, the glyph in a brand-soft square
   /// over the label — each opening that category's own listing screen rather than filtering the
   /// grid in place, which is how the frame's flow reads (home → listing → shop).
-  Widget _categoryStrip() {
-    final List<StoreVertical> verticals = _chipVerticals;
-
-    return SizedBox(
-      height: 96,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsetsDirectional.fromSTEB(
-            _gutter, DeliverySpacing.md, DeliverySpacing.md, DeliverySpacing.xs),
-        children: <Widget>[
-          for (final StoreVertical vertical in verticals) ...<Widget>[
-            _categoryCard(vertical),
-            const SizedBox(width: 10),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// The tinted-glyph tile: every category renders this — brand glyph on the soft brand fill.
-  Widget _categoryIconTile(StoreVertical vertical) => Container(
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: DeliveryColors.brandSoft,
-          borderRadius: BorderRadius.circular(DeliveryRadius.sm + 2),
-        ),
-        child: Icon(iconForVertical(vertical),
-            size: 20, color: DeliveryColors.brand),
-      );
-
-  Widget _categoryCard(StoreVertical vertical) {
-    return Semantics(
-      button: true,
-      label: _chipLabel(vertical),
-      child: Material(
-        color: DeliveryColors.white,
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          onTap: () => _openListing(vertical),
-          child: Container(
-            width: 82,
-            padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(DeliveryRadius.md),
-              border: Border.all(color: DeliveryColors.borderFaint),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                _categoryIconTile(vertical),
-                const SizedBox(height: 6),
-                Text(
-                  _chipLabel(vertical),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    // Smaller and a touch tighter than the shop-name scale — the tile is 82px
-                    // wide and the longer vertical names (Restaurants, Pharmacies) were riding
-                    // the ellipsis at 11.5. This fits them whole.
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: DeliveryColors.ink,
-                    letterSpacing: -0.1,
-                    height: 1.15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  Widget _categoryStrip(BuildContext context) {
+    return CategoryStrip(
+      verticals: _chipVerticals,
+      labelOf: _chipLabel,
+      onSelected: _openListing,
+      gutter: _gutter,
     );
   }
 

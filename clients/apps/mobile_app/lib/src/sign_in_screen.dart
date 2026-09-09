@@ -252,13 +252,13 @@ class _SignInScreenState extends State<SignInScreen> {
       _error = null;
     });
 
+    // The session, once authentication has genuinely succeeded.
+    final AuthSession session;
+
     try {
-      final AuthSession session =
-          await widget.authService.signInWithPassword(_username.text, passcode);
+      session = await widget.authService.signInWithPassword(_username.text, passcode);
       // The identifier that just worked, kept so next time only the passcode is typed.
       await widget.authService.rememberLastLogin(_username.text.trim());
-      if (!mounted) return;
-      widget.onSignedIn(session);
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -268,6 +268,7 @@ class _SignInScreenState extends State<SignInScreen> {
         // error reads as "that is still there" and the pad refuses further digits.
         _passcode = '';
       });
+      return;
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -277,7 +278,25 @@ class _SignInScreenState extends State<SignInScreen> {
         _error = DeliveryStrings.of(context).couldNotReachTheServer;
         _passcode = '';
       });
+      return;
     }
+
+    if (!mounted) return;
+
+    // Handing the session on sits OUTSIDE that try, deliberately, and the scope of the try is the
+    // whole point of this method's shape.
+    //
+    // It used to be inside, so anything that threw downstream of a SUCCESSFUL authentication was
+    // caught by the catch-all above and reported as "We could not reach the server" — to somebody
+    // whose token had just been issued and whose network was fine. Not hypothetical: registering
+    // the device for push resolved FirebaseMessaging.instance in an initialiser list, which throws
+    // on any build or device where Firebase never came up, and this screen blamed the network for
+    // it. The person was told to check a connection that was working, and no amount of retrying
+    // could clear it.
+    //
+    // Whatever the app does with a session afterwards may fail on its own terms and say so in its
+    // own words. This screen's job ends when the token arrives.
+    widget.onSignedIn(session);
   }
 
   /// Opens the reset flow and, when it succeeds, leaves the person on the credentials step with

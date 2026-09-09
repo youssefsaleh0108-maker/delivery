@@ -18,13 +18,28 @@ class DeviceTokenRegistrar {
     FirebaseMessaging? messaging,
   })  : _dio = dio,
         _issuer = issuer,
-        _messaging = messaging ?? FirebaseMessaging.instance;
+        _injectedMessaging = messaging;
 
   static const String _attribute = 'fcmToken';
 
   final Dio _dio;
   final String _issuer;
-  final FirebaseMessaging _messaging;
+
+  /// The instance a test handed us, or null to resolve the real one on first use.
+  ///
+  /// Deliberately NOT resolved in the initialiser list, and that is the whole reason this field
+  /// has this shape. `FirebaseMessaging.instance` THROWS when `Firebase.initializeApp()` did not
+  /// succeed — a build with no google-services.json, a device with no Play Services, an outdated
+  /// one — and an initialiser list runs before the constructor body, so it threw straight past the
+  /// try/catch in [register] that promises to swallow exactly this.
+  ///
+  /// Where it landed instead is the point. The app touches this class through a `late final` on
+  /// the first sign-in, from inside the sign-in screen's own `try`, whose catch-all reports "We
+  /// could not reach the server. Check your connection and try again." So a sign-in that had
+  /// already SUCCEEDED — token issued, session valid — told the person their network was broken,
+  /// on every device where push happened to be unconfigured. Resolving lazily is not a style
+  /// preference; it is what makes the promise below true.
+  final FirebaseMessaging? _injectedMessaging;
 
   /// Asks for permission, reads the token and saves it. Safe to call on every sign-in.
   ///
@@ -33,12 +48,17 @@ class DeviceTokenRegistrar {
   /// using the app, and none of those are things the person signing in can act on.
   Future<void> register() async {
     try {
-      final NotificationSettings settings = await _messaging.requestPermission();
+      // Resolved HERE, inside the try, so a Firebase that never initialised is one more swallowed
+      // failure rather than an exception thrown at whoever called this.
+      final FirebaseMessaging messaging =
+          _injectedMessaging ?? FirebaseMessaging.instance;
+
+      final NotificationSettings settings = await messaging.requestPermission();
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         return;
       }
 
-      final String? token = await _messaging.getToken();
+      final String? token = await messaging.getToken();
       if (token == null || token.isEmpty) return;
 
       await _save(token);
@@ -46,7 +66,7 @@ class DeviceTokenRegistrar {
       // The token is rotated by the OS — on reinstall, on restore to a new device, and
       // occasionally on its own. Without this the platform keeps pushing to a token that stopped
       // existing, which fails silently at the provider and looks like push simply not working.
-      _messaging.onTokenRefresh.listen(_save);
+      messaging.onTokenRefresh.listen(_save);
     } catch (_) {
       // Deliberately quiet. See the note above.
     }
