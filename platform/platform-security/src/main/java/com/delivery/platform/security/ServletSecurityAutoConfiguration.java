@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.web.config.PageableHandlerMethodArgumentResolverCustomizer;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -36,6 +37,33 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableConfigurationProperties(PlatformSecurityProperties.class)
 @EnableMethodSecurity
 public class ServletSecurityAutoConfiguration {
+
+    /** See {@link #platformPageSizeCap()}. */
+    static final int MAX_PAGE_SIZE = 200;
+
+    /**
+     * How big a page any caller may ask for, on every paginated endpoint in the platform.
+     *
+     * <p>Spring Boot ships a maximum of 2000, and {@code @PageableDefault} sets only the DEFAULT —
+     * so every {@code Pageable} endpoint in this platform would serve {@code ?size=2000} to any
+     * authenticated caller who asked. On the order boards, where each row drags its own lines,
+     * that is roughly 2,001 statements on one request, holding a connection from a pool of ten
+     * for the whole walk. The caller waits; so does the rider job board, and so does checkout.
+     *
+     * <p>200 is comfortably above every screen in the platform — the largest ask anywhere is 100
+     * — and far below anything that can hurt. Over-asking is clamped rather than refused, which
+     * is how Spring has always treated this ceiling.
+     *
+     * <p>Here rather than in fifteen application.yml files because it is a property of the
+     * platform, and fifteen copies of a limit is fourteen chances to drift. A service that needs
+     * a different one declares its own customizer.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(PageableHandlerMethodArgumentResolverCustomizer.class)
+    public PageableHandlerMethodArgumentResolverCustomizer platformPageSizeCap() {
+        return resolver -> resolver.setMaxPageSize(MAX_PAGE_SIZE);
+    }
 
     @Bean
     @ConditionalOnMissingBean
