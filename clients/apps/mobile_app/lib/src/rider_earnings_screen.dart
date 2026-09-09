@@ -195,10 +195,11 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
 
   /// The rider's own finished work — the pre-ledger fallback's source.
   Future<List<DeliveryOrder>> _loadDerived() async {
-    final Paged<DeliveryOrder> page = await widget.api.assigned(size: 100);
-    return page.content
-        .where((DeliveryOrder o) => o.status == OrderStatus.delivered)
-        .toList();
+    // Asked for rather than filtered out: this wants the opposite half from the home screen,
+    // and both were paying for the whole history to get their part of it.
+    final Paged<DeliveryOrder> page = await widget.api
+        .assigned(size: 100, statuses: const <OrderStatus>[OrderStatus.delivered]);
+    return page.content.toList();
   }
 
   void _reloadDerived() {

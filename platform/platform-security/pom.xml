@@ -67,6 +67,15 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- Compile-only, for the paginated-request cap in ServletSecurityAutoConfiguration. A
+         service that does not use Spring Data Web never sees this on its runtime classpath, and
+         the matching @ConditionalOnClass means the bean simply is not contributed there. -->
+    <dependency>
+      <groupId>org.springframework.data</groupId>
+      <artifactId>spring-data-commons</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- Was inherited from the root pom, which applied it to every module without exception. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

@@ -105,6 +105,18 @@ class RiderHomeScreen extends StatefulWidget {
 /// What the Available tab is showing. Deliveries and errands are two boards, not two filters.
 enum _Board { deliveries, errands }
 
+/// The states a rider still has something to do about.
+///
+/// Derived from the same rule the screen used to apply after the fact — it fetched everything and
+/// discarded anything terminal — moved into the request so the work is never done at all.
+const List<OrderStatus> _liveStatuses = <OrderStatus>[
+  OrderStatus.placed,
+  OrderStatus.accepted,
+  OrderStatus.preparing,
+  OrderStatus.ready,
+  OrderStatus.pickedUp,
+];
+
 class _RiderHomeScreenState extends State<RiderHomeScreen> {
   static const Duration _refreshInterval = Duration(seconds: 5);
 
@@ -191,7 +203,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     try {
       final List<Paged<DeliveryOrder>> results = await Future.wait(<Future<Paged<DeliveryOrder>>>[
         widget.api.available(size: 30),
-        widget.api.assigned(size: 30),
+        // Live work only. This runs every five seconds, and a rider's finished orders are
+        // neither shown here nor getting fewer.
+        widget.api.assigned(size: 30, statuses: _liveStatuses),
       ]);
       if (!mounted) return;
       setState(() {
