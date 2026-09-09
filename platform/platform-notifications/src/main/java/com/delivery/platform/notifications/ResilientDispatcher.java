@@ -49,6 +49,24 @@ public class ResilientDispatcher {
                 .slidingWindowSize(20)
                 .minimumNumberOfCalls(5)
                 .permittedNumberOfCallsInHalfOpenState(3)
+                // Judge the OUTCOME, exactly as the retry below does.
+                //
+                // Without this the breaker could never open, no matter how badly a provider was
+                // failing. resilience4j counts a call as failed only when the decorated function
+                // throws, and every function handed to this class is written never to throw —
+                // ConnectorClient and each provider client catch Exception and return a
+                // DeliveryOutcome instead. So the breaker recorded 100% successes forever: a
+                // provider that had permanently failed seventy messages in a day still read
+                // CLOSED, and every message went on spending the full timeout on a call that was
+                // never going to succeed. The retry layer worked the whole time, on these same
+                // outcomes, which is what made it invisible.
+                //
+                // Only a RETRYABLE failure counts. That is the same line the retry draws, and it
+                // is the right one: a rejected phone number says something about the message, not
+                // about the provider, and a batch of bad numbers must not take a healthy provider
+                // out of service.
+                .recordResult(result -> result instanceof DeliveryOutcome outcome
+                        && !outcome.success() && outcome.retryable())
                 .build());
 
         this.retry = Retry.of(name, RetryConfig.<DeliveryOutcome>custom()

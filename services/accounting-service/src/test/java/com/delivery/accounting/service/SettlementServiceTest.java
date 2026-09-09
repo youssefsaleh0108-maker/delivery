@@ -179,12 +179,19 @@ class SettlementServiceTest {
             assertThat(amountOf(legs, Leg.CUSTOMER_DEBIT)).isEqualByComparingTo("40.00");
         }
 
-        /** An entirely-delivery order (nothing but a fee) credits the shop nothing, not a negative. */
+        /**
+         * An entirely-delivery order (nothing but a fee) credits the shop nothing, not a negative.
+         *
+         * <p>"Nothing" is no leg, not a leg worth zero. {@code chk_txn_amount CHECK (amount > 0)}
+         * refuses a zero row, so posting one would not have paid the merchant nothing — it would
+         * have failed the insert and taken the commission leg down with it. This asserted the
+         * zero row for as long as nothing exercised the path against a real database.
+         */
         @Test
         void a_zero_goods_order_pays_the_merchant_nothing() {
             List<AccountingTransaction> legs = settle("12.5", "5.00", "0.00");
 
-            assertThat(amountOf(legs, Leg.MERCHANT_CREDIT)).isEqualByComparingTo("0.00");
+            assertThat(amountOf(legs, Leg.MERCHANT_CREDIT)).isNull();
             assertThat(amountOf(legs, Leg.PLATFORM_COMMISSION)).isEqualByComparingTo("5.00");
         }
     }
