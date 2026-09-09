@@ -1,7 +1,20 @@
 server:
   port: ${SERVER_PORT:8102}
 
+  # Finish what is in flight before the process goes.
+  #
+  # Spring's default is immediate: on every rolling update and every node drain the outgoing pod
+  # dropped whatever it was serving, and with one replica of each service there was nowhere else
+  # for those requests to land. The pod is removed from the Service first, so this window is spent
+  # draining rather than accepting.
+  shutdown: graceful
+
 spring:
+  lifecycle:
+    # Shorter than the pod's terminationGracePeriodSeconds, so the drain finishes on its own
+    # terms rather than being cut off by SIGKILL.
+    timeout-per-shutdown-phase: 20s
+
   application:
     name: order-tracking
 
@@ -184,6 +197,20 @@ management:
     health:
       probes:
         enabled: true
+      # What "ready to take traffic" actually means.
+      #
+      # Spring's readiness group contains only readinessState by default, which says the context
+      # finished starting and nothing more — so a pod whose connection pool has died reports Ready
+      # and keeps being sent work. Naming the dependency it cannot serve without is the whole
+      # point of the group.
+      #
+      # LIVENESS is deliberately left alone. A dependency belongs in readiness, never in liveness:
+      # readiness takes a pod out of the Service until it recovers, while liveness kills it — so a
+      # database blip with the two conflated would restart every pod on the platform at once,
+      # turning a recoverable stall into an outage plus a cold start.
+      group:
+        readiness:
+          include: readinessState,db
   tracing:
     sampling:
       # Deliberately lower than the other services: this endpoint is called several times a second

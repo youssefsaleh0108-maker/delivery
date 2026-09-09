@@ -150,6 +150,91 @@ metadata:
   name: prometheus-rules
   namespace: monitoring
 data:
+  # Two groups, and the split is the point: "money is in the wrong place" and "an event is
+  # permanently lost" are states that do not resolve on their own and that nothing else announces,
+  # while the platform group below is ordinary operational noise worth seeing in daylight.
+  #
+  # These were authored in infra/prometheus/alerts.yml and never reached a cluster — the manifest
+  # that actually runs had scrape_configs and no rule_files, so /api/v1/rules answered with an
+  # empty list for the whole life of both environments. The metrics were being collected the
+  # entire time.
+  #
+  # There is still no Alertmanager, so nothing pages: a firing rule shows in the Prometheus UI and
+  # as the ALERTS series in Grafana. That is a real limitation and it is written down in
+  # deploy/k3s/README.md rather than implied by the presence of these rules.
+  settlement.yaml: |
+    groups:
+      - name: settlement
+        rules:
+          # The one this file exists for.
+          #
+          # A customer's money has left their account and reached nobody: no merchant leg, no
+          # rider leg, no refund. Silent by construction — the debit succeeded so nothing failed,
+          # and the saga is waiting so nothing errored — which means without this the first report
+          # comes from the customer.
+          - alert: SettlementDebitedWithoutCounterpart
+            expr: delivery_settlement_debited_without_counterpart > 0
+            for: 2m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $value }} order(s) debited with nothing credited ({{ $labels.namespace }})"
+              description: >-
+                A customer has been debited and no merchant, rider, provider or refund leg has
+                posted. Check the unsettled view in Backoffice Finance and core_banking_sync_log
+                for the orders concerned. Do not unwind anything automatically — confirm against
+                the bank first.
+
+          # Broader and less acute: the saga is waiting on something, often a bank outage, in
+          # which case no money has moved and the legs drain when it returns.
+          - alert: SettlementLegsStuck
+            expr: delivery_settlement_stuck_legs > 0
+            for: 15m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $value }} settlement leg(s) pending far longer than they should be"
+              description: >-
+                Legs have sat PENDING past the configured threshold. If the bank is up, suspect a
+                posting result that was never delivered.
+
+      - name: outbox
+        rules:
+          # An event that will never be published. Whatever was waiting for it waits forever, and
+          # the relay logs this once, in one container, at whatever hour it happened.
+          - alert: OutboxEventsDeadLettered
+            expr: delivery_outbox_dead_lettered > 0
+            for: 1m
+            labels: { severity: page }
+            annotations:
+              summary: "{{ $labels.namespace }} has {{ $value }} dead-lettered outbox event(s)"
+              description: >-
+                Events exhausted their retries and will never publish. This survives restarts and
+                does not clear itself. Inspect outbox_event WHERE status = 'DEAD_LETTERED';
+                republishing is a manual decision because consumers may have partially acted.
+
+          # Damage in progress rather than damage done: the relay is not draining. Caught here,
+          # nothing has been lost yet. The threshold is a backlog that PERSISTS — a burst of
+          # orders legitimately puts hundreds of rows in the table for a few seconds.
+          - alert: OutboxBacklogNotDraining
+            expr: delivery_outbox_pending > 200
+            for: 10m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.namespace }} outbox backlog is not draining ({{ $value }} pending)"
+              description: >-
+                Events are being written faster than they publish, or not publishing at all. Check
+                the broker is reachable and that delivery.outbox.relay-enabled is on.
+
+          # The same failure caught earlier, and it fires even when the absolute number is small —
+          # which is what a low-traffic service with a broken relay looks like.
+          - alert: OutboxBacklogGrowing
+            expr: delta(delivery_outbox_pending[30m]) > 100
+            for: 10m
+            labels: { severity: warning }
+            annotations:
+              summary: "{{ $labels.namespace }} outbox backlog is growing steadily"
+              description: >-
+                Pending events have risen sharply over the last half hour without draining.
+
   platform.yaml: |
     groups:
       - name: platform
@@ -196,6 +281,14 @@ metadata:
   labels: { app: prometheus }
 spec:
   replicas: 1
+  # Recreate, not the default RollingUpdate.
+  #
+  # This pod holds a ReadWriteOnce volume, so a rolling update deadlocks by construction: the new
+  # pod cannot mount the disk until the old one lets go, and the old one is not terminated until
+  # the new one is Ready. It sits in ContainerCreating until somebody notices. One replica of a
+  # single-node monitoring stack has nothing to gain from a rolling update anyway — the trade is
+  # a few seconds without metrics against a deploy that cannot finish.
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app: prometheus }
   template:
@@ -303,6 +396,14 @@ metadata:
   labels: { app: grafana }
 spec:
   replicas: 1
+  # Recreate, not the default RollingUpdate.
+  #
+  # This pod holds a ReadWriteOnce volume, so a rolling update deadlocks by construction: the new
+  # pod cannot mount the disk until the old one lets go, and the old one is not terminated until
+  # the new one is Ready. It sits in ContainerCreating until somebody notices. One replica of a
+  # single-node monitoring stack has nothing to gain from a rolling update anyway — the trade is
+  # a few seconds without metrics against a deploy that cannot finish.
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app: grafana }
   template:
