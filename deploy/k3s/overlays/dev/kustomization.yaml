@@ -64,7 +64,7 @@ images:
   newTag: sha-1e8ceaab789eecd76c032aff89520988488da9cc
 - name: ghcr.io/youssefsaleh0108-maker/notifications-manager
   newName: ghcr.io/youssefsaleh0108-maker/notifications-manager
-  newTag: sha-78705d667e62fcd5494ff72a879904123cb3a4c8
+  newTag: sha-1e8ceaab789eecd76c032aff89520988488da9cc
 - name: ghcr.io/youssefsaleh0108-maker/onboarding-service
   newName: ghcr.io/youssefsaleh0108-maker/onboarding-service
   newTag: sha-c90cc218bcc958f237b531a2c99e7a6b5f90008d
