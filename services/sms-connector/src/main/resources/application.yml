@@ -9,6 +9,19 @@ server:
   # draining rather than accepting.
   shutdown: graceful
 
+  tomcat:
+    threads:
+      # Bounded rather than left at Spring Boot's 200.
+      #
+      # This service holds no database pool — what it holds is a provider connection and a
+      # circuit breaker around it — but the same argument applies to the thing it does queue
+      # behind: 200 request threads each carrying a 512 KB stack in a 512 Mi container, all of
+      # them waiting on one slow vendor. 40 is comfortably more than the worker in front of it
+      # will ever have in flight, and few enough that a stuck provider produces a queue at the
+      # door instead of a thundering herd inside.
+      max: 40
+      min-spare: 5
+
 spring:
   lifecycle:
     # Shorter than the pod's terminationGracePeriodSeconds, so the drain finishes on its own
