@@ -92,13 +92,39 @@ public class StaffInvite {
     }
 
     public boolean isRedeemable(Instant now) {
-        return acceptedAt == null && now.isBefore(expiresAt);
+        return acceptedAt == null && revokedAt == null && now.isBefore(expiresAt);
     }
 
     public void redeem(String userRef) {
         this.acceptedBy = userRef;
         this.acceptedAt = Instant.now();
     }
+
+    /**
+     * Taken back before anybody used it.
+     *
+     * <p>Its own state rather than winding {@code expiresAt} back to now. Both would stop the code
+     * working; only this one can answer whether it timed out or somebody cancelled it, and who —
+     * which is what anybody reading a shop's staff history actually wants to know.
+     */
+    public void revoke(String actorRef) {
+        this.revokedBy = actorRef;
+        this.revokedAt = Instant.now();
+    }
+
+    public Instant getRevokedAt() {
+        return revokedAt;
+    }
+
+    public String getRevokedBy() {
+        return revokedBy;
+    }
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    @Column(name = "revoked_by", length = 64)
+    private String revokedBy;
 
     public String getCode() {
         return code;

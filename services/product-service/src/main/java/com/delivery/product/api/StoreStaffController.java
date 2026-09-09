@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.security.CurrentUser;
@@ -119,6 +120,20 @@ public class StoreStaffController {
         return ResponseEntity.status(HttpStatus.CREATED).body(new InviteResponse(
                 invite.getCode(), invite.getRole(), invite.getDisplayName(), invite.getEmail(),
                 invite.getExpiresAt()));
+    }
+
+    /**
+     * Cancels a pending invite.
+     *
+     * <p>Keyed on the CODE, because that is the only handle a pending invite has — the member id
+     * the other DELETE takes does not exist until somebody redeems it, which is precisely the case
+     * a manager wants to prevent.
+     */
+    @DeleteMapping("/invites/{code}")
+    @PreAuthorize("isAuthenticated()")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeInvite(@PathVariable UUID storeId, @PathVariable String code) {
+        staff.revokeInvite(storeId, code, require(storeId));
     }
 
     // ---------------------------------------------------------------- member writes
