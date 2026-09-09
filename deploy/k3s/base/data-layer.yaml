@@ -174,6 +174,42 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/rabbitmq
+          # A fence around the dead-letter queues.
+          #
+          # Nothing consumes them, on purpose — the bodies in them are the only record of what was
+          # never sent, and an operator drains them by hand (see "Draining a dead-letter queue" in
+          # deploy/k3s/README.md). But nothing bounded them either, so their depth was pure
+          # accumulation: the only thing between a dead-letter queue and the broker's disk was
+          # nobody having sent enough failing messages yet, and a full broker takes down every
+          # queue on it, including the ones carrying live orders.
+          #
+          # A POLICY rather than queue arguments. These queues already exist declared with no
+          # arguments, and redeclaring a durable queue with different ones is refused outright
+          # (PRECONDITION_FAILED) — the only way to set them from the application would be to
+          # delete the queue first, which destroys the evidence it exists to hold. A policy
+          # applies to a live queue, survives restarts in the node's own database, and can be
+          # changed again later without touching a message.
+          #
+          # reject-publish, not the default drop-head: dropping the OLDEST message would discard
+          # the first sign of whatever went wrong. Rejecting means the publisher logs a message it
+          # could not park — a loud problem instead of a silent one.
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - |
+                    i=0
+                    while [ $i -lt 60 ]; do
+                      if rabbitmqctl -q await_startup 2>/dev/null; then
+                        rabbitmqctl -q set_policy dead-letter-capacity '\.dlq$' \
+                          '{"max-length":20000,"overflow":"reject-publish"}' \
+                          --apply-to queues --priority 1 && exit 0
+                      fi
+                      i=$((i + 1))
+                      sleep 5
+                    done
           readinessProbe:
             exec:
               command: ["rabbitmq-diagnostics", "-q", "check_running"]
