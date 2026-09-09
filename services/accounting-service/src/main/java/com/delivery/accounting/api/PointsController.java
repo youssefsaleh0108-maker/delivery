@@ -8,8 +8,11 @@ import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.delivery.accounting.domain.PointsEntry;
 import com.delivery.accounting.domain.PointsEntry.OwnerKind;
 import com.delivery.accounting.domain.PointsRedemption;
+import com.delivery.accounting.service.CarrierCompanyClient;
 import com.delivery.accounting.service.PointsService;
 
 /**
@@ -31,9 +35,11 @@ import com.delivery.accounting.service.PointsService;
  * merchant asking for a balance can only ever be asking for their own. The Backoffice endpoints are
  * the exception and are role-gated separately.
  *
- * <p>A carrier is identified by their delivery-provider id, which is not the same as their user id.
- * That mapping lives in Order Manager, and until it is exposed the carrier endpoints take the
- * provider id explicitly — see the note on {@link #carrierBalance}.
+ * <p>A carrier is the one owner whose reference is not their user id: their points are attributed
+ * with Order Manager's delivery-provider id, so the carrier routes carry one. <strong>Every place
+ * that reference can be named is checked against the company the caller's own token resolves
+ * to</strong> — {@code hasRole('CARRIER')} is true for every delivery company on the platform, so a
+ * role gate alone lets one company read and spend another's points. See {@link #requireOwnCompany}.
  */
 @RestController
 @RequestMapping("/api/points")
@@ -43,8 +49,12 @@ public class PointsController {
 
     private final PointsService points;
 
-    public PointsController(PointsService points) {
+    /** Turns the caller's token into the delivery-provider id their points are attributed with. */
+    private final CarrierCompanyClient carrierCompanies;
+
+    public PointsController(PointsService points, CarrierCompanyClient carrierCompanies) {
         this.points = points;
+        this.carrierCompanies = carrierCompanies;
     }
 
     /** The caller's own balance, as a merchant, a platform rider — or a customer. */
@@ -73,15 +83,15 @@ public class PointsController {
      * company has one number and no way to work out who to pay — the platform would have handed
      * them a settlement problem with none of the data needed to solve it.
      *
-     * <p>{@code providerId} is taken from the path rather than the token because the rider-to-fleet
-     * mapping is Order Manager's, not this service's. That makes this endpoint authorising on role
-     * alone, so a carrier can currently read another carrier's totals. It is CARRIER-gated rather
-     * than open, and closing it properly needs the provider id on the token or a lookup here —
-     * recorded rather than left to be discovered.
+     * <p>{@code providerId} is on the path because the rider-to-fleet mapping is Order Manager's,
+     * not this service's — but it is checked, never trusted. Naming another company's id is refused
+     * exactly as it is on the carrier routes elsewhere on the platform.
      */
     @GetMapping("/carriers/{providerId}/balance")
     @PreAuthorize("hasRole('CARRIER')")
-    public Map<String, Object> carrierBalance(@PathVariable String providerId) {
+    public Map<String, Object> carrierBalance(@AuthenticationPrincipal Jwt jwt,
+                                              @PathVariable String providerId) {
+        requireOwnCompany(jwt, providerId);
         Map<String, Object> payload = balancePayload(OwnerKind.CARRIER, providerId);
         payload.put("riders", points.riderBreakdown(providerId).stream()
                 .map(r -> Map.<String, Object>of(
@@ -98,11 +108,24 @@ public class PointsController {
     public ResponseEntity<?> request(@AuthenticationPrincipal Jwt jwt,
                                      @RequestBody RedemptionRequest body) {
         OwnerKind kind = body.ownerKind() != null ? body.ownerKind() : kindFor(jwt);
+        // The body names the kind, so it has to be one the caller's own roles grant. Without this a
+        // rider could ask to spend a merchant balance, and the request would be written against
+        // whatever the subject happens to key.
+        if (!mayActAs(kind)) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "That is not a balance your account holds"));
+        }
+
         String ref = kind == OwnerKind.CARRIER ? body.ownerRef() : jwt.getSubject();
 
         if (kind == OwnerKind.CARRIER && (ref == null || ref.isBlank())) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "A carrier redemption must name the provider"));
+        }
+        if (kind == OwnerKind.CARRIER) {
+            // Money, not a read: unchecked, this turns another company's points into a payout
+            // request the caller wrote.
+            requireOwnCompany(jwt, ref);
         }
 
         try {
@@ -121,7 +144,11 @@ public class PointsController {
     public List<Map<String, Object>> myRedemptions(@AuthenticationPrincipal Jwt jwt,
                                                    @RequestParam(required = false) String ownerRef) {
         OwnerKind kind = kindFor(jwt);
-        String ref = kind == OwnerKind.CARRIER && ownerRef != null ? ownerRef : jwt.getSubject();
+        // ownerRef was read straight off the query string, which handed any carrier every other
+        // company's payout history — amounts, notes and decisions. It is now only ever an
+        // assertion about which company the caller runs, and a wrong one is refused rather than
+        // answered. Omitting it is the same question, so it resolves to the same company.
+        String ref = kind == OwnerKind.CARRIER ? requireOwnCompany(jwt, ownerRef) : jwt.getSubject();
         return points.requestsFor(kind, ref).stream()
                 .map(PointsController::redemptionPayload)
                 .toList();
@@ -131,6 +158,14 @@ public class PointsController {
     @PostMapping("/redemptions/{id}/cancel")
     @PreAuthorize("hasAnyRole('MERCHANT', 'DELIVERY', 'CARRIER')")
     public ResponseEntity<?> cancel(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        // Nothing downstream knows who asked: the service takes the id and the domain only checks
+        // the status. Without this, any partner token cancelled anybody's pending redemption by id
+        // and released points that were not theirs.
+        PointsRedemption existing = points.find(id).orElse(null);
+        if (existing != null && !ownedByCaller(jwt, existing)) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "That redemption request is not yours"));
+        }
         return decide(() -> points.cancel(id, jwt.getSubject()));
     }
 
@@ -173,6 +208,102 @@ public class PointsController {
     public ResponseEntity<?> markPaid(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
                                       @RequestBody(required = false) Decision body) {
         return decide(() -> points.markPaid(id, jwt.getSubject(), noteOf(body)));
+    }
+
+    // ---------------------------------------------------------------------------- ownership
+
+    /** Thrown when a caller names a delivery company that is not the one they run. */
+    public static class NotYourCompanyException extends RuntimeException {
+        NotYourCompanyException() {
+            super("That is not your delivery company");
+        }
+    }
+
+    /** Thrown when Order Manager could not say which company the caller runs. */
+    public static class CompanyUnknownException extends RuntimeException {
+    }
+
+    /**
+     * The caller's own delivery-provider id, refusing any other one they named.
+     *
+     * <p>The check the carrier routes were missing. {@code hasRole('CARRIER')} is held by every
+     * delivery company on the platform, so gating on it alone means the id in the path or the body
+     * decides whose points are read and spent — and that id comes from the caller. The company is
+     * resolved from the token through Order Manager instead, which is the same rule, message and
+     * status the carrier endpoints in Onboarding already apply.
+     *
+     * @param named the company the caller asked about, or null to mean their own
+     * @return the caller's company id, safe to query with
+     */
+    private String requireOwnCompany(Jwt jwt, String named) {
+        String mine;
+        try {
+            mine = carrierCompanies.companyIdFor(jwt.getTokenValue());
+        } catch (CarrierCompanyClient.NoCompanyException e) {
+            // Staff of no company runs no company. The same refusal as naming somebody else's:
+            // which ids exist is not worth confirming to a caller who runs none of them.
+            throw new NotYourCompanyException();
+        } catch (IllegalStateException e) {
+            // An outage in the check must never become a way past it.
+            throw new CompanyUnknownException();
+        }
+        if (named != null && !named.isBlank() && !named.equals(mine)) {
+            throw new NotYourCompanyException();
+        }
+        return mine;
+    }
+
+    /** Whether an existing redemption belongs to the caller, so they may withdraw it. */
+    private boolean ownedByCaller(Jwt jwt, PointsRedemption redemption) {
+        OwnerKind kind = redemption.getOwnerKind();
+        if (!mayActAs(kind)) {
+            return false;
+        }
+        if (kind == OwnerKind.CARRIER) {
+            try {
+                return requireOwnCompany(jwt, redemption.getOwnerRef()) != null;
+            } catch (NotYourCompanyException e) {
+                return false;
+            }
+        }
+        return jwt.getSubject().equals(redemption.getOwnerRef());
+    }
+
+    /**
+     * Whether the caller's roles grant them a balance of this kind at all.
+     *
+     * <p>Read from the granted authorities rather than from {@code realm_access}, unlike
+     * {@link #kindFor}: this one decides a refusal, and it has to agree with what
+     * {@code @PreAuthorize} enforces rather than with a second, weaker reading of the token.
+     */
+    private static boolean mayActAs(OwnerKind kind) {
+        String role = switch (kind) {
+            case MERCHANT -> "ROLE_MERCHANT";
+            case CARRIER -> "ROLE_CARRIER";
+            case RIDER -> "ROLE_DELIVERY";
+            case CUSTOMER -> "ROLE_CUSTOMER";
+        };
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(granted -> role.equals(granted.getAuthority()));
+    }
+
+    @ExceptionHandler(NotYourCompanyException.class)
+    public ResponseEntity<Map<String, String>> notYours(NotYourCompanyException e) {
+        return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
+    }
+
+    /**
+     * 503, and never the figures.
+     *
+     * <p>Order Manager owns the answer to "which company is this", so when it cannot be reached
+     * ownership is unknown — and unknown is not permission.
+     */
+    @ExceptionHandler(CompanyUnknownException.class)
+    public ResponseEntity<Map<String, String>> companyUnknown(CompanyUnknownException e) {
+        return ResponseEntity.status(503).body(Map.of(
+                "error", "Your delivery company could not be confirmed just now. "
+                        + "Please try again."));
     }
 
     // ---------------------------------------------------------------------------- plumbing

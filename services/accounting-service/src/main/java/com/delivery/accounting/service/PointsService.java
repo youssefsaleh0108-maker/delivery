@@ -253,6 +253,11 @@ public class PointsService {
         return redemptions.findByOwnerKindAndOwnerRefOrderByRequestedAtDesc(kind, ref);
     }
 
+    /** One request, so a caller can be checked against its owner before acting on it. */
+    public Optional<PointsRedemption> find(UUID id) {
+        return redemptions.findById(id);
+    }
+
     public List<PointsRedemption> queue() {
         return redemptions.findByStatusInOrderByRequestedAtAsc(
                 List.of(PointsRedemption.Status.PENDING, PointsRedemption.Status.APPROVED));

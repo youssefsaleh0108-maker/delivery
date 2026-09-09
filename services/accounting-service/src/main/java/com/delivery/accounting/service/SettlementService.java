@@ -318,8 +318,21 @@ public class SettlementService {
         }
 
         BigDecimal amount = total.setScale(2, RoundingMode.HALF_UP);
-        if (amount.signum() <= 0) {
-            log.warn("Refusing to settle order {} with a total of {}", orderId, total);
+        // The gross, not the net, decides whether there is anything to settle.
+        //
+        // A promotion comes off what the CUSTOMER pays and never off what the shop sold or what the
+        // delivery cost, so an order discounted to exactly zero is still a real order: goods were
+        // handed over and somebody carried them. Refusing on the net total paid nobody at all —
+        // merchant, carrier and rider alike — and the platform pocketed the difference silently,
+        // because every credit below is derived from the gross and the platform's own leg is the
+        // remainder. A negative total is still refused: that is a nonsensical event, not a promotion.
+        if (amount.signum() < 0) {
+            log.warn("Refusing to settle order {} with a negative total of {}", orderId, total);
+            return List.of();
+        }
+        BigDecimal gross = waivers.grossOf(amount);
+        if (gross.signum() <= 0) {
+            log.warn("Refusing to settle order {}: nothing to distribute (gross {})", orderId, gross);
             return List.of();
         }
 
@@ -337,7 +350,6 @@ public class SettlementService {
         // shop less than they sold, charging the merchant for the platform's own promotion. Adding
         // the discount back is what tells the two cases apart: a real inconsistency in the event
         // still trips the clamp, and a discounted order does not.
-        BigDecimal gross = waivers.grossOf(amount);
         if (goods.signum() < 0 || goods.compareTo(gross) > 0) {
             log.warn("Order {} has a merchant base of {} against a gross of {}; using the gross",
                     orderId, goods, gross);
@@ -414,10 +426,19 @@ public class SettlementService {
         // Attaching it here rather than in a pass afterwards is what makes it impossible to add a
         // leg and forget: the attribution sits on the same line as the amount.
         List<AccountingTransaction> legs = new ArrayList<>();
-        legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
-        legs.add(new AccountingTransaction(orderId, Leg.MERCHANT_CREDIT, merchantAccount,
-                merchantShare, currency, Direction.CREDIT, correlationId)
-                .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
+        // Only when money actually changed hands. On a fully discounted order the customer owes
+        // nothing and hands the rider no notes, so there is no collection to record — and both
+        // the ledger and the cash float enforce amount > 0, so a zero row would abort the whole
+        // settlement rather than record a harmless nothing.
+        if (amount.signum() > 0) {
+            legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
+        }
+        // Same rule as every other credit below: a zero-value posting is not sent.
+        if (merchantShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.MERCHANT_CREDIT, merchantAccount,
+                    merchantShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
+        }
 
         if (carrierShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.PROVIDER_CREDIT, carrierAccount,
