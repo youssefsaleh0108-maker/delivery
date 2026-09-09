@@ -46,7 +46,8 @@ images:
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/app-notification
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/app-notification
+  newTag: sha-7070c39c1f70e91744c22cfaf194d4ca11765b77
 - name: ghcr.io/youssefsaleh0108-maker/config-server
   newName: ghcr.io/youssefsaleh0108-maker/config-server
   newTag: sha-7070c39c1f70e91744c22cfaf194d4ca11765b77
