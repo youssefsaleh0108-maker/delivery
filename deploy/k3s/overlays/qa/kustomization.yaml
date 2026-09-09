@@ -48,7 +48,8 @@ images:
 - name: ghcr.io/youssefsaleh0108-maker/app-notification
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/config-server
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/config-server
+  newTag: sha-7070c39c1f70e91744c22cfaf194d4ca11765b77
 - name: ghcr.io/youssefsaleh0108-maker/connector-settings
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/email-connector
