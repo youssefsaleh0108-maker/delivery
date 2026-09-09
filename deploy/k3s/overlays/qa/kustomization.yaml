@@ -64,7 +64,8 @@ images:
   newName: ghcr.io/youssefsaleh0108-maker/order-tracking
   newTag: sha-b0b3f2f738058100872b8a5852f9fe422891128e
 - name: ghcr.io/youssefsaleh0108-maker/product-service
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/product-service
+  newTag: sha-7070c39c1f70e91744c22cfaf194d4ca11765b77
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
   newTag: main
 - name: ghcr.io/youssefsaleh0108-maker/sms-connector
