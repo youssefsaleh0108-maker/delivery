@@ -49,6 +49,23 @@ metadata:
   name: platform-rate-limit
 spec:
   rateLimit:
+    # Per caller, not per platform.
+    #
+    # These numbers were always meant to be one client's budget, and for a while they were the
+    # whole platform's: with externalTrafficPolicy Cluster, every connection reached Traefik from
+    # the same SNATed address, so one bucket covered every user of all five apps. ~28 riders on
+    # duty, or ~60 merchants with a tab open, were enough to spend it — and because the apps poll,
+    # everyone past that saw continuous failure rather than slowness. The edge was delivering
+    # around 2% of what the services behind it had been measured serving.
+    #
+    # The Service now preserves the source address (cluster/traefik-config.yaml), and this says
+    # explicitly what it depends on rather than relying on the fallback that quietly did the wrong
+    # thing. depth 0: trust the connection's own address, not an X-Forwarded-For a client can write.
+    sourceCriterion:
+      ipStrategy:
+        depth: 0
+    # One rider on duty with a job spends ~0.7 req/s and a merchant with tabs alive ~0.33, so this
+    # is a wide margin for a single client and still refuses a script.
     average: 20
     burst: 40
 ---
@@ -90,7 +107,7 @@ spec:
         - { name: strip-identity-headers }
         - { name: security-headers }
     - kind: Rule
-      match: Host(`__API_HOST__`) && (PathPrefix(`/api/orders`) || PathPrefix(`/api/butler`) || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`) || PathPrefix(`/api/partner-keys`) || PathPrefix(`/api/partner`) || PathPrefix(`/api/promotions`))
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/orders`) || PathPrefix(`/api/butler`) || PathPrefix(`/api/delivery-providers`) || PathPrefix(`/api/offers`) || PathPrefix(`/api/partner-keys`) || PathPrefix(`/api/partner`) || PathPrefix(`/api/promotions`) || PathPrefix(`/api/riders`))
       services: [{ name: order-manager, port: 8101 }]
       middlewares: *api-mw
     - kind: Rule
@@ -101,19 +118,33 @@ spec:
       match: Host(`__API_HOST__`) && (PathPrefix(`/api/notifications`) || PathPrefix(`/ws/notifications`) || PathPrefix(`/api/chat`))
       services: [{ name: app-notification, port: 8108 }]
       middlewares: *api-mw
-    # Notifications Manager owns the direct-send endpoints beneath the in-app prefix; explicit
-    # priority so an edit to either rule cannot silently shadow it again.
+    # Notifications Manager owns the direct-send endpoints beneath App Notification's prefix, so
+    # this rule MUST outrank the one above it. Traefik does not order by specificity: a route
+    # without `priority` gets a priority equal to the LENGTH OF ITS RULE STRING, and the longer
+    # string wins. Rendered, this rule is 71 characters and the app-notification rule is 128, so
+    # the more specific route loses and /api/notifications/direct reaches App Notification, which
+    # has no such endpoint — a 404 with nothing in either service's log to explain it.
+    #
+    # An explicit priority REPLACES that length, it is not added to it: the previous value of 100
+    # was still under 128 and changed nothing. The number has to clear the longest rule in this
+    # file (the product-service rule, 290 characters), so 1000 is the value with room for the
+    # rules a future service adds. Lengths grow with the hostname too — api-dev is one character
+    # longer than api-qa — which is one more reason not to pick a number that only just fits.
     - kind: Rule
       match: Host(`__API_HOST__`) && PathPrefix(`/api/notifications/direct`)
-      priority: 100
+      priority: 1000
       services: [{ name: notifications-manager, port: 8104 }]
       middlewares: *api-mw
     - kind: Rule
       match: Host(`__API_HOST__`) && (PathPrefix(`/api/notification-log`) || PathPrefix(`/api/notification-rates`) || PathPrefix(`/api/notification-preferences`))
       services: [{ name: notifications-manager, port: 8104 }]
       middlewares: *api-mw
+    # `/api/rider/` keeps its trailing slash. PathPrefix compares characters, not path segments,
+    # so a bare `/api/rider` also swallows /api/riders/{id}/rating — Order Manager's rider ratings,
+    # listed on the rule above — and answers it from Accounting, which has no such endpoint. Two
+    # prefixes where one is a prefix of the other must be made to differ at a separator.
     - kind: Rule
-      match: Host(`__API_HOST__`) && (PathPrefix(`/api/accounting`) || PathPrefix(`/api/points`) || PathPrefix(`/api/rider`))
+      match: Host(`__API_HOST__`) && (PathPrefix(`/api/accounting`) || PathPrefix(`/api/points`) || PathPrefix(`/api/rider/`))
       services: [{ name: accounting-service, port: 8115 }]
       middlewares: *api-mw
     - kind: Rule
@@ -141,6 +172,10 @@ spec:
     # Object storage over the API hostname. The prefix is NOT stripped: an S3 signature covers
     # host and path, and the bucket name is the first path segment. Only the public buckets and
     # the APK drop are routed — merchant-kyc, receipts and delivery-proof stay unreachable.
+    #
+    # The 90 below is under this rule's own length (116) and so demotes it, which is harmless only
+    # because no other rule matches these three prefixes. Do not read it as the priority band the
+    # /api/notifications/direct rule uses.
     - kind: Rule
       match: Host(`__API_HOST__`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`) || PathPrefix(`/apk`))
       priority: 90

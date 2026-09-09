@@ -22,6 +22,22 @@ spec:
       enabled: true
       size: 128Mi
       path: /data
+    # Keep the caller's real IP.
+    #
+    # The default, Cluster, has kube-proxy SNAT every inbound connection to an in-cluster address
+    # before Traefik ever sees it — so Traefik observed ONE source for the entire internet, and
+    # `platform-rate-limit`, which falls back to the client IP when nothing else is given, applied
+    # a single 20 req/s bucket to every user of every app at once. Measured from outside: a
+    # quiescent workstation at ~1 req/s got 429 on 16 of 20 probes purely because a different
+    # machine was busy. Nothing in the middleware could fix that; the address it needed had already
+    # been rewritten.
+    #
+    # Local preserves the source address, at the cost of only load-balancing to nodes that run a
+    # Traefik pod. This is a one-node cluster with one Traefik, so there is nothing to lose here —
+    # revisit it if a second node ever joins.
+    service:
+      spec:
+        externalTrafficPolicy: Local
     podSecurityContext:
       fsGroup: 65532
     # fsGroup re-chmods acme.json to 660 on every mount, and Traefik then refuses the whole
