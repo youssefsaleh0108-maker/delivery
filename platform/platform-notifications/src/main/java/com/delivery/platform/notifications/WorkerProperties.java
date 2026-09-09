@@ -33,8 +33,19 @@ public class WorkerProperties {
     private float failureRateThreshold = 50f;
     private Duration openStateDuration = Duration.ofSeconds(30);
 
-    /** How long to wait on the connector before treating the call as a transient failure. */
-    private Duration connectorTimeout = Duration.ofSeconds(10);
+    /**
+     * How long to wait on the connector before treating the call as a transient failure.
+     *
+     * <p><strong>Must exceed the connector's own retry budget.</strong> The connector retries the
+     * provider on the far side of this call, and a timeout shorter than that budget means this
+     * worker abandons every slow call while the connector is still working — then retries it. One
+     * message becomes attempts x attempts provider calls and attempts + 1 dead-letters; on dev, 70
+     * notifications produced exactly 280 dead-letter events in a day at the old 10s default.
+     *
+     * <p>60s is generous for the shape of call this is, and each connector overrides it with the
+     * arithmetic for its own provider written down beside the value.
+     */
+    private Duration connectorTimeout = Duration.ofSeconds(60);
 
     private String deadLetterQueue = "notification.dlq";
 
