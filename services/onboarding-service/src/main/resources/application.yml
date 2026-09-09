@@ -9,6 +9,23 @@ server:
   # draining rather than accepting.
   shutdown: graceful
 
+  tomcat:
+    threads:
+      # Bounded, and bounded against the connection pool rather than left at Spring Boot's 200.
+      #
+      # Two hundred request threads in front of a pool of 12 is not concurrency, it is a queue
+      # with a worse failure mode: 190 of them block on the pool, each holding a 512 KB stack in a
+      # 512 Mi container, and a dependency that slows down converts directly into thread exhaustion
+      # across EVERY endpoint on the service rather than just the slow one. Checkout makes 2N+2
+      # sequential cross-service calls, so it is the one that gets there first — and the callers it
+      # takes down with it are the rider job board and the merchant board.
+      #
+      # 48 is 4 per connection: enough that work needing no database keeps moving while
+      # the pool is saturated, few enough that saturation is a queue at the door instead of a
+      # thundering herd inside.
+      max: 48
+      min-spare: 5
+
 spring:
   lifecycle:
     # Shorter than the pod's terminationGracePeriodSeconds, so the drain finishes on its own
