@@ -27,6 +27,9 @@ class DeliveryProductImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.onTap,
+    this.emptyLabel,
+    this.unavailableLabel,
+    this.openLabel,
   });
 
   final String? url;
@@ -38,15 +41,27 @@ class DeliveryProductImage extends StatelessWidget {
   /// Tapping opens the full-size preview. Null leaves the image inert.
   final VoidCallback? onTap;
 
+  /// The three sentences this widget can put on screen, already localised by the caller — the
+  /// missing-photo caption, the expired-URL caption, and the hint assistive tech reads on a
+  /// tappable photo. They were English constants here, which is invisible until a shop opens its
+  /// own catalog in Arabic.
+  ///
+  /// Null draws the glyph with no words rather than falling back to English: several callers
+  /// already wanted the caption gone at thumbnail sizes, and a caption the reader cannot read is
+  /// worse than none.
+  final String? emptyLabel;
+  final String? unavailableLabel;
+  final String? openLabel;
+
   @override
   Widget build(BuildContext context) {
     final BorderRadius radius = borderRadius ?? BorderRadius.circular(DeliveryRadius.md);
 
     Widget content;
     if (url == null || url!.isEmpty) {
-      content = const _Placeholder(
+      content = _Placeholder(
         icon: Icons.image_outlined,
-        label: 'No photo',
+        label: emptyLabel,
       );
     } else {
       content = Image(
@@ -70,9 +85,9 @@ class DeliveryProductImage extends StatelessWidget {
         },
         // Covers an expired presigned URL, a deleted object and an offline client alike. The user
         // cannot act differently on any of them, so they get one honest message.
-        errorBuilder: (_, __, ___) => const _Placeholder(
+        errorBuilder: (_, __, ___) => _Placeholder(
           icon: Icons.broken_image_outlined,
-          label: 'Image unavailable',
+          label: unavailableLabel,
         ),
       );
     }
@@ -95,7 +110,7 @@ class DeliveryProductImage extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: 'Open full-size photo',
+      label: openLabel,
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
@@ -194,6 +209,7 @@ class _Placeholder extends StatelessWidget {
 Future<void> showProductImagePreview(
   BuildContext context, {
   required List<String> urls,
+  required ProductPreviewWords words,
   String? title,
   int initialIndex = 0,
 }) {
@@ -207,20 +223,51 @@ Future<void> showProductImagePreview(
     barrierDismissible: true,
     builder: (BuildContext context) => _ImagePreviewDialog(
       urls: urls,
+      words: words,
       title: title,
       initialIndex: initialIndex.clamp(0, urls.length - 1),
     ),
   );
 }
 
+/// The preview dialog's own chrome, already localised by the caller.
+///
+/// Bundled rather than passed as four loose named arguments: the design system holds no words of
+/// its own, and one required bundle is the version of that rule a caller cannot half-satisfy.
+class ProductPreviewWords {
+  const ProductPreviewWords({
+    required this.untitled,
+    required this.unavailable,
+    required this.close,
+    required this.previous,
+    required this.next,
+    required this.position,
+  });
+
+  /// The dialog's heading when the caller has no product name to give it.
+  final String untitled;
+
+  /// What the full-size image says when its presigned URL has already expired.
+  final String unavailable;
+
+  final String close;
+  final String previous;
+  final String next;
+
+  /// "2 of 5", for a product carrying several photos.
+  final String Function(int index, int count) position;
+}
+
 class _ImagePreviewDialog extends StatefulWidget {
   const _ImagePreviewDialog({
     required this.urls,
+    required this.words,
     required this.initialIndex,
     this.title,
   });
 
   final List<String> urls;
+  final ProductPreviewWords words;
   final int initialIndex;
   final String? title;
 
@@ -263,18 +310,18 @@ class _ImagePreviewDialogState extends State<_ImagePreviewDialog> {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      widget.title ?? 'Photo',
+                      widget.title ?? widget.words.untitled,
                       style: Theme.of(context).textTheme.titleMedium,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (multiple)
-                    Text('${_index + 1} of ${widget.urls.length}',
+                    Text(widget.words.position(_index + 1, widget.urls.length),
                         style: const TextStyle(color: DeliveryColors.muted)),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
-                    tooltip: 'Close',
+                    tooltip: widget.words.close,
                   ),
                 ],
               ),
@@ -288,7 +335,7 @@ class _ImagePreviewDialogState extends State<_ImagePreviewDialog> {
                       IconButton(
                         onPressed: () => _step(-1),
                         icon: const Icon(Icons.chevron_left),
-                        tooltip: 'Previous',
+                        tooltip: widget.words.previous,
                       ),
                     Expanded(
                       child: InteractiveViewer(
@@ -298,6 +345,7 @@ class _ImagePreviewDialogState extends State<_ImagePreviewDialog> {
                         child: DeliveryProductImage(
                           url: widget.urls[_index],
                           fit: BoxFit.contain,
+                          unavailableLabel: widget.words.unavailable,
                         ),
                       ),
                     ),
@@ -305,7 +353,7 @@ class _ImagePreviewDialogState extends State<_ImagePreviewDialog> {
                       IconButton(
                         onPressed: () => _step(1),
                         icon: const Icon(Icons.chevron_right),
-                        tooltip: 'Next',
+                        tooltip: widget.words.next,
                       ),
                   ],
                 ),

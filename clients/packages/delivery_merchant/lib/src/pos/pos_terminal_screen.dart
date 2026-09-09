@@ -1203,6 +1203,8 @@ class _ProductTile extends StatelessWidget {
                       child: DeliveryProductImage(
                         url: product.listImageUrl,
                         borderRadius: BorderRadius.circular(DeliveryRadius.md),
+                        emptyLabel: t.noPhoto,
+                        unavailableLabel: t.imageUnavailable,
                       ),
                     ),
                     if (busy)

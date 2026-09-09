@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_merchant/delivery_merchant.dart';
+import 'package:delivery_portal/src/portal_shell.dart';
 
 // This portal had no localisation at all — no delegates, no saved locale, no dependency — while the
 // market it serves reads Arabic. These assert on what a merchant would actually see.
@@ -63,6 +64,33 @@ CatalogApi _api() {
     '/api/categories': <dynamic>[],
   });
   return CatalogApi(dio);
+}
+
+/// A live shop, so the config screen draws its status pill.
+StoreApi _storeApi() {
+  final Dio dio = Dio(BaseOptions(baseUrl: 'http://localhost:8100'));
+  dio.httpClientAdapter = _StubAdapter(<String, Object>{
+    '/api/stores/mine': <String, dynamic>{
+      'content': <dynamic>[
+        <String, dynamic>{
+          'id': 's1',
+          'slug': 'pizza',
+          'name': 'Margherita',
+          'vertical': 'RESTAURANT',
+          'availability': 'OPEN',
+          'status': 'LIVE',
+          'deliveryFee': 2.0,
+          'minOrder': 5.0,
+        },
+      ],
+      'page': 0,
+      'size': 20,
+      'totalElements': 1,
+      'totalPages': 1,
+    },
+    '/api/stores/s1/hours': <dynamic>[],
+  });
+  return StoreApi(dio);
 }
 
 Widget _wrap(Widget child, Locale locale) => MaterialApp(
@@ -136,6 +164,20 @@ void main() {
         reason: 'English left on the Arabic product list: $untranslated');
   });
 
+  testWidgets('the shop status pill is Arabic too', (WidgetTester tester) async {
+    // The pill took its word from the design system's own enum, which was English, so this one
+    // Latin word sat on an otherwise fully translated shop-config screen.
+    tester.view.physicalSize = const Size(1400, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_wrap(StoreScreen(api: _storeApi()), const Locale('ar')));
+    await tester.pumpAndSettle();
+
+    expect(find.text(ar.statusOpen), findsOneWidget);
+    expect(find.text(en.statusOpen), findsNothing);
+  });
+
   testWidgets('lays out right-to-left', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1400, 1200);
     tester.view.devicePixelRatio = 1.0;
@@ -158,6 +200,20 @@ void main() {
     expect(find.text(en.merchbMenuItems), findsOneWidget);
     expect(find.text(ar.merchbMenuItems), findsNothing);
     expect(Directionality.of(tester.element(find.byType(ProductListScreen))), TextDirection.ltr);
+  });
+
+  test('the sidebar footer card names the reader\'s access in their own language', () {
+    // Every other line on that rail came from the string table; this one was an inline English
+    // constant, so a merchant reading an Arabic portal found "Merchant partner" under their name.
+    for (final PortalArea area in <PortalArea>[
+      PortalArea.merchant_,
+      PortalArea.carrier_,
+      PortalArea.backoffice_,
+    ]) {
+      expect(area.accountRole(ar), isNotEmpty);
+      expect(area.accountRole(ar), isNot(area.accountRole(en)));
+      expect(area.accountRole(ar), isNot(matches(_latin)));
+    }
   });
 
   test('the merchant strings all have an Arabic translation', () {

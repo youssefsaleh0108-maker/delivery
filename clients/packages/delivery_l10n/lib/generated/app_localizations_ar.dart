@@ -5150,6 +5150,11 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get riderCashOutAvailable => 'المتاح للسحب';
 
   @override
+  String riderCashOutHeldNote(Object amount) {
+    return '$amount منها نقد لا يزال بحوزتك — سلّمه ليصبح متاحاً';
+  }
+
+  @override
   String riderCashOutMinimum(Object amount) {
     return 'الحد الأدنى $amount';
   }
@@ -7035,4 +7040,33 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get repFilterAll => 'الكل';
+
+  @override
+  String get merchantPartner => 'شريك تاجر';
+
+  @override
+  String get carrierPartner => 'شريك توصيل';
+
+  @override
+  String get backofficeOperator => 'مشغّل الإدارة';
+
+  @override
+  String get imageUnavailable => 'الصورة غير متاحة';
+
+  @override
+  String get openFullSizePhoto => 'افتح الصورة بالحجم الكامل';
+
+  @override
+  String photoPosition(int index, int count) {
+    return '$index من $count';
+  }
+
+  @override
+  String get close => 'إغلاق';
+
+  @override
+  String get previous => 'السابق';
+
+  @override
+  String get next => 'التالي';
 }

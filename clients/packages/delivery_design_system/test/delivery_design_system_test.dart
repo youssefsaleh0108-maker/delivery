@@ -237,6 +237,83 @@ void main() {
     expect(find.text('Delivered'), findsOneWidget);
   });
 
+  group('the package carries no words of its own', () {
+    // The whole point of this package taking already-localised strings: an English word baked into
+    // a widget or an enum here reaches all three clients and survives every translated screen
+    // around it. A shop in an Arabic session read "Open" on its own status pill for exactly that
+    // reason.
+    testWidgets('the shop status pill prints the label it is handed, not an English one',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: DeliveryTheme.light(),
+        home: const Scaffold(
+          body: StoreStatePill(state: DeliveryStoreState.open, label: 'مفتوح'),
+        ),
+      ));
+
+      expect(find.text('مفتوح'), findsOneWidget);
+      expect(find.text('Open'), findsNothing);
+    });
+
+    testWidgets('and does the same in its compact form on a card',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: DeliveryTheme.light(),
+        home: const Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 200,
+              child: StorefrontMiniCard(
+                name: 'مطعم',
+                state: DeliveryStoreState.closed,
+                stateLabel: 'مغلق',
+                unratedLabel: 'جديد',
+                etaLabel: '٢٠ د',
+              ),
+            ),
+          ),
+        ),
+      ));
+
+      expect(find.text('مغلق'), findsOneWidget);
+      expect(find.text('Closed'), findsNothing);
+      // The unrated shop's rating slot, which was the other English constant on this card.
+      expect(find.text('جديد'), findsOneWidget);
+      expect(find.text('New'), findsNothing);
+    });
+
+    test('no shop state carries a word', () {
+      // A field would be enough for the bug to come back: an enum constant is built at compile time
+      // and a translation is resolved per reader, so there is nowhere on this enum a label can
+      // correctly live.
+      for (final DeliveryStoreState state in DeliveryStoreState.values) {
+        expect(
+          state.toString(),
+          isNot(matches(RegExp('Open|Busy|Closing|Closed'))),
+          reason: 'DeliveryStoreState must carry colour and nothing readable',
+        );
+      }
+    });
+
+    testWidgets('a product photo placeholder says nothing rather than saying it in English',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 160,
+              height: 160,
+              child: DeliveryProductImage(url: null, emptyLabel: 'لا توجد صورة'),
+            ),
+          ),
+        ),
+      ));
+
+      expect(find.text('لا توجد صورة'), findsOneWidget);
+      expect(find.text('No photo'), findsNothing);
+    });
+  });
+
   group('DeliveryLogo', () {
     testWidgets('occupies exactly the size it is given', (WidgetTester tester) async {
       await tester.pumpWidget(const MaterialApp(

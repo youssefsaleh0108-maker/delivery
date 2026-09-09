@@ -676,7 +676,11 @@ class _InventoryRow extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: <Widget>[
-          _Thumbnail(url: item.listImageUrl, label: t.noPhoto),
+          _Thumbnail(
+            url: item.listImageUrl,
+            label: t.noPhoto,
+            unavailableLabel: t.imageUnavailable,
+          ),
           const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
           Expanded(
             child: Column(
@@ -849,12 +853,19 @@ class _StockCell extends StatelessWidget {
 /// height than this row gives it — so the empty slot is the glyph alone, with the sentence attached
 /// as a tooltip and a semantic label.
 class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.url, required this.label});
+  const _Thumbnail({
+    required this.url,
+    required this.label,
+    required this.unavailableLabel,
+  });
 
   final String? url;
 
   /// Already localised by the caller.
   final String label;
+
+  /// What a photo whose presigned link has expired says instead. Also already localised.
+  final String unavailableLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -885,6 +896,7 @@ class _Thumbnail extends StatelessWidget {
       child: DeliveryProductImage(
         url: url,
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
+        unavailableLabel: unavailableLabel,
       ),
     );
   }

@@ -184,6 +184,14 @@ class _Data {
 
 // ---------------------------------------------------------------------------- the money
 
+/// Every figure on this screen that is money, in one shape.
+///
+/// Two decimals always, and no currency symbol — the platform sends amounts as bare numbers and
+/// names a currency nowhere on the wire, so a "$" here would be this screen asserting one the
+/// server never stated. The reason it is a function rather than a `toStringAsFixed(2)` at each site
+/// is the budget bar, which took its own default and drew a one-decimal figure beside these.
+String _money(double amount) => amount.toStringAsFixed(2);
+
 class _Budget extends StatelessWidget {
   const _Budget({required this.budget});
 
@@ -201,25 +209,25 @@ class _Budget extends StatelessWidget {
             tiles: <Widget>[
               StatTile(
                 label: 'Revenue earned',
-                value: budget.earned.toStringAsFixed(2),
+                value: _money(budget.earned),
                 icon: Icons.trending_up,
                 accent: DeliveryAccent.positive,
               ),
               StatTile(
                 label: 'Given away',
-                value: budget.given.toStringAsFixed(2),
+                value: _money(budget.given),
                 icon: Icons.redeem_outlined,
                 accent: DeliveryAccent.info,
               ),
               StatTile(
                 label: 'Left to give',
-                value: budget.remaining.toStringAsFixed(2),
+                value: _money(budget.remaining),
                 icon: Icons.savings_outlined,
                 accent: budget.exhausted ? DeliveryAccent.caution : DeliveryAccent.neutral,
               ),
               StatTile(
                 label: 'Kept',
-                value: budget.kept.toStringAsFixed(2),
+                value: _money(budget.kept),
                 icon: Icons.account_balance_outlined,
                 // The number that pays the bills, and it can go negative. Shown as critical when it
                 // does, because a platform paying to run itself needs to notice.
@@ -232,6 +240,11 @@ class _Budget extends StatelessWidget {
             label: 'Budget used',
             used: budget.given,
             total: budget.budget,
+            // [UsageBar] defaults to one decimal, which is right for a quota of things and wrong
+            // for money: this bar drew "12.5 / 100" directly under the same two figures printed as
+            // "12.50" and "100.00" in the tiles above, and a reader comparing them has to work out
+            // whether that is a different number. USD is two decimals everywhere on this platform.
+            format: _money,
             // Caution rather than positive: a full bar here means the whole giveaway allowance has
             // gone, which is not a goal being met.
             accent: budget.exhausted ? DeliveryAccent.caution : DeliveryAccent.info,
@@ -241,7 +254,7 @@ class _Budget extends StatelessWidget {
             'Over the last ${budget.windowDays} days. At most '
             '${budget.capPercentage.toStringAsFixed(0)}% of revenue may be given away'
             '${budget.allowance > 0 ? ', plus a standing allowance of '
-                '${budget.allowance.toStringAsFixed(2)}' : ''}; waivers stop when that is reached.',
+                '${_money(budget.allowance)}' : ''}; waivers stop when that is reached.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           if (budget.given > 0) ...<Widget>[
@@ -249,9 +262,9 @@ class _Budget extends StatelessWidget {
             // Broken out because the three cost different amounts and an operator deciding what to
             // withdraw needs to know which one is doing the spending.
             Text(
-              'Customers ${budget.givenCustomer.toStringAsFixed(2)}   ·   '
-              'Merchants ${budget.givenMerchant.toStringAsFixed(2)}   ·   '
-              'Delivery companies ${budget.givenCarrier.toStringAsFixed(2)}',
+              'Customers ${_money(budget.givenCustomer)}   ·   '
+              'Merchants ${_money(budget.givenMerchant)}   ·   '
+              'Delivery companies ${_money(budget.givenCarrier)}',
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
@@ -342,7 +355,7 @@ class _OfferCard extends StatelessWidget {
             Text(offer.subtitle!, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: DeliverySpacing.xs),
           Text(
-            'Minimum basket ${offer.minSubtotal.toStringAsFixed(2)}   ·   '
+            'Minimum basket ${_money(offer.minSubtotal)}   ·   '
             'Runs until ${offer.endsAt == null ? 'withdrawn' : formatDate(offer.endsAt!)}',
             style: Theme.of(context).textTheme.labelSmall,
           ),

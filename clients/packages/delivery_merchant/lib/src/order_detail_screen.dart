@@ -37,6 +37,20 @@ const double merchantChipRadius = 10;
 /// belongs to the store, not to a screen.
 String merchantMoney(double amount) => amount.toStringAsFixed(2);
 
+/// The full-size photo preview's own chrome, in the reader's language.
+///
+/// One place rather than per screen: the design system holds no words, so every merchant surface
+/// that opens the preview has to hand it the same five, and five strings assembled twice is five
+/// strings that drift.
+ProductPreviewWords productPreviewWords(DeliveryStrings t) => ProductPreviewWords(
+      untitled: t.photo,
+      unavailable: t.imageUnavailable,
+      close: t.close,
+      previous: t.previous,
+      next: t.next,
+      position: (int index, int count) => t.photoPosition(index, count),
+    );
+
 /// "10 mins ago", from the shared relative-time strings.
 ///
 /// Returns an empty string when the order carries no timestamp, so a caller can drop the slot

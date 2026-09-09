@@ -328,7 +328,10 @@ class _StoreScreenState extends State<StoreScreen> {
                 ),
               ),
               const SizedBox(width: DeliverySpacing.sm),
-              StoreStatePill(state: _stateOf(store.availability)),
+              StoreStatePill(
+                state: _stateOf(store.availability),
+                label: store.availability.labelIn(t),
+              ),
             ],
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),

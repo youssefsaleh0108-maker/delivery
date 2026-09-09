@@ -622,7 +622,7 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
           // A shop that is not open is the one thing on this strip that changes what happens next.
           if (state != DeliveryStoreState.open) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-            StoreStatePill(state: state),
+            StoreStatePill(state: state, label: card.availability.labelIn(t)),
           ],
         ],
       ),

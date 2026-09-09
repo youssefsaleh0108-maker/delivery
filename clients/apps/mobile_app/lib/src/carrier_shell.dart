@@ -950,12 +950,18 @@ class _CarrierShellState extends State<CarrierShell> {
                               fontSize: 14, fontWeight: FontWeight.w700)),
                       const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
                       _moneyRow(t.navOrders, '${earnings.delivered}'),
+                      // Every figure here is the server's. The card used to be handed only the
+                      // NET and the rate, and then computed a "total" and a commission from them
+                      // — deducting the platform's cut a second time on money it had already been
+                      // taken from, so the band below promised less than the ledger owed. It also
+                      // could not have been right: a waived order carries no cut at all, so the
+                      // gross is not the net over a fixed rate.
                       _moneyRow(t.carrTotalRevenue,
-                          '\$${earnings.earned.toStringAsFixed(2)}'),
+                          '\${earnings.grossEarned.toStringAsFixed(2)}'),
                       // The deduction in money, not just the rate — 87:350 writes the dollars.
                       _moneyRow(
                         t.carrCommissionPct(earnings.cutPercentage.round()),
-                        '-\$${(earnings.earned * earnings.cutPercentage / 100).toStringAsFixed(2)}',
+                        '-\${earnings.commission.toStringAsFixed(2)}',
                         color: DeliveryColors.brand,
                       ),
                       const SizedBox(height: DeliverySpacing.sm),
@@ -981,7 +987,7 @@ class _CarrierShellState extends State<CarrierShell> {
                                   )),
                             ),
                             Text(
-                              '\$${(earnings.earned * (1 - earnings.cutPercentage / 100)).toStringAsFixed(2)}',
+                              '\${earnings.earned.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,

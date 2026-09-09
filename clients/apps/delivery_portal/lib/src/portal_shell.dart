@@ -164,7 +164,11 @@ class PortalArea {
   ///
   /// Their *access*, not their job title — the token carries a realm role and nothing that would
   /// let us print "Super Admin" honestly.
-  final String accountRole;
+  ///
+  /// Resolved against the reader's locale like [title], not an inline constant like [wordmark]. The
+  /// wordmark labels a console that is English-only in this wave; this line sits under the name of a
+  /// shop that reads its whole portal in Arabic, and it was the one Latin word left on that card.
+  final String Function(DeliveryStrings) accountRole;
 
   /// The glyph in the 32px brand tile. Per the design this is the console's subject — a package for
   /// the Backoffice, a truck for the Carrier Hub — not a company mark.
@@ -189,7 +193,7 @@ class PortalArea {
     role: DeliveryRole.merchant,
     title: (DeliveryStrings t) => t.merchantPortal,
     wordmark: 'Merchant Hub',
-    accountRole: 'Merchant partner',
+    accountRole: (DeliveryStrings t) => t.merchantPartner,
     logoIcon: Icons.storefront,
     destinations: <PortalDestination>[
       // First, and ahead of the catalog. A shop opening the portal wants to know what came in
@@ -321,7 +325,7 @@ class PortalArea {
     role: DeliveryRole.carrier,
     title: (DeliveryStrings t) => t.carrierPortal,
     wordmark: 'Carrier Hub',
-    accountRole: 'Carrier partner',
+    accountRole: (DeliveryStrings t) => t.carrierPartner,
     logoIcon: Icons.local_shipping,
     destinations: <PortalDestination>[
       PortalDestination(
@@ -398,7 +402,7 @@ class PortalArea {
     role: DeliveryRole.backoffice,
     title: (DeliveryStrings t) => t.backoffice,
     wordmark: 'Backoffice',
-    accountRole: 'Backoffice operator',
+    accountRole: (DeliveryStrings t) => t.backofficeOperator,
     logoIcon: Icons.inventory_2,
     destinations: <PortalDestination>[
       // The overview first, then the ledger it summarises — the order the redesign draws, and the
@@ -668,7 +672,7 @@ class _PortalShellState extends State<PortalShell> {
             selectedIndex: _index,
             onSelected: (int i) => setState(() => _index = i),
             userName: widget.session.displayName,
-            userRole: area.accountRole,
+            userRole: area.accountRole(t),
             accountMenu: _accountMenu(t),
           ),
           Expanded(
