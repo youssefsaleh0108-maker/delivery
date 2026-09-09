@@ -44,7 +44,8 @@ images:
 - name: docker.io/youssefsaleh0108/delivery-order-manager
   newTag: qa
 - name: ghcr.io/youssefsaleh0108-maker/accounting-service
-  newTag: main
+  newName: ghcr.io/youssefsaleh0108-maker/accounting-service
+  newTag: sha-7070c39c1f70e91744c22cfaf194d4ca11765b77
 - name: ghcr.io/youssefsaleh0108-maker/app-notification
   newName: ghcr.io/youssefsaleh0108-maker/app-notification
   newTag: sha-7070c39c1f70e91744c22cfaf194d4ca11765b77
