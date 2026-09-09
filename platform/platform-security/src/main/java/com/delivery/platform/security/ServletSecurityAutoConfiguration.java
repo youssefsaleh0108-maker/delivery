@@ -38,17 +38,17 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class ServletSecurityAutoConfiguration {
 
-    /** See {@link #platformPageSizeCap()}. */
+    /** See {@link PageableDefaults#platformPageSizeCap()}. */
     static final int MAX_PAGE_SIZE = 200;
 
     /**
      * How big a page any caller may ask for, on every paginated endpoint in the platform.
      *
-     * <p>Spring Boot ships a maximum of 2000, and {@code @PageableDefault} sets only the DEFAULT —
-     * so every {@code Pageable} endpoint in this platform would serve {@code ?size=2000} to any
-     * authenticated caller who asked. On the order boards, where each row drags its own lines,
-     * that is roughly 2,001 statements on one request, holding a connection from a pool of ten
-     * for the whole walk. The caller waits; so does the rider job board, and so does checkout.
+     * <p>Spring Boot ships a maximum of 2000, and {@code @PageableDefault} sets only the DEFAULT
+     * — so every {@code Pageable} endpoint would serve {@code ?size=2000} to any authenticated
+     * caller who asked. On the order boards, where each row drags its own lines, that is roughly
+     * 2,001 statements on one request, holding a connection from a pool of ten for the whole
+     * walk. The caller waits; so does the rider job board, and so does checkout.
      *
      * <p>200 is comfortably above every screen in the platform — the largest ask anywhere is 100
      * — and far below anything that can hurt. Over-asking is clamped rather than refused, which
@@ -57,12 +57,23 @@ public class ServletSecurityAutoConfiguration {
      * <p>Here rather than in fifteen application.yml files because it is a property of the
      * platform, and fifteen copies of a limit is fourteen chances to drift. A service that needs
      * a different one declares its own customizer.
+     *
+     * <p><strong>A nested class, not a {@code @ConditionalOnClass} on the bean method.</strong>
+     * That condition is evaluated only after the declaring class's methods have been
+     * introspected, and introspecting a method resolves its return type — so the three connector
+     * services that carry no Spring Data at all died on NoClassDefFoundError before the condition
+     * they were relying on ever ran. Guarding the enclosing class is what makes the reference
+     * genuinely optional: its metadata is read without loading it.
      */
-    @Bean
-    @ConditionalOnMissingBean
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(PageableHandlerMethodArgumentResolverCustomizer.class)
-    public PageableHandlerMethodArgumentResolverCustomizer platformPageSizeCap() {
-        return resolver -> resolver.setMaxPageSize(MAX_PAGE_SIZE);
+    static class PageableDefaults {
+
+        @Bean
+        @ConditionalOnMissingBean
+        public PageableHandlerMethodArgumentResolverCustomizer platformPageSizeCap() {
+            return resolver -> resolver.setMaxPageSize(MAX_PAGE_SIZE);
+        }
     }
 
     @Bean
