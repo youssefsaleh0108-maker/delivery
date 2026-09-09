@@ -67,6 +67,34 @@ invent is the onboarding client secret, which must match what the realm import c
 - **probes are TCP**, matching what the compose stack verified; actuator-based HTTP probes are a
   cheap later upgrade if /actuator/health is permitted unauthenticated.
 
+## The connection budget
+
+Postgres allows 200 connections, three of them reserved for superusers, so **197 are usable per
+environment** (dev and qa each run their own instance). Eleven services hold independently-sized
+Hikari pools with nothing between them and the database:
+
+| | max | idle floor |
+| --- | --- | --- |
+| order-tracking | 15 | 3 |
+| onboarding-service | 12 | 3 |
+| accounting, app-notification, notifications-manager, order-manager, product, whatsapp | 10 each | 2 each |
+| transfer-service | 5 | 1 |
+| connector-settings | 4 | 1 |
+| config-server | 2 | 1 |
+| **total** | **98** | **21** |
+
+**Every pool names `minimum-idle`, and that is not decoration.** Hikari defaults the idle floor to
+the MAXIMUM, so a pool that does not name one never shrinks and its ceiling becomes its permanent
+footprint. Three services were in that state and held 10, 5 and 2 connections around the clock
+between them for work measured in milliseconds.
+
+The ceiling is what decides whether this platform can run **two replicas of everything**: 98 x 2 =
+196 against 197 usable, which fits and leaves nothing. A third replica, or a new service, needs
+either a raised `max_connections` (each backend costs roughly 10 MB of the box's memory) or a
+connection pooler in front. There is no pooler today. Failure is not graceful — a service that
+cannot get a connection blocks for Hikari's 30-second timeout, and the losers are whichever
+services start last rather than whichever matter least.
+
 ## Monitoring
 
 `scripts/setup-monitoring.sh` installs `cluster/monitoring.yaml` — one Prometheus and one Grafana

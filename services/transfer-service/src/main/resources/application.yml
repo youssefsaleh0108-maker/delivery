@@ -39,6 +39,11 @@ spring:
       # Small on purpose: the shared Postgres allows 100 connections platform-wide and this
       # service's work is short writes.
       maximum-pool-size: 5
+      # minimum-idle is set on every pool in the platform for one reason: Hikari defaults it to the
+      # MAXIMUM, so a pool that never names it never shrinks. Its configured ceiling becomes its
+      # permanent footprint, held against a shared Postgres whose 200 connections are the budget
+      # for eleven services — this one sat at 10 of 10 idle around the clock.
+      minimum-idle: 1
 
   flyway:
     enabled: true
