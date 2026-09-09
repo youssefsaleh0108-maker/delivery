@@ -109,9 +109,20 @@ delivery:
     initial-backoff: 500ms
     failure-rate-threshold: 50
     open-state-duration: 30s
-    # Longer than SMS: an SMTP handshake plus DATA is slower than an HTTP API call, and cutting it
-    # short would classify successful sends as timeouts.
-    connector-timeout: 20s
+    # Longer than the connector's own retry budget, and that ordering is the whole point.
+    #
+    # Two retry layers sit in series here: this worker retries the HTTP call, and the connector on
+    # the far side of that call retries the provider. They protect different things and both should
+    # exist — but if the outer timeout is SHORTER than the inner budget, the worker abandons every
+    # slow call while the connector is still working, then retries it. One message became 9 provider
+    # calls and 4 dead-letters, every time: 70 distinct notifications produced exactly 280
+    # dead-letter events on dev in a day, and notification_log FAILED to notification.dlq stood at
+    # exactly 4.00x.
+    #
+    # The budget below is the connector's worst case: 3 attempts x (5s connect + 10s read + 10s write) + 1.5s of backoff = 76.5s.
+    # Waiting past it means this worker's own retry fires only when the connector genuinely failed
+    # or could not be reached, which is what its javadoc always said it was for.
+    connector-timeout: 90s
     dead-letter-queue: notification.dlq
 
   connector:
