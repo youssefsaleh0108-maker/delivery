@@ -138,6 +138,32 @@ public class StaffService {
         return invite;
     }
 
+    /**
+     * Takes a pending invite back.
+     *
+     * <p>There was no way to. The only DELETE took the id of an already-redeemed member, so a code
+     * sent to the wrong number stayed live for its whole 24 hours, redeemable by whoever held the
+     * string — and a MANAGER invite carries all seven permissions.
+     *
+     * <p>Under MANAGE_STAFF, the same permission that issued it, and scoped to the store it was
+     * issued for: a code is a store's to cancel, and naming one from another shop finds nothing.
+     */
+    @Transactional
+    public void revokeInvite(UUID storeId, String code, StoreAccess actor) {
+        actor.require(Permission.MANAGE_STAFF);
+        StaffInvite invite = invites.findById(code.trim().toUpperCase())
+                .filter(i -> i.getStoreId().equals(storeId))
+                .orElseThrow(() -> new CatalogRuleViolationException(
+                        "That invite does not exist"));
+        if (!invite.isRedeemable(Instant.now())) {
+            // Already taken up, already cancelled, or already expired. Saying so beats a silent
+            // success that leaves a manager believing they closed something they did not.
+            throw new CatalogRuleViolationException("That invite is no longer pending");
+        }
+        invite.revoke(actor.userRef());
+        log.info("Store {} revoked invite {}", storeId, code);
+    }
+
     @Transactional(readOnly = true)
     public List<StaffInvite> pendingInvites(UUID storeId) {
         Instant now = Instant.now();
