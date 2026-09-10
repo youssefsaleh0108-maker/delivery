@@ -104,7 +104,16 @@ class ButlerRequest {
   final DateTime? resolvedAt;
 
   /// Whether the customer still has a decision to make on this one.
-  bool get awaitingApproval => status.needsCustomerAnswer;
+  ///
+  /// A quoted purchase — and a send a rider has taken. A send has no price to quote, but it still
+  /// becomes an order only when the customer approves it: the server takes it from claimed
+  /// straight to approved on the customer's call (infra/smoke-test-butler.js, "it goes straight
+  /// from claimed to approved", on the customer's token), and nothing else moves it. Leaving that
+  /// case out left every send stuck at "Claimed" with nothing for the customer to press, no order
+  /// for the rider to run, and so no order to track.
+  bool get awaitingApproval =>
+      status.needsCustomerAnswer ||
+      (status == ButlerStatus.claimed && mode == ButlerMode.send);
 
   factory ButlerRequest.fromJson(Map<String, dynamic> json) => ButlerRequest(
         id: json['id'] as String,
