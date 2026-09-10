@@ -144,6 +144,17 @@ void main() {
       }
     });
 
+    test('every accent has a label shade that reads as text on its own tint', () {
+      // A status word on a badge is 11–12px, so WCAG's 4.5:1 is the bar. The accents themselves
+      // miss it on their tint by a long way (amber 1.96, green 2.27) — which is why onTint exists,
+      // and why this holds it to the real figure rather than to the design's own minimum.
+      for (final DeliveryAccent accent in DeliveryAccent.values) {
+        final Color onWhite = Color.alphaBlend(accent.tint, DeliveryColors.white);
+        expect(contrast(accent.onTint, onWhite), greaterThanOrEqualTo(4.5),
+            reason: '${accent.name} label on its own tint');
+      }
+    });
+
     test('the accents are distinguishable from each other', () {
       // Two accents that read as the same colour convey nothing. Compared by hue rather than by
       // contrast: same-lightness colours can be far apart and still look identical.

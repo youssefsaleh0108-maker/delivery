@@ -641,6 +641,58 @@
   "@butlerStepConfirmed": {
     "description": "Last step of a send errand, which has no price to agree — the rider is booked to carry it."
   },
+  "butlerStepClaimBuyPending": "Waiting for a shopper",
+  "@butlerStepClaimBuyPending": {
+    "description": "Timeline step of a purchase errand nobody has taken yet. Worded as not-yet-happened on purpose: its finished form is butlerStepClaimedBuy."
+  },
+  "butlerStepClaimSendPending": "Waiting for a rider",
+  "butlerStepQuotePending": "The shopper tells you the price",
+  "butlerStepAgreePending": "You agree the price",
+  "butlerStepConfirmPending": "You confirm the fee",
+  "@butlerStepConfirmPending": {
+    "description": "Timeline step of a send errand still waiting for the customer to confirm the errand fee."
+  },
+  "butlerStepStateDone": "Done",
+  "@butlerStepStateDone": {
+    "description": "Read by a screen reader before a finished step of an errand's timeline."
+  },
+  "butlerStepStateNow": "Now",
+  "@butlerStepStateNow": {
+    "description": "Read by a screen reader before the timeline step the errand is currently waiting on."
+  },
+  "butlerStepStateNext": "Still to come",
+  "@butlerStepStateNext": {
+    "description": "Read by a screen reader before a timeline step the errand has not reached yet."
+  },
+  "butlerStepStateEnded": "Ended",
+  "@butlerStepStateEnded": {
+    "description": "Read by a screen reader before the step that ended an errand without an agreement (declined, cancelled, expired)."
+  },
+  "butlerDetailQuotedTotal": "Quoted total",
+  "@butlerDetailQuotedTotal": {
+    "description": "The total a declined errand was quoted at — shown so the customer sees what they turned down, without saying it is owed."
+  },
+  "butlerConfirmFee": "Confirm {amount}",
+  "@butlerConfirmFee": {
+    "description": "Button: the customer confirms a send errand a rider has taken, at this fee. This is what turns it into an order.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "butlerSendConfirmed": "Confirmed. The rider will collect it.",
+  "butlerSendAwaitingConfirm": "A rider took it. Confirm the fee of {fee} and they will collect it.",
+  "@butlerSendAwaitingConfirm": {
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "butlerDeclineConfirmTitle": "Turn down this price?",
+  "butlerDeclineConfirmBody": "The errand ends here and cannot be reopened. The shopper has already paid for the goods.",
+  "butlerDeclineConfirmYes": "Yes, decline",
   "somebodyElseClaimed": "Somebody else claimed that one",
   "whatYouPaidBeforeFee": "What you paid, before the errand fee",
   "sentForApproval": "Sent. They will approve the price before you deliver.",

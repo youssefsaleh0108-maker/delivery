@@ -118,26 +118,36 @@ enum DeliveryAccent {
   /// brighter and do not all clear it (this green is 2.5:1 on white). Applied as designed at the
   /// owner's request — so the old rule hardens into: the strong value is for glyphs and numbers ON
   /// the tint, never for text on bare white at body sizes.
-  positive(Color(0xFF10B981)),
+  positive(Color(0xFF10B981), Color(0xFF047857)),
 
   /// Needs a look, but nothing is broken — pending, near a limit, waiting on somebody.
-  caution(Color(0xFFF59E0B)),
+  caution(Color(0xFFF59E0B), Color(0xFFB45309)),
 
   /// Stopped, failed, refused.
-  critical(Color(0xFFEF4444)),
+  critical(Color(0xFFEF4444), Color(0xFFB91C1C)),
 
   /// Categorical rather than judgemental: a count that is neither good nor bad.
   ///
   /// Kept from the previous system — the design never paints purple, but existing call sites do,
   /// and a categorical colour that matches nothing else in the palette is doing its job.
-  neutral(Color(0xFF6C5CE0)),
+  neutral(Color(0xFF6C5CE0), Color(0xFF4F3FC4)),
 
   /// Informational, and the one that reads as "in motion". Blue-500.
-  info(Color(0xFF3B82F6));
+  info(Color(0xFF3B82F6), Color(0xFF1D4ED8));
 
-  const DeliveryAccent(this.color);
+  const DeliveryAccent(this.color, this.onTint);
 
   final Color color;
+
+  /// The same hue darkened for *words* on its own [tint] — a status label on a badge.
+  ///
+  /// [color] on its tint is fine for a glyph or a large number, and not for text: composited over
+  /// white, amber measures 1.96:1 on its own tint and green 2.27:1, well short of the 4.5:1 an
+  /// 11–12px label needs. That is *less* than the same text on bare white, so putting a bright
+  /// accent word on its tint does not rescue it. These are the Tailwind -700 stops of each hue (a
+  /// hand-darkened violet for [neutral]); every one clears 4.5:1 on its tint, amber-700 the
+  /// tightest at 4.58. Pinned by a test, so a brighter retouch fails the build, not the reader.
+  final Color onTint;
 
   /// The soft fill this accent sits on. 12% is the lightest tint that still reads as a surface
   /// rather than as a rendering artefact on a low-quality screen.

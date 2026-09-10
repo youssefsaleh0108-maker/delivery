@@ -152,6 +152,15 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
     await _act(() => widget.api.cancel(_r.id), t.cancelled);
   }
 
+  /// "No thanks" is as final as Cancel — the errand ends declined, the shopper is left holding
+  /// goods they paid for, and there is no undo — so it asks first for the same reason. It used to
+  /// fire on one touch, a finger's width from "Pay".
+  Future<void> _decline() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    if (!await confirmButlerDecline(context) || !mounted) return;
+    await _act(() => widget.api.decline(_r.id), t.declined);
+  }
+
   /// Exactly what the recent-tasks row used to do for an agreed errand, moved here so the row can
   /// open this page for every errand instead of only for the ones that had become orders.
   void _track() {
@@ -218,9 +227,19 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
   /// The one thing the customer can do next, if there is one.
   ///
   /// * quoted — the decision, as the list's quote card draws it: "No thanks" beside "Pay X".
-  /// * requested / claimed — Cancel, behind a confirmation. The server refuses it once a shopper
-  ///   has paid; by then the state is quoted and the exit is "No thanks" instead.
+  ///   "No thanks" is final, so it asks first, as Cancel does.
+  /// * claimed send — "Cancel" beside "Confirm X". A send has no price to quote, but it becomes an
+  ///   order — something the rider can run, and the customer can track — only when the customer
+  ///   approves it (infra/smoke-test-butler.js: "it goes straight from claimed to approved", on the
+  ///   customer's token). Without this button a send sat at "Claimed" for good.
+  /// * requested / claimed purchase — Cancel, behind a confirmation. The server refuses it once a
+  ///   shopper has paid; by then the state is quoted and the exit is "No thanks" instead.
   /// * agreed — Track order, once the order it became exists.
+  ///
+  /// Every button here is the regular 52px pill: the bar has the room, and the compact 44 is under
+  /// the 48dp Material minimum for the most consequential taps in Butler. In a pair the quiet
+  /// button takes its natural width and the answer takes the rest, so "Pay 124.90" or
+  /// "Confirm 2.50" is never the label that gets cut short on a narrow phone.
   Widget? _actions(DeliveryStrings t, ButlerRequest r) {
     return switch (r.status) {
       ButlerStatus.quoted => Column(
@@ -233,32 +252,37 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
               _overBudgetNote(t, r),
               const SizedBox(height: DeliverySpacing.sm),
             ],
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: YdPillButton.secondary(
-                    label: t.noThanks,
-                    size: YdPillButtonSize.compact,
-                    busy: _busy,
-                    onPressed: _busy
-                        ? null
-                        : () => _act(() => widget.api.decline(r.id), t.declined),
-                  ),
-                ),
-                const SizedBox(width: DeliverySpacing.sm),
-                Expanded(
-                  child: YdPillButton(
-                    label: t.payAmount(_money(r.payableTotal)),
-                    size: YdPillButtonSize.compact,
-                    busy: _busy,
-                    onPressed: _busy
-                        ? null
-                        : () => _act(() => widget.api.approve(r.id), t.approvedOnItsWay),
-                  ),
-                ),
-              ],
+            _answerPair(
+              no: YdPillButton.secondary(
+                label: t.noThanks,
+                expand: false,
+                busy: _busy,
+                onPressed: _busy ? null : _decline,
+              ),
+              yes: YdPillButton(
+                label: t.payAmount(_money(r.payableTotal)),
+                busy: _busy,
+                onPressed: _busy
+                    ? null
+                    : () => _act(() => widget.api.approve(r.id), t.approvedOnItsWay),
+              ),
             ),
           ],
+        ),
+      ButlerStatus.claimed when r.awaitingApproval => _answerPair(
+          no: YdPillButton.secondary(
+            label: t.cancel,
+            expand: false,
+            busy: _busy,
+            onPressed: _busy ? null : _cancel,
+          ),
+          yes: YdPillButton(
+            label: t.butlerConfirmFee(_money(r.payableTotal)),
+            busy: _busy,
+            onPressed: _busy
+                ? null
+                : () => _act(() => widget.api.approve(r.id), t.butlerSendConfirmed),
+          ),
         ),
       ButlerStatus.requested || ButlerStatus.claimed => YdPillButton.secondary(
           label: t.butlerCancelErrand,
@@ -273,6 +297,16 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
         ),
       _ => null,
     };
+  }
+
+  Widget _answerPair({required Widget no, required Widget yes}) {
+    return Row(
+      children: <Widget>[
+        no,
+        const SizedBox(width: DeliverySpacing.sm),
+        Expanded(child: yes),
+      ],
+    );
   }
 
   Widget _actionBar(Widget child) {
@@ -292,7 +326,7 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
   /// What it is, which kind of errand, and the status in words — the same sentence the list row
   /// shows, so the page reads as the row opened up rather than as a different account of it.
   Widget _summaryCard(DeliveryStrings t, ButlerRequest r) {
-    final (String label, Color colour) = butlerStatusOf(r, t);
+    final ButlerStatusLook status = butlerStatusOf(r, t);
 
     return YdCard.bordered(
       child: Column(
@@ -332,7 +366,13 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
                 ),
               ),
               const SizedBox(width: DeliverySpacing.sm),
-              YdBadge(label: label, color: colour, uppercase: false, fontSize: 12),
+              YdBadge(
+                label: status.label,
+                color: status.text,
+                background: status.fill,
+                uppercase: false,
+                fontSize: 12,
+              ),
             ],
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
@@ -355,6 +395,7 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
           const SizedBox(height: DeliverySpacing.md),
           for (int i = 0; i < steps.length; i++)
             _stepRow(
+              t,
               steps[i],
               last: i == steps.length - 1,
               // The connector is lit when the step it leads to has happened.
@@ -377,6 +418,12 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
   /// An errand that ended early (cancelled before anyone took it, expired on the board) shows only
   /// the steps it actually passed through and then how it ended — greyed-out steps it will never
   /// reach would read as if they might still happen.
+  ///
+  /// A step that has not happened is worded as something still to happen — "Waiting for a
+  /// shopper", "You agree the price" — and only takes its past-tense label once it has. The first
+  /// cut drew the steps ahead in their finished wording, so a brand-new request read "A shopper
+  /// took it · Price quoted · Price agreed", and a screen reader said exactly that: a blind
+  /// customer was told the price was already agreed. The dot alone cannot carry that difference.
   List<_Step> _stepsFor(DeliveryStrings t, ButlerRequest r) {
     final bool buying = r.mode == ButlerMode.buy;
     final ButlerStatus s = r.status;
@@ -390,18 +437,24 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
             s == ButlerStatus.quoted ||
             s == ButlerStatus.approved ||
             s == ButlerStatus.declined);
-    final String claimedLabel = buying ? t.butlerStepClaimedBuy : t.butlerStepClaimedSend;
-    final String agreedLabel = buying ? t.butlerStepAgreed : t.butlerStepConfirmed;
+    // Each step as (once it has happened, while it is still to happen).
+    final (String, String) claimedLabel = buying
+        ? (t.butlerStepClaimedBuy, t.butlerStepClaimBuyPending)
+        : (t.butlerStepClaimedSend, t.butlerStepClaimSendPending);
+    final (String, String) quotedLabel = (t.butlerStepQuoted, t.butlerStepQuotePending);
+    final (String, String) agreedLabel = buying
+        ? (t.butlerStepAgreed, t.butlerStepAgreePending)
+        : (t.butlerStepConfirmed, t.butlerStepConfirmPending);
 
     final List<_Step> steps = <_Step>[
       _Step(t.butlerStepRequested, _StepState.done, when: r.createdAt),
-      if (claimed) _Step(claimedLabel, _StepState.done, when: r.claimedAt),
-      if (quoted) _Step(t.butlerStepQuoted, _StepState.done, when: r.quotedAt),
+      if (claimed) _Step(claimedLabel.$1, _StepState.done, when: r.claimedAt),
+      if (quoted) _Step(quotedLabel.$1, _StepState.done, when: r.quotedAt),
     ];
 
     switch (s) {
       case ButlerStatus.approved:
-        steps.add(_Step(agreedLabel, _StepState.done, when: r.resolvedAt));
+        steps.add(_Step(agreedLabel.$1, _StepState.done, when: r.resolvedAt));
       case ButlerStatus.declined:
         final String? reason = r.declineReason?.trim();
         steps.add(_Step(
@@ -416,28 +469,49 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
         steps.add(_Step(t.butlerStatusExpired, _StepState.stopped,
             when: r.resolvedAt, note: t.nobodyPickedThisUp));
       case ButlerStatus.requested || ButlerStatus.claimed || ButlerStatus.quoted:
-        // Still moving: what is left, with the next one marked as where it has got to.
+        // Still moving: what is left, in its still-to-happen wording, with the next one marked as
+        // where it has got to. When that next step is the customer's own — agreeing a quote,
+        // confirming a send — it says so.
         final List<String> ahead = <String>[
-          if (!claimed) claimedLabel,
-          if (buying && !quoted) t.butlerStepQuoted,
-          agreedLabel,
+          if (!claimed) claimedLabel.$2,
+          if (buying && !quoted) quotedLabel.$2,
+          agreedLabel.$2,
         ];
         for (int i = 0; i < ahead.length; i++) {
           steps.add(_Step(
             ahead[i],
             i == 0 ? _StepState.current : _StepState.upcoming,
-            note: i == 0 && s == ButlerStatus.quoted ? t.custWaitingOnYou : null,
+            note: i == 0 && r.awaitingApproval ? t.custWaitingOnYou : null,
           ));
         }
     }
     return steps;
   }
 
-  Widget _stepRow(_Step step, {required bool last, required bool leadsToReached}) {
-    final bool reached = step.state == _StepState.done || step.state == _StepState.stopped;
+  /// One step: its dot and connector, then the label, the moment and any note.
+  ///
+  /// The row is one merged node for a screen reader, led by the step's state in words ("Done",
+  /// "Now", "Still to come", "Ended"). The dot is the only other thing that tells a finished step
+  /// from the one the errand is waiting on, and a dot says nothing aloud.
+  Widget _stepRow(DeliveryStrings t, _Step step,
+      {required bool last, required bool leadsToReached}) {
     final DateTime? when = step.when;
+    final String stateWord = switch (step.state) {
+      _StepState.done => t.butlerStepStateDone,
+      _StepState.current => t.butlerStepStateNow,
+      _StepState.upcoming => t.butlerStepStateNext,
+      _StepState.stopped => t.butlerStepStateEnded,
+    };
+    // Three tiers a sighted customer can tell apart without the dot: ink for what happened, brand
+    // for where it is now, muted for what is ahead. Muted rather than faint — faint is for
+    // decoration and would put the steps ahead under AA.
+    final Color labelColour = switch (step.state) {
+      _StepState.done || _StepState.stopped => DeliveryColors.ink,
+      _StepState.current => DeliveryColors.brand,
+      _StepState.upcoming => DeliveryColors.muted,
+    };
 
-    return IntrinsicHeight(
+    final Widget row = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -445,7 +519,7 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
             width: 24,
             child: Column(
               children: <Widget>[
-                _StepDot(state: step.state),
+                Semantics(label: stateWord, child: _StepDot(state: step.state)),
                 if (!last)
                   Expanded(
                     child: Container(
@@ -473,9 +547,7 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: reached || step.state == _StepState.current
-                          ? DeliveryColors.ink
-                          : DeliveryColors.faint,
+                      color: labelColour,
                       height: 1.3,
                     ),
                   ),
@@ -510,6 +582,7 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
         ],
       ),
     );
+    return MergeSemantics(child: row);
   }
 
   /// Where it comes from, where it goes, and who to ask — each only when the customer gave one.
@@ -560,9 +633,20 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
   /// the line says so instead of showing a zero, and no total is drawn — a "total" that is only
   /// the fee would be the one number on this page that is wrong. A send has no goods at all, so
   /// its total is the fee from the start.
+  ///
+  /// "Total to pay" is said only while the total can still be paid or has been agreed. A declined
+  /// errand keeps the figure the customer turned down, under the plainer "Quoted total", so they
+  /// can see what they said no to without being told they owe it. A cancelled or expired one has
+  /// no total at all — nothing was agreed and nothing is owed — where it used to end on a bold
+  /// "Total to pay 2.50", the one wrong number this comment set out to avoid.
   Widget _priceCard(DeliveryStrings t, ButlerRequest r) {
     final bool buying = r.mode == ButlerMode.buy;
     final bool priced = !buying || r.goodsCost != null;
+    final String? totalLabel = switch (r.status) {
+      ButlerStatus.cancelled || ButlerStatus.expired => null,
+      ButlerStatus.declined => t.butlerDetailQuotedTotal,
+      _ => t.butlerDetailTotal,
+    };
     final String? receipt = _present(r.receiptRef);
 
     return YdCard.bordered(
@@ -578,12 +662,13 @@ class _ButlerRequestDetailsScreenState extends State<ButlerRequestDetailsScreen>
           else if (buying && !r.status.isTerminal)
             _moneyLine(t.butlerDetailGoods, t.butlerDetailGoodsPending, pending: true),
           _moneyLine(t.butlerDetailErrandFee, _money(r.deliveryFee)),
-          if (priced) ...<Widget>[
+          if (priced && totalLabel != null) ...<Widget>[
             const Padding(
               padding: EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
               child: Divider(height: 1, thickness: 1, color: DeliveryColors.border),
             ),
-            _moneyLine(t.butlerDetailTotal, _money(r.payableTotal), strong: true),
+            _moneyLine(totalLabel, _money(r.payableTotal),
+                strong: r.status != ButlerStatus.declined),
           ],
           if (r.overBudget && r.budgetCap != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.sm),
@@ -844,21 +929,41 @@ class ButlerModeChip extends StatelessWidget {
   }
 }
 
-/// The status word and its colour.
+/// The status word, the colour it is written in, and the fill of the [YdBadge] behind it.
+typedef ButlerStatusLook = ({String label, Color text, Color fill});
+
+/// How an errand's status is named and painted.
 ///
 /// The design colour-codes green for finished and amber for outstanding; the states that are
-/// neither take the faint neutral rather than borrowing one of those meanings. Drawn as a
-/// [YdBadge], i.e. on its own tint — which is where the accent tokens are legible; as bare text on
-/// white the amber is not.
-(String, Color) butlerStatusOf(ButlerRequest r, DeliveryStrings t) {
+/// neither take a slate neutral rather than borrowing one of those meanings, and anything waiting
+/// on the customer is "Your call" in the brand's colours.
+///
+/// The word is written in a dark shade on a light fill, never in the accent itself: an accent on
+/// its own 12% tint measures 1.96:1 for amber, 2.27:1 for green and 2.33:1 for the faint grey —
+/// less than the same word on bare white, and far under the 4.5:1 a 12px label needs. The shades
+/// used here reach 4.58 (amber), 4.90 (green), 6.9 (the ended states, muted on slate-100) and 7.3
+/// ("Your call", brand-dark on brand-soft); a test holds every one to 4.5.
+ButlerStatusLook butlerStatusOf(ButlerRequest r, DeliveryStrings t) {
+  ButlerStatusLook accent(String label, DeliveryAccent a) =>
+      (label: label, text: a.onTint, fill: a.tint);
+  ButlerStatusLook ended(String label) =>
+      (label: label, text: DeliveryColors.muted, fill: DeliveryColors.borderFaint);
+  final ButlerStatusLook yourCall = (
+    label: t.butlerStatusYourCall,
+    text: DeliveryColors.brandDark,
+    fill: DeliveryColors.brandSoft,
+  );
+
+  // A claimed send is the customer's call as much as a quote is: it waits on their Confirm.
+  if (r.awaitingApproval) return yourCall;
   return switch (r.status) {
-    ButlerStatus.requested => (t.custStatusPending, DeliveryAccent.caution.color),
-    ButlerStatus.claimed => (t.butlerStatusClaimed, DeliveryAccent.caution.color),
-    ButlerStatus.quoted => (t.butlerStatusYourCall, DeliveryColors.brand),
-    ButlerStatus.approved => (t.butlerStatusAgreed, DeliveryAccent.positive.color),
-    ButlerStatus.declined => (t.declined, DeliveryColors.faint),
-    ButlerStatus.cancelled => (t.cancelled, DeliveryColors.faint),
-    ButlerStatus.expired => (t.butlerStatusExpired, DeliveryColors.faint),
+    ButlerStatus.requested => accent(t.custStatusPending, DeliveryAccent.caution),
+    ButlerStatus.claimed => accent(t.butlerStatusClaimed, DeliveryAccent.caution),
+    ButlerStatus.quoted => yourCall,
+    ButlerStatus.approved => accent(t.butlerStatusAgreed, DeliveryAccent.positive),
+    ButlerStatus.declined => ended(t.declined),
+    ButlerStatus.cancelled => ended(t.cancelled),
+    ButlerStatus.expired => ended(t.butlerStatusExpired),
   };
 }
 
@@ -868,9 +973,11 @@ String butlerSummaryLine(ButlerRequest r, DeliveryStrings t) {
   String money(double value) => value.toStringAsFixed(2);
   return switch (r.status) {
     ButlerStatus.requested => t.waitingForShopper(money(r.deliveryFee)),
+    // Not "a rider is on the way to collect it", which it used to say: nothing moves on a send
+    // until the customer confirms the fee, and this is the sentence that tells them to.
     ButlerStatus.claimed => r.mode == ButlerMode.buy
         ? t.shopperIsOnIt
-        : t.riderOnTheWayToCollect(money(r.payableTotal)),
+        : t.butlerSendAwaitingConfirm(money(r.payableTotal)),
     ButlerStatus.quoted =>
       t.goodsPlusFee(money(r.goodsCost ?? 0), money(r.deliveryFee), money(r.payableTotal)),
     ButlerStatus.approved => t.agreedAt(money(r.payableTotal)),
@@ -911,6 +1018,35 @@ Future<bool> confirmButlerCancel(BuildContext context) async {
           onPressed: () => Navigator.of(context).pop(true),
           style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
           child: Text(t.butlerCancelConfirmYes),
+        ),
+      ],
+    ),
+  );
+  return yes ?? false;
+}
+
+/// Asks before a quote is declined.
+///
+/// Declining is as final as cancelling — the errand ends, it cannot be reopened, and the shopper is
+/// left holding goods they paid for with their own money — and "No thanks" sat a finger's width from
+/// "Pay". The way out is "Back" rather than "Keep it": beside a price, "keep it" reads as keeping
+/// the goods, which is the opposite of what it would do. Resolves `true` only on an explicit yes.
+Future<bool> confirmButlerDecline(BuildContext context) async {
+  final DeliveryStrings t = DeliveryStrings.of(context);
+  final bool? yes = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) => AlertDialog(
+      title: Text(t.butlerDeclineConfirmTitle),
+      content: Text(t.butlerDeclineConfirmBody),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(t.back),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
+          child: Text(t.butlerDeclineConfirmYes),
         ),
       ],
     ),

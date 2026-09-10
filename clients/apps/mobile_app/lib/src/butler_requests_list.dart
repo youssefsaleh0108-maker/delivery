@@ -159,6 +159,14 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
     await _run(r.id, () => widget.api.cancel(r.id), t.cancelled);
   }
 
+  /// Declining a quote is as final as cancelling — the errand ends, and the shopper is left holding
+  /// goods they paid for — so it asks first too, as on the details page.
+  Future<void> _decline(ButlerRequest r) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    if (!await confirmButlerDecline(context) || !mounted) return;
+    await _run(r.id, () => widget.api.decline(r.id), t.declined);
+  }
+
   /// Opens the errand's page, and reloads at once if it changed while that page was open — so a
   /// customer who cancels or pays there comes back to a list that already says so, rather than one
   /// that catches up on its next poll.
@@ -249,12 +257,26 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
   /// with a brand hairline, which is exactly how the frame marks the thing you are being asked to
   /// choose.
   ///
-  /// The decision stays on the card, full-width and first: answering should never need a second
-  /// screen. The card itself opens the details page, for a customer who wants to see the receipt
-  /// or the timeline before saying yes — the buttons keep their own taps.
+  /// Two kinds of errand wait on the customer ([ButlerRequest.awaitingApproval]): a purchase the
+  /// shopper has priced — "No thanks" / "Pay X" — and a send a rider has taken, which only becomes
+  /// an order when the customer confirms the fee — "Cancel" / "Confirm X".
+  ///
+  /// The decision stays on the card, first: answering should never need a second screen. The card
+  /// itself opens the details page, for a customer who wants to see the receipt or the timeline
+  /// before saying yes — the buttons keep their own taps. Both are the regular 52px pill (the
+  /// compact 44 is under the 48dp minimum), and the quiet one takes only its natural width so the
+  /// answer, which carries the amount, is never the label cut short on a narrow phone. The quiet
+  /// one asks before it ends the errand, as Cancel does everywhere.
+  ///
+  /// While one of its actions is in flight the card stops opening the page. A busy pill gives its
+  /// InkWell a null onTap, so a tap on the spinner used to fall through to the card and open the
+  /// page mid-request — a page that, having read the errand before the answer landed, offered Pay
+  /// again, and a second approve is refused with an error for a payment that went through.
   Widget _quoteCard(ButlerRequest r) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final bool busy = _busyId == r.id;
+    final bool sending = r.mode == ButlerMode.send;
+    final String total = r.payableTotal.toStringAsFixed(2);
     final BorderRadius corners = BorderRadius.circular(DeliveryRadius.lg);
 
     return Material(
@@ -265,7 +287,7 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _openDetails(r),
+        onTap: busy ? null : () => _openDetails(r),
         child: Padding(
           padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
           child: Column(
@@ -310,26 +332,21 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
               const SizedBox(height: DeliverySpacing.md),
               Row(
                 children: <Widget>[
-                  Expanded(
-                    child: YdPillButton.secondary(
-                      label: t.noThanks,
-                      size: YdPillButtonSize.compact,
-                      busy: busy,
-                      onPressed: busy
-                          ? null
-                          : () => _run(r.id, () => widget.api.decline(r.id), t.declined),
-                    ),
+                  YdPillButton.secondary(
+                    label: sending ? t.cancel : t.noThanks,
+                    expand: false,
+                    busy: busy,
+                    onPressed: busy ? null : () => sending ? _cancel(r) : _decline(r),
                   ),
                   const SizedBox(width: DeliverySpacing.sm),
                   Expanded(
                     child: YdPillButton(
-                      label: t.payAmount(r.payableTotal.toStringAsFixed(2)),
-                      size: YdPillButtonSize.compact,
+                      label: sending ? t.butlerConfirmFee(total) : t.payAmount(total),
                       busy: busy,
                       onPressed: busy
                           ? null
-                          : () => _run(
-                              r.id, () => widget.api.approve(r.id), t.approvedOnItsWay),
+                          : () => _run(r.id, () => widget.api.approve(r.id),
+                              sending ? t.butlerSendConfirmed : t.approvedOnItsWay),
                     ),
                   ),
                 ],
@@ -374,21 +391,25 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
   /// chevron that says the row opens something.
   ///
   /// The whole row is the target and is at least [_minTapTarget] tall. Cancel, where it is still
-  /// possible, is a real button on its own line — the design system's compact secondary pill,
-  /// labelled with what it cancels — instead of the 11px link it used to be, and it asks first.
+  /// possible, is a real button on its own line — the design system's secondary pill, labelled
+  /// with what it cancels — instead of the 11px link it used to be, and it asks first. It is the
+  /// regular 52px size: the compact one is 44, under the same 48dp minimum the row is held to.
+  ///
+  /// While the row's Cancel is in flight the row does not open the page, for the reason the quote
+  /// card gives: a tap on the busy pill would otherwise fall through to the row.
   Widget _taskRow(ButlerRequest r) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final bool busy = _busyId == r.id;
     final bool cancellable =
         r.status == ButlerStatus.requested || r.status == ButlerStatus.claimed;
-    final (String label, Color colour) = butlerStatusOf(r, t);
+    final ButlerStatusLook status = butlerStatusOf(r, t);
 
     // A transparent Material of its own: the card paints white over the Scaffold's Material, and
     // an ink ripple drawn underneath that white is a ripple nobody sees.
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
-        onTap: () => _openDetails(r),
+        onTap: busy ? null : () => _openDetails(r),
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: _minTapTarget),
@@ -422,7 +443,15 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
                             ),
                           ),
                           const SizedBox(width: DeliverySpacing.sm),
-                          YdBadge(label: label, color: colour, uppercase: false),
+                          // 12px, the size the bare status word had before it became a badge;
+                          // the badge's own default of 11 shrank it.
+                          YdBadge(
+                            label: status.label,
+                            color: status.text,
+                            background: status.fill,
+                            uppercase: false,
+                            fontSize: 12,
+                          ),
                         ],
                       ),
                       const SizedBox(height: DeliverySpacing.xs),
@@ -441,7 +470,6 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
                         YdPillButton.secondary(
                           label: t.butlerCancelErrand,
                           icon: Icons.close_rounded,
-                          size: YdPillButtonSize.compact,
                           expand: false,
                           busy: busy,
                           onPressed: busy ? null : () => _cancel(r),
@@ -462,12 +490,15 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
     );
   }
 
-  /// "This opens something", mirrored in RTL like every other chevron in the app.
+  /// "This opens something" — pointing forward in either direction.
+  ///
+  /// Always [Icons.chevron_right]: it is declared with `matchTextDirection`, so [Icon] already
+  /// flips it in an RTL context. Picking chevron_left for Arabic, as this did (and as a few older
+  /// screens still do), flips it a second time, so an Arabic row pointed back the way the customer
+  /// came.
   Widget _chevron(DeliveryStrings t) {
     return Icon(
-      Directionality.of(context) == TextDirection.rtl
-          ? Icons.chevron_left
-          : Icons.chevron_right,
+      Icons.chevron_right,
       size: 20,
       color: DeliveryColors.faint,
       semanticLabel: t.butlerViewDetails,

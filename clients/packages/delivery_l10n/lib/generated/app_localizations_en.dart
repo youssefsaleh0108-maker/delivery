@@ -962,6 +962,59 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get butlerStepConfirmed => 'Confirmed';
 
   @override
+  String get butlerStepClaimBuyPending => 'Waiting for a shopper';
+
+  @override
+  String get butlerStepClaimSendPending => 'Waiting for a rider';
+
+  @override
+  String get butlerStepQuotePending => 'The shopper tells you the price';
+
+  @override
+  String get butlerStepAgreePending => 'You agree the price';
+
+  @override
+  String get butlerStepConfirmPending => 'You confirm the fee';
+
+  @override
+  String get butlerStepStateDone => 'Done';
+
+  @override
+  String get butlerStepStateNow => 'Now';
+
+  @override
+  String get butlerStepStateNext => 'Still to come';
+
+  @override
+  String get butlerStepStateEnded => 'Ended';
+
+  @override
+  String get butlerDetailQuotedTotal => 'Quoted total';
+
+  @override
+  String butlerConfirmFee(String amount) {
+    return 'Confirm $amount';
+  }
+
+  @override
+  String get butlerSendConfirmed => 'Confirmed. The rider will collect it.';
+
+  @override
+  String butlerSendAwaitingConfirm(String fee) {
+    return 'A rider took it. Confirm the fee of $fee and they will collect it.';
+  }
+
+  @override
+  String get butlerDeclineConfirmTitle => 'Turn down this price?';
+
+  @override
+  String get butlerDeclineConfirmBody =>
+      'The errand ends here and cannot be reopened. The shopper has already paid for the goods.';
+
+  @override
+  String get butlerDeclineConfirmYes => 'Yes, decline';
+
+  @override
   String get somebodyElseClaimed => 'Somebody else claimed that one';
 
   @override

@@ -240,11 +240,17 @@ void main() {
           createdAt: DateTime.now(),
         );
 
-    test('only a quoted request is waiting on the customer', () {
+    test('a quoted purchase, or a send a rider has taken, is waiting on the customer', () {
       // This is what pulls a card to the top of the customer's list and rings it. If it were true
-      // of any other state the list would nag about errands nobody can act on.
+      // of any other state the list would nag about errands nobody can act on. And it must be
+      // true of a claimed send: the server only turns one into an order when the customer
+      // approves it (infra/smoke-test-butler.js), so a send left in the history with no Confirm
+      // sat at "Claimed" forever.
       for (final ButlerStatus s in ButlerStatus.values) {
-        expect(at(s).awaitingApproval, s == ButlerStatus.quoted, reason: '$s');
+        expect(at(s).awaitingApproval, s == ButlerStatus.quoted, reason: 'buy $s');
+        expect(at(s, mode: ButlerMode.send).awaitingApproval,
+            s == ButlerStatus.quoted || s == ButlerStatus.claimed,
+            reason: 'send $s');
       }
     });
 

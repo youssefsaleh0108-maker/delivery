@@ -961,6 +961,59 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get butlerStepConfirmed => 'تم التأكيد';
 
   @override
+  String get butlerStepClaimBuyPending => 'بانتظار متسوّق';
+
+  @override
+  String get butlerStepClaimSendPending => 'بانتظار سائق';
+
+  @override
+  String get butlerStepQuotePending => 'يخبرك المتسوّق بالسعر';
+
+  @override
+  String get butlerStepAgreePending => 'توافق على السعر';
+
+  @override
+  String get butlerStepConfirmPending => 'تؤكّد الرسوم';
+
+  @override
+  String get butlerStepStateDone => 'تم';
+
+  @override
+  String get butlerStepStateNow => 'الآن';
+
+  @override
+  String get butlerStepStateNext => 'لم يحن بعد';
+
+  @override
+  String get butlerStepStateEnded => 'انتهت';
+
+  @override
+  String get butlerDetailQuotedTotal => 'الإجمالي المعروض';
+
+  @override
+  String butlerConfirmFee(String amount) {
+    return 'تأكيد $amount';
+  }
+
+  @override
+  String get butlerSendConfirmed => 'تم التأكيد. سيأتي السائق لاستلامها.';
+
+  @override
+  String butlerSendAwaitingConfirm(String fee) {
+    return 'تولّاها سائق. أكّد رسوم $fee وسيأتي لاستلامها.';
+  }
+
+  @override
+  String get butlerDeclineConfirmTitle => 'هل تريد رفض هذا السعر؟';
+
+  @override
+  String get butlerDeclineConfirmBody =>
+      'تنتهي المهمة هنا ولا يمكن إعادة فتحها. لقد دفع المتسوّق ثمن المشتريات بالفعل.';
+
+  @override
+  String get butlerDeclineConfirmYes => 'نعم، ارفض';
+
+  @override
   String get somebodyElseClaimed => 'استلمها شخص آخر';
 
   @override

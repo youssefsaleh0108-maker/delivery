@@ -372,10 +372,15 @@ class _RiderButlerBoardState extends State<RiderButlerBoard> {
             onPressed: busy ? null : () => _askPrice(r),
           ),
         ),
-      // A pickup has no goods price to agree, so it is already approved and waiting to be run.
+      // A pickup has no goods price to quote, but it is not approved yet either. It becomes an
+      // order — the thing in the rider's Deliveries tab — only when the customer confirms the fee
+      // (infra/smoke-test-butler.js: the customer's approve takes a claimed send straight to
+      // approved). This used to tell the rider it was already approved and to go and run it,
+      // when there was no order yet to collect against. Until the customer answers, the rider
+      // waits, exactly as for a quoted purchase.
       ButlerStatus.claimed => _Note(
-          icon: Icons.directions_bike_rounded,
-          text: t.collectAndDropInstruction,
+          icon: Icons.hourglass_bottom_rounded,
+          text: t.waitingOnApproval,
         ),
       ButlerStatus.quoted => _Note(
           icon: Icons.hourglass_bottom_rounded,

@@ -1766,6 +1766,102 @@ abstract class DeliveryStrings {
   /// **'Confirmed'**
   String get butlerStepConfirmed;
 
+  /// Timeline step of a purchase errand nobody has taken yet. Worded as not-yet-happened on purpose: its finished form is butlerStepClaimedBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a shopper'**
+  String get butlerStepClaimBuyPending;
+
+  /// No description provided for @butlerStepClaimSendPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a rider'**
+  String get butlerStepClaimSendPending;
+
+  /// No description provided for @butlerStepQuotePending.
+  ///
+  /// In en, this message translates to:
+  /// **'The shopper tells you the price'**
+  String get butlerStepQuotePending;
+
+  /// No description provided for @butlerStepAgreePending.
+  ///
+  /// In en, this message translates to:
+  /// **'You agree the price'**
+  String get butlerStepAgreePending;
+
+  /// Timeline step of a send errand still waiting for the customer to confirm the errand fee.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirm the fee'**
+  String get butlerStepConfirmPending;
+
+  /// Read by a screen reader before a finished step of an errand's timeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get butlerStepStateDone;
+
+  /// Read by a screen reader before the timeline step the errand is currently waiting on.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get butlerStepStateNow;
+
+  /// Read by a screen reader before a timeline step the errand has not reached yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Still to come'**
+  String get butlerStepStateNext;
+
+  /// Read by a screen reader before the step that ended an errand without an agreement (declined, cancelled, expired).
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get butlerStepStateEnded;
+
+  /// The total a declined errand was quoted at — shown so the customer sees what they turned down, without saying it is owed.
+  ///
+  /// In en, this message translates to:
+  /// **'Quoted total'**
+  String get butlerDetailQuotedTotal;
+
+  /// Button: the customer confirms a send errand a rider has taken, at this fee. This is what turns it into an order.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {amount}'**
+  String butlerConfirmFee(String amount);
+
+  /// No description provided for @butlerSendConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed. The rider will collect it.'**
+  String get butlerSendConfirmed;
+
+  /// No description provided for @butlerSendAwaitingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider took it. Confirm the fee of {fee} and they will collect it.'**
+  String butlerSendAwaitingConfirm(String fee);
+
+  /// No description provided for @butlerDeclineConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn down this price?'**
+  String get butlerDeclineConfirmTitle;
+
+  /// No description provided for @butlerDeclineConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The errand ends here and cannot be reopened. The shopper has already paid for the goods.'**
+  String get butlerDeclineConfirmBody;
+
+  /// No description provided for @butlerDeclineConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, decline'**
+  String get butlerDeclineConfirmYes;
+
   /// No description provided for @somebodyElseClaimed.
   ///
   /// In en, this message translates to:
