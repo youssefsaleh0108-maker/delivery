@@ -409,11 +409,22 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
           ),
         ),
       ),
-      bottomNavigationBar: widget.cart.isEmpty
-          ? null
-          : AnimatedBuilder(
-              animation: widget.cart,
-              builder: (BuildContext context, _) => StickyBasketBar(
+      // The empty check belongs INSIDE the builder, not outside it.
+      //
+      // It used to read `widget.cart.isEmpty ? null : AnimatedBuilder(...)`, which looks
+      // equivalent and is not: that test runs during build(), and the only thing subscribed to
+      // the cart was the AnimatedBuilder around the body. So adding the first item rebuilt the
+      // body — the product row's quantity badge duly appeared — while the Scaffold's
+      // bottomNavigationBar argument was never re-evaluated and stayed null. A customer put their
+      // first item in the basket and got no basket bar at all, on the shop page, with no way
+      // forward from that screen; it only appeared later, if something unrelated happened to
+      // rebuild the page. Subscribing first and deciding second is what makes the bar arrive with
+      // the item it is about.
+      bottomNavigationBar: AnimatedBuilder(
+        animation: widget.cart,
+        builder: (BuildContext context, _) => widget.cart.isEmpty
+            ? const SizedBox.shrink()
+            : StickyBasketBar(
                 itemCount: widget.cart.itemCount,
                 total: widget.cart.subtotal.toStringAsFixed(2),
                 label: DeliveryStrings.of(context).viewBasket,
@@ -423,7 +434,7 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                         widget.cart.amountBelowMinimum.toStringAsFixed(2)),
                 onTap: () => Navigator.of(context).pop(),
               ),
-            ),
+      ),
     );
   }
 
