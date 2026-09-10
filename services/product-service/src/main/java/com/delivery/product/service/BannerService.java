@@ -100,11 +100,18 @@ public class BannerService {
     }
 
     /**
-     * Checks a STORE or CATEGORY banner actually points at something that exists.
+     * Checks a STORE or CATEGORY banner actually points somewhere a tap can go.
      *
      * <p>Caught here rather than left to the tap: a banner pointing at a deleted category is a dead
      * end a customer discovers, and the person who could fix it is not the person who finds it.
      * URL targets are not followed — that is not this service's job.
+     *
+     * <p>For a category, existing is not enough. The customer app follows a CATEGORY banner by
+     * matching its target against the home strip — the chips — and the strip is
+     * {@link #verticalCategories()}, the platform categories that carry a vertical. Point a banner
+     * at any of the others and it passes every check, goes live, and does nothing at all when
+     * tapped: the app finds no chip and silently returns. That is precisely the dead end this
+     * method exists to prevent, so the tag is part of what makes a category a destination.
      */
     private void validateTarget(Banner banner) {
         if (banner.getLinkKind() == Banner.LinkKind.NONE
@@ -118,10 +125,19 @@ public class BannerService {
             throw new CatalogRuleViolationException(
                     "A " + banner.getLinkKind() + " banner needs an id to point at");
         }
-        boolean exists = banner.getLinkKind() == Banner.LinkKind.CATEGORY
-                ? categories.existsById(target)
-                : stores.existsById(target);
-        if (!exists) {
+        if (banner.getLinkKind() == Banner.LinkKind.CATEGORY) {
+            Category category = categories.findById(target).orElseThrow(
+                    () -> new CatalogRuleViolationException(
+                            "Nothing found for CATEGORY " + target));
+            if (category.getVertical() == null) {
+                throw new CatalogRuleViolationException(
+                        "\"" + category.getName() + "\" is not on the home strip, so tapping this "
+                                + "banner would do nothing. Give the category a vertical first, or "
+                                + "point the banner at one that has one.");
+            }
+            return;
+        }
+        if (!stores.existsById(target)) {
             throw new CatalogRuleViolationException(
                     "Nothing found for " + banner.getLinkKind() + " " + target);
         }

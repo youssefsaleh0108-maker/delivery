@@ -102,6 +102,77 @@ class BannerEditorialRulesTest {
     }
 
     @Nested
+    @DisplayName("where a banner is allowed to point")
+    class Destinations {
+
+        private static final UUID TARGET = UUID.fromString("815eb423-3c77-4434-b68a-901bc5ab7a3a");
+
+        private BannerRequest pointingAtCategory() {
+            return new BannerRequest("Frozen aisle now open", "Ice cream and peas",
+                    Banner.LinkKind.CATEGORY, TARGET.toString(), 0, true);
+        }
+
+        private Category category(String name, Store.Vertical vertical) {
+            Category c = new Category(name, null);
+            c.setVertical(vertical);
+            return c;
+        }
+
+        @Test
+        void a_category_that_is_not_there_is_refused() {
+            when(categories.findById(TARGET)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.create(pointingAtCategory()))
+                    .isInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessageContaining("Nothing found for CATEGORY");
+            verify(banners, never()).save(any(Banner.class));
+        }
+
+        /**
+         * THE ONE THAT MATTERS. Existing was the whole of the old check, and it let through the
+         * exact dead end the check was written to prevent.
+         *
+         * <p>The customer app follows a CATEGORY banner by matching the target against the home
+         * strip, which is the categories carrying a vertical — seven of the twenty on dev. Point a
+         * banner at one of the other thirteen and every gate passes: the id is a real category, the
+         * service saves it, the console lists it as Live, and a customer who taps it gets nothing.
+         * No error, no navigation, no way for the person who published it to find out.
+         */
+        @Test
+        void a_category_that_is_not_on_the_home_strip_is_refused() {
+            when(categories.findById(TARGET)).thenReturn(Optional.of(category("Frozen", null)));
+
+            assertThatThrownBy(() -> service.create(pointingAtCategory()))
+                    .isInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessageContaining("Frozen")
+                    .hasMessageContaining("home strip");
+            verify(banners, never()).save(any(Banner.class));
+        }
+
+        @Test
+        void a_category_on_the_home_strip_is_accepted() {
+            when(categories.findById(TARGET))
+                    .thenReturn(Optional.of(category("Groceries", Store.Vertical.GROCERY)));
+
+            assertThatCode(() -> service.create(pointingAtCategory())).doesNotThrowAnyException();
+            verify(banners).save(any(Banner.class));
+        }
+
+        /** Editing an existing banner goes through the same gate — that was the other way in. */
+        @Test
+        void the_same_gate_stands_on_an_edit() {
+            Banner existing = new Banner("Frozen aisle now open", null, Banner.LinkKind.NONE, null,
+                    0, true, Instant.parse("2026-09-09T09:00:00Z"));
+            when(banners.findById(TARGET)).thenReturn(Optional.of(existing));
+            when(categories.findById(TARGET)).thenReturn(Optional.of(category("Frozen", null)));
+
+            assertThatThrownBy(() -> service.update(TARGET, pointingAtCategory()))
+                    .isInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessageContaining("home strip");
+        }
+    }
+
+    @Nested
     @DisplayName("tagging a category with a vertical")
     class Verticals {
 

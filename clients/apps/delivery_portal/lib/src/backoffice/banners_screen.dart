@@ -75,7 +75,13 @@ class _BannerListState extends State<_BannerList> {
   /// Catches everything, not just [DioException]: a failure that is not an HTTP failure — a
   /// missing platform plugin, a bad decode — would otherwise leave the button looking like it
   /// simply does nothing, which is the worst thing a button can do.
-  Future<void> _run(Future<void> Function() action, String success) async {
+  /// [onError] takes the failure instead of the SnackBar, for callers that have somewhere better
+  /// to put it - the edit dialog shows it beside the field that caused it and stays open.
+  Future<void> _run(
+    Future<void> Function() action,
+    String success, {
+    void Function(Object error)? onError,
+  }) async {
     setState(() => _busy = true);
     try {
       await action();
@@ -83,6 +89,10 @@ class _BannerListState extends State<_BannerList> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
       _load(_pageIndex);
     } catch (e) {
+      if (onError != null) {
+        onError(e);
+        return;
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message(e))));
     } finally {
@@ -110,12 +120,24 @@ class _BannerListState extends State<_BannerList> {
   }
 
   Future<void> _edit({HomeBanner? existing}) async {
-    final _BannerDraft? draft = await showDialog<_BannerDraft>(
+    await showDialog<void>(
       context: context,
-      builder: (BuildContext context) => _BannerDialog(existing: existing),
+      builder: (BuildContext context) => _BannerDialog(
+        existing: existing,
+        submit: (_BannerDraft draft) => _save(existing, draft),
+      ),
     );
-    if (draft == null) return;
+  }
 
+  /// Writes one banner, and answers the dialog with the reason when the service refuses it.
+  ///
+  /// Returning the message instead of showing it is what keeps the dialog open. The refusal that
+  /// actually happens here is a destination that does not resolve - the service checks that a
+  /// STORE or CATEGORY id exists - and the operator fixes that by correcting one field. Popping
+  /// first and reporting afterwards, which is what this screen used to do, threw away a title, a
+  /// subtitle, a destination and a position to report a typo in one of them.
+  Future<String?> _save(HomeBanner? existing, _BannerDraft draft) async {
+    String? failure;
     await _run(
       () async {
         if (existing == null) {
@@ -140,7 +162,9 @@ class _BannerListState extends State<_BannerList> {
         }
       },
       existing == null ? 'Banner created' : 'Banner saved',
+      onError: (Object error) => failure = _message(error),
     );
+    return failure;
   }
 
   Future<void> _upload(HomeBanner banner) async {
@@ -403,9 +427,12 @@ class _BannerDraft {
 }
 
 class _BannerDialog extends StatefulWidget {
-  const _BannerDialog({this.existing});
+  const _BannerDialog({required this.submit, this.existing});
 
   final HomeBanner? existing;
+
+  /// Writes the banner. Returns null when it landed, or the message to show in the dialog.
+  final Future<String?> Function(_BannerDraft draft) submit;
 
   @override
   State<_BannerDialog> createState() => _BannerDialogState();
@@ -424,6 +451,7 @@ class _BannerDialogState extends State<_BannerDialog> {
   late BannerLinkKind _kind = widget.existing?.linkKind ?? BannerLinkKind.none;
   late bool _active = widget.existing?.active ?? true;
   String? _error;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -434,7 +462,7 @@ class _BannerDialogState extends State<_BannerDialog> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final String title = _title.text.trim();
     if (title.isEmpty) {
       setState(() => _error = 'A banner needs a title');
@@ -451,7 +479,11 @@ class _BannerDialogState extends State<_BannerDialog> {
       return;
     }
 
-    Navigator.of(context).pop(_BannerDraft(
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final String? failure = await widget.submit(_BannerDraft(
       title: title,
       subtitle: _subtitle.text.trim().isEmpty ? null : _subtitle.text.trim(),
       linkKind: _kind,
@@ -459,6 +491,15 @@ class _BannerDialogState extends State<_BannerDialog> {
       position: position,
       active: _active,
     ));
+    if (!mounted) return;
+    if (failure == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _saving = false;
+      _error = failure;
+    });
   }
 
   static String _kindLabel(BannerLinkKind kind) => switch (kind) {
@@ -561,12 +602,18 @@ class _BannerDialogState extends State<_BannerDialog> {
       ),
       actions: <Widget>[
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: _submit,
-          child: Text(widget.existing == null ? 'Create' : 'Save'),
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(widget.existing == null ? 'Create' : 'Save'),
         ),
       ],
     );
