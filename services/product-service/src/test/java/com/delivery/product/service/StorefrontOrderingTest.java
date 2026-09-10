@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,8 +65,16 @@ class StorefrontOrderingTest {
     @Mock private ProductRepository products;
     @Mock private CategoryRepository categories;
 
-    private final StoreService service = new StoreService(stores, offers, favorites, products,
-            categories, Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC));
+    private StoreService service;
+
+    // Built here, not as a field initialiser: those run before Mockito injects the @Mock fields,
+    // so the service would be constructed with six nulls and every test would fail on the first
+    // call with an NPE about the repository rather than about anything it was asking.
+    @BeforeEach
+    void setUp() {
+        service = new StoreService(stores, offers, favorites, products, categories,
+                Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC));
+    }
 
     /** Runs a storefront read and hands back the Pageable the repository was actually given. */
     private Pageable pageableFor(Pageable asked) {

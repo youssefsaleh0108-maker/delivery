@@ -78,7 +78,7 @@ public class BannerService {
     public Banner create(BannerRequest request) {
         try {
             Banner banner = new Banner(request.title(), request.subtitle(), request.linkKind(),
-                    request.linkTarget(), request.position(), request.active());
+                    request.linkTarget(), request.position(), request.active(), clock.instant());
             validateTarget(banner);
             return banners.save(banner);
         } catch (IllegalArgumentException e) {

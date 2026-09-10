@@ -85,13 +85,21 @@ public class Banner {
      * saved as a draft — artwork still being agreed, a campaign dated for next month — went out to
      * every customer's home screen the moment it was created, and the only way back was for
      * somebody to notice and withdraw it.
+     *
+     * @param startsAt when this banner begins running — the caller's clock, not the wall clock.
+     *     It used to be {@code Instant.now()} here, which quietly made BannerService's injected
+     *     {@code Clock} a lie: a test could fix the clock to a moment, create a banner, ask
+     *     {@link #isLiveAt} about that same moment, and really be comparing against the machine's
+     *     real time. One did exactly that. It passed for as long as the real date stayed behind
+     *     the instant it hardcoded, then turned red on its own overnight with nothing changed —
+     *     and took the whole service's build with it.
      */
     public Banner(String title, String subtitle, LinkKind linkKind, String linkTarget,
-                  int position, boolean active) {
+                  int position, boolean active, Instant startsAt) {
         this.id = UUID.randomUUID();
         this.title = title;
         this.subtitle = subtitle;
-        this.startsAt = Instant.now();
+        this.startsAt = startsAt;
         this.active = active;
         applyLink(linkKind, linkTarget);
         this.position = (short) position;
