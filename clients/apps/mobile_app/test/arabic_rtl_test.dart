@@ -163,6 +163,8 @@ void main() {
           // does not appear, which is the same as a deployment with no areas configured.
           zoneApi: DeliveryZoneApi(dio),
           cart: Cart(),
+          // Nothing here opens a shop, so there is no basket bar to follow.
+          onOpenBasket: () {},
         ),
         const Locale('ar'),
       ));

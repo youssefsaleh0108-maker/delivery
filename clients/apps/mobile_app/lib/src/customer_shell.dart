@@ -111,6 +111,28 @@ class _CustomerShellState extends State<CustomerShell> {
   /// to Orders says so by name and cannot be broken by the order changing again.
   void _open(int tab) => setState(() => _index = tab);
 
+  /// Opens the Basket tab from anywhere — including from a screen pushed over this shell, which is
+  /// where every "View basket" in the app lives.
+  ///
+  /// The shop page is pushed from Home, a category listing or an order, and the nav bar is
+  /// underneath it. Switching the index alone would change a tab nobody can see. So this first
+  /// pops everything above the shell's own route and then switches: the customer lands on the one
+  /// basket with the bar under it, can check out from there, and checkout's jump to Orders works
+  /// because nothing is left covering it. The Home tab keeps its scroll position under all of this
+  /// (it is a child of the IndexedStack, not one of the routes being popped), so going back to
+  /// shopping afterwards is one tap on Home.
+  ///
+  /// Pops to THIS route, not to the first one. The shell is not always the root: an applicant
+  /// exploring as a customer has it pushed over their application status (main.dart's
+  /// `_exploreAsCustomer`), and popping to the first route would throw them out of the shop
+  /// altogether instead of into their basket.
+  void _openBasket() {
+    final ModalRoute<Object?>? shell = ModalRoute.of(context);
+    Navigator.of(context)
+        .popUntil((Route<dynamic> route) => route == shell || route.isFirst);
+    _open(CustomerNavBar.basketIndex);
+  }
+
   /// Re-asks the server what this basket qualifies for, when the basket has actually changed.
   ///
   /// Crossing an offer's minimum is exactly the moment the customer should see the fee disappear,
@@ -164,6 +186,7 @@ class _CustomerShellState extends State<CustomerShell> {
           splitApi: widget.splitApi,
           transferApi: widget.transferApi,
           onSignOut: widget.onSignOut,
+          onOpenBasket: _openBasket,
         );
       case CustomerNavBar.ordersIndex:
         return MyOrdersScreen(
@@ -173,6 +196,7 @@ class _CustomerShellState extends State<CustomerShell> {
           trackingSocket: widget.trackingSocket,
           chatApi: widget.chatApi,
           cart: _cart,
+          onOpenBasket: _openBasket,
         );
       case CustomerNavBar.butlerIndex:
         return ButlerScreen(
@@ -185,6 +209,7 @@ class _CustomerShellState extends State<CustomerShell> {
           trackingSocket: widget.trackingSocket,
           chatApi: widget.chatApi,
           cart: _cart,
+          onOpenBasket: _openBasket,
         );
       case CustomerNavBar.basketIndex:
         return CartScreen(

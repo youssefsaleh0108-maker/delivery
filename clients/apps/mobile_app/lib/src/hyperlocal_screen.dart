@@ -24,11 +24,16 @@ class HyperlocalScreen extends StatefulWidget {
     required this.storeApi,
     required this.orderApi,
     required this.cart,
+    required this.onOpenBasket,
   });
 
   final StoreApi storeApi;
   final OrderApi orderApi;
   final Cart cart;
+
+  /// Handed to every shop opened from this list, for its basket bar. See
+  /// [StorePageScreen.onOpenBasket].
+  final VoidCallback onOpenBasket;
 
   @override
   State<HyperlocalScreen> createState() => _HyperlocalScreenState();
@@ -104,6 +109,7 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }

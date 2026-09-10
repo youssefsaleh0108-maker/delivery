@@ -241,9 +241,12 @@ void main() {
             'On screen: ${describeScreen(tester)}');
     step('added "$productName" to the basket');
 
-    // Back to the shell first. StorePageScreen is a PUSHED route and the shell — nav bar included
-    // — sits underneath it, so tapping a tab from here finds nothing at all. The sticky basket bar
-    // that appears once the cart is non-empty is the shop page's own way out: its onTap is a pop.
+    // StorePageScreen is a PUSHED route and the shell — nav bar included — sits underneath it, so
+    // the sticky basket bar that appears once the cart is non-empty is the shop page's only way to
+    // the basket. It closes the shop and opens the shell's Basket tab by itself. It used to be a
+    // bare pop, which returned to whatever the shop was opened from (Home, here), and this test
+    // then tapped the Basket tab on the customer's behalf — the one step a customer did not know
+    // to take, and so the step that hid the bug.
     //
     // Matched on the widget rather than on the label, because the bar RENAMES itself: when the
     // basket is under the shop's minimum order it renders `addToReachMinimumShort` instead of
@@ -270,12 +273,13 @@ void main() {
     await tester.tap(basketTap);
     await pumpUntilGone(tester, find.byType(StorePageScreen),
         timeout: const Duration(seconds: 30),
-        reason: 'The basket bar did not return the app to the shell.');
+        reason: 'The basket bar did not close the shop page.');
 
-    await tester.tap(find.descendant(
-        of: find.byType(CustomerNavBar), matching: find.text(en.navBasket)));
+    // No tap on the Basket tab: View basket has to land there on its own. Tapping the tab here as
+    // well would pass against the old bare pop too, which is how it went unnoticed.
     await pumpUntil(tester, find.byType(CartScreen),
-        reason: 'The Basket tab did not build.');
+        reason: 'View basket closed the shop but did not open the Basket tab — the customer is '
+            'back on whatever the shop was opened from.');
 
     final Finder proceed = find.widgetWithText(YdPillButton, en.custProceedToCheckout);
     expect(find.widgetWithText(YdPillButton, en.minimumNotReached), findsNothing,

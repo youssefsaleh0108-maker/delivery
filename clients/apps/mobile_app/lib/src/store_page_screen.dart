@@ -24,6 +24,7 @@ class StorePageScreen extends StatefulWidget {
     required this.storeApi,
     required this.cart,
     required this.storeId,
+    required this.onOpenBasket,
     this.preview,
     this.orderApi,
     this.onFavoriteChanged,
@@ -47,6 +48,23 @@ class StorePageScreen extends StatefulWidget {
   /// rather than a popped result because this page can leave by system back or edge swipe, which
   /// return nothing.
   final void Function(StoreCard store)? onFavoriteChanged;
+
+  /// Where the basket bar's "View basket" goes: the customer shell's Basket tab.
+  ///
+  /// The bar used to call `Navigator.pop()`, on the theory that the basket was "back there". It is
+  /// not. This page is pushed over the shell from Home, from a banner, from a category listing,
+  /// from a past order's Reorder and from an order's shop card, so popping it lands on whichever of
+  /// those the customer came from — the home grid, the listing, the order — and never on the
+  /// basket. A customer who had just filled one pressed View basket and was shown the screen
+  /// before the shop, with the basket still one unexplained tab-tap away.
+  ///
+  /// A callback rather than a push of the basket screen, because the basket is a TAB and the shell
+  /// owns it: one cart, one Basket screen, and checkout's jump to Orders only works when nothing is
+  /// left covering the shell. The shell pops back to itself and switches tabs; this page only asks.
+  ///
+  /// Required, so every road here has to say where the basket is. A hop that forgets is a compile
+  /// error rather than a bar that goes nowhere — which is what the pop was, quietly, for everyone.
+  final VoidCallback onOpenBasket;
 
   @override
   State<StorePageScreen> createState() => _StorePageScreenState();
@@ -432,7 +450,9 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                     ? null
                     : DeliveryStrings.of(context).addToReachMinimumShort(
                         widget.cart.amountBelowMinimum.toStringAsFixed(2)),
-                onTap: () => Navigator.of(context).pop(),
+                // To the basket itself, not back to wherever this page was opened from. See
+                // [StorePageScreen.onOpenBasket] for what the old pop() did instead.
+                onTap: widget.onOpenBasket,
               ),
       ),
     );

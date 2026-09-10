@@ -30,6 +30,7 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.storeApi,
     required this.cart,
     required this.orderId,
+    required this.onOpenBasket,
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
@@ -40,6 +41,11 @@ class OrderDetailsScreen extends StatefulWidget {
   final StoreApi storeApi;
   final Cart cart;
   final String orderId;
+
+  /// The shell's way to its Basket tab, for the basket bar on the shop page this page's shop card
+  /// opens. That shop sits two routes above the shell — list, this page, shop — so the bar's old
+  /// bare pop came back HERE, to an order, rather than to the basket the customer had just filled.
+  final VoidCallback onOpenBasket;
 
   /// The ETA endpoint, handed through to the tracking panel. Optional so call sites that have
   /// not been wired yet keep compiling; the panel then shows what it always showed.
@@ -761,6 +767,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   cart: widget.cart,
                   storeId: order.storeId!,
                   preview: _store?.toCard(),
+                  onOpenBasket: widget.onOpenBasket,
                 ),
               )),
             ),
