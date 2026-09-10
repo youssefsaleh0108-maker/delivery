@@ -202,11 +202,27 @@ try {
     bad('settlement posted nothing', 'the customer paid at the door and nobody was credited');
   } else {
     const names = legs.map((l) => `${l.leg}:${l.amount}`).join('  ');
-    // The leg that only exists because somebody else did the carrying. Its absence would mean
-    // the platform kept the delivery fee for work it did not do.
-    legs.some((l) => l.leg === 'PROVIDER_CREDIT')
-      ? ok('settlement credits the carrier', names)
-      : bad('no PROVIDER_CREDIT leg', `${names} — the company carried this and was not paid`);
+    const fee = Number(delivered.deliveryFeeCharged ?? delivered.deliveryFee ?? 0);
+    const credited = legs.some((l) => l.leg === 'PROVIDER_CREDIT');
+
+    // PROVIDER_CREDIT is the leg that exists only because somebody else did the carrying — and it
+    // is owed out of the DELIVERY FEE. A shop that charges nothing to deliver produces no such
+    // leg, and demanding one would be asserting a payment nobody agreed to. So the fee decides
+    // which of the two statements is the true one, and both are worth making: a fee that reaches
+    // the carrier, or a fee that was never charged.
+    if (fee > 0) {
+      credited
+        ? ok('settlement credits the carrier', names)
+        : bad('no PROVIDER_CREDIT leg',
+          `${names} — a delivery fee of ${fee} was charged and the company that carried it was `
+          + 'not paid, so the platform kept the fee for work it did not do');
+    } else if (credited) {
+      bad('a PROVIDER_CREDIT leg with no delivery fee',
+        `${names} — the carrier was paid out of a fee the customer never paid`);
+    } else {
+      ok('nothing owed to the carrier on a free delivery', `fee ${fee} · ${names}`);
+      console.log('        (set a delivery fee on the shop to exercise the paid-carrier path)');
+    }
   }
 
   const after = (await call('GET', '/api/orders/carrier/earnings', carrier)).json;

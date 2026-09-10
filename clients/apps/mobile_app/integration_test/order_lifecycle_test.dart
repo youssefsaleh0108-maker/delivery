@@ -129,9 +129,6 @@ void main() {
       of: find.descendant(of: find.byType(StoreHomeScreen), matching: find.byType(YdSearchField)),
       matching: find.byType(TextField),
     );
-    await tester.enterText(searchField, shopName);
-    await pumpFor(tester, const Duration(milliseconds: 1500)); // the debounce, then the re-query
-
     Finder shopCard() => find
         .ancestor(
           of: find.descendant(
@@ -145,11 +142,22 @@ void main() {
           matching: find.byType(YdCard),
         );
 
+    // Typed more than once if it has to be. The search debounces for 350ms and then calls
+    // refresh(), which sets isLoadingFirstPage and REPLACES the grid with a spinner — so a query
+    // that lands while the storefront's own first page is still arriving can be superseded, and
+    // the box ends up holding text that was never sent. Re-typing is cheap; a 45-second wait on a
+    // search that never happened is not.
+    for (int attempt = 0; attempt < 3 && shopCard().evaluate().isEmpty; attempt++) {
+      await tester.enterText(searchField, shopName);
+      await pumpFor(tester, const Duration(milliseconds: 1500)); // debounce, then the re-query
+      await appearsWithin(tester, shopCard(), const Duration(seconds: 20));
+    }
+
     await pumpUntil(tester, shopCard(),
         reason: 'Searching for "$shopName" returned no card for it. The shop exists — the fixture '
             'above read it off /api/stores/mine — so either it is not on the public storefront or '
-            'the search did not reach the server.');
-    await tester.tap(shopCard());
+            'the search did not reach the server. On screen: ${describeScreen(tester)}');
+    await tester.tap(shopCard().firstOrNothing);
     await pumpUntil(tester, find.byType(StorePageScreen),
         reason: 'Tapping the shop card did not open the shop.');
     step('opened $shopName');
@@ -252,8 +260,16 @@ void main() {
             '"${bar.blockedReason}" and cannot be tapped. The fixture prices one item above the '
             'minimum, so the shop minimum has changed.');
     expect(bar.itemCount, greaterThan(0));
-    await tester.tap(basketBar);
+
+    // The InkWell, not the bar. StickyBasketBar wraps itself in a SafeArea and a Padding, so on a
+    // phone with gesture navigation the widget's centre can sit in the bottom inset rather than
+    // on the tappable surface — the tap lands on nothing and the page simply does not pop.
+    final Finder basketTap =
+        find.descendant(of: basketBar, matching: find.byType(InkWell)).firstOrNothing;
+    expect(basketTap, findsOneWidget, reason: 'The basket bar has no tappable surface.');
+    await tester.tap(basketTap);
     await pumpUntilGone(tester, find.byType(StorePageScreen),
+        timeout: const Duration(seconds: 30),
         reason: 'The basket bar did not return the app to the shell.');
 
     await tester.tap(find.descendant(
@@ -423,12 +439,14 @@ void main() {
     Finder orderCard() =>
         find.ancestor(of: find.textContaining(shortId), matching: find.byType(YdCard));
 
-    Future<void> merchantDoes(String bucket, String action) async {
-      // Back to the top first. On a phone the queue is ONE CustomScrollView — header, tab strip
-      // and cards scroll together — so the ensureVisible that reached the previous action button
-      // has carried the tab strip off the top of the viewport, where its sliver is destroyed and
-      // no finder can reach it. Nothing is wrong with the screen; the test simply scrolled away
-      // from the control it needs next.
+    /// Scrolls the queue back to the top and selects one bucket.
+    ///
+    /// The scroll is not defensive. On a phone the queue is ONE CustomScrollView — header, tab
+    /// strip and cards scroll together — so the ensureVisible that reached the previous action
+    /// button has carried the tab strip off the top of the viewport, where its sliver is
+    /// destroyed and no finder can reach it. Nothing is wrong with the screen; the test simply
+    /// scrolled away from the control it needs next.
+    Future<void> openBucket(String bucket) async {
       final Finder queue = find
           .descendant(of: find.byType(OrdersScreen), matching: find.byType(Scrollable))
           .firstOrNothing;
@@ -445,11 +463,16 @@ void main() {
         of: find.byType(OrdersScreen),
         matching: find.textContaining(bucket),
       );
-      expect(tab, findsWidgets,
+      await pumpUntil(tester, tab,
+          timeout: const Duration(seconds: 20),
           reason: 'The "$bucket" tab is not on the merchant queue. On screen: '
               '${describeScreen(tester)}');
-      await tester.tap(tab.first);
+      await tester.tap(tab.firstOrNothing);
       await pumpFor(tester, const Duration(milliseconds: 600));
+    }
+
+    Future<void> merchantDoes(String bucket, String action) async {
+      await openBucket(bucket);
       await pumpUntil(tester, orderCard(),
           timeout: const Duration(seconds: 60),
           reason: 'Order #$shortId is not in the "$bucket" tab. The queue loads only the newest '
@@ -480,9 +503,22 @@ void main() {
       step('merchant: $action');
     }
 
+    // The tab named here is where the order is BEFORE the action, which is not the tab named
+    // after the action. The buckets hold statuses, not steps: New is PLACED, Preparing is
+    // ACCEPTED *and* PREPARING, Ready is READY and PICKED_UP. So an accepted order and a
+    // preparing one are worked from the same tab, and only "Mark ready" moves the card out of it.
     await merchantDoes(en.merchTabNew, OrderAction.accept.labelIn(en));
     await merchantDoes(en.stepPreparing, OrderAction.prepare.labelIn(en));
-    await merchantDoes(en.stepReady, OrderAction.ready.labelIn(en));
+    await merchantDoes(en.stepPreparing, OrderAction.ready.labelIn(en));
+
+    // And now it should have left. Asserting where the card LANDED is what proves the last
+    // transition — the tap alone only proves a button was pressed.
+    await openBucket(en.stepReady);
+    await pumpUntil(tester, orderCard(),
+        timeout: const Duration(seconds: 45),
+        reason: 'Order #$shortId was marked ready but is not in the "${en.stepReady}" tab, so the '
+            'card did not move and the merchant has no sign the shop\'s part is done.');
+    step('the order is on the counter');
 
     expect((await Backend.order(merchantToken, orderId))['status'], 'READY',
         reason: 'The three taps landed but the order is not READY, so one of them did not take.');
