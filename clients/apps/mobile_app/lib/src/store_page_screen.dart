@@ -446,7 +446,15 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                 itemCount: widget.cart.itemCount,
                 total: widget.cart.subtotal.toStringAsFixed(2),
                 label: DeliveryStrings.of(context).viewBasket,
-                blockedReason: widget.cart.meetsMinimum
+                // The shortfall only on the page of the shop the basket belongs to.
+                //
+                // The minimum is the BASKET's shop's (Cart measures against the store of its first
+                // add), not this page's. With shop A's basket under A's minimum, shop B's page
+                // used to say "add 3.50 to reach the minimum" — advice that cannot be followed
+                // there, because adding anything on B asks to throw A's basket away rather than
+                // counting towards it. On any other shop's page the bar is simply the way to the
+                // basket, and the basket explains A's minimum itself.
+                blockedReason: widget.cart.meetsMinimum || widget.cart.storeId != widget.storeId
                     ? null
                     : DeliveryStrings.of(context).addToReachMinimumShort(
                         widget.cart.amountBelowMinimum.toStringAsFixed(2)),

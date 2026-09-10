@@ -250,8 +250,9 @@ void main() {
     //
     // Matched on the widget rather than on the label, because the bar RENAMES itself: when the
     // basket is under the shop's minimum order it renders `addToReachMinimumShort` instead of
-    // "View basket" and its onTap is null. Finding it by type and then reading the label back is
-    // what tells those two apart.
+    // "View basket". It still opens the basket then, but the basket's checkout is disabled and this
+    // run needs to check out. Finding it by type and then reading the label back is what tells
+    // those two apart — and says why, here, rather than at a disabled button two screens later.
     final Finder basketBar = find.byType(StickyBasketBar);
     if (!await appearsWithin(tester, basketBar, const Duration(seconds: 45))) {
       fail('The basket bar never appeared on the shop page, so nothing reached the cart. '
@@ -260,8 +261,8 @@ void main() {
     final StickyBasketBar bar = tester.widget<StickyBasketBar>(basketBar);
     expect(bar.blockedReason, isNull,
         reason: 'The basket is under this shop\'s minimum order, so the bar reads '
-            '"${bar.blockedReason}" and cannot be tapped. The fixture prices one item above the '
-            'minimum, so the shop minimum has changed.');
+            '"${bar.blockedReason}" and checkout will be disabled. The fixture prices one item '
+            'above the minimum, so the shop minimum has changed.');
     expect(bar.itemCount, greaterThan(0));
 
     // The InkWell, not the bar. StickyBasketBar wraps itself in a SafeArea and a Padding, so on a

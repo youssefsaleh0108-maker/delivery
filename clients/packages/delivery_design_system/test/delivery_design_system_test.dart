@@ -314,6 +314,48 @@ void main() {
     });
   });
 
+  group('StickyBasketBar', () {
+    // The bar leads to the basket, not to checkout. It used to go dead under a minimum order,
+    // which on a shop page — pushed over the nav bar — left a customer with products in their
+    // basket and no way to it.
+    Future<int> pumpAndTap(WidgetTester tester, {String? blockedReason}) async {
+      int taps = 0;
+      await tester.pumpWidget(MaterialApp(
+        theme: DeliveryTheme.light(),
+        home: Scaffold(
+          bottomNavigationBar: StickyBasketBar(
+            itemCount: 1,
+            total: '6.50',
+            label: 'عرض السلة',
+            blockedReason: blockedReason,
+            onTap: () => taps++,
+          ),
+        ),
+      ));
+      await tester.tap(find.byType(InkWell));
+      await tester.pump();
+      return taps;
+    }
+
+    testWidgets('opens the basket', (WidgetTester tester) async {
+      expect(await pumpAndTap(tester), 1);
+      expect(find.text('عرض السلة'), findsOneWidget);
+    });
+
+    testWidgets('still opens the basket under a minimum, naming the shortfall instead of the label',
+        (WidgetTester tester) async {
+      expect(await pumpAndTap(tester, blockedReason: 'أضف 3.50 للوصول إلى الحد الأدنى'), 1,
+          reason: 'A blocked bar must still lead to the basket; the basket blocks checkout itself.');
+      expect(find.text('أضف 3.50 للوصول إلى الحد الأدنى'), findsOneWidget);
+      expect(find.text('عرض السلة'), findsNothing);
+      // Still greyed, so it does not read as "ready to check out".
+      final Material surface = tester.widget<Material>(find
+          .descendant(of: find.byType(StickyBasketBar), matching: find.byType(Material))
+          .first);
+      expect(surface.color, DeliveryColors.muted);
+    });
+  });
+
   group('DeliveryLogo', () {
     testWidgets('occupies exactly the size it is given', (WidgetTester tester) async {
       await tester.pumpWidget(const MaterialApp(

@@ -32,13 +32,25 @@ import 'widget_test.dart' show sessionWith;
 /// the bar, it was in where the bar went, and only the shell knows where the basket is. Its
 /// constructor did not change with the fix, so this file compiles against the old wiring too —
 /// and fails there, at "the basket is showing".
+///
+/// <p>The same dead end had a second door: a basket under its shop's minimum order. The bar then
+/// names the shortfall instead of "View basket", and it used to be disabled outright — so a
+/// customer with products in their basket still had no way to it from the shop page. Worse on
+/// another shop's page, where the bar gave the basket's shop's shortfall as advice that cannot be
+/// followed there. The last two cases pin both.
 void main() {
   /// Secure storage, answered in-process — the shell loads the address book on start, and a real
   /// platform channel in fake async awaits a reply that never arrives. See checkout_test.dart.
   const MethodChannel storageChannel =
       MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
 
+  /// The first shop's minimum order, set per test. Zero by default, so the bar reads View basket.
+  /// Above the falafel's 6.50 the bar names the shortfall instead — which must still lead to the
+  /// basket, and has its own cases at the bottom.
+  double minOrder = 0;
+
   setUp(() {
+    minOrder = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(storageChannel, (MethodCall call) async => null);
   });
@@ -53,16 +65,22 @@ void main() {
   const String shopName = 'Shop s1';
   const String productName = 'Falafel wrap';
 
-  /// No minimum order, so the bar reads View basket and is tappable. Under a minimum it names the
-  /// shortfall instead and does nothing — a different path, and not the one being tested.
-  const Map<String, dynamic> shop = <String, dynamic>{
-    'id': 's1',
-    'slug': 's1',
-    'name': shopName,
-    'availability': 'OPEN',
-    'deliveryFee': 0,
-    'minOrder': 0,
-  };
+  /// A second shop, for the basket that was filled somewhere else. It never has a minimum, so
+  /// any shortfall its page shows can only be the first shop's.
+  const String otherShopName = 'Shop s2';
+
+  /// What the bar reads on the first shop's page with the falafel in the basket and a minimum of
+  /// 10: the 3.50 still missing.
+  final String shortfallTo10 = en.addToReachMinimumShort('3.50');
+
+  Map<String, dynamic> shop(String id) => <String, dynamic>{
+        'id': id,
+        'slug': id,
+        'name': 'Shop $id',
+        'availability': 'OPEN',
+        'deliveryFee': 0,
+        'minOrder': id == 's1' ? minOrder : 0,
+      };
 
   const Map<String, dynamic> falafel = <String, dynamic>{
     'id': 'p1',
@@ -82,20 +100,23 @@ void main() {
 
   /// What the fake server says to a GET, or null for "not found".
   ///
-  /// One shop with one product without options, and an empty answer for the rest of what the
-  /// shell's five tabs ask on start. Everything else — butler terms, offer previews — is refused,
-  /// and every screen that asks already treats a refusal as "nothing to show".
+  /// Two shops — the first with one product without options, the second with an empty shelf,
+  /// since nothing is ever added there — and an empty answer for the rest of what the shell's five
+  /// tabs ask on start. Everything else — butler terms, offer previews — is refused, and every
+  /// screen that asks already treats a refusal as "nothing to show".
   Object? answer(String path) {
     if (path.startsWith('/api/orders')) return page(const <Map<String, dynamic>>[]);
     return switch (path) {
-      '/api/stores' => page(<Map<String, dynamic>>[shop]),
+      '/api/stores' => page(<Map<String, dynamic>>[shop('s1'), shop('s2')]),
       '/api/stores/favorites' => page(const <Map<String, dynamic>>[]),
       '/api/banners' => const <dynamic>[],
       '/api/categories/chips' => const <dynamic>[],
-      '/api/stores/s1' => shop,
+      '/api/stores/s1' => shop('s1'),
+      '/api/stores/s2' => shop('s2'),
       '/api/stores/s1/products' => page(<Map<String, dynamic>>[falafel]),
-      '/api/stores/s1/aisles' => const <dynamic>[],
-      '/api/stores/s1/offers' => page(const <Map<String, dynamic>>[]),
+      '/api/stores/s2/products' => page(const <Map<String, dynamic>>[]),
+      '/api/stores/s1/aisles' || '/api/stores/s2/aisles' => const <dynamic>[],
+      '/api/stores/s1/offers' || '/api/stores/s2/offers' => page(const <Map<String, dynamic>>[]),
       '/api/products/p1/options' => const <dynamic>[],
       '/api/notifications/unread-count' => const <String, dynamic>{'unread': 0},
       '/api/butler/mine' => page(const <Map<String, dynamic>>[]),
@@ -177,20 +198,28 @@ void main() {
     expect(find.byType(CustomerShell), findsOneWidget);
   }
 
-  /// Home → the shop → Add, which is the road the customer described.
-  Future<void> fillABasketOnTheShopPage(WidgetTester tester) async {
-    await tester.tap(find.text(shopName).first);
+  /// Home → the named shop's page.
+  Future<void> openShop(WidgetTester tester, String name) async {
+    await tester.tap(find.text(name).first);
     await tester.pumpAndSettle();
     expect(find.byType(StorePageScreen), findsOneWidget);
+  }
 
+  /// The falafel's Add on the first shop's page, which brings the basket bar.
+  Future<void> addTheFalafel(WidgetTester tester) async {
     await tester.tap(find.descendant(
         of: find.byType(StorePageScreen), matching: find.byType(AddButton)));
     await tester.pumpAndSettle();
-
     expect(find.byType(StickyBasketBar), findsOneWidget);
+  }
+
+  /// Home → the shop → Add, which is the road the customer described.
+  Future<void> fillABasketOnTheShopPage(WidgetTester tester) async {
+    await openShop(tester, shopName);
+    await addTheFalafel(tester);
     expect(find.text(en.viewBasket), findsOneWidget,
-        reason: 'The bar must read View basket and be tappable. If it names a shortfall instead, '
-            'the fixture shop grew a minimum order.');
+        reason: 'The bar must read View basket. If it names a shortfall instead, the fixture shop '
+            'grew a minimum order.');
   }
 
   /// The basket is the screen actually SHOWING — not merely built.
@@ -211,6 +240,14 @@ void main() {
     expect(tester.widget<CustomerNavBar>(find.byType(CustomerNavBar)).index,
         CustomerNavBar.basketIndex,
         reason: 'The nav bar must agree with the screen it is under.');
+  }
+
+  /// The basket, opened under its shop's minimum, is the one that says no to checkout — with its
+  /// own disabled button — rather than the bar that leads to it.
+  void expectCheckoutHeldByTheMinimum() {
+    expect(find.widgetWithText(YdPillButton, en.minimumNotReached), findsOneWidget,
+        reason: 'The basket is under its shop\'s minimum; its checkout button should say so.');
+    expect(find.widgetWithText(YdPillButton, en.custProceedToCheckout), findsNothing);
   }
 
   testWidgets('View basket on a shop page opens the basket, and checkout goes on from there',
@@ -252,5 +289,52 @@ void main() {
         reason: 'View basket popped past the shell to the route underneath it.');
     expect(find.byType(CustomerShell), findsOneWidget);
     expectOnTheBasket(tester);
+  });
+
+  testWidgets('under the shop\'s minimum the bar names the shortfall, and still opens the basket',
+      (WidgetTester tester) async {
+    minOrder = 10;
+    await pumpShell(tester);
+    await openShop(tester, shopName);
+    await addTheFalafel(tester);
+
+    expect(find.text(shortfallTo10), findsOneWidget,
+        reason: 'On the basket\'s own shop the bar should say what is missing.');
+    expect(find.text(en.viewBasket), findsNothing);
+
+    await tester.tap(find.text(shortfallTo10));
+    await tester.pumpAndSettle();
+
+    // The bar used to be disabled here, and the customer stayed on the shop page with the basket
+    // behind a back press and a tab tap.
+    expectOnTheBasket(tester);
+    expectCheckoutHeldByTheMinimum();
+  });
+
+  testWidgets('on another shop\'s page the bar leads to the basket, not to the first shop\'s shortfall',
+      (WidgetTester tester) async {
+    minOrder = 10;
+    await pumpShell(tester);
+    await openShop(tester, shopName);
+    await addTheFalafel(tester);
+
+    // Back to Home with the basket still under shop s1's minimum, and into a different shop.
+    await Navigator.of(tester.element(find.byType(StorePageScreen))).maybePop();
+    await tester.pumpAndSettle();
+    await openShop(tester, otherShopName);
+
+    expect(find.byType(StickyBasketBar), findsOneWidget,
+        reason: 'The basket is not empty, so its bar is on every shop page.');
+    expect(find.text(shortfallTo10), findsNothing,
+        reason: 'That shortfall is shop s1\'s. Adding anything here asks to throw s1\'s basket '
+            'away rather than counting towards it, so it is advice this page cannot act on.');
+    expect(find.text(en.viewBasket), findsOneWidget);
+
+    await tester.tap(find.text(en.viewBasket));
+    await tester.pumpAndSettle();
+
+    // The basket that opens is s1's, and it is the basket that explains s1's minimum.
+    expectOnTheBasket(tester);
+    expectCheckoutHeldByTheMinimum();
   });
 }
