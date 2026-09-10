@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -28,26 +30,79 @@ class RiderButlerBoard extends StatefulWidget {
 }
 
 class _RiderButlerBoardState extends State<RiderButlerBoard> {
+  /// Matched to the job board this sits beside (rider_home_screen.dart), because the two are one
+  /// surface to a rider: an errand appearing a minute later than a delivery would read as the
+  /// errands feature being broken rather than slower.
+  static const Duration _pollInterval = Duration(seconds: 5);
+
   late Future<List<List<ButlerRequest>>> _board = _load();
+
+  /// The last board that loaded. Kept so a refresh can replace the list without blanking the
+  /// screen: the builder gates on connectionState, so reassigning [_board] on its own throws the
+  /// rider back to a spinner every five seconds.
+  List<List<ButlerRequest>>? _latest;
+
   String? _busyId;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    // Errands arrive from customers, not from anything the rider does, and until now nothing on
+    // this screen ever asked again: the board loaded once and refreshed only after the rider
+    // claimed something or pulled it down by hand. A rider watching an empty board saw an empty
+    // board however many errands had been posted behind it.
+    _poll = Timer.periodic(_pollInterval, (_) => _refreshSilently());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
 
   Future<List<List<ButlerRequest>>> _load() async {
     final List<Paged<ButlerRequest>> pages = await Future.wait(<Future<Paged<ButlerRequest>>>[
       widget.api.available(size: 30),
       widget.api.claimed(size: 30),
     ]);
-    return <List<ButlerRequest>>[
+    final List<List<ButlerRequest>> board = <List<ButlerRequest>>[
       pages[0].content,
       // Terminal ones are dropped: a declined or cancelled errand is not work, and leaving it here
       // makes the rider's list grow forever with things they can do nothing about.
       pages[1].content.where((ButlerRequest r) => !r.status.isTerminal).toList(),
     ];
+    _latest = board;
+    return board;
   }
 
   void _reload() {
     setState(() {
       _board = _load();
     });
+  }
+
+  /// A reload the rider does not see happen.
+  ///
+  /// Two things are deliberately skipped. While an action is in flight the board is left alone —
+  /// a card moving out from under a finger mid-tap is worse than a stale list. And a failed poll
+  /// keeps the last good board rather than replacing it with an error: the rider did not ask for
+  /// this refresh, and the next tick will try again.
+  Future<void> _refreshSilently() async {
+    if (!mounted || _busyId != null) {
+      return;
+    }
+    try {
+      final List<List<ButlerRequest>> next = await _load();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _board = Future<List<List<ButlerRequest>>>.value(next);
+      });
+    } catch (_) {
+      // Deliberately silent — see above.
+    }
   }
 
   Future<void> _run(String id, Future<ButlerRequest> Function() action, String success) async {
@@ -158,8 +213,11 @@ class _RiderButlerBoardState extends State<RiderButlerBoard> {
 
     return FutureBuilder<List<List<ButlerRequest>>>(
       future: _board,
+      // The last board, so a five-second poll refreshes the list instead of replacing it with a
+      // spinner. Only the very first load has nothing to show.
+      initialData: _latest,
       builder: (BuildContext context, AsyncSnapshot<List<List<ButlerRequest>>> snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (!snapshot.hasData && snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator(color: DeliveryColors.brand));
         }
         if (snapshot.hasError) {

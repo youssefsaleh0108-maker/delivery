@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -54,8 +56,58 @@ class ButlerRequestsList extends StatefulWidget {
 }
 
 class _ButlerRequestsListState extends State<ButlerRequestsList> {
-  late Future<Paged<ButlerRequest>> _page = widget.api.mine();
+  /// The customer's side of the same five seconds the rider's board polls on.
+  ///
+  /// This half matters more. Everything a customer waits for on an errand happens on somebody
+  /// else's phone: a rider claims it, shops, and quotes a price the customer then has to approve
+  /// before anything else can happen. Until now nothing here asked again — the list loaded once
+  /// and reloaded only when the customer acted or the parent bumped [ButlerRequestsList.version]
+  /// — so the quote sat on the server and the customer sat looking at "waiting for a rider".
+  static const Duration _pollInterval = Duration(seconds: 5);
+
+  late Future<Paged<ButlerRequest>> _page = _load();
+
+  /// The last page that loaded, so a poll refreshes the list rather than blanking it.
+  Paged<ButlerRequest>? _latest;
+
   String? _busyId;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(_pollInterval, (_) => _refreshSilently());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<Paged<ButlerRequest>> _load() async {
+    final Paged<ButlerRequest> page = await widget.api.mine();
+    _latest = page;
+    return page;
+  }
+
+  /// A reload the customer does not see happen: the list stays on screen, an in-flight action is
+  /// left alone, and a failed poll keeps the last good page rather than showing an error for a
+  /// refresh nobody asked for.
+  Future<void> _refreshSilently() async {
+    if (!mounted || _busyId != null) {
+      return;
+    }
+    try {
+      final Paged<ButlerRequest> next = await _load();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _page = Future<Paged<ButlerRequest>>.value(next));
+    } catch (_) {
+      // Deliberately silent — see above.
+    }
+  }
 
   /// The history card shows a handful; "See All" opens the rest. The design draws the link and
   /// this is the only place it can lead — there is no separate task screen to route to.
@@ -71,7 +123,7 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
 
   void _reload() {
     setState(() {
-      _page = widget.api.mine();
+      _page = _load();
     });
   }
 
@@ -117,8 +169,11 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
 
     return FutureBuilder<Paged<ButlerRequest>>(
       future: _page,
+      // The last page, so the five-second poll refreshes the list instead of dropping the
+      // customer back to a spinner. Only the very first load has nothing to show.
+      initialData: _latest,
       builder: (BuildContext context, AsyncSnapshot<Paged<ButlerRequest>> snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (!snapshot.hasData && snapshot.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.all(DeliverySpacing.lg),
             child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
