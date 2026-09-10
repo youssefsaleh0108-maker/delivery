@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_core/src/auth/oidc_client.dart';
