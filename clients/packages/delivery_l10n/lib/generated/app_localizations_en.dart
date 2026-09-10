@@ -881,6 +881,87 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get butlerStatusExpired => 'Expired';
 
   @override
+  String get butlerDetailsTitle => 'Errand details';
+
+  @override
+  String get butlerViewDetails => 'View details';
+
+  @override
+  String get butlerCancelErrand => 'Cancel errand';
+
+  @override
+  String get butlerCancelConfirmTitle => 'Cancel this errand?';
+
+  @override
+  String get butlerCancelConfirmBody =>
+      'It is withdrawn straight away and nobody will go for it. You can always ask again.';
+
+  @override
+  String get butlerCancelConfirmYes => 'Yes, cancel';
+
+  @override
+  String get butlerTrackOrder => 'Track order';
+
+  @override
+  String get butlerDetailProgress => 'Progress';
+
+  @override
+  String get butlerDetailTheErrand => 'The errand';
+
+  @override
+  String get butlerDetailWhereFrom => 'Where from';
+
+  @override
+  String get butlerDetailRecipient => 'Who receives it';
+
+  @override
+  String get butlerDetailContactPhone => 'Contact phone';
+
+  @override
+  String get butlerDetailPrice => 'Price';
+
+  @override
+  String get butlerDetailBudgetCap => 'Your budget cap';
+
+  @override
+  String get butlerDetailGoods => 'Goods';
+
+  @override
+  String get butlerDetailGoodsPending => 'Known once the shopper has paid';
+
+  @override
+  String get butlerDetailErrandFee => 'Errand fee';
+
+  @override
+  String get butlerDetailTotal => 'Total to pay';
+
+  @override
+  String get butlerDetailReceipt => 'Receipt reference';
+
+  @override
+  String butlerDeclineReason(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String get butlerStepRequested => 'Request sent';
+
+  @override
+  String get butlerStepClaimedBuy => 'A shopper took it';
+
+  @override
+  String get butlerStepClaimedSend => 'A rider took it';
+
+  @override
+  String get butlerStepQuoted => 'Price quoted';
+
+  @override
+  String get butlerStepAgreed => 'Price agreed';
+
+  @override
+  String get butlerStepConfirmed => 'Confirmed';
+
+  @override
   String get somebodyElseClaimed => 'Somebody else claimed that one';
 
   @override

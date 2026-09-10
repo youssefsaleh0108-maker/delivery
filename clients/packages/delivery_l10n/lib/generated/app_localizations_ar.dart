@@ -880,6 +880,87 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get butlerStatusExpired => 'منتهية';
 
   @override
+  String get butlerDetailsTitle => 'تفاصيل المهمة';
+
+  @override
+  String get butlerViewDetails => 'عرض التفاصيل';
+
+  @override
+  String get butlerCancelErrand => 'إلغاء المهمة';
+
+  @override
+  String get butlerCancelConfirmTitle => 'هل تريد إلغاء هذه المهمة؟';
+
+  @override
+  String get butlerCancelConfirmBody =>
+      'ستُسحب فورًا ولن يذهب أحد لتنفيذها. يمكنك طلبها مجددًا في أي وقت.';
+
+  @override
+  String get butlerCancelConfirmYes => 'نعم، ألغِها';
+
+  @override
+  String get butlerTrackOrder => 'تتبّع الطلب';
+
+  @override
+  String get butlerDetailProgress => 'سير المهمة';
+
+  @override
+  String get butlerDetailTheErrand => 'المهمة';
+
+  @override
+  String get butlerDetailWhereFrom => 'من أين';
+
+  @override
+  String get butlerDetailRecipient => 'من سيستلمها';
+
+  @override
+  String get butlerDetailContactPhone => 'هاتف التواصل';
+
+  @override
+  String get butlerDetailPrice => 'السعر';
+
+  @override
+  String get butlerDetailBudgetCap => 'سقف ميزانيتك';
+
+  @override
+  String get butlerDetailGoods => 'المشتريات';
+
+  @override
+  String get butlerDetailGoodsPending => 'يُعرف بعد أن يدفع المتسوّق';
+
+  @override
+  String get butlerDetailErrandFee => 'رسوم المهمة';
+
+  @override
+  String get butlerDetailTotal => 'الإجمالي المستحق';
+
+  @override
+  String get butlerDetailReceipt => 'رقم الإيصال';
+
+  @override
+  String butlerDeclineReason(String reason) {
+    return 'السبب: $reason';
+  }
+
+  @override
+  String get butlerStepRequested => 'تم إرسال الطلب';
+
+  @override
+  String get butlerStepClaimedBuy => 'تولّاها متسوّق';
+
+  @override
+  String get butlerStepClaimedSend => 'تولّاها سائق';
+
+  @override
+  String get butlerStepQuoted => 'تم تحديد السعر';
+
+  @override
+  String get butlerStepAgreed => 'تم الاتفاق على السعر';
+
+  @override
+  String get butlerStepConfirmed => 'تم التأكيد';
+
+  @override
   String get somebodyElseClaimed => 'استلمها شخص آخر';
 
   @override

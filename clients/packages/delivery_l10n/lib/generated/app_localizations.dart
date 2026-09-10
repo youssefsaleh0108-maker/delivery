@@ -1610,6 +1610,162 @@ abstract class DeliveryStrings {
   /// **'Expired'**
   String get butlerStatusExpired;
 
+  /// Header of the page a customer's Butler errand opens onto from the recent-tasks list.
+  ///
+  /// In en, this message translates to:
+  /// **'Errand details'**
+  String get butlerDetailsTitle;
+
+  /// Accessibility label for the chevron on a Butler errand row that opens its details.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get butlerViewDetails;
+
+  /// No description provided for @butlerCancelErrand.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel errand'**
+  String get butlerCancelErrand;
+
+  /// No description provided for @butlerCancelConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this errand?'**
+  String get butlerCancelConfirmTitle;
+
+  /// No description provided for @butlerCancelConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It is withdrawn straight away and nobody will go for it. You can always ask again.'**
+  String get butlerCancelConfirmBody;
+
+  /// No description provided for @butlerCancelConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, cancel'**
+  String get butlerCancelConfirmYes;
+
+  /// Opens the order an agreed Butler errand became, where its delivery is tracked.
+  ///
+  /// In en, this message translates to:
+  /// **'Track order'**
+  String get butlerTrackOrder;
+
+  /// No description provided for @butlerDetailProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get butlerDetailProgress;
+
+  /// No description provided for @butlerDetailTheErrand.
+  ///
+  /// In en, this message translates to:
+  /// **'The errand'**
+  String get butlerDetailTheErrand;
+
+  /// No description provided for @butlerDetailWhereFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Where from'**
+  String get butlerDetailWhereFrom;
+
+  /// No description provided for @butlerDetailRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Who receives it'**
+  String get butlerDetailRecipient;
+
+  /// No description provided for @butlerDetailContactPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact phone'**
+  String get butlerDetailContactPhone;
+
+  /// No description provided for @butlerDetailPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get butlerDetailPrice;
+
+  /// No description provided for @butlerDetailBudgetCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Your budget cap'**
+  String get butlerDetailBudgetCap;
+
+  /// No description provided for @butlerDetailGoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods'**
+  String get butlerDetailGoods;
+
+  /// Shown in place of the goods price of a purchase errand before the shopper has bought it.
+  ///
+  /// In en, this message translates to:
+  /// **'Known once the shopper has paid'**
+  String get butlerDetailGoodsPending;
+
+  /// No description provided for @butlerDetailErrandFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Errand fee'**
+  String get butlerDetailErrandFee;
+
+  /// No description provided for @butlerDetailTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total to pay'**
+  String get butlerDetailTotal;
+
+  /// No description provided for @butlerDetailReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt reference'**
+  String get butlerDetailReceipt;
+
+  /// No description provided for @butlerDeclineReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String butlerDeclineReason(String reason);
+
+  /// No description provided for @butlerStepRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Request sent'**
+  String get butlerStepRequested;
+
+  /// No description provided for @butlerStepClaimedBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'A shopper took it'**
+  String get butlerStepClaimedBuy;
+
+  /// No description provided for @butlerStepClaimedSend.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider took it'**
+  String get butlerStepClaimedSend;
+
+  /// No description provided for @butlerStepQuoted.
+  ///
+  /// In en, this message translates to:
+  /// **'Price quoted'**
+  String get butlerStepQuoted;
+
+  /// No description provided for @butlerStepAgreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Price agreed'**
+  String get butlerStepAgreed;
+
+  /// Last step of a send errand, which has no price to agree — the rider is booked to carry it.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get butlerStepConfirmed;
+
   /// No description provided for @somebodyElseClaimed.
   ///
   /// In en, this message translates to:

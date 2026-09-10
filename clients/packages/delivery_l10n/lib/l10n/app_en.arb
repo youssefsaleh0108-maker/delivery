@@ -593,6 +593,54 @@
   "butlerStatusYourCall": "Your call",
   "butlerStatusAgreed": "Agreed",
   "butlerStatusExpired": "Expired",
+  "butlerDetailsTitle": "Errand details",
+  "@butlerDetailsTitle": {
+    "description": "Header of the page a customer's Butler errand opens onto from the recent-tasks list."
+  },
+  "butlerViewDetails": "View details",
+  "@butlerViewDetails": {
+    "description": "Accessibility label for the chevron on a Butler errand row that opens its details."
+  },
+  "butlerCancelErrand": "Cancel errand",
+  "butlerCancelConfirmTitle": "Cancel this errand?",
+  "butlerCancelConfirmBody": "It is withdrawn straight away and nobody will go for it. You can always ask again.",
+  "butlerCancelConfirmYes": "Yes, cancel",
+  "butlerTrackOrder": "Track order",
+  "@butlerTrackOrder": {
+    "description": "Opens the order an agreed Butler errand became, where its delivery is tracked."
+  },
+  "butlerDetailProgress": "Progress",
+  "butlerDetailTheErrand": "The errand",
+  "butlerDetailWhereFrom": "Where from",
+  "butlerDetailRecipient": "Who receives it",
+  "butlerDetailContactPhone": "Contact phone",
+  "butlerDetailPrice": "Price",
+  "butlerDetailBudgetCap": "Your budget cap",
+  "butlerDetailGoods": "Goods",
+  "butlerDetailGoodsPending": "Known once the shopper has paid",
+  "@butlerDetailGoodsPending": {
+    "description": "Shown in place of the goods price of a purchase errand before the shopper has bought it."
+  },
+  "butlerDetailErrandFee": "Errand fee",
+  "butlerDetailTotal": "Total to pay",
+  "butlerDetailReceipt": "Receipt reference",
+  "butlerDeclineReason": "Reason: {reason}",
+  "@butlerDeclineReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "butlerStepRequested": "Request sent",
+  "butlerStepClaimedBuy": "A shopper took it",
+  "butlerStepClaimedSend": "A rider took it",
+  "butlerStepQuoted": "Price quoted",
+  "butlerStepAgreed": "Price agreed",
+  "butlerStepConfirmed": "Confirmed",
+  "@butlerStepConfirmed": {
+    "description": "Last step of a send errand, which has no price to agree — the rider is booked to carry it."
+  },
   "somebodyElseClaimed": "Somebody else claimed that one",
   "whatYouPaidBeforeFee": "What you paid, before the errand fee",
   "sentForApproval": "Sent. They will approve the price before you deliver.",
