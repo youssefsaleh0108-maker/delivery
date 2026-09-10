@@ -18,7 +18,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,7 +96,39 @@ public class StoreService {
                                       Pageable pageable) {
         Instant now = clock.instant();
         return stores.findStorefront(vertical, SearchPatterns.like(search), maxDeliveryFee,
-                maxEtaMinutes, minRating, neighborhood, pageable).map(s -> view(s, now));
+                maxEtaMinutes, minRating, neighborhood, bestFirst(pageable)).map(s -> view(s, now));
+    }
+
+    /**
+     * Makes "sorted by rating" mean what a customer reads it to mean.
+     *
+     * <p>The controller asks for {@code rating DESC} and nothing more, which has two consequences
+     * neither it nor the customer intends.
+     *
+     * <p><strong>Unrated shops came first.</strong> SQL sorts nulls first on a descending column,
+     * and a shop nobody has reviewed has a null rating — so the top of the storefront was the
+     * shops with no reviews at all, above a 4.9. On dev that put three unrated shops ahead of
+     * every rated one. {@code nullsLast()} is the whole fix: no rating is not a good rating.
+     *
+     * <p><strong>And ties made rows repeat and vanish.</strong> Paging over a non-unique sort key
+     * has no defined order within a tie, so the database is free to return a tied row on page one
+     * and again on page two — and to never return another. Real catalogues tie constantly: three
+     * shops at null, two at 4.8 here. The id breaks every tie, which costs nothing and makes the
+     * pages add up.
+     *
+     * <p>An explicit sort from the caller is left alone; this only completes the default.
+     */
+    private static Pageable bestFirst(Pageable pageable) {
+        Sort sort = pageable.getSort();
+        boolean byRating = sort.stream().anyMatch(o -> "rating".equals(o.getProperty()));
+        if (!byRating) {
+            return pageable;
+        }
+        Sort stable = Sort.by(sort.stream()
+                .map(o -> "rating".equals(o.getProperty()) ? o.nullsLast() : o)
+                .toList());
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                stable.and(Sort.by(Sort.Direction.ASC, "id")));
     }
 
     /** The district chips for the hyperlocal browse. */

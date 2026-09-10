@@ -103,6 +103,24 @@ if (!item) {
   }, merchant);
 }
 
+// AND THE RIDER GOES BACK IN-HOUSE, which the pin restore above makes mandatory rather than tidy.
+//
+// The two have to agree. While the rider is crewed to this company, dispatch — now unpinned and
+// deciding on merit — sends new orders to the in-house fleet, and the job board is scoped to the
+// rider's own fleet: `findAvailableFor` returns orders whose deliveryProviderId is the rider's
+// provider or null. So the only rider who can sign in sees nothing, every order the merchant
+// marks ready sits on the counter forever, and no screen anywhere is wrong about it.
+//
+// This ran on the SUCCESS path. A seed whose job is to make one feature demonstrable was leaving
+// the platform unable to deliver anything, and the next person to look found a dev environment
+// where orders reached READY and stopped.
+//
+// The carrier console does not need the membership to stay: its earnings and job history are
+// computed from the orders already assigned to the company, so what was seeded above is still
+// there to look at.
+send('DELETE', `/api/delivery-providers/riders/${subOf(rider)}`, null, backoffice);
+console.log('returned the rider to the in-house fleet');
+
 const earnings = get('/api/orders/carrier/earnings', carrier);
 console.log(`\n${company.name}: ${earnings.delivered} delivered, ${earnings.active} in flight, `
   + `${earnings.earned} earned, ${earnings.expected} expected`);
