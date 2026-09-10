@@ -315,6 +315,8 @@ void main() {
           storeApi: StoreApi(dio),
           zoneApi: DeliveryZoneApi(dio),
           cart: Cart(),
+          // Nothing here opens a shop, so there is no basket bar to follow.
+          onOpenBasket: () {},
         ),
       ));
       // Lets the terms request fail and settle, so the tree is stable before anything is asserted.

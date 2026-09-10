@@ -25,6 +25,7 @@ class MyOrdersScreen extends StatefulWidget {
     this.trackingSocket,
     this.chatApi,
     required this.cart,
+    required this.onOpenBasket,
   });
 
   final OrderApi api;
@@ -40,6 +41,10 @@ class MyOrdersScreen extends StatefulWidget {
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final Cart cart;
+
+  /// The shell's way to its Basket tab. Reorder opens a shop page, and so does the shop card on an
+  /// order's own page — both basket bars need to reach the basket, not pop back to this list.
+  final VoidCallback onOpenBasket;
 
   @override
   State<MyOrdersScreen> createState() => _MyOrdersScreenState();
@@ -114,6 +119,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         trackingSocket: widget.trackingSocket,
         chatApi: widget.chatApi,
         cart: widget.cart,
+        onOpenBasket: widget.onOpenBasket,
         orderId: order.id,
         preview: order,
       ),
@@ -173,6 +179,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         orderApi: widget.api,
         cart: widget.cart,
         storeId: storeId,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }

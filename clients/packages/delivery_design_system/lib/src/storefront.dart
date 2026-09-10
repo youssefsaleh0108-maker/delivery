@@ -956,7 +956,15 @@ class StickyBasketBar extends StatelessWidget {
   final String label;
 
   /// When set, the bar explains why checkout is unavailable instead of offering it — a minimum
-  /// order not yet met, most often.
+  /// order not yet met, most often. It greys out and prints this in place of [label], and it STILL
+  /// OPENS THE BASKET.
+  ///
+  /// It used to disable the bar outright. But the bar leads to the basket, not to checkout, and the
+  /// basket is exactly where a customer under the minimum needs to be: it explains the shortfall in
+  /// full, lets them change quantities, and has its own disabled checkout button. With the bar dead,
+  /// a customer who had added products to a shop page's basket had no way to it from there — the
+  /// Basket tab is under the pushed page — so "add 3.50 to reach the minimum" was a dead end rather
+  /// than advice. Blocking checkout is the basket's job, not the way to it.
   final String? blockedReason;
 
   @override
@@ -971,7 +979,8 @@ class StickyBasketBar extends StatelessWidget {
           color: blocked ? DeliveryColors.muted : DeliveryColors.brand,
           borderRadius: BorderRadius.circular(DeliveryRadius.md),
           child: InkWell(
-            onTap: blocked ? null : onTap,
+            // Live in both states — see [blockedReason].
+            onTap: onTap,
             borderRadius: BorderRadius.circular(DeliveryRadius.md),
             child: Padding(
               padding: const EdgeInsets.symmetric(

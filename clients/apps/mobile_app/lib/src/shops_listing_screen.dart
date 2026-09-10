@@ -22,6 +22,7 @@ class ShopsListingScreen extends StatefulWidget {
     required this.storeApi,
     required this.orderApi,
     required this.cart,
+    required this.onOpenBasket,
     this.initialVertical,
     this.chips = const <CategoryChip>[],
   });
@@ -29,6 +30,11 @@ class ShopsListingScreen extends StatefulWidget {
   final StoreApi storeApi;
   final OrderApi orderApi;
   final Cart cart;
+
+  /// Handed to every shop opened from this list, for its basket bar. See
+  /// [StorePageScreen.onOpenBasket] — and note that this screen sits between the shop and the
+  /// shell, so a bare pop from the shop used to land HERE, on the listing, not on the basket.
+  final VoidCallback onOpenBasket;
 
   /// The category tapped on home. Null lists everything.
   final StoreVertical? initialVertical;
@@ -83,6 +89,7 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }

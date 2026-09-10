@@ -30,6 +30,7 @@ class ButlerRequestsList extends StatefulWidget {
     this.trackingSocket,
     this.chatApi,
     required this.cart,
+    required this.onOpenBasket,
     this.version = 0,
     this.query = '',
   });
@@ -43,6 +44,9 @@ class ButlerRequestsList extends StatefulWidget {
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final Cart cart;
+
+  /// Handed to the order page an approved errand opens. See [OrderDetailsScreen.onOpenBasket].
+  final VoidCallback onOpenBasket;
 
   /// Bumped by the form above when it submits, to reload without a manual pull.
   final int version;
@@ -354,6 +358,7 @@ class _ButlerRequestsListState extends State<ButlerRequestsList> {
                   trackingSocket: widget.trackingSocket,
                   chatApi: widget.chatApi,
                   cart: widget.cart,
+                  onOpenBasket: widget.onOpenBasket,
                 ),
               )),
       borderRadius: BorderRadius.circular(DeliveryRadius.sm),

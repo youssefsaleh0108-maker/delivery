@@ -42,6 +42,7 @@ class StoreHomeScreen extends StatefulWidget {
     this.splitApi,
     this.transferApi,
     required this.onSignOut,
+    required this.onOpenBasket,
   });
 
   final StoreApi storeApi;
@@ -74,6 +75,10 @@ class StoreHomeScreen extends StatefulWidget {
   final SplitApi? splitApi;
   final TransferApi? transferApi;
   final Future<void> Function() onSignOut;
+
+  /// The shell's way to its Basket tab, handed to every shop page opened from here — a card, a
+  /// banner, or a shop reached through a category listing — for the basket bar's View basket.
+  final VoidCallback onOpenBasket;
 
   @override
   State<StoreHomeScreen> createState() => _StoreHomeScreenState();
@@ -282,6 +287,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         storeId: store.id,
         preview: store,
         onFavoriteChanged: _applyFavorite,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }
@@ -849,6 +855,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         initialVertical: vertical,
         chips: _chips,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }
@@ -1105,6 +1112,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             cart: widget.cart,
             storeId: banner.linkTarget!,
             onFavoriteChanged: _applyFavorite,
+            onOpenBasket: widget.onOpenBasket,
           ),
         ));
       case BannerLinkKind.category:

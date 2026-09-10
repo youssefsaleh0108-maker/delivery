@@ -39,6 +39,7 @@ class ButlerScreen extends StatefulWidget {
     this.trackingSocket,
     this.chatApi,
     required this.cart,
+    required this.onOpenBasket,
   });
 
   final DeliveryAddressStore addresses;
@@ -60,6 +61,11 @@ class ButlerScreen extends StatefulWidget {
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
   final Cart cart;
+
+  /// Threaded through the request list to the order page an approved errand opens. That page's
+  /// shop card opens a shop page, and its basket bar has to reach the shell's Basket tab — see
+  /// [OrderDetailsScreen.onOpenBasket].
+  final VoidCallback onOpenBasket;
 
   @override
   State<ButlerScreen> createState() => _ButlerScreenState();
@@ -225,6 +231,7 @@ class _ButlerScreenState extends State<ButlerScreen> {
                       orderApi: widget.orderApi,
                       storeApi: widget.storeApi,
                       cart: widget.cart,
+                      onOpenBasket: widget.onOpenBasket,
                       version: _listVersion,
                       query: _query,
                     ),
