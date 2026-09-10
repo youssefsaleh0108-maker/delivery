@@ -83,6 +83,63 @@ public class ApplicationIntake {
         return application;
     }
 
+    /**
+     * Records an application made by an account that already exists, all or nothing.
+     *
+     * <p>The signed-in twin of {@link #record}, for somebody who came in through Google and then
+     * said they want to ride or to sell. Two things differ, and both follow from there being an
+     * account already:
+     *
+     * <ul>
+     *   <li><strong>No email token is spent.</strong> The address is the account's own, read from
+     *       the caller's token, and the caller has already checked that the identity provider
+     *       vouched for it. {@code emailVerifiedAt} is that moment. Asking for a one-time code on
+     *       top would be proving the same inbox twice.
+     *   <li><strong>The account is attached here, in the same insert.</strong> The open path
+     *       attaches it later, when the applicant chooses a passcode. Doing it in the same
+     *       transaction means there is no moment at which a committed row exists that the caller's
+     *       own {@code /applications/mine} cannot find — which is what makes a retry idempotent
+     *       rather than a second application.
+     * </ul>
+     *
+     * <p>A phone number, when one is given, is still proved by its own code and the proof is spent
+     * here, for the reason {@link #record} spends its proofs in the same transaction as the insert.
+     *
+     * @param emailVerifiedAt when the identity provider's word on the address was taken — never null
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public OnboardingApplication recordForAccount(String userRef,
+                                                  OnboardingApplication.Kind kind,
+                                                  String businessName, String contactName,
+                                                  String contactEmail, Instant emailVerifiedAt,
+                                                  String contactPhone,
+                                                  String phoneVerificationToken, String notes,
+                                                  java.util.Map<String, Object> details,
+                                                  java.util.UUID targetProviderId) {
+
+        String phone = contactPhone == null || contactPhone.isBlank() ? null : contactPhone;
+        Instant phoneVerifiedAt = phone == null
+                ? null
+                : verifications.consume(phoneVerificationToken, Channel.PHONE, phone);
+
+        OnboardingApplication application = new OnboardingApplication(
+                kind, businessName.trim(), contactName.trim(),
+                verifications.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
+                phone == null ? null : verifications.normalise(Channel.PHONE, phone),
+                phoneVerifiedAt, notes, details, targetProviderId);
+        application.applicantAccountCreated(userRef);
+
+        try {
+            applications.saveAndFlush(application);
+        } catch (DataIntegrityViolationException e) {
+            // Either index can refuse this: one open application per email per kind, or one
+            // application per account. Both mean the same thing to the person asking.
+            throw new OnboardingService.ApplicationRuleException(
+                    "You already have an application in progress for this business");
+        }
+        return application;
+    }
+
     /** Records the process instance against an application that is already committed. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void attachProcess(java.util.UUID applicationId, String processInstanceId) {

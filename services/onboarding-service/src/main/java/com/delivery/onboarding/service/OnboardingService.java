@@ -132,12 +132,32 @@ public class OnboardingService {
             throw new ApplicationRuleException(e.getMessage());
         }
 
+        startReview(application);
+
+        log.info("Application {} submitted: {} as {}",
+                application.getReference(), application.getBusinessName(), kind);
+        return application;
+    }
+
+    /**
+     * Starts the review process for an application whose row is already committed.
+     *
+     * <p>Tolerant, for the reason {@link #submit} gives: the write has already committed, so a
+     * process that fails to start leaves a recorded application a reviewer can decide by hand.
+     *
+     * <p>Public, and its own method, so that the signed-in path —
+     * {@link AccountApplicationService}, where somebody who already has an account applies to ride
+     * or sell — starts a review in exactly the way the open form does. A second copy of this block
+     * would be a second place for the process key or its variables to drift, and the first person
+     * to notice would be a reviewer whose queue never showed the application's review task.
+     */
+    public void startReview(OnboardingApplication application) {
         try {
             String instanceId = runtime.startProcessInstanceByKey(
                     PROCESS_KEY,
                     application.getId().toString(),
                     Map.of("applicationId", application.getId().toString(),
-                            "kind", kind.name(),
+                            "kind", application.getKind().name(),
                             "businessName", application.getBusinessName())).getId();
             intake.attachProcess(application.getId(), instanceId);
             application.startedAs(instanceId);
@@ -148,10 +168,6 @@ public class OnboardingService {
             log.error("Application {} was recorded but its review process did not start",
                     application.getId(), e);
         }
-
-        log.info("Application {} submitted: {} as {}",
-                application.getReference(), application.getBusinessName(), kind);
-        return application;
     }
 
     /**
