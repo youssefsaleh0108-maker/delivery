@@ -1,4 +1,3 @@
-import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
