@@ -7069,4 +7069,80 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get next => 'التالي';
+
+  @override
+  String get accountIntentSheetTitle => 'كيف ستستخدم YouDrop؟';
+
+  @override
+  String get accountIntentSheetSubtitle =>
+      'اختر واحداً ثم تابع باستخدام Google. تتم مراجعة التوصيل والبيع قبل أن تبدأ، ويمكن للحساب التقدّم لواحد منهما فقط.';
+
+  @override
+  String get accountIntentCustomer => 'زبون';
+
+  @override
+  String get accountIntentCustomerBlurb => 'أريد أن أطلب';
+
+  @override
+  String get accountIntentRider => 'سائق توصيل';
+
+  @override
+  String get accountIntentRiderBlurb => 'أريد أن أوصّل';
+
+  @override
+  String get accountIntentSeller => 'بائع';
+
+  @override
+  String get accountIntentSellerBlurb => 'أريد أن أبيع';
+
+  @override
+  String get googleSignInCancelled =>
+      'تم إلغاء تسجيل الدخول عبر Google. لم يتغيّر شيء.';
+
+  @override
+  String get googleSignInUnavailable =>
+      'تسجيل الدخول عبر Google غير متاح بعد. يُرجى استخدام بريدك الإلكتروني أو هاتفك حالياً.';
+
+  @override
+  String get googleRoleNotAdded =>
+      'تم تسجيل دخولك، لكن تعذّر إكمال إعداد حسابك. يُرجى الاختيار مجدداً.';
+
+  @override
+  String get googleExistingApplication =>
+      'لدى هذا الحساب طلب انضمام بالفعل، لذا فتحناه بدلاً من بدء طلب جديد.';
+
+  @override
+  String get accountSetupTitle => 'خطوة أخيرة';
+
+  @override
+  String get accountSetupSubtitle =>
+      'أخبرنا كيف ستستخدم YouDrop لإكمال إعداد حسابك.';
+
+  @override
+  String get wizAccountEmailNote =>
+      'سنستخدم البريد الإلكتروني المرتبط بالحساب الذي سجّلت الدخول به.';
+
+  @override
+  String get wizAccountRefreshFailed =>
+      'تم استلام طلبك، لكن تعذّر تحديث تسجيل دخولك. حاول مجدداً.';
+
+  @override
+  String get accountApplicationClosed =>
+      'تم البتّ في طلب الشراكة على هذا الحساب مسبقاً، لذا لا يمكن إعادة فتحه من هنا. يُرجى التواصل مع الدعم.';
+
+  @override
+  String get accountAlreadyPartner =>
+      'هذا الحساب شريك لدى YouDrop بالفعل، ولا يمكن للحساب الواحد أن يحمل أكثر من دور شريك واحد.';
+
+  @override
+  String get accountOtherApplication =>
+      'لدى هذا الحساب طلب لدور آخر بالفعل، ولا يمكن للحساب الواحد التقدّم إلا لدور واحد.';
+
+  @override
+  String get accountEmailUnverified =>
+      'لم يتم التحقق من البريد الإلكتروني لحسابك بعد، لذا لا يمكننا استلام طلب عليه حالياً.';
+
+  @override
+  String get wizAccountRolesRetry =>
+      'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
 }

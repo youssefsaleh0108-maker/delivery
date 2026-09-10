@@ -1,8 +1,11 @@
+import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'google_sign_in.dart';
 import 'one_time_code.dart';
+import 'role_option_card.dart';
 
 /// The first thing a signed-out person sees, and the fork in the road.
 ///
@@ -17,6 +20,11 @@ import 'one_time_code.dart';
 /// card was tapped, this one lets a role be chosen and reconsidered before Continue acts on it;
 /// Order leads a shopper to sign-up, Deliver and Sell each to their partner intro. The footer keeps
 /// the way back for anyone who already has an account.
+///
+/// <p><strong>Continue with Google</strong> sits under Continue once [WelcomeScreen.onGoogle] is
+/// given. It still asks customer / rider / seller in a sheet before any browser opens — that answer
+/// decides whether the new account is reviewed, so it is confirmed rather than inferred — but the
+/// sheet starts on whichever role card is chosen here, so answering twice costs one tap.
 ///
 /// <p>The screen is [DeliveryColors.background], not brand — the crimson brand moment is the splash
 /// before it. So the status bar keeps the app-wide dark glyphs; no per-screen override is needed.
@@ -58,12 +66,12 @@ class WelcomeScreen extends StatefulWidget {
   /// question would promise something the path behind it cannot keep.
   final VoidCallback? onJoinAsCarrier;
 
-  /// Opens the browser on Google, or null when Google sign-in is not configured. The redesign moves
-  /// social sign-in onto the login screen, so this screen no longer draws a Google button; the hook
-  /// stays on the widget so the broker round trip has somewhere to return to when it is restored.
-  final VoidCallback? onGoogle;
+  /// Starts the Google round trip with the answer to the customer / rider / seller sheet, which
+  /// this screen shows first. Null leaves the Google button off the screen.
+  final ValueChanged<AccountIntent>? onGoogle;
 
-  /// True while a Google round trip is in flight. The role buttons just change screens.
+  /// True while a Google round trip is in flight. The spinner is on the Google button, and the
+  /// rest of the screen holds still until it comes back.
   final bool busy;
 
   @override
@@ -74,6 +82,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// The chosen role, acted on by Continue. Order is the default: it is the role almost everybody
   /// arriving here holds, and the design draws it selected and badged Popular.
   int _selected = 0;
+
+  /// The card chosen here, as the Google sheet's starting answer. The carrier card has no Google
+  /// answer — a delivery company applies through its own wizard — so it starts the sheet blank.
+  AccountIntent? get _selectedIntent => switch (_selected) {
+        0 => AccountIntent.customer,
+        1 => AccountIntent.rider,
+        2 => AccountIntent.seller,
+        _ => null,
+      };
 
   void _continue() {
     if (widget.busy) return;
@@ -92,6 +109,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final ValueChanged<AccountIntent>? onGoogle = widget.onGoogle;
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
@@ -166,7 +184,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ),
                     ),
                     const SizedBox(height: DeliverySpacing.lg),
-                    _RoleOption(
+                    RoleOptionCard(
                       icon: Icons.shopping_bag_outlined,
                       title: t.authRoleWantOrder,
                       subtitle: t.authRoleWantOrderBlurb,
@@ -175,7 +193,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       onTap: () => setState(() => _selected = 0),
                     ),
                     const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                    _RoleOption(
+                    RoleOptionCard(
                       icon: Icons.two_wheeler_outlined,
                       title: t.authRoleWantDeliver,
                       subtitle: t.authRoleWantDeliverBlurb,
@@ -183,7 +201,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       onTap: () => setState(() => _selected = 1),
                     ),
                     const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                    _RoleOption(
+                    RoleOptionCard(
                       icon: Icons.storefront_outlined,
                       title: t.authRoleWantSell,
                       subtitle: t.authRoleWantSellBlurb,
@@ -193,7 +211,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     if (widget.onJoinAsCarrier != null) ...<Widget>[
                       const SizedBox(
                           height: DeliverySpacing.md - DeliverySpacing.xs),
-                      _RoleOption(
+                      RoleOptionCard(
                         icon: Icons.local_shipping_outlined,
                         title: t.carrChoiceCard,
                         subtitle: t.carrChoiceCardBlurb,
@@ -205,157 +223,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     const Spacer(),
                     AuthPrimaryButton(
                       label: t.continueLabel,
-                      busy: widget.busy,
                       onPressed: widget.busy ? null : _continue,
                     ),
+                    if (onGoogle != null) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.md),
+                      const AuthOrDivider(),
+                      const SizedBox(height: DeliverySpacing.md),
+                      SocialAuthButton(
+                        icon: Icons.g_mobiledata,
+                        iconColor: DeliveryColors.brand,
+                        label: t.continueWithGoogle,
+                        busy: widget.busy,
+                        onTap: () => askThenContinueWithGoogle(context, onGoogle,
+                            initial: _selectedIntent),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// One selectable role (Figma `role-card-order` 40:1096 and its deliver / sell twins).
-///
-/// A white card that takes a brand outline and a brand-tinted icon tile when it is the chosen one,
-/// so the selection reads at a glance without a separate radio. The Popular pill is drawn only on
-/// the role the design badges.
-class _RoleOption extends StatelessWidget {
-  const _RoleOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-    this.popular = false,
-  });
-
-  final IconData icon;
-
-  /// Already localised by the caller.
-  final String title;
-
-  /// Already localised by the caller.
-  final String subtitle;
-
-  final bool selected;
-  final bool popular;
-  final VoidCallback onTap;
-
-  static const double _radius = 16;
-
-  @override
-  Widget build(BuildContext context) {
-    final BorderRadius corners = BorderRadius.circular(_radius);
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: Material(
-        color: DeliveryColors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: corners,
-          side: BorderSide(
-            color: selected ? DeliveryColors.brand : DeliveryColors.borderFaint,
-            width: selected ? 2 : 1.5,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(DeliverySpacing.md),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 48,
-                  height: 48,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? DeliveryColors.brandSoft
-                        : DeliveryColors.borderFaint,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color:
-                        selected ? DeliveryColors.brand : DeliveryColors.muted,
-                  ),
-                ),
-                const SizedBox(width: DeliverySpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Flexible(
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: DeliveryColors.ink,
-                                height: 1.2,
-                              ),
-                            ),
-                          ),
-                          if (popular) ...<Widget>[
-                            const SizedBox(width: DeliverySpacing.sm),
-                            const _PopularBadge(),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: DeliveryColors.muted,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The brand-tinted "Popular" pill on the first role (Figma `badge` 63:40).
-class _PopularBadge extends StatelessWidget {
-  const _PopularBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: DeliveryColors.brandSoft,
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-      ),
-      child: Text(
-        DeliveryStrings.of(context).authRolePopular.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: DeliveryColors.brand,
-          letterSpacing: 0.5,
-          height: 1.1,
         ),
       ),
     );

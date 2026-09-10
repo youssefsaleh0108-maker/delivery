@@ -71,6 +71,11 @@ export 'src/models/zone_models.dart';
 export 'src/models/localised_labels.dart';
 export 'src/auth/auth_config.dart';
 export 'src/auth/auth_service.dart';
+export 'src/auth/broker_sign_in.dart';
+// AuthService's constructor has taken an `OidcClient` since it was written, so the type was already
+// public API in all but name. Exported so an app's own tests can stand in for the browser — the
+// Google path cannot be exercised any other way — without reaching into src/.
+export 'src/auth/oidc_client.dart' show OidcClient, TokenSet;
 export 'src/auth/device_token.dart';
 export 'src/auth/delivery_role.dart';
 export 'src/models/catalog_models.dart';

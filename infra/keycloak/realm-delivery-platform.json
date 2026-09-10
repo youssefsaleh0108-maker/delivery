@@ -106,15 +106,6 @@
         "claim": "family_name",
         "user.attribute": "lastName"
       }
-    },
-    {
-      "name": "customer-role",
-      "identityProviderAlias": "google",
-      "identityProviderMapper": "oidc-hardcoded-role-idp-mapper",
-      "config": {
-        "syncMode": "INHERIT",
-        "role": "CUSTOMER"
-      }
     }
   ],
   "clients": [

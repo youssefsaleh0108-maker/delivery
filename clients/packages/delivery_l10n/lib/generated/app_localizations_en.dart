@@ -7062,4 +7062,80 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get next => 'Next';
+
+  @override
+  String get accountIntentSheetTitle => 'How will you use YouDrop?';
+
+  @override
+  String get accountIntentSheetSubtitle =>
+      'Pick one, then continue with Google. Riding and selling are reviewed before you start, and an account can apply for only one of them.';
+
+  @override
+  String get accountIntentCustomer => 'Customer';
+
+  @override
+  String get accountIntentCustomerBlurb => 'I want to order';
+
+  @override
+  String get accountIntentRider => 'Rider';
+
+  @override
+  String get accountIntentRiderBlurb => 'I want to deliver';
+
+  @override
+  String get accountIntentSeller => 'Seller';
+
+  @override
+  String get accountIntentSellerBlurb => 'I want to sell';
+
+  @override
+  String get googleSignInCancelled =>
+      'Google sign-in was cancelled. Nothing was changed.';
+
+  @override
+  String get googleSignInUnavailable =>
+      'Google sign-in isn\'t available yet. Please use your email or phone for now.';
+
+  @override
+  String get googleRoleNotAdded =>
+      'You\'re signed in, but we couldn\'t finish setting up your account. Please choose again.';
+
+  @override
+  String get googleExistingApplication =>
+      'This account already has an application, so we\'ve opened that instead of starting another.';
+
+  @override
+  String get accountSetupTitle => 'One more step';
+
+  @override
+  String get accountSetupSubtitle =>
+      'Tell us how you\'ll use YouDrop to finish setting up your account.';
+
+  @override
+  String get wizAccountEmailNote =>
+      'We\'ll use the email on the account you signed in with.';
+
+  @override
+  String get wizAccountRefreshFailed =>
+      'Your application is in, but we couldn\'t refresh your sign-in. Try again.';
+
+  @override
+  String get accountApplicationClosed =>
+      'The partner application on this account has already been decided, so it can\'t be reopened here. Please contact support.';
+
+  @override
+  String get accountAlreadyPartner =>
+      'This account is already a YouDrop partner, and an account can hold only one partner role.';
+
+  @override
+  String get accountOtherApplication =>
+      'This account already has an application for another role, and an account can apply for only one.';
+
+  @override
+  String get accountEmailUnverified =>
+      'Your account\'s email address hasn\'t been verified, so we can\'t take an application on it yet.';
+
+  @override
+  String get wizAccountRolesRetry =>
+      'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
 }

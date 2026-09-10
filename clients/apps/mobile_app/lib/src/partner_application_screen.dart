@@ -111,6 +111,7 @@ class PartnerApplicationScreen extends StatefulWidget {
     required this.onSignedIn,
     required this.onClose,
     this.onLogIn,
+    this.account,
   });
 
   final OnboardingApi api;
@@ -132,6 +133,24 @@ class PartnerApplicationScreen extends StatefulWidget {
   /// Leaves the application flow for Sign In — the carrier intro's "Already a partner?" line
   /// (86:15). Null keeps the line off that screen.
   final VoidCallback? onLogIn;
+
+  /// The account that is applying, when there already is one — somebody who signed in with Google
+  /// and then said they want to ride or to sell. Null is the stranger this screen was written for.
+  ///
+  /// With an account, three things the open form needs fall away and nothing else changes: the same
+  /// intro, the same four steps, the same documents and bank details, the same queue and gates.
+  ///
+  /// - **No email round.** The address is the account's own, prefilled, ticked and read-only, and
+  ///   Google already proved it; a one-time code on top would be proving one inbox twice. The server
+  ///   takes the address from the token, not from this field.
+  /// - **No passcode.** They sign in with Google, and a passcode would be a second credential nobody
+  ///   asked for.
+  /// - **No new account at the end.** [OnboardingApi.applyForMyAccount] attaches the application to
+  ///   this one and gives it APPLICANT beside the live role — the open form's gates — and the
+  ///   session is refreshed so those roles are in the token before [onSignedIn] routes it.
+  ///
+  /// Rider and merchant only: those are the two the Google question offers.
+  final AuthSession? account;
 
   @override
   State<PartnerApplicationScreen> createState() =>
@@ -206,6 +225,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   String? _verifiedPhone;
   bool _busy = false;
   String? _error;
+
+  /// True when an account applying got back an application that was already decided, so no role
+  /// arrived and none will — see [_finishAccount]. The finishing screen then says why and offers
+  /// Close rather than a "Try again" that could only ever repeat the same answer.
+  bool _applicationClosed = false;
   String? _reference;
 
   /// True once the account exists. Creating it is not retryable — the server refuses a second
@@ -237,6 +261,9 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   bool _payoutSent = false;
 
   bool get _isRider => widget.kind == PartnerKind.rider;
+
+  /// True when an existing account is applying — see [PartnerApplicationScreen.account].
+  bool get _forAccount => widget.account != null;
 
   bool get _isCarrier => widget.kind == PartnerKind.carrier;
 
@@ -296,6 +323,13 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   @override
   void initState() {
     super.initState();
+    // The account's own name and address, from its token. The name stays editable — the spelling
+    // Google holds is not always the one somebody wants a reviewer to read — the address does not.
+    final AuthSession? account = widget.account;
+    if (account != null) {
+      _name.text = account.name ?? '';
+      _email.text = account.email ?? '';
+    }
     for (final TextEditingController c in _allControllers) {
       c.addListener(_refresh);
     }
@@ -341,9 +375,12 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       return payoutOk;
     }
     if (_step != 0) return true;
+    // An account applying brings its own address and signs in with Google, so neither the address
+    // nor a passcode is asked of it — see [PartnerApplicationScreen.account].
     final bool identity = _name.text.trim().isNotEmpty &&
-        _email.text.trim().contains('@') &&
-        _passcode.text.length == PasscodePad.passcodeLength;
+        (_forAccount ||
+            (_email.text.trim().contains('@') &&
+                _passcode.text.length == PasscodePad.passcodeLength));
     return _isRider ? identity : identity && _business.text.trim().isNotEmpty;
   }
 
@@ -381,7 +418,8 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         setState(() {
           _error = null;
           _phoneCode.clear();
-          _phase = _Phase.verifyEmail;
+          // An account never saw the email round, so back from the number is back to the wizard.
+          _phase = _forAccount ? _Phase.wizard : _Phase.verifyEmail;
         });
       case _Phase.finishing:
         // Nothing to go back to: the application is in and the account may already exist.
@@ -416,7 +454,24 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   }
 
   /// Leaves the wizard for the verification the server insists on.
+  ///
+  /// An account applying skips the email round — its address is already proved — and goes to the
+  /// phone round only when a number was typed, exactly as the open form does after its email.
   Future<void> _beginSubmit() async {
+    if (_forAccount) {
+      if (_phone.text.trim().isEmpty) {
+        await _send();
+        return;
+      }
+      try {
+        await _sendCode('PHONE', _phone.text.trim());
+      } catch (_) {
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _phase = _Phase.verifyPhone);
+      return;
+    }
     try {
       await _sendCode('EMAIL', _email.text.trim());
     } catch (_) {
@@ -548,6 +603,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       _busy = true;
       _error = null;
     });
+    if (_forAccount) {
+      await _sendForAccount();
+      return;
+    }
     try {
       _reference ??= _isRider
           ? await widget.api.applyAsRider(
@@ -594,6 +653,62 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     await _finishAccount();
   }
 
+  /// The account path's half of [_send].
+  ///
+  /// [OnboardingApi.applyForMyAccount] carries the wizard's answers and nothing that proves an
+  /// address: the server takes the account's own from its token. It is idempotent on the server, so
+  /// the retry button calling this again after a dropped connection gets the same application back
+  /// rather than a second one.
+  Future<void> _sendForAccount() async {
+    try {
+      _reference ??= (await widget.api.applyForMyAccount(
+        kind: _isRider ? OnboardingKind.rider : OnboardingKind.merchant,
+        name: _name.text.trim(),
+        businessName: _isRider ? null : _business.text.trim(),
+        // Null when a rider chose us, exactly as on the open form.
+        companyId: _isRider ? _company?.id : null,
+        phone: _verifiedPhone,
+        phoneVerificationToken: _phoneToken,
+        notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+        details: _details,
+      ))
+          .reference;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = _accountRefusalFrom(e);
+      });
+      return;
+    }
+    await _finishAccount();
+  }
+
+  /// What to say when the account path's application is refused, in the reader's own language.
+  ///
+  /// The open form shows the server's sentence as it comes, and so did this path at first — which
+  /// put English in front of an Arabic-speaking applicant for every refusal the signed-in endpoint
+  /// added. The server now names the refusals it knows with a `code`, and a 502 there always means
+  /// the same thing, so those are said here. Anything else — the domain's own refusals, or a code
+  /// this build does not know — falls back to [_messageFrom], exactly as on the open form.
+  String _accountRefusalFrom(Object e) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    if (e is DioException) {
+      // The record is in and only the roles are missing; the same call, retried, finishes it.
+      if (e.response?.statusCode == 502) return t.wizAccountRolesRetry;
+      final Object? body = e.response?.data;
+      switch (body is Map ? body['code'] : null) {
+        case 'already-partner':
+          return t.accountAlreadyPartner;
+        case 'other-application':
+          return t.accountOtherApplication;
+        case 'email-unverified':
+          return t.accountEmailUnverified;
+      }
+    }
+    return _messageFrom(e);
+  }
+
   /// Creates the applicant's account and signs them in with the passcode they chose on step one.
   ///
   /// The two halves are tracked separately. The account is created ONCE — retrying its creation
@@ -609,28 +724,40 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       _collateralSkippable = false;
     });
     try {
-      if (!_accountCreated) {
-        await widget.api.createApplicantAccount(
-          reference: _reference!,
-          password: _passcode.text,
-        );
-        _accountCreated = true;
+      if (_forAccount) {
+        // The account exists and is signed in already; what changed is its roles, on the server.
+        // Refreshed BEFORE anything is handed on, so the session routed next carries APPLICANT and
+        // the role applied for — routing on the old token would put somebody straight back on the
+        // role question they just answered.
+        _session ??= await widget.authService.refresh();
+      } else {
+        if (!_accountCreated) {
+          await widget.api.createApplicantAccount(
+            reference: _reference!,
+            password: _passcode.text,
+          );
+          _accountCreated = true;
+        }
+        _session ??= await widget.authService
+            .signInWithPassword(_verifiedEmail!, _passcode.text);
       }
-      _session ??= await widget.authService
-          .signInWithPassword(_verifiedEmail!, _passcode.text);
     } catch (e, stack) {
       // Without this the cause never leaves the device: the screen says one sentence, and a
       // Keycloak refusal and a network failure look identical in it.
-      debugPrint('APPLICANT SIGN-IN FAILED (accountCreated=$_accountCreated): $e');
+      debugPrint('APPLICANT SIGN-IN FAILED (accountCreated=$_accountCreated, '
+          'forAccount=$_forAccount): $e');
       debugPrintStack(stackTrace: stack, label: 'applicant-sign-in');
       if (!mounted) return;
       setState(() {
         _busy = false;
         // Two genuinely different situations, and telling them apart is the difference between
-        // "try again" and "stop typing, you already have an account".
-        _error = _accountCreated
-            ? '${t.accountReadySignInInstead} ${_messageFrom(e)}'
-            : '${t.couldNotCreateSignIn} ${_messageFrom(e)}';
+        // "try again" and "stop typing, you already have an account". An account applying is a
+        // third: the application is in, and only the refresh needs another go.
+        _error = _forAccount
+            ? t.wizAccountRefreshFailed
+            : _accountCreated
+                ? '${t.accountReadySignInInstead} ${_messageFrom(e)}'
+                : '${t.couldNotCreateSignIn} ${_messageFrom(e)}';
       });
       return;
     }
@@ -639,6 +766,21 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     // details collected during the wizard can finally travel. Only what succeeds is forgotten;
     // anything that fails stays queued for the retry.
     final AuthSession session = _session!;
+    // An account applying whose refreshed token still lacks the role. Every application the server
+    // takes or resumes grants the role before it answers, so this is the one answer that grants
+    // nothing: an application that was already decided — a partner approved the old way, whose
+    // record GET /applications/mine could not see (it reads only the applicant column), or one
+    // approved and suspended since. The documents would 404 on /applications/mine, and handing
+    // the role-less session on landed them on the role question with no reason given. Say it.
+    if (_forAccount &&
+        !session.hasRole(_isRider ? DeliveryRole.delivery : DeliveryRole.merchant)) {
+      setState(() {
+        _busy = false;
+        _applicationClosed = true;
+        _error = t.accountApplicationClosed;
+      });
+      return;
+    }
     final _CollateralFailure? failure = await _sendCollateral(t);
     if (!mounted) return;
     if (failure != null) {
@@ -778,8 +920,11 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                         ] else
                           ..._finishingBody(t),
                         // Suppressed when it would repeat the finishing body's own sentence —
-                        // a collateral failure is already fully described up there.
-                        if (_error != null && _error != _collateralError) ...<Widget>[
+                        // a collateral failure, or a closed application, is already fully
+                        // described up there.
+                        if (_error != null &&
+                            _error != _collateralError &&
+                            !_applicationClosed) ...<Widget>[
                           const SizedBox(height: DeliverySpacing.md),
                           AuthErrorNote(message: _error!),
                         ],
@@ -854,15 +999,20 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            AuthPrimaryButton(
-              label: t.tryAgain,
-              busy: _busy,
-              onPressed: _busy
-                  ? null
-                  : _reference == null
-                      ? _send
-                      : _finishAccount,
-            ),
+            // A decided application cannot be retried into a role, so this closes instead, and
+            // what the account holds then decides where it lands. See [_applicationClosed].
+            if (_applicationClosed)
+              AuthPrimaryButton(label: t.close, onPressed: widget.onClose)
+            else
+              AuthPrimaryButton(
+                label: t.tryAgain,
+                busy: _busy,
+                onPressed: _busy
+                    ? null
+                    : _reference == null
+                        ? _send
+                        : _finishAccount,
+              ),
             // Only for a failure the applicant may actually walk away from — the bank details,
             // which the payout step lets them leave blank anyway. A failed document does not get a
             // skip: offering one beside a required paper says it was optional. See
@@ -1364,6 +1514,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           controller: _email,
           icon: Icons.mail_outline,
           enabled: !_busy,
+          // An account's own address, which the server reads from its token: shown, ticked, and not
+          // editable — editing it here would change nothing but what the screen claims.
+          readOnly: _forAccount,
+          verified: _forAccount,
           borderColor: DeliveryColors.border,
           uppercaseLabel: true,
           keyboardType: TextInputType.emailAddress,
@@ -1383,8 +1537,13 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           textInputAction: TextInputAction.next,
           autofillHints: const <String>[AutofillHints.telephoneNumber],
         ),
-        const SizedBox(height: 14),
-        _passcodeField(t),
+        if (!_forAccount) ...<Widget>[
+          const SizedBox(height: 14),
+          _passcodeField(t),
+        ] else ...<Widget>[
+          const SizedBox(height: 14),
+          SoftNote(text: t.wizAccountEmailNote, icon: Icons.verified_user_outlined),
+        ],
         const SizedBox(height: 14),
         AuthField(
           label: t.authDateOfBirth,
@@ -1804,6 +1963,8 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           hint: t.authEmailHint,
           controller: _email,
           enabled: !_busy,
+          readOnly: _forAccount,
+          verified: _forAccount,
           borderColor: DeliveryColors.border,
           labelColor: DeliveryColors.muted,
           keyboardType: TextInputType.emailAddress,
@@ -1823,7 +1984,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           autofillHints: const <String>[AutofillHints.telephoneNumber],
         ),
         const SizedBox(height: DeliverySpacing.md),
-        _passcodeField(t, labelColor: DeliveryColors.muted, uppercase: false),
+        if (!_forAccount)
+          _passcodeField(t, labelColor: DeliveryColors.muted, uppercase: false)
+        else
+          SoftNote(text: t.wizAccountEmailNote, icon: Icons.verified_user_outlined),
         const SizedBox(height: DeliverySpacing.md),
         SoftNote(text: t.finishSettingUpInTheApp, icon: Icons.info_outline),
       ];
@@ -1859,7 +2023,10 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           maxLines: 3,
         ),
         const SizedBox(height: DeliverySpacing.md),
-        SoftNote(text: t.guestApplicationExplainer, icon: Icons.person_outline),
+        // The guest explainer promises a passcode at the end, which an account applying never
+        // chooses — it signs in with Google.
+        if (!_forAccount)
+          SoftNote(text: t.guestApplicationExplainer, icon: Icons.person_outline),
       ];
 
   // ---------------------------------------------------------------- documents and bank
@@ -1997,10 +2164,14 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           YdEmptyState(
             icon: Icons.error_outline,
             title: t.thatDidNotGoThrough,
-            message: _collateralError ??
-                (_reference == null
-                    ? t.authCouldNotSendApplication
-                    : t.couldNotCreateSignIn),
+            message: _applicationClosed
+                ? t.accountApplicationClosed
+                : _collateralError ??
+                    (_reference == null
+                        ? t.authCouldNotSendApplication
+                        : _forAccount
+                            ? t.wizAccountRefreshFailed
+                            : t.couldNotCreateSignIn),
           ),
         const SizedBox(height: DeliverySpacing.md),
         if (_error == null)

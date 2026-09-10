@@ -15,7 +15,8 @@ blocker, and doing it after the OAuth client is registered means registering it 
 | Piece | State |
 | --- | --- |
 | Google identity provider in the realm | configured, **disabled**, no credentials |
-| Mappers (email, first name, last name, username, CUSTOMER role) | written, in the realm file and in `apply-identity-updates.sh` |
+| Mappers (email, first name, last name, username) | written, in the realm file and in `apply-identity-updates.sh` |
+| Role on a new Google account | **no mapper** — the app asks customer / rider / seller first and onboarding-service grants the role; the old `customer-role` mapper is removed. See [`docs/google-sign-in.md`](../../docs/google-sign-in.md), which also covers the k3s deployment |
 | Account linking (existing account + same email must link, not duplicate) | hardened flow written, see [Account linking](#account-linking) |
 | Redirect URI to register | known exactly, [below](#step-2--create-the-oauth-client) |
 | Google Cloud project + OAuth client | **you** |
@@ -186,12 +187,16 @@ provider secret is used only for the back-channel code exchange, not for anythin
 
 ## Step 4 — Turn the button on in the app
 
-`clients/apps/mobile_app/lib/main.dart` currently passes `onGoogle: null` to `WelcomeScreen`, with
-a comment saying why: a control that cannot work should not be shown. The handler
-(`_signInWithGoogle`) is written and correct and is deliberately kept rather than deleted.
+**Nothing to do — it is on.** The Google button is wired on the sign-in screen and on Create
+Account. The app asks Keycloak whether the provider is enabled when it starts and after every
+sign-out, and again before it opens a browser. Until step 3 is done, Create Account draws no
+Google button and the sign-in screen's says "Google sign-in is coming soon." — nobody is asked
+customer / rider / seller, and no browser opens on Keycloak's own login page. So finishing step 3
+is what switches it on for users (at the app's next launch or sign-out); no app release is needed.
 
-Once step 3 is done, that becomes `onGoogle: _signInWithGoogle`. That is a one-line change in the
-Flutter client and it is not in this directory — it belongs to whoever owns `clients/`.
+How the role question, the role grants and the k3s deployment fit together is in
+[`docs/google-sign-in.md`](../../docs/google-sign-in.md) — read that one for the dev/qa cluster,
+because the `docker compose` commands above do not apply there.
 
 ---
 
@@ -308,10 +313,13 @@ After step 3, in this order:
    HTTPS, with a valid certificate. If not, stop — step 0 is not done.
 2. Admin console → `delivery-platform` → Identity providers → Google should be **Enabled**, with a
    client id present, and *First login flow override* / *First broker login flow* set to
-   `youdrop-first-broker-login`. Its **Mappers** tab should list five: `username-from-email`,
-   `email`, `first-name`, `last-name`, `customer-role`.
-3. Sign in as a **brand new** Google address. Expect: one tap on Google, no profile form, and a new
-   account in Users with the email, a first and last name, and the `CUSTOMER` role.
+   `youdrop-first-broker-login`. Its **Mappers** tab should list four: `username-from-email`,
+   `email`, `first-name`, `last-name`. A `customer-role` mapper is a leftover from before the app
+   asked customer / rider / seller — `apply-identity-updates.sh` deletes it.
+3. Sign in as a **brand new** Google address and pick *Customer* in the app. Expect: one tap on
+   Google, no profile form, and a new account in Users with the email, a first and last name, and
+   the `CUSTOMER` role — granted by onboarding-service, not by a mapper. Picking *Rider* or
+   *Seller* instead leads to the application, and the account holds `APPLICANT` beside the role.
 4. Sign in with a Google address that **already has a YouDrop account**. Expect: a screen saying an
    account already exists, then a password prompt for that account, then one account — not two.
    Check Users: there must still be exactly one row for that address, and *Identity provider links*

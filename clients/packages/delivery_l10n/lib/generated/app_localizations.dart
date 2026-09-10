@@ -12553,6 +12553,132 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Next'**
   String get next;
+
+  /// No description provided for @accountIntentSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How will you use YouDrop?'**
+  String get accountIntentSheetTitle;
+
+  /// No description provided for @accountIntentSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one, then continue with Google. Riding and selling are reviewed before you start, and an account can apply for only one of them.'**
+  String get accountIntentSheetSubtitle;
+
+  /// No description provided for @accountIntentCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get accountIntentCustomer;
+
+  /// No description provided for @accountIntentCustomerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to order'**
+  String get accountIntentCustomerBlurb;
+
+  /// No description provided for @accountIntentRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get accountIntentRider;
+
+  /// No description provided for @accountIntentRiderBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to deliver'**
+  String get accountIntentRiderBlurb;
+
+  /// No description provided for @accountIntentSeller.
+  ///
+  /// In en, this message translates to:
+  /// **'Seller'**
+  String get accountIntentSeller;
+
+  /// No description provided for @accountIntentSellerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to sell'**
+  String get accountIntentSellerBlurb;
+
+  /// No description provided for @googleSignInCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in was cancelled. Nothing was changed.'**
+  String get googleSignInCancelled;
+
+  /// No description provided for @googleSignInUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in isn\'t available yet. Please use your email or phone for now.'**
+  String get googleSignInUnavailable;
+
+  /// No description provided for @googleRoleNotAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re signed in, but we couldn\'t finish setting up your account. Please choose again.'**
+  String get googleRoleNotAdded;
+
+  /// No description provided for @googleExistingApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'This account already has an application, so we\'ve opened that instead of starting another.'**
+  String get googleExistingApplication;
+
+  /// No description provided for @accountSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One more step'**
+  String get accountSetupTitle;
+
+  /// No description provided for @accountSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us how you\'ll use YouDrop to finish setting up your account.'**
+  String get accountSetupSubtitle;
+
+  /// No description provided for @wizAccountEmailNote.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll use the email on the account you signed in with.'**
+  String get wizAccountEmailNote;
+
+  /// No description provided for @wizAccountRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is in, but we couldn\'t refresh your sign-in. Try again.'**
+  String get wizAccountRefreshFailed;
+
+  /// No description provided for @accountApplicationClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The partner application on this account has already been decided, so it can\'t be reopened here. Please contact support.'**
+  String get accountApplicationClosed;
+
+  /// No description provided for @accountAlreadyPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is already a YouDrop partner, and an account can hold only one partner role.'**
+  String get accountAlreadyPartner;
+
+  /// No description provided for @accountOtherApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'This account already has an application for another role, and an account can apply for only one.'**
+  String get accountOtherApplication;
+
+  /// No description provided for @accountEmailUnverified.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account\'s email address hasn\'t been verified, so we can\'t take an application on it yet.'**
+  String get accountEmailUnverified;
+
+  /// No description provided for @wizAccountRolesRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is in, but we couldn\'t finish setting up your account. Please try again.'**
+  String get wizAccountRolesRetry;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

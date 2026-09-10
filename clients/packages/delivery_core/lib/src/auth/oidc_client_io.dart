@@ -12,20 +12,30 @@ class _AppAuthOidcClient implements OidcClient {
 
   @override
   Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async {
-    final AuthorizationTokenResponse response = await _appAuth.authorizeAndExchangeCode(
-      AuthorizationTokenRequest(
-        config.clientId,
-        config.redirectUrl,
-        discoveryUrl: config.discoveryUrl,
-        scopes: config.scopes,
-        // True only for an http:// issuer — the local dev stack. AppAuth otherwise refuses the
-        // discovery call outright and takes the app down with it. See AuthConfig.
-        allowInsecureConnections: config.allowInsecureConnections,
-        additionalParameters: extraParams,
-        // PKCE is on by default and is what makes a public client safe here: there is no client
-        // secret to ship inside an app binary.
-      ),
-    );
+    final AuthorizationTokenResponse response;
+    try {
+      response = await _appAuth.authorizeAndExchangeCode(
+        AuthorizationTokenRequest(
+          config.clientId,
+          config.redirectUrl,
+          discoveryUrl: config.discoveryUrl,
+          scopes: config.scopes,
+          // True only for an http:// issuer — the local dev stack. AppAuth otherwise refuses the
+          // discovery call outright and takes the app down with it. See AuthConfig.
+          allowInsecureConnections: config.allowInsecureConnections,
+          additionalParameters: extraParams,
+          // PKCE is on by default and is what makes a public client safe here: there is no client
+          // secret to ship inside an app binary.
+        ),
+      );
+    } on FlutterAppAuthUserCancelledException {
+      // Backing out of the browser — its close button, the system back gesture, or closing a
+      // Google error page — is not a failure, and the interface already says what it is: null,
+      // no session. AppAuth reports it as an exception, and until this catch every caller that
+      // relied on the contract showed "sign-in did not complete" to somebody who had simply
+      // changed their mind.
+      return null;
+    }
     return _toTokenSet(
       response.accessToken,
       response.refreshToken,

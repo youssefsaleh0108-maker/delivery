@@ -270,13 +270,26 @@ else
   current_flow=$($KCADM get identity-provider/instances/google -r "$REALM" \
     --fields firstBrokerLoginFlowAlias --format csv --noquotes || true)
 
+  current_enabled=$($KCADM get identity-provider/instances/google -r "$REALM" \
+    --fields enabled --format csv --noquotes || true)
+
   if [ "$current_flow" = "$BROKER_FLOW" ]; then
     echo "    already bound to $BROKER_FLOW"
   else
     echo "    !! bound to '$current_flow', not '$BROKER_FLOW'."
-    echo "       Account linking is on the mail-link route until that changes. Re-run"
-    echo "       keycloak/configure-google-idp.sh - it holds the credentials, and now that the"
-    echo "       hardened flow exists it will pick it up on its own. See SOCIAL-SIGN-IN-SETUP.md."
+    echo "       Account linking is on the mail-link route until that changes. Bind it: on the"
+    echo "       compose stack re-run keycloak/configure-google-idp.sh (it holds the credentials and"
+    echo "       picks the hardened flow up on its own); on k3s set Identity providers -> google ->"
+    echo "       First login flow override in the admin console. See docs/google-sign-in.md."
+    # Enabled AND on the built-in flow, with trustEmail on, is the exact state the hardened flow
+    # exists to prevent - so it is said separately and loudly rather than folded into the above.
+    if [ "$current_enabled" = "true" ]; then
+      echo "    !! AND GOOGLE IS ENABLED. Until the flow is bound, a Google login can be linked into"
+      echo "       an account somebody else parked that address on. Bind the flow or disable the"
+      echo "       provider now."
+    else
+      echo "       Google is disabled, so nothing is exposed yet. Bind the flow BEFORE enabling it."
+    fi
   fi
 
   # ------------------------------------------------------------------------------------------
@@ -393,24 +406,38 @@ JSON
 JSON
   idp_mapper last-name /tmp/kc-idp-last-name.json
 
-  # Everyone who arrives through Google is a shopper. Nothing on this path can grant DELIVERY,
-  # MERCHANT, CARRIER or BACKOFFICE - those are decided by the reviewed onboarding flow, and a
-  # social login must never be a way around a review.
+  # NO ROLE MAPPER - and a stale one is removed.
   #
-  # Hardcoded rather than claim-driven on purpose: a "role from claim" mapper reads a value the
-  # external provider controls, and Google is not entitled to say who administers this platform.
-  cat > /tmp/kc-idp-role.json <<'JSON'
-{
-  "name": "customer-role",
-  "identityProviderAlias": "google",
-  "identityProviderMapper": "oidc-hardcoded-role-idp-mapper",
-  "config": {
-    "syncMode": "INHERIT",
-    "role": "CUSTOMER"
-  }
-}
-JSON
-  idp_mapper customer-role /tmp/kc-idp-role.json
+  # This used to attach `customer-role`, a hardcoded mapper that made every Google account a
+  # CUSTOMER the moment Keycloak created it. The app now asks, BEFORE the browser opens, whether the
+  # person is a customer, a rider or a seller, and that answer is what decides the role:
+  #
+  #   customer        -> onboarding-service grants CUSTOMER    (POST /api/onboarding/me/customer)
+  #   rider / seller  -> the reviewed application, which grants the live role beside APPLICANT
+  #                      and lets auto-approval or a reviewer take APPLICANT off, exactly as the
+  #                      open application form does          (POST /api/onboarding/applications/mine)
+  #
+  # Keeping the mapper would make somebody who came to ride a shopper before they had answered, and
+  # would leave the question deciding nothing at all for the customer case. What the mapper was
+  # there to guarantee still holds, and more tightly: nothing a Google login carries can grant a
+  # role by itself, and every role now comes from our own service acting on the person's answer.
+  # See docs/google-sign-in.md.
+  #
+  # Removed rather than merely no longer created, because every realm that already ran this script
+  # carries it, and a mapper left behind keeps granting CUSTOMER on every first login regardless.
+  stale_role=$($KCADM get identity-provider/instances/google/mappers -r "$REALM" \
+    --fields id,name --format csv --noquotes | grep ",customer-role\$" || true)
+  if [ -n "$stale_role" ]; then
+    stale_role_id=${stale_role%%,*}
+    if $KCADM delete "identity-provider/instances/google/mappers/$stale_role_id" -r "$REALM"; then
+      echo "    mapper customer-role removed - the app's role question decides the role now"
+    else
+      echo "    !! could not remove the customer-role mapper. Every new Google account still gets"
+      echo "       CUSTOMER at first login until it is deleted in the admin console."
+    fi
+  else
+    echo "    no customer-role mapper, as intended"
+  fi
 fi
 
 # ---------------------------------------------------------------------------------------------
@@ -515,6 +542,6 @@ done
 
 rm -f /tmp/kc-execution.json /tmp/kc-review-profile.json /tmp/kc-idp-username.json \
       /tmp/kc-idp-email.json /tmp/kc-idp-first-name.json /tmp/kc-idp-last-name.json \
-      /tmp/kc-idp-role.json /tmp/kc-pm-phone.json /tmp/kc-pm-phone-verified.json
+      /tmp/kc-pm-phone.json /tmp/kc-pm-phone-verified.json
 
 echo "==> Identity updates applied"
