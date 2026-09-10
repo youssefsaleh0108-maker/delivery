@@ -82,20 +82,37 @@ public class OrderEventListener {
                     notify("order.placed.merchant", orderId, event.path("merchantId").asText(null),
                             values, correlationId);
                 }
-                case "order.status_changed" ->
-                        // With a dedupe key carrying the RAW status. The order-based check treats
-                        // all four transitions (ACCEPTED, PREPARING, READY, PICKED_UP) as one
-                        // notification — same order, same type — so only the first ever fired and
-                        // the rest were silently discarded as duplicates. Keyed per status, each
-                        // transition notifies exactly once and a redelivered event still cannot
-                        // notify twice. The raw wire value, not the humanised one: the key must be
-                        // stable however the copy is worded.
-                        notify(eventType, orderId, event.path("customerId").asText(null),
-                                values, correlationId,
-                                orderId + ":" + event.path("status").asText(""));
-                case "order.delivered" ->
-                        notify(eventType, orderId, event.path("customerId").asText(null),
-                                values, correlationId);
+                case "order.status_changed" -> {
+                    // With a dedupe key carrying the RAW status. The order-based check treats
+                    // all four transitions (ACCEPTED, PREPARING, READY, PICKED_UP) as one
+                    // notification — same order, same type — so only the first ever fired and
+                    // the rest were silently discarded as duplicates. Keyed per status, each
+                    // transition notifies exactly once and a redelivered event still cannot
+                    // notify twice. The raw wire value, not the humanised one: the key must be
+                    // stable however the copy is worded.
+                    String status = event.path("status").asText("");
+                    notify(eventType, orderId, event.path("customerId").asText(null),
+                            values, correlationId, orderId + ":" + status);
+
+                    // The merchant's half, and only for the transition they did not cause.
+                    // ACCEPTED, PREPARING and READY are their own three taps; telling them about
+                    // those is how people learn to turn notifications off. PICKED_UP is somebody
+                    // else's action on their order, and until now the counter was never told the
+                    // rider had actually come.
+                    if ("PICKED_UP".equals(status)) {
+                        notify("order.status_changed.merchant", orderId,
+                                event.path("merchantId").asText(null), values, correlationId,
+                                orderId + ":" + status + ":merchant");
+                    }
+                }
+                case "order.delivered" -> {
+                    notify(eventType, orderId, event.path("customerId").asText(null),
+                            values, correlationId);
+                    // The shop finds out their order arrived. Without this an order simply goes
+                    // quiet for the merchant the moment they mark it ready.
+                    notify("order.delivered.merchant", orderId,
+                            event.path("merchantId").asText(null), values, correlationId);
+                }
                 case "order.rider_assigned" -> {
                     notify(eventType, orderId, event.path("customerId").asText(null),
                             values, correlationId);
