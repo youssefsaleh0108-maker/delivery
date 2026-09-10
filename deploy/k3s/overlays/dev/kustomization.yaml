@@ -73,7 +73,7 @@ images:
   newTag: sha-7c701a6be3361bdb973776c27feb25c720f84d75
 - name: ghcr.io/youssefsaleh0108-maker/product-service
   newName: ghcr.io/youssefsaleh0108-maker/product-service
-  newTag: sha-ca4afdd39d38650beb5e0b93149be8d7680adb1e
+  newTag: sha-a7d357436e557dbf55e3338f85cd751979e4606c
 - name: ghcr.io/youssefsaleh0108-maker/push-connector
   newName: ghcr.io/youssefsaleh0108-maker/push-connector
   newTag: sha-7c701a6be3361bdb973776c27feb25c720f84d75
