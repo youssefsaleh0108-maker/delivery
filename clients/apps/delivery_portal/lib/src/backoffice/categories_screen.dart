@@ -28,24 +28,30 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     });
   }
 
-  Future<void> _add(List<Category> existing) async {
-    final _NewCategory? result = await showDialog<_NewCategory>(
-      context: context,
-      builder: (BuildContext context) => _AddCategoryDialog(existing: existing),
-    );
-    if (result == null) return;
-
+  /// Posts one category, and answers the dialog with the reason when the service refuses.
+  ///
+  /// Returning the message rather than showing it keeps the dialog open, because both ways this
+  /// fails are ones the operator fixes by editing what they already typed: the name collides
+  /// with a sibling, or the write did not land. Popping first and reporting afterwards - which
+  /// is what this screen used to do - threw the typing away and made them start over.
+  Future<String?> _create(String name, String? parentId) async {
     try {
-      await widget.api.createCategory(name: result.name, parentId: result.parentId);
+      await widget.api.createCategory(name: name, parentId: parentId);
       _reload();
+      return null;
     } on DioException catch (e) {
-      if (!mounted) return;
       // 409 is the interesting one: the service has a uniqueness constraint on (name, parent).
-      final String message = e.response?.statusCode == 409
+      return e.response?.statusCode == 409
           ? 'A category with that name already exists here'
           : 'Could not create the category';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _add(List<Category> existing) async {
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => _AddCategoryDialog(existing: existing, submit: _create),
+    );
   }
 
   @override
@@ -117,17 +123,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 }
 
-class _NewCategory {
-  const _NewCategory(this.name, this.parentId);
-
-  final String name;
-  final String? parentId;
-}
-
 class _AddCategoryDialog extends StatefulWidget {
-  const _AddCategoryDialog({required this.existing});
+  const _AddCategoryDialog({required this.existing, required this.submit});
 
   final List<Category> existing;
+
+  /// Writes the category. Returns null when it landed, or the message to show under the name.
+  final Future<String?> Function(String name, String? parentId) submit;
 
   @override
   State<_AddCategoryDialog> createState() => _AddCategoryDialogState();
@@ -136,11 +138,38 @@ class _AddCategoryDialog extends StatefulWidget {
 class _AddCategoryDialogState extends State<_AddCategoryDialog> {
   final TextEditingController _name = TextEditingController();
   String? _parentId;
+  String? _error;
+  bool _saving = false;
 
   @override
   void dispose() {
     _name.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final String name = _name.text.trim();
+    if (name.isEmpty) {
+      // Without this the button is simply dead, which reads as a broken screen rather than as
+      // an empty field.
+      setState(() => _error = 'Give the category a name');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final String? failure = await widget.submit(name, _parentId);
+    if (!mounted) return;
+    if (failure == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _saving = false;
+      _error = failure;
+    });
   }
 
   @override
@@ -155,7 +184,14 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
           TextField(
             controller: _name,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'Name'),
+            enabled: !_saving,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) {
+              if (!_saving) _submit();
+            },
+            decoration: InputDecoration(labelText: 'Name', errorText: _error),
           ),
           const SizedBox(height: DeliverySpacing.md),
           DropdownButtonFormField<String>(
@@ -169,22 +205,24 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
                   child: Text('${'    ' * entry.depth}${entry.category.name}'),
                 ),
             ],
-            onChanged: (String? value) => setState(() => _parentId = value),
+            onChanged: _saving ? null : (String? value) => setState(() => _parentId = value),
           ),
         ],
       ),
       actions: <Widget>[
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () {
-            final String name = _name.text.trim();
-            if (name.isEmpty) return;
-            Navigator.of(context).pop(_NewCategory(name, _parentId));
-          },
-          child: const Text('Create'),
+          onPressed: _saving ? null : _submit,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Create'),
         ),
       ],
     );
