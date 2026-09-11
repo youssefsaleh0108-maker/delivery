@@ -49,7 +49,41 @@ class Backend {
 
   // ---------------------------------------------------------------- plumbing
 
+  /// One request, retried when the network — not the server — dropped it.
+  ///
+  /// <p>These scenarios run on a real phone over Wi-Fi, and a weak or high-latency link drops a
+  /// connection now and then: "Failed host lookup", "Software caused connection abort". Without a
+  /// retry, one blip while ARRANGING the world fails the whole scenario before a single screen is
+  /// touched, which reads as an app failure and is not one.
+  ///
+  /// <p>What is retried is deliberately narrow. A [SocketException] is raised while connecting, so
+  /// the server never saw the request and any method can safely go again. A failure after the
+  /// request was sent ([HttpException], a TLS handshake that died) is retried only for a GET: a
+  /// POST that may have landed must not be sent twice, or a fixture would create a second errand
+  /// or order on the shared demo account that nothing cleans up.
   static Future<_Res> _send(
+    String method,
+    String url, {
+    String? token,
+    Object? json,
+    String? form,
+  }) async {
+    const int attempts = 4;
+    for (int attempt = 1;; attempt++) {
+      try {
+        return await _sendOnce(method, url, token: token, json: json, form: form);
+      } on SocketException {
+        if (attempt == attempts) rethrow;
+      } on HttpException {
+        if (method != 'GET' || attempt == attempts) rethrow;
+      } on HandshakeException {
+        if (method != 'GET' || attempt == attempts) rethrow;
+      }
+      await Future<void>.delayed(Duration(seconds: attempt));
+    }
+  }
+
+  static Future<_Res> _sendOnce(
     String method,
     String url, {
     String? token,
@@ -283,6 +317,47 @@ class Backend {
       await Future<void>.delayed(every);
     }
     return null;
+  }
+
+  // ---------------------------------------------------------------- butler errands
+
+  /// Files an errand as [customerToken] — the arranging half of a Butler scenario.
+  ///
+  /// The customer's own screen is not the subject when a scenario is about what the customer sees
+  /// AFTER a shopper has acted, so the request, the claim and the quote are put in place here and
+  /// only the customer's reading of them is driven through the app.
+  static Future<Map<String, dynamic>> butlerRequest(
+      String customerToken, Map<String, Object?> body) async {
+    final _Res res = await _api('POST', '/api/butler', customerToken, json: body);
+    if (res.code != 200 && res.code != 201) _fail('filing a butler errand', res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// The rider takes the errand off the board.
+  static Future<void> butlerClaim(String riderToken, String id) async {
+    final _Res res = await _api('POST', '/api/butler/$id/claim', riderToken);
+    if (res.code != 200) _fail('claiming butler errand $id', res);
+  }
+
+  /// The shopper reports what the goods cost.
+  static Future<void> butlerQuote(String riderToken, String id, double goodsCost,
+      {String? receiptRef}) async {
+    final _Res res = await _api('POST', '/api/butler/$id/quote', riderToken,
+        json: <String, Object?>{'goodsCost': goodsCost, 'receiptRef': receiptRef});
+    if (res.code != 200) _fail('quoting butler errand $id', res);
+  }
+
+  /// The errand as the server holds it now — how a scenario corroborates what a screen claimed.
+  static Future<Map<String, dynamic>> butlerRead(String token, String id) async {
+    final _Res res = await _api('GET', '/api/butler/$id', token);
+    if (res.code != 200) _fail('reading butler errand $id', res);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// Cancels an errand left open by a run that failed half-way, so the next run starts clean.
+  /// Best effort: a request that has already moved on refuses, and that is fine here.
+  static Future<void> butlerCancelQuietly(String customerToken, String id) async {
+    await _api('POST', '/api/butler/$id/cancel', customerToken);
   }
 }
 
