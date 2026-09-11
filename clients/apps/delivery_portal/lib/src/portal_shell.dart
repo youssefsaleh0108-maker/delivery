@@ -368,8 +368,17 @@ class PortalArea {
         icon: Icons.groups_outlined,
         selectedIcon: Icons.groups,
         label: (DeliveryStrings t) => t.navCompany,
-        build: (PortalApis a, _, __, ___) =>
-            CompanyScreen(api: a.provider, orderApi: a.order),
+        // All six clients. This page shipped with only the first two, which left its region,
+        // join-date and status columns, Add Rider, suspension and the rider drawer dead in the
+        // deployed build — the screen treats a missing client as "not wired up", not as an error.
+        build: (PortalApis a, _, __, ___) => CompanyScreen(
+          api: a.provider,
+          orderApi: a.order,
+          onboardingApi: a.onboarding,
+          managementApi: a.partnerManagement,
+          trackingApi: a.tracking,
+          performanceApi: a.riderPerformance,
+        ),
       ),
       // Immediately after the fleet, as drawn. Hiring is occasional and must not be missed:
       // somebody is waiting to be told yes or no, which is not true of any other page here.
