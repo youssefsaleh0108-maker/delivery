@@ -159,6 +159,13 @@ delivery:
       platform-recipient:
       platform-name: The platform
 
+    float:
+      # How long door cash may be held before it is called overdue — on a delivery company's
+      # reconciliation page and on the Back Office's cash-on-hand list alike, so both sides of a
+      # hand-over agree on what "late" means. The Back Office used to hard-code a day in the client;
+      # the carrier design asks for two. One number, served from here, rather than two that differ.
+      overdue-after-hours: 48
+
     order-events-queue: accounting.order-events
     results-queue: accounting.posting-results
     platform-account: ACC-PLATFORM

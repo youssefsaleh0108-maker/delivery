@@ -18,10 +18,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestBody;
+
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
+import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.domain.CashFloatRepository;
+import com.delivery.accounting.service.CarrierCashService;
 import com.delivery.accounting.service.CashFloatService;
+import com.delivery.accounting.service.Statement;
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.accounting.domain.CoreBankingSyncLogRepository;
 
@@ -47,37 +52,91 @@ public class ReconciliationController {
     private final CashFloatRepository floatEntries;
     private final CashFloatService cashFloat;
     private final CoreBankingSyncLogRepository syncLog;
+    private final CarrierCashService carrierCash;
 
     public ReconciliationController(AccountingTransactionRepository transactions,
                                     CashFloatRepository floatEntries,
                                     CashFloatService cashFloat,
-                                    CoreBankingSyncLogRepository syncLog) {
+                                    CoreBankingSyncLogRepository syncLog,
+                                    CarrierCashService carrierCash) {
         this.transactions = transactions;
         this.floatEntries = floatEntries;
         this.cashFloat = cashFloat;
         this.syncLog = syncLog;
+        this.carrierCash = carrierCash;
     }
 
     /**
-     * Records that a holder has banked everything they were carrying.
+     * Records that a holder has banked everything they were carrying — a rider of the platform's own
+     * fleet, or a delivery company paying in what its riders handed it.
      *
      * <p>BACKOFFICE only, and deliberately so: this is somebody at the platform confirming that
      * money physically arrived. A rider marking their own float clear would be the one party with
-     * an incentive to get it wrong.
+     * an incentive to get it wrong — and so would a company.
+     *
+     * <p>The body is optional, so a caller written before it existed banks exactly as it always did.
+     * With one, {@code expectedAmount} is the figure the operator counted against: a company's
+     * balance grows with every hand-over at its hub, and if it moved since the page loaded nothing
+     * is recorded and the answer is 409 with the current figure. {@code requestKey} makes a double
+     * press harmless, and whoever is signed in is recorded as the person who confirmed it.
      */
     @PostMapping("/float/{holderRef}/remit")
-    public ResponseEntity<Map<String, Object>> remit(@PathVariable String holderRef) {
-        return cashFloat.remitAll(holderRef, MDC.get(CorrelationIdFilter.MDC_KEY))
-                .<ResponseEntity<Map<String, Object>>>map(r -> ResponseEntity.ok(Map.of(
-                        "remittanceId", r.id(),
-                        "holderRef", r.holderRef(),
-                        "amount", r.amount(),
-                        "collections", r.collections())))
-                // Nothing outstanding is not an error — it is the answer to "have they banked it".
-                .orElseGet(() -> ResponseEntity.ok(Map.of(
-                        "holderRef", holderRef,
-                        "amount", java.math.BigDecimal.ZERO,
-                        "collections", 0)));
+    public ResponseEntity<?> remit(@PathVariable String holderRef,
+                                   @RequestBody(required = false) RemitRequest body) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        CashFloatEntry.Method method = null;
+        if (body != null && body.method() != null && !body.method().isBlank()) {
+            method = CashFloatEntry.Method.parse(body.method());
+            if (method == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "method must be one of CASH, BANK_DEPOSIT or WALLET"));
+            }
+        }
+        String note = body == null || body.note() == null || body.note().isBlank()
+                ? null
+                : body.note().trim().substring(0, Math.min(body.note().trim().length(), 500));
+        String key = body == null || body.requestKey() == null || body.requestKey().isBlank()
+                ? null
+                : body.requestKey().trim();
+
+        try {
+            return cashFloat.remit(holderRef, MDC.get(CorrelationIdFilter.MDC_KEY),
+                            body == null ? null : body.expectedAmount(),
+                            new CashFloatEntry.Recorded(Callers.jwt().getSubject(), method, note,
+                                    key))
+                    .<ResponseEntity<?>>map(r -> {
+                        Map<String, Object> out = new LinkedHashMap<>();
+                        out.put("remittanceId", r.id());
+                        out.put("holderRef", r.holderRef());
+                        out.put("amount", r.amount());
+                        out.put("collections", r.collections());
+                        out.put("replayed", r.replayed());
+                        return ResponseEntity.ok(out);
+                    })
+                    // Nothing outstanding is not an error — it is the answer to "have they banked it".
+                    .orElseGet(() -> ResponseEntity.ok(Map.of(
+                            "holderRef", holderRef,
+                            "amount", java.math.BigDecimal.ZERO,
+                            "collections", 0)));
+        } catch (CashFloatService.AmountChangedException e) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("error", "They are holding " + Statement.money(e.current()).toPlainString()
+                    + " now, not the amount you confirmed. Nothing was recorded.");
+            out.put("code", "AMOUNT_CHANGED");
+            out.put("current", Statement.money(e.current()).toPlainString());
+            return ResponseEntity.status(409).body(out);
+        } catch (CashFloatService.RequestKeyReusedException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(), "code", "REQUEST_KEY_REUSED"));
+        }
+    }
+
+    /** {@code {"expectedAmount":"320.00","method":"BANK_DEPOSIT","note":"...","requestKey":"..."}}. */
+    public record RemitRequest(BigDecimal expectedAmount, String method, String note,
+                               String requestKey) {
     }
 
     /**
@@ -87,6 +146,10 @@ public class ReconciliationController {
      * account yet, and the age of the oldest entry is the part worth watching: a large balance
      * collected this morning is a working day, and the same balance collected three weeks ago is a
      * problem.
+     *
+     * <p>A delivery company appears here as a {@code PROVIDER} holder once its riders hand it cash.
+     * {@code overdue} is decided by the server's configured limit, so this list and the carrier's own
+     * reconciliation page cannot disagree about what "late" means.
      */
     @GetMapping("/float")
     public List<Map<String, Object>> outstandingFloat() {
@@ -98,9 +161,44 @@ public class ReconciliationController {
                     out.put("amount", row.getAmount());
                     out.put("orders", row.getOrders());
                     out.put("oldest", row.getOldest());
+                    out.put("overdue", carrierCash.isOverdue(row.getOldest()));
                     return out;
                 })
                 .toList();
+    }
+
+    /**
+     * Cash held by delivery companies: what each holds and owes the platform now, and what its
+     * riders still hold for it.
+     *
+     * <p>The Back Office half of the custody model. A company's own balance is what an operator
+     * records a payment against (through {@code /float/{ref}/remit}, as for any holder); its riders'
+     * balance is reported beside it and never added to it, because that cash is owed to the company
+     * until the company records the hand-over. Money as two-decimal strings.
+     */
+    @GetMapping("/float/carriers")
+    public ResponseEntity<?> carriers() {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        return ResponseEntity.ok(Map.of(
+                "overdueAfterHours", carrierCash.overdueAfterHours(),
+                "carriers", carrierCash.carriers().stream().map(c -> {
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("carrierRef", c.carrierRef());
+                    out.put("held", Statement.money(c.held()).toPlainString());
+                    out.put("orders", c.orders());
+                    out.put("oldest", c.oldest() == null ? null : c.oldest().toString());
+                    out.put("overdue", c.overdue());
+                    out.put("withRiders", Statement.money(c.withRiders()).toPlainString());
+                    out.put("ridersHolding", c.ridersHolding());
+                    out.put("ridersOldest",
+                            c.ridersOldest() == null ? null : c.ridersOldest().toString());
+                    out.put("lastPaidAt",
+                            c.lastPaidAt() == null ? null : c.lastPaidAt().toString());
+                    return out;
+                }).toList()));
     }
 
     /**

@@ -2,19 +2,35 @@ package com.delivery.accounting.domain;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID> {
 
     /** The idempotency guard: the bus delivers at least once, and a debt must not be booked twice. */
     boolean existsByOrderIdAndEntryKind(UUID orderId, CashFloatEntry.Kind entryKind);
 
-    /** Oldest first, so a remittance clears the longest-held cash before the newest. */
+    /**
+     * Oldest first, so a remittance clears the longest-held cash before the newest — and LOCKED.
+     *
+     * <p>The lock is the fix for a race that cost money. Two operators pressing "Banked" at once both
+     * read the same outstanding rows, and both wrote a remittance and a CASH_REMITTANCE posting: the
+     * platform would ask the bank for the same takings twice. With the rows locked the second call
+     * waits for the first to commit, re-reads them as already cleared, and records nothing. Only the
+     * write path may call this — Postgres refuses {@code FOR UPDATE} in a read-only transaction, which
+     * is why the views read {@link #heldBy} instead.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT f FROM CashFloatEntry f
             WHERE f.holderRef = :holder
@@ -23,6 +39,16 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
             ORDER BY f.createdAt ASC
             """)
     List<CashFloatEntry> outstandingFor(@Param("holder") String holder);
+
+    /** The same rows as {@link #outstandingFor}, unlocked, for pages that only read them. */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderRef = :holder
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> heldBy(@Param("holder") String holder);
 
     /**
      * What one person still owes.
@@ -83,10 +109,18 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
                                           @Param("from") Instant from,
                                           @Param("to") Instant to);
 
-    /** The same figure across every holder, for the platform's own statement. */
+    /**
+     * The same figure across every holder, for the platform's own statement.
+     *
+     * <p>Door cash only: a delivery company's custody copies are excluded. They are the same orders
+     * a rider already collected, re-held after a hand-over, and counting them here would report
+     * every carrier order's cash as collected twice. Remittances carry no hand-over, so the
+     * "banked" figure is unaffected.
+     */
     @Query("""
             SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
             WHERE f.entryKind = :kind
+              AND f.handoverId IS NULL
               AND f.createdAt >= :from AND f.createdAt < :to
             """)
     BigDecimal totalBetween(@Param("kind") CashFloatEntry.Kind kind,
@@ -100,6 +134,9 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
      * in July and still not banked in August is a fact about today that no August window can show,
      * and leaving it out of the note is how a statement can be arithmetically perfect and still
      * mislead the person reading it.
+     *
+     * <p>Correct across a hand-over without a special case: the rider's rows are cleared by the
+     * transfer and the company's copies are not, so the same cash is counted exactly once.
      */
     @Query("""
             SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
@@ -135,4 +172,196 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
 
         java.time.Instant getOldest();
     }
+
+    // --------------------------------------------------------------- delivery-company custody
+
+    /**
+     * What a rider handed to their delivery company inside a window — the credit that balances their
+     * statement once the cash they collected has left their pocket for the company's hub.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.holderRef = :rider
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.TRANSFERRED
+              AND f.createdAt >= :from AND f.createdAt < :to
+            """)
+    BigDecimal handedOverBetween(@Param("rider") String rider,
+                                 @Param("from") Instant from,
+                                 @Param("to") Instant to);
+
+    /**
+     * What a delivery company took into custody from its riders inside a window: its custody copies,
+     * by when the hand-over happened.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.holderRef = :carrier
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.PROVIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.handoverId IS NOT NULL
+              AND f.createdAt >= :from AND f.createdAt < :to
+            """)
+    BigDecimal custodyReceivedBetween(@Param("carrier") String carrier,
+                                      @Param("from") Instant from,
+                                      @Param("to") Instant to);
+
+    /** What a delivery company paid the platform inside a window. */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.holderRef = :carrier
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.PROVIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.REMITTED
+              AND f.createdAt >= :from AND f.createdAt < :to
+            """)
+    BigDecimal carrierPaidBetween(@Param("carrier") String carrier,
+                                  @Param("from") Instant from,
+                                  @Param("to") Instant to);
+
+    /**
+     * What one rider still holds for one company, oldest first, LOCKED — the rows a hand-over
+     * clears.
+     *
+     * <p>Only that company's rows. Cash the same rider took on the platform's own fleet, or for a
+     * company they rode for before, is somebody else's to collect and stays exactly where it is.
+     * Locked for the reason {@link #outstandingFor} is: two presses of "Confirm" must not both clear
+     * the same notes.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderRef = :rider
+              AND f.carrierRef = :carrier
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> lockHeldForCarrier(@Param("rider") String rider,
+                                            @Param("carrier") String carrier);
+
+    /** {@link #lockHeldForCarrier}, unlocked, for the rider's settlement page. */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderRef = :rider
+              AND f.carrierRef = :carrier
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> heldForCarrier(@Param("rider") String rider,
+                                        @Param("carrier") String carrier);
+
+    /**
+     * Every outstanding collection this company's riders are carrying for it.
+     *
+     * <p>Rows rather than a grouped total, and totalled in Java: the reconciliation page needs the
+     * sum, the count, the oldest AND how much of it is past the overdue line, and one company's
+     * unhanded cash is a few dozen rows at most. Grouping it four ways in SQL would put the overdue
+     * rule in a second place.
+     */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.carrierRef = :carrier
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> heldByRidersFor(@Param("carrier") String carrier);
+
+    /**
+     * One company's rows of one kind in a window: its riders' collections, or its hand-overs.
+     *
+     * <p>{@code holderKind} is a parameter so the company's own custody copies can never be read as
+     * its riders' door cash.
+     */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.carrierRef = :carrier
+              AND f.holderKind = :holderKind
+              AND f.entryKind = :kind
+              AND f.createdAt >= :from AND f.createdAt < :to
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> forCarrierBetween(@Param("carrier") String carrier,
+                                           @Param("holderKind") CashFloatEntry.HolderKind holderKind,
+                                           @Param("kind") CashFloatEntry.Kind kind,
+                                           @Param("from") Instant from,
+                                           @Param("to") Instant to);
+
+    /**
+     * Every rider who has ever carried cash for this company.
+     *
+     * <p>Read from the float rather than from Order Manager's roster, deliberately: what a company is
+     * answerable for is the cash its jobs produced, and a rider who left last week with notes still
+     * in their pocket must still be on the page that chases them.
+     */
+    @Query("""
+            SELECT DISTINCT f.holderRef FROM CashFloatEntry f
+            WHERE f.carrierRef = :carrier
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+            """)
+    List<String> ridersCarryingFor(@Param("carrier") String carrier);
+
+    /** Whether this rider has ever carried cash for this company — the page's 404 test. */
+    boolean existsByCarrierRefAndHolderRefAndHolderKind(String carrierRef, String holderRef,
+                                                        CashFloatEntry.HolderKind holderKind);
+
+    /** When each of this company's riders last handed cash over. [holderRef, Instant]. */
+    @Query("""
+            SELECT f.holderRef, MAX(f.createdAt) FROM CashFloatEntry f
+            WHERE f.carrierRef = :carrier
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.TRANSFERRED
+            GROUP BY f.holderRef
+            """)
+    List<Object[]> lastHandoverByRider(@Param("carrier") String carrier);
+
+    /** A company's hand-overs, newest first. */
+    List<CashFloatEntry> findByCarrierRefAndEntryKindOrderByCreatedAtDesc(
+            String carrierRef, CashFloatEntry.Kind entryKind, Pageable pageable);
+
+    /** One rider's hand-overs to one company, newest first. */
+    List<CashFloatEntry> findByCarrierRefAndHolderRefAndEntryKindOrderByCreatedAtDesc(
+            String carrierRef, String holderRef, CashFloatEntry.Kind entryKind, Pageable pageable);
+
+    /** What a holder has banked with the platform, newest first — a company's payments. */
+    List<CashFloatEntry> findByHolderRefAndHolderKindAndEntryKindOrderByCreatedAtDesc(
+            String holderRef, CashFloatEntry.HolderKind holderKind, CashFloatEntry.Kind entryKind,
+            Pageable pageable);
+
+    /** The row a client's idempotency key already produced, if any. */
+    Optional<CashFloatEntry> findByRequestKey(String requestKey);
+
+    /** How many collections each of these hand-overs or remittances cleared. [id, count]. */
+    @Query("""
+            SELECT f.clearedBy, COUNT(f) FROM CashFloatEntry f
+            WHERE f.clearedBy IN :ids
+            GROUP BY f.clearedBy
+            """)
+    List<Object[]> countClearedBy(@Param("ids") Collection<UUID> ids);
+
+    /**
+     * Cash still in the pockets of each company's riders, for the Back Office.
+     * [carrierRef, amount, riders, oldest].
+     */
+    @Query("""
+            SELECT f.carrierRef, SUM(f.amount), COUNT(DISTINCT f.holderRef), MIN(f.createdAt)
+            FROM CashFloatEntry f
+            WHERE f.carrierRef IS NOT NULL
+              AND f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            GROUP BY f.carrierRef
+            """)
+    List<Object[]> withRidersByCarrier();
+
+    /** When each company last paid the platform. [holderRef, Instant]. */
+    @Query("""
+            SELECT f.holderRef, MAX(f.createdAt) FROM CashFloatEntry f
+            WHERE f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.PROVIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.REMITTED
+            GROUP BY f.holderRef
+            """)
+    List<Object[]> lastRemittedByCarrier();
 }
