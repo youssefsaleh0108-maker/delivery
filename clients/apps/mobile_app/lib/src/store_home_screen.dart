@@ -13,6 +13,7 @@ import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
 import 'friend_split_screen.dart';
+import 'hyperlocal_screen.dart';
 import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
@@ -407,6 +408,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 else if (_error != null)
                   SliverFillRemaining(hasScrollBody: false, child: _errorState())
                 else ...<Widget>[
+                  SliverToBoxAdapter(child: _neighbourhoodEntry(t)),
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
@@ -855,6 +857,80 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         initialVertical: vertical,
         chips: _chips,
+        onOpenBasket: widget.onOpenBasket,
+      ),
+    ));
+  }
+
+  /// The door to the neighbourhood browse (Figma 112:1941).
+  ///
+  /// That screen existed long before anything opened it — the surface checklist carried it as
+  /// UNREACHABLE — so it gets a place on Home, just under the category tiles, where somebody asking
+  /// "what is near me" already is. The frames draw no entry card of their own; this is the home
+  /// feed's own card language, and it names the screen it opens.
+  Widget _neighbourhoodEntry(DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.sm),
+      child: YdCard(
+        onTap: _openNeighbourhood,
+        padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                  color: DeliveryColors.brandSoft, shape: BoxShape.circle),
+              child: const Icon(Icons.storefront_rounded, size: 20, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    t.dekkaneBrowseTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.dekkaneEntrySub,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+            // Always chevron_right: the icon is declared with matchTextDirection, so Icon already
+            // mirrors it in Arabic, and choosing chevron_left there would flip it a second time.
+            const Icon(Icons.chevron_right, size: 20, color: DeliveryColors.faint),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pushed over the shell like every other shop list, with the shell's basket and address book —
+  /// the browse is measured from the same address this screen's header shows.
+  void _openNeighbourhood() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => HyperlocalScreen(
+        storeApi: widget.storeApi,
+        orderApi: widget.orderApi,
+        cart: widget.cart,
+        addresses: widget.addresses,
+        zoneApi: widget.zoneApi,
         onOpenBasket: widget.onOpenBasket,
       ),
     ));

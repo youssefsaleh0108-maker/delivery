@@ -70,10 +70,28 @@ class StoreApi {
   ///
   /// [radiusMetres] is clamped into range server-side rather than refused — a million metres is a
   /// legitimate "everything around here".
+  ///
+  /// The filters are the neighbourhood browse's chips, applied by the server before the page is
+  /// cut, so pages stay full and [Paged.totalElements] counts what matches. Omitted ones are not
+  /// sent, and the plain search is what the home rail has always had.
+  ///
+  /// * [openNow] drops a shop whose card would read closed; busy and closing-soon stay, because
+  ///   both still take orders.
+  /// * [powerStatus] is what the merchant says the lights are doing NOW. `generator` means "running
+  ///   on the generator at the moment", not "owns one" — label it that way.
+  /// * [neighborhood] is an exact match on the district a shop declared.
+  /// * [newSinceDays] keeps shops that joined the platform within that many days (clamped to
+  ///   1..365 server-side).
+  /// * [verifiedLocal] keeps only shops Backoffice granted the trust badge.
   Future<Paged<NearbyStore>> nearby(
     double lat,
     double lng, {
     int radiusMetres = 5000,
+    bool openNow = false,
+    StorePowerStatus? powerStatus,
+    String? neighborhood,
+    int? newSinceDays,
+    bool verifiedLocal = false,
     int page = 0,
     int size = 20,
   }) async {
@@ -83,6 +101,11 @@ class StoreApi {
         'latitude': lat,
         'longitude': lng,
         'radiusMetres': radiusMetres,
+        if (openNow) 'openNow': true,
+        if (powerStatus != null) 'powerStatus': powerStatus.wire,
+        if (neighborhood != null && neighborhood.trim().isNotEmpty) 'neighborhood': neighborhood,
+        if (newSinceDays != null) 'newSinceDays': newSinceDays,
+        if (verifiedLocal) 'verifiedLocal': true,
         'page': page,
         'size': size,
       },

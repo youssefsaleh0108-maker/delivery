@@ -155,29 +155,3 @@ class TrustedLocalBadge extends StatelessWidget {
     );
   }
 }
-
-/// The dekkane trust badge — Backoffice-granted, drawn in the positive green.
-class VerifiedLocalBadge extends StatelessWidget {
-  const VerifiedLocalBadge({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    return Container(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: DeliveryAccent.positive.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-      ),
-      child: Text(
-        t.custVerifiedLocal,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: DeliveryAccent.positive.color,
-          height: 1.2,
-        ),
-      ),
-    );
-  }
-}
