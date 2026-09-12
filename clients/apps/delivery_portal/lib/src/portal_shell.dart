@@ -31,6 +31,7 @@ import 'carrier/jobs_screen.dart';
 // No prefix needed: this file's class is `CarrierSettingsScreen`, distinct from the Backoffice
 // `SettingsScreen` imported above, because the two administer entirely different things.
 import 'carrier/settings_screen.dart';
+import 'carrier/shift_schedule_screen.dart';
 // Likewise `CarrierStatementScreen` — the carrier reads only its own, through /mine, where the
 // Backoffice screen reads everybody's.
 import 'carrier/statement_screen.dart';
@@ -370,6 +371,22 @@ class PortalArea {
         label: (DeliveryStrings t) => t.navCompany,
         build: (PortalApis a, _, __, ___) =>
             CompanyScreen(api: a.provider, orderApi: a.order),
+      ),
+      // NAV CHANGE (carrier-attendance slice) — Riders HR: shift schedules, and each rider's
+      // monthly attendance (Figma 112:945) opened from them. One destination, inserted directly
+      // after the fleet page because the design puts attendance inside "Riders HR", which is what
+      // that page is. Deliberately minimal: a sidebar restructure is landing in parallel and will
+      // re-home it. Nothing jumps to an index at or after this one (the only jump here is
+      // Dashboard → Jobs, index 1), so the insertion moves no link.
+      PortalDestination(
+        icon: Icons.event_available_outlined,
+        selectedIcon: Icons.event_available,
+        label: (DeliveryStrings t) => t.attendanceNavShifts,
+        build: (PortalApis a, _, __, ___) => ShiftScheduleScreen(
+          api: a.tracking,
+          providerApi: a.provider,
+          onboardingApi: a.onboarding,
+        ),
       ),
       // Immediately after the fleet, as drawn. Hiring is occasional and must not be missed:
       // somebody is waiting to be told yes or no, which is not true of any other page here.
