@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'cart.dart';
 import 'checkout_screen.dart';
+import 'order_outbox.dart';
 import 'split_add_friend_sheet.dart';
 import 'split_status_screen.dart';
 import 'delivery_address.dart';
@@ -38,6 +40,8 @@ class CartScreen extends StatefulWidget {
     this.profileApi,
     this.session,
     this.geocodingApi,
+    this.outbox,
+    this.connectivity,
   });
 
   final Cart cart;
@@ -68,6 +72,15 @@ class CartScreen extends StatefulWidget {
   /// reason as [promoApi].
   final GeocodingApi? geocodingApi;
 
+  /// Handed to checkout, which queues a checkout here when the platform cannot be reached.
+  /// Optional for the same reason as [promoApi]; without it checkout offers no queue.
+  final OrderOutbox? outbox;
+
+  /// Handed to checkout, so it knows the platform is unreachable before it tries.
+  final ValueListenable<bool>? connectivity;
+
+  /// After a placement AND after a checkout is queued: either way the customer's next question is
+  /// "where is it?", and the Orders tab is where both answers live.
   final VoidCallback onOrderPlaced;
 
   @override
@@ -202,8 +215,9 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _checkout(BuildContext context) async {
     final PromoQuote? quote = _quote;
-    final DeliveryOrder? order = await Navigator.of(context).push<DeliveryOrder>(
-      MaterialPageRoute<DeliveryOrder>(
+    // A placed order, a checkout queued for when the connection returns, or nothing (backed out).
+    final Object? outcome = await Navigator.of(context).push<Object>(
+      MaterialPageRoute<Object>(
         builder: (_) => CheckoutScreen(
           api: widget.orderApi,
           cart: widget.cart,
@@ -215,10 +229,23 @@ class _CartScreenState extends State<CartScreen> {
           // The canonical stored code, never the raw field text — and only when the server said
           // it applies, because placing with a refused code fails the whole order.
           promo: quote != null && quote.valid ? quote : null,
+          outbox: widget.outbox,
+          connectivity: widget.connectivity,
         ),
       ),
     );
-    if (order == null || !context.mounted) return;
+    if (!context.mounted) return;
+    if (outcome is PendingOrder) {
+      // Queued, not placed: no order and no server total exist yet, so there is no receipt to
+      // toast. The queued card on the Orders tab says what happens next.
+      _removePromo();
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(DeliveryStrings.of(context).offlineQueued)));
+      widget.onOrderPlaced();
+      return;
+    }
+    final DeliveryOrder? order = outcome is DeliveryOrder ? outcome : null;
+    if (order == null) return;
 
     // The code was consumed by the order; a stale "applied" chip over an empty basket would
     // claim a discount on nothing.

@@ -117,9 +117,15 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     ),
   );
 
+  /// Whether the platform answers, learned from this app's own requests rather than the phone's
+  /// network settings — see [ConnectivityService] for why. One for the whole app, fed by the one
+  /// Dio below; the customer shell draws it and queues checkouts on it.
+  late final ConnectivityService _connectivity = ConnectivityService();
+
   late final Dio _dio = ApiClient.create(
     baseUrl: _apiBaseUrl,
     authService: _authService,
+    connectivity: _connectivity,
   );
 
   late final StoreApi _storeApi = StoreApi(_dio);
@@ -555,6 +561,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       pointsApi: _pointsApi,
       transferApi: _transferApi,
       splitApi: _splitApi,
+      connectivity: _connectivity,
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,

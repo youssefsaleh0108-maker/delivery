@@ -7399,4 +7399,8 @@ class DeliveryStringsAr extends DeliveryStrings {
   String offlineSent(String ref) {
     return 'تم تنفيذ طلبك المنتظِر $ref.';
   }
+
+  @override
+  String get offlineQueueUnavailable =>
+      'لا يمكن لهذا الطلب انتظار عودة الاتصال. حاول مجدداً عند عودة الاتصال.';
 }

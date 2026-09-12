@@ -4,12 +4,14 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
 import 'split_complete_screen.dart';
 import 'cart.dart';
 import 'delivery_address.dart';
+import 'order_outbox.dart';
 
 /// Review the basket and place the order.
 ///
@@ -36,6 +38,8 @@ class CheckoutScreen extends StatefulWidget {
     this.promo,
     this.transferApi,
     this.splitApi,
+    this.outbox,
+    this.connectivity,
   });
 
   final OrderApi api;
@@ -65,6 +69,15 @@ class CheckoutScreen extends StatefulWidget {
   /// the basket does not hand over a refused one. The discount that is billed is recomputed by
   /// the server at placement.
   final PromoQuote? promo;
+
+  /// Where a checkout goes when the platform cannot be reached: kept on the phone and sent when the
+  /// connection returns (Figma 121:279). Null — a test that passes none — offers no queue, only
+  /// the error it always showed.
+  final OrderOutbox? outbox;
+
+  /// Whether the platform is reachable. When it is already known not to be, placing goes straight
+  /// to the queue offer instead of spending a twenty-second timeout proving it again.
+  final ValueListenable<bool>? connectivity;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -259,7 +272,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // One attempt per basket. Its key lives on the cart rather than on this screen, so backing out
     // after a try whose answer was lost and checking out again is recognised as the same attempt:
     // the server answers with the order that try may already have placed, instead of placing a
-    // second. Every retry of this basket carries this same submission.
+    // second. Every retry below — and a queued send hours later — carries this same submission.
     final OrderSubmission submission = OrderSubmission(
       idempotencyKey: widget.cart.checkoutKey,
       items: widget.cart.toOrderLines(),
@@ -284,6 +297,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       deliveryLatitude: address.latitude,
       deliveryLongitude: address.longitude,
     );
+
+    // Already known to be unreachable: offer the queue now rather than prove it with a timeout.
+    if (widget.outbox != null && widget.connectivity?.value == false) {
+      await widget.addresses.select(address);
+      if (!mounted) return;
+      await _offerToQueue(submission);
+      return;
+    }
 
     setState(() => _placing = true);
     try {
@@ -372,8 +393,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       setState(() => _placing = false);
 
-      // An answer that never came is reported like any other failure, but nothing is lost: the
-      // basket and its key stay, so tapping Place again is the same attempt, not a second order.
+      // The answer never came. The order may not exist — or it may, with the confirmation lost on
+      // the way back — so this is not a failure to report as one. The basket and its key stay, and
+      // the customer can have this same attempt sent when the connection returns.
+      if (widget.outbox != null && ConnectivityService.outcomeUnknown(e)) {
+        await _offerToQueue(submission);
+        return;
+      }
+
       // 422 is the interesting case: an item went out of stock, was archived, or the basket somehow
       // spans two merchants. The server's message is specific, so show it rather than a generic one.
       final String message = switch (e.response?.statusCode) {
@@ -394,6 +421,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  /// Offers to keep this checkout on the phone and send it when the connection returns.
+  ///
+  /// Cash only, and not for a group-split basket: a card or wallet hold needs the payment provider
+  /// while the customer waits, and a split plan closes over its order the moment it exists. The
+  /// dialog says so rather than offering a queue that could only fail later.
+  ///
+  /// What is queued is this exact [submission] — the key of the attempt that just went unanswered —
+  /// so if that attempt did reach the server, the outbox's send is answered with the order it placed
+  /// instead of placing another. It carries the total on this screen's button as the total the
+  /// customer agreed to; if the server's is different when it is sent, the customer is asked again.
+  /// The basket is cleared only once the checkout is safely written to the phone.
+  Future<void> _offerToQueue(OrderSubmission submission) async {
+    final OrderOutbox? outbox = widget.outbox;
+    if (outbox == null) return;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final bool cash = submission.paymentMethod == PaymentMethod.cash;
+    final bool queueable = cash && widget.cart.splitPlanId == null;
+    final String explanation = queueable
+        ? t.offlineQueueBody
+        // A split basket already pays cash: telling its host to "choose cash" would be advice they
+        // cannot follow.
+        : (cash ? t.offlineQueueUnavailable : t.offlineQueueCashOnly);
+
+    final bool? queue = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        backgroundColor: DeliveryColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+        title: Text(t.offlineQueueTitle,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
+        content: Text(explanation,
+            style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4)),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
+            child: Text(queueable ? t.notNow : t.close),
+          ),
+          if (queueable)
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: DeliveryColors.brand,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(DeliveryRadius.md)),
+              ),
+              child: Text(t.offlineQueueAction),
+            ),
+        ],
+      ),
+    );
+    if (queue != true || !mounted) return;
+
+    final PendingOrder pending = PendingOrder(
+      submission: submission,
+      expectedTotal: _orderTotal,
+      storeId: widget.cart.storeId,
+      storeName: widget.cart.store?.name ?? '',
+      splitUsd: _splitUsdValue,
+      createdAt: DateTime.now(),
+    );
+    try {
+      await outbox.enqueue(pending);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(t.offlineQueueSaveFailed)));
+      }
+      return;
+    }
+    widget.cart.clear();
+    if (!mounted) return;
+    Navigator.of(context).pop(pending);
   }
 
   @override

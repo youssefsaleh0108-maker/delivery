@@ -7393,4 +7393,8 @@ class DeliveryStringsEn extends DeliveryStrings {
   String offlineSent(String ref) {
     return 'Your queued order $ref was placed.';
   }
+
+  @override
+  String get offlineQueueUnavailable =>
+      'This order can\'t wait for the connection. Try again when you\'re back online.';
 }

@@ -13129,6 +13129,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your queued order {ref} was placed.'**
   String offlineSent(String ref);
+
+  /// No description provided for @offlineQueueUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This order can\'t wait for the connection. Try again when you\'re back online.'**
+  String get offlineQueueUnavailable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

@@ -1,15 +1,23 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'account_screen.dart';
 import 'butler_screen.dart';
+import 'cached_catalog_screen.dart';
 import 'cart.dart';
 import 'cart_screen.dart';
 import 'customer_nav_bar.dart';
 import 'delivery_address.dart';
 import 'my_orders_screen.dart';
 import 'notification_inbox.dart';
+import 'offline_banner.dart';
+import 'offline_catalog.dart';
+import 'offline_store.dart';
+import 'order_outbox.dart';
 import 'profile_drawer.dart';
 import 'rewards_screen.dart';
 import 'store_home_screen.dart';
@@ -34,6 +42,8 @@ class CustomerShell extends StatefulWidget {
     this.prefsApi,
     this.profileApi,
     this.pointsApi,
+    this.connectivity,
+    this.offlineStore,
     required this.session,
     required this.locale,
     required this.onSignOut,
@@ -71,6 +81,14 @@ class CustomerShell extends StatefulWidget {
   /// The points ledger behind the Account tab's rewards screen. Null keeps the old account page —
   /// the fallback a test that constructs the shell without APIs lands on.
   final PointsApi? pointsApi;
+
+  /// Whether the platform answers, fed by the app's own requests (Figma 121:279). Drives the
+  /// offline banner, checkout's queue offer and the outbox. Null — a test — counts as online.
+  final ConnectivityService? connectivity;
+
+  /// Where queued checkouts and the offline shelf are kept. Null means the device's secure store;
+  /// a test passes an in-memory one.
+  final OfflineStore? offlineStore;
   final AuthSession session;
 
   /// Passed to the home screen for the language toggle in the app bar.
@@ -81,7 +99,7 @@ class CustomerShell extends StatefulWidget {
   State<CustomerShell> createState() => _CustomerShellState();
 }
 
-class _CustomerShellState extends State<CustomerShell> {
+class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserver {
   /// One cart for the whole session, owned here so the badge and the basket screen cannot disagree.
   final Cart _cart = Cart();
 
@@ -104,6 +122,30 @@ class _CustomerShellState extends State<CustomerShell> {
   /// Owned here for the same reason: the unread badge has to stay right while the user is on the
   /// Browse tab, so the poll cannot live inside the notifications screen.
   late final NotificationInbox _inbox = NotificationInbox(widget.notificationApi);
+
+  /// Stands in for [CustomerShell.connectivity] when none was given: always online.
+  final ValueNotifier<bool> _assumedOnline = ValueNotifier<bool>(true);
+
+  ValueListenable<bool> get _online => widget.connectivity ?? _assumedOnline;
+
+  late final OfflineStore _offlineStore = widget.offlineStore ?? const SecureOfflineStore();
+
+  /// Checkouts waiting for the connection. Owned here, like the cart, so the Orders tab, the
+  /// cached catalog and checkout all see the same queue — and scoped to this account, so nobody
+  /// else signing in on the phone can send them.
+  late final OrderOutbox _outbox = OrderOutbox(
+    api: widget.orderApi,
+    store: _offlineStore,
+    ownerId: widget.session.subject,
+    connectivity: _online,
+    transfers: widget.transferApi,
+  );
+
+  /// The shelf of recent purchases the cached catalog shows, refreshed whenever the app can.
+  late final OfflineCatalog _catalog =
+      OfflineCatalog(store: _offlineStore, ownerId: widget.session.subject);
+
+  StreamSubscription<OutboxPlaced>? _placedFromOutbox;
 
   int _index = CustomerNavBar.homeIndex;
 
@@ -146,6 +188,44 @@ class _CustomerShellState extends State<CustomerShell> {
     _cart.refreshWaiver(widget.offerApi);
   }
 
+  /// Re-saves the offline shelf. Silent and best effort; throttled inside unless [force]d.
+  void _refreshCatalog({bool force = false}) {
+    unawaited(_catalog.refresh(orders: widget.orderApi, stores: widget.storeApi, force: force));
+  }
+
+  /// Back online is the moment the shelf can catch up with anything bought meanwhile.
+  void _onConnectivity() {
+    if (_online.value) _refreshCatalog();
+  }
+
+  /// A queued checkout became an order: say so, whichever tab the customer is on.
+  ///
+  /// Differently when the order is an earlier try of the same basket rather than the checkout as
+  /// queued (see [OutboxPlaced.earlierAttempt]) — "your queued order was placed" would describe a
+  /// basket that was not.
+  void _onQueuedOrderPlaced(OutboxPlaced placed) {
+    if (!mounted) return;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(placed.earlierAttempt
+            ? t.offlineAlreadyPlaced
+            : t.offlineSent(placed.pending.reference))));
+    _refreshCatalog(force: true);
+  }
+
+  /// The offline banner's "Saved items".
+  void _openCachedCatalog() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => CachedCatalogScreen(
+        catalog: _catalog,
+        cart: _cart,
+        connectivity: _online,
+        outbox: _outbox,
+        onOpenBasket: _openBasket,
+      ),
+    ));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -154,10 +234,34 @@ class _CustomerShellState extends State<CustomerShell> {
     // The quote follows the basket rather than the screen, so the fee has already disappeared by
     // the time the customer opens the Basket tab to look at it.
     _cart.addListener(_requoteDelivery);
+    // Whatever was queued before the app last stopped is restored and, if the platform answers,
+    // sent now.
+    _outbox.load();
+    _placedFromOutbox = _outbox.placed.listen(_onQueuedOrderPlaced);
+    _catalog.load().then((_) => _refreshCatalog());
+    _online.addListener(_onConnectivity);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Coming back to the app is when a connection most often turns out to have returned — and a
+  /// phone that suspended the app may never have run the re-check it had scheduled. So ask now, and
+  /// give anything waiting in the outbox its chance: a send is always safe, because every copy of a
+  /// queued checkout carries its one key.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    unawaited(widget.connectivity?.recheck());
+    unawaited(_outbox.drain());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _online.removeListener(_onConnectivity);
+    _placedFromOutbox?.cancel();
+    _outbox.dispose();
+    _catalog.dispose();
+    _assumedOnline.dispose();
     _cart.removeListener(_requoteDelivery);
     _cart.dispose();
     _addresses.dispose();
@@ -197,6 +301,7 @@ class _CustomerShellState extends State<CustomerShell> {
           chatApi: widget.chatApi,
           cart: _cart,
           onOpenBasket: _openBasket,
+          outbox: _outbox,
         );
       case CustomerNavBar.butlerIndex:
         return ButlerScreen(
@@ -224,7 +329,13 @@ class _CustomerShellState extends State<CustomerShell> {
           profileApi: widget.profileApi,
           session: widget.session,
           geocodingApi: widget.geocodingApi,
-          onOrderPlaced: () => _open(CustomerNavBar.ordersIndex),
+          outbox: _outbox,
+          connectivity: _online,
+          onOrderPlaced: () {
+            _open(CustomerNavBar.ordersIndex);
+            // The purchase just made belongs on the offline shelf.
+            _refreshCatalog(force: true);
+          },
         );
       case CustomerNavBar.accountIndex:
         // The redesign splits what this tab used to hold: the tab itself shows Rewards & Points,
@@ -278,11 +389,18 @@ class _CustomerShellState extends State<CustomerShell> {
           // below is built by index rather than as a literal so the two cannot drift: a stack whose
           // third child is not Butler is a bar that opens the wrong screen, and nothing about the
           // code would look wrong.
-          body: IndexedStack(
-            index: _index,
-            children: <Widget>[
-              for (int tab = 0; tab < CustomerNavBar.tabCount; tab++) _tabAt(tab),
-            ],
+          //
+          // The offline banner wraps the stack rather than any one tab: it is true whichever tab is
+          // showing, and above the stack it can never cover the nav bar below.
+          body: OfflineBanner(
+            connectivity: _online,
+            onOpenSaved: _openCachedCatalog,
+            child: IndexedStack(
+              index: _index,
+              children: <Widget>[
+                for (int tab = 0; tab < CustomerNavBar.tabCount; tab++) _tabAt(tab),
+              ],
+            ),
           ),
           bottomNavigationBar: CustomerNavBar(
             index: _index,

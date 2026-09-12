@@ -3500,5 +3500,6 @@
   "offlineQueueSaveFailed": "Couldn't save the order on this phone, so nothing was queued.",
   "offlineAlreadyPlaced": "Your earlier try already went through, so that's the order we placed.",
   "offlineSent": "Your queued order {ref} was placed.",
-  "@offlineSent": {"placeholders":{"ref":{"type":"String"}}}
+  "@offlineSent": {"placeholders":{"ref":{"type":"String"}}},
+  "offlineQueueUnavailable": "This order can't wait for the connection. Try again when you're back online."
 }
