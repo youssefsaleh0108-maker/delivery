@@ -39,6 +39,9 @@ class RepositoryQueryParseTest {
     static void bootHibernateWithoutADatabase() {
         Configuration configuration = new Configuration()
                 .addAnnotatedClass(Banner.class)
+                .addAnnotatedClass(CatalogScan.class)
+                .addAnnotatedClass(CatalogScanItem.class)
+                .addAnnotatedClass(CatalogScanPhoto.class)
                 .addAnnotatedClass(Category.class)
                 .addAnnotatedClass(DeliveredOrderLine.class)
                 .addAnnotatedClass(DeliveryZone.class)
@@ -111,6 +114,36 @@ class RepositoryQueryParseTest {
                 GROUP BY other.productId
                 HAVING COUNT(DISTINCT other.orderId) >= :minOrdersTogether
                 ORDER BY COUNT(DISTINCT other.orderId) DESC, other.productId ASC
+                """);
+    }
+
+    /**
+     * Merchant Blitz's two locking reads, read straight off the repository's annotations so this
+     * cannot drift from what actually runs — plus the scan tables' columns as the entities map them,
+     * which is what {@code ddl-auto: validate} would otherwise be the first to check, at deploy.
+     */
+    @Test
+    void the_merchant_blitz_queries_parse() throws NoSuchMethodException {
+        parses(CatalogScanRepository.class.getMethod("lockStore", java.util.UUID.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses(CatalogScanRepository.class.getMethod("lockOwned", java.util.UUID.class, String.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+
+        // What the derived quota count generates.
+        parses("SELECT COUNT(s) FROM CatalogScan s WHERE s.merchantId = :merchantId AND s.createdAt > :since");
+
+        parses("""
+                SELECT s.id, s.merchantId, s.storeId, s.status, s.provider, s.failureCode,
+                       s.analysisAttempts, s.analysisStartedAt, s.completedAt, s.createdAt, s.updatedAt
+                FROM CatalogScan s
+                """);
+        parses("SELECT p.id, p.scanId, p.fileId, p.objectKey, p.status, p.position, p.createdAt "
+                + "FROM CatalogScanPhoto p");
+        parses("""
+                SELECT i.id, i.scanId, i.photoId, i.position, i.name, i.brand, i.sizeLabel,
+                       i.categoryId, i.confidence, i.priceGuess, i.price, i.boxLeft, i.boxTop,
+                       i.boxWidth, i.boxHeight, i.status, i.productId, i.decidedAt
+                FROM CatalogScanItem i
                 """);
     }
 

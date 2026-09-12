@@ -105,6 +105,36 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A Merchant Blitz scan, photo or line the caller does not own, or that does not exist.
+     *
+     * <p>One answer for both, like every other id here: a 403 on another merchant's scan would
+     * confirm the id is real.
+     */
+    @ExceptionHandler(com.delivery.product.service.CatalogScanService.CatalogScanNotFoundException.class)
+    public ProblemDetail onScanNotFound(
+            com.delivery.product.service.CatalogScanService.CatalogScanNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Scan not found", e.getMessage());
+    }
+
+    /**
+     * The day's scans are spent. 429 with the limit in the body, so the client can say "5 a day"
+     * rather than a bare "try later" — each scan is a paid vision call once a real provider is on.
+     */
+    @ExceptionHandler(com.delivery.product.service.CatalogScanService.ScanQuotaExceededException.class)
+    public ProblemDetail onScanQuota(
+            com.delivery.product.service.CatalogScanService.ScanQuotaExceededException e) {
+        ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Scan limit reached", e.getMessage());
+        detail.setProperty("limit", e.getLimit());
+        return detail;
+    }
+
+    /** The scan is not in a state for that: already analysing, already complete, out of attempts. */
+    @ExceptionHandler(com.delivery.product.service.CatalogScanService.ScanStateException.class)
+    public ProblemDetail onScanState(com.delivery.product.service.CatalogScanService.ScanStateException e) {
+        return problem(HttpStatus.CONFLICT, "Scan not ready for that", e.getMessage());
+    }
+
+    /**
      * A staff member who lacks one permission.
      *
      * <p>The permission is named in the body on purpose: "you cannot do that" sends a cashier to

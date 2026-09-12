@@ -156,6 +156,16 @@
       <version>${springdoc.version}</version>
     </dependency>
 
+    <!-- Merchant Blitz's vision provider (ClaudeVisionProvider). Pinned rather than managed: nothing
+         in the Spring BOM knows about it, and a model or beta-flag change is a deliberate bump, not
+         something a transitive upgrade should decide. The client reads ANTHROPIC_API_KEY from the
+         environment; with no key the service runs the deterministic FAKE provider instead. -->
+    <dependency>
+      <groupId>com.anthropic</groupId>
+      <artifactId>anthropic-java</artifactId>
+      <version>2.34.0</version>
+    </dependency>
+
     <!-- Was inherited from the root pom, which applied it to every module without exception. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
