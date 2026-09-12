@@ -31,6 +31,7 @@ export 'src/models/promo_models.dart';
 export 'src/models/rating_models.dart';
 export 'src/models/rider_money_models.dart';
 export 'src/models/tracking_models.dart';
+export 'src/models/attendance_models.dart';
 export 'src/network/user_queue_socket.dart';
 export 'src/models/offer_models.dart';
 export 'src/api/onboarding_api.dart';
