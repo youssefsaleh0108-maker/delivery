@@ -57,6 +57,16 @@ invent is the onboarding client secret, which must match what the realm import c
 - **Mail goes to mailpit** (monitoring-<env>/mailpit, behind the ops basic-auth). Real SMTP means
   putting relay credentials in `platform-secrets` and pointing `SMTP_*` in `platform-common` at
   the relay — a deliberate act, since test data then reaches real inboxes.
+- **Merchant Blitz reads shelf photos with sample data** until two deliberate acts, both per
+  environment. (1) Put the Claude API key in `platform-secrets` under `ANTHROPIC_API_KEY` — a Secret
+  made before this slot existed needs it added: `kubectl -n delivery-dev edit secret
+  platform-secrets` (values are base64), never a key pasted into a manifest, a commit or a chat.
+  product-service reads it from its environment (an optional `secretKeyRef` in
+  `base/services.yaml`), so restart the pod afterwards. (2) Select the provider: add
+  `CATALOG_SCAN_VISION_PROVIDER=CLAUDE` to that overlay's `platform-env` literals. Either one alone
+  changes nothing a merchant can see: CLAUDE without a key still answers with labelled samples, and
+  a key without CLAUDE is never used. Each scan is a paid call once both are done; the per-merchant
+  caps live under `delivery.catalog.scan` in product-service's `application.yml`.
 - **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.

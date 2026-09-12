@@ -34,6 +34,19 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8103"
+            # Merchant Blitz's photo reader (ClaudeVisionProvider). The Anthropic SDK reads the key
+            # from the process environment only, so it arrives as an env var rather than through
+            # Vault and the Config Server. Named here although envFrom above already carries every
+            # platform-secrets key, because this is the one service that needs it and a reader
+            # should not have to know that. OPTIONAL: until the owner adds the key to
+            # platform-secrets the pod starts normally and scans answer with labelled sample data.
+            # The value is never in this repository.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
           ports:
             - containerPort: 8103
           # Ask the application, not the socket.
