@@ -1,5 +1,6 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
 /// Financial reconciliation (Phase 4). BACKOFFICE only.
@@ -11,10 +12,21 @@ import 'package:flutter/material.dart';
 ///
 /// The headline number is money, not rows. "14 unsettled" says nothing about whether to worry;
 /// "$1,240 at risk" does.
+///
+/// <strong>Delivery companies hold their riders' cash</strong> (the owner's decision). A company's
+/// rider hands the door cash to the company, and the company owes the platform until somebody here
+/// records its payment. So the riders on the cash-on-hand list are the platform's own and any
+/// company rider still carrying notes, while companies get their own section: what each holds and
+/// owes now, with what its riders still hold for it shown beside it and never added to it.
 class ReconciliationScreen extends StatefulWidget {
-  const ReconciliationScreen({super.key, required this.api});
+  const ReconciliationScreen({super.key, required this.api, this.providerApi});
 
   final AccountingApi api;
+
+  /// Where a delivery company's name comes from. The ledger keys a company by its Order Manager id
+  /// and knows no name for it, so without this the companies section shows a short id — the same
+  /// fallback this screen uses for a rider.
+  final DeliveryProviderApi? providerApi;
 
   @override
   State<ReconciliationScreen> createState() => _ReconciliationScreenState();
@@ -34,7 +46,34 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     // matter which settlement status is being looked at, and it is the one exposure on this screen
     // that no bank statement will ever reveal.
     final List<CashHolder> float = await widget.api.cashFloat();
-    return _ReconciliationData(summary, rows, float);
+
+    // Allowed to fail on its own. The companies' section is one panel of a finance screen whose
+    // work list must still open when that panel's route is down — it says so in place instead.
+    List<CarrierCashHolding>? carriers;
+    try {
+      carriers = await widget.api.carriersFloat();
+    } catch (_) {
+      carriers = null;
+    }
+    final Map<String, String> names = carriers == null || carriers.isEmpty
+        ? const <String, String>{}
+        : await _companyNames();
+
+    return _ReconciliationData(summary, rows, float, carriers, names);
+  }
+
+  /// Company names by provider id, or nothing: a name is a nicety, and an id still identifies them.
+  Future<Map<String, String>> _companyNames() async {
+    final DeliveryProviderApi? providers = widget.providerApi;
+    if (providers == null) return const <String, String>{};
+    try {
+      final Paged<DeliveryProviderInfo> page = await providers.all(size: 100);
+      return <String, String>{
+        for (final DeliveryProviderInfo p in page.content) p.id: p.name,
+      };
+    } catch (_) {
+      return const <String, String>{};
+    }
   }
 
   /// Records that a holder has banked everything they were carrying.
@@ -84,6 +123,50 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     if (mounted) _reload();
   }
 
+  /// Records that a delivery company has paid the platform everything it holds.
+  ///
+  /// Against the figure on screen, not "whatever it holds by the time this lands": a company's
+  /// balance grows every time one of its riders hands over at its hub, so an operator confirming a
+  /// cheque for 485.50 must not clear 525.50. If it moved, the server records nothing and says what
+  /// it is now. The key is made once per confirmation, so a double press records one payment.
+  Future<void> _remitCarrier(CarrierCashHolding carrier, String company) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final Money? expected = carrier.held;
+    if (expected == null || !carrier.holdsCash) return;
+
+    final String requestKey = CarrierCashApi.newRequestKey();
+    final _PaymentChoice? choice = await showDialog<_PaymentChoice>(
+      context: context,
+      builder: (BuildContext context) => _CarrierPaymentDialog(
+        company: company,
+        amount: _cash(expected),
+        orders: t.carrCashOrderCount(carrier.orders),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    String message;
+    try {
+      final Remittance receipt = await widget.api.remit(
+        carrier.carrierRef,
+        expected: expected,
+        method: choice.method,
+        requestKey: requestKey,
+      );
+      message = receipt.isEmpty
+          ? t.carrCashBoNothing
+          // The confirmed figure, which the server has just agreed is exactly what was cleared.
+          : t.carrCashBoRecorded(_cash(expected), company);
+    } on CashAmountChanged catch (e) {
+      message = t.carrCashBoAmountChanged(company, _cash(e.current));
+    } catch (e) {
+      message = t.carrCashBoFailed('$e');
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+    if (mounted) _reload();
+  }
+
   void _reload() {
     // Block body, not an arrow — see the note in settings_screen.dart.
     setState(() {
@@ -109,8 +192,13 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
         }
 
         final _ReconciliationData data = snapshot.data!;
+        // Companies are listed in their own section below, with the payment flow that fits them.
+        final List<CashHolder> riders =
+            data.float.where((CashHolder h) => !h.isCarrier).toList(growable: false);
+        final List<CarrierCashHolding>? carriers = data.carriers;
 
-        return Column(
+        // What sits above the work list: the heading, the tiles, and who is holding cash.
+        final Widget panels = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Padding(
@@ -148,19 +236,52 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
               padding: const EdgeInsets.all(DeliverySpacing.lg),
               child: _SummaryTiles(summary: data.summary, float: data.float),
             ),
-            if (data.float.isNotEmpty)
+            if (riders.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                     DeliverySpacing.lg, 0, DeliverySpacing.lg, DeliverySpacing.lg),
-                child: _CashOnHand(holders: data.float, onRemit: _remit),
+                child: _CashOnHand(holders: riders, onRemit: _remit),
               ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.lg),
-              child: _Filters(selected: _filter, onSelected: _selectFilter),
-            ),
-            const SizedBox(height: DeliverySpacing.md),
-            Expanded(child: _TransactionTable(rows: data.rows, api: widget.api)),
+            // Hidden when no company holds or is owed anything, as cash on hand is; shown with its
+            // own sentence when it could not be loaded, because silence would read as "none".
+            if (carriers == null || carriers.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    DeliverySpacing.lg, 0, DeliverySpacing.lg, DeliverySpacing.lg),
+                child: _HeldByCarriers(
+                  carriers: carriers,
+                  names: data.names,
+                  onRecord: _remitCarrier,
+                ),
+              ),
           ],
+        );
+
+        // The panels scroll among themselves once the window is too short for all of them, rather
+        // than overflowing: they are context, and the settlement table below is the job, so it
+        // always keeps a usable height. On an ordinary window everything fits and nothing
+        // scrolls, exactly as before the companies' section was added.
+        return LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            const double filtersHeight = 64;
+            const double minTableHeight = 200;
+            final double room = constraints.maxHeight - filtersHeight - minTableHeight;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: room > 0 ? room : 0),
+                  child: SingleChildScrollView(child: panels),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.lg),
+                  child: _Filters(selected: _filter, onSelected: _selectFilter),
+                ),
+                const SizedBox(height: DeliverySpacing.md),
+                Expanded(child: _TransactionTable(rows: data.rows, api: widget.api)),
+              ],
+            );
+          },
         );
       },
     );
@@ -168,18 +289,29 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
 }
 
 class _ReconciliationData {
-  const _ReconciliationData(this.summary, this.rows, this.float);
+  const _ReconciliationData(this.summary, this.rows, this.float, this.carriers, this.names);
 
   final ReconciliationSummary summary;
   final List<AccountingTransaction> rows;
   final List<CashHolder> float;
+
+  /// Null when the companies' figures could not be loaded — not the same as "no company holds any".
+  final List<CarrierCashHolding>? carriers;
+
+  /// Company names by provider id; empty when unknown.
+  final Map<String, String> names;
 }
 
 /// Past this, cash has been out longer than a shift and somebody should be asked about it.
 ///
-/// A day is a judgement, not a rule the ledger enforces — but a number here is what turns "some
-/// cash is out" into "this is late", and no number at all means nobody ever chases it.
+/// <strong>A fallback only.</strong> The server now decides with its configured limit
+/// (`delivery.accounting.float.overdue-after-hours`) and flags every holder, so this screen and a
+/// delivery company's own reconciliation page cannot disagree about what "late" means. This day is
+/// used only against a server that predates the flag.
 const Duration _bankItWithin = Duration(hours: 24);
+
+/// Whether a holder's cash is late: the server's call, or the fallback above when it made none.
+bool _isLate(CashHolder holder) => holder.overdue ?? holder.age > _bankItWithin;
 
 class _SummaryTiles extends StatelessWidget {
   const _SummaryTiles({required this.summary, required this.float});
@@ -199,9 +331,7 @@ class _SummaryTiles extends StatelessWidget {
   /// colour.
   DeliveryAccent get _floatAccent {
     if (float.isEmpty) return DeliveryAccent.positive;
-    return DateTime.now().difference(_oldest) > _bankItWithin
-        ? DeliveryAccent.caution
-        : DeliveryAccent.info;
+    return float.any(_isLate) ? DeliveryAccent.caution : DeliveryAccent.info;
   }
 
   @override
@@ -272,9 +402,10 @@ class _SummaryTiles extends StatelessWidget {
 
 /// Who is holding platform cash, and the button that says they have banked it.
 ///
-/// This is the only place in the product where the float can be discharged. Until it existed the
-/// balance only ever grew: settlement recorded every collection correctly and nothing could ever
-/// record the hand-over, so a working ledger still added up to a number that meant nothing.
+/// This is the only place in the product where a rider's float can be discharged with the
+/// platform. Until it existed the balance only ever grew: settlement recorded every collection
+/// correctly and nothing could ever record the hand-over, so a working ledger still added up to a
+/// number that meant nothing.
 ///
 /// Sorted oldest-first rather than largest-first. The biggest balance is usually just the busiest
 /// rider; the oldest one is the question worth asking.
@@ -288,8 +419,7 @@ class _CashOnHand extends StatelessWidget {
   Widget build(BuildContext context) {
     final List<CashHolder> sorted = holders.toList()
       ..sort((CashHolder a, CashHolder b) => a.oldest.compareTo(b.oldest));
-    final bool anyLate =
-        DateTime.now().difference(sorted.first.oldest) > _bankItWithin;
+    final bool anyLate = sorted.any(_isLate);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,11 +427,10 @@ class _CashOnHand extends StatelessWidget {
         const SectionLabel('Cash on hand'),
         const SizedBox(height: DeliverySpacing.sm),
         if (anyLate)
-          const Padding(
-            padding: EdgeInsets.only(bottom: DeliverySpacing.sm),
+          Padding(
+            padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
             child: SoftNote(
-              text: 'Cash has been out longer than a day. Nothing is wrong with the ledger — '
-                  'this is money the bank has not seen yet.',
+              text: DeliveryStrings.of(context).carrCashBoOverdueNote,
               accent: DeliveryAccent.caution,
               icon: Icons.schedule_rounded,
             ),
@@ -335,21 +464,14 @@ class _HolderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool late = holder.age > _bankItWithin;
+    final bool late = _isLate(holder);
 
     return Padding(
       padding: const EdgeInsets.symmetric(
           horizontal: DeliverySpacing.sm, vertical: DeliverySpacing.sm),
       child: Row(
         children: <Widget>[
-          Icon(
-            // A rider today; a delivery company once carriers collect their own cash.
-            holder.holderKind == 'PROVIDER'
-                ? Icons.local_shipping_outlined
-                : Icons.pedal_bike_outlined,
-            size: 18,
-            color: DeliveryColors.muted,
-          ),
+          const Icon(Icons.pedal_bike_outlined, size: 18, color: DeliveryColors.muted),
           const SizedBox(width: DeliverySpacing.sm),
           Expanded(
             child: Column(
@@ -388,6 +510,212 @@ class _HolderRow extends StatelessWidget {
     );
   }
 }
+
+/// What each delivery company holds and owes the platform, and the button that records it paid.
+///
+/// A company's own figure is what its riders handed it and it has not yet paid: exactly what a
+/// payment clears. What its riders still carry is owed to the company, not yet to the platform, so
+/// it is written beside the figure and never added to it — adding it would record a payment for
+/// notes still in a rider's pocket.
+class _HeldByCarriers extends StatelessWidget {
+  const _HeldByCarriers({required this.carriers, required this.names, required this.onRecord});
+
+  /// Null when the figures could not be loaded.
+  final List<CarrierCashHolding>? carriers;
+  final Map<String, String> names;
+  final Future<void> Function(CarrierCashHolding carrier, String company) onRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<CarrierCashHolding>? list = carriers;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SectionLabel(t.carrCashBoTitle),
+        const SizedBox(height: DeliverySpacing.sm),
+        if (list == null)
+          Text(
+            t.carrCashBoLoadFailed,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: DeliveryColors.muted),
+          )
+        else
+          SoftCard(
+            padding: EdgeInsets.zero,
+            child: ConstrainedBox(
+              // Capped for the reason cash on hand is: the work list below is the job.
+              constraints: const BoxConstraints(maxHeight: 180),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(DeliverySpacing.sm),
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (BuildContext context, int i) => _CarrierRow(
+                  carrier: list[i],
+                  name: names[list[i].carrierRef] ?? _shortId(list[i].carrierRef),
+                  onRecord: onRecord,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CarrierRow extends StatelessWidget {
+  const _CarrierRow({required this.carrier, required this.name, required this.onRecord});
+
+  final CarrierCashHolding carrier;
+  final String name;
+  final Future<void> Function(CarrierCashHolding carrier, String company) onRecord;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final CarrierCashHolding c = carrier;
+    final TextStyle? meta =
+        Theme.of(context).textTheme.bodySmall?.copyWith(color: DeliveryColors.muted);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: DeliverySpacing.sm, vertical: DeliverySpacing.sm),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.local_shipping_outlined, size: 18, color: DeliveryColors.muted),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(name,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  <String>[
+                    if (c.holdsCash) t.carrCashOrderCount(c.orders) else t.carrCashBoHoldsNothing,
+                    t.carrCashBoWithRiders(_cash(c.withRiders)),
+                    if (c.lastPaidAt == null)
+                      t.carrCashBoNeverPaid
+                    else
+                      t.carrCashBoLastPaid(CarrierCashApi.isoDate(c.lastPaidAt!)),
+                  ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: meta,
+                ),
+              ],
+            ),
+          ),
+          if (c.overdue) ...<Widget>[
+            StatePill(label: t.carrCashKpiOverdue, accent: DeliveryAccent.caution),
+            const SizedBox(width: DeliverySpacing.sm),
+          ],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(_cash(c.held),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              Text(t.carrCashBoOwes, style: meta),
+            ],
+          ),
+          const SizedBox(width: DeliverySpacing.md),
+          // Disabled when the company holds nothing: recording a payment of nothing is not a fact.
+          OutlinedButton.icon(
+            onPressed: c.holdsCash ? () => onRecord(c, name) : null,
+            icon: const Icon(Icons.account_balance_outlined, size: 16),
+            label: Text(t.carrCashBoRecordPayment),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the operator chose when confirming a company's payment. [method] is null when they did not
+/// say — recorded as not said, rather than guessed.
+class _PaymentChoice {
+  const _PaymentChoice(this.method);
+
+  final CashMethod? method;
+}
+
+class _CarrierPaymentDialog extends StatefulWidget {
+  const _CarrierPaymentDialog({
+    required this.company,
+    required this.amount,
+    required this.orders,
+  });
+
+  final String company;
+  final String amount;
+  final String orders;
+
+  @override
+  State<_CarrierPaymentDialog> createState() => _CarrierPaymentDialogState();
+}
+
+class _CarrierPaymentDialogState extends State<_CarrierPaymentDialog> {
+  CashMethod? _method;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return AlertDialog(
+      title: Text(t.carrCashBoConfirmTitle),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(t.carrCashBoConfirmBody(widget.company, widget.amount, widget.orders)),
+            const SizedBox(height: DeliverySpacing.md),
+            Text(
+              t.carrCashBoMethodLabel,
+              style:
+                  Theme.of(context).textTheme.labelMedium?.copyWith(color: DeliveryColors.muted),
+            ),
+            const SizedBox(height: DeliverySpacing.xs),
+            Wrap(
+              spacing: DeliverySpacing.sm,
+              runSpacing: DeliverySpacing.xs,
+              children: <Widget>[
+                for (final CashMethod m in CashMethod.values)
+                  ChoiceChip(
+                    label: Text(_methodLabel(t, m)),
+                    selected: _method == m,
+                    onSelected: (bool on) => setState(() => _method = on ? m : null),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_PaymentChoice(_method)),
+          child: Text(t.carrCashBoConfirmYes),
+        ),
+      ],
+    );
+  }
+}
+
+String _methodLabel(DeliveryStrings t, CashMethod method) => switch (method) {
+      CashMethod.cash => t.carrCashMethodCash,
+      CashMethod.bankDeposit => t.carrCashMethodBank,
+      CashMethod.wallet => t.carrCashMethodWallet,
+    };
 
 class _Filters extends StatelessWidget {
   const _Filters({required this.selected, required this.onSelected});
@@ -605,6 +933,9 @@ class _Payload extends StatelessWidget {
 String _shortId(String id) => id.length <= 8 ? id : id.substring(0, 8).toUpperCase();
 
 String _money(double amount) => '\$${amount.toStringAsFixed(2)}';
+
+/// A company's figure exactly as the ledger wrote it; a dash when it sent none, never a zero.
+String _cash(Money? money) => money == null ? '—' : '\$${money.amount}';
 
 String _ago(DateTime time) {
   final Duration d = DateTime.now().difference(time);
