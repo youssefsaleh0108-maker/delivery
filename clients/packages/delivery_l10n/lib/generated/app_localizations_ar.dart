@@ -7279,4 +7279,112 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get dekkaneBrowseTitle => 'حيّك';
+
+  @override
+  String dekkaneBrowseSubRegion(String region) {
+    return 'دكاكين $region المحلية';
+  }
+
+  @override
+  String dekkaneAreaInRegion(String area, String region) {
+    return '$area، $region';
+  }
+
+  @override
+  String get dekkaneEntrySub => 'الدكاكين والمحلات الصغيرة حول عنوانك';
+
+  @override
+  String get dekkaneFilterOpenNow => 'مفتوح الآن';
+
+  @override
+  String get dekkaneFilterOnGenerator => 'على المولّد الآن';
+
+  @override
+  String get dekkaneFilterNew => 'جديد على YouDrop';
+
+  @override
+  String get dekkaneExpandMap => 'توسيع الخريطة التفاعلية';
+
+  @override
+  String get dekkaneNearbyShops => 'محلات قريبة منك';
+
+  @override
+  String get dekkaneLocalShops => 'محلات الحي';
+
+  @override
+  String dekkaneDistanceMetres(int metres) {
+    final intl.NumberFormat metresNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String metresString = metresNumberFormat.format(metres);
+
+    return 'على بُعد $metresString م';
+  }
+
+  @override
+  String dekkaneDistanceKm(double km) {
+    final intl.NumberFormat kmNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+            locale: localeName, decimalDigits: 1);
+    final String kmString = kmNumberFormat.format(km);
+
+    return 'على بُعد $kmString كم';
+  }
+
+  @override
+  String get dekkaneGeneratorActive => 'المولّد يعمل';
+
+  @override
+  String get dekkaneTrustedLocal => 'محلّي موثوق';
+
+  @override
+  String get dekkaneCouldNotLoadShops => 'تعذّر تحميل المحلات من حولك';
+
+  @override
+  String get dekkanePinAddressPrompt =>
+      'ثبّت عنوانك على الخريطة لترى أقرب المحلات إليك وكم يبعد كلّ منها.';
+
+  @override
+  String get dekkaneNoShopsNearby => 'لا توجد محلات قرب هذا العنوان بعد';
+
+  @override
+  String get dekkaneMapTitle => 'المحلات على الخريطة';
+
+  @override
+  String dekkaneOpenClosesAt(String time) {
+    return 'مفتوح · يغلق $time';
+  }
+
+  @override
+  String get dekkaneShopInventory => 'بضاعة المحل';
+
+  @override
+  String dekkaneLbpAmount(int amount) {
+    final intl.NumberFormat amountNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String amountString = amountNumberFormat.format(amount);
+
+    return '$amountString ل.ل.';
+  }
+
+  @override
+  String get dekkaneAddOneMore => 'أضف واحداً آخر';
+
+  @override
+  String get dekkaneMerchNeighborhood => 'الحي';
+
+  @override
+  String get dekkaneMerchNeighborhoodHint => 'مثلاً: مار مخايل';
+
+  @override
+  String get dekkaneMerchNeighborhoodHelp =>
+      'يجد الزبائن الذين يتصفّحون حيّهم محلّك تحت هذا الاسم.';
+
+  @override
+  String get dekkaneMerchNeighborhoodTooLong => 'يجب ألّا يتجاوز 80 حرفاً';
+
+  @override
+  String get dekkaneCouldNotLoadShelf => 'تعذّر تحميل رفوف المحل';
 }

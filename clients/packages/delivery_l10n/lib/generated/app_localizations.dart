@@ -12931,6 +12931,168 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your application is in, but we couldn\'t finish setting up your account. Please try again.'**
   String get wizAccountRolesRetry;
+
+  /// No description provided for @dekkaneBrowseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Neighborhood'**
+  String get dekkaneBrowseTitle;
+
+  /// No description provided for @dekkaneBrowseSubRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Local {region} dekkanes'**
+  String dekkaneBrowseSubRegion(String region);
+
+  /// No description provided for @dekkaneAreaInRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'{area}, {region}'**
+  String dekkaneAreaInRegion(String area, String region);
+
+  /// No description provided for @dekkaneEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'The dekkanes and small shops around your address'**
+  String get dekkaneEntrySub;
+
+  /// No description provided for @dekkaneFilterOpenNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open now'**
+  String get dekkaneFilterOpenNow;
+
+  /// No description provided for @dekkaneFilterOnGenerator.
+  ///
+  /// In en, this message translates to:
+  /// **'On generator now'**
+  String get dekkaneFilterOnGenerator;
+
+  /// No description provided for @dekkaneFilterNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New on YouDrop'**
+  String get dekkaneFilterNew;
+
+  /// No description provided for @dekkaneExpandMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand interactive map'**
+  String get dekkaneExpandMap;
+
+  /// No description provided for @dekkaneNearbyShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops near you'**
+  String get dekkaneNearbyShops;
+
+  /// No description provided for @dekkaneLocalShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Local shops'**
+  String get dekkaneLocalShops;
+
+  /// No description provided for @dekkaneDistanceMetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{metres} m away'**
+  String dekkaneDistanceMetres(int metres);
+
+  /// No description provided for @dekkaneDistanceKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km away'**
+  String dekkaneDistanceKm(double km);
+
+  /// No description provided for @dekkaneGeneratorActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Generator active'**
+  String get dekkaneGeneratorActive;
+
+  /// No description provided for @dekkaneTrustedLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted local'**
+  String get dekkaneTrustedLocal;
+
+  /// No description provided for @dekkaneCouldNotLoadShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the shops around you'**
+  String get dekkaneCouldNotLoadShops;
+
+  /// No description provided for @dekkanePinAddressPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin your address on the map to see the shops nearest you, and how far each one is.'**
+  String get dekkanePinAddressPrompt;
+
+  /// No description provided for @dekkaneNoShopsNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'No shops near this address yet'**
+  String get dekkaneNoShopsNearby;
+
+  /// No description provided for @dekkaneMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops on the map'**
+  String get dekkaneMapTitle;
+
+  /// No description provided for @dekkaneOpenClosesAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Open · Closes {time}'**
+  String dekkaneOpenClosesAt(String time);
+
+  /// No description provided for @dekkaneShopInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop inventory'**
+  String get dekkaneShopInventory;
+
+  /// No description provided for @dekkaneLbpAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'LBP {amount}'**
+  String dekkaneLbpAmount(int amount);
+
+  /// No description provided for @dekkaneAddOneMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Add one more'**
+  String get dekkaneAddOneMore;
+
+  /// No description provided for @dekkaneMerchNeighborhood.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood'**
+  String get dekkaneMerchNeighborhood;
+
+  /// No description provided for @dekkaneMerchNeighborhoodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Mar Mikhael'**
+  String get dekkaneMerchNeighborhoodHint;
+
+  /// No description provided for @dekkaneMerchNeighborhoodHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers browsing their neighborhood find your shop under this name.'**
+  String get dekkaneMerchNeighborhoodHelp;
+
+  /// No description provided for @dekkaneMerchNeighborhoodTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it to 80 characters or fewer'**
+  String get dekkaneMerchNeighborhoodTooLong;
+
+  /// No description provided for @dekkaneCouldNotLoadShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this shop\'s shelves'**
+  String get dekkaneCouldNotLoadShelf;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

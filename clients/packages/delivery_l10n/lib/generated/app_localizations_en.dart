@@ -7272,4 +7272,114 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get dekkaneBrowseTitle => 'Your Neighborhood';
+
+  @override
+  String dekkaneBrowseSubRegion(String region) {
+    return 'Local $region dekkanes';
+  }
+
+  @override
+  String dekkaneAreaInRegion(String area, String region) {
+    return '$area, $region';
+  }
+
+  @override
+  String get dekkaneEntrySub =>
+      'The dekkanes and small shops around your address';
+
+  @override
+  String get dekkaneFilterOpenNow => 'Open now';
+
+  @override
+  String get dekkaneFilterOnGenerator => 'On generator now';
+
+  @override
+  String get dekkaneFilterNew => 'New on YouDrop';
+
+  @override
+  String get dekkaneExpandMap => 'Expand interactive map';
+
+  @override
+  String get dekkaneNearbyShops => 'Shops near you';
+
+  @override
+  String get dekkaneLocalShops => 'Local shops';
+
+  @override
+  String dekkaneDistanceMetres(int metres) {
+    final intl.NumberFormat metresNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String metresString = metresNumberFormat.format(metres);
+
+    return '$metresString m away';
+  }
+
+  @override
+  String dekkaneDistanceKm(double km) {
+    final intl.NumberFormat kmNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+            locale: localeName, decimalDigits: 1);
+    final String kmString = kmNumberFormat.format(km);
+
+    return '$kmString km away';
+  }
+
+  @override
+  String get dekkaneGeneratorActive => 'Generator active';
+
+  @override
+  String get dekkaneTrustedLocal => 'Trusted local';
+
+  @override
+  String get dekkaneCouldNotLoadShops => 'Could not load the shops around you';
+
+  @override
+  String get dekkanePinAddressPrompt =>
+      'Pin your address on the map to see the shops nearest you, and how far each one is.';
+
+  @override
+  String get dekkaneNoShopsNearby => 'No shops near this address yet';
+
+  @override
+  String get dekkaneMapTitle => 'Shops on the map';
+
+  @override
+  String dekkaneOpenClosesAt(String time) {
+    return 'Open · Closes $time';
+  }
+
+  @override
+  String get dekkaneShopInventory => 'Shop inventory';
+
+  @override
+  String dekkaneLbpAmount(int amount) {
+    final intl.NumberFormat amountNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String amountString = amountNumberFormat.format(amount);
+
+    return 'LBP $amountString';
+  }
+
+  @override
+  String get dekkaneAddOneMore => 'Add one more';
+
+  @override
+  String get dekkaneMerchNeighborhood => 'Neighborhood';
+
+  @override
+  String get dekkaneMerchNeighborhoodHint => 'e.g. Mar Mikhael';
+
+  @override
+  String get dekkaneMerchNeighborhoodHelp =>
+      'Customers browsing their neighborhood find your shop under this name.';
+
+  @override
+  String get dekkaneMerchNeighborhoodTooLong =>
+      'Keep it to 80 characters or fewer';
+
+  @override
+  String get dekkaneCouldNotLoadShelf => 'Could not load this shop\'s shelves';
 }

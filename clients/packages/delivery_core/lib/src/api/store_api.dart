@@ -234,6 +234,12 @@ class StoreApi {
     return Paged<Store>.fromJson(response.data as Map<String, dynamic>, Store.fromJson);
   }
 
+  /// Saves the profile form.
+  ///
+  /// [neighborhood] follows the server's three-way rule: null leaves the shop's district as it is
+  /// (and is not sent at all), an empty string clears it, anything else sets it. The field used to
+  /// be missing here entirely while the server wrote whatever arrived — so every profile save
+  /// cleared the district, and the neighbourhood browse had nothing to browse.
   Future<Store> updateProfile(
     String storeId, {
     required String name,
@@ -243,6 +249,7 @@ class StoreApi {
     List<String> tags = const <String>[],
     String? timezone,
     String? address,
+    String? neighborhood,
   }) async {
     final Response<dynamic> response = await _dio.put<dynamic>(
       '/api/stores/$storeId',
@@ -254,6 +261,7 @@ class StoreApi {
         'tags': tags,
         'timezone': timezone,
         'address': address,
+        if (neighborhood != null) 'neighborhood': neighborhood,
       },
     );
     return Store.fromJson(response.data as Map<String, dynamic>);

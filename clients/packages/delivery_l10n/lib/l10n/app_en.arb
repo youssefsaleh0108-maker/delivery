@@ -3460,5 +3460,83 @@
   "accountAlreadyPartner": "This account is already a YouDrop partner, and an account can hold only one partner role.",
   "accountOtherApplication": "This account already has an application for another role, and an account can apply for only one.",
   "accountEmailUnverified": "Your account's email address hasn't been verified, so we can't take an application on it yet.",
-  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again."
+  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again.",
+  "dekkaneBrowseTitle": "Your Neighborhood",
+  "dekkaneBrowseSubRegion": "Local {region} dekkanes",
+  "@dekkaneBrowseSubRegion": {
+    "placeholders": {
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneAreaInRegion": "{area}, {region}",
+  "@dekkaneAreaInRegion": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      },
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneEntrySub": "The dekkanes and small shops around your address",
+  "dekkaneFilterOpenNow": "Open now",
+  "dekkaneFilterOnGenerator": "On generator now",
+  "dekkaneFilterNew": "New on YouDrop",
+  "dekkaneExpandMap": "Expand interactive map",
+  "dekkaneNearbyShops": "Shops near you",
+  "dekkaneLocalShops": "Local shops",
+  "dekkaneDistanceMetres": "{metres} m away",
+  "@dekkaneDistanceMetres": {
+    "placeholders": {
+      "metres": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "dekkaneDistanceKm": "{km} km away",
+  "@dekkaneDistanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "double",
+        "format": "decimalPatternDigits",
+        "optionalParameters": {
+          "decimalDigits": 1
+        }
+      }
+    }
+  },
+  "dekkaneGeneratorActive": "Generator active",
+  "dekkaneTrustedLocal": "Trusted local",
+  "dekkaneCouldNotLoadShops": "Could not load the shops around you",
+  "dekkanePinAddressPrompt": "Pin your address on the map to see the shops nearest you, and how far each one is.",
+  "dekkaneNoShopsNearby": "No shops near this address yet",
+  "dekkaneMapTitle": "Shops on the map",
+  "dekkaneOpenClosesAt": "Open · Closes {time}",
+  "@dekkaneOpenClosesAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneShopInventory": "Shop inventory",
+  "dekkaneLbpAmount": "LBP {amount}",
+  "@dekkaneLbpAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "dekkaneAddOneMore": "Add one more",
+  "dekkaneMerchNeighborhood": "Neighborhood",
+  "dekkaneMerchNeighborhoodHint": "e.g. Mar Mikhael",
+  "dekkaneMerchNeighborhoodHelp": "Customers browsing their neighborhood find your shop under this name.",
+  "dekkaneMerchNeighborhoodTooLong": "Keep it to 80 characters or fewer",
+  "dekkaneCouldNotLoadShelf": "Could not load this shop's shelves"
 }
