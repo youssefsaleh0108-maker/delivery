@@ -64,6 +64,16 @@ class DeliveryProviderApi {
         .toList();
   }
 
+  /// Ends a rider's contract with the caller's company: they come off this fleet and go back to
+  /// YouDrop's in-house riders — the same change Backoffice makes with [releaseRider], reachable
+  /// by carrier staff only for a rider on their own fleet.
+  ///
+  /// 404 for a rider not on this fleet (identical for one that does not exist); 409 while the
+  /// rider is carrying one of this company's unfinished jobs, with `jobs` in the body. Nothing
+  /// else changes: sign-in, history, ratings and money stay exactly where they were.
+  Future<void> releaseMyRider(String riderRef) =>
+      _dio.delete<void>('/api/delivery-providers/my-company/riders/$riderRef');
+
   /// How this carrier is performing, and therefore how much work they are offered.
   Future<CarrierScore> myScore() async {
     final Response<dynamic> response =

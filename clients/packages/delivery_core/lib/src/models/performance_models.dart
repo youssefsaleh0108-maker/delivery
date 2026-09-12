@@ -67,3 +67,79 @@ class RiderDeliveredToday {
         day: DateTime.parse(json['day'] as String),
       );
 }
+
+/// One rider's deliveries day by day, mirroring `RiderPerformanceService.DailyOutput` — the bars
+/// of the carrier rider profile's output chart.
+///
+/// Scoped server-side exactly like [RiderPerformance]: a carrier sees only the deliveries the rider
+/// made for that carrier, so the chart and the thirty-day tiles above it always count the same
+/// work. [days] carries only dates with a delivery on them; [zeroFilled] draws the quiet days
+/// between [from] and [to], the same convention as the duty-hours series.
+class RiderDailyOutput {
+  const RiderDailyOutput({
+    required this.riderId,
+    required this.zone,
+    required this.from,
+    required this.to,
+    required this.days,
+  });
+
+  final String riderId;
+
+  /// The zone the server split days in, echoed so the screen can say so rather than let a reader
+  /// in another zone assume their own midnight.
+  final String zone;
+
+  /// The first and last day of the window, both inclusive, as plain dates in [zone].
+  final DateTime from;
+  final DateTime to;
+
+  /// Only the days with something delivered, oldest first.
+  final List<RiderDeliveredDay> days;
+
+  /// Every day from [from] to [to], a quiet day as zero. The server never sends zero rows, so a
+  /// missing date means nothing was delivered — not that the date is unknown.
+  List<RiderDeliveredDay> get zeroFilled {
+    final Map<DateTime, int> byDay = <DateTime, int>{
+      for (final RiderDeliveredDay d in days) _dateOnly(d.date): d.delivered,
+    };
+    return <RiderDeliveredDay>[
+      for (DateTime day = _dateOnly(from);
+          !day.isAfter(_dateOnly(to));
+          day = DateTime(day.year, day.month, day.day + 1))
+        RiderDeliveredDay(date: day, delivered: byDay[day] ?? 0),
+    ];
+  }
+
+  /// Everything delivered across the window.
+  int get total => days.fold<int>(0, (int sum, RiderDeliveredDay d) => sum + d.delivered);
+
+  factory RiderDailyOutput.fromJson(Map<String, dynamic> json) => RiderDailyOutput(
+        riderId: json['riderId'] as String? ?? '',
+        zone: json['zone'] as String? ?? 'UTC',
+        from: _plainDate(json['from'] as String),
+        to: _plainDate(json['to'] as String),
+        days: (json['days'] as List<dynamic>? ?? const <dynamic>[])
+            .map((dynamic d) => RiderDeliveredDay.fromJson(d as Map<String, dynamic>))
+            .toList(),
+      );
+
+  /// A `YYYY-MM-DD` the server already resolved in its zone, kept as that calendar date rather
+  /// than shifted by the viewer's offset.
+  static DateTime _plainDate(String value) => _dateOnly(DateTime.parse(value));
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+}
+
+/// One bar: a calendar day and what the rider delivered on it.
+class RiderDeliveredDay {
+  const RiderDeliveredDay({required this.date, required this.delivered});
+
+  final DateTime date;
+  final int delivered;
+
+  factory RiderDeliveredDay.fromJson(Map<String, dynamic> json) => RiderDeliveredDay(
+        date: RiderDailyOutput._plainDate(json['date'] as String),
+        delivered: (json['delivered'] as num?)?.toInt() ?? 0,
+      );
+}
