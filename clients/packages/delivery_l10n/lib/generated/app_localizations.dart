@@ -12931,6 +12931,726 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your application is in, but we couldn\'t finish setting up your account. Please try again.'**
   String get wizAccountRolesRetry;
+
+  /// No description provided for @attendanceNavShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shifts & attendance'**
+  String get attendanceNavShifts;
+
+  /// No description provided for @attendanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Attendance & Shift Logs'**
+  String get attendanceTitle;
+
+  /// No description provided for @attendanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track daily check-ins, lates, absences, and shift overrides'**
+  String get attendanceSubtitle;
+
+  /// No description provided for @attendanceForMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance & clock logs for {month}'**
+  String attendanceForMonth(String month);
+
+  /// No description provided for @attendanceBackToRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to riders'**
+  String get attendanceBackToRiders;
+
+  /// No description provided for @attendanceManualLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Attendance Log'**
+  String get attendanceManualLog;
+
+  /// No description provided for @attendancePrevMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get attendancePrevMonth;
+
+  /// No description provided for @attendanceNextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get attendanceNextMonth;
+
+  /// No description provided for @attendanceLegendPresent.
+  ///
+  /// In en, this message translates to:
+  /// **'Present'**
+  String get attendanceLegendPresent;
+
+  /// No description provided for @attendanceLegendLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get attendanceLegendLate;
+
+  /// No description provided for @attendanceLegendAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get attendanceLegendAbsent;
+
+  /// No description provided for @attendanceLegendOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Day off'**
+  String get attendanceLegendOff;
+
+  /// No description provided for @attendanceLegendOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'On duty'**
+  String get attendanceLegendOnDuty;
+
+  /// No description provided for @attendanceWeekMon.
+  ///
+  /// In en, this message translates to:
+  /// **'MON'**
+  String get attendanceWeekMon;
+
+  /// No description provided for @attendanceWeekTue.
+  ///
+  /// In en, this message translates to:
+  /// **'TUE'**
+  String get attendanceWeekTue;
+
+  /// No description provided for @attendanceWeekWed.
+  ///
+  /// In en, this message translates to:
+  /// **'WED'**
+  String get attendanceWeekWed;
+
+  /// No description provided for @attendanceWeekThu.
+  ///
+  /// In en, this message translates to:
+  /// **'THU'**
+  String get attendanceWeekThu;
+
+  /// No description provided for @attendanceWeekFri.
+  ///
+  /// In en, this message translates to:
+  /// **'FRI'**
+  String get attendanceWeekFri;
+
+  /// No description provided for @attendanceWeekSat.
+  ///
+  /// In en, this message translates to:
+  /// **'SAT'**
+  String get attendanceWeekSat;
+
+  /// No description provided for @attendanceWeekSun.
+  ///
+  /// In en, this message translates to:
+  /// **'SUN'**
+  String get attendanceWeekSun;
+
+  /// No description provided for @attendanceAggregatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance Aggregates'**
+  String get attendanceAggregatesTitle;
+
+  /// No description provided for @attendanceDaysWorked.
+  ///
+  /// In en, this message translates to:
+  /// **'Days worked'**
+  String get attendanceDaysWorked;
+
+  /// No description provided for @attendanceAbsences.
+  ///
+  /// In en, this message translates to:
+  /// **'Absences'**
+  String get attendanceAbsences;
+
+  /// No description provided for @attendanceTimesLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Times late'**
+  String get attendanceTimesLate;
+
+  /// No description provided for @attendanceOvertime.
+  ///
+  /// In en, this message translates to:
+  /// **'Overtime accumulated'**
+  String get attendanceOvertime;
+
+  /// No description provided for @attendanceHoursOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours on duty'**
+  String get attendanceHoursOnDuty;
+
+  /// No description provided for @attendanceManualHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours logged by hand'**
+  String get attendanceManualHours;
+
+  /// No description provided for @attendanceExcusedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused, sick or on leave'**
+  String get attendanceExcusedDays;
+
+  /// No description provided for @attendanceDaysCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String attendanceDaysCount(int count);
+
+  /// No description provided for @attendanceHoursValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hours'**
+  String attendanceHoursValue(String hours);
+
+  /// No description provided for @attendanceHoursShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hrs'**
+  String attendanceHoursShort(String hours);
+
+  /// No description provided for @attendanceLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Clock-In / Clock-Out Logs'**
+  String get attendanceLogsTitle;
+
+  /// No description provided for @attendanceColDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get attendanceColDate;
+
+  /// No description provided for @attendanceColShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled shift'**
+  String get attendanceColShift;
+
+  /// No description provided for @attendanceColClockIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock in'**
+  String get attendanceColClockIn;
+
+  /// No description provided for @attendanceColClockOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock out'**
+  String get attendanceColClockOut;
+
+  /// No description provided for @attendanceColHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get attendanceColHours;
+
+  /// No description provided for @attendanceColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get attendanceColStatus;
+
+  /// No description provided for @attendanceColNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get attendanceColNotes;
+
+  /// No description provided for @attendanceShiftLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} ({start} - {end})'**
+  String attendanceShiftLabel(String name, String start, String end);
+
+  /// No description provided for @attendanceStatusOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get attendanceStatusOnTime;
+
+  /// No description provided for @attendanceStatusLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late check-in'**
+  String get attendanceStatusLate;
+
+  /// No description provided for @attendanceStatusAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get attendanceStatusAbsent;
+
+  /// No description provided for @attendanceStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in yet'**
+  String get attendanceStatusPending;
+
+  /// No description provided for @attendanceStatusDayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Day off'**
+  String get attendanceStatusDayOff;
+
+  /// No description provided for @attendanceStatusExtra.
+  ///
+  /// In en, this message translates to:
+  /// **'Worked a day off'**
+  String get attendanceStatusExtra;
+
+  /// No description provided for @attendanceStatusWorked.
+  ///
+  /// In en, this message translates to:
+  /// **'On duty'**
+  String get attendanceStatusWorked;
+
+  /// No description provided for @attendanceStatusLateExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Late (excused)'**
+  String get attendanceStatusLateExcused;
+
+  /// No description provided for @attendanceStatusExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused'**
+  String get attendanceStatusExcused;
+
+  /// No description provided for @attendanceStatusSick.
+  ///
+  /// In en, this message translates to:
+  /// **'Sick leave'**
+  String get attendanceStatusSick;
+
+  /// No description provided for @attendanceStatusLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get attendanceStatusLeave;
+
+  /// No description provided for @attendanceOnShiftNow.
+  ///
+  /// In en, this message translates to:
+  /// **'On shift now'**
+  String get attendanceOnShiftNow;
+
+  /// No description provided for @attendanceAutoClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-closed: signal lost'**
+  String get attendanceAutoClosed;
+
+  /// No description provided for @attendanceLateBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min late'**
+  String attendanceLateBy(int minutes);
+
+  /// No description provided for @attendanceOvertimeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min overtime'**
+  String attendanceOvertimeNote(int minutes);
+
+  /// No description provided for @attendanceLoggedByHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged by hand'**
+  String get attendanceLoggedByHand;
+
+  /// No description provided for @attendanceNoSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'No shift schedule is set for this rider, so only time on duty is shown.'**
+  String get attendanceNoSchedule;
+
+  /// No description provided for @attendanceEmptyMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.'**
+  String get attendanceEmptyMonth;
+
+  /// No description provided for @attendanceZoneNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Days are split in the {zone} time zone.'**
+  String attendanceZoneNote(String zone);
+
+  /// No description provided for @attendanceNotOnFleet.
+  ///
+  /// In en, this message translates to:
+  /// **'This rider is not on your fleet in tracking yet. They appear here once they have carried an order for your company.'**
+  String get attendanceNotOnFleet;
+
+  /// No description provided for @attendanceLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance could not be loaded just now.'**
+  String get attendanceLoadFailed;
+
+  /// No description provided for @attendanceLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log attendance for {name}'**
+  String attendanceLogTitle(String name);
+
+  /// No description provided for @attendanceLogStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened'**
+  String get attendanceLogStatus;
+
+  /// No description provided for @attendanceLogChooseStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a status'**
+  String get attendanceLogChooseStatus;
+
+  /// No description provided for @attendanceKindPresent.
+  ///
+  /// In en, this message translates to:
+  /// **'Present (not shown by the app)'**
+  String get attendanceKindPresent;
+
+  /// No description provided for @attendanceKindLateExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Late, excused'**
+  String get attendanceKindLateExcused;
+
+  /// No description provided for @attendanceKindAbsentExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent, excused'**
+  String get attendanceKindAbsentExcused;
+
+  /// No description provided for @attendanceKindSick.
+  ///
+  /// In en, this message translates to:
+  /// **'Sick'**
+  String get attendanceKindSick;
+
+  /// No description provided for @attendanceKindLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'On leave'**
+  String get attendanceKindLeave;
+
+  /// No description provided for @attendanceLogClockIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock in (optional)'**
+  String get attendanceLogClockIn;
+
+  /// No description provided for @attendanceLogClockOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock out (optional)'**
+  String get attendanceLogClockOut;
+
+  /// No description provided for @attendanceLogNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get attendanceLogNote;
+
+  /// No description provided for @attendanceLogSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save entry'**
+  String get attendanceLogSave;
+
+  /// No description provided for @attendanceLogWithdraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove entry'**
+  String get attendanceLogWithdraw;
+
+  /// No description provided for @attendanceLogSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance entry saved.'**
+  String get attendanceLogSaved;
+
+  /// No description provided for @attendanceLogRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry removed. The day shows what the app recorded.'**
+  String get attendanceLogRemoved;
+
+  /// No description provided for @attendanceLogTimesRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Times go only on a present day, and need both a clock-in and a clock-out.'**
+  String get attendanceLogTimesRule;
+
+  /// No description provided for @attendanceLogManualNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours typed here are reported as manual, never as app evidence.'**
+  String get attendanceLogManualNote;
+
+  /// No description provided for @attendanceLogFutureRule.
+  ///
+  /// In en, this message translates to:
+  /// **'A day that has not happened yet can only be marked as leave, sick or excused.'**
+  String get attendanceLogFutureRule;
+
+  /// No description provided for @attendanceTimeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a 24-hour time such as 08:00.'**
+  String get attendanceTimeInvalid;
+
+  /// No description provided for @attendanceShiftsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift schedules'**
+  String get attendanceShiftsTitle;
+
+  /// No description provided for @attendanceShiftsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the shifts your riders work, then open anyone’s monthly attendance.'**
+  String get attendanceShiftsSubtitle;
+
+  /// No description provided for @attendanceShiftsCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Shifts'**
+  String get attendanceShiftsCard;
+
+  /// No description provided for @attendanceAddShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Add shift'**
+  String get attendanceAddShift;
+
+  /// No description provided for @attendanceNoShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.'**
+  String get attendanceNoShifts;
+
+  /// No description provided for @attendanceShiftGrace.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min grace'**
+  String attendanceShiftGrace(int minutes);
+
+  /// No description provided for @attendanceShiftRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No riders} =1{1 rider} other{{count} riders}}'**
+  String attendanceShiftRiders(int count);
+
+  /// No description provided for @attendanceShiftOvernight.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends next day'**
+  String get attendanceShiftOvernight;
+
+  /// No description provided for @attendanceRetireShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Retire shift'**
+  String get attendanceRetireShift;
+
+  /// No description provided for @attendanceRetireBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the riders on this shift to another one first.'**
+  String get attendanceRetireBlocked;
+
+  /// No description provided for @attendanceShiftRetired.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift retired.'**
+  String get attendanceShiftRetired;
+
+  /// No description provided for @attendanceRidersCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders'**
+  String get attendanceRidersCard;
+
+  /// No description provided for @attendanceColRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get attendanceColRider;
+
+  /// No description provided for @attendanceColCurrentShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get attendanceColCurrentShift;
+
+  /// No description provided for @attendanceColActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get attendanceColActions;
+
+  /// No description provided for @attendanceFreelancer.
+  ///
+  /// In en, this message translates to:
+  /// **'No schedule (freelancer)'**
+  String get attendanceFreelancer;
+
+  /// No description provided for @attendanceChangeShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Change shift'**
+  String get attendanceChangeShift;
+
+  /// No description provided for @attendanceOpenAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance'**
+  String get attendanceOpenAttendance;
+
+  /// No description provided for @attendanceUpcomingShift.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} from {date}'**
+  String attendanceUpcomingShift(String name, String date);
+
+  /// No description provided for @attendanceUnlinkedRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 rider has not carried an order for your company yet, so their attendance cannot be read until they do.} other{{count} riders have not carried an order for your company yet, so their attendance cannot be read until they do.}}'**
+  String attendanceUnlinkedRiders(int count);
+
+  /// No description provided for @attendanceNoRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'No riders on your fleet in tracking yet.'**
+  String get attendanceNoRiders;
+
+  /// No description provided for @attendanceNewShiftTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New shift'**
+  String get attendanceNewShiftTitle;
+
+  /// No description provided for @attendanceShiftName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get attendanceShiftName;
+
+  /// No description provided for @attendanceShiftStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts (HH:mm)'**
+  String get attendanceShiftStart;
+
+  /// No description provided for @attendanceShiftEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends (HH:mm)'**
+  String get attendanceShiftEnd;
+
+  /// No description provided for @attendanceShiftDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get attendanceShiftDays;
+
+  /// No description provided for @attendanceShiftGraceField.
+  ///
+  /// In en, this message translates to:
+  /// **'Grace before late (minutes)'**
+  String get attendanceShiftGraceField;
+
+  /// No description provided for @attendanceShiftImmutable.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.'**
+  String get attendanceShiftImmutable;
+
+  /// No description provided for @attendanceCreateShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Create shift'**
+  String get attendanceCreateShift;
+
+  /// No description provided for @attendanceShiftCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift created.'**
+  String get attendanceShiftCreated;
+
+  /// No description provided for @attendanceShiftNeedsName.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the shift a name.'**
+  String get attendanceShiftNeedsName;
+
+  /// No description provided for @attendanceShiftNeedsDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at least one day.'**
+  String get attendanceShiftNeedsDays;
+
+  /// No description provided for @attendanceShiftSameTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'A shift cannot start and end at the same time.'**
+  String get attendanceShiftSameTimes;
+
+  /// No description provided for @attendanceGraceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a number of minutes from 0 to 120.'**
+  String get attendanceGraceInvalid;
+
+  /// No description provided for @attendanceAssignTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift for {name}'**
+  String attendanceAssignTitle(String name);
+
+  /// No description provided for @attendanceAssignFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting'**
+  String get attendanceAssignFrom;
+
+  /// No description provided for @attendanceAssignNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedules start today or later. Past days keep the schedule they were worked against.'**
+  String get attendanceAssignNote;
+
+  /// No description provided for @attendanceAssignSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save schedule'**
+  String get attendanceAssignSave;
+
+  /// No description provided for @attendanceAssignSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule updated.'**
+  String get attendanceAssignSaved;
+
+  /// No description provided for @attendanceHistoryLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This month is older than the duty history the platform keeps, so it can no longer be shown.'**
+  String get attendanceHistoryLimit;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

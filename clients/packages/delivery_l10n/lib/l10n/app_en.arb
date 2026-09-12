@@ -3460,5 +3460,232 @@
   "accountAlreadyPartner": "This account is already a YouDrop partner, and an account can hold only one partner role.",
   "accountOtherApplication": "This account already has an application for another role, and an account can apply for only one.",
   "accountEmailUnverified": "Your account's email address hasn't been verified, so we can't take an application on it yet.",
-  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again."
+  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again.",
+  "attendanceNavShifts": "Shifts & attendance",
+  "attendanceTitle": "Rider Attendance & Shift Logs",
+  "attendanceSubtitle": "Track daily check-ins, lates, absences, and shift overrides",
+  "attendanceForMonth": "Attendance & clock logs for {month}",
+  "@attendanceForMonth": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceBackToRiders": "Back to riders",
+  "attendanceManualLog": "Manual Attendance Log",
+  "attendancePrevMonth": "Previous month",
+  "attendanceNextMonth": "Next month",
+  "attendanceLegendPresent": "Present",
+  "attendanceLegendLate": "Late",
+  "attendanceLegendAbsent": "Absent",
+  "attendanceLegendOff": "Day off",
+  "attendanceLegendOnDuty": "On duty",
+  "attendanceWeekMon": "MON",
+  "attendanceWeekTue": "TUE",
+  "attendanceWeekWed": "WED",
+  "attendanceWeekThu": "THU",
+  "attendanceWeekFri": "FRI",
+  "attendanceWeekSat": "SAT",
+  "attendanceWeekSun": "SUN",
+  "attendanceAggregatesTitle": "Attendance Aggregates",
+  "attendanceDaysWorked": "Days worked",
+  "attendanceAbsences": "Absences",
+  "attendanceTimesLate": "Times late",
+  "attendanceOvertime": "Overtime accumulated",
+  "attendanceHoursOnDuty": "Hours on duty",
+  "attendanceManualHours": "Hours logged by hand",
+  "attendanceExcusedDays": "Excused, sick or on leave",
+  "attendanceDaysCount": "{count, plural, =1{1 day} other{{count} days}}",
+  "@attendanceDaysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceHoursValue": "{hours} hours",
+  "@attendanceHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceHoursShort": "{hours} hrs",
+  "@attendanceHoursShort": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceLogsTitle": "Recent Clock-In / Clock-Out Logs",
+  "attendanceColDate": "Date",
+  "attendanceColShift": "Scheduled shift",
+  "attendanceColClockIn": "Clock in",
+  "attendanceColClockOut": "Clock out",
+  "attendanceColHours": "Hours",
+  "attendanceColStatus": "Status",
+  "attendanceColNotes": "Notes",
+  "attendanceShiftLabel": "{name} ({start} - {end})",
+  "@attendanceShiftLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceStatusOnTime": "On time",
+  "attendanceStatusLate": "Late check-in",
+  "attendanceStatusAbsent": "Absent",
+  "attendanceStatusPending": "Not in yet",
+  "attendanceStatusDayOff": "Day off",
+  "attendanceStatusExtra": "Worked a day off",
+  "attendanceStatusWorked": "On duty",
+  "attendanceStatusLateExcused": "Late (excused)",
+  "attendanceStatusExcused": "Excused",
+  "attendanceStatusSick": "Sick leave",
+  "attendanceStatusLeave": "Leave",
+  "attendanceOnShiftNow": "On shift now",
+  "attendanceAutoClosed": "Auto-closed: signal lost",
+  "attendanceLateBy": "{minutes} min late",
+  "@attendanceLateBy": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceOvertimeNote": "{minutes} min overtime",
+  "@attendanceOvertimeNote": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceLoggedByHand": "Logged by hand",
+  "attendanceNoSchedule": "No shift schedule is set for this rider, so only time on duty is shown.",
+  "attendanceEmptyMonth": "No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.",
+  "attendanceZoneNote": "Days are split in the {zone} time zone.",
+  "@attendanceZoneNote": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceNotOnFleet": "This rider is not on your fleet in tracking yet. They appear here once they have carried an order for your company.",
+  "attendanceLoadFailed": "Attendance could not be loaded just now.",
+  "attendanceLogTitle": "Log attendance for {name}",
+  "@attendanceLogTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceLogStatus": "What happened",
+  "attendanceLogChooseStatus": "Choose a status",
+  "attendanceKindPresent": "Present (not shown by the app)",
+  "attendanceKindLateExcused": "Late, excused",
+  "attendanceKindAbsentExcused": "Absent, excused",
+  "attendanceKindSick": "Sick",
+  "attendanceKindLeave": "On leave",
+  "attendanceLogClockIn": "Clock in (optional)",
+  "attendanceLogClockOut": "Clock out (optional)",
+  "attendanceLogNote": "Note (optional)",
+  "attendanceLogSave": "Save entry",
+  "attendanceLogWithdraw": "Remove entry",
+  "attendanceLogSaved": "Attendance entry saved.",
+  "attendanceLogRemoved": "Entry removed. The day shows what the app recorded.",
+  "attendanceLogTimesRule": "Times go only on a present day, and need both a clock-in and a clock-out.",
+  "attendanceLogManualNote": "Hours typed here are reported as manual, never as app evidence.",
+  "attendanceLogFutureRule": "A day that has not happened yet can only be marked as leave, sick or excused.",
+  "attendanceTimeInvalid": "Use a 24-hour time such as 08:00.",
+  "attendanceShiftsTitle": "Shift schedules",
+  "attendanceShiftsSubtitle": "Set the shifts your riders work, then open anyone’s monthly attendance.",
+  "attendanceShiftsCard": "Shifts",
+  "attendanceAddShift": "Add shift",
+  "attendanceNoShifts": "No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.",
+  "attendanceShiftGrace": "{minutes} min grace",
+  "@attendanceShiftGrace": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceShiftRiders": "{count, plural, =0{No riders} =1{1 rider} other{{count} riders}}",
+  "@attendanceShiftRiders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceShiftOvernight": "Ends next day",
+  "attendanceRetireShift": "Retire shift",
+  "attendanceRetireBlocked": "Move the riders on this shift to another one first.",
+  "attendanceShiftRetired": "Shift retired.",
+  "attendanceRidersCard": "Riders",
+  "attendanceColRider": "Rider",
+  "attendanceColCurrentShift": "Shift",
+  "attendanceColActions": "Actions",
+  "attendanceFreelancer": "No schedule (freelancer)",
+  "attendanceChangeShift": "Change shift",
+  "attendanceOpenAttendance": "Attendance",
+  "attendanceUpcomingShift": "{name} from {date}",
+  "@attendanceUpcomingShift": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceUnlinkedRiders": "{count, plural, =1{1 rider has not carried an order for your company yet, so their attendance cannot be read until they do.} other{{count} riders have not carried an order for your company yet, so their attendance cannot be read until they do.}}",
+  "@attendanceUnlinkedRiders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceNoRiders": "No riders on your fleet in tracking yet.",
+  "attendanceNewShiftTitle": "New shift",
+  "attendanceShiftName": "Name",
+  "attendanceShiftStart": "Starts (HH:mm)",
+  "attendanceShiftEnd": "Ends (HH:mm)",
+  "attendanceShiftDays": "Days",
+  "attendanceShiftGraceField": "Grace before late (minutes)",
+  "attendanceShiftImmutable": "Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.",
+  "attendanceCreateShift": "Create shift",
+  "attendanceShiftCreated": "Shift created.",
+  "attendanceShiftNeedsName": "Give the shift a name.",
+  "attendanceShiftNeedsDays": "Choose at least one day.",
+  "attendanceShiftSameTimes": "A shift cannot start and end at the same time.",
+  "attendanceGraceInvalid": "Use a number of minutes from 0 to 120.",
+  "attendanceAssignTitle": "Shift for {name}",
+  "@attendanceAssignTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceAssignFrom": "Starting",
+  "attendanceAssignNote": "Schedules start today or later. Past days keep the schedule they were worked against.",
+  "attendanceAssignSave": "Save schedule",
+  "attendanceAssignSaved": "Schedule updated.",
+  "attendanceHistoryLimit": "This month is older than the duty history the platform keeps, so it can no longer be shown."
 }

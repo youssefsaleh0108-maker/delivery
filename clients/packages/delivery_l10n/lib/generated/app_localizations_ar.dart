@@ -7279,4 +7279,443 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get attendanceNavShifts => 'الورديات والحضور';
+
+  @override
+  String get attendanceTitle => 'حضور السائقين وسجلّ الورديات';
+
+  @override
+  String get attendanceSubtitle =>
+      'تابِع تسجيلات الدخول اليومية والتأخير والغياب وتعديلات الورديات';
+
+  @override
+  String attendanceForMonth(String month) {
+    return 'الحضور وسجلّات الدوام لشهر $month';
+  }
+
+  @override
+  String get attendanceBackToRiders => 'العودة إلى السائقين';
+
+  @override
+  String get attendanceManualLog => 'تسجيل حضور يدوي';
+
+  @override
+  String get attendancePrevMonth => 'الشهر السابق';
+
+  @override
+  String get attendanceNextMonth => 'الشهر التالي';
+
+  @override
+  String get attendanceLegendPresent => 'حاضر';
+
+  @override
+  String get attendanceLegendLate => 'متأخر';
+
+  @override
+  String get attendanceLegendAbsent => 'غائب';
+
+  @override
+  String get attendanceLegendOff => 'يوم عطلة';
+
+  @override
+  String get attendanceLegendOnDuty => 'في الخدمة';
+
+  @override
+  String get attendanceWeekMon => 'إثنين';
+
+  @override
+  String get attendanceWeekTue => 'ثلاثاء';
+
+  @override
+  String get attendanceWeekWed => 'أربعاء';
+
+  @override
+  String get attendanceWeekThu => 'خميس';
+
+  @override
+  String get attendanceWeekFri => 'جمعة';
+
+  @override
+  String get attendanceWeekSat => 'سبت';
+
+  @override
+  String get attendanceWeekSun => 'أحد';
+
+  @override
+  String get attendanceAggregatesTitle => 'ملخّص الحضور';
+
+  @override
+  String get attendanceDaysWorked => 'أيام العمل';
+
+  @override
+  String get attendanceAbsences => 'الغياب';
+
+  @override
+  String get attendanceTimesLate => 'مرات التأخير';
+
+  @override
+  String get attendanceOvertime => 'الساعات الإضافية المتراكمة';
+
+  @override
+  String get attendanceHoursOnDuty => 'ساعات الخدمة';
+
+  @override
+  String get attendanceManualHours => 'ساعات مسجّلة يدويًا';
+
+  @override
+  String get attendanceExcusedDays => 'أعذار أو مرض أو إجازة';
+
+  @override
+  String attendanceDaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count يوم',
+      many: '$count يومًا',
+      few: '$count أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+      zero: '0 يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attendanceHoursValue(String hours) {
+    return '$hours ساعة';
+  }
+
+  @override
+  String attendanceHoursShort(String hours) {
+    return '$hours س';
+  }
+
+  @override
+  String get attendanceLogsTitle => 'أحدث سجلّات الدخول والخروج';
+
+  @override
+  String get attendanceColDate => 'التاريخ';
+
+  @override
+  String get attendanceColShift => 'الوردية المجدولة';
+
+  @override
+  String get attendanceColClockIn => 'الدخول';
+
+  @override
+  String get attendanceColClockOut => 'الخروج';
+
+  @override
+  String get attendanceColHours => 'الساعات';
+
+  @override
+  String get attendanceColStatus => 'الحالة';
+
+  @override
+  String get attendanceColNotes => 'ملاحظات';
+
+  @override
+  String attendanceShiftLabel(String name, String start, String end) {
+    return '$name ($start - $end)';
+  }
+
+  @override
+  String get attendanceStatusOnTime => 'في الموعد';
+
+  @override
+  String get attendanceStatusLate => 'دخول متأخر';
+
+  @override
+  String get attendanceStatusAbsent => 'غائب';
+
+  @override
+  String get attendanceStatusPending => 'لم يصل بعد';
+
+  @override
+  String get attendanceStatusDayOff => 'يوم عطلة';
+
+  @override
+  String get attendanceStatusExtra => 'عمل في يوم عطلة';
+
+  @override
+  String get attendanceStatusWorked => 'في الخدمة';
+
+  @override
+  String get attendanceStatusLateExcused => 'متأخر (بعذر)';
+
+  @override
+  String get attendanceStatusExcused => 'غياب بعذر';
+
+  @override
+  String get attendanceStatusSick => 'إجازة مرضية';
+
+  @override
+  String get attendanceStatusLeave => 'إجازة';
+
+  @override
+  String get attendanceOnShiftNow => 'في الوردية الآن';
+
+  @override
+  String get attendanceAutoClosed => 'أُغلقت تلقائيًا: انقطعت الإشارة';
+
+  @override
+  String attendanceLateBy(int minutes) {
+    return 'متأخر $minutes دقيقة';
+  }
+
+  @override
+  String attendanceOvertimeNote(int minutes) {
+    return '$minutes دقيقة إضافية';
+  }
+
+  @override
+  String get attendanceLoggedByHand => 'مسجّل يدويًا';
+
+  @override
+  String get attendanceNoSchedule =>
+      'لا توجد وردية مجدولة لهذا السائق، لذا يظهر وقت الخدمة فقط.';
+
+  @override
+  String get attendanceEmptyMonth =>
+      'لا يوجد دوام مسجّل لهذا الشهر. يبدأ السجلّ منذ بدء تتبّع الدوام، ولا يُضاف أي شيء بأثر رجعي.';
+
+  @override
+  String attendanceZoneNote(String zone) {
+    return 'تُقسَّم الأيام حسب المنطقة الزمنية $zone.';
+  }
+
+  @override
+  String get attendanceNotOnFleet =>
+      'هذا السائق غير مرتبط بأسطولك في نظام التتبّع بعد. سيظهر هنا بعد أن ينقل طلبًا لشركتك.';
+
+  @override
+  String get attendanceLoadFailed => 'تعذّر تحميل الحضور حاليًا.';
+
+  @override
+  String attendanceLogTitle(String name) {
+    return 'تسجيل حضور $name';
+  }
+
+  @override
+  String get attendanceLogStatus => 'ما الذي حدث';
+
+  @override
+  String get attendanceLogChooseStatus => 'اختر الحالة';
+
+  @override
+  String get attendanceKindPresent => 'حاضر (لم يظهر في التطبيق)';
+
+  @override
+  String get attendanceKindLateExcused => 'متأخر بعذر';
+
+  @override
+  String get attendanceKindAbsentExcused => 'غائب بعذر';
+
+  @override
+  String get attendanceKindSick => 'مريض';
+
+  @override
+  String get attendanceKindLeave => 'في إجازة';
+
+  @override
+  String get attendanceLogClockIn => 'وقت الدخول (اختياري)';
+
+  @override
+  String get attendanceLogClockOut => 'وقت الخروج (اختياري)';
+
+  @override
+  String get attendanceLogNote => 'ملاحظة (اختيارية)';
+
+  @override
+  String get attendanceLogSave => 'حفظ السجل';
+
+  @override
+  String get attendanceLogWithdraw => 'حذف السجل';
+
+  @override
+  String get attendanceLogSaved => 'تم حفظ سجل الحضور.';
+
+  @override
+  String get attendanceLogRemoved =>
+      'تم حذف السجل. يعرض اليوم ما سجّله التطبيق.';
+
+  @override
+  String get attendanceLogTimesRule =>
+      'تُسجَّل الأوقات في يوم الحضور فقط، ويجب إدخال وقتي الدخول والخروج معًا.';
+
+  @override
+  String get attendanceLogManualNote =>
+      'تُحتسب الساعات المُدخلة هنا ساعاتٍ يدوية، وليست دليلًا من التطبيق.';
+
+  @override
+  String get attendanceLogFutureRule =>
+      'اليوم الذي لم يأتِ بعد لا يمكن تسجيله إلا إجازةً أو مرضًا أو غيابًا بعذر.';
+
+  @override
+  String get attendanceTimeInvalid => 'استخدم صيغة 24 ساعة مثل 08:00.';
+
+  @override
+  String get attendanceShiftsTitle => 'جداول الورديات';
+
+  @override
+  String get attendanceShiftsSubtitle =>
+      'حدّد الورديات التي يعمل بها سائقوك، ثم افتح الحضور الشهري لأيٍّ منهم.';
+
+  @override
+  String get attendanceShiftsCard => 'الورديات';
+
+  @override
+  String get attendanceAddShift => 'إضافة وردية';
+
+  @override
+  String get attendanceNoShifts =>
+      'لا توجد ورديات بعد. يُعامَل السائقون دون وردية كعاملين أحرار: لا تأخير ولا غياب.';
+
+  @override
+  String attendanceShiftGrace(int minutes) {
+    return 'مهلة $minutes دقيقة';
+  }
+
+  @override
+  String attendanceShiftRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق',
+      many: '$count سائقًا',
+      few: '$count سائقين',
+      two: 'سائقان',
+      one: 'سائق واحد',
+      zero: 'لا سائقين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceShiftOvernight => 'تنتهي في اليوم التالي';
+
+  @override
+  String get attendanceRetireShift => 'إيقاف الوردية';
+
+  @override
+  String get attendanceRetireBlocked =>
+      'انقل السائقين في هذه الوردية إلى وردية أخرى أولًا.';
+
+  @override
+  String get attendanceShiftRetired => 'تم إيقاف الوردية.';
+
+  @override
+  String get attendanceRidersCard => 'السائقون';
+
+  @override
+  String get attendanceColRider => 'السائق';
+
+  @override
+  String get attendanceColCurrentShift => 'الوردية';
+
+  @override
+  String get attendanceColActions => 'إجراءات';
+
+  @override
+  String get attendanceFreelancer => 'بلا جدول (عمل حر)';
+
+  @override
+  String get attendanceChangeShift => 'تغيير الوردية';
+
+  @override
+  String get attendanceOpenAttendance => 'الحضور';
+
+  @override
+  String attendanceUpcomingShift(String name, String date) {
+    return '$name اعتبارًا من $date';
+  }
+
+  @override
+  String attendanceUnlinkedRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count سائق لم ينقلوا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهم حتى يفعلوا.',
+      many:
+          '$count سائقًا لم ينقلوا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهم حتى يفعلوا.',
+      few:
+          '$count سائقين لم ينقلوا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهم حتى يفعلوا.',
+      two:
+          'سائقان لم ينقلا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهما حتى يفعلا.',
+      one:
+          'سائق واحد لم ينقل أي طلب لشركتك بعد، لذا لا يمكن عرض حضوره حتى يفعل.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceNoRiders =>
+      'لا يوجد سائقون في أسطولك ضمن نظام التتبّع بعد.';
+
+  @override
+  String get attendanceNewShiftTitle => 'وردية جديدة';
+
+  @override
+  String get attendanceShiftName => 'الاسم';
+
+  @override
+  String get attendanceShiftStart => 'تبدأ (HH:mm)';
+
+  @override
+  String get attendanceShiftEnd => 'تنتهي (HH:mm)';
+
+  @override
+  String get attendanceShiftDays => 'الأيام';
+
+  @override
+  String get attendanceShiftGraceField =>
+      'المهلة قبل احتساب التأخير (بالدقائق)';
+
+  @override
+  String get attendanceShiftImmutable =>
+      'لا يمكن تعديل ساعات الوردية لاحقًا. لتغييرها، أضِف وردية جديدة وانقل السائقين إليها، لتبقى الأيام السابقة على الوردية التي عُمل بها.';
+
+  @override
+  String get attendanceCreateShift => 'إنشاء الوردية';
+
+  @override
+  String get attendanceShiftCreated => 'تم إنشاء الوردية.';
+
+  @override
+  String get attendanceShiftNeedsName => 'أدخل اسمًا للوردية.';
+
+  @override
+  String get attendanceShiftNeedsDays => 'اختر يومًا واحدًا على الأقل.';
+
+  @override
+  String get attendanceShiftSameTimes =>
+      'لا يمكن أن تبدأ الوردية وتنتهي في الوقت نفسه.';
+
+  @override
+  String get attendanceGraceInvalid => 'أدخل عدد دقائق بين 0 و120.';
+
+  @override
+  String attendanceAssignTitle(String name) {
+    return 'وردية $name';
+  }
+
+  @override
+  String get attendanceAssignFrom => 'ابتداءً من';
+
+  @override
+  String get attendanceAssignNote =>
+      'تبدأ الجداول اليوم أو لاحقًا. تبقى الأيام السابقة على الجدول الذي عُمل به.';
+
+  @override
+  String get attendanceAssignSave => 'حفظ الجدول';
+
+  @override
+  String get attendanceAssignSaved => 'تم تحديث الجدول.';
+
+  @override
+  String get attendanceHistoryLimit =>
+      'هذا الشهر أقدم من سجلّ الدوام الذي تحتفظ به المنصّة، لذا لا يمكن عرضه بعد الآن.';
 }

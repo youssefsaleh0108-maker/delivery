@@ -7272,4 +7272,428 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get attendanceNavShifts => 'Shifts & attendance';
+
+  @override
+  String get attendanceTitle => 'Rider Attendance & Shift Logs';
+
+  @override
+  String get attendanceSubtitle =>
+      'Track daily check-ins, lates, absences, and shift overrides';
+
+  @override
+  String attendanceForMonth(String month) {
+    return 'Attendance & clock logs for $month';
+  }
+
+  @override
+  String get attendanceBackToRiders => 'Back to riders';
+
+  @override
+  String get attendanceManualLog => 'Manual Attendance Log';
+
+  @override
+  String get attendancePrevMonth => 'Previous month';
+
+  @override
+  String get attendanceNextMonth => 'Next month';
+
+  @override
+  String get attendanceLegendPresent => 'Present';
+
+  @override
+  String get attendanceLegendLate => 'Late';
+
+  @override
+  String get attendanceLegendAbsent => 'Absent';
+
+  @override
+  String get attendanceLegendOff => 'Day off';
+
+  @override
+  String get attendanceLegendOnDuty => 'On duty';
+
+  @override
+  String get attendanceWeekMon => 'MON';
+
+  @override
+  String get attendanceWeekTue => 'TUE';
+
+  @override
+  String get attendanceWeekWed => 'WED';
+
+  @override
+  String get attendanceWeekThu => 'THU';
+
+  @override
+  String get attendanceWeekFri => 'FRI';
+
+  @override
+  String get attendanceWeekSat => 'SAT';
+
+  @override
+  String get attendanceWeekSun => 'SUN';
+
+  @override
+  String get attendanceAggregatesTitle => 'Attendance Aggregates';
+
+  @override
+  String get attendanceDaysWorked => 'Days worked';
+
+  @override
+  String get attendanceAbsences => 'Absences';
+
+  @override
+  String get attendanceTimesLate => 'Times late';
+
+  @override
+  String get attendanceOvertime => 'Overtime accumulated';
+
+  @override
+  String get attendanceHoursOnDuty => 'Hours on duty';
+
+  @override
+  String get attendanceManualHours => 'Hours logged by hand';
+
+  @override
+  String get attendanceExcusedDays => 'Excused, sick or on leave';
+
+  @override
+  String attendanceDaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attendanceHoursValue(String hours) {
+    return '$hours hours';
+  }
+
+  @override
+  String attendanceHoursShort(String hours) {
+    return '$hours hrs';
+  }
+
+  @override
+  String get attendanceLogsTitle => 'Recent Clock-In / Clock-Out Logs';
+
+  @override
+  String get attendanceColDate => 'Date';
+
+  @override
+  String get attendanceColShift => 'Scheduled shift';
+
+  @override
+  String get attendanceColClockIn => 'Clock in';
+
+  @override
+  String get attendanceColClockOut => 'Clock out';
+
+  @override
+  String get attendanceColHours => 'Hours';
+
+  @override
+  String get attendanceColStatus => 'Status';
+
+  @override
+  String get attendanceColNotes => 'Notes';
+
+  @override
+  String attendanceShiftLabel(String name, String start, String end) {
+    return '$name ($start - $end)';
+  }
+
+  @override
+  String get attendanceStatusOnTime => 'On time';
+
+  @override
+  String get attendanceStatusLate => 'Late check-in';
+
+  @override
+  String get attendanceStatusAbsent => 'Absent';
+
+  @override
+  String get attendanceStatusPending => 'Not in yet';
+
+  @override
+  String get attendanceStatusDayOff => 'Day off';
+
+  @override
+  String get attendanceStatusExtra => 'Worked a day off';
+
+  @override
+  String get attendanceStatusWorked => 'On duty';
+
+  @override
+  String get attendanceStatusLateExcused => 'Late (excused)';
+
+  @override
+  String get attendanceStatusExcused => 'Excused';
+
+  @override
+  String get attendanceStatusSick => 'Sick leave';
+
+  @override
+  String get attendanceStatusLeave => 'Leave';
+
+  @override
+  String get attendanceOnShiftNow => 'On shift now';
+
+  @override
+  String get attendanceAutoClosed => 'Auto-closed: signal lost';
+
+  @override
+  String attendanceLateBy(int minutes) {
+    return '$minutes min late';
+  }
+
+  @override
+  String attendanceOvertimeNote(int minutes) {
+    return '$minutes min overtime';
+  }
+
+  @override
+  String get attendanceLoggedByHand => 'Logged by hand';
+
+  @override
+  String get attendanceNoSchedule =>
+      'No shift schedule is set for this rider, so only time on duty is shown.';
+
+  @override
+  String get attendanceEmptyMonth =>
+      'No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.';
+
+  @override
+  String attendanceZoneNote(String zone) {
+    return 'Days are split in the $zone time zone.';
+  }
+
+  @override
+  String get attendanceNotOnFleet =>
+      'This rider is not on your fleet in tracking yet. They appear here once they have carried an order for your company.';
+
+  @override
+  String get attendanceLoadFailed => 'Attendance could not be loaded just now.';
+
+  @override
+  String attendanceLogTitle(String name) {
+    return 'Log attendance for $name';
+  }
+
+  @override
+  String get attendanceLogStatus => 'What happened';
+
+  @override
+  String get attendanceLogChooseStatus => 'Choose a status';
+
+  @override
+  String get attendanceKindPresent => 'Present (not shown by the app)';
+
+  @override
+  String get attendanceKindLateExcused => 'Late, excused';
+
+  @override
+  String get attendanceKindAbsentExcused => 'Absent, excused';
+
+  @override
+  String get attendanceKindSick => 'Sick';
+
+  @override
+  String get attendanceKindLeave => 'On leave';
+
+  @override
+  String get attendanceLogClockIn => 'Clock in (optional)';
+
+  @override
+  String get attendanceLogClockOut => 'Clock out (optional)';
+
+  @override
+  String get attendanceLogNote => 'Note (optional)';
+
+  @override
+  String get attendanceLogSave => 'Save entry';
+
+  @override
+  String get attendanceLogWithdraw => 'Remove entry';
+
+  @override
+  String get attendanceLogSaved => 'Attendance entry saved.';
+
+  @override
+  String get attendanceLogRemoved =>
+      'Entry removed. The day shows what the app recorded.';
+
+  @override
+  String get attendanceLogTimesRule =>
+      'Times go only on a present day, and need both a clock-in and a clock-out.';
+
+  @override
+  String get attendanceLogManualNote =>
+      'Hours typed here are reported as manual, never as app evidence.';
+
+  @override
+  String get attendanceLogFutureRule =>
+      'A day that has not happened yet can only be marked as leave, sick or excused.';
+
+  @override
+  String get attendanceTimeInvalid => 'Use a 24-hour time such as 08:00.';
+
+  @override
+  String get attendanceShiftsTitle => 'Shift schedules';
+
+  @override
+  String get attendanceShiftsSubtitle =>
+      'Set the shifts your riders work, then open anyone’s monthly attendance.';
+
+  @override
+  String get attendanceShiftsCard => 'Shifts';
+
+  @override
+  String get attendanceAddShift => 'Add shift';
+
+  @override
+  String get attendanceNoShifts =>
+      'No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.';
+
+  @override
+  String attendanceShiftGrace(int minutes) {
+    return '$minutes min grace';
+  }
+
+  @override
+  String attendanceShiftRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count riders',
+      one: '1 rider',
+      zero: 'No riders',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceShiftOvernight => 'Ends next day';
+
+  @override
+  String get attendanceRetireShift => 'Retire shift';
+
+  @override
+  String get attendanceRetireBlocked =>
+      'Move the riders on this shift to another one first.';
+
+  @override
+  String get attendanceShiftRetired => 'Shift retired.';
+
+  @override
+  String get attendanceRidersCard => 'Riders';
+
+  @override
+  String get attendanceColRider => 'Rider';
+
+  @override
+  String get attendanceColCurrentShift => 'Shift';
+
+  @override
+  String get attendanceColActions => 'Actions';
+
+  @override
+  String get attendanceFreelancer => 'No schedule (freelancer)';
+
+  @override
+  String get attendanceChangeShift => 'Change shift';
+
+  @override
+  String get attendanceOpenAttendance => 'Attendance';
+
+  @override
+  String attendanceUpcomingShift(String name, String date) {
+    return '$name from $date';
+  }
+
+  @override
+  String attendanceUnlinkedRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count riders have not carried an order for your company yet, so their attendance cannot be read until they do.',
+      one:
+          '1 rider has not carried an order for your company yet, so their attendance cannot be read until they do.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceNoRiders => 'No riders on your fleet in tracking yet.';
+
+  @override
+  String get attendanceNewShiftTitle => 'New shift';
+
+  @override
+  String get attendanceShiftName => 'Name';
+
+  @override
+  String get attendanceShiftStart => 'Starts (HH:mm)';
+
+  @override
+  String get attendanceShiftEnd => 'Ends (HH:mm)';
+
+  @override
+  String get attendanceShiftDays => 'Days';
+
+  @override
+  String get attendanceShiftGraceField => 'Grace before late (minutes)';
+
+  @override
+  String get attendanceShiftImmutable =>
+      'Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.';
+
+  @override
+  String get attendanceCreateShift => 'Create shift';
+
+  @override
+  String get attendanceShiftCreated => 'Shift created.';
+
+  @override
+  String get attendanceShiftNeedsName => 'Give the shift a name.';
+
+  @override
+  String get attendanceShiftNeedsDays => 'Choose at least one day.';
+
+  @override
+  String get attendanceShiftSameTimes =>
+      'A shift cannot start and end at the same time.';
+
+  @override
+  String get attendanceGraceInvalid => 'Use a number of minutes from 0 to 120.';
+
+  @override
+  String attendanceAssignTitle(String name) {
+    return 'Shift for $name';
+  }
+
+  @override
+  String get attendanceAssignFrom => 'Starting';
+
+  @override
+  String get attendanceAssignNote =>
+      'Schedules start today or later. Past days keep the schedule they were worked against.';
+
+  @override
+  String get attendanceAssignSave => 'Save schedule';
+
+  @override
+  String get attendanceAssignSaved => 'Schedule updated.';
+
+  @override
+  String get attendanceHistoryLimit =>
+      'This month is older than the duty history the platform keeps, so it can no longer be shown.';
 }
