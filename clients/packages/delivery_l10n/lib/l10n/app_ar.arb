@@ -2546,5 +2546,9 @@
   "carrRidersNoPresenceCount": "{count, plural, zero{لا أحد غيرهم خارج سجل التواجد} one{سائق آخر ليس ضمن سجل التواجد بعد} two{سائقان آخران ليسا ضمن سجل التواجد بعد} few{{count} سائقين آخرين ليسوا ضمن سجل التواجد بعد} many{{count} سائقاً آخر ليسوا ضمن سجل التواجد بعد} other{{count} سائق آخر ليسوا ضمن سجل التواجد بعد}}",
   "carrRidersNoPresenceNote": "ينضمّ السائق إلى سجل التواجد لديك بعد أن يحمل عملاً لشركتك. وحتى ذلك الحين لا تستطيع هذه الصفحة معرفة ما إذا كان في الخدمة.",
   "carrRidersVehicleModel": "طراز المركبة",
-  "carrRidersPlateNumber": "رقم اللوحة"
+  "carrRidersPlateNumber": "رقم اللوحة",
+  "carrRidersDateOfBirth": "تاريخ الميلاد",
+  "carrRidersNationalIdNumber": "رقم الهوية الوطنية",
+  "carrRidersDutyChanged": "آخر تغيير لحالة الخدمة",
+  "carrRidersVehicleYear": "سنة صنع المركبة"
 }

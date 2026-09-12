@@ -204,6 +204,16 @@ CarrierApis _apis({
             },
           ],
       '/my-company/riders': <String, dynamic>{'providerId': 'p1', 'riders': riders},
+      '/my-company/score': <String, dynamic>{
+        'providerId': 'p1',
+        'name': 'Swift Couriers',
+        'score': 84,
+        'orders': 120,
+        'completionRate': 0.96,
+        'avgSecondsToClaim': 240,
+        'avgSecondsOnRoad': 1080,
+        'provisional': false,
+      },
       '/my-company': _company(),
     },
     failing: failing,
@@ -238,8 +248,8 @@ Future<void> pump(
   /// The content column's width — the viewport minus the 260px rail when this screen is mounted
   /// in the console. 1180 is what the design's 1440 leaves it.
   double width = 1180,
-  /// The shell has not been rewired to pass the new clients yet, so the screen has to work with
-  /// and without them. False mounts it the way the portal mounts it today.
+  /// The two optional clients. The portal passes both; false mounts the screen without them, which
+  /// it still has to survive rather than break or invent.
   bool wired = true,
 }) async {
   // The console is drawn at 1440. Tall, because the page scrolls and a short viewport makes every
@@ -402,8 +412,8 @@ void main() {
 
   testWidgets('works, and says less, when the new clients are not passed',
       (WidgetTester tester) async {
-    // The portal shell still builds this screen with two APIs. Until it passes the rest, the page
-    // has to draw what it can rather than break or invent.
+    // The portal passes both now; a build without them must still draw what it can rather than
+    // break or invent.
     await pump(tester, _apis(), wired: false);
 
     expect(find.text('8 Completed'), findsOneWidget);
@@ -418,6 +428,18 @@ void main() {
     await tester.tap(find.text('Deliveries Today'));
     await tester.pumpAndSettle();
     expect(went, isTrue);
+  });
+
+  testWidgets('carries the score and the pause switch the riders page used to',
+      (WidgetTester tester) async {
+    // Both sat under the old riders table. The riders page is an HR directory now, and a company
+    // can lose neither: the score decides how much work arrives, the switch stops it arriving.
+    await pump(tester, _apis());
+
+    expect(find.text(en.howYouAreDoing), findsOneWidget);
+    expect(find.text('84'), findsOneWidget);
+    expect(find.text(en.youAreTakingOrders), findsOneWidget);
+    expect(find.text(en.pauseNewOrders), findsOneWidget);
   });
 
   testWidgets('belonging to no company reads as a gap, not a crash',

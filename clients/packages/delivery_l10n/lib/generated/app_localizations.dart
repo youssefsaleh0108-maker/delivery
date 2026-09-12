@@ -13663,6 +13663,30 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Plate number'**
   String get carrRidersPlateNumber;
+
+  /// No description provided for @carrRidersDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth'**
+  String get carrRidersDateOfBirth;
+
+  /// No description provided for @carrRidersNationalIdNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID number'**
+  String get carrRidersNationalIdNumber;
+
+  /// No description provided for @carrRidersDutyChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Duty last changed'**
+  String get carrRidersDutyChanged;
+
+  /// No description provided for @carrRidersVehicleYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle year'**
+  String get carrRidersVehicleYear;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

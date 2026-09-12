@@ -7755,4 +7755,16 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get carrRidersPlateNumber => 'رقم اللوحة';
+
+  @override
+  String get carrRidersDateOfBirth => 'تاريخ الميلاد';
+
+  @override
+  String get carrRidersNationalIdNumber => 'رقم الهوية الوطنية';
+
+  @override
+  String get carrRidersDutyChanged => 'آخر تغيير لحالة الخدمة';
+
+  @override
+  String get carrRidersVehicleYear => 'سنة صنع المركبة';
 }

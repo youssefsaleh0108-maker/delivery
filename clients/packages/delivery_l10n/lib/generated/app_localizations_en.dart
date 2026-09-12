@@ -7735,4 +7735,16 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get carrRidersPlateNumber => 'Plate number';
+
+  @override
+  String get carrRidersDateOfBirth => 'Date of birth';
+
+  @override
+  String get carrRidersNationalIdNumber => 'National ID number';
+
+  @override
+  String get carrRidersDutyChanged => 'Duty last changed';
+
+  @override
+  String get carrRidersVehicleYear => 'Vehicle year';
 }

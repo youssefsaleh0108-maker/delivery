@@ -3760,5 +3760,9 @@
   },
   "carrRidersNoPresenceNote": "A rider joins your presence roster once they have carried your work. Until then this page cannot tell whether they are on duty.",
   "carrRidersVehicleModel": "Vehicle model",
-  "carrRidersPlateNumber": "Plate number"
+  "carrRidersPlateNumber": "Plate number",
+  "carrRidersDateOfBirth": "Date of birth",
+  "carrRidersNationalIdNumber": "National ID number",
+  "carrRidersDutyChanged": "Duty last changed",
+  "carrRidersVehicleYear": "Vehicle year"
 }
