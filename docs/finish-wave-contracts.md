@@ -354,13 +354,14 @@ max 30; **out of range = 400** (unlike order-manager's daily series, which clamp
 Response 200 (`HoursOnline`):
 
 ```json
-{ "riderId": "kc-sub", "zone": "UTC", "from": "2026-08-21", "to": "2026-08-27",
+{ "riderId": "kc-sub", "zone": "Asia/Beirut", "from": "2026-08-21", "to": "2026-08-27",
   "days": [ { "date": "2026-08-26", "secondsOnline": 3600, "hoursOnline": 1.00, "sessions": 1 } ] }
 ```
 
 - `zone`: the configured day-splitting zone (`delivery.tracking.duty-session.day-zone`, default
-  `UTC`) — echoed so the client never guesses. A 23:00–01:00 shift splits across the midnight of
-  this zone.
+  `Asia/Beirut` since the attendance work; it was `UTC` before) — echoed so the client never
+  guesses. A 23:00–01:00 shift splits across the midnight of this zone. Shift schedules and
+  attendance use the same zone: see `docs/rider-attendance-contract.md`.
 - `from`/`to`: the requested window inclusive; `to` is today in `zone`.
 - `days`: ONLY dates with on-duty time, ascending; `[]` when none — the client draws its own zeros.
 - `secondsOnline` (long): use for any arithmetic. `hoursOnline` (decimal) = seconds/3600 at 2dp

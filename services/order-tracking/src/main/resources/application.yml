@@ -194,7 +194,14 @@ delivery:
       # The zone whose midnights split a shift into per-day hours. One zone platform-wide, because
       # payroll and every console must agree on what "Tuesday" means; it is echoed on every
       # hours-online response so no client has to guess.
-      day-zone: UTC
+      #
+      # Asia/Beirut, not UTC. The platform operates in Lebanon, and with UTC every day boundary was
+      # two or three hours off: a 23:30 shift in Beirut landed on the next day, and "08:00" on a
+      # shift schedule would have meant 10:00 or 11:00 local. It is a zone ID, never a fixed
+      # offset, so the summer (UTC+3) and winter (UTC+2) clocks are handled by the zone's own
+      # rules — shift windows, day splits and lateness are all computed through it. Changing it
+      # also moves the existing hours-online tiles onto Beirut days, which is the point.
+      day-zone: ${TRACKING_DAY_ZONE:Asia/Beirut}
       # How long a rider must be silent before an open shift is given up on. Deliberately hours
       # where the presence ttl above is seconds: a STALE rider staying visible on the roster is a
       # feature (the dispatcher is meant to notice), so expiry fires only long after anyone

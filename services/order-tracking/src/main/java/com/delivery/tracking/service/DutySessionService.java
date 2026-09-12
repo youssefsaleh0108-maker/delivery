@@ -5,7 +5,10 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -66,7 +69,10 @@ public class DutySessionService {
                               RiderPresenceRepository presenceRows,
                               CarrierScopeResolver carrierScope,
                               PresenceService presence,
-                              @Value("${delivery.tracking.duty-session.day-zone:UTC}") String dayZone,
+                              // Beirut here as well as in application.yml: a profile or config
+                              // server that forgot the key must not quietly put every day
+                              // boundary, shift window and lateness verdict back on UTC.
+                              @Value("${delivery.tracking.duty-session.day-zone:Asia/Beirut}") String dayZone,
                               @Value("${delivery.tracking.presence.ttl:120s}") Duration presenceWindow,
                               @Value("${delivery.tracking.duty-session.expire-after:4h}") Duration expireAfter) {
         this.sessions = sessions;
@@ -103,22 +109,88 @@ public class DutySessionService {
      */
     @Transactional(readOnly = true)
     public HoursOnline riderHours(String riderId, String callerId, boolean isBackoffice, int days) {
-        if (isBackoffice) {
-            if (!presenceRows.existsById(riderId)) {
-                throw new PresenceNotFoundException(riderId);
-            }
-        } else {
-            // Same resolution as the roster this column sits beside: a carrier's own fleet comes
-            // from Order Manager when this service has not learned it yet, never from the request.
-            UUID scope = carrierScope.requireScopeFor(callerId);
-            boolean owned = presenceRows.findById(riderId)
-                    .map(row -> scope.equals(row.getCarrierId()))
-                    .orElse(false);
-            if (!owned) {
-                throw new PresenceNotFoundException(riderId);
-            }
-        }
+        requireReadable(riderId, callerId, isBackoffice);
         return aggregate(riderId, days, Instant.now());
+    }
+
+    /**
+     * Whether this caller may read this rider's duty record, and in which fleet's name.
+     *
+     * <p>The one answer shared by the hours column, the sessions list and the attendance month, so
+     * the three can never disagree about who sees whom. The rules are the ones {@link #riderHours}
+     * documents: Backoffice sees any rider who exists; a carrier sees only riders whose
+     * {@code rider_presence.carrier_id} is their own fleet, resolved from their token; everybody
+     * else, and every unknown id, gets the same not-found.
+     *
+     * @return the fleet the rider is read in — the caller's own for a carrier, the rider's current
+     *         one for Backoffice (null for one of the platform's own riders)
+     */
+    public ReadAccess requireReadable(String riderId, String callerId, boolean isBackoffice) {
+        if (isBackoffice) {
+            RiderPresence row = presenceRows.findById(riderId)
+                    .orElseThrow(() -> new PresenceNotFoundException(riderId));
+            return new ReadAccess(riderId, row.getCarrierId());
+        }
+        return new ReadAccess(riderId, requireOwnFleet(riderId, callerId));
+    }
+
+    /**
+     * The caller's fleet, provided this rider rides for it — the gate on every carrier write about
+     * a rider (their shift, a manual attendance entry).
+     *
+     * <p>Same resolution as the roster: a carrier's own fleet comes from Order Manager when this
+     * service has not learned it yet, never from the request. A foreign rider and an unknown one
+     * are the same not-found, as on every read.
+     */
+    public UUID requireOwnFleet(String riderId, String callerId) {
+        UUID scope = carrierScope.requireScopeFor(callerId);
+        boolean owned = presenceRows.findById(riderId)
+                .map(row -> scope.equals(row.getCarrierId()))
+                .orElse(false);
+        if (!owned) {
+            throw new PresenceNotFoundException(riderId);
+        }
+        return scope;
+    }
+
+    /** The zone whose midnights split every day this service reports. */
+    public ZoneId zone() {
+        return dayZone;
+    }
+
+    /**
+     * One rider's duty sessions over a period, whole — the clock-in/clock-out rows behind the
+     * attendance table. Authorisation is the caller's; see {@link #requireReadable}.
+     *
+     * <p>A session that crosses either edge of the period is listed whole rather than clipped:
+     * this answers "when did they go on and off duty", and a clipped row would print a clock-in
+     * nobody made. The per-day split is {@link #aggregate}'s job.
+     */
+    DutySessions sessionsIn(String riderId, AttendancePeriod period, Instant now) {
+        Instant from = period.from().atStartOfDay(dayZone).toInstant();
+        Instant until = period.to().plusDays(1).atStartOfDay(dayZone).toInstant();
+        return new DutySessions(riderId, dayZone.getId(), period.from(), period.to(),
+                views(riderId, from, until, now));
+    }
+
+    /**
+     * Sessions overlapping {@code [from, until)}, each with the time it may honestly be credited —
+     * the same {@link #effectiveEnd} rule the hours use, so the attendance month, the hours tile
+     * and the eventual closed record all agree.
+     */
+    List<SessionView> views(String riderId, Instant from, Instant until, Instant now) {
+        List<DutySession> overlapping = sessions.findOverlapping(riderId, from, until);
+        if (overlapping.isEmpty()) {
+            return List.of();
+        }
+        Instant lastSeen = presenceRows.findById(riderId)
+                .map(RiderPresence::getLastSeenAt)
+                .orElse(null);
+        return overlapping.stream()
+                .map(session -> SessionView.of(session,
+                        max(session.getStartedAt(), effectiveEnd(session, lastSeen, now)),
+                        dayZone))
+                .toList();
     }
 
     /**
@@ -268,6 +340,83 @@ public class DutySessionService {
     }
 
     /**
+     * Who may be read, and in whose name.
+     *
+     * @param carrierId the fleet whose schedule and manual entries apply to this read — null when
+     *                  Backoffice reads one of the platform's own riders, who has neither
+     */
+    public record ReadAccess(String riderId, UUID carrierId) {
+    }
+
+    /** A rider's sessions over a period, with the zone the period's dates are in. */
+    public record DutySessions(
+            String riderId,
+            String zone,
+            LocalDate from,
+            LocalDate to,
+            List<SessionView> sessions) {
+    }
+
+    /**
+     * One duty session as a console shows it.
+     *
+     * @param endedAt        when it was closed; null while it is still open
+     * @param endReason      who closed it — RIDER, BACKOFFICE, or EXPIRED for a rider who went
+     *                       silent, whose close is their last sighting rather than a tap
+     * @param countedUntil   where crediting stops: the close for a closed session, now for a
+     *                       running one whose rider is still pinging, the last sighting for one
+     *                       whose rider went quiet
+     * @param countedSeconds the whole session's credited time — what arithmetic should use
+     * @param countedHours   the same over 3600 at two decimals, for display
+     * @param startedAtLocal    {@code startedAt} as wall-clock time in the day zone,
+     *                          {@code yyyy-MM-ddTHH:mm} — what a console prints, so a manager
+     *                          reading from another time zone still sees Beirut's clock
+     * @param countedUntilLocal {@code countedUntil} the same way
+     */
+    public record SessionView(
+            UUID id,
+            Instant startedAt,
+            Instant endedAt,
+            DutySession.EndReason endReason,
+            boolean open,
+            Instant countedUntil,
+            long countedSeconds,
+            BigDecimal countedHours,
+            String startedAtLocal,
+            String countedUntilLocal) {
+
+        static SessionView of(DutySession session, Instant countedUntil, ZoneId zone) {
+            long seconds = Duration.between(session.getStartedAt(), countedUntil).getSeconds();
+            return new SessionView(session.getId(), session.getStartedAt(), session.getEndedAt(),
+                    session.getEndReason(), session.isOpen(), countedUntil, seconds,
+                    hours(seconds), localStamp(session.getStartedAt(), zone),
+                    localStamp(countedUntil, zone));
+        }
+    }
+
+    /** Seconds over 3600 at two decimals, HALF_UP — the one rounding every screen shares. */
+    public static BigDecimal hours(long seconds) {
+        return BigDecimal.valueOf(seconds).divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * An instant as wall-clock minutes in {@code zone}, {@code yyyy-MM-ddTHH:mm}.
+     *
+     * <p>Sent beside the instant rather than instead of it. A browser converts an instant to its
+     * own zone, and the manager reading a Beirut rider's clock-in from Paris must still see
+     * 07:56, not 06:56 — the client has no zone database to do that conversion itself.
+     */
+    public static String localStamp(Instant instant, ZoneId zone) {
+        return instant == null
+                ? null
+                : LocalDateTime.ofInstant(instant, zone).truncatedTo(ChronoUnit.MINUTES)
+                        .format(LOCAL_STAMP);
+    }
+
+    private static final DateTimeFormatter LOCAL_STAMP =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+
+    /**
      * One day's total.
      *
      * @param secondsOnline the exact figure, what anything doing arithmetic should use
@@ -282,10 +431,7 @@ public class DutySessionService {
             int sessions) {
 
         static DayOnline of(LocalDate date, long secondsOnline, int sessions) {
-            return new DayOnline(date, secondsOnline,
-                    BigDecimal.valueOf(secondsOnline)
-                            .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP),
-                    sessions);
+            return new DayOnline(date, secondsOnline, hours(secondsOnline), sessions);
         }
     }
 }

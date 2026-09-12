@@ -20,7 +20,10 @@ import com.delivery.tracking.domain.DutyState;
 import com.delivery.tracking.domain.RiderDutyEvent;
 import com.delivery.tracking.domain.RiderPresence;
 import com.delivery.tracking.domain.RiderPresenceRepository;
+import com.delivery.tracking.service.DutySessionService.DayOnline;
 import com.delivery.tracking.service.DutySessionService.HoursOnline;
+import com.delivery.tracking.service.DutySessionService.ReadAccess;
+import com.delivery.tracking.service.DutySessionService.SessionView;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -293,6 +296,116 @@ class DutySessionServiceTest {
         void a_carrier_who_belongs_to_no_company_is_told_so() {
             assertThatThrownBy(() -> service.riderHours(RIDER, DISPATCHER, false, 7))
                     .isInstanceOf(PresenceService.NoCarrierException.class);
+        }
+
+        /**
+         * The sessions list and the attendance month go through the same check as the hours, so
+         * a competitor's rider is the same not-found on all three.
+         */
+        @Test
+        void the_shared_read_check_refuses_another_fleets_rider_like_the_hours_do() {
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+            riderCarriesFor(OTHER_CARRIER);
+
+            assertThatThrownBy(() -> service.requireReadable(RIDER, DISPATCHER, false))
+                    .isInstanceOf(PresenceService.PresenceNotFoundException.class);
+            assertThatThrownBy(() -> service.requireOwnFleet(RIDER, DISPATCHER))
+                    .isInstanceOf(PresenceService.PresenceNotFoundException.class);
+        }
+
+        @Test
+        void a_carrier_reads_its_own_rider_in_its_own_fleets_name() {
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+            riderCarriesFor(CARRIER);
+
+            assertThat(service.requireReadable(RIDER, DISPATCHER, false))
+                    .isEqualTo(new ReadAccess(RIDER, CARRIER));
+        }
+
+        /** Backoffice reads a rider against the fleet they ride for now. */
+        @Test
+        void backoffice_reads_a_rider_in_their_current_fleets_name() {
+            riderCarriesFor(CARRIER);
+
+            assertThat(service.requireReadable(RIDER, "backoffice-sub", true).carrierId())
+                    .isEqualTo(CARRIER);
+        }
+    }
+
+    @Nested
+    @DisplayName("days split in Beirut")
+    class Beirut {
+
+        private DutySessionService beirut;
+
+        @BeforeEach
+        void inBeirut() {
+            beirut = new DutySessionService(sessions, presenceRows, carrierScope, presence,
+                    "Asia/Beirut", PRESENCE_WINDOW, EXPIRE_AFTER);
+        }
+
+        /**
+         * 23:00-01:00 in Beirut on 26/27 August (UTC+3) is 20:00Z-22:00Z: one UTC day, two Beirut
+         * days. The split has to be at the rider's midnight.
+         */
+        @Test
+        void a_shift_across_beirut_midnight_is_split_at_local_midnight_not_utc() {
+            sessionsAre(closed(Instant.parse("2026-08-26T20:00:00Z"),
+                    Instant.parse("2026-08-26T22:00:00Z")));
+
+            HoursOnline result = beirut.aggregate(RIDER, 7, NOW);
+
+            assertThat(result.zone()).isEqualTo("Asia/Beirut");
+            assertThat(result.days()).extracting(DayOnline::date)
+                    .containsExactly(LocalDate.parse("2026-08-26"), LocalDate.parse("2026-08-27"));
+            assertThat(result.days()).extracting(DayOnline::secondsOnline)
+                    .containsExactly(3600L, 3600L);
+        }
+
+        /**
+         * 24 October 2026 in Beirut runs from 21:00Z on the 23rd to 22:00Z on the 24th — the clocks
+         * go back at midnight, so the day really is 25 hours, and a rider on duty throughout is
+         * credited all 25.
+         */
+        @Test
+        void the_day_the_clocks_go_back_is_twenty_five_hours_long() {
+            sessionsAre(closed(Instant.parse("2026-10-23T20:00:00Z"),
+                    Instant.parse("2026-10-25T00:00:00Z")));
+
+            HoursOnline result = beirut.aggregate(RIDER, 2,
+                    Instant.parse("2026-10-25T10:00:00Z"));
+
+            assertThat(result.days()).extracting(DayOnline::date)
+                    .containsExactly(LocalDate.parse("2026-10-24"), LocalDate.parse("2026-10-25"));
+            assertThat(result.days().get(0).secondsOnline()).isEqualTo(25 * 3600L);
+            assertThat(result.days().get(1).secondsOnline()).isEqualTo(2 * 3600L);
+        }
+
+        /** A sessions read for 6 October asks for Beirut's 6 October, 21:00Z to 21:00Z. */
+        @Test
+        void a_sessions_read_covers_the_beirut_day_not_the_utc_one() {
+            beirut.sessionsIn(RIDER, new AttendancePeriod(LocalDate.parse("2026-10-06"),
+                    LocalDate.parse("2026-10-06")), NOW);
+
+            verify(sessions).findOverlapping(RIDER, Instant.parse("2026-10-05T21:00:00Z"),
+                    Instant.parse("2026-10-06T21:00:00Z"));
+        }
+
+        /** Each row carries what it may be credited, by the same rule as the hours. */
+        @Test
+        void each_listed_session_is_credited_only_what_there_is_evidence_for() {
+            DutySession quiet = DutySession.open(RIDER, NOW.minus(Duration.ofHours(3)));
+            sessionsAre(closed(NOW.minus(Duration.ofHours(8)), NOW.minus(Duration.ofHours(6))),
+                    quiet);
+            lastSeenAt(NOW.minus(Duration.ofHours(1)));
+
+            List<SessionView> rows = beirut.sessionsIn(RIDER, new AttendancePeriod(TODAY, TODAY),
+                    NOW).sessions();
+
+            assertThat(rows).extracting(SessionView::countedSeconds)
+                    .containsExactly(2 * 3600L, 2 * 3600L);
+            assertThat(rows.get(1).open()).isTrue();
+            assertThat(rows.get(1).countedUntil()).isEqualTo(NOW.minus(Duration.ofHours(1)));
         }
     }
 
