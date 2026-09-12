@@ -204,6 +204,13 @@ public final class StoreDtos {
             @Size(max = 80) String neighborhood) {
     }
 
+    /**
+     * Backoffice's decision on the dekkane trust badge. A Boolean rather than a boolean so a body
+     * that does not say is refused as a 400, not read as a withdrawal.
+     */
+    public record VerifiedLocalRequest(@NotNull Boolean verified) {
+    }
+
     /** The merchant's power declaration — what the lights are doing, and the one-liner under it. */
     public record PowerRequest(
             @NotNull Store.PowerStatus status,

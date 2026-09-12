@@ -501,12 +501,45 @@ public class StoreService {
         return view(stores.save(store), clock.instant());
     }
 
+    /**
+     * Saves the profile form.
+     *
+     * <p>The neighbourhood is only touched when the request mentions it. It used to be written
+     * unconditionally, and no client sent it — the merchant form had no field for it — so every
+     * profile save wrote null over it. Every shop's district was wiped the next time its owner fixed
+     * a typo in their tagline, which is why the district list was empty in practice. The same shape
+     * of failure {@link #pin} is kept off this form for: a field a client does not know about must
+     * not be cleared by that client.
+     *
+     * <p>So: absent (null) leaves the district alone, blank clears it, anything else sets it. A client
+     * that wants to clear it has to say so with an empty string, which only a client that knows the
+     * field exists can do.
+     */
     @Transactional
     public StoreView update(UUID id, String merchantId, StoreRequest request) {
         Store store = requireOwned(id, merchantId);
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
-        store.setNeighborhood(request.neighborhood());
+        if (request.neighborhood() != null) {
+            store.setNeighborhood(request.neighborhood());
+        }
+        return view(store, clock.instant());
+    }
+
+    /**
+     * Backoffice grants or withdraws a shop's "Trusted Local" badge.
+     *
+     * <p>No ownership rule, and that is the point: this is the one write on a store that is never
+     * the merchant's. Who may call it is decided by the controller's role check; this only records
+     * who did, because a trust badge is a claim the platform makes to a shop's neighbours and it
+     * should be possible to say afterwards who made it.
+     */
+    @Transactional
+    public StoreView setVerifiedLocal(UUID id, String backofficeId, boolean verified) {
+        Store store = stores.findById(id)
+                .orElseThrow(() -> new StoreNotFoundException(id.toString()));
+        store.setVerifiedLocal(verified);
+        log.info("Backoffice {} set verified-local on store {} to {}", backofficeId, id, verified);
         return view(store, clock.instant());
     }
 

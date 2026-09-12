@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import com.delivery.product.api.dto.StoreDtos.HoursRequest;
+import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ProductRepository;
@@ -133,6 +134,105 @@ class StoreAdministrationTest {
             assertThatThrownBy(() ->
                     service.replaceHours(store.getId(), MERCHANT, List.of(on(0))))
                     .hasMessageNotContainingAny("DayOfWeek", "DateTimeException", "java.time");
+        }
+    }
+
+    @Nested
+    @DisplayName("saving the profile form")
+    class Profile {
+
+        private StoreRequest profile(String neighborhood) {
+            return new StoreRequest("Beirut Grill", Store.Vertical.RESTAURANT, "Grills since 1985",
+                    null, List.of("grill"), null, "Hamra Street", neighborhood);
+        }
+
+        /**
+         * The regression. Every client that saved this form before it had a district field sent no
+         * district, and the service wrote that absence over the stored one — so fixing a typo in the
+         * tagline silently took the shop out of its neighbourhood, and the district list was empty
+         * in practice.
+         */
+        @Test
+        void a_save_that_does_not_mention_the_neighbourhood_keeps_it() {
+            store.setNeighborhood("Mar Mikhael");
+
+            service.update(store.getId(), MERCHANT, profile(null));
+
+            assertThat(store.getNeighborhood()).isEqualTo("Mar Mikhael");
+            assertThat(store.getTagline()).isEqualTo("Grills since 1985");
+        }
+
+        @Test
+        void a_save_that_names_one_sets_it_trimmed() {
+            service.update(store.getId(), MERCHANT, profile("  Hamra "));
+
+            // Trimmed, because the district list is the distinct values of this column and every
+            // filter on it is exact: " Hamra" would be a second Hamra.
+            assertThat(store.getNeighborhood()).isEqualTo("Hamra");
+        }
+
+        /** Only a client that knows the field exists can clear it — by saying so. */
+        @Test
+        void an_empty_one_clears_it() {
+            store.setNeighborhood("Mar Mikhael");
+
+            service.update(store.getId(), MERCHANT, profile(""));
+            assertThat(store.getNeighborhood()).isNull();
+
+            store.setNeighborhood("Mar Mikhael");
+            service.update(store.getId(), MERCHANT, profile("   "));
+            assertThat(store.getNeighborhood()).isNull();
+        }
+
+        /** Another merchant's save is refused before anything on the shop is touched. */
+        @Test
+        void another_merchants_save_is_refused_and_changes_nothing() {
+            store.setNeighborhood("Mar Mikhael");
+
+            assertThatThrownBy(() -> service.update(store.getId(), "someone-else", profile("Hamra")))
+                    .isInstanceOf(StoreService.StoreNotFoundException.class);
+
+            assertThat(store.getNeighborhood()).isEqualTo("Mar Mikhael");
+        }
+
+        /** The trust badge is not on this form at all, so no profile save can grant or drop it. */
+        @Test
+        void a_profile_save_neither_grants_nor_withdraws_the_trust_badge() {
+            store.setVerifiedLocal(true);
+
+            service.update(store.getId(), MERCHANT, profile("Hamra"));
+
+            assertThat(store.isVerifiedLocal()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("the trust badge")
+    class TrustBadge {
+
+        private static final String BACKOFFICE = "backoffice-sub";
+
+        /**
+         * No ownership rule — this is the one write on a shop that is never the merchant's, and who
+         * may make it is the controller's role check (pinned in StoreVerifiedLocalAccessTest).
+         */
+        @Test
+        void backoffice_grants_and_withdraws_it_on_a_shop_it_does_not_own() {
+            when(stores.findById(store.getId())).thenReturn(Optional.of(store));
+
+            assertThat(service.setVerifiedLocal(store.getId(), BACKOFFICE, true)
+                    .store().isVerifiedLocal()).isTrue();
+            assertThat(service.setVerifiedLocal(store.getId(), BACKOFFICE, false)
+                    .store().isVerifiedLocal()).isFalse();
+        }
+
+        @Test
+        void an_id_that_names_no_shop_is_not_found() {
+            UUID nothing = UUID.randomUUID();
+            when(stores.findById(nothing)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.setVerifiedLocal(nothing, BACKOFFICE, true))
+                    .isInstanceOf(StoreService.StoreNotFoundException.class);
         }
     }
 

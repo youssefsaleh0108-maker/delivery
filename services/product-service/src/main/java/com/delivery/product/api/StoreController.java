@@ -48,6 +48,7 @@ import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
+import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.Store;
@@ -392,6 +393,25 @@ public class StoreController {
         // exactly as /nearby's does. As two loose doubles an impossible coordinate was answered
         // rather than refused.
         return Map.of("canDeliver", storeService.deliversTo(id, latitude, longitude));
+    }
+
+    /**
+     * Backoffice grants or withdraws the dekkane "Trusted Local" badge.
+     *
+     * <p>BACKOFFICE and nobody else — not even the shop's own merchant, and that is the point of the
+     * badge: it is a claim the platform makes to the shop's neighbours, and one the shop could award
+     * itself would certify nothing. V23 made the column deliberately not merchant-writable and this
+     * is the only road to it; it is not on {@link #update}'s form, so no profile save can touch it.
+     *
+     * <p>Any store, in any status. Vetting a shop before it is listed is exactly when Backoffice
+     * would do it, and granting a badge to a draft shows it to nobody until the shop publishes.
+     */
+    @PutMapping("/{id}/verified-local")
+    @PreAuthorize("hasRole('BACKOFFICE')")
+    public StoreResponse setVerifiedLocal(@PathVariable UUID id,
+                                          @Valid @RequestBody VerifiedLocalRequest request) {
+        return toResponse(storeService.setVerifiedLocal(
+                id, CurrentUser.requireId(), request.verified()), Set.of());
     }
 
     /** The merchant declares what the lights are doing — the power chip's one source of truth. */

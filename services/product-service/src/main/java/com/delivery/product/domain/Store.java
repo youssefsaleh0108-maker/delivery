@@ -539,12 +539,33 @@ public class Store {
         return neighborhood;
     }
 
+    /**
+     * Declares the shop's district, or clears it.
+     *
+     * <p>Trimmed, and blank stored as null. The district list is the distinct values of this column
+     * and every filter on it is an exact match, so " Hamra" and "Hamra" would otherwise be two
+     * districts in the list and two different answers to one question.
+     */
     public void setNeighborhood(String neighborhood) {
-        this.neighborhood = neighborhood;
+        this.neighborhood = neighborhood == null || neighborhood.isBlank()
+                ? null
+                : neighborhood.trim();
     }
 
     public boolean isVerifiedLocal() {
         return verifiedLocal;
+    }
+
+    /**
+     * Grants or withdraws the dekkane trust badge.
+     *
+     * <p>Only ever called on Backoffice's behalf, and deliberately nowhere near
+     * {@link #updateProfile}: a badge the shop could award itself would certify nothing. V23 made the
+     * column not merchant-writable and, until this existed, nothing could write it at all — so the
+     * badge the customer app draws for it could never appear.
+     */
+    public void setVerifiedLocal(boolean verified) {
+        this.verifiedLocal = verified;
     }
 
     public Integer getDeliveryRadiusMetres() {
