@@ -7272,4 +7272,459 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get carrCashNavLabel => 'Reconciliation';
+
+  @override
+  String get carrCashTitle => 'Rider Cash Reconciliation';
+
+  @override
+  String get carrCashSubtitle =>
+      'Match the cash your riders collected against what they hand over';
+
+  @override
+  String carrCashTodayChip(String date) {
+    return 'Today: $date';
+  }
+
+  @override
+  String carrCashDayChip(String date) {
+    return 'Day: $date';
+  }
+
+  @override
+  String get carrCashPickDay => 'Which day?';
+
+  @override
+  String get carrCashKpiWithRiders => 'With your riders';
+
+  @override
+  String carrCashKpiWithRidersNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Held by $count riders',
+      one: 'Held by 1 rider',
+      zero: 'Nobody is holding cash',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiHandedOver => 'Handed over';
+
+  @override
+  String carrCashKpiHandedOverNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hand-overs on this day',
+      one: '1 hand-over on this day',
+      zero: 'No hand-overs on this day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOwed => 'Owed to YouDrop';
+
+  @override
+  String carrCashKpiOwedNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Held by your company · $count orders',
+      one: 'Held by your company · 1 order',
+      zero: 'Your company holds no cash',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOverdue => 'Overdue';
+
+  @override
+  String carrCashKpiOverdueNote(int count, int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count riders past the ${hours}h limit',
+      one: '1 rider past the ${hours}h limit',
+      zero: 'Nobody past the ${hours}h limit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String carrCashOverdueSoftNote(int hours) {
+    return 'Some cash has been held for longer than $hours hours. Ask those riders to hand it over.';
+  }
+
+  @override
+  String get carrCashBalancesTitle => 'Rider balances';
+
+  @override
+  String get carrCashColRider => 'Rider';
+
+  @override
+  String get carrCashColCollected => 'Collected';
+
+  @override
+  String get carrCashColEarned => 'Fees earned for you';
+
+  @override
+  String get carrCashColHolding => 'Cash to hand over';
+
+  @override
+  String get carrCashColLastHandover => 'Last hand-over';
+
+  @override
+  String get carrCashColStatus => 'Status';
+
+  @override
+  String get carrCashColActions => 'Actions';
+
+  @override
+  String get carrCashStatusHolding => 'Holding cash';
+
+  @override
+  String carrCashStatusOverdue(int hours) {
+    return 'Overdue ${hours}h';
+  }
+
+  @override
+  String get carrCashStatusSettled => 'Settled';
+
+  @override
+  String get carrCashActionSettle => 'Settle';
+
+  @override
+  String get carrCashActionView => 'View';
+
+  @override
+  String get carrCashNever => 'Never';
+
+  @override
+  String get carrCashToday => 'Today';
+
+  @override
+  String get carrCashYesterday => 'Yesterday';
+
+  @override
+  String carrCashDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: '1 day ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashNobodyYet =>
+      'None of your riders has carried cash for your company yet.';
+
+  @override
+  String get carrCashTableNote =>
+      'Collected and fees are for the day chosen. Cash to hand over is everything still held, whenever it was collected. What your company pays its riders is agreed between you and is not shown here.';
+
+  @override
+  String carrCashSelectRider(String name) {
+    return 'Select $name';
+  }
+
+  @override
+  String get carrCashSelectAll => 'Select every rider holding cash';
+
+  @override
+  String get carrCashSettleSelected => 'Settle selected';
+
+  @override
+  String carrCashSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected',
+      one: '1 selected',
+      zero: 'None selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashExportCsv => 'Export CSV';
+
+  @override
+  String carrCashExported(String file) {
+    return 'Saved $file';
+  }
+
+  @override
+  String get carrCashCsvRiderId => 'Rider ID';
+
+  @override
+  String get carrCashCsvOrdersHeld => 'Orders held';
+
+  @override
+  String get carrCashCsvOldest => 'Oldest collection';
+
+  @override
+  String carrCashOrderCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count orders',
+      one: '1 order',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmTitle => 'Record a hand-over';
+
+  @override
+  String carrCashConfirmBody(String name, String amount, String orders) {
+    return 'Confirm $name has handed your company $amount in cash, for $orders. This clears their whole balance with you and cannot be undone.';
+  }
+
+  @override
+  String carrCashConfirmBulkTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Record $count hand-overs',
+      one: 'Record 1 hand-over',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmBulkBody =>
+      'Confirm each of these riders has handed your company the cash shown. Every balance is cleared in full and none of it can be undone.';
+
+  @override
+  String carrCashConfirmBulkTotal(String amount) {
+    return 'Total $amount';
+  }
+
+  @override
+  String get carrCashConfirmYes => 'Yes, record it';
+
+  @override
+  String get carrCashMethodLabel => 'How it was handed over';
+
+  @override
+  String get carrCashMethodCash => 'Cash hand-over';
+
+  @override
+  String get carrCashMethodBank => 'Bank deposit';
+
+  @override
+  String get carrCashMethodWallet => 'Money transfer app';
+
+  @override
+  String get carrCashNoteLabel => 'Note (optional)';
+
+  @override
+  String get carrCashNoteHint =>
+      'Anything the hub should remember, like a bag number';
+
+  @override
+  String carrCashRecorded(String amount, String name) {
+    return 'Recorded $amount from $name.';
+  }
+
+  @override
+  String get carrCashReplayed =>
+      'That hand-over was already recorded, so nothing was recorded twice.';
+
+  @override
+  String carrCashAmountChanged(String name, String amount) {
+    return '$name is now holding $amount, not the amount you confirmed. Nothing was recorded; count it again.';
+  }
+
+  @override
+  String carrCashAmountChangedUnknown(String name) {
+    return '$name\'s balance changed since you opened the page. Nothing was recorded; reload and count it again.';
+  }
+
+  @override
+  String get carrCashRecordFailed =>
+      'Could not record it. Nothing was changed; try again.';
+
+  @override
+  String carrCashBulkDone(int done, int total) {
+    return 'Recorded $done of $total.';
+  }
+
+  @override
+  String get carrCashLoadFailed =>
+      'Your company\'s cash could not be loaded just now. Nothing is wrong with your records; try again.';
+
+  @override
+  String get carrCashTryAgain => 'Try again';
+
+  @override
+  String get carrCashRiderTitle => 'Rider Settlement Detail';
+
+  @override
+  String carrCashRiderSubtitle(String name) {
+    return 'Reconcile the cash bag with $name';
+  }
+
+  @override
+  String get carrCashBack => 'Back to reconciliation';
+
+  @override
+  String get carrCashBadgeUnsettled => 'Unsettled balance';
+
+  @override
+  String carrCashRiderSince(String date) {
+    return 'Carrying cash for you since $date';
+  }
+
+  @override
+  String carrCashRatings(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '($count ratings)',
+      one: '(1 rating)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashRatingNew => 'New rider';
+
+  @override
+  String get carrCashHeldTitle => 'Unsettled deliveries';
+
+  @override
+  String get carrCashColOrder => 'Order #';
+
+  @override
+  String get carrCashColCash => 'Total cash';
+
+  @override
+  String get carrCashColFee => 'Fee earned for you';
+
+  @override
+  String get carrCashHeldEmpty =>
+      'Nothing to settle: this rider is holding none of your company\'s cash.';
+
+  @override
+  String get carrCashSummaryTitle => 'Reconciliation summary';
+
+  @override
+  String get carrCashSummaryCollected => 'Cash collected, not yet handed over';
+
+  @override
+  String get carrCashSummaryFees => 'Fees earned for your company';
+
+  @override
+  String get carrCashSummaryDue => 'Cash due to your company';
+
+  @override
+  String get carrCashSummaryKeeps =>
+      'The rider keeps none of this cash. What your company pays them is agreed between you, and the fees above are paid to your company by YouDrop, not taken from the cash.';
+
+  @override
+  String get carrCashConfirmSettlement => 'Confirm settlement';
+
+  @override
+  String get carrCashNothingToSettle => 'Nothing to settle';
+
+  @override
+  String get carrCashHistoryTitle => 'Hand-over history';
+
+  @override
+  String carrCashHistoryItem(String date) {
+    return 'Hand-over · $date';
+  }
+
+  @override
+  String carrCashHistoryDetail(String amount, String orders, String name) {
+    return '$amount for $orders, recorded by $name';
+  }
+
+  @override
+  String carrCashHistoryDetailAnon(String amount, String orders) {
+    return '$amount for $orders';
+  }
+
+  @override
+  String get carrCashHistoryEmpty => 'No hand-overs recorded yet.';
+
+  @override
+  String get carrCashRiderNotFound =>
+      'This rider has never worked for your company.';
+
+  @override
+  String get carrCashBoTitle => 'Held by delivery companies';
+
+  @override
+  String get carrCashBoOwes => 'Owes the platform';
+
+  @override
+  String carrCashBoWithRiders(String amount) {
+    return 'With its riders: $amount';
+  }
+
+  @override
+  String carrCashBoLastPaid(String when) {
+    return 'Last paid $when';
+  }
+
+  @override
+  String get carrCashBoNeverPaid => 'Never paid';
+
+  @override
+  String get carrCashBoHoldsNothing => 'Holds nothing itself yet';
+
+  @override
+  String get carrCashBoRecordPayment => 'Record payment';
+
+  @override
+  String get carrCashBoConfirmTitle => 'Record a payment';
+
+  @override
+  String carrCashBoConfirmBody(String company, String amount, String orders) {
+    return 'Confirm $company has paid the platform $amount, covering $orders. This clears everything the company holds and cannot be undone.';
+  }
+
+  @override
+  String get carrCashBoConfirmYes => 'Yes, they paid';
+
+  @override
+  String carrCashBoRecorded(String amount, String company) {
+    return 'Recorded $amount from $company.';
+  }
+
+  @override
+  String get carrCashBoNothing =>
+      'Nothing was outstanding; somebody may have recorded this already.';
+
+  @override
+  String carrCashBoAmountChanged(String company, String amount) {
+    return '$company now holds $amount, not the amount you confirmed. Nothing was recorded.';
+  }
+
+  @override
+  String carrCashBoFailed(String error) {
+    return 'Could not record it: $error';
+  }
+
+  @override
+  String get carrCashBoOverdueNote =>
+      'Some cash has been out longer than the platform\'s limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.';
+
+  @override
+  String get carrCashBoLoadFailed =>
+      'What delivery companies hold could not be loaded just now. The rest of this page is unaffected.';
+
+  @override
+  String get carrCashBoMethodLabel => 'How it was paid (optional)';
 }

@@ -3460,5 +3460,374 @@
   "accountAlreadyPartner": "This account is already a YouDrop partner, and an account can hold only one partner role.",
   "accountOtherApplication": "This account already has an application for another role, and an account can apply for only one.",
   "accountEmailUnverified": "Your account's email address hasn't been verified, so we can't take an application on it yet.",
-  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again."
+  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again.",
+  "carrCashNavLabel": "Reconciliation",
+  "carrCashTitle": "Rider Cash Reconciliation",
+  "carrCashSubtitle": "Match the cash your riders collected against what they hand over",
+  "carrCashTodayChip": "Today: {date}",
+  "@carrCashTodayChip": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashDayChip": "Day: {date}",
+  "@carrCashDayChip": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashPickDay": "Which day?",
+  "carrCashKpiWithRiders": "With your riders",
+  "carrCashKpiWithRidersNote": "{count, plural, =0{Nobody is holding cash} =1{Held by 1 rider} other{Held by {count} riders}}",
+  "@carrCashKpiWithRidersNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashKpiHandedOver": "Handed over",
+  "carrCashKpiHandedOverNote": "{count, plural, =0{No hand-overs on this day} =1{1 hand-over on this day} other{{count} hand-overs on this day}}",
+  "@carrCashKpiHandedOverNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashKpiOwed": "Owed to YouDrop",
+  "carrCashKpiOwedNote": "{count, plural, =0{Your company holds no cash} =1{Held by your company · 1 order} other{Held by your company · {count} orders}}",
+  "@carrCashKpiOwedNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashKpiOverdue": "Overdue",
+  "carrCashKpiOverdueNote": "{count, plural, =0{Nobody past the {hours}h limit} =1{1 rider past the {hours}h limit} other{{count} riders past the {hours}h limit}}",
+  "@carrCashKpiOverdueNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashOverdueSoftNote": "Some cash has been held for longer than {hours} hours. Ask those riders to hand it over.",
+  "@carrCashOverdueSoftNote": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashBalancesTitle": "Rider balances",
+  "carrCashColRider": "Rider",
+  "carrCashColCollected": "Collected",
+  "carrCashColEarned": "Fees earned for you",
+  "carrCashColHolding": "Cash to hand over",
+  "carrCashColLastHandover": "Last hand-over",
+  "carrCashColStatus": "Status",
+  "carrCashColActions": "Actions",
+  "carrCashStatusHolding": "Holding cash",
+  "carrCashStatusOverdue": "Overdue {hours}h",
+  "@carrCashStatusOverdue": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashStatusSettled": "Settled",
+  "carrCashActionSettle": "Settle",
+  "carrCashActionView": "View",
+  "carrCashNever": "Never",
+  "carrCashToday": "Today",
+  "carrCashYesterday": "Yesterday",
+  "carrCashDaysAgo": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "@carrCashDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashNobodyYet": "None of your riders has carried cash for your company yet.",
+  "carrCashTableNote": "Collected and fees are for the day chosen. Cash to hand over is everything still held, whenever it was collected. What your company pays its riders is agreed between you and is not shown here.",
+  "carrCashSelectRider": "Select {name}",
+  "@carrCashSelectRider": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashSelectAll": "Select every rider holding cash",
+  "carrCashSettleSelected": "Settle selected",
+  "carrCashSelectedCount": "{count, plural, =0{None selected} =1{1 selected} other{{count} selected}}",
+  "@carrCashSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashExportCsv": "Export CSV",
+  "carrCashExported": "Saved {file}",
+  "@carrCashExported": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashCsvRiderId": "Rider ID",
+  "carrCashCsvOrdersHeld": "Orders held",
+  "carrCashCsvOldest": "Oldest collection",
+  "carrCashOrderCount": "{count, plural, =1{1 order} other{{count} orders}}",
+  "@carrCashOrderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashConfirmTitle": "Record a hand-over",
+  "carrCashConfirmBody": "Confirm {name} has handed your company {amount} in cash, for {orders}. This clears their whole balance with you and cannot be undone.",
+  "@carrCashConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashConfirmBulkTitle": "{count, plural, =1{Record 1 hand-over} other{Record {count} hand-overs}}",
+  "@carrCashConfirmBulkTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashConfirmBulkBody": "Confirm each of these riders has handed your company the cash shown. Every balance is cleared in full and none of it can be undone.",
+  "carrCashConfirmBulkTotal": "Total {amount}",
+  "@carrCashConfirmBulkTotal": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashConfirmYes": "Yes, record it",
+  "carrCashMethodLabel": "How it was handed over",
+  "carrCashMethodCash": "Cash hand-over",
+  "carrCashMethodBank": "Bank deposit",
+  "carrCashMethodWallet": "Money transfer app",
+  "carrCashNoteLabel": "Note (optional)",
+  "carrCashNoteHint": "Anything the hub should remember, like a bag number",
+  "carrCashRecorded": "Recorded {amount} from {name}.",
+  "@carrCashRecorded": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashReplayed": "That hand-over was already recorded, so nothing was recorded twice.",
+  "carrCashAmountChanged": "{name} is now holding {amount}, not the amount you confirmed. Nothing was recorded; count it again.",
+  "@carrCashAmountChanged": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashAmountChangedUnknown": "{name}'s balance changed since you opened the page. Nothing was recorded; reload and count it again.",
+  "@carrCashAmountChangedUnknown": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashRecordFailed": "Could not record it. Nothing was changed; try again.",
+  "carrCashBulkDone": "Recorded {done} of {total}.",
+  "@carrCashBulkDone": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashLoadFailed": "Your company's cash could not be loaded just now. Nothing is wrong with your records; try again.",
+  "carrCashTryAgain": "Try again",
+  "carrCashRiderTitle": "Rider Settlement Detail",
+  "carrCashRiderSubtitle": "Reconcile the cash bag with {name}",
+  "@carrCashRiderSubtitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBack": "Back to reconciliation",
+  "carrCashBadgeUnsettled": "Unsettled balance",
+  "carrCashRiderSince": "Carrying cash for you since {date}",
+  "@carrCashRiderSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashRatings": "{count, plural, =1{(1 rating)} other{({count} ratings)}}",
+  "@carrCashRatings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashRatingNew": "New rider",
+  "carrCashHeldTitle": "Unsettled deliveries",
+  "carrCashColOrder": "Order #",
+  "carrCashColCash": "Total cash",
+  "carrCashColFee": "Fee earned for you",
+  "carrCashHeldEmpty": "Nothing to settle: this rider is holding none of your company's cash.",
+  "carrCashSummaryTitle": "Reconciliation summary",
+  "carrCashSummaryCollected": "Cash collected, not yet handed over",
+  "carrCashSummaryFees": "Fees earned for your company",
+  "carrCashSummaryDue": "Cash due to your company",
+  "carrCashSummaryKeeps": "The rider keeps none of this cash. What your company pays them is agreed between you, and the fees above are paid to your company by YouDrop, not taken from the cash.",
+  "carrCashConfirmSettlement": "Confirm settlement",
+  "carrCashNothingToSettle": "Nothing to settle",
+  "carrCashHistoryTitle": "Hand-over history",
+  "carrCashHistoryItem": "Hand-over · {date}",
+  "@carrCashHistoryItem": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashHistoryDetail": "{amount} for {orders}, recorded by {name}",
+  "@carrCashHistoryDetail": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashHistoryDetailAnon": "{amount} for {orders}",
+  "@carrCashHistoryDetailAnon": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashHistoryEmpty": "No hand-overs recorded yet.",
+  "carrCashRiderNotFound": "This rider has never worked for your company.",
+  "carrCashBoTitle": "Held by delivery companies",
+  "carrCashBoOwes": "Owes the platform",
+  "carrCashBoWithRiders": "With its riders: {amount}",
+  "@carrCashBoWithRiders": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoLastPaid": "Last paid {when}",
+  "@carrCashBoLastPaid": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoNeverPaid": "Never paid",
+  "carrCashBoHoldsNothing": "Holds nothing itself yet",
+  "carrCashBoRecordPayment": "Record payment",
+  "carrCashBoConfirmTitle": "Record a payment",
+  "carrCashBoConfirmBody": "Confirm {company} has paid the platform {amount}, covering {orders}. This clears everything the company holds and cannot be undone.",
+  "@carrCashBoConfirmBody": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoConfirmYes": "Yes, they paid",
+  "carrCashBoRecorded": "Recorded {amount} from {company}.",
+  "@carrCashBoRecorded": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "company": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoNothing": "Nothing was outstanding; somebody may have recorded this already.",
+  "carrCashBoAmountChanged": "{company} now holds {amount}, not the amount you confirmed. Nothing was recorded.",
+  "@carrCashBoAmountChanged": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoFailed": "Could not record it: {error}",
+  "@carrCashBoFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoOverdueNote": "Some cash has been out longer than the platform's limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.",
+  "carrCashBoLoadFailed": "What delivery companies hold could not be loaded just now. The rest of this page is unaffected.",
+  "carrCashBoMethodLabel": "How it was paid (optional)"
 }

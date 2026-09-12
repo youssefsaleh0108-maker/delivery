@@ -7279,4 +7279,486 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get carrCashNavLabel => 'التسوية';
+
+  @override
+  String get carrCashTitle => 'تسوية نقد السائقين';
+
+  @override
+  String get carrCashSubtitle => 'طابِق النقد الذي جمعه سائقوك مع ما يسلّمونه';
+
+  @override
+  String carrCashTodayChip(String date) {
+    return 'اليوم: $date';
+  }
+
+  @override
+  String carrCashDayChip(String date) {
+    return 'يوم $date';
+  }
+
+  @override
+  String get carrCashPickDay => 'أيّ يوم؟';
+
+  @override
+  String get carrCashKpiWithRiders => 'لدى سائقيك';
+
+  @override
+  String carrCashKpiWithRidersNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مع $count سائق',
+      many: 'مع $count سائقاً',
+      few: 'مع $count سائقين',
+      two: 'مع سائقَين',
+      one: 'مع سائق واحد',
+      zero: 'لا أحد يحمل نقداً',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiHandedOver => 'تم تسليمه';
+
+  @override
+  String carrCashKpiHandedOverNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عملية تسليم في هذا اليوم',
+      many: '$count عملية تسليم في هذا اليوم',
+      few: '$count عمليات تسليم في هذا اليوم',
+      two: 'عمليتا تسليم في هذا اليوم',
+      one: 'عملية تسليم واحدة في هذا اليوم',
+      zero: 'لا عمليات تسليم في هذا اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOwed => 'مستحق لـ YouDrop';
+
+  @override
+  String carrCashKpiOwedNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بحوزة شركتك · $count طلب',
+      many: 'بحوزة شركتك · $count طلباً',
+      few: 'بحوزة شركتك · $count طلبات',
+      two: 'بحوزة شركتك · طلبان',
+      one: 'بحوزة شركتك · طلب واحد',
+      zero: 'لا تحتفظ شركتك بأي نقد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOverdue => 'متأخر';
+
+  @override
+  String carrCashKpiOverdueNote(int count, int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق تجاوزوا حدّ $hours ساعة',
+      many: '$count سائقاً تجاوزوا حدّ $hours ساعة',
+      few: '$count سائقين تجاوزوا حدّ $hours ساعة',
+      two: 'سائقان تجاوزا حدّ $hours ساعة',
+      one: 'سائق واحد تجاوز حدّ $hours ساعة',
+      zero: 'لا أحد تجاوز حدّ $hours ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String carrCashOverdueSoftNote(int hours) {
+    return 'بعض النقد محتفظ به منذ أكثر من $hours ساعة. اطلب من هؤلاء السائقين تسليمه.';
+  }
+
+  @override
+  String get carrCashBalancesTitle => 'أرصدة السائقين';
+
+  @override
+  String get carrCashColRider => 'السائق';
+
+  @override
+  String get carrCashColCollected => 'المُحصَّل';
+
+  @override
+  String get carrCashColEarned => 'رسوم مكتسبة لك';
+
+  @override
+  String get carrCashColHolding => 'نقد للتسليم';
+
+  @override
+  String get carrCashColLastHandover => 'آخر تسليم';
+
+  @override
+  String get carrCashColStatus => 'الحالة';
+
+  @override
+  String get carrCashColActions => 'الإجراءات';
+
+  @override
+  String get carrCashStatusHolding => 'يحمل نقداً';
+
+  @override
+  String carrCashStatusOverdue(int hours) {
+    return 'متأخر $hours ساعة';
+  }
+
+  @override
+  String get carrCashStatusSettled => 'مُسوّى';
+
+  @override
+  String get carrCashActionSettle => 'تسوية';
+
+  @override
+  String get carrCashActionView => 'عرض';
+
+  @override
+  String get carrCashNever => 'أبداً';
+
+  @override
+  String get carrCashToday => 'اليوم';
+
+  @override
+  String get carrCashYesterday => 'أمس';
+
+  @override
+  String carrCashDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'منذ $count يوم',
+      many: 'منذ $count يوماً',
+      few: 'منذ $count أيام',
+      two: 'منذ يومين',
+      one: 'منذ يوم',
+      zero: 'اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashNobodyYet => 'لم يحمل أيّ من سائقيك نقداً لشركتك بعد.';
+
+  @override
+  String get carrCashTableNote =>
+      'المُحصَّل والرسوم تخصّ اليوم المختار. أمّا النقد للتسليم فهو كل ما لا يزال بحوزة السائق أيّاً كان تاريخ تحصيله. ما تدفعه شركتك لسائقيها متّفق عليه بينكم ولا يظهر هنا.';
+
+  @override
+  String carrCashSelectRider(String name) {
+    return 'اختر $name';
+  }
+
+  @override
+  String get carrCashSelectAll => 'اختر كل السائقين الذين يحملون نقداً';
+
+  @override
+  String get carrCashSettleSelected => 'تسوية المحدَّد';
+
+  @override
+  String carrCashSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count محدَّد',
+      many: '$count محدَّداً',
+      few: '$count محدَّدين',
+      two: 'محدَّدان',
+      one: 'محدَّد واحد',
+      zero: 'لم يُحدَّد أحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashExportCsv => 'تصدير CSV';
+
+  @override
+  String carrCashExported(String file) {
+    return 'تم حفظ $file';
+  }
+
+  @override
+  String get carrCashCsvRiderId => 'معرّف السائق';
+
+  @override
+  String get carrCashCsvOrdersHeld => 'الطلبات المحتفظ بها';
+
+  @override
+  String get carrCashCsvOldest => 'أقدم تحصيل';
+
+  @override
+  String carrCashOrderCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count طلب',
+      many: '$count طلباً',
+      few: '$count طلبات',
+      two: 'طلبان',
+      one: 'طلب واحد',
+      zero: 'لا طلبات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmTitle => 'تسجيل عملية تسليم';
+
+  @override
+  String carrCashConfirmBody(String name, String amount, String orders) {
+    return 'أكّد أنّ $name سلّم شركتك $amount نقداً عن $orders. هذا يُصفّي رصيده معك بالكامل ولا يمكن التراجع عنه.';
+  }
+
+  @override
+  String carrCashConfirmBulkTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تسجيل $count عملية تسليم',
+      many: 'تسجيل $count عملية تسليم',
+      few: 'تسجيل $count عمليات تسليم',
+      two: 'تسجيل عمليتي تسليم',
+      one: 'تسجيل عملية تسليم واحدة',
+      zero: 'لا عمليات تسليم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmBulkBody =>
+      'أكّد أنّ كل واحد من هؤلاء السائقين سلّم شركتك المبلغ الظاهر. يُصفّى كل رصيد بالكامل ولا يمكن التراجع عن أيّ منها.';
+
+  @override
+  String carrCashConfirmBulkTotal(String amount) {
+    return 'المجموع $amount';
+  }
+
+  @override
+  String get carrCashConfirmYes => 'نعم، سجّلها';
+
+  @override
+  String get carrCashMethodLabel => 'طريقة التسليم';
+
+  @override
+  String get carrCashMethodCash => 'تسليم نقدي';
+
+  @override
+  String get carrCashMethodBank => 'إيداع مصرفي';
+
+  @override
+  String get carrCashMethodWallet => 'تطبيق تحويل أموال';
+
+  @override
+  String get carrCashNoteLabel => 'ملاحظة (اختيارية)';
+
+  @override
+  String get carrCashNoteHint => 'أيّ شيء يجب أن يتذكّره المركز، مثل رقم الكيس';
+
+  @override
+  String carrCashRecorded(String amount, String name) {
+    return 'تم تسجيل $amount من $name.';
+  }
+
+  @override
+  String get carrCashReplayed =>
+      'هذه العملية مسجّلة مسبقاً، لذا لم يُسجَّل شيء مرتين.';
+
+  @override
+  String carrCashAmountChanged(String name, String amount) {
+    return 'يحمل $name الآن $amount، وليس المبلغ الذي أكّدته. لم يُسجَّل شيء؛ أعد العدّ.';
+  }
+
+  @override
+  String carrCashAmountChangedUnknown(String name) {
+    return 'تغيّر رصيد $name منذ فتحت الصفحة. لم يُسجَّل شيء؛ أعد التحميل ثم العدّ.';
+  }
+
+  @override
+  String get carrCashRecordFailed =>
+      'تعذّر التسجيل. لم يتغيّر شيء؛ حاول مجدداً.';
+
+  @override
+  String carrCashBulkDone(int done, int total) {
+    return 'تم تسجيل $done من $total.';
+  }
+
+  @override
+  String get carrCashLoadFailed =>
+      'تعذّر تحميل نقد شركتك الآن. لا مشكلة في سجلاتك؛ حاول مجدداً.';
+
+  @override
+  String get carrCashTryAgain => 'حاول مجدداً';
+
+  @override
+  String get carrCashRiderTitle => 'تفاصيل تسوية السائق';
+
+  @override
+  String carrCashRiderSubtitle(String name) {
+    return 'طابِق كيس النقد مع $name';
+  }
+
+  @override
+  String get carrCashBack => 'العودة إلى التسوية';
+
+  @override
+  String get carrCashBadgeUnsettled => 'رصيد غير مُسوّى';
+
+  @override
+  String carrCashRiderSince(String date) {
+    return 'يحمل نقداً لشركتك منذ $date';
+  }
+
+  @override
+  String carrCashRatings(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '($count تقييم)',
+      many: '($count تقييماً)',
+      few: '($count تقييمات)',
+      two: '(تقييمان)',
+      one: '(تقييم واحد)',
+      zero: '(لا تقييمات)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashRatingNew => 'سائق جديد';
+
+  @override
+  String get carrCashHeldTitle => 'توصيلات غير مُسوّاة';
+
+  @override
+  String get carrCashColOrder => 'رقم الطلب';
+
+  @override
+  String get carrCashColCash => 'إجمالي النقد';
+
+  @override
+  String get carrCashColFee => 'الرسم المكتسب لك';
+
+  @override
+  String get carrCashHeldEmpty =>
+      'لا شيء للتسوية: هذا السائق لا يحمل أيّ نقد لشركتك.';
+
+  @override
+  String get carrCashSummaryTitle => 'ملخّص التسوية';
+
+  @override
+  String get carrCashSummaryCollected => 'نقد مُحصَّل لم يُسلَّم بعد';
+
+  @override
+  String get carrCashSummaryFees => 'رسوم مكتسبة لشركتك';
+
+  @override
+  String get carrCashSummaryDue => 'نقد مستحق لشركتك';
+
+  @override
+  String get carrCashSummaryKeeps =>
+      'لا يحتفظ السائق بأيّ جزء من هذا النقد. ما تدفعه شركتك له متّفق عليه بينكما، والرسوم أعلاه تدفعها YouDrop لشركتك ولا تُقتطع من النقد.';
+
+  @override
+  String get carrCashConfirmSettlement => 'تأكيد التسوية';
+
+  @override
+  String get carrCashNothingToSettle => 'لا شيء للتسوية';
+
+  @override
+  String get carrCashHistoryTitle => 'سجلّ التسليمات';
+
+  @override
+  String carrCashHistoryItem(String date) {
+    return 'تسليم · $date';
+  }
+
+  @override
+  String carrCashHistoryDetail(String amount, String orders, String name) {
+    return '$amount عن $orders، سجّله $name';
+  }
+
+  @override
+  String carrCashHistoryDetailAnon(String amount, String orders) {
+    return '$amount عن $orders';
+  }
+
+  @override
+  String get carrCashHistoryEmpty => 'لم تُسجَّل أيّ عمليات تسليم بعد.';
+
+  @override
+  String get carrCashRiderNotFound => 'لم يعمل هذا السائق لدى شركتك من قبل.';
+
+  @override
+  String get carrCashBoTitle => 'بحوزة شركات التوصيل';
+
+  @override
+  String get carrCashBoOwes => 'مستحق للمنصة';
+
+  @override
+  String carrCashBoWithRiders(String amount) {
+    return 'لدى سائقيها: $amount';
+  }
+
+  @override
+  String carrCashBoLastPaid(String when) {
+    return 'آخر دفعة $when';
+  }
+
+  @override
+  String get carrCashBoNeverPaid => 'لم تدفع بعد';
+
+  @override
+  String get carrCashBoHoldsNothing => 'لا تحتفظ بشيء بعد';
+
+  @override
+  String get carrCashBoRecordPayment => 'تسجيل دفعة';
+
+  @override
+  String get carrCashBoConfirmTitle => 'تسجيل دفعة';
+
+  @override
+  String carrCashBoConfirmBody(String company, String amount, String orders) {
+    return 'أكّد أنّ $company دفعت للمنصة $amount عن $orders. هذا يُصفّي كل ما تحتفظ به الشركة ولا يمكن التراجع عنه.';
+  }
+
+  @override
+  String get carrCashBoConfirmYes => 'نعم، تم الدفع';
+
+  @override
+  String carrCashBoRecorded(String amount, String company) {
+    return 'تم تسجيل $amount من $company.';
+  }
+
+  @override
+  String get carrCashBoNothing =>
+      'لم يكن هناك مبلغ مستحق؛ ربما سجّله أحدهم مسبقاً.';
+
+  @override
+  String carrCashBoAmountChanged(String company, String amount) {
+    return 'تحتفظ $company الآن بـ $amount، وليس المبلغ الذي أكّدته. لم يُسجَّل شيء.';
+  }
+
+  @override
+  String carrCashBoFailed(String error) {
+    return 'تعذّر التسجيل: $error';
+  }
+
+  @override
+  String get carrCashBoOverdueNote =>
+      'بعض النقد لم يُسلَّم منذ مدة تتجاوز الحدّ الذي تعتمده المنصة. لا خطأ في السجلات: هذا مال لم يصل إلى المصرف بعد.';
+
+  @override
+  String get carrCashBoLoadFailed =>
+      'تعذّر تحميل ما تحتفظ به شركات التوصيل حالياً. بقية هذه الصفحة غير متأثرة.';
+
+  @override
+  String get carrCashBoMethodLabel => 'طريقة الدفع (اختياري)';
 }
