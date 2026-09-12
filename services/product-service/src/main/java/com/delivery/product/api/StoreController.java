@@ -102,6 +102,14 @@ public class StoreController {
      */
     static final int MAX_NEARBY_CANDIDATES = 500;
 
+    /**
+     * The widest "new on the platform" window the nearby search will apply: a year.
+     *
+     * <p>Past that "new" has stopped meaning anything, and a client asking for more is asking for
+     * every shop, which a year's window already very nearly is.
+     */
+    static final int MAX_NEW_SINCE_DAYS = 365;
+
     private final StoreService storeService;
     private final CatalogService catalog;
     private final ProductImageService images;
@@ -180,6 +188,15 @@ public class StoreController {
             @RequestParam BigDecimal latitude,
             @RequestParam BigDecimal longitude,
             @RequestParam(defaultValue = "5000") int radiusMetres,
+            // The neighbourhood browse's chips. Each is documented where it is applied — see
+            // StoreService.NearbyFilters — because what a filter MEANS is a service rule, and the
+            // one worth reading is powerStatus: what the lights are doing now, not what the shop
+            // owns.
+            @RequestParam(defaultValue = "false") boolean openNow,
+            @RequestParam(required = false) Store.PowerStatus powerStatus,
+            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) Integer newSinceDays,
+            @RequestParam(defaultValue = "false") boolean verifiedLocal,
             @PageableDefault(size = 20) Pageable pageable) {
 
         // Built here rather than passed on as two loose numbers, so an out-of-range or (0, 0)
@@ -190,8 +207,19 @@ public class StoreController {
         int radius = Math.min(Math.max(radiusMetres, MIN_NEARBY_RADIUS_METRES),
                 MAX_NEARBY_RADIUS_METRES);
 
+        StoreService.NearbyFilters filters = new StoreService.NearbyFilters(
+                openNow,
+                powerStatus,
+                neighborhood,
+                // Clamped like the radius, and for the same reason: zero or a negative number of
+                // days is a client bug with no sensible answer, and ten thousand days is a client
+                // asking for "every shop", which the widest window genuinely answers.
+                newSinceDays == null ? null
+                        : Math.min(Math.max(newSinceDays, 1), MAX_NEW_SINCE_DAYS),
+                verifiedLocal);
+
         Page<StoreService.NearbyStoreView> page =
-                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, pageable);
+                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, filters, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();

@@ -1,7 +1,10 @@
 package com.delivery.product.service;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,12 +23,14 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.ProductRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreFavoriteRepository;
+import com.delivery.product.domain.StoreHours;
 import com.delivery.product.domain.StoreOfferRepository;
 import com.delivery.product.domain.StoreRepository;
 
@@ -89,12 +94,35 @@ class NearbyStoreSearchTest {
         });
     }
 
-    /** Registers a shop at a real place, and returns it so a test can name it in an assertion. */
+    /**
+     * Registers a listed, open shop at a real place, and returns it so a test can name it.
+     *
+     * <p>Published, with a whole week of all-day hours. These used to be left as constructed — DRAFT
+     * — which the real candidate query never returns; the stub below hands back whatever is in the
+     * world, so the service now has to be the thing that refuses a draft, and a fixture that is
+     * itself a draft would be refused with it.
+     */
     private Store shopAt(String name, double latitude, double longitude) {
+        Store store = draftAt(name, latitude, longitude);
+        store.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+        store.publish();
+        return store;
+    }
+
+    /** A shop created and pinned but never published — what every store is before it lists. */
+    private Store draftAt(String name, double latitude, double longitude) {
         Store store = new Store("merchant-1", name, Store.Vertical.RESTAURANT);
         store.pinAt(GeoPoint.of(latitude, longitude));
         world.put(store.getId(), store);
         return store;
+    }
+
+    private static List<StoreHours> everyDay(LocalTime opens, LocalTime closes) {
+        List<StoreHours> week = new ArrayList<>();
+        for (DayOfWeek day : DayOfWeek.values()) {
+            week.add(new StoreHours(day, opens, closes));
+        }
+        return week;
     }
 
     private Store shopWithNoPin(String name) {
@@ -221,6 +249,202 @@ class NearbyStoreSearchTest {
             moving.clearPin();
 
             assertThat(namesNear(10_000)).containsExactly("Downtown Grill");
+        }
+    }
+
+    @Nested
+    @DisplayName("shops that are not listed")
+    class Unlisted {
+
+        /**
+         * The candidate query filters on ACTIVE, and the rows are then read again by id — so a shop
+         * suspended between the two used to come back on the strength of the status it had a moment
+         * earlier. The stub here returns every shop in the world, drafts included, which is exactly
+         * the gap: the service must refuse them itself.
+         */
+        @Test
+        void a_suspended_shop_never_appears() {
+            shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            Store shut = shopAt("Downtown Grill", 33.895800d, 35.500900d);
+            shut.suspend();
+
+            assertThat(namesNear(10_000)).containsExactly("Corner Cafe");
+        }
+
+        @Test
+        void a_draft_shop_never_appears() {
+            shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            draftAt("Not Open Yet", 33.895800d, 35.500900d);
+
+            assertThat(namesNear(10_000)).containsExactly("Corner Cafe");
+        }
+    }
+
+    @Nested
+    @DisplayName("the neighbourhood browse's filters")
+    class Filters {
+
+        private static final Instant NOW = Instant.parse("2026-08-27T12:00:00Z");
+
+        private List<String> namesNear(StoreService.NearbyFilters filters) {
+            return service.nearby(CUSTOMER, 10_000, 500, filters, PageRequest.of(0, 20))
+                    .getContent().stream().map(n -> n.store().store().getName()).toList();
+        }
+
+        private static StoreService.NearbyFilters openNow() {
+            return new StoreService.NearbyFilters(true, null, null, null, false);
+        }
+
+        private static StoreService.NearbyFilters power(Store.PowerStatus status) {
+            return new StoreService.NearbyFilters(false, status, null, null, false);
+        }
+
+        private static StoreService.NearbyFilters district(String neighborhood) {
+            return new StoreService.NearbyFilters(false, null, neighborhood, null, false);
+        }
+
+        private static StoreService.NearbyFilters newWithin(int days) {
+            return new StoreService.NearbyFilters(false, null, null, days, false);
+        }
+
+        private static StoreService.NearbyFilters verifiedOnly() {
+            return new StoreService.NearbyFilters(false, null, null, null, true);
+        }
+
+        /** Stands in for the column default: a shop joined at a known instant. */
+        private static void joined(Store store, Instant at) {
+            ReflectionTestUtils.setField(store, "createdAt", at);
+        }
+
+        @Test
+        void no_filter_is_the_plain_search() {
+            shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            shopAt("Downtown Grill", 33.895800d, 35.500900d);
+
+            assertThat(namesNear(StoreService.NearbyFilters.NONE))
+                    .containsExactly("Corner Cafe", "Downtown Grill");
+        }
+
+        /**
+         * "Open now" asks what a customer can buy from. A shop that is behind on orders, or about to
+         * close, still takes an order; one outside its hours does not.
+         */
+        @Test
+        void open_now_drops_a_closed_shop_and_keeps_busy_and_closing_soon() {
+            shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            Store shut = shopAt("Shut For The Day", 33.899000d, 35.483000d);
+            shut.replaceHours(everyDay(LocalTime.of(6, 0), LocalTime.of(7, 0)));
+            Store busy = shopAt("Behind On Orders", 33.895800d, 35.500900d);
+            busy.markBusyUntil(NOW.plusSeconds(1800));
+            Store closing = shopAt("Closing Soon", 33.888000d, 35.531000d);
+            closing.replaceHours(everyDay(LocalTime.of(11, 0), LocalTime.of(12, 20)));
+
+            assertThat(namesNear(openNow()))
+                    .containsExactly("Corner Cafe", "Behind On Orders", "Closing Soon");
+        }
+
+        /**
+         * What the lights are doing now. A shop on mains is left out of a GENERATOR filter even
+         * though it may well own one — which is why the client must not label this "has a
+         * generator".
+         */
+        @Test
+        void power_status_is_an_exact_match_on_what_was_declared() {
+            Store generator = shopAt("On The Generator", 33.900800d, 35.482900d);
+            generator.declarePower(Store.PowerStatus.GENERATOR, null);
+            Store mains = shopAt("On Mains", 33.895800d, 35.500900d);
+            mains.declarePower(Store.PowerStatus.MAINS, null);
+            shopAt("Never Said", 33.888000d, 35.531000d);
+
+            assertThat(namesNear(power(Store.PowerStatus.GENERATOR)))
+                    .containsExactly("On The Generator");
+        }
+
+        @Test
+        void neighbourhood_is_an_exact_match_on_the_declared_district() {
+            Store hamra = shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            hamra.setNeighborhood("Hamra");
+            Store downtown = shopAt("Downtown Grill", 33.895800d, 35.500900d);
+            downtown.setNeighborhood("Downtown");
+            shopAt("No District", 33.888000d, 35.531000d);
+
+            assertThat(namesNear(district("Hamra"))).containsExactly("Corner Cafe");
+            // Trimmed on the way in, as the district is when it is stored.
+            assertThat(namesNear(district("  Hamra "))).containsExactly("Corner Cafe");
+            // Blank is no filter at all rather than "shops with a blank district".
+            assertThat(namesNear(district("  ")))
+                    .containsExactly("Corner Cafe", "Downtown Grill", "No District");
+        }
+
+        /**
+         * "New" is a claim made on the shop's card. A shop whose creation time is unknown is not
+         * new — nothing supports saying so.
+         */
+        @Test
+        void new_since_keeps_only_shops_that_joined_inside_the_window() {
+            Store fresh = shopAt("Opened Last Week", 33.900800d, 35.482900d);
+            joined(fresh, NOW.minus(Duration.ofDays(7)));
+            Store edge = shopAt("Opened A Month Ago", 33.899000d, 35.483000d);
+            joined(edge, NOW.minus(Duration.ofDays(30)));
+            Store old = shopAt("Here For Years", 33.895800d, 35.500900d);
+            joined(old, NOW.minus(Duration.ofDays(900)));
+            shopAt("Unknown Age", 33.888000d, 35.531000d);
+
+            // Nearest first, as ever: the month-old shop is the closer of the two. The one exactly
+            // on the window's edge is inside it.
+            assertThat(namesNear(newWithin(30)))
+                    .containsExactly("Opened A Month Ago", "Opened Last Week");
+        }
+
+        @Test
+        void verified_local_keeps_only_shops_backoffice_vouched_for() {
+            Store vouched = shopAt("Abu Hassan", 33.900800d, 35.482900d);
+            vouched.setVerifiedLocal(true);
+            shopAt("Downtown Grill", 33.895800d, 35.500900d);
+
+            assertThat(namesNear(verifiedOnly())).containsExactly("Abu Hassan");
+        }
+
+        /** Filters narrow the radius's answer; they never widen it. */
+        @Test
+        void filters_combine_with_the_radius_and_with_each_other() {
+            Store near = shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            near.declarePower(Store.PowerStatus.GENERATOR, null);
+            Store far = shopAt("Achrafieh Bakery", 33.888000d, 35.531000d);
+            far.declarePower(Store.PowerStatus.GENERATOR, null);
+            Store nearButShut = shopAt("Shut Generator Shop", 33.899000d, 35.483000d);
+            nearButShut.declarePower(Store.PowerStatus.GENERATOR, null);
+            nearButShut.replaceHours(everyDay(LocalTime.of(6, 0), LocalTime.of(7, 0)));
+
+            List<String> found = service.nearby(CUSTOMER, 1_000, 500,
+                            new StoreService.NearbyFilters(true, Store.PowerStatus.GENERATOR,
+                                    null, null, false),
+                            PageRequest.of(0, 20))
+                    .getContent().stream().map(n -> n.store().store().getName()).toList();
+
+            assertThat(found).containsExactly("Corner Cafe");
+        }
+
+        /**
+         * The page is cut after filtering. Filtering a page after it was cut — what the client used
+         * to have to do — returns short pages and a total that counts shops the customer will never
+         * see.
+         */
+        @Test
+        void pages_and_totals_count_only_what_the_filter_let_through() {
+            for (int i = 0; i < 3; i++) {
+                Store generator = shopAt("Generator " + i, 33.8977d + i * 0.001d, 35.4829d);
+                generator.declarePower(Store.PowerStatus.GENERATOR, null);
+                shopAt("Mains " + i, 33.8977d + i * 0.001d + 0.0005d, 35.4829d);
+            }
+
+            Page<StoreService.NearbyStoreView> first = service.nearby(CUSTOMER, 10_000, 500,
+                    power(Store.PowerStatus.GENERATOR), PageRequest.of(0, 2));
+
+            assertThat(first.getContent()).hasSize(2);
+            assertThat(first.getTotalElements()).isEqualTo(3);
+            assertThat(first.getContent()).allSatisfy(n -> assertThat(
+                    n.store().store().getPowerStatus()).isEqualTo(Store.PowerStatus.GENERATOR));
         }
     }
 

@@ -230,6 +230,86 @@ public class StoreService {
     @Transactional(readOnly = true)
     public Page<NearbyStoreView> nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
                                         Pageable pageable) {
+        return nearby(centre, radiusMetres, maxCandidates, NearbyFilters.NONE, pageable);
+    }
+
+    /**
+     * What the neighbourhood browse may narrow "near me" by — each one a fact the platform already
+     * holds, and none of them a guess.
+     *
+     * <p>Applied here, in Java, after the distance and before the page is cut, rather than in the
+     * candidate query. Two reasons. {@code openNow} cannot be SQL at all: availability is walked out
+     * of the opening hours at a given instant by {@link Store#availabilityAt}, and a second copy of
+     * that walk in SQL would be a second answer to "is it open" free to disagree with the card. And
+     * filtering before the page is cut is what keeps the pages full and the total honest — the
+     * alternative the client used to have, filtering what one page happened to contain, returns
+     * short pages and a count that is not a count of anything.
+     *
+     * <p>The filters narrow the nearest {@code maxCandidates} shops, not the whole table. Inside a
+     * neighbourhood-sized radius that cap is nowhere near reached; at the endpoint's widest radius in
+     * a dense city it means a filter answers over the nearest 500, which is the right subset to
+     * narrow.
+     *
+     * @param openNow           drops a shop whose card would read CLOSED. BUSY and CLOSING_SOON stay:
+     *                          both still take orders, and a customer asking "what is open" is
+     *                          asking what they can buy from.
+     * @param powerStatus       an exact match on what the merchant last declared the lights to be
+     *                          doing. It is a statement about NOW — GENERATOR means "running on the
+     *                          generator at the moment", not "owns one" — and a shop that owns a
+     *                          generator but is on mains right now is correctly left out of a
+     *                          GENERATOR filter. Clients must label it that way.
+     * @param neighborhood      an exact match on the district the shop declared, the same rule as
+     *                          the storefront's own filter and the district list. Trimmed; blank is
+     *                          no filter.
+     * @param newSinceDays      shops whose row was created within this many days: "joined the
+     *                          platform recently". A shop with no creation time is not new — the
+     *                          badge is a claim, and nothing supports it.
+     * @param verifiedLocalOnly only shops Backoffice has granted the trust badge.
+     */
+    public record NearbyFilters(boolean openNow, Store.PowerStatus powerStatus,
+                                String neighborhood, Integer newSinceDays,
+                                boolean verifiedLocalOnly) {
+
+        public static final NearbyFilters NONE = new NearbyFilters(false, null, null, null, false);
+
+        public NearbyFilters {
+            neighborhood = neighborhood == null || neighborhood.isBlank() ? null : neighborhood.trim();
+        }
+
+        boolean admits(StoreView view, Instant now) {
+            Store store = view.store();
+            if (openNow && view.availability() == Store.Availability.CLOSED) {
+                return false;
+            }
+            if (powerStatus != null && store.getPowerStatus() != powerStatus) {
+                return false;
+            }
+            if (neighborhood != null && !neighborhood.equals(store.getNeighborhood())) {
+                return false;
+            }
+            if (verifiedLocalOnly && !store.isVerifiedLocal()) {
+                return false;
+            }
+            if (newSinceDays != null) {
+                Instant joined = store.getCreatedAt();
+                return joined != null && !joined.isBefore(now.minus(Duration.ofDays(newSinceDays)));
+            }
+            return true;
+        }
+    }
+
+    /**
+     * {@link #nearby(GeoPoint, double, int, Pageable)} narrowed by {@link NearbyFilters}.
+     *
+     * <p>A shop that is not ACTIVE is dropped here as well as in the candidate query, and the second
+     * check is not redundant. The ids come from one query and the rows from another, so a shop
+     * suspended — or pulled back to draft — between the two would otherwise be handed to a customer
+     * on the strength of a status it no longer has. A DRAFT or SUSPENDED shop reaching a customer's
+     * screen is the one thing every storefront read in this service is pinned against.
+     */
+    @Transactional(readOnly = true)
+    public Page<NearbyStoreView> nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
+                                        NearbyFilters filters, Pageable pageable) {
         List<UUID> candidateIds = stores.findActiveIdsNear(
                 centre.latitude().doubleValue(),
                 centre.longitude().doubleValue(),
@@ -244,6 +324,9 @@ public class StoreService {
         List<NearbyStoreView> near = new ArrayList<>(candidateIds.size());
 
         for (Store store : stores.findAllById(candidateIds)) {
+            if (store.getStatus() != Store.Status.ACTIVE) {
+                continue;
+            }
             GeoPoint location = store.location();
             if (location == null) {
                 // Only reachable if the pin were cleared between the two queries. Skipped rather
@@ -252,8 +335,12 @@ public class StoreService {
                 continue;
             }
             double metres = centre.distanceMetresTo(location);
-            if (metres <= radiusMetres) {
-                near.add(new NearbyStoreView(view(store, now), metres));
+            if (metres > radiusMetres) {
+                continue;
+            }
+            StoreView view = view(store, now);
+            if (filters.admits(view, now)) {
+                near.add(new NearbyStoreView(view, metres));
             }
         }
 
