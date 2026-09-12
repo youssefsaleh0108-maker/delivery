@@ -138,6 +138,56 @@ class _LogoPainter extends CustomPainter {
       old.background != background || old.foreground != foreground || old.badge != badge;
 }
 
+/// The small brand pill the redesign's screen headers carry in their end slot (Figma `logo`,
+/// e.g. 112:1961 on `customer-dekkane-browse`): a rose dot, then "You" in ink and "Drop" in the
+/// brand, on the brand-soft fill.
+///
+/// The two-colour name is a wordmark, not a sentence, so it is written here once and always laid
+/// out left to right — the Arabic string table spells the brand "YouDrop" too. What a screen reader
+/// says is still the caller's, because this package carries no localisations.
+class YouDropPill extends StatelessWidget {
+  const YouDropPill({super.key, this.semanticLabel});
+
+  /// The app's name in the reader's language. Null excludes the pill from semantics, for a screen
+  /// that already announces the name elsewhere.
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget pill = Container(
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.sm, vertical: 4),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: TextDirection.ltr,
+        children: <Widget>[
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(color: DeliveryColors.brand, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          const Text.rich(
+            TextSpan(
+              children: <InlineSpan>[
+                TextSpan(text: 'You', style: TextStyle(color: DeliveryColors.ink)),
+                TextSpan(text: 'Drop', style: TextStyle(color: DeliveryColors.brand)),
+              ],
+            ),
+            textDirection: TextDirection.ltr,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, height: 1.2),
+          ),
+        ],
+      ),
+    );
+    if (semanticLabel == null) return ExcludeSemantics(child: pill);
+    return Semantics(label: semanticLabel, excludeSemantics: true, child: pill);
+  }
+}
+
 /// The mark beside the app's name, for a header or a sign-in screen.
 class DeliveryWordmark extends StatelessWidget {
   const DeliveryWordmark({

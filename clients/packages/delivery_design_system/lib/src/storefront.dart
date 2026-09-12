@@ -1026,6 +1026,211 @@ class StickyBasketBar extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------- product grid tile
+
+/// A product as the dekkane shop's two-column grid draws it (Figma `customer-dekkane-shop`
+/// 112:2041): a 100px picture, the name on one line, the dollar price over its LBP conversion, and
+/// a full-width add button.
+///
+/// The frame draws only the empty state. Once the product is in the basket the button becomes a
+/// stepper — the count, and the way back out — because a shelf you can only add to is a shelf you
+/// have to leave to correct; [ShelfProductTile] made the same call.
+///
+/// Laid out top-and-bottom with the button pinned to the foot, so two tiles side by side in a
+/// stretched row keep their buttons on one line whatever the names wrap to. In an unbounded column
+/// it simply packs.
+class ShelfGridTile extends StatelessWidget {
+  const ShelfGridTile({
+    super.key,
+    required this.name,
+    required this.price,
+    required this.addLabel,
+    this.secondaryPrice,
+    this.imageUrl,
+    this.quantityInBasket = 0,
+    this.onAdd,
+    this.onRemove,
+    this.onTap,
+    this.removeSemanticLabel,
+    this.addMoreSemanticLabel,
+  });
+
+  final String name;
+
+  /// The price as it should read, already formatted.
+  final String price;
+
+  /// The second figure under the price — the LBP conversion — or null to draw none. Null is the
+  /// honest state when there is no rate: a price with an invented conversion is worse than one
+  /// without.
+  final String? secondaryPrice;
+
+  final String? imageUrl;
+
+  /// The add button's word, already localised.
+  final String addLabel;
+
+  final int quantityInBasket;
+
+  /// Null draws no add control at all — a closed shop's shelf still browses, and a button that
+  /// cannot add anything is not drawn. The space is kept so the grid does not jump.
+  final VoidCallback? onAdd;
+  final VoidCallback? onRemove;
+  final VoidCallback? onTap;
+
+  /// Screen-reader labels for the stepper's two glyphs, localised by the caller.
+  final String? removeSemanticLabel;
+  final String? addMoreSemanticLabel;
+
+  static const double imageHeight = 100;
+  static const double controlHeight = 32;
+
+  @override
+  Widget build(BuildContext context) {
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.lg);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: DeliveryColors.white,
+        borderRadius: corners,
+        border: Border.all(color: DeliveryColors.border),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: corners,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                      child: SizedBox(
+                        height: imageHeight,
+                        width: double.infinity,
+                        child: DeliveryProductImage(url: imageUrl),
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.sm),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.sm),
+                    Text(
+                      price,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: DeliveryColors.brand,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (secondaryPrice != null) ...<Widget>[
+                      const SizedBox(height: 1),
+                      Text(
+                        secondaryPrice!,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: DeliveryColors.faint,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: DeliverySpacing.sm),
+                _control(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _control() {
+    if (onAdd == null) {
+      return const SizedBox(height: controlHeight);
+    }
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.sm);
+    if (quantityInBasket == 0) {
+      return Semantics(
+        button: true,
+        child: Material(
+          color: DeliveryColors.brand,
+          borderRadius: corners,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onAdd,
+            child: SizedBox(
+              height: controlHeight,
+              child: Center(
+                child: Text(
+                  addLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.white,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return Container(
+      height: controlHeight,
+      decoration: BoxDecoration(color: DeliveryColors.brand, borderRadius: corners),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          _step(Icons.remove_rounded, onRemove, removeSemanticLabel),
+          Text(
+            '$quantityInBasket',
+            style: const TextStyle(
+                color: DeliveryColors.white, fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          _step(Icons.add_rounded, onAdd, addMoreSemanticLabel),
+        ],
+      ),
+    );
+  }
+
+  Widget _step(IconData icon, VoidCallback? onTap, String? label) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: controlHeight,
+          child: Icon(icon, size: 17, color: DeliveryColors.white),
+        ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------- product row
 
 /// A product as it appears on a store's shelf: text on the left, picture on the right, an add

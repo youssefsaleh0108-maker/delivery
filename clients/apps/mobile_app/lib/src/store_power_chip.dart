@@ -70,6 +70,92 @@ class StorePowerChip extends StatelessWidget {
   }
 }
 
+/// The dekkane frames' power pill (112:1941 on the card, 112:2041 on the shop's hero): "⚡ Generator
+/// active" in the brand, and the grey "Currently dark" for a shop that has declared it has no power.
+///
+/// Worded as what is happening NOW, because that is all the data says: `power_status` is the
+/// merchant's latest declaration of what the lights are doing, not a fact about what the shop owns.
+/// Mains and undeclared draw nothing — mains is the normal state and not worth a badge on this
+/// frame, and a shop that never said should not wear one it did not earn.
+///
+/// [solid] is the hero's version, a filled pill that survives a photograph behind it; the card's
+/// is the brand-soft one.
+class DekkanePowerPill extends StatelessWidget {
+  const DekkanePowerPill({super.key, required this.status, this.solid = false});
+
+  final StorePowerStatus status;
+  final bool solid;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final (String label, Color fg, Color bg, IconData? icon) = switch (status) {
+      StorePowerStatus.generator => solid
+          ? (t.dekkaneGeneratorActive, DeliveryColors.white, DeliveryColors.brand, Icons.bolt_rounded)
+          : (t.dekkaneGeneratorActive, DeliveryColors.brand, DeliveryColors.brandSoft,
+              Icons.bolt_rounded),
+      StorePowerStatus.dark => solid
+          ? (t.custPowerDark, DeliveryColors.white, DeliveryColors.muted, null)
+          : (t.custPowerDark, DeliveryColors.muted, DeliveryColors.border, null),
+      StorePowerStatus.mains || StorePowerStatus.unknown =>
+        ('', Colors.transparent, Colors.transparent, null),
+    };
+    if (label.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: EdgeInsetsDirectional.symmetric(horizontal: solid ? 8 : 6, vertical: solid ? 4 : 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(solid ? DeliveryRadius.sm : 4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (icon != null) ...<Widget>[
+            Icon(icon, size: 12, color: fg),
+            const SizedBox(width: 2),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: solid ? FontWeight.w700 : FontWeight.w600,
+              color: fg,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The dekkane frames' "Trusted local" badge — the Backoffice-granted `verified_local`, drawn as
+/// the frame draws it: brand on brand-soft, small and square-cornered, beside the shop's name.
+class TrustedLocalBadge extends StatelessWidget {
+  const TrustedLocalBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        DeliveryStrings.of(context).dekkaneTrustedLocal,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: DeliveryColors.brand,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
 /// The dekkane trust badge — Backoffice-granted, drawn in the positive green.
 class VerifiedLocalBadge extends StatelessWidget {
   const VerifiedLocalBadge({super.key});

@@ -8,7 +8,28 @@ import 'package:flutter/material.dart';
 import 'cart.dart';
 import 'product_detail_screen.dart';
 import 'product_options_sheet.dart';
+import 'store_power_chip.dart';
 import 'store_state_mapping.dart';
+
+/// Builds the "chat with the shop" control for the dekkane shop page, or returns null for none.
+/// See [StorePageScreen.shopChatAction].
+typedef ShopChatActionBuilder = Widget? Function(BuildContext context, StoreCard store);
+
+/// Which of the two shop-page designs to draw. The data, the basket rules and every flow behind
+/// them are the same; only the layout differs.
+enum StorePageLayout {
+  /// `customer-shop` (Figma 3:224): the 200px cover hero, the stat strip, and the Shop / Aisles /
+  /// Offers / Buy again tabs over a list of rows.
+  standard,
+
+  /// `customer-dekkane-shop` (Figma 112:2041), for a shop opened from the neighbourhood browse: a
+  /// white header naming the district, an inset hero carrying the open and power pills, the aisle
+  /// chips, and the shelf as a two-column grid with the LBP line under every price.
+  ///
+  /// No tabs, no in-shop search and no favourite heart — the frame has none of them, and a
+  /// dekkane's whole shelf is a few dozen lines the aisle chips already cut.
+  dekkane,
+}
 
 /// A store's landing page: Shop, Aisles, Offers, Buy Again.
 ///
@@ -28,7 +49,34 @@ class StorePageScreen extends StatefulWidget {
     this.preview,
     this.orderApi,
     this.onFavoriteChanged,
+    this.layout = StorePageLayout.standard,
+    this.shopChatAction,
   });
+
+  /// Which design to draw. The neighbourhood browse and its map open shops as
+  /// [StorePageLayout.dekkane]; every other road here keeps the standard page.
+  final StorePageLayout layout;
+
+  /// THE HOOK FOR "CHAT WITH THE SHOP" — deliberately empty today, and deliberately not drawn.
+  ///
+  /// The dekkane frame floats a green `Chat with <shopkeeper>` pill over the grid. No
+  /// customer-to-shop chat exists: the chat in app-notification is two-party and order-scoped, and
+  /// keeps the merchant out of it on purpose. A shop thread needs its own conversation kind and
+  /// membership rule, a way to resolve which merchant owns the store, a merchant inbox and a policy
+  /// for closing threads before a button here could do anything — and a button that cannot work is
+  /// not drawn.
+  ///
+  /// When that lands, whoever builds it passes this builder. It is called with the shop's card each
+  /// time the dekkane layout builds and returns the control, or null for none (capability off, chat
+  /// switched off for this shop). What it returns becomes the Scaffold's floating action button,
+  /// which the Scaffold lays out ABOVE the basket bar in `bottomNavigationBar` — so the chat pill and
+  /// the basket bar cannot overlap however tall either grows, with nothing measured by hand. Thread
+  /// it from CustomerShell (which holds the ChatApi) through StoreHomeScreen and
+  /// `HyperlocalScreen.shopChatAction`, which already passes it on to every shop it opens. The
+  /// label wants the store's name: the data has no shopkeeper name to put in "Chat with Abu Hassan".
+  ///
+  /// Ignored by [StorePageLayout.standard], which has no such slot in its frame.
+  final ShopChatActionBuilder? shopChatAction;
 
   final StoreApi storeApi;
   final Cart cart;
@@ -401,6 +449,10 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       );
     }
 
+    if (widget.layout == StorePageLayout.dekkane) {
+      return _dekkanePage();
+    }
+
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       body: AnimatedBuilder(
@@ -427,18 +479,24 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
           ),
         ),
       ),
-      // The empty check belongs INSIDE the builder, not outside it.
-      //
-      // It used to read `widget.cart.isEmpty ? null : AnimatedBuilder(...)`, which looks
-      // equivalent and is not: that test runs during build(), and the only thing subscribed to
-      // the cart was the AnimatedBuilder around the body. So adding the first item rebuilt the
-      // body — the product row's quantity badge duly appeared — while the Scaffold's
-      // bottomNavigationBar argument was never re-evaluated and stayed null. A customer put their
-      // first item in the basket and got no basket bar at all, on the shop page, with no way
-      // forward from that screen; it only appeared later, if something unrelated happened to
-      // rebuild the page. Subscribing first and deciding second is what makes the bar arrive with
-      // the item it is about.
-      bottomNavigationBar: AnimatedBuilder(
+      bottomNavigationBar: _basketBar(),
+    );
+  }
+
+  /// The basket bar both layouts share.
+  ///
+  /// The empty check belongs INSIDE the builder, not outside it.
+  ///
+  /// It used to read `widget.cart.isEmpty ? null : AnimatedBuilder(...)`, which looks equivalent
+  /// and is not: that test runs during build(), and the only thing subscribed to the cart was the
+  /// AnimatedBuilder around the body. So adding the first item rebuilt the body — the product row's
+  /// quantity badge duly appeared — while the Scaffold's bottomNavigationBar argument was never
+  /// re-evaluated and stayed null. A customer put their first item in the basket and got no basket
+  /// bar at all, on the shop page, with no way forward from that screen; it only appeared later, if
+  /// something unrelated happened to rebuild the page. Subscribing first and deciding second is what
+  /// makes the bar arrive with the item it is about.
+  Widget _basketBar() {
+    return AnimatedBuilder(
         animation: widget.cart,
         builder: (BuildContext context, _) => widget.cart.isEmpty
             ? const SizedBox.shrink()
@@ -462,7 +520,324 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                 // [StorePageScreen.onOpenBasket] for what the old pop() did instead.
                 onTap: widget.onOpenBasket,
               ),
+    );
+  }
+
+  // ------------------------------------------------------------------------------- dekkane layout
+
+  /// `customer-dekkane-shop` (Figma 112:2041). Same state, same flows — [_add] with its option
+  /// sheet and one-store rule, the paged shelf, the aisle filter, the basket bar — in the frame's
+  /// layout.
+  Widget _dekkanePage() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final StoreCard card = _card;
+    final String? district = card.neighborhood?.trim();
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      appBar: YdScreenHeader(
+        title: card.name,
+        // The district the shop declared, omitted when it never declared one.
+        subtitle: (district == null || district.isEmpty) ? null : district,
+        onBack: () => Navigator.of(context).maybePop(),
+        backSemanticLabel: t.back,
+        trailing: YouDropPill(semanticLabel: t.appTitle),
       ),
+      body: AnimatedBuilder(
+        // The rate as well as the cart: the LBP line under each price appears the moment the
+        // platform's rate arrives, rather than on whatever rebuild happens next.
+        animation: Listenable.merge(<Listenable>[widget.cart, MarketRates.instance]),
+        builder: (BuildContext context, _) => NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification notification) {
+            if (notification.depth == 0 && shouldLoadMore(notification.metrics)) {
+              _products.loadMore();
+            }
+            return false;
+          },
+          child: CustomScrollView(
+            slivers: <Widget>[
+              SliverToBoxAdapter(child: _dekkaneHero(t, card)),
+              if (_aisles.isNotEmpty) SliverToBoxAdapter(child: _dekkaneAisles(t)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                      DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md - 4),
+                  child: Text(
+                    t.dekkaneShopInventory.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              ..._dekkaneShelf(t),
+              const SliverToBoxAdapter(child: SizedBox(height: DeliverySpacing.xl)),
+            ],
+          ),
+        ),
+      ),
+      // The chat hook's slot — empty until the capability exists. See
+      // [StorePageScreen.shopChatAction].
+      floatingActionButton: widget.shopChatAction?.call(context, card),
+      bottomNavigationBar: _basketBar(),
+    );
+  }
+
+  /// The inset hero: the full-size cover under a 45% scrim, the open and power pills across the
+  /// top, the name, and the rating with the shop's own tagline.
+  ///
+  /// The frame's "Family-run since 1985" is a field the platform does not have; the tagline is what
+  /// the merchant wrote about themselves, which is the honest stand-in.
+  Widget _dekkaneHero(DeliveryStrings t, StoreCard card) {
+    final String? tagline = card.tagline?.trim();
+    final String facts = <String>[
+      if (card.rating != null)
+        '★ ${card.rating!.toStringAsFixed(1)} (${t.custRatingsCount(card.ratingCount)})'
+      else
+        t.ratingNew,
+      if (tagline != null && tagline.isNotEmpty) tagline,
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: CustomerPhoto(
+                // The full-size cover: this is the one place on the page it is drawn large.
+                url: card.coverUrl,
+                icon: iconForVertical(card.vertical),
+              ),
+            ),
+            Positioned.fill(
+              child: ColoredBox(color: DeliveryColors.ink.withValues(alpha: 0.45)),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _dekkaneStatePill(t, card),
+                        ),
+                      ),
+                      const SizedBox(width: DeliverySpacing.sm),
+                      DekkanePowerPill(status: card.powerStatus, solid: true),
+                    ],
+                  ),
+                  const SizedBox(height: DeliverySpacing.md - 4),
+                  Text(
+                    card.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: DeliveryColors.white,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: DeliverySpacing.xs),
+                  Text(
+                    facts,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: DeliveryColors.white, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// "Open · Closes 10:00 PM" — the frame's green pill, from the card's availability and the
+  /// store's closing time, in the reader's own clock format.
+  ///
+  /// The fills are the accent tokens' dark stops, not the frame's bright emerald: under an 11px
+  /// white label the emerald measures about 2.5:1, which the token system rules out for words, and
+  /// its -700 stop clears 4.5:1. Busy and closing-soon share the amber's; closed is the muted grey,
+  /// because closed is an absence, not a warning.
+  Widget _dekkaneStatePill(DeliveryStrings t, StoreCard card) {
+    final String? closes = _closingTime();
+    final String label = card.availability == StoreAvailability.open && closes != null
+        ? t.dekkaneOpenClosesAt(closes)
+        : card.availability.labelIn(t);
+    final Color fill = switch (card.availability) {
+      StoreAvailability.open => DeliveryAccent.positive.onTint,
+      StoreAvailability.busy || StoreAvailability.closingSoon => DeliveryAccent.caution.onTint,
+      StoreAvailability.closed => DeliveryColors.muted,
+    };
+
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: DeliveryColors.white,
+          height: 1.2,
+        ),
+      ),
+    );
+  }
+
+  /// The store's closing time for the window it is in, formatted by the reader's locale — "10:00
+  /// PM", or the 24-hour and Arabic forms — or null when the full store has not arrived yet or the
+  /// shop is shut.
+  String? _closingTime() {
+    final String? raw = _store?.closesAt;
+    if (raw == null) return null;
+    final List<String> parts = raw.split(':');
+    if (parts.length < 2) return null;
+    final int? hour = int.tryParse(parts[0]);
+    final int? minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return MaterialLocalizations.of(context)
+        .formatTimeOfDay(TimeOfDay(hour: hour, minute: minute));
+  }
+
+  Widget _dekkaneAisles(DeliveryStrings t) {
+    return SizedBox(
+      height: YdChip.minHeight + DeliverySpacing.md - 4,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md - 4),
+        children: <Widget>[
+          // "All", as the frame labels it, where the standard page says "Everything".
+          YdChip(
+            label: t.all,
+            selected: _selectedAisle == null,
+            onTap: () => _selectAisle(null),
+          ),
+          for (final Aisle aisle in _aisles) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.md - 4),
+            YdChip(
+              label: aisle.name,
+              selected: _selectedAisle == aisle.categoryId,
+              onTap: () => _selectAisle(aisle.categoryId),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The shelf as the frame's two-column grid.
+  ///
+  /// Rows of two rather than a fixed-extent grid: a grid cell has to be told its height, and one
+  /// that fits "Pepsi Glass Bottle 330ml" at the default text size clips it at Android's largest.
+  /// Each row is as tall as its taller tile, and the tiles pin their buttons to the foot, so the
+  /// two Add buttons in a row stay level whatever the names do.
+  List<Widget> _dekkaneShelf(DeliveryStrings t) {
+    final PagedList<Product> list = _products;
+    if (list.isLoadingFirstPage) {
+      return const <Widget>[
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(DeliverySpacing.xl),
+            child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+          ),
+        ),
+      ];
+    }
+    if (list.error != null && list.isEmpty) {
+      return <Widget>[
+        SliverToBoxAdapter(
+          child: YdEmptyState(
+            icon: Icons.cloud_off,
+            title: t.dekkaneCouldNotLoadShelf,
+            padding: const EdgeInsets.all(DeliverySpacing.xl),
+            action: YdPillButton(
+              label: t.tryAgain,
+              onPressed: list.refresh,
+              size: YdPillButtonSize.compact,
+              expand: false,
+            ),
+          ),
+        ),
+      ];
+    }
+    if (list.isEmptyAfterLoad) {
+      return <Widget>[
+        SliverToBoxAdapter(
+          child: _empty(
+            _selectedAisle == null ? Icons.inventory_2_outlined : Icons.search_off_rounded,
+            _selectedAisle == null ? t.nothingOnShelves : t.nothingInAisle,
+          ),
+        ),
+      ];
+    }
+
+    final List<Product> products = list.items;
+    final int rows = (products.length + 1) ~/ 2;
+    return <Widget>[
+      SliverPadding(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.md),
+        sliver: SliverList.separated(
+          itemCount: rows,
+          separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md - 4),
+          itemBuilder: (BuildContext context, int row) {
+            final Product first = products[row * 2];
+            final Product? second =
+                row * 2 + 1 < products.length ? products[row * 2 + 1] : null;
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Expanded(child: _dekkaneTile(t, first)),
+                  const SizedBox(width: DeliverySpacing.md - 4),
+                  Expanded(
+                    child: second == null ? const SizedBox.shrink() : _dekkaneTile(t, second),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+      SliverToBoxAdapter(child: _listFooter(list)),
+    ];
+  }
+
+  Widget _dekkaneTile(DeliveryStrings t, Product product) {
+    final int? pounds = MarketRates.instance.lbpRounded(product.price);
+    return ShelfGridTile(
+      name: product.name,
+      price: '\$${product.price.toStringAsFixed(2)}',
+      // The platform rate's conversion, not a second price — and nothing at all without a rate.
+      secondaryPrice: pounds == null ? null : t.dekkaneLbpAmount(pounds),
+      imageUrl: product.listImageUrl,
+      addLabel: t.custAddToBasket,
+      quantityInBasket: widget.cart.qtyOf(product.id),
+      // A closed shop's shelf still browses, and draws no add control it could not honour.
+      onAdd: _acceptsOrders ? () => _add(product) : null,
+      onRemove: () => widget.cart.removeProduct(product.id),
+      onTap: () => _openProduct(product),
+      removeSemanticLabel: t.remove,
+      addMoreSemanticLabel: t.dekkaneAddOneMore,
     );
   }
 
