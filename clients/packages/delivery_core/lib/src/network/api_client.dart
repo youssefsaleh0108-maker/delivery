@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 
 import '../auth/auth_service.dart';
+import 'connectivity.dart';
 
 /// Builds the Dio instance every client uses to reach the API Gateway (Section 9).
 ///
@@ -23,10 +24,18 @@ abstract final class ApiClient {
   /// Absent (the default), every request behaves exactly as it always has.
   static const String skipAuth = 'delivery.skipAuth';
 
+  /// The gateway path the connectivity probe asks. Any answer at all — even a 404 from a gateway
+  /// that does not expose it — proves the platform is reachable, which is all a probe needs.
+  static const String probePath = '/actuator/health';
+
+  /// [connectivity], when given, is fed by every request this Dio makes and handed a probe to
+  /// re-check with while unreachable. See [ConnectivityService] for why the app's own traffic is
+  /// the signal rather than the phone's network settings.
   static Dio create({
     required String baseUrl,
     required AuthService authService,
     Duration timeout = const Duration(seconds: 20),
+    ConnectivityService? connectivity,
   }) {
     final Dio dio = Dio(
       BaseOptions(
@@ -38,6 +47,24 @@ abstract final class ApiClient {
       ),
     );
 
+    // First, so it sees every request's raw outcome before anything else reshapes it.
+    if (connectivity != null) {
+      dio.interceptors.add(ConnectivityInterceptor(connectivity));
+      connectivity.useProbe(() async {
+        try {
+          // Unauthenticated and any status accepted: this asks whether the gateway answers, not
+          // whether this session may do anything there.
+          await dio.head<void>(probePath,
+              options: Options(
+                extra: <String, dynamic>{skipAuth: true},
+                validateStatus: (_) => true,
+              ));
+          return true;
+        } on DioException catch (e) {
+          return e.response != null;
+        }
+      });
+    }
     dio.interceptors.add(_CorrelationIdInterceptor());
     dio.interceptors.add(_AuthInterceptor(authService, dio));
     return dio;

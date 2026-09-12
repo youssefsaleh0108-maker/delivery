@@ -256,6 +256,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (typed.isNotEmpty) typed,
     ].join('\n');
 
+    // One attempt per basket. Its key lives on the cart rather than on this screen, so backing out
+    // after a try whose answer was lost and checking out again is recognised as the same attempt:
+    // the server answers with the order that try may already have placed, instead of placing a
+    // second. Every retry of this basket carries this same submission.
+    final OrderSubmission submission = OrderSubmission(
+      idempotencyKey: widget.cart.checkoutKey,
+      items: widget.cart.toOrderLines(),
+      deliveryAddress: address.line,
+      // The area comes from the address that was picked, so the two can no longer disagree the
+      // way they could when the line was a free-text box sitting over a remembered zone id.
+      deliveryZoneId: address.zoneId,
+      contactPhone: _phone.text.trim(),
+      notes: notes,
+      paymentMethod: _payment,
+      // Always sent, never inferred. The surcharge that follows from it is the server's to
+      // price and the receipt's to itemise.
+      deliveryTier: _tier,
+      // The canonical code the server quoted, never raw field text. The discount is recomputed
+      // at placement against the basket the server priced itself.
+      promoCode: widget.promo?.code,
+      // Non-cash goes to the DEV provider, which ignores the token by design — there is no
+      // card SDK to mint a real one. A decline comes back as a 402 and the order is not placed.
+      paymentInstrumentToken: _payment.needsProvider ? _devInstrumentToken : null,
+      // The pin from the place picker, when the address has one. This is what gives the
+      // tracking service a real point to measure the rider's ETA against.
+      deliveryLatitude: address.latitude,
+      deliveryLongitude: address.longitude,
+    );
+
     setState(() => _placing = true);
     try {
       // Re-selects it unchanged, which promotes it to the top of the recents for next time.
@@ -265,30 +294,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // the door instructions the address had been carrying.
       await widget.addresses.select(address);
 
-      final DeliveryOrder order = await widget.api.place(
-        items: widget.cart.toOrderLines(),
-        deliveryAddress: address.line,
-        // The area comes from the address that was picked, so the two can no longer disagree the
-        // way they could when the line was a free-text box sitting over a remembered zone id.
-        deliveryZoneId: address.zoneId,
-        contactPhone: _phone.text.trim(),
-        notes: notes,
-        paymentMethod: _payment,
-        // Always sent, never inferred. The surcharge that follows from it is the server's to
-        // price and the receipt's to itemise.
-        deliveryTier: _tier,
-        // The canonical code the server quoted, never raw field text. The discount is recomputed
-        // at placement against the basket the server priced itself.
-        promoCode: widget.promo?.code,
-        // Non-cash goes to the DEV provider, which ignores the token by design — there is no
-        // card SDK to mint a real one. A decline comes back as a 402 and the order is not placed.
-        paymentInstrumentToken:
-            _payment.needsProvider ? _devInstrumentToken : null,
-        // The pin from the place picker, when the address has one. This is what gives the
-        // tracking service a real point to measure the rider's ETA against.
-        deliveryLatitude: address.latitude,
-        deliveryLongitude: address.longitude,
-      );
+      final PlaceOrderResult result = await widget.api.place(submission);
+      final DeliveryOrder order;
+      switch (result) {
+        case OrderPlaced(order: final DeliveryOrder placed):
+          order = placed;
+        case OrderAlreadyPlaced(orderId: final String orderId):
+          // An earlier try of this basket went through before the customer changed it. That order
+          // is the truth; placing the changed basket as well is the duplicate the key prevents.
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(t.offlineAlreadyPlaced)));
+          }
+          DeliveryOrder? existing;
+          try {
+            existing = await widget.api.read(orderId);
+          } catch (_) {
+            existing = null;
+          }
+          if (existing == null) {
+            // It exists; it just could not be fetched to show. The basket it came from is done.
+            widget.cart.clear();
+            if (mounted) Navigator.of(context).pop();
+            return;
+          }
+          order = existing;
+        case OrderPriceChanged():
+          // Only ever the answer to a request that asserts a total, which this screen does not
+          // send: the customer is looking at it, and the confirmation shows the server's own.
+          if (!mounted) return;
+          setState(() => _placing = false);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(t.couldNotPlaceOrder)));
+          return;
+      }
       // The approved payment intent, into the transfer ledger with the locked rate — which
       // instrument actually carries the money (cash split, Whish, OMT), a fact the order's own
       // cash/wallet field is too coarse to hold. Best-effort by design: the order exists either
@@ -333,6 +372,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       setState(() => _placing = false);
 
+      // An answer that never came is reported like any other failure, but nothing is lost: the
+      // basket and its key stay, so tapping Place again is the same attempt, not a second order.
       // 422 is the interesting case: an item went out of stock, was archived, or the basket somehow
       // spans two merchants. The server's message is specific, so show it rather than a generic one.
       final String message = switch (e.response?.statusCode) {

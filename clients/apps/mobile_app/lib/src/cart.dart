@@ -9,6 +9,11 @@ import 'product_options_sheet.dart';
 /// basket restored from disk days later could show a total that no longer matches what the server
 /// would charge. Losing the basket on restart is the lesser problem.
 ///
+/// Offline mode did not change that. What must survive a restart is a checkout the customer asked
+/// to send later, and that is kept by [OrderOutbox] — as the exact request, with the total the
+/// customer agreed to, which the server refuses to exceed. The basket that produced it is cleared
+/// the moment it is safely queued.
+///
 /// Scoped to one **store**, not one merchant. That is stricter than Order Manager's rule and
 /// deliberately so — a merchant may run several shops, and a basket mixing a pharmacy and a pizzeria
 /// is one delivery nobody can make. Anything this accepts still satisfies the server's
@@ -204,6 +209,7 @@ class Cart extends ChangeNotifier {
   /// Empties the basket and immediately re-locks it to a new store, for "discard and start here".
   void switchTo(StoreCard store) {
     _lines.clear();
+    _checkoutKey = null;
     _storeId = store.id;
     _store = store;
     notifyListeners();
@@ -212,7 +218,23 @@ class Cart extends ChangeNotifier {
   void _releaseStore() {
     _storeId = null;
     _store = null;
+    _checkoutKey = null;
   }
+
+  String? _checkoutKey;
+
+  /// The idempotency key of this basket's checkout attempt — minted on first use, kept for as long
+  /// as the basket has anything in it.
+  ///
+  /// On the basket rather than on the checkout screen, because the attempt outlives the screen. A
+  /// placement whose answer was lost may have gone through; the customer backing out to the basket
+  /// and checking out again must be recognised as the same attempt, or it places a second order.
+  /// Editing the basket in between keeps the key too — the server then answers with the order the
+  /// first try placed rather than placing the edited one as well (see [OrderAlreadyPlaced]).
+  ///
+  /// A fresh key only when the basket is emptied: by a placement, by being queued, by the customer
+  /// removing everything, or by starting again at another shop — each of which ends the attempt.
+  String get checkoutKey => _checkoutKey ??= newIdempotencyKey();
 
   /// The payload Order Manager expects: ids and quantities only, never prices.
   List<({String productId, int qty, List<String> optionIds})> toOrderLines() => _lines.values

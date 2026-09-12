@@ -12931,6 +12931,204 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your application is in, but we couldn\'t finish setting up your account. Please try again.'**
   String get wizAccountRolesRetry;
+
+  /// No description provided for @offlinePill.
+  ///
+  /// In en, this message translates to:
+  /// **'OFFLINE'**
+  String get offlinePill;
+
+  /// No description provided for @offlineBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re offline. Orders you queue will be sent when you\'re back online.'**
+  String get offlineBanner;
+
+  /// No description provided for @offlineBackOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Back online'**
+  String get offlineBackOnline;
+
+  /// No description provided for @offlineSavedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved items'**
+  String get offlineSavedItems;
+
+  /// No description provided for @offlineModeBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Mode'**
+  String get offlineModeBadge;
+
+  /// No description provided for @offlineCachedCatalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached Catalog'**
+  String get offlineCachedCatalogTitle;
+
+  /// No description provided for @offlineLastPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Last Cached Purchases'**
+  String get offlineLastPurchases;
+
+  /// No description provided for @offlinePricesAsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Prices as of {when}. They may have changed since.'**
+  String offlinePricesAsOf(String when);
+
+  /// No description provided for @offlineQuickAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Add'**
+  String get offlineQuickAdd;
+
+  /// No description provided for @offlineNeedsOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose options when you\'re online'**
+  String get offlineNeedsOptions;
+
+  /// No description provided for @offlineNothingSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing saved for offline yet'**
+  String get offlineNothingSaved;
+
+  /// No description provided for @offlineNothingSavedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What you order while online is saved here, so you can order it again when the connection drops.'**
+  String get offlineNothingSavedHint;
+
+  /// No description provided for @offlineOutboxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to send'**
+  String get offlineOutboxTitle;
+
+  /// No description provided for @offlineQueuedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {ref} — Queued'**
+  String offlineQueuedTitle(String ref);
+
+  /// No description provided for @offlineQueuedStoreAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} • {amount}'**
+  String offlineQueuedStoreAmount(String store, String amount);
+
+  /// No description provided for @offlineWillSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Will send as soon as you\'re back online'**
+  String get offlineWillSend;
+
+  /// No description provided for @offlineSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get offlineSending;
+
+  /// No description provided for @offlinePriceChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The total is now {total}. Confirm to send it at this price.'**
+  String offlinePriceChanged(String total);
+
+  /// No description provided for @offlineSendAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Send at {total}'**
+  String offlineSendAt(String total);
+
+  /// No description provided for @offlineStale.
+  ///
+  /// In en, this message translates to:
+  /// **'This has been waiting a while. Do you still want it?'**
+  String get offlineStale;
+
+  /// No description provided for @offlineSendNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Send now'**
+  String get offlineSendNow;
+
+  /// No description provided for @offlineFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t place this order: {reason}'**
+  String offlineFailed(String reason);
+
+  /// No description provided for @offlineDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get offlineDiscard;
+
+  /// No description provided for @offlineDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this order?'**
+  String get offlineDiscardTitle;
+
+  /// No description provided for @offlineDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It hasn\'t been sent, and it won\'t be.'**
+  String get offlineDiscardBody;
+
+  /// No description provided for @offlineQueueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach YouDrop'**
+  String get offlineQueueTitle;
+
+  /// No description provided for @offlineQueueBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order hasn\'t gone through. We can keep it on this phone and send it automatically when you\'re back online — and if the price changes, we\'ll ask you first.'**
+  String get offlineQueueBody;
+
+  /// No description provided for @offlineQueueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Place when back online'**
+  String get offlineQueueAction;
+
+  /// No description provided for @offlineQueueCashOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only cash orders can wait for the connection. Choose cash, or try again when you\'re back online.'**
+  String get offlineQueueCashOnly;
+
+  /// No description provided for @offlineQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Order saved on this phone. It will be sent when you\'re back online.'**
+  String get offlineQueued;
+
+  /// No description provided for @offlineQueueSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the order on this phone, so nothing was queued.'**
+  String get offlineQueueSaveFailed;
+
+  /// No description provided for @offlineAlreadyPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Your earlier try already went through, so that\'s the order we placed.'**
+  String get offlineAlreadyPlaced;
+
+  /// No description provided for @offlineSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your queued order {ref} was placed.'**
+  String offlineSent(String ref);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
