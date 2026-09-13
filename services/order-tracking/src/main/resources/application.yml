@@ -138,6 +138,14 @@ delivery:
       # dispatcher who has left can still see the fleet. Short enough to bound that, long enough
       # that a console polling every few seconds is not asking Order Manager every time.
       ttl: 15m
+
+    fleet-check:
+      # How long Order Manager's answer to "who is on my fleet" stands, per dispatcher, before a
+      # carrier read of one rider (roster, live position, hours) asks again. It is the window in
+      # which a company that has just let a rider go can still see them. An Order Manager that
+      # cannot be reached refuses those reads instead of serving an older answer, so this is
+      # never stretched by an outage. See FleetMembershipGuard.
+      ttl: 30s
     # How long a cached position stays valid. Slightly longer than the rider ping interval so a
     # single dropped ping does not push every watcher through to Postgres.
     location-cache-ttl: 60s

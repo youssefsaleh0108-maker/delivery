@@ -77,6 +77,8 @@ public class PresenceService {
     private final ObjectMapper objectMapper;
     private final Duration presenceWindow;
     private final Duration persistInterval;
+    /** Confirms with Order Manager that a rider the local linkage nominates is on the fleet NOW. */
+    private final FleetMembershipGuard fleetGuard;
 
     public PresenceService(RiderPresenceRepository presence,
                            RiderDutyEventRepository dutyEvents,
@@ -87,7 +89,8 @@ public class PresenceService {
                            StringRedisTemplate redis,
                            ObjectMapper objectMapper,
                            @Value("${delivery.tracking.presence.ttl:120s}") Duration presenceWindow,
-                           @Value("${delivery.tracking.presence.persist-interval:30s}") Duration persistInterval) {
+                           @Value("${delivery.tracking.presence.persist-interval:30s}") Duration persistInterval,
+                           FleetMembershipGuard fleetGuard) {
         this.presence = presence;
         this.dutyEvents = dutyEvents;
         this.dutySessions = dutySessions;
@@ -98,6 +101,7 @@ public class PresenceService {
         this.objectMapper = objectMapper;
         this.presenceWindow = presenceWindow;
         this.persistInterval = persistInterval;
+        this.fleetGuard = fleetGuard;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -281,7 +285,13 @@ public class PresenceService {
         // no row here until somebody asks Order Manager for one. The RIDER's fleet is only ever
         // read — we hold no token for them, and an order event is how a rider's row appears.
         Optional<UUID> callerCarrier = carrierScope.scopeFor(callerId);
-        if (callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))) {
+        // The local linkage only nominates: it is learned from order events, and nothing but a
+        // membership event clears it. Order Manager, asked with the caller's own token, confirms
+        // the rider is on that fleet NOW, so a company that let the rider go stops seeing where
+        // they are, and an Order Manager that cannot be reached refuses rather than trusting the
+        // linkage. Asked last, so a customer or a stranger never costs a cross-service call.
+        if (callerCarrier.isPresent() && callerCarrier.equals(carrierOf(riderId))
+                && fleetGuard.isOnCallersFleet(callerId, riderId)) {
             return true;
         }
         return participants.customerHasLiveOrderWith(callerId, riderId);
@@ -321,6 +331,14 @@ public class PresenceService {
             rows = onDutyOnly
                     ? presence.findByCarrierIdAndDutyStateOrderByLastSeenAtDesc(scope, DutyState.ON_DUTY)
                     : presence.findByCarrierIdOrderByLastSeenAtDesc(scope);
+        }
+
+        if (!isBackoffice) {
+            // Only riders on the caller's fleet NOW, as Order Manager has it. A membership event
+            // clears the carrier_id the query above filters on, but an event can be late or lost,
+            // and without this a company that let a rider go could keep their live position and
+            // duty on its roster. See FleetMembershipGuard.
+            rows = fleetGuard.retainCallersFleet(callerId, rows, RiderPresence::getRiderId);
         }
 
         return rows.stream()

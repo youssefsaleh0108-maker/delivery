@@ -124,4 +124,62 @@ public class CarrierDirectoryClient {
                     "Could not reach Order Manager to find your delivery company", e);
         }
     }
+
+    /**
+     * Who is on the fleet of the delivery company this token's bearer is staff of, as Order Manager
+     * has it at this moment — what {@code FleetMembershipGuard} asks before a carrier reads anything
+     * about one rider.
+     *
+     * <p>The same envelope rules as {@link #companyFor}: a 404 or a 403 is a fact — the bearer runs
+     * no company — and reads as a fleet with nobody on it; anything else that stops Order Manager
+     * answering is an outage and throws, so it can never be mistaken for that fact.
+     *
+     * @param bearerToken the caller's own token, without the "Bearer " prefix
+     * @return the riders' Keycloak subjects; empty when the bearer is staff of no company
+     */
+    public java.util.Set<String> ridersFor(String bearerToken) {
+        try {
+            JsonNode body = orders.get()
+                    .uri("/api/delivery-providers/my-company/riders")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken)
+                    .retrieve()
+                    .body(JsonNode.class);
+            return ridersIn(body);
+
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404 || e.getStatusCode().value() == 403) {
+                return java.util.Set.of();
+            }
+            log.error("Could not read the caller's fleet: {} {}", e.getStatusCode(), e.getMessage());
+            throw new DirectoryUnavailableException(
+                    "Could not reach Order Manager to confirm your fleet", e);
+
+        } catch (RestClientException e) {
+            log.error("Could not reach Order Manager to read a fleet: {}", e.getMessage());
+            throw new DirectoryUnavailableException(
+                    "Could not reach Order Manager to confirm your fleet", e);
+        }
+    }
+
+    /**
+     * The rider list out of Order Manager's {@code ProviderRidersResponse}.
+     *
+     * <p>A 200 without one is Order Manager contradicting itself, and is refused as an outage rather
+     * than read as a fleet with nobody on it — which would tell a dispatcher that every rider had
+     * left at once.
+     */
+    static java.util.Set<String> ridersIn(JsonNode body) {
+        JsonNode riders = body == null ? null : body.get("riders");
+        if (riders == null || !riders.isArray()) {
+            throw new DirectoryUnavailableException(
+                    "Order Manager returned a fleet with no rider list", null);
+        }
+        java.util.Set<String> refs = new java.util.HashSet<>();
+        for (JsonNode rider : riders) {
+            if (rider.isTextual() && !rider.asText().isBlank()) {
+                refs.add(rider.asText());
+            }
+        }
+        return java.util.Set.copyOf(refs);
+    }
 }
