@@ -161,7 +161,9 @@ void main() {
       expect(find.text(en.offlineBackOnline), findsNothing);
     });
 
-    testWidgets('its "Saved items" opens the cached catalog', (WidgetTester tester) async {
+    testWidgets('its "Saved items" opens the cached catalog where the frame draws it — in the Orders '
+        'tab, under the strip and over the nav bar — and back returns to the order list',
+        (WidgetTester tester) async {
       final ConnectivityService connectivity = ConnectivityService();
       addTearDown(connectivity.dispose);
       await pumpShell(tester, connectivity);
@@ -176,6 +178,34 @@ void main() {
       expect(find.text(en.offlineModeBadge), findsOneWidget);
       // Nothing was ever bought on this account, so nothing was saved.
       expect(find.text(en.offlineNothingSaved), findsOneWidget);
+
+      // The strip still over it, the nav bar still under it, with Orders lit.
+      expect(find.text(en.offlineBanner), findsOneWidget);
+      expect(tester.widget<CustomerNavBar>(find.byType(CustomerNavBar)).index,
+          CustomerNavBar.ordersIndex);
+      final Rect strip = tester.getRect(find
+          .ancestor(of: find.text(en.offlineBanner), matching: find.byType(ColoredBox))
+          .first);
+      final Rect title = tester.getRect(find.text(en.offlineCachedCatalogTitle));
+      expect(title.top, greaterThanOrEqualTo(strip.bottom));
+      expect(title.bottom, lessThanOrEqualTo(tester.getRect(find.byType(CustomerNavBar)).top));
+      // No link to the page already showing.
+      expect(find.text(en.offlineSavedItems), findsNothing);
+
+      // Its back chip returns to the order list.
+      await tester.tap(find.byType(YdBackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(CachedCatalogScreen), findsNothing);
+      expect(find.text(en.custYourOrders), findsOneWidget);
+
+      // So does the system back gesture, which closes the catalog rather than leaving the app.
+      await tester.tap(find.text(en.offlineSavedItems));
+      await tester.pumpAndSettle();
+      expect(find.byType(CachedCatalogScreen), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(CachedCatalogScreen), findsNothing);
+      expect(find.text(en.custYourOrders), findsOneWidget);
     });
 
     testWidgets('in Arabic the pill leads from the right and "Saved items" ends it on the left',

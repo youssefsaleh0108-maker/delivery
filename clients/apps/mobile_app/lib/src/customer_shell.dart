@@ -155,9 +155,21 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
 
   int _index = CustomerNavBar.homeIndex;
 
+  /// Whether the Orders tab is showing the cached catalog instead of the order list.
+  ///
+  /// The frame (121:279) draws the catalog inside the app — the offline strip above it, the nav bar
+  /// below with Orders lit — so it opens here, in the Orders tab's place, rather than as a route
+  /// pushed over the shell, which would cover both.
+  bool _catalogOpen = false;
+
   /// Moves to a tab. The one place the index is written, so a screen that wants to send somebody
   /// to Orders says so by name and cannot be broken by the order changing again.
-  void _open(int tab) => setState(() => _index = tab);
+  ///
+  /// Closes the cached catalog on the way: a tab tapped shows that tab's own screen, Orders too.
+  void _open(int tab) => setState(() {
+        _index = tab;
+        _catalogOpen = false;
+      });
 
   /// Opens the Basket tab from anywhere — including from a screen pushed over this shell, which is
   /// where every "View basket" in the app lives.
@@ -252,18 +264,14 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     _refreshCatalog(force: true);
   }
 
-  /// The offline banner's "Saved items".
-  void _openCachedCatalog() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => CachedCatalogScreen(
-        catalog: _catalog,
-        cart: _cart,
-        connectivity: _online,
-        outbox: _outbox,
-        onOpenBasket: _openBasket,
-      ),
-    ));
-  }
+  /// The offline banner's "Saved items": the cached catalog, in the Orders tab.
+  void _openCachedCatalog() => setState(() {
+        _index = CustomerNavBar.ordersIndex;
+        _catalogOpen = true;
+      });
+
+  /// The catalog's back chip, and the system back gesture while it shows: back to the order list.
+  void _closeCachedCatalog() => setState(() => _catalogOpen = false);
 
   @override
   void initState() {
@@ -338,15 +346,34 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           onOpenBasket: _openBasket,
         );
       case CustomerNavBar.ordersIndex:
-        return MyOrdersScreen(
-          api: widget.orderApi,
-          storeApi: widget.storeApi,
-          trackingApi: widget.trackingApi,
-          trackingSocket: widget.trackingSocket,
-          chatApi: widget.chatApi,
-          cart: _cart,
-          onOpenBasket: _openBasket,
-          outbox: _outbox,
+        // The order list stays mounted under the catalog, so closing the catalog lands back on the
+        // list as it was — scroll position and loaded orders — rather than on a fresh fetch.
+        return IndexedStack(
+          index: _catalogOpen ? 1 : 0,
+          sizing: StackFit.expand,
+          children: <Widget>[
+            MyOrdersScreen(
+              api: widget.orderApi,
+              storeApi: widget.storeApi,
+              trackingApi: widget.trackingApi,
+              trackingSocket: widget.trackingSocket,
+              chatApi: widget.chatApi,
+              cart: _cart,
+              onOpenBasket: _openBasket,
+              outbox: _outbox,
+            ),
+            if (_catalogOpen)
+              CachedCatalogScreen(
+                catalog: _catalog,
+                cart: _cart,
+                connectivity: _online,
+                outbox: _outbox,
+                onOpenBasket: _openBasket,
+                onBack: _closeCachedCatalog,
+              )
+            else
+              const SizedBox.shrink(),
+          ],
         );
       case CustomerNavBar.butlerIndex:
         return ButlerScreen(
@@ -414,44 +441,53 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
       // Both drive badges in the bar below, so both have to rebuild it.
       animation: Listenable.merge(<Listenable>[_cart, _inbox, _addresses]),
       builder: (BuildContext context, _) {
-        return Scaffold(
-          // The profile side menu, opened from the home header's avatar. On the SHELL's scaffold
-          // rather than a screen's so it slides over everything, nav bar included, the way the
-          // frame draws it.
-          drawer: ProfileDrawer(
-            session: widget.session,
-            addresses: _addresses,
-            zoneApi: widget.zoneApi,
-            onSignOut: widget.onSignOut,
-            locale: widget.locale,
-            inbox: _inbox,
-            profileApi: widget.profileApi,
-            onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
-          ),
-          // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight requests
-          // alive, so switching to the basket and back does not refetch the catalog.
-          //
-          // The order is the design's, and it is written down once in [CustomerNavBar]. The list
-          // below is built by index rather than as a literal so the two cannot drift: a stack whose
-          // third child is not Butler is a bar that opens the wrong screen, and nothing about the
-          // code would look wrong.
-          //
-          // The offline banner wraps the stack rather than any one tab: it is true whichever tab is
-          // showing, and above the stack it can never cover the nav bar below.
-          body: OfflineBanner(
-            connectivity: _online,
-            onOpenSaved: _openCachedCatalog,
-            child: IndexedStack(
-              index: _index,
-              children: <Widget>[
-                for (int tab = 0; tab < CustomerNavBar.tabCount; tab++) _tabAt(tab),
-              ],
+        // While the catalog shows, back means back to the order list, not out of the shell.
+        return PopScope<Object?>(
+          canPop: !_catalogOpen,
+          onPopInvokedWithResult: (bool didPop, Object? _) {
+            if (!didPop) _closeCachedCatalog();
+          },
+          child: Scaffold(
+            // The profile side menu, opened from the home header's avatar. On the SHELL's scaffold
+            // rather than a screen's so it slides over everything, nav bar included, the way the
+            // frame draws it.
+            drawer: ProfileDrawer(
+              session: widget.session,
+              addresses: _addresses,
+              zoneApi: widget.zoneApi,
+              onSignOut: widget.onSignOut,
+              locale: widget.locale,
+              inbox: _inbox,
+              profileApi: widget.profileApi,
+              onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
             ),
-          ),
-          bottomNavigationBar: CustomerNavBar(
-            index: _index,
-            basketCount: _cart.itemCount,
-            onSelected: _open,
+            // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight
+            // requests alive, so switching to the basket and back does not refetch the catalog.
+            //
+            // The order is the design's, and it is written down once in [CustomerNavBar]. The list
+            // below is built by index rather than as a literal so the two cannot drift: a stack
+            // whose third child is not Butler is a bar that opens the wrong screen, and nothing
+            // about the code would look wrong.
+            //
+            // The offline banner wraps the stack rather than any one tab: it is true whichever tab
+            // is showing — the cached catalog included — and above the stack it can never cover the
+            // nav bar below.
+            body: OfflineBanner(
+              connectivity: _online,
+              // No link to the page already showing.
+              onOpenSaved: _catalogOpen ? null : _openCachedCatalog,
+              child: IndexedStack(
+                index: _index,
+                children: <Widget>[
+                  for (int tab = 0; tab < CustomerNavBar.tabCount; tab++) _tabAt(tab),
+                ],
+              ),
+            ),
+            bottomNavigationBar: CustomerNavBar(
+              index: _index,
+              basketCount: _cart.itemCount,
+              onSelected: _open,
+            ),
           ),
         );
       },

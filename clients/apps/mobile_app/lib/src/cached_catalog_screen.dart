@@ -14,7 +14,9 @@ import 'outbox_card.dart';
 /// Laid out as the frame draws it: the 56px header with its back chip, the title over the shop's
 /// name, and the brand "Offline Mode" pill on the end; then "Your Last Cached Purchases" as a
 /// horizontal track of 160px cards, each with its photo, name, price and a "Quick Add"; then the
-/// queued checkouts. Pushed from the offline banner's "Saved items", so it is one tap from any tab.
+/// queued checkouts. Opened by the offline strip's "Saved items" from any tab, and shown where the
+/// frame draws it: in the Orders tab, under the strip and above the nav bar, with its back chip
+/// returning to the order list ([onBack]).
 ///
 /// The prices are the ones saved with the shelf, and a line under the heading says when that was.
 /// The design's "Offline Mode" pill appears only while offline — once the connection is back this
@@ -32,6 +34,7 @@ class CachedCatalogScreen extends StatelessWidget {
     required this.connectivity,
     required this.onOpenBasket,
     this.outbox,
+    this.onBack,
   });
 
   final OfflineCatalog catalog;
@@ -41,6 +44,10 @@ class CachedCatalogScreen extends StatelessWidget {
 
   /// The shell's way to its Basket tab, offered on the "added" message.
   final VoidCallback onOpenBasket;
+
+  /// What the back chip does. The shell closes the catalog back to the order list; null — the
+  /// screen on a route of its own, as in a test — pops the route.
+  final VoidCallback? onBack;
 
   void _quickAdd(BuildContext context, CachedProduct item) {
     final DeliveryStrings t = DeliveryStrings.of(context);
@@ -72,7 +79,7 @@ class CachedCatalogScreen extends StatelessWidget {
           appBar: YdScreenHeader(
             title: t.offlineCachedCatalogTitle,
             subtitle: catalog.store?.name,
-            onBack: () => Navigator.of(context).maybePop(),
+            onBack: onBack ?? () => Navigator.of(context).maybePop(),
             backSemanticLabel: t.back,
             trailing: offline ? YdBadge.brand(label: t.offlineModeBadge, uppercase: false) : null,
           ),
