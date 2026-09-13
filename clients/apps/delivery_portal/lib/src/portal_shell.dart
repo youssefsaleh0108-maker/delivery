@@ -10,6 +10,7 @@ import 'backoffice/banners_screen.dart';
 import 'backoffice/catalog_screen.dart';
 import 'backoffice/categories_screen.dart';
 import 'backoffice/dashboard_screen.dart';
+import 'backoffice/moderation_screen.dart';
 import 'backoffice/offers_screen.dart';
 import 'backoffice/onboarding_screen.dart';
 import 'backoffice/overview_screen.dart';
@@ -68,6 +69,8 @@ class PortalApis {
     required this.inventory,
     required this.staff,
     required this.reports,
+    required this.shopChat,
+    required this.moderation,
   });
 
   final CatalogApi catalog;
@@ -114,6 +117,12 @@ class PortalApis {
   final InventoryApi inventory;
   final StoreStaffApi staff;
   final ReportsApi reports;
+
+  /// Customers' conversations with the merchant's shops.
+  final ShopChatApi shopChat;
+
+  /// The neighbourhood chat moderation queue. BACKOFFICE-only on the server.
+  final ChatModerationApi moderation;
 }
 
 /// One destination in a rail.
@@ -289,6 +298,14 @@ class PortalArea {
           storeId: storeId,
           access: const MerchantAccess.owner(),
         )),
+      ),
+      // Appended, like the suite above, so no earlier index moves. The server decides which shops'
+      // conversations the signed-in merchant reads, so the page needs no store id.
+      PortalDestination(
+        icon: Icons.forum_outlined,
+        selectedIcon: Icons.forum,
+        label: (DeliveryStrings t) => t.chatShopInboxTitle,
+        build: (PortalApis a, _, __, ___) => ShopInboxScreen(api: a.shopChat, embedded: true),
       ),
     ],
   );
@@ -533,6 +550,15 @@ class PortalArea {
         label: (DeliveryStrings _) => 'Promo Codes',
         build: (PortalApis a, _, __, ___) =>
             PromotionsScreen(api: a.promo, notificationApi: a.notification),
+      ),
+      // Neighbourhood chat's reported messages. Late in the rail, because it is worked in bursts
+      // when reports come in, and before Settings, which stays last. Nothing jumps to an index
+      // after Orders, so no link moves.
+      PortalDestination(
+        icon: Icons.shield_outlined,
+        selectedIcon: Icons.shield,
+        label: (DeliveryStrings t) => t.chatModerationTitle,
+        build: (PortalApis a, _, __, ___) => ModerationScreen(api: a.moderation),
       ),
       // Last, and deliberately so: the least-used and most consequential page here.
       PortalDestination(
