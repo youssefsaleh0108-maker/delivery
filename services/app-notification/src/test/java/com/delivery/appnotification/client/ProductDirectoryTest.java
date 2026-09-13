@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
@@ -103,6 +105,53 @@ class ProductDirectoryTest {
                 .andRespond(withServerError());
 
         assertThatThrownBy(() -> directory.activeZone(MAR_MIKHAEL))
+                .isInstanceOf(DirectoryUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("reads a storefront the caller can see, and treats a 404 as no such shop")
+    void storefront_or_nothing() {
+        signedInWith("customer-token");
+        UUID visible = UUID.fromString("33333333-3333-3333-3333-333333333333");
+        UUID hidden = UUID.fromString("44444444-4444-4444-4444-444444444444");
+        server.expect(once(), requestTo("http://product-service/api/stores/" + visible))
+                .andExpect(header("Authorization", "Bearer customer-token"))
+                .andRespond(withSuccess("{\"id\":\"" + visible + "\",\"name\":\"Abu Hassan Mini Market\","
+                        + "\"slug\":\"abu-hassan\",\"rating\":4.6}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo("http://product-service/api/stores/" + hidden))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(directory.storefront(visible))
+                .hasValueSatisfying(store -> assertThat(store.name()).isEqualTo("Abu Hassan Mini Market"));
+        assertThat(directory.storefront(hidden)).isEmpty();
+    }
+
+    /** The only way a shop's owner is known: Product Service answering for the merchant's own token. */
+    @Test
+    @DisplayName("learns a merchant's shops from /api/stores/mine asked with their own token")
+    void a_merchants_own_shops() {
+        signedInWith("merchant-token");
+        server.expect(once(), requestTo("http://product-service/api/stores/mine?size=100"))
+                .andExpect(header("Authorization", "Bearer merchant-token"))
+                .andRespond(withSuccess("{\"content\":[{\"id\":\"33333333-3333-3333-3333-333333333333\","
+                        + "\"name\":\"Abu Hassan Mini Market\"}],\"page\":0,\"size\":100,"
+                        + "\"totalElements\":1,\"totalPages\":1}", MediaType.APPLICATION_JSON));
+
+        assertThat(directory.storesOwnedByCaller())
+                .containsExactly(UUID.fromString("33333333-3333-3333-3333-333333333333"));
+    }
+
+    @Test
+    @DisplayName("a caller Product Service does not treat as a merchant owns nothing; a failure is not 'nothing'")
+    void forbidden_is_nothing_and_failure_is_unavailable() {
+        signedInWith("customer-token");
+        server.expect(once(), requestTo("http://product-service/api/stores/mine?size=100"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+        server.expect(once(), requestTo("http://product-service/api/stores/mine?size=100"))
+                .andRespond(withServerError());
+
+        assertThat(directory.storesOwnedByCaller()).isEmpty();
+        assertThatThrownBy(() -> directory.storesOwnedByCaller())
                 .isInstanceOf(DirectoryUnavailableException.class);
     }
 

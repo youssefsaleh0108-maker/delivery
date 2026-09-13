@@ -164,6 +164,16 @@ delivery:
       # The send rate limit: at most this many messages per window, per person, across all rooms.
       send-window: 1m
       max-messages-per-window: ${CHAT_ROOM_MAX_MESSAGES_PER_WINDOW:8}
+    # Customer <-> shop threads. See ShopChatProperties for the reasoning behind each number.
+    shop-threads:
+      # A thread closes this long after the customer's last activity; only the customer reopens it.
+      idle-close-after: ${CHAT_SHOP_THREAD_IDLE_CLOSE:14d}
+      history-page-size: 100
+      inbox-page-size: 100
+      send-window: 1m
+      max-messages-per-window: 20
+      # How long Product Service's "this merchant owns this shop" is trusted before asking again.
+      owner-confirmation-ttl: 10m
 
   # Product Service answers what chat cannot know alone: whether a delivery area is real, whether a
   # shop exists, which shops a merchant owns. Always asked with the caller's own token.
