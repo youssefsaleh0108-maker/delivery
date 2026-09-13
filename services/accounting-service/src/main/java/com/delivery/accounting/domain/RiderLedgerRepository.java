@@ -96,4 +96,37 @@ public interface RiderLedgerRepository extends JpaRepository<RiderLedgerEntry, U
      */
     boolean existsByOrderIdAndRiderRefAndEntryType(UUID orderId, String riderRef,
                                                    EntryType entryType);
+
+    /**
+     * Every job a delivery company's riders did for it in a window, by when the work happened.
+     *
+     * <p>The amount on each row is what the platform credited the COMPANY for that job (see
+     * {@code SettlementService.creditRider}), so this is "what your riders earned for you", which is
+     * the one per-rider figure the platform can state truthfully about a carrier's fleet. What the
+     * company pays the rider is its own employment contract and is nowhere in this ledger.
+     *
+     * <p>Uses {@code idx_rider_ledger_carrier}, which V46 created for exactly this and nothing read.
+     */
+    @Query("""
+            SELECT e FROM RiderLedgerEntry e
+             WHERE e.carrierRef = :carrier
+               AND e.fleet = com.delivery.accounting.domain.RiderLedgerEntry$Fleet.CARRIER
+               AND e.entryType = com.delivery.accounting.domain.RiderLedgerEntry$EntryType.JOB_EARNING
+               AND e.earnedAt >= :from AND e.earnedAt < :to
+             ORDER BY e.earnedAt ASC
+            """)
+    List<RiderLedgerEntry> jobsForCarrierBetween(@Param("carrier") String carrier,
+                                                 @Param("from") Instant from,
+                                                 @Param("to") Instant to);
+
+    /**
+     * Whether this rider has ever done a job for this delivery company.
+     *
+     * <p>The other half of "is this rider one of ours" on the company's cash pages. A rider whose
+     * shifts for the company were all card orders never produced a float row, yet the company's
+     * reconciliation list shows their day's jobs — so their settlement page must open too, showing
+     * nothing held, rather than calling them a stranger.
+     */
+    boolean existsByRiderRefAndCarrierRefAndFleet(String riderRef, String carrierRef,
+                                                  RiderLedgerEntry.Fleet fleet);
 }

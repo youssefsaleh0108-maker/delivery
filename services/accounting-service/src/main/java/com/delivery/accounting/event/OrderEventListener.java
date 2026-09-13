@@ -140,7 +140,8 @@ public class OrderEventListener {
             if ("CASH".equals(event.path("paymentMethod").asText(null))) {
                 if (riderId != null) {
                     holder = new SettlementService.CashHolder(
-                            riderId, CashFloatEntry.HolderKind.RIDER);
+                            riderId, CashFloatEntry.HolderKind.RIDER,
+                            carrierOwningTheCash(event, errand));
                 } else {
                     log.warn("Order {} was paid in cash but names no rider; recording the "
                             + "collection against the customer, which overstates their account.",
@@ -276,6 +277,32 @@ public class OrderEventListener {
             // because the tip is already recorded.
             log.warn("Tip on order {} not recorded: {}", orderId, e.getMessage());
         }
+    }
+
+    /**
+     * The delivery company a cash order's notes are owed to, or null when they are owed to the
+     * platform.
+     *
+     * <p>The owner's rule: a delivery company holds its riders' cash. So a catalog order carried by a
+     * company's rider names that company, and the rider hands the notes to it rather than to the
+     * platform. Decided by the same discriminator the fee split turns on —
+     * {@code deliveryProviderAccount} is null for the platform's own riders — so the fee and the cash
+     * can never disagree about which fleet carried the job.
+     *
+     * <p>Never for an errand. The rider fronted the goods on the platform's instruction and every row
+     * of an errand is platform-payable whoever they ride for; a company that never saw that
+     * transaction cannot be made answerable for its cash.
+     */
+    private static String carrierOwningTheCash(JsonNode event, boolean errand) {
+        if (errand) {
+            return null;
+        }
+        String carrierAccount = event.path("deliveryProviderAccount").asText(null);
+        if (carrierAccount == null) {
+            return null;
+        }
+        String providerId = event.path("deliveryProviderId").asText(null);
+        return providerId == null || providerId.isBlank() ? null : providerId;
     }
 
     /**

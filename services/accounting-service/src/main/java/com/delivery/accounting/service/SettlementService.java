@@ -134,8 +134,29 @@ public class SettlementService {
      *
      * <p>Null means it was not — a card order has no holder, because the money went straight to a
      * bank account and nobody is carrying it.
+     *
+     * @param carrierRef the delivery company the rider carried this job for, or null on the
+     *                   platform's own fleet. It decides who the rider owes the notes to: their
+     *                   company, which then owes the platform, or the platform directly. Stamped on
+     *                   the float row at collection so the cash stays that company's responsibility
+     *                   even if the rider later moves fleet
      */
-    public record CashHolder(String ref, CashFloatEntry.HolderKind kind) {
+    public record CashHolder(String ref, CashFloatEntry.HolderKind kind, String carrierRef) {
+
+        /** A holder on the platform's own fleet — the shape of every cash order before V50. */
+        public CashHolder(String ref, CashFloatEntry.HolderKind kind) {
+            this(ref, kind, null);
+        }
+
+        /**
+         * The same holder with no company attached.
+         *
+         * <p>For an errand: the rider fronted the goods on the PLATFORM's instruction and every row
+         * of it is platform-payable whoever they ride for, so the cash is the platform's too.
+         */
+        CashHolder owedToPlatform() {
+            return carrierRef == null ? this : new CashHolder(ref, kind, null);
+        }
     }
 
     /**
@@ -558,7 +579,9 @@ public class SettlementService {
         BigDecimal riderShare = amount.subtract(commission);
 
         List<AccountingTransaction> legs = new ArrayList<>();
-        legs.add(collectionLeg(orderId, amount, customerAccount, cashHolder, correlationId));
+        // An errand's cash is always the platform's — see CashHolder.owedToPlatform.
+        legs.add(collectionLeg(orderId, amount, customerAccount,
+                cashHolder == null ? null : cashHolder.owedToPlatform(), correlationId));
         // The rider is the payee here, so the rider record IS the attribution — there is no separate
         // Parties argument on this path because an errand has no merchant and no carrier.
         legs.add(new AccountingTransaction(orderId, Leg.RIDER_CREDIT, riderAccount,
@@ -730,9 +753,13 @@ public class SettlementService {
 
         // Guarded as well as constrained: the bus delivers at least once, and booking the same
         // order's cash twice would invent a debt the holder does not owe.
+        //
+        // The company rides along on the row: on a delivery company's job the rider owes these
+        // notes to their company, not to the platform, and that is decided here, once, from the
+        // event — never re-read from wherever the rider happens to ride later.
         if (!floatEntries.existsByOrderIdAndEntryKind(orderId, CashFloatEntry.Kind.COLLECTED)) {
             floatEntries.save(CashFloatEntry.collected(
-                    holder.ref(), holder.kind(), orderId, amount, currency));
+                    holder.ref(), holder.kind(), orderId, amount, currency, holder.carrierRef()));
         }
 
         // Attributed to whoever took the notes, which is what makes a rider's statement able to say

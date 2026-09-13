@@ -185,13 +185,51 @@ public class StatementService {
         BigDecimal owed = ledger.sumOf(Leg.PROVIDER_CREDIT);
         Attribution take = ledger.platformTake(CounterpartyKind.CARRIER, ref);
 
-        List<Statement.Line> lines = grossUp("Delivery fees", owed, take,
-                ledger.orderCount() + " jobs");
+        List<Statement.Line> lines = new ArrayList<>(grossUp("Delivery fees", owed, take,
+                ledger.orderCount() + " jobs"));
+
+        // The company's cash, since delivery companies hold their riders' takings (V50). Both halves
+        // shown, as on a rider's statement: what its riders handed over is the platform's money in
+        // the company's safe, and what it paid the platform discharges that. A company that has
+        // never taken custody of anything gets neither line and reads exactly as it always did.
+        BigDecimal received = orZero(floatEntries.custodyReceivedBetween(
+                ref, range.fromInstant(), range.toExclusive()));
+        BigDecimal paid = orZero(floatEntries.carrierPaidBetween(
+                ref, range.fromInstant(), range.toExclusive()));
+        addIfAny(lines, Statement.Line.debit("Cash handed over by your riders", received,
+                "the platform's money, now held by your company"));
+        addIfAny(lines, Statement.Line.credit("Cash paid to the platform", paid, null));
+
+        // Independently of the lines, as on every statement: the fee legs, plus what was paid in,
+        // less what was taken into custody.
+        BigDecimal control = owed.add(paid).subtract(received);
 
         List<Statement.Entry> entries = ledger.entriesFor(Leg.PROVIDER_CREDIT, take);
         return Statement.of(CounterpartyKind.CARRIER, ref, name, range, currency,
-                lines, owed, entries, ledger.orderCount(),
-                note(range, ledger, take, "delivery fees"));
+                lines, control, entries, ledger.orderCount(),
+                withCustodyNote(note(range, ledger, take, "delivery fees"), ref, received, paid));
+    }
+
+    /**
+     * Adds what a company is holding right now, whenever its riders handed it over.
+     *
+     * <p>For the reason {@link #riderNote} states it for a rider: cash handed over in July and still
+     * not paid in August is a fact about today that an August window cannot show. Said only when it
+     * differs from what this period alone would suggest, so a quiet company's note stays quiet.
+     */
+    private String withCustodyNote(String note, String ref, BigDecimal received, BigDecimal paid) {
+        BigDecimal held = orZero(floatEntries.outstandingTotalFor(ref));
+        if (held.signum() == 0 || held.compareTo(received.subtract(paid)) == 0) {
+            return note;
+        }
+        String custody = "Your company is holding " + Statement.money(held) + " " + currency
+                + " of platform cash in total, handed over by your riders and not yet paid to the "
+                + "platform, including anything from before this period.";
+        return note == null ? custody : note + " " + custody;
+    }
+
+    private static BigDecimal orZero(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO : amount;
     }
 
     // ---------------------------------------------------------------------------------- rider
@@ -241,6 +279,11 @@ public class StatementService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal remitted = floatEntries.totalForHolderBetween(
                 ref, CashFloatEntry.Kind.REMITTED, range.fromInstant(), range.toExclusive());
+        // Cash a delivery company's rider handed to their company (V50). It left their pocket as
+        // surely as banked cash did, so it balances the collection the same way; it is its own line
+        // because "banked with the platform" is exactly what it is not.
+        BigDecimal handedOver = orZero(floatEntries.handedOverBetween(
+                ref, range.fromInstant(), range.toExclusive()));
 
         long jobs = payable.stream().filter(e -> e.getEntryType() == EntryType.JOB_EARNING).count();
 
@@ -256,6 +299,8 @@ public class StatementService {
         addIfAny(lines, Statement.Line.debit("Cash collected from customers", collected,
                 "the platform's money, taken at the door"));
         addIfAny(lines, Statement.Line.credit("Cash banked", remitted, null));
+        addIfAny(lines, Statement.Line.credit("Cash handed to your delivery company", handedOver,
+                "your company now answers to the platform for it"));
 
         // Computed from the rows rather than from the lines above, so it is a real check and not a
         // restatement. It fires if a new rider-ledger entry type is ever added without a line here:
@@ -264,6 +309,7 @@ public class StatementService {
                 .map(RiderLedgerEntry::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .add(remitted)
+                .add(handedOver)
                 .subtract(collected);
 
         return Statement.of(CounterpartyKind.RIDER, ref, name, range, currency,
@@ -276,7 +322,7 @@ public class StatementService {
                         .filter(java.util.Objects::nonNull)
                         .distinct()
                         .count()),
-                riderNote(ref, rows, collected, remitted));
+                riderNote(ref, rows, collections, collected, remitted.add(handedOver)));
     }
 
     /**
@@ -355,9 +401,25 @@ public class StatementService {
      * genuinely has, and all three are excluded from the net — so leaving them unsaid is how a
      * statement can be arithmetically perfect and still read as short-paying somebody.
      */
-    private String riderNote(String ref, List<RiderLedgerEntry> rows, BigDecimal collected,
+    private String riderNote(String ref, List<RiderLedgerEntry> rows,
+                             List<CashFloatEntry> collections, BigDecimal collected,
                              BigDecimal remitted) {
         List<String> notes = new ArrayList<>();
+
+        // Who the door cash is owed to, when it is not the platform. A delivery company's rider
+        // hands their takings to the company (V50), and a statement that only said "the platform's
+        // money" would send them to the wrong counter with it.
+        BigDecimal forCompany = collections.stream()
+                .filter(c -> c.getCarrierRef() != null)
+                .map(CashFloatEntry::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Worded as a fact rather than an instruction: the same statement is read after the hand-over
+        // too, and "hand that to your company" would then tell a rider to pay twice.
+        if (forCompany.signum() != 0) {
+            notes.add(Statement.money(forCompany) + " " + currency + " of the cash collected in "
+                    + "this period was on jobs for your delivery company. That cash is owed to your "
+                    + "company, which settles it with the platform.");
+        }
 
         BigDecimal carrierOwed = rows.stream()
                 .filter(e -> e.getPayableBy() == PayableBy.CARRIER)

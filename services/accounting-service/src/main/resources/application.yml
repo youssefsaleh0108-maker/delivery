@@ -159,6 +159,20 @@ delivery:
       platform-recipient:
       platform-name: The platform
 
+    float:
+      # How long door cash may be held before it is called overdue. Two lines, because the owner's
+      # decision that delivery companies hold their riders' cash changed one kind of cash and not
+      # the other.
+      #
+      # A rider of the platform's own fleet owes the platform directly and keeps the rule the Back
+      # Office has always flagged them by: bank it within a day.
+      platform-overdue-after-hours: 24
+      # Cash in a delivery company's custody: with one of its riders, or with the company after a
+      # hand-over. The carrier design asks for two days. Served from here to the company's own
+      # reconciliation page and to the Back Office's list alike, so both sides of a hand-over agree
+      # on what "late" means.
+      carrier-overdue-after-hours: 48
+
     order-events-queue: accounting.order-events
     results-queue: accounting.posting-results
     platform-account: ACC-PLATFORM

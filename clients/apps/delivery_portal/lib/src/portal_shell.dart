@@ -24,6 +24,8 @@ import 'backoffice/statements_screen.dart';
 // delivers to. The prefix goes on this one because it is the local file of the two.
 import 'backoffice/zones_screen.dart' as backoffice;
 import 'carrier/applicants_screen.dart';
+// carr-cash (feat/carrier-cash-custody): the Reconciliation destination below.
+import 'carrier/cash_reconciliation_screen.dart';
 import 'carrier/company_screen.dart';
 import 'carrier/dashboard_screen.dart';
 import 'carrier/earnings_screen.dart';
@@ -362,6 +364,24 @@ class PortalArea {
         label: (DeliveryStrings _) => 'Statement',
         build: (PortalApis a, _, __, ___) => CarrierStatementScreen(api: a.statements),
       ),
+      // ---- carr-cash (feat/carrier-cash-custody) ------------------------------------------------
+      // Rider cash reconciliation, Figma 112:9, with each rider's settlement page (112:235) opening
+      // inside it so this item stays selected, as the design draws it. Right after Statement
+      // because both are the ledger's figures for this company: the statement is what the platform
+      // owes it; this is the cash its riders owe it, and what it owes the platform in turn. Nothing
+      // is inserted before Jobs, which the dashboard reaches with jump(1). A carrier rail being
+      // restructured elsewhere only needs to keep this one destination.
+      PortalDestination(
+        icon: Icons.calculate_outlined,
+        selectedIcon: Icons.calculate,
+        label: (DeliveryStrings t) => t.carrCashNavLabel,
+        build: (PortalApis a, _, __, ___) => CarrierCashScreen(
+          api: a.accounting.carrierCash,
+          notificationApi: a.notification,
+          orderApi: a.order,
+        ),
+      ),
+      // ---- end carr-cash ------------------------------------------------------------------------
       // The design's `users-round` glyph. This is the fleet page — the company's own record is on
       // Settings now, where the design puts it.
       PortalDestination(
@@ -499,7 +519,9 @@ class PortalArea {
         icon: Icons.account_balance_outlined,
         selectedIcon: Icons.account_balance,
         label: (DeliveryStrings t) => t.navFinance,
-        build: (PortalApis a, _, __, ___) => ReconciliationScreen(api: a.accounting),
+        // carr-cash: the provider API names the delivery companies holding cash.
+        build: (PortalApis a, _, __, ___) =>
+            ReconciliationScreen(api: a.accounting, providerApi: a.provider),
       ),
       // Immediately after Finance, and deliberately so: Reconciliation answers "what has not
       // settled" inside our own books, and this answers the question that follows it — who are we

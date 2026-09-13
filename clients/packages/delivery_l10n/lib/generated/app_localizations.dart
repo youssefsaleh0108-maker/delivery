@@ -63,7 +63,7 @@ import 'app_localizations_en.dart';
 /// property.
 abstract class DeliveryStrings {
   DeliveryStrings(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class DeliveryStrings {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
-    Locale('en')
+    Locale('en'),
   ];
 
   /// No description provided for @appTitle.
@@ -13195,6 +13195,642 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'We couldn\'t confirm this order\'s total for this address, so it can\'t wait for the connection. Try again when you\'re back online.'**
   String get offlineQueueTotalUnknown;
+
+  /// No description provided for @carrCashNavLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation'**
+  String get carrCashNavLabel;
+
+  /// No description provided for @carrCashTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Cash Reconciliation'**
+  String get carrCashTitle;
+
+  /// No description provided for @carrCashSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Match the cash your riders collected against what they hand over'**
+  String get carrCashSubtitle;
+
+  /// No description provided for @carrCashTodayChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Today: {date}'**
+  String carrCashTodayChip(String date);
+
+  /// No description provided for @carrCashDayChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Day: {date}'**
+  String carrCashDayChip(String date);
+
+  /// No description provided for @carrCashPickDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Which day?'**
+  String get carrCashPickDay;
+
+  /// No description provided for @carrCashKpiWithRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'With your riders'**
+  String get carrCashKpiWithRiders;
+
+  /// No description provided for @carrCashKpiWithRidersNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nobody is holding cash} =1{Held by 1 rider} other{Held by {count} riders}}'**
+  String carrCashKpiWithRidersNote(int count);
+
+  /// No description provided for @carrCashKpiHandedOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Handed over'**
+  String get carrCashKpiHandedOver;
+
+  /// No description provided for @carrCashKpiHandedOverNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No hand-overs on this day} =1{1 hand-over on this day} other{{count} hand-overs on this day}}'**
+  String carrCashKpiHandedOverNote(int count);
+
+  /// No description provided for @carrCashKpiOwed.
+  ///
+  /// In en, this message translates to:
+  /// **'Owed to YouDrop'**
+  String get carrCashKpiOwed;
+
+  /// No description provided for @carrCashKpiOwedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Your company holds no cash} =1{Held by your company · 1 order} other{Held by your company · {count} orders}}'**
+  String carrCashKpiOwedNote(int count);
+
+  /// No description provided for @carrCashKpiOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get carrCashKpiOverdue;
+
+  /// No description provided for @carrCashKpiOverdueNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nobody past the {hours}h limit} =1{1 rider past the {hours}h limit} other{{count} riders past the {hours}h limit}}'**
+  String carrCashKpiOverdueNote(int count, int hours);
+
+  /// No description provided for @carrCashOverdueSoftNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Some cash has been held for longer than {hours} hours. Ask those riders to hand it over.'**
+  String carrCashOverdueSoftNote(int hours);
+
+  /// No description provided for @carrCashBalancesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider balances'**
+  String get carrCashBalancesTitle;
+
+  /// No description provided for @carrCashColRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get carrCashColRider;
+
+  /// No description provided for @carrCashColCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected'**
+  String get carrCashColCollected;
+
+  /// No description provided for @carrCashColEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'Fees earned for you'**
+  String get carrCashColEarned;
+
+  /// No description provided for @carrCashColHolding.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash to hand over'**
+  String get carrCashColHolding;
+
+  /// No description provided for @carrCashColLastHandover.
+  ///
+  /// In en, this message translates to:
+  /// **'Last hand-over'**
+  String get carrCashColLastHandover;
+
+  /// No description provided for @carrCashColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get carrCashColStatus;
+
+  /// No description provided for @carrCashColActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get carrCashColActions;
+
+  /// No description provided for @carrCashStatusHolding.
+  ///
+  /// In en, this message translates to:
+  /// **'Holding cash'**
+  String get carrCashStatusHolding;
+
+  /// No description provided for @carrCashStatusOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue {hours}h'**
+  String carrCashStatusOverdue(int hours);
+
+  /// No description provided for @carrCashStatusSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled'**
+  String get carrCashStatusSettled;
+
+  /// No description provided for @carrCashActionSettle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle'**
+  String get carrCashActionSettle;
+
+  /// No description provided for @carrCashActionView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get carrCashActionView;
+
+  /// No description provided for @carrCashNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get carrCashNever;
+
+  /// No description provided for @carrCashToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get carrCashToday;
+
+  /// No description provided for @carrCashYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get carrCashYesterday;
+
+  /// No description provided for @carrCashDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day ago} other{{count} days ago}}'**
+  String carrCashDaysAgo(int count);
+
+  /// No description provided for @carrCashNobodyYet.
+  ///
+  /// In en, this message translates to:
+  /// **'None of your riders has carried cash for your company yet.'**
+  String get carrCashNobodyYet;
+
+  /// No description provided for @carrCashTableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected and fees are for the day chosen. Cash to hand over is everything still held, whenever it was collected. What your company pays its riders is agreed between you and is not shown here.'**
+  String get carrCashTableNote;
+
+  /// No description provided for @carrCashSelectRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Select {name}'**
+  String carrCashSelectRider(String name);
+
+  /// No description provided for @carrCashSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select every rider holding cash'**
+  String get carrCashSelectAll;
+
+  /// No description provided for @carrCashSettleSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle selected'**
+  String get carrCashSettleSelected;
+
+  /// No description provided for @carrCashSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{None selected} =1{1 selected} other{{count} selected}}'**
+  String carrCashSelectedCount(int count);
+
+  /// No description provided for @carrCashExportCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get carrCashExportCsv;
+
+  /// No description provided for @carrCashExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {file}'**
+  String carrCashExported(String file);
+
+  /// No description provided for @carrCashCsvRiderId.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider ID'**
+  String get carrCashCsvRiderId;
+
+  /// No description provided for @carrCashCsvOrdersHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders held'**
+  String get carrCashCsvOrdersHeld;
+
+  /// No description provided for @carrCashCsvOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest collection'**
+  String get carrCashCsvOldest;
+
+  /// No description provided for @carrCashOrderCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 order} other{{count} orders}}'**
+  String carrCashOrderCount(int count);
+
+  /// No description provided for @carrCashConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a hand-over'**
+  String get carrCashConfirmTitle;
+
+  /// No description provided for @carrCashConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {name} has handed your company {amount} in cash, for {orders}. This clears their whole balance with you and cannot be undone.'**
+  String carrCashConfirmBody(String name, String amount, String orders);
+
+  /// No description provided for @carrCashConfirmBulkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Record 1 hand-over} other{Record {count} hand-overs}}'**
+  String carrCashConfirmBulkTitle(int count);
+
+  /// No description provided for @carrCashConfirmBulkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm each of these riders has handed your company the cash shown. Every balance is cleared in full and none of it can be undone.'**
+  String get carrCashConfirmBulkBody;
+
+  /// No description provided for @carrCashConfirmBulkTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total {amount}'**
+  String carrCashConfirmBulkTotal(String amount);
+
+  /// No description provided for @carrCashConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, record it'**
+  String get carrCashConfirmYes;
+
+  /// No description provided for @carrCashMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How it was handed over'**
+  String get carrCashMethodLabel;
+
+  /// No description provided for @carrCashMethodCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash hand-over'**
+  String get carrCashMethodCash;
+
+  /// No description provided for @carrCashMethodBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank deposit'**
+  String get carrCashMethodBank;
+
+  /// No description provided for @carrCashMethodWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Money transfer app'**
+  String get carrCashMethodWallet;
+
+  /// No description provided for @carrCashNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get carrCashNoteLabel;
+
+  /// No description provided for @carrCashNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything the hub should remember, like a bag number'**
+  String get carrCashNoteHint;
+
+  /// No description provided for @carrCashRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {amount} from {name}.'**
+  String carrCashRecorded(String amount, String name);
+
+  /// No description provided for @carrCashReplayed.
+  ///
+  /// In en, this message translates to:
+  /// **'That hand-over was already recorded, so nothing was recorded twice.'**
+  String get carrCashReplayed;
+
+  /// No description provided for @carrCashAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now holding {amount}, not the amount you confirmed. Nothing was recorded; count it again.'**
+  String carrCashAmountChanged(String name, String amount);
+
+  /// No description provided for @carrCashAmountChangedUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}\'s balance changed since you opened the page. Nothing was recorded; reload and count it again.'**
+  String carrCashAmountChangedUnknown(String name);
+
+  /// No description provided for @carrCashRecordFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not record it. Nothing was changed; try again.'**
+  String get carrCashRecordFailed;
+
+  /// No description provided for @carrCashBulkDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {done} of {total}.'**
+  String carrCashBulkDone(int done, int total);
+
+  /// No description provided for @carrCashLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your company\'s cash could not be loaded just now. Nothing is wrong with your records; try again.'**
+  String get carrCashLoadFailed;
+
+  /// No description provided for @carrCashTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get carrCashTryAgain;
+
+  /// No description provided for @carrCashRiderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Settlement Detail'**
+  String get carrCashRiderTitle;
+
+  /// No description provided for @carrCashRiderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconcile the cash bag with {name}'**
+  String carrCashRiderSubtitle(String name);
+
+  /// No description provided for @carrCashBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to reconciliation'**
+  String get carrCashBack;
+
+  /// No description provided for @carrCashBadgeUnsettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsettled balance'**
+  String get carrCashBadgeUnsettled;
+
+  /// No description provided for @carrCashRiderSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrying cash for you since {date}'**
+  String carrCashRiderSince(String date);
+
+  /// No description provided for @carrCashRatings.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{(1 rating)} other{({count} ratings)}}'**
+  String carrCashRatings(int count);
+
+  /// No description provided for @carrCashRatingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New rider'**
+  String get carrCashRatingNew;
+
+  /// No description provided for @carrCashHeldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsettled deliveries'**
+  String get carrCashHeldTitle;
+
+  /// No description provided for @carrCashColOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order #'**
+  String get carrCashColOrder;
+
+  /// No description provided for @carrCashColCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Total cash'**
+  String get carrCashColCash;
+
+  /// No description provided for @carrCashColFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee earned for you'**
+  String get carrCashColFee;
+
+  /// No description provided for @carrCashHeldEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to settle: this rider is holding none of your company\'s cash.'**
+  String get carrCashHeldEmpty;
+
+  /// No description provided for @carrCashSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation summary'**
+  String get carrCashSummaryTitle;
+
+  /// No description provided for @carrCashSummaryCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected, not yet handed over'**
+  String get carrCashSummaryCollected;
+
+  /// No description provided for @carrCashSummaryFees.
+  ///
+  /// In en, this message translates to:
+  /// **'Fees earned for your company'**
+  String get carrCashSummaryFees;
+
+  /// No description provided for @carrCashSummaryDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash due to your company'**
+  String get carrCashSummaryDue;
+
+  /// No description provided for @carrCashSummaryKeeps.
+  ///
+  /// In en, this message translates to:
+  /// **'The rider keeps none of this cash. What your company pays them is agreed between you, and the fees above are paid to your company by YouDrop, not taken from the cash.'**
+  String get carrCashSummaryKeeps;
+
+  /// No description provided for @carrCashConfirmSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm settlement'**
+  String get carrCashConfirmSettlement;
+
+  /// No description provided for @carrCashNothingToSettle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to settle'**
+  String get carrCashNothingToSettle;
+
+  /// No description provided for @carrCashHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand-over history'**
+  String get carrCashHistoryTitle;
+
+  /// No description provided for @carrCashHistoryItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand-over · {date}'**
+  String carrCashHistoryItem(String date);
+
+  /// No description provided for @carrCashHistoryDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} for {orders}, recorded by {name}'**
+  String carrCashHistoryDetail(String amount, String orders, String name);
+
+  /// No description provided for @carrCashHistoryDetailAnon.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} for {orders}'**
+  String carrCashHistoryDetailAnon(String amount, String orders);
+
+  /// No description provided for @carrCashHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No hand-overs recorded yet.'**
+  String get carrCashHistoryEmpty;
+
+  /// No description provided for @carrCashRiderNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This rider has never worked for your company.'**
+  String get carrCashRiderNotFound;
+
+  /// No description provided for @carrCashBoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Held by delivery companies'**
+  String get carrCashBoTitle;
+
+  /// No description provided for @carrCashBoOwes.
+  ///
+  /// In en, this message translates to:
+  /// **'Owes the platform'**
+  String get carrCashBoOwes;
+
+  /// No description provided for @carrCashBoWithRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'With its riders: {amount}'**
+  String carrCashBoWithRiders(String amount);
+
+  /// No description provided for @carrCashBoLastPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Last paid {when}'**
+  String carrCashBoLastPaid(String when);
+
+  /// No description provided for @carrCashBoNeverPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Never paid'**
+  String get carrCashBoNeverPaid;
+
+  /// No description provided for @carrCashBoHoldsNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Holds nothing itself yet'**
+  String get carrCashBoHoldsNothing;
+
+  /// No description provided for @carrCashBoRecordPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record payment'**
+  String get carrCashBoRecordPayment;
+
+  /// No description provided for @carrCashBoConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a payment'**
+  String get carrCashBoConfirmTitle;
+
+  /// No description provided for @carrCashBoConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {company} has paid the platform {amount}, covering {orders}. This clears everything the company holds and cannot be undone.'**
+  String carrCashBoConfirmBody(String company, String amount, String orders);
+
+  /// No description provided for @carrCashBoConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, they paid'**
+  String get carrCashBoConfirmYes;
+
+  /// No description provided for @carrCashBoRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {amount} from {company}.'**
+  String carrCashBoRecorded(String amount, String company);
+
+  /// No description provided for @carrCashBoNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was outstanding; somebody may have recorded this already.'**
+  String get carrCashBoNothing;
+
+  /// No description provided for @carrCashBoAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{company} now holds {amount}, not the amount you confirmed. Nothing was recorded.'**
+  String carrCashBoAmountChanged(String company, String amount);
+
+  /// No description provided for @carrCashBoFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not record it: {error}'**
+  String carrCashBoFailed(String error);
+
+  /// No description provided for @carrCashBoOverdueNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Some cash has been out longer than the platform\'s limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.'**
+  String get carrCashBoOverdueNote;
+
+  /// No description provided for @carrCashBoLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'What delivery companies hold could not be loaded just now. The rest of this page is unaffected.'**
+  String get carrCashBoLoadFailed;
+
+  /// No description provided for @carrCashBoMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How it was paid (optional)'**
+  String get carrCashBoMethodLabel;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
@@ -13223,8 +13859,9 @@ DeliveryStrings lookupDeliveryStrings(Locale locale) {
   }
 
   throw FlutterError(
-      'DeliveryStrings.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'DeliveryStrings.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

@@ -188,11 +188,12 @@ class CashHolder {
     required this.amount,
     required this.orders,
     required this.oldest,
+    this.overdue,
   });
 
   final String holderRef;
 
-  /// RIDER today; PROVIDER once a delivery company collects its own COD.
+  /// RIDER, or PROVIDER for a delivery company holding what its riders handed it.
   final String holderKind;
   final double amount;
   final int orders;
@@ -203,6 +204,13 @@ class CashHolder {
   /// and the same balance collected three weeks ago is a problem.
   final DateTime oldest;
 
+  /// Whether the server's own limit calls this late. Null from a server that predates the field,
+  /// in which case the screen falls back to its own rule.
+  final bool? overdue;
+
+  /// A delivery company rather than a rider.
+  bool get isCarrier => holderKind == 'PROVIDER';
+
   /// How long the oldest cash has been out.
   Duration get age => DateTime.now().difference(oldest);
 
@@ -212,6 +220,7 @@ class CashHolder {
         amount: (json['amount'] as num).toDouble(),
         orders: (json['orders'] as num).toInt(),
         oldest: DateTime.parse(json['oldest'] as String),
+        overdue: json['overdue'] is bool ? json['overdue'] as bool : null,
       );
 }
 
