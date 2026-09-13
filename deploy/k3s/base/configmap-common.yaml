@@ -61,6 +61,8 @@ data:
   ORDER_MANAGER_URL: http://order-manager:8101
   ORDER_TRACKING_URL: http://order-tracking:8102
   NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
+  # Product Service asks it whether a merchant with no shop applied to offer services.
+  ONBOARDING_SERVICE_URL: http://onboarding-service:8117
   CONNECTOR_SETTINGS_URL: http://connector-settings:8109
   MINIO_ENDPOINT: http://minio:9000
   # The Lebanese-market switches, as the compose stack ran them.

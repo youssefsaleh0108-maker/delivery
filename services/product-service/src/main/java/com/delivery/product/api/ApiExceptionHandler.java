@@ -105,6 +105,32 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A services applicant reaching a path that would open a shop for them — a first product, a
+     * first scan — before their services shop is open.
+     *
+     * <p>A 422 like any catalogue rule, but with its own title, so a client can tell "open your
+     * services shop first" apart from a rule about the product it sent.
+     */
+    @ExceptionHandler(com.delivery.product.service.StoreService.ServicesShopNotOpenedException.class)
+    public ProblemDetail onServicesShopNotOpened(
+            com.delivery.product.service.StoreService.ServicesShopNotOpenedException e) {
+        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Services shop not opened", e.getMessage());
+    }
+
+    /**
+     * Onboarding could not say whether a merchant with no shop applied to offer services, so no shop
+     * was opened. A 503 rather than a guess: guessing "no" would open a restaurant that can never
+     * become the services shop, and retrying is all it takes.
+     */
+    @ExceptionHandler(com.delivery.product.service.OnboardingApplicationClient
+            .OnboardingUnavailableException.class)
+    public ProblemDetail onOnboardingUnavailable(
+            com.delivery.product.service.OnboardingApplicationClient.OnboardingUnavailableException e) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Onboarding unavailable",
+                "Your shop could not be set up just now. Please try again in a moment.");
+    }
+
+    /**
      * A Merchant Blitz scan, photo or line the caller does not own, or that does not exist.
      *
      * <p>One answer for both, like every other id here: a 403 on another merchant's scan would

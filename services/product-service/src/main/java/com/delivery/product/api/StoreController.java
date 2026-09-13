@@ -370,11 +370,20 @@ public class StoreController {
 
     // ---------------------------------------------------------------- administration
 
+    /**
+     * Opens a shop for the calling merchant.
+     *
+     * <p>201 with the new shop. 200 with the merchant's existing services shop when they ask for a
+     * SERVICES shop and already have one: the provider app opens that shop on its first entry after
+     * approval, and a retry or a second phone has to land on the same shop rather than open another.
+     * See {@link StoreService#open}.
+     */
     @PostMapping
     @PreAuthorize("hasRole('MERCHANT')")
     public ResponseEntity<StoreResponse> create(@Valid @RequestBody StoreRequest request) {
-        StoreView created = storeService.create(CurrentUser.requireId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created, Set.of()));
+        StoreService.Opened opened = storeService.open(CurrentUser.requireId(), request);
+        return ResponseEntity.status(opened.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(toResponse(opened.view(), Set.of()));
     }
 
     @PutMapping("/{id}")

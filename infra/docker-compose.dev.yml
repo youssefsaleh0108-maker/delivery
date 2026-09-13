@@ -471,6 +471,9 @@ services:
       # Nominatim's usage policy requires a User-Agent identifying the application; the geocoder
       # refuses to call at all while this is empty rather than borrow an identity. Set in .env.
       NOMINATIM_USER_AGENT: ${NOMINATIM_USER_AGENT:-}
+      # Asked whether a merchant with no shop applied to offer services, so a first product never
+      # opens a restaurant for a print shop. Without it the default is this container's localhost.
+      ONBOARDING_SERVICE_URL: http://onboarding-service:8117
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
@@ -1079,6 +1082,9 @@ services:
       KEYCLOAK_CLIENT_ID: onboarding-service
       KEYCLOAK_CLIENT_SECRET: ${ONBOARDING_CLIENT_SECRET:?set it in infra/.env — see infra/rotate-onboarding-secret.sh to mint one}
       ORDER_MANAGER_URL: http://order-manager:8101
+      # Asked which service categories are open and which delivery zones exist when somebody
+      # applies to offer services.
+      PRODUCT_SERVICE_URL: http://product-service:8103
       # Where one-time codes and decision emails are handed off. Without it the default is
       # localhost, which inside a container is this service talking to itself.
       NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104

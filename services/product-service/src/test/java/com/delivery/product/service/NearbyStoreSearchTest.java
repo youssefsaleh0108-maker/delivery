@@ -100,7 +100,9 @@ class NearbyStoreSearchTest {
     void setUp() {
         environment = new org.springframework.mock.env.MockEnvironment();
         service = new StoreService(stores, offers, favorites, products, categories,
-                new ServiceCategories(environment), Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR);
+                new ServiceCategories(environment),
+                org.mockito.Mockito.mock(OnboardingApplicationClient.class),
+                Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR);
         world.clear();
         betweenTheQueries = () -> { };
 

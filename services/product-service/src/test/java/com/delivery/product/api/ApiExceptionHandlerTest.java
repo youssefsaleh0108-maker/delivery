@@ -237,6 +237,50 @@ class ApiExceptionHandlerTest {
         }
     }
 
+    /**
+     * A services applicant reaching a path that would open a shop for them. Both answers matter to
+     * the provider's app: the 422 must be told apart from a rule about the product it sent, and the
+     * 503 must say "try again" without passing on where Onboarding lives.
+     */
+    @Nested
+    @DisplayName("a merchant with no shop who applied to offer services")
+    class ServicesShopNotOpened {
+
+        @Test
+        void is_a_422_titled_so_the_app_can_send_them_to_open_their_shop() {
+            ProblemDetail problem = handler.onServicesShopNotOpened(
+                    new com.delivery.product.service.StoreService.ServicesShopNotOpenedException());
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.value());
+            assertThat(problem.getTitle()).isEqualTo("Services shop not opened");
+            assertThat(problem.getDetail()).contains("Open your services shop first");
+        }
+
+        @Test
+        void takes_that_title_through_the_mvc_chain_rather_than_the_generic_rule() throws Exception {
+            // It IS a catalogue rule; Spring must still choose the more specific handler.
+            MockMvc mvc = MockMvcBuilders.standaloneSetup(new Probe())
+                    .setControllerAdvice(handler)
+                    .build();
+
+            mvc.perform(get("/probe/services-shop"))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.title").value("Services shop not opened"));
+        }
+
+        @Test
+        void an_onboarding_that_cannot_answer_is_a_503_that_names_no_host() {
+            ProblemDetail problem = handler.onOnboardingUnavailable(
+                    new com.delivery.product.service.OnboardingApplicationClient
+                            .OnboardingUnavailableException(
+                            "Could not ask Onboarding what this account applied to be",
+                            new IllegalStateException("connect timed out: 10.43.0.12:8117")));
+
+            assertThat(problem.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+            assertThat(problem.getDetail()).contains("try again").doesNotContain("10.43.0.12");
+        }
+    }
+
     private static MethodArgumentTypeMismatchException mismatch(String value, Class<?> requiredType) {
         return new MethodArgumentTypeMismatchException(value, requiredType, "storeId",
                 storeIdParameter(), new IllegalArgumentException("Invalid UUID string: " + value));
@@ -256,6 +300,12 @@ class ApiExceptionHandlerTest {
         @GetMapping("/probe/{storeId}/me")
         public String me(@PathVariable UUID storeId) {
             return storeId.toString();
+        }
+
+        /** What requireStoreFor throws for a services applicant with no shop yet. */
+        @GetMapping("/probe/services-shop")
+        public String servicesShop() {
+            throw new com.delivery.product.service.StoreService.ServicesShopNotOpenedException();
         }
 
         /** The signature StoreController.setHours declares, and nothing else of it. */

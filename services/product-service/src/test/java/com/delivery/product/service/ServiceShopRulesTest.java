@@ -67,6 +67,7 @@ class ServiceShopRulesTest {
         service = new StoreService(stores, mock(StoreOfferRepository.class),
                 mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
                 mock(CategoryRepository.class), new ServiceCategories(environment),
+                mock(OnboardingApplicationClient.class),
                 Clock.fixed(Instant.parse("2026-09-13T10:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(4));
         when(stores.save(any(Store.class))).thenAnswer(call -> call.getArgument(0));

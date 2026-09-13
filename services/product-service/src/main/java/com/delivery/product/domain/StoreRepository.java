@@ -22,6 +22,24 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
 
     Page<Store> findByMerchantIdOrderByCreatedAtDesc(String merchantId, Pageable pageable);
 
+    /** The first key of {@link #lockMerchantStores}, naming that lock among the database's others. */
+    int MERCHANT_STORE_LOCK = 33_001;
+
+    /**
+     * Serialises the decisions that open a merchant's shop for them: a first product finding no shop
+     * ({@code StoreService.requireStoreFor}) and the provider app opening its one services shop
+     * ({@code StoreService.open}).
+     *
+     * <p>Both are "look, then insert", and with nothing to lock yet two of them — a double tap, a
+     * retry racing its original, a first product racing the app's own bootstrap — could each see no
+     * shop and open one apiece. A transaction-scoped advisory lock on the merchant's id, released at
+     * commit or rollback, closes that window without a row to lock. The two-key form with a fixed
+     * first key, for the reasons {@code CatalogScanRepository#lockMerchant} gives.
+     */
+    @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(" + MERCHANT_STORE_LOCK
+            + ", hashtext(:merchantId))", nativeQuery = true)
+    int lockMerchantStores(@Param("merchantId") String merchantId);
+
     boolean existsByMerchantId(String merchantId);
 
     /**

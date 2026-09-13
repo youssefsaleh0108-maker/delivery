@@ -106,6 +106,12 @@ delivery:
     exchange: delivery.events
     relay-enabled: true
 
+  services:
+    # Asked, once per merchant, whether a merchant with no shop yet applied to offer services — so
+    # that a first product never opens a restaurant for a print shop (StoreService.requireStoreFor).
+    # The caller's own token is forwarded; this service holds no credential for it.
+    onboarding-service: ${ONBOARDING_SERVICE_URL:http://localhost:8117}
+
   storage:
     minio:
       endpoint: ${MINIO_ENDPOINT:http://localhost:9010}
