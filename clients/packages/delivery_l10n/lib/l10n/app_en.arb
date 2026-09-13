@@ -3600,7 +3600,7 @@
   "carrRidersPhone": "Phone",
   "carrRidersEmail": "Email",
   "carrRidersLastSeen": "Last seen",
-  "carrRidersNoPresenceYet": "Not on your presence roster yet",
+  "carrRidersNoPresenceYet": "No duty or location yet",
   "carrRidersStaleNote": "Declared on duty, but the last location is too old to dispatch on.",
   "carrRidersNoApplication": "The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.",
   "carrRidersDocumentsTitle": "Documents Verification",
@@ -3696,7 +3696,7 @@
       }
     }
   },
-  "carrRidersHoursNone": "No duty history for this rider. Nothing is backfilled from before duty tracking began.",
+  "carrRidersHoursNone": "No hours online to show for your company.",
   "carrRidersHoursZone": "Days are split in the {zone} time zone, as the server reports them.",
   "@carrRidersHoursZone": {
     "placeholders": {
@@ -3721,7 +3721,7 @@
       }
     }
   },
-  "carrRidersTerminateBody": "{name} comes off your fleet straight away and stops being offered your work. They keep their YouDrop sign-in and go back to YouDrop's own riders, where they can be offered the platform's work.",
+  "carrRidersTerminateBody": "{name} comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop's own riders: they can take no work at all until another company hires them or YouDrop takes them on.",
   "@carrRidersTerminateBody": {
     "placeholders": {
       "name": {
@@ -3730,8 +3730,8 @@
     }
   },
   "carrRidersTerminateJobs": "Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.",
-  "carrRidersTerminateMoney": "No money is settled by this: what they have earned and what they have collected stays on record exactly as it is.",
-  "carrRidersTerminateUndo": "Only YouDrop can put them back on your fleet afterwards.",
+  "carrRidersTerminateMoney": "Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.",
+  "carrRidersTerminateUndo": "Taking them back later means hiring them again.",
   "carrRidersTerminateConfirm": "Terminate contract",
   "carrRidersTerminated": "{name} is no longer on your fleet.",
   "@carrRidersTerminated": {
@@ -3750,7 +3750,7 @@
     }
   },
   "carrRidersNotOnFleet": "This rider is no longer on your fleet.",
-  "carrRidersNoPresenceCount": "{count, plural, =1{1 more is not on your presence roster yet} other{{count} more are not on your presence roster yet}}",
+  "carrRidersNoPresenceCount": "{count, plural, =1{1 more has no duty or location yet} other{{count} more have no duty or location yet}}",
   "@carrRidersNoPresenceCount": {
     "placeholders": {
       "count": {
@@ -3758,11 +3758,15 @@
       }
     }
   },
-  "carrRidersNoPresenceNote": "A rider joins your presence roster once they have carried your work. Until then this page cannot tell whether they are on duty.",
+  "carrRidersNoPresenceNote": "Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.",
   "carrRidersVehicleModel": "Vehicle model",
   "carrRidersPlateNumber": "Plate number",
   "carrRidersDateOfBirth": "Date of birth",
   "carrRidersNationalIdNumber": "National ID number",
   "carrRidersDutyChanged": "Duty last changed",
-  "carrRidersVehicleYear": "Vehicle year"
+  "carrRidersVehicleYear": "Vehicle year",
+  "carrRidersTerminateReason": "Reason, kept on record",
+  "carrRidersTerminateReasonHint": "Why is this contract ending?",
+  "carrRidersStatusStandingUnknown": "Standing unknown",
+  "carrRidersStandingUnknownNote": "Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again."
 }

@@ -17,7 +17,8 @@ import 'rider_profile_screen.dart';
 /// everything that table could do: search, a working-now view (tap a presence card), "Add Rider"
 /// approving somebody who is actually waiting, every rider's detail (now a full profile page
 /// rather than a drawer) and suspension (on that profile). The score card and the pause switch
-/// that sat under the table moved to the dashboard — see [CarrierStandingCards].
+/// that sat under the table moved to the dashboard: the score to the foot of the page and the
+/// switch to its top bar (`company_standing.dart`).
 ///
 /// What the design draws and the platform cannot say is left out rather than faked:
 ///
@@ -105,7 +106,6 @@ class _RidersDirectoryScreenState extends State<RidersDirectoryScreen> {
         provider: widget.api,
         order: widget.orderApi,
         onboarding: widget.onboardingApi,
-        management: widget.managementApi,
         tracking: widget.trackingApi,
         performance: widget.performanceApi,
       );
@@ -483,9 +483,10 @@ class _RiderCard extends StatelessWidget {
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text(
+                      // Left to right on an Arabic card too, still at the card's start edge:
+                      // "REF-884#" is not the reference anybody quotes.
+                      child: FleetCode(
                         '#${fleet.referenceOf(rider)}',
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

@@ -72,9 +72,12 @@ class RiderDeliveredToday {
 /// of the carrier rider profile's output chart.
 ///
 /// Scoped server-side exactly like [RiderPerformance]: a carrier sees only the deliveries the rider
-/// made for that carrier, so the chart and the thirty-day tiles above it always count the same
-/// work. [days] carries only dates with a delivery on them; [zeroFilled] draws the quiet days
-/// between [from] and [to], the same convention as the duty-hours series.
+/// made for that carrier. Both count a delivery by when it was delivered, from the same local
+/// midnight at the start of the window, so the thirty days of bars add up to the thirty-day
+/// delivered tile above them. (The tile's "claimed" caption is still anchored on when orders were
+/// placed — a claim records no time of its own.) [days] carries only dates with a delivery on them;
+/// [zeroFilled] draws the quiet days between [from] and [to], the same convention as the duty-hours
+/// series.
 class RiderDailyOutput {
   const RiderDailyOutput({
     required this.riderId,

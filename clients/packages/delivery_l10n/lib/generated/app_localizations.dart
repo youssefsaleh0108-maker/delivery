@@ -13349,7 +13349,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrRidersNoPresenceYet.
   ///
   /// In en, this message translates to:
-  /// **'Not on your presence roster yet'**
+  /// **'No duty or location yet'**
   String get carrRidersNoPresenceYet;
 
   /// No description provided for @carrRidersStaleNote.
@@ -13529,7 +13529,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrRidersHoursNone.
   ///
   /// In en, this message translates to:
-  /// **'No duty history for this rider. Nothing is backfilled from before duty tracking began.'**
+  /// **'No hours online to show for your company.'**
   String get carrRidersHoursNone;
 
   /// No description provided for @carrRidersHoursZone.
@@ -13595,7 +13595,7 @@ abstract class DeliveryStrings {
   /// No description provided for @carrRidersTerminateBody.
   ///
   /// In en, this message translates to:
-  /// **'{name} comes off your fleet straight away and stops being offered your work. They keep their YouDrop sign-in and go back to YouDrop\'s own riders, where they can be offered the platform\'s work.'**
+  /// **'{name} comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop\'s own riders: they can take no work at all until another company hires them or YouDrop takes them on.'**
   String carrRidersTerminateBody(String name);
 
   /// No description provided for @carrRidersTerminateJobs.
@@ -13607,13 +13607,13 @@ abstract class DeliveryStrings {
   /// No description provided for @carrRidersTerminateMoney.
   ///
   /// In en, this message translates to:
-  /// **'No money is settled by this: what they have earned and what they have collected stays on record exactly as it is.'**
+  /// **'Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.'**
   String get carrRidersTerminateMoney;
 
   /// No description provided for @carrRidersTerminateUndo.
   ///
   /// In en, this message translates to:
-  /// **'Only YouDrop can put them back on your fleet afterwards.'**
+  /// **'Taking them back later means hiring them again.'**
   String get carrRidersTerminateUndo;
 
   /// No description provided for @carrRidersTerminateConfirm.
@@ -13643,13 +13643,13 @@ abstract class DeliveryStrings {
   /// No description provided for @carrRidersNoPresenceCount.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 more is not on your presence roster yet} other{{count} more are not on your presence roster yet}}'**
+  /// **'{count, plural, =1{1 more has no duty or location yet} other{{count} more have no duty or location yet}}'**
   String carrRidersNoPresenceCount(int count);
 
   /// No description provided for @carrRidersNoPresenceNote.
   ///
   /// In en, this message translates to:
-  /// **'A rider joins your presence roster once they have carried your work. Until then this page cannot tell whether they are on duty.'**
+  /// **'Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.'**
   String get carrRidersNoPresenceNote;
 
   /// No description provided for @carrRidersVehicleModel.
@@ -13687,6 +13687,30 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Vehicle year'**
   String get carrRidersVehicleYear;
+
+  /// No description provided for @carrRidersTerminateReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason, kept on record'**
+  String get carrRidersTerminateReason;
+
+  /// No description provided for @carrRidersTerminateReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Why is this contract ending?'**
+  String get carrRidersTerminateReasonHint;
+
+  /// No description provided for @carrRidersStatusStandingUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing unknown'**
+  String get carrRidersStatusStandingUnknown;
+
+  /// No description provided for @carrRidersStandingUnknownNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.'**
+  String get carrRidersStandingUnknownNote;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

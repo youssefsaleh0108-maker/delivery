@@ -67,10 +67,10 @@ class RiderPage {
 /// * **Employment** is the start date and what the application said. Contract type, pay rate and
 ///   zone assignment are recorded nowhere, and a note says so instead of printing a plausible rate
 ///   that nobody pays.
-/// * **Actions**: suspend or reinstate (with the typed reason the server requires), and
-///   "Terminate Contract" — the rider comes off this fleet and goes back to YouDrop's own riders,
-///   refused while they carry one of this company's jobs. The design's "Edit Profile" has no
-///   endpoint a carrier may call, so it is not drawn.
+/// * **Actions**: suspend or reinstate (with the typed reason the server requires) while the
+///   rider's standing is known, and "Terminate Contract" — the rider comes off this fleet onto no
+///   fleet at all, with a reason kept on record, refused while they carry one of this company's
+///   jobs. The design's "Edit Profile" has no endpoint a carrier may call, so it is not drawn.
 class RiderProfileScreen extends StatefulWidget {
   const RiderProfileScreen({
     super.key,
@@ -123,8 +123,7 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
       _try(() => widget.performanceApi.forRider(widget.riderId));
   late final Future<RiderDailyOutput?> _daily =
       _try(() => widget.performanceApi.dailyForRider(widget.riderId, days: _windowDays));
-  late final Future<HoursOnline?> _hours =
-      _try(() => widget.trackingApi.riderDutyHours(widget.riderId, days: _hoursDays));
+  late final Future<({HoursOnline? hours, bool notFound})> _hours = _readHours();
   late final Future<List<ReviewedDocument>?>? _documents = _application == null
       ? null
       : _try(() => widget.documentsApi
@@ -141,6 +140,22 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
       return await load();
     } catch (_) {
       return null;
+    }
+  }
+
+  /// A week of hours, and whether the tracking service answered "not found". The two failures read
+  /// differently: a 404 is the service declining to show this company the rider's hours — nothing
+  /// recorded for them here, or a rider it no longer counts as this company's, which it will not
+  /// tell apart from one that does not exist — while anything else is a read that did not work.
+  Future<({HoursOnline? hours, bool notFound})> _readHours() async {
+    try {
+      final HoursOnline hours =
+          await widget.trackingApi.riderDutyHours(widget.riderId, days: _hoursDays);
+      return (hours: hours, notFound: false);
+    } on DioException catch (e) {
+      return (hours: null, notFound: e.response?.statusCode == 404);
+    } catch (_) {
+      return (hours: null, notFound: false);
     }
   }
 
@@ -273,7 +288,9 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
           Text(_name, textAlign: TextAlign.center, style: ConsoleText.cardTitle),
           const SizedBox(height: DeliverySpacing.xs),
           Text(
-            t.carrRidersBadgeId(fleet.referenceOf(widget.riderId)),
+            // Isolated, so an Arabic sentence keeps the reference's letters, hyphen and digits in
+            // their own order.
+            t.carrRidersBadgeId(ltrIsolate(fleet.referenceOf(widget.riderId))),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 12,
@@ -293,17 +310,26 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
           if (application == null)
             Padding(
               padding: const EdgeInsets.only(bottom: DeliverySpacing.md - DeliverySpacing.xs),
-              child: Text(t.carrRidersNoApplication,
+              // "Attached directly" is only known when the applications were read. When they were
+              // not, the page cannot tell, and says that rather than a reason it made up.
+              child: Text(
+                  fleet.applicationsLoaded ? t.carrRidersNoApplication : t.carrRidersCouldNotRead,
                   style: ConsoleText.body.copyWith(color: DeliveryColors.muted, height: 1.4)),
             )
           else ...<Widget>[
             _fact(t.carrRidersPhone, application.contactPhone),
             _fact(t.carrRidersEmail, application.contactEmail),
-            // As the rider wizard took them down. Shown to the company that reviewed and hired
-            // them, as the old rider drawer showed every answer on the application; the papers
-            // behind them are in the card below.
-            _fact(t.carrRidersDateOfBirth, application.details['dateOfBirth']),
-            _fact(t.carrRidersNationalIdNumber, application.details['nationalId']),
+            // The national ID to its last three characters: enough to tell riders apart or match a
+            // paper in hand, and the whole number is on the verified document in the card below.
+            // No date of birth at all — that document carries it too, and a birth date in plain
+            // text on an office screen is personal data dispatching a rider does not need.
+            _fact(
+              t.carrRidersNationalIdNumber,
+              switch (application.details['nationalId']?.trim()) {
+                null || '' => null,
+                final String id => ltrIsolate(maskedNationalId(id)),
+              },
+            ),
           ],
           _fact(t.carrRidersLastSeen, lastSeen),
           // When they last went on or off duty — "on duty since seven" is how a dispatcher reads
@@ -381,7 +407,12 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     return ConsoleCard(
       title: t.carrRidersDocumentsTitle,
       child: documents == null
-          ? Text(t.carrRidersNoApplication,
+          // "Attached directly" only when the applications were read; otherwise the page does not
+          // know why there are no papers to ask for, and says only that it could not read them.
+          ? Text(
+              widget.fleet.applicationsLoaded
+                  ? t.carrRidersNoApplication
+                  : t.carrRidersCouldNotRead,
               style: ConsoleText.body.copyWith(color: DeliveryColors.muted, height: 1.4))
           : FutureBuilder<List<ReviewedDocument>?>(
               future: documents,
@@ -584,15 +615,21 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
   Widget _hoursCard(DeliveryStrings t) {
     return ConsoleCard(
       title: t.carrRidersHoursTitle(_hoursDays),
-      child: FutureBuilder<HoursOnline?>(
+      child: FutureBuilder<({HoursOnline? hours, bool notFound})>(
         future: _hours,
-        builder: (BuildContext context, AsyncSnapshot<HoursOnline?> snapshot) {
+        builder: (BuildContext context,
+            AsyncSnapshot<({HoursOnline? hours, bool notFound})> snapshot) {
           if (snapshot.connectionState != ConnectionState.done) return const _Loading();
-          final HoursOnline? hours = snapshot.data;
+          final HoursOnline? hours = snapshot.data?.hours;
           if (hours == null) {
-            // A foreign rider and an unknown one answer the identical 404 by design, so this
-            // cannot say which it was without inventing the difference.
-            return Text(t.carrRidersHoursNone,
+            // A 404 is the tracking service declining to show this company the rider's hours: a
+            // foreign rider, one it no longer counts as this company's and an unknown one answer it
+            // identically by design, so the page says only that there is nothing to show. Any other
+            // failure is a read that did not work, and is said as exactly that.
+            return Text(
+                (snapshot.data?.notFound ?? false)
+                    ? t.carrRidersHoursNone
+                    : t.carrRidersCouldNotRead,
                 style: ConsoleText.body.copyWith(color: DeliveryColors.muted, height: 1.4));
           }
 
@@ -697,9 +734,6 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
   // ------------------------------------------------------------------ actions
 
   Widget _actions(DeliveryStrings t) {
-    final OnboardingApplication? application = _application;
-    final bool suspended = widget.fleet.suspended[widget.riderId] == true;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -713,28 +747,30 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
         ],
-        if (application == null)
+        switch ((widget.fleet.suspensionOf(widget.riderId), _application)) {
+          // Neither control while the standing is unknown. "Suspend" on a rider who may already be
+          // suspended, or "Reinstate" on one who may not be, is a guess dressed as a button.
+          (RiderSuspension.unknown, _) =>
+            Text(t.carrRidersStandingUnknownNote, style: ConsoleText.meta.copyWith(height: 1.4)),
+          (RiderSuspension.suspended, final OnboardingApplication a) => ConsoleSoftButton(
+              label: t.carrRidersReinstateRider,
+              icon: Icons.lock_open_rounded,
+              accent: DeliveryAccent.positive,
+              busy: _busy,
+              onPressed: _busy ? null : () => _flipStanding(a, suspended: true),
+            ),
+          (RiderSuspension.active, final OnboardingApplication a) => ConsoleSoftButton(
+              label: t.carrRidersSuspendRider,
+              icon: Icons.block_rounded,
+              accent: DeliveryAccent.caution,
+              busy: _busy,
+              onPressed: _busy ? null : () => _flipStanding(a, suspended: false),
+            ),
           // The suspension endpoints are addressed to a rider's application to this company, and
           // somebody the platform attached directly has none. Said instead of a button that 404s.
-          Text(t.carrRidersSuspendUnavailable, style: ConsoleText.meta.copyWith(height: 1.4))
-        else if (suspended)
-          ConsoleSoftButton(
-            label: t.carrRidersReinstateRider,
-            icon: Icons.lock_open_rounded,
-            accent: DeliveryAccent.positive,
-            busy: _busy,
-            onPressed: _busy ? null : () => _flipStanding(application, suspended: true),
-          )
-        else
-          // A standing that could not be read offers "Suspend" rather than guessing a state; the
-          // server's suspend is idempotent, so pressing it on a suspended rider changes nothing.
-          ConsoleSoftButton(
-            label: t.carrRidersSuspendRider,
-            icon: Icons.block_rounded,
-            accent: DeliveryAccent.caution,
-            busy: _busy,
-            onPressed: _busy ? null : () => _flipStanding(application, suspended: false),
-          ),
+          _ =>
+            Text(t.carrRidersSuspendUnavailable, style: ConsoleText.meta.copyWith(height: 1.4)),
+        },
         const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
         ConsoleSoftButton(
           label: t.carrRidersTerminate,
@@ -774,19 +810,21 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     }
   }
 
-  /// Ends the rider's contract with this company, after a dialog that says exactly what that does
-  /// — including to a job they are carrying right now, which is the server's reason to refuse.
+  /// Ends the rider's contract with this company, after a dialog that says exactly what that does —
+  /// including to a job they are carrying right now, which is the server's reason to refuse — and
+  /// takes the reason the release is recorded with.
   Future<void> _terminate() async {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final bool? confirmed = await showDialog<bool>(
+    // The reason, or null when nothing should be sent.
+    final String? reason = await showDialog<String>(
       context: context,
       builder: (BuildContext context) => _TerminateDialog(name: _name),
     );
-    if (confirmed != true || !mounted) return;
+    if (reason == null || !mounted) return;
 
     setState(() => _busy = true);
     try {
-      await widget.providerApi.releaseMyRider(widget.riderId);
+      await widget.providerApi.releaseMyRider(widget.riderId, reason: reason);
       if (!mounted) return;
       widget.onReleased(_name);
     } on DioException catch (e) {
@@ -812,16 +850,39 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
   }
 }
 
-/// "End this rider's contract?" — what happens to them, to a job they are carrying, and to money,
-/// before the button is pressed.
-class _TerminateDialog extends StatelessWidget {
+/// "End this rider's contract?" — where the rider goes (no fleet at all, not YouDrop's), what
+/// happens to a job they are carrying, that their door cash is the company's to collect first, and
+/// the reason the release is kept on record with.
+///
+/// Pops with the reason, trimmed, or with nothing: the confirm button stays dead until there is a
+/// reason to record.
+class _TerminateDialog extends StatefulWidget {
   const _TerminateDialog({required this.name});
 
   final String name;
 
   @override
+  State<_TerminateDialog> createState() => _TerminateDialogState();
+}
+
+class _TerminateDialogState extends State<_TerminateDialog> {
+  final TextEditingController _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  static OutlineInputBorder _border(Color color) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+        borderSide: BorderSide(color: color),
+      );
+
+  @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final String reason = _reason.text.trim();
 
     Widget paragraph(IconData icon, String text) => Padding(
           padding: const EdgeInsets.only(bottom: DeliverySpacing.md - DeliverySpacing.xs),
@@ -841,23 +902,46 @@ class _TerminateDialog extends StatelessWidget {
       backgroundColor: DeliveryColors.white,
       surfaceTintColor: DeliveryColors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
-      title: Text(t.carrRidersTerminateTitle(name), style: ConsoleText.cardTitle),
+      title: Text(t.carrRidersTerminateTitle(widget.name), style: ConsoleText.cardTitle),
       content: SizedBox(
         width: 460,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            paragraph(Icons.person_remove_outlined, t.carrRidersTerminateBody(name)),
-            paragraph(Icons.local_shipping_outlined, t.carrRidersTerminateJobs),
-            paragraph(Icons.payments_outlined, t.carrRidersTerminateMoney),
-            paragraph(Icons.undo_rounded, t.carrRidersTerminateUndo),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              paragraph(Icons.person_remove_outlined, t.carrRidersTerminateBody(widget.name)),
+              paragraph(Icons.local_shipping_outlined, t.carrRidersTerminateJobs),
+              paragraph(Icons.payments_outlined, t.carrRidersTerminateMoney),
+              paragraph(Icons.undo_rounded, t.carrRidersTerminateUndo),
+              const SizedBox(height: DeliverySpacing.xs),
+              Text(t.carrRidersTerminateReason, style: ConsoleText.cellStrong),
+              const SizedBox(height: DeliverySpacing.xs),
+              TextField(
+                controller: _reason,
+                maxLines: 3,
+                // What the record holds; the server refuses a longer reason rather than cut it.
+                maxLength: 500,
+                style: ConsoleText.cell,
+                cursorColor: DeliveryColors.brand,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: t.carrRidersTerminateReasonHint,
+                  hintStyle: const TextStyle(fontSize: 14, color: DeliveryColors.faint),
+                  filled: true,
+                  fillColor: DeliveryColors.background,
+                  border: _border(DeliveryColors.border),
+                  enabledBorder: _border(DeliveryColors.border),
+                  focusedBorder: _border(DeliveryColors.brand),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: <Widget>[
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () => Navigator.pop(context),
           child: Text(
             t.cancel,
             style: const TextStyle(
@@ -867,11 +951,13 @@ class _TerminateDialog extends StatelessWidget {
             ),
           ),
         ),
-        ConsoleSoftButton(
+        // Solid and red: this ends somebody's work with the company, and must not read like the
+        // soft buttons beside it on the profile.
+        ConsolePrimaryButton(
           label: t.carrRidersTerminateConfirm,
           icon: Icons.delete_outline_rounded,
-          accent: DeliveryAccent.critical,
-          onPressed: () => Navigator.pop(context, true),
+          color: DeliveryAccent.critical.color,
+          onPressed: reason.isEmpty ? null : () => Navigator.pop(context, reason),
         ),
       ],
     );

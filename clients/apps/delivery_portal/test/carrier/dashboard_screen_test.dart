@@ -430,16 +430,19 @@ void main() {
     expect(went, isTrue);
   });
 
-  testWidgets('carries the score and the pause switch the riders page used to',
+  testWidgets('the pause switch sits in the top bar, and the score at the foot of the page',
       (WidgetTester tester) async {
-    // Both sat under the old riders table. The riders page is an HR directory now, and a company
-    // can lose neither: the score decides how much work arrives, the switch stops it arriving.
+    // Both sat under the old riders table, and a company can lose neither: the score decides how
+    // much work arrives, the switch stops it arriving. A brake belongs where it is seen first —
+    // it was below the fold on any laptop.
     await pump(tester, _apis());
 
+    final Finder topbar = find.byType(ConsoleTopbar);
+    expect(find.descendant(of: topbar, matching: find.text(en.pauseNewOrders)), findsOneWidget);
+    expect(find.descendant(of: topbar, matching: find.text(en.takingWork)), findsOneWidget);
     expect(find.text(en.howYouAreDoing), findsOneWidget);
     expect(find.text('84'), findsOneWidget);
-    expect(find.text(en.youAreTakingOrders), findsOneWidget);
-    expect(find.text(en.pauseNewOrders), findsOneWidget);
+    expect(find.descendant(of: topbar, matching: find.text(en.howYouAreDoing)), findsNothing);
   });
 
   testWidgets('belonging to no company reads as a gap, not a crash',

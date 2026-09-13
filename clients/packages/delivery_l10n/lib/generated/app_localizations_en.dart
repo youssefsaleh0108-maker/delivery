@@ -7517,7 +7517,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get carrRidersLastSeen => 'Last seen';
 
   @override
-  String get carrRidersNoPresenceYet => 'Not on your presence roster yet';
+  String get carrRidersNoPresenceYet => 'No duty or location yet';
 
   @override
   String get carrRidersStaleNote =>
@@ -7635,8 +7635,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String get carrRidersHoursNone =>
-      'No duty history for this rider. Nothing is backfilled from before duty tracking began.';
+  String get carrRidersHoursNone => 'No hours online to show for your company.';
 
   @override
   String carrRidersHoursZone(String zone) {
@@ -7676,7 +7675,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String carrRidersTerminateBody(String name) {
-    return '$name comes off your fleet straight away and stops being offered your work. They keep their YouDrop sign-in and go back to YouDrop\'s own riders, where they can be offered the platform\'s work.';
+    return '$name comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop\'s own riders: they can take no work at all until another company hires them or YouDrop takes them on.';
   }
 
   @override
@@ -7685,11 +7684,11 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get carrRidersTerminateMoney =>
-      'No money is settled by this: what they have earned and what they have collected stays on record exactly as it is.';
+      'Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.';
 
   @override
   String get carrRidersTerminateUndo =>
-      'Only YouDrop can put them back on your fleet afterwards.';
+      'Taking them back later means hiring them again.';
 
   @override
   String get carrRidersTerminateConfirm => 'Terminate contract';
@@ -7720,15 +7719,15 @@ class DeliveryStringsEn extends DeliveryStrings {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count more are not on your presence roster yet',
-      one: '1 more is not on your presence roster yet',
+      other: '$count more have no duty or location yet',
+      one: '1 more has no duty or location yet',
     );
     return '$_temp0';
   }
 
   @override
   String get carrRidersNoPresenceNote =>
-      'A rider joins your presence roster once they have carried your work. Until then this page cannot tell whether they are on duty.';
+      'Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.';
 
   @override
   String get carrRidersVehicleModel => 'Vehicle model';
@@ -7747,4 +7746,17 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get carrRidersVehicleYear => 'Vehicle year';
+
+  @override
+  String get carrRidersTerminateReason => 'Reason, kept on record';
+
+  @override
+  String get carrRidersTerminateReasonHint => 'Why is this contract ending?';
+
+  @override
+  String get carrRidersStatusStandingUnknown => 'Standing unknown';
+
+  @override
+  String get carrRidersStandingUnknownNote =>
+      'Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.';
 }

@@ -86,15 +86,15 @@ void main() {
       expect(out.total, 6);
     });
 
-    test('ending a contract is a DELETE on the caller\'s own company, naming no company', () async {
+    test('ending a contract is a POST on the caller\'s own company, naming no company', () async {
       final _Recorder recorder = _Recorder(null);
       final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = recorder;
 
-      await DeliveryProviderApi(dio).releaseMyRider('rider-1');
+      await DeliveryProviderApi(dio).releaseMyRider('rider-1', reason: 'Missed agreed shifts');
 
-      expect(recorder.requests.single.method, 'DELETE');
+      expect(recorder.requests.single.method, 'POST');
       expect(recorder.requests.single.path,
-          '/api/delivery-providers/my-company/riders/rider-1');
+          '/api/delivery-providers/my-company/riders/rider-1/release');
     });
   });
 }

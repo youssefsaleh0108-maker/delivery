@@ -16,6 +16,7 @@ class ConsoleTopbar extends StatelessWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.below,
     this.actions = const <Widget>[],
     this.titleStyle,
   });
@@ -25,6 +26,15 @@ class ConsoleTopbar extends StatelessWidget {
   /// The design's second line. Omit it and the title sits alone, vertically centred against the
   /// actions.
   final String? subtitle;
+
+  /// A control that belongs to the page's header rather than its body — the carrier dashboard's
+  /// "stop taking orders" switch — drawn under the subtitle.
+  ///
+  /// Inside the title's own column rather than among [actions], deliberately. The actions are
+  /// sized to their content and never wrap, so every control added there takes width from the
+  /// title until the bar overflows on a narrow window; the title column is bounded, so a control
+  /// here wraps with it instead. Omit it and the header is exactly as it was.
+  final Widget? below;
 
   /// Laid out right-aligned with the design's 16px gap. Typically a [ConsoleSearchField] and a
   /// [ConsoleIconAction] or two.
@@ -53,6 +63,10 @@ class ConsoleTopbar extends StatelessWidget {
                 if (subtitle != null) ...<Widget>[
                   const SizedBox(height: DeliverySpacing.xs),
                   Text(subtitle!, style: ConsoleText.pageSubtitle),
+                ],
+                if (below != null) ...<Widget>[
+                  const SizedBox(height: DeliverySpacing.sm),
+                  below!,
                 ],
               ],
             ),

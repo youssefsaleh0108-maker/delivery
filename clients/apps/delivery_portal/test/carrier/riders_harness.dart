@@ -19,14 +19,18 @@ import 'package:flutter_test/flutter_test.dart';
 /// is only reached through the directory's "Manage Profile", so the profile's tests arrive the way
 /// a dispatcher does, and one fleet fixture cannot disagree with itself about who is on it.
 ///
+/// The stub answers only fleet-wide reads for ratings and standing: the fleet's ratings in one
+/// response, and each application carrying its standing. There is no per-rider rating or standing
+/// route, so a page that went back to asking once per rider would find nothing to read.
+///
 /// The fleet, unless a test says otherwise:
 ///
 /// * [nadia] — Nadia Haddad, hired through her application (`app-1`, reference `REF-app-1`): she
-///   gave Beirut and a motorcycle, is on duty, is rated 4.5 over four ratings (three of them five
-///   stars), delivered three today, and has one delivered job on the board.
+///   gave Beirut and a motorcycle, is in good standing, is on duty, is rated 4.5 over four ratings
+///   (three of them five stars), delivered three today, and has one delivered job on the board.
 /// * [direct] — attached by the platform directly, so there is no application: no name, region,
-///   vehicle or papers. Absent from the roster (never declared duty), unrated, and out on a job
-///   that has not finished.
+///   vehicle, papers or standing. Absent from the roster, unrated, and out on a job that has not
+///   finished.
 /// * Waiting to be hired: Karim Aoun (`app-2`).
 const String nadia = 'rider-aaaaaaaa';
 const String direct = 'rider-bbbbbbbb';
@@ -148,12 +152,16 @@ Map<String, dynamic> jobJson({
       'cancelReason': null,
     };
 
+/// An application as the company's own listing sends it. [suspended] is the standing the listing
+/// carries for every application; null is a listing that did not say.
 Map<String, dynamic> applicationJson({
   required String id,
   required String name,
   String status = 'PROVISIONED',
   String? riderRef,
   Map<String, String> details = const <String, String>{},
+  bool? suspended = false,
+  bool decided = true,
 }) =>
     <String, dynamic>{
       'id': id,
@@ -168,12 +176,13 @@ Map<String, dynamic> applicationJson({
       'notes': null,
       'status': status,
       'createdAt': '2026-07-01T09:00:00Z',
-      'decidedAt': status == 'PROVISIONED' ? '2026-07-04T09:00:00Z' : null,
+      'decidedAt': status == 'PROVISIONED' && decided ? '2026-07-04T09:00:00Z' : null,
       'decidedBy': null,
       'rejectionReason': null,
       'provisionedUserRef': riderRef,
       'provisionedEntityId': null,
       'details': details,
+      'suspended': suspended,
     };
 
 Map<String, dynamic> presenceJson(String riderId, {String state = 'ON_DUTY'}) =>
@@ -272,8 +281,8 @@ class FleetStub {
     List<Map<String, dynamic>>? jobs,
     List<Map<String, dynamic>>? applications,
     List<Map<String, dynamic>>? roster,
-    bool suspended = false,
-    Map<String, Map<String, dynamic>>? ratings,
+    bool? suspended = false,
+    List<Map<String, dynamic>>? ratings,
     List<Map<String, dynamic>>? deliveredToday,
     List<Map<String, dynamic>>? documents,
     Map<String, dynamic>? performance,
@@ -286,7 +295,13 @@ class FleetStub {
       <String, Object>{
         '/my-company/score': score ?? scoreJson(),
         '/my-company/riders': <String, dynamic>{'providerId': 'p1', 'riders': riders},
-        'DELETE /my-company/riders/': <String, dynamic>{},
+        // The whole fleet's ratings in one response — every rider on it, the unrated included.
+        '/my-company/riders/ratings': ratings ??
+            <Map<String, dynamic>>[
+              standingJson(nadia, average: 4.5, stars: const <int, int>{3: 1, 5: 3}),
+              standingJson(direct),
+            ],
+        'POST /my-company/riders/': <String, dynamic>{},
         '/my-company/pause': companyJson(status: 'PAUSED', canTakeWork: false),
         '/my-company/resume': companyJson(),
         '/my-company': company ?? companyJson(),
@@ -307,6 +322,7 @@ class FleetStub {
                 id: 'app-1',
                 name: 'Nadia Haddad',
                 riderRef: nadia,
+                suspended: suspended,
                 // The keys the rider wizard writes today (mobile_app partner_application_screen).
                 details: const <String, String>{
                   'preferredArea': 'Beirut',
@@ -323,19 +339,6 @@ class FleetStub {
               ),
               applicationJson(id: 'app-2', name: 'Karim Aoun', status: 'SUBMITTED'),
             ],
-        '/suspension': <String, dynamic>{
-          'suspended': suspended,
-          'lastChange': suspended
-              ? <String, dynamic>{
-                  'suspended': true,
-                  'reason': 'POLICY_VIOLATION',
-                  'reasonNote': 'Third missed shift',
-                  'actor': 'kc-boss',
-                  'at': '2026-08-15T09:00:00Z',
-                }
-              : null,
-          'history': <dynamic>[],
-        },
         '/suspend': <String, dynamic>{'suspended': true, 'lastChange': null},
         '/unsuspend': <String, dynamic>{'suspended': false, 'lastChange': null},
         '/approve': applicationJson(id: 'app-2', name: 'Karim Aoun', riderRef: 'rider-cccccccc'),
@@ -356,13 +359,6 @@ class FleetStub {
               documentJson('d0', 'NATIONAL_ID', 'REJECTED', superseded: true),
               documentJson('d2', 'DRIVING_LICENCE', 'PENDING'),
             ],
-        for (final MapEntry<String, Map<String, dynamic>> r in (ratings ??
-                <String, Map<String, dynamic>>{
-                  nadia: standingJson(nadia, average: 4.5, stars: const <int, int>{3: 1, 5: 3}),
-                  direct: standingJson(direct),
-                })
-            .entries)
-          '/riders/${r.key}/rating': r.value,
       },
       failing: failing,
     );

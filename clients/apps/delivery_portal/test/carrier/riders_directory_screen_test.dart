@@ -1,3 +1,4 @@
+import 'package:delivery_portal/src/carrier/fleet_roster.dart';
 import 'package:delivery_portal/src/carrier/riders_directory_screen.dart';
 import 'package:delivery_portal/src/shell/console_controls.dart';
 import 'package:delivery_portal/src/shell/shell.dart';
@@ -12,7 +13,8 @@ import 'riders_harness.dart';
 /// tests forward — searching, the working-now view, Add Rider, opening a rider — beside what the
 /// card grid added. The rule throughout: every figure comes from the service that owns it, a source
 /// that failed is a dash rather than a zero, and a state the platform does not have is not drawn.
-/// There is no "on break", and a rider the presence roster says nothing about is not "offline".
+/// There is no "on break", a rider the presence roster says nothing about is not "offline", and a
+/// standing that could not be read is not a clean one.
 void main() {
   String kpi(WidgetTester tester, String label) =>
       tester.widget<ConsoleKpiCard>(find.widgetWithText(ConsoleKpiCard, label)).value;
@@ -41,6 +43,23 @@ void main() {
     expect(find.text('—'), findsNWidgets(2));
   });
 
+  testWidgets('every rating and every standing comes from a fleet-wide read, never one per rider',
+      (WidgetTester tester) async {
+    // Six plus two per rider used to go out at once — more than eighty for forty riders — into the
+    // gateway's per-address rate limit. However many riders, the load is the same seven reads.
+    final FleetStub stub = FleetStub(riders: <String>[
+      nadia,
+      direct,
+      for (int i = 0; i < 20; i++) 'rider-${i.toString().padLeft(8, '0')}',
+    ]);
+    await pumpDirectory(tester, stub);
+
+    expect(stub.adapter.calls, hasLength(7));
+    expect(stub.adapter.calls.where((String c) => c.contains('rating')),
+        <String>['GET /api/delivery-providers/my-company/riders/ratings']);
+    expect(stub.called('GET', '/suspension'), isFalse);
+  });
+
   testWidgets('an unrated rider is New, never a zero, and absent from today\'s list is zero',
       (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub());
@@ -54,13 +73,13 @@ void main() {
   testWidgets('a figure whose source failed is left off, not New and not zero',
       (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub(failing: const <String, (int, Object?)>{
-      '/riders/$nadia/rating': (503, null),
+      '/my-company/riders/ratings': (503, null),
       '/riders/delivered-today': (503, null),
     }));
 
     expect(find.text('4.5'), findsNothing);
-    // Only the rider who really is unrated reads New.
-    expect(find.text(en.carrRidersRatingNew), findsOneWidget);
+    // With the ratings unread, nobody is New: that would be a claim about riders nobody read.
+    expect(find.text(en.carrRidersRatingNew), findsNothing);
     // "(0 today)" would be a number the platform does not have.
     expect(find.text(en.carrRidersDeliveredToday(0)), findsNothing);
     expect(find.text(en.carrRidersDeliveredToday(3)), findsNothing);
@@ -87,8 +106,8 @@ void main() {
     expect(kpi(tester, en.carrRidersStatSignalLost), '1');
     expect(kpi(tester, en.carrRidersStatOffline), '1');
 
-    // Two riders have not carried this company's work, so its roster cannot place them either
-    // way. They are counted in no card, and said where a reader would otherwise assume them.
+    // Two riders the roster has no duty or location for, so it cannot place them either way. They
+    // are counted in no card, and said where a reader would otherwise assume them.
     expect(find.text(en.carrRidersNoPresenceCount(2)), findsOneWidget);
     expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusOffline), findsOneWidget);
     expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusSignalLost), findsOneWidget);
@@ -96,8 +115,7 @@ void main() {
 
   testWidgets('a rider out on your job but missing from the roster is on a job, and on duty',
       (WidgetTester tester) async {
-    // The roster only learns a rider carries for a company from that company's orders, so a
-    // rider's first job can be in hand before they appear on it.
+    // A rider's first job can be in hand before the roster places them.
     await pumpDirectory(tester, FleetStub());
 
     expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusOnAJob), findsOneWidget);
@@ -151,6 +169,29 @@ void main() {
 
     expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusSuspended), findsOneWidget);
     expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusActive), findsNothing);
+  });
+
+  testWidgets('a standing that could not be read outranks presence too, and says it is unknown',
+      (WidgetTester tester) async {
+    // Nadia is on duty. Were her standing unread and the badge to fall back to presence, a
+    // suspended rider would read "Active" — the one guess this badge must never make.
+    await pumpDirectory(tester, FleetStub(suspended: null));
+
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusStandingUnknown),
+        findsOneWidget);
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusActive), findsNothing);
+  });
+
+  testWidgets('with the applications unread, no rider\'s standing is known and none is guessed',
+      (WidgetTester tester) async {
+    await pumpDirectory(tester, FleetStub(failing: const <String, (int, Object?)>{
+      'GET =/applications/for-company/p1': (503, null),
+    }));
+
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusStandingUnknown),
+        findsNWidgets(2));
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusActive), findsNothing);
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusOnAJob), findsNothing);
   });
 
   testWidgets('search narrows by name, by reference and by short reference',
@@ -298,7 +339,7 @@ void main() {
 
     await openProfile(tester);
     expect(find.text(en.carrRidersProfileTitle), findsOneWidget);
-    expect(find.text(en.carrRidersBadgeId('REF-app-1')), findsOneWidget);
+    expect(find.text(en.carrRidersBadgeId(ltrIsolate('REF-app-1'))), findsOneWidget);
 
     await tester.tap(find.widgetWithText(ConsoleButton, en.carrRidersBackToDirectory));
     await tester.pumpAndSettle();
@@ -346,6 +387,21 @@ void main() {
     expect(find.widgetWithText(ConsoleStatusPill, ar.carrRidersStatusActive), findsOneWidget);
     expect(find.text(en.carrRidersStatusActive), findsNothing);
     expect(find.text(en.carrRidersManageProfile), findsNothing);
+  });
+
+  testWidgets('on an Arabic card the reference still reads left to right, from the card\'s start',
+      (WidgetTester tester) async {
+    // Laid out right to left, "#REF-app-1" came out as "REF-app-1#" — not the reference the company
+    // and the rider quote to each other.
+    await pumpDirectory(tester, FleetStub(), locale: const Locale('ar'));
+
+    final Finder reference = find.text('#REF-app-1');
+    expect(reference, findsOneWidget);
+    final Directionality direction = tester.widget<Directionality>(
+        find.ancestor(of: reference, matching: find.byType(Directionality)).first);
+    expect(direction.textDirection, TextDirection.ltr);
+    // Still at the start edge of a right-to-left card.
+    expect(tester.widget<Text>(reference).textAlign, TextAlign.right);
   });
 
   // What a 1440 / 1280 / 1024 window leaves the content column once the 260px rail has its share.

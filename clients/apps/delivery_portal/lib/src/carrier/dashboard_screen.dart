@@ -192,6 +192,11 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
         subtitle: _company == null
             ? 'Operational health dashboard'
             : 'Operational health dashboard for ${_company!.name}',
+        // In the header, under the company's name: the switch that stops this company being offered
+        // work. It sat at the foot of the page, below the fold on any laptop — the wrong place for a
+        // brake — and the header's own column lets it wrap on a narrow window rather than crowd the
+        // search and the bell out of the bar.
+        below: CarrierAvailabilitySwitch(api: widget.providerApi),
         actions: <Widget>[
           // Live, and over the one population this page holds: the recent jobs the chart and the
           // feed are both drawn from.
@@ -217,11 +222,10 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
       children: <Widget>[
         ConsoleKpiRow(cards: _kpis(s)),
         _split(s, jobs),
-        // How much work this company is offered, and the switch that stops it being offered any.
-        // They sat under the old riders table; the riders page is an HR directory now, and this is
-        // the page a company opens to ask how it is doing. They load on their own, so a failure
-        // there never takes the figures above down with them.
-        CarrierStandingCards(api: widget.providerApi),
+        // How much work this company is offered. It sat under the old riders table; the riders page
+        // is an HR directory now, and this is the page a company opens to ask how it is doing. It
+        // loads on its own, so a failure there never takes the figures above down with it.
+        CarrierScoreCard(api: widget.providerApi),
       ],
     );
   }

@@ -17,15 +17,23 @@ import '../shell/shell.dart';
 ///   to a coverage zone, and the directory says so rather than calling it an assignment.
 /// * **Presence** is the tracking roster: on duty, signal lost, or off duty. There is no "on break"
 ///   state anywhere in the platform, and signal lost is never relabelled as one. A rider missing
-///   from the roster has not carried this company's work yet, which says nothing about their duty
-///   — see [CarrierFleet.bucketOf].
-/// * **Suspension** is the onboarding service's carrier-scoped standing, per application.
-/// * **Rating** is the order service's aggregate per rider. Unrated is "New", never a zero.
+///   from the roster is one the tracking service has not linked to this company yet, which says
+///   nothing about their duty — see [CarrierFleet.bucketOf].
+/// * **Suspension** is the onboarding service's standing, carried on this company's own
+///   applications listing — see [CarrierFleet.suspensionOf].
+/// * **Rating** is the order service's aggregate, for the whole fleet at once. Unrated is "New",
+///   never a zero.
 /// * **Delivered today** is the carrier-scoped delivered-today list, where absence means zero.
 ///
-/// The first three reads (company, score-free fleet list) are the page; every other source may
-/// fail on its own, and a failed source is null here — which the screens draw as a dash — rather
-/// than an empty map that would read as "nobody is on duty" or "nobody delivered anything".
+/// **Seven requests, however large the fleet.** The page used to follow the fleet list with a rating
+/// request and a standing request for every rider — 6 + 2×N, more than eighty for forty riders on
+/// every load — and an office behind one address ran into the gateway's per-address rate limit,
+/// which the page then drew as nobody suspended and nobody rated. Every per-rider fact now arrives
+/// in a fleet-wide read, and nothing here is asked once per rider.
+///
+/// The first two reads (company, fleet list) are the page; every other source may fail on its own,
+/// and a failed source is null here — which the screens draw as a dash — rather than an empty map
+/// that would read as "nobody is on duty" or "nobody delivered anything".
 class CarrierFleet {
   const CarrierFleet({
     required this.company,
@@ -36,7 +44,6 @@ class CarrierFleet {
     required this.applicationsLoaded,
     required this.roster,
     required this.deliveredToday,
-    required this.suspended,
     required this.ratings,
   });
 
@@ -68,11 +75,9 @@ class CarrierFleet {
   /// Deliveries today by rider. Absent riders delivered nothing; null means the call failed.
   final Map<String, int>? deliveredToday;
 
-  /// Who is suspended. A rider missing from this map has no known standing — never a claim that
-  /// they are in good standing.
-  final Map<String, bool> suspended;
-
-  /// Rating aggregates. A rider missing from this map is one whose rating could not be read.
+  /// Rating aggregates from the fleet-wide read, which names every rider on the fleet. Empty when
+  /// that read failed; a rider missing from it is one whose rating could not be read — never an
+  /// unrated rider.
   final Map<String, RiderStanding> ratings;
 
   /// Loads and joins the fleet. Throws only when the company itself cannot be read — for a user
@@ -81,7 +86,6 @@ class CarrierFleet {
     required DeliveryProviderApi provider,
     required OrderApi order,
     required OnboardingApi onboarding,
-    required PartnerManagementApi management,
     required TrackingApi tracking,
     required RiderPerformanceApi performance,
   }) async {
@@ -92,18 +96,22 @@ class CarrierFleet {
     final DeliveryProviderInfo company = base[0] as DeliveryProviderInfo;
     final List<String> riders = base[1] as List<String>;
 
-    // Together: none of these depends on another, and each may fail on its own.
+    // Together: none of these depends on another, and each may fail on its own. Every one is
+    // fleet-wide; nothing is asked once per rider.
     final List<Object?> extra = await Future.wait(<Future<Object?>>[
       _tryLoad(() async => (await order.forCarrier(size: jobsWindow)).content),
+      // Carries each rider's standing, so a suspension costs no request of its own.
       _tryLoad(() => onboarding.forCompany(company.id, all: true)),
       // Everyone, not just the on-duty half: this is a staff list, and a rider who is off duty has
       // to appear in it as off duty rather than vanish.
       _tryLoad(() => tracking.roster(onDutyOnly: false)),
       _tryLoad(performance.deliveredToday),
+      _tryLoad(provider.myRiderRatings),
     ]);
     final List<OnboardingApplication>? applications = extra[1] as List<OnboardingApplication>?;
     final List<RiderPresence>? roster = extra[2] as List<RiderPresence>?;
     final List<RiderDeliveredToday>? today = extra[3] as List<RiderDeliveredToday>?;
+    final List<RiderStanding>? ratings = extra[4] as List<RiderStanding>?;
 
     final Map<String, OnboardingApplication> byRider = <String, OnboardingApplication>{
       if (applications != null)
@@ -111,26 +119,6 @@ class CarrierFleet {
           if (a.kind == OnboardingKind.rider && a.provisionedUserRef != null)
             a.provisionedUserRef!: a,
     };
-
-    // One call per rider for each of the two per-rider facts. A fleet is human-sized; a joined
-    // directory endpoint is the fix if that stops being true.
-    final Map<String, bool> suspended = <String, bool>{};
-    final Map<String, RiderStanding> ratings = <String, RiderStanding>{};
-    await Future.wait(<Future<void>>[
-      for (final String rider in riders) ...<Future<void>>[
-        () async {
-          final RiderStanding? standing = await _tryLoad(() => order.riderRating(rider));
-          if (standing != null) ratings[rider] = standing;
-        }(),
-        () async {
-          final OnboardingApplication? application = byRider[rider];
-          if (application == null) return;
-          final PartnerSuspensionRecord? record =
-              await _tryLoad(() => management.riderSuspension(company.id, application.id));
-          if (record != null) suspended[rider] = record.suspended;
-        }(),
-      ],
-    ]);
 
     return CarrierFleet(
       company: company,
@@ -149,8 +137,10 @@ class CarrierFleet {
       deliveredToday: today == null
           ? null
           : <String, int>{for (final RiderDeliveredToday d in today) d.riderId: d.delivered},
-      suspended: suspended,
-      ratings: ratings,
+      ratings: <String, RiderStanding>{
+        if (ratings != null)
+          for (final RiderStanding standing in ratings) standing.riderId: standing,
+      },
     );
   }
 
@@ -203,11 +193,9 @@ class CarrierFleet {
 
   static const String vehicleKey = 'vehicleType';
 
-  /// The day this company approved them, or the day they applied when that was not recorded.
-  DateTime? joinedOn(String rider) {
-    final OnboardingApplication? application = applications[rider];
-    return application?.decidedAt ?? application?.createdAt;
-  }
+  /// The day this company approved them. Null when no decision date is recorded — never the day
+  /// they applied, which is a different fact the profile shows under its own label.
+  DateTime? joinedOn(String rider) => applications[rider]?.decidedAt;
 
   bool isOnAJob(String rider) => (jobs ?? const <DeliveryOrder>[])
       .any((DeliveryOrder j) => j.riderId == rider && !j.status.isTerminal);
@@ -216,14 +204,31 @@ class CarrierFleet {
   int? deliveredTodayBy(String rider) =>
       deliveredToday == null ? null : deliveredToday![rider] ?? 0;
 
+  /// Whether this rider is suspended, as far as this page can say.
+  ///
+  /// [RiderSuspension.unknown] is an answer of its own and never folded into "active": when the
+  /// applications could not be read, or the listing did not carry a standing, a suspended rider
+  /// would otherwise wear a presence badge — "Offline", "Signal lost" — and be offered "Suspend". A
+  /// rider the platform attached directly has no application to be suspended through at all.
+  RiderSuspension suspensionOf(String rider) {
+    if (!applicationsLoaded) return RiderSuspension.unknown;
+    final OnboardingApplication? application = applications[rider];
+    if (application == null) return RiderSuspension.noApplication;
+    return switch (application.suspended) {
+      true => RiderSuspension.suspended,
+      false => RiderSuspension.active,
+      null => RiderSuspension.unknown,
+    };
+  }
+
   /// Which stat card the rider counts towards. Null when presence could not be read at all, and
   /// null for a rider the loaded roster says nothing about.
   ///
-  /// Missing from the roster is not "offline". The tracking service links a rider to a company from
-  /// the orders they carry for it (`PresenceService.learnCarrier` in order-tracking), so a rider who
-  /// has not yet carried this company's work is absent from its roster whether they are on duty or
-  /// not. The one thing that does say such a rider is out working is holding one of this company's
-  /// unfinished jobs, which counts as on duty — "available or on a job", as that card says.
+  /// Missing from the roster is not "offline". The tracking service links a rider to a company when
+  /// it hears they joined, or from the orders they carry for it, so a rider it has not linked yet is
+  /// absent from the roster whether they are on duty or not. The one thing that does say such a
+  /// rider is out working is holding one of this company's unfinished jobs, which counts as on duty
+  /// — "available or on a job", as that card says.
   PresenceBucket? bucketOf(String rider) {
     if (roster == null) return null;
     final RiderPresence? presence = roster![rider];
@@ -246,10 +251,20 @@ class CarrierFleet {
       roster == null ? null : riders.where((String r) => bucketOf(r) == null).length;
 
   /// The badge, in the precedence the old table used and the design keeps: a suspension beats
-  /// presence, presence beats the job board, and with nothing to go on the badge is left off rather
-  /// than guessed — which includes a rider missing from the roster, for the reason on [bucketOf].
+  /// presence, and so does a standing that could not be read — a presence badge on a rider who may
+  /// be suspended is a guess in the reassuring direction. Presence beats the job board, and with
+  /// nothing to go on the badge is left off rather than guessed — which includes a rider missing
+  /// from the roster, for the reason on [bucketOf].
   RiderStatus statusOf(String rider) {
-    if (suspended[rider] == true) return RiderStatus.suspended;
+    switch (suspensionOf(rider)) {
+      case RiderSuspension.suspended:
+        return RiderStatus.suspended;
+      case RiderSuspension.unknown:
+        return RiderStatus.standingUnknown;
+      case RiderSuspension.active:
+      case RiderSuspension.noApplication:
+        break;
+    }
     final RiderPresence? presence = roster?[rider];
     if (presence != null) {
       return switch (presence.state) {
@@ -266,12 +281,59 @@ class CarrierFleet {
 /// The directory's three presence cards.
 enum PresenceBucket { onDuty, signalLost, offline }
 
+/// Whether a rider is suspended, as far as the page can say — see [CarrierFleet.suspensionOf].
+enum RiderSuspension { active, suspended, unknown, noApplication }
+
 /// One rider's badge. There is deliberately no "on break": the platform has no such state.
-enum RiderStatus { suspended, active, signalLost, offline, onAJob, unknown }
+enum RiderStatus { suspended, standingUnknown, active, signalLost, offline, onAJob, unknown }
 
 /// Riders are Keycloak subjects; the whole uuid is noise on a card, and it is only shown at all
 /// where the platform has no reference or name to put in its place.
 String shortRiderRef(String ref) => ref.length <= 8 ? ref : ref.substring(0, 8).toUpperCase();
+
+/// A code — a reference, a masked number — isolated so it reads left to right inside a sentence in
+/// either language. Without it an Arabic page's bidi rules carry the code's "#" and hyphens to the
+/// wrong ends: "YK-884#".
+String ltrIsolate(String code) => '$_leftToRightIsolate$code$_popDirectionalIsolate';
+
+/// U+2066 LEFT-TO-RIGHT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, built from their code points
+/// so that no invisible character sits in the source where a reader cannot see it.
+final String _leftToRightIsolate = String.fromCharCode(0x2066);
+final String _popDirectionalIsolate = String.fromCharCode(0x2069);
+
+/// A code on a line of its own, laid out left to right whatever the page's direction, yet still at
+/// the page's start edge — right on an Arabic page, left on an English one.
+class FleetCode extends StatelessWidget {
+  const FleetCode(this.text, {super.key, this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Text(
+        text,
+        overflow: TextOverflow.ellipsis,
+        textAlign: rtl ? TextAlign.right : TextAlign.left,
+        style: style,
+      ),
+    );
+  }
+}
+
+/// A national ID as a company sees it on a profile: the last three characters, the rest withheld.
+///
+/// Enough to tell two riders apart or to match a paper in hand. The number in full is on the
+/// verified ID document in the documents card, one deliberate click away, rather than sitting in
+/// plain text on a page that stays open on an office screen.
+String maskedNationalId(String raw) {
+  final String compact = raw.replaceAll(RegExp(r'[^0-9A-Za-z]'), '');
+  if (compact.length <= 3) return '•••';
+  return '•••${compact.substring(compact.length - 3)}';
+}
 
 /// "Sep 1, 2026" in the reader's own language, off the Material localizations the portal already
 /// loads rather than a second date library.
@@ -308,6 +370,10 @@ String serverMessage(Object error, DeliveryStrings t) {
 Widget? riderStatusPill(DeliveryStrings t, RiderStatus status) => switch (status) {
       RiderStatus.suspended =>
         ConsoleStatusPill(label: t.carrRidersStatusSuspended, accent: DeliveryAccent.critical),
+      // Caution, not the quiet slate of "Offline": this badge is a warning that the page cannot
+      // vouch for the rider, not the absence of a state.
+      RiderStatus.standingUnknown => ConsoleStatusPill(
+          label: t.carrRidersStatusStandingUnknown, accent: DeliveryAccent.caution),
       RiderStatus.active =>
         ConsoleStatusPill(label: t.carrRidersStatusActive, accent: DeliveryAccent.positive),
       RiderStatus.signalLost =>

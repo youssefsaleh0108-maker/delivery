@@ -3,36 +3,31 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
-import '../shell/console_controls.dart';
 import '../shell/shell.dart';
 import 'fleet_roster.dart';
 
-/// The two things a delivery company cannot lose and the Riders HR frame (112:413) has no place
-/// for: the delivery score that decides how much work arrives, and the switch that stops it
-/// arriving.
+/// The delivery score that decides how much work a company is offered, and what it is made of —
+/// one of the two things a company cannot lose that the Riders HR frame (112:413) has no place for.
+/// The other is [CarrierAvailabilitySwitch], the switch that stops the work arriving.
 ///
-/// They sat under the old fleet table because that page was the company's page. The riders page
-/// is an HR directory now, so they moved here, onto the dashboard — the page a company opens to
-/// ask "how are we doing, and do we want more work tonight". Behaviour is unchanged: the score
-/// says when it is provisional, and a company the platform suspended is not offered a resume
-/// button that would fail.
+/// Both sat under the old fleet table and moved to the dashboard, the page a company opens to ask
+/// "how are we doing, and do we want more work tonight". The score sits at the foot of that page;
+/// the switch sits in its top bar, because a brake below the fold is one nobody finds in time.
 ///
-/// Loads its own two reads rather than taking them from the dashboard, so mounting it is one line
-/// and a failure here never takes the dashboard's figures down with it. Each read may fail alone:
-/// no score still leaves the switch, and no company leaves nothing to draw at all.
-class CarrierStandingCards extends StatefulWidget {
-  const CarrierStandingCards({super.key, required this.api});
+/// Each loads its own read rather than taking it from the dashboard, so mounting one is one line
+/// and a failure in either never takes the dashboard's figures down with it. A score that cannot
+/// be read draws nothing: the switch does not depend on it.
+class CarrierScoreCard extends StatefulWidget {
+  const CarrierScoreCard({super.key, required this.api});
 
   final DeliveryProviderApi api;
 
   @override
-  State<CarrierStandingCards> createState() => _CarrierStandingCardsState();
+  State<CarrierScoreCard> createState() => _CarrierScoreCardState();
 }
 
-class _CarrierStandingCardsState extends State<CarrierStandingCards> {
-  DeliveryProviderInfo? _company;
+class _CarrierScoreCardState extends State<CarrierScoreCard> {
   CarrierScore? _score;
-  bool _busy = false;
 
   @override
   void initState() {
@@ -41,81 +36,22 @@ class _CarrierStandingCardsState extends State<CarrierStandingCards> {
   }
 
   Future<void> _load() async {
-    final List<Object?> both = await Future.wait(<Future<Object?>>[
-      _tryLoad(widget.api.myCompany),
-      _tryLoad(widget.api.myScore),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _company = both[0] as DeliveryProviderInfo?;
-      _score = both[1] as CarrierScore?;
-    });
-  }
-
-  static Future<T?> _tryLoad<T>(Future<T> Function() load) async {
+    CarrierScore? score;
     try {
-      return await load();
+      score = await widget.api.myScore();
     } catch (_) {
-      return null;
+      score = null;
     }
-  }
-
-  Future<void> _toggleAvailability(DeliveryProviderInfo company) async {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    setState(() => _busy = true);
-    try {
-      final bool wasTaking = company.canTakeWork;
-      await (wasTaking ? widget.api.pauseMyCompany() : widget.api.resumeMyCompany());
-      messenger.showSnackBar(SnackBar(
-        content: Text(wasTaking ? t.pausedNoNewOrders : t.resumedTakingOrders),
-      ));
-      await _load();
-    } catch (e) {
-      // The server's own sentence where it has one: it is the side that knows a suspended carrier
-      // cannot resume itself, and says so.
-      messenger.showSnackBar(SnackBar(content: Text(serverMessage(e, t))));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!mounted) return;
+    setState(() => _score = score);
   }
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final DeliveryProviderInfo? company = _company;
     final CarrierScore? score = _score;
-    if (company == null) return const SizedBox.shrink();
+    if (score == null) return const SizedBox.shrink();
 
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        final Widget availability = _availabilityCard(company, t);
-        if (score == null) return availability;
-        final Widget scoreCard = _scoreCard(score, t);
-
-        if (constraints.maxWidth < 900) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              scoreCard,
-              const SizedBox(height: ConsoleMetrics.pageGap),
-              availability,
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(child: scoreCard),
-            const SizedBox(width: ConsoleMetrics.pageGap),
-            SizedBox(width: 380, child: availability),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _scoreCard(CarrierScore score, DeliveryStrings t) {
     final DeliveryAccent accent = score.score >= 80
         ? DeliveryAccent.positive
         : (score.score >= 60 ? DeliveryAccent.caution : DeliveryAccent.critical);
@@ -167,52 +103,99 @@ class _CarrierStandingCardsState extends State<CarrierStandingCards> {
     );
   }
 
-  Widget _availabilityCard(DeliveryProviderInfo company, DeliveryStrings t) {
+  static String _minutes(Duration? d) => d == null ? '—' : '${d.inMinutes}m';
+}
+
+/// Whether this company is being offered work, and the switch that stops or restarts it — small
+/// enough for the dashboard's top bar, where it is the first thing on the page.
+///
+/// What pausing means is on the tooltip rather than in a paragraph beside it: the bar has room for
+/// a status and a button, and the explanation is one hover away for whoever has not paused before.
+/// A company the platform suspended sees its status, and why on the same tooltip, and is offered no
+/// button — resuming out of a suspension is the platform's decision, and a button that silently
+/// failed would be worse than none. Draws nothing when the company cannot be read; the page around
+/// it already says so.
+class CarrierAvailabilitySwitch extends StatefulWidget {
+  const CarrierAvailabilitySwitch({super.key, required this.api});
+
+  final DeliveryProviderApi api;
+
+  @override
+  State<CarrierAvailabilitySwitch> createState() => _CarrierAvailabilitySwitchState();
+}
+
+class _CarrierAvailabilitySwitchState extends State<CarrierAvailabilitySwitch> {
+  DeliveryProviderInfo? _company;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    DeliveryProviderInfo? company;
+    try {
+      company = await widget.api.myCompany();
+    } catch (_) {
+      company = null;
+    }
+    if (!mounted) return;
+    setState(() => _company = company);
+  }
+
+  Future<void> _toggle(DeliveryProviderInfo company) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      final bool wasTaking = company.canTakeWork;
+      await (wasTaking ? widget.api.pauseMyCompany() : widget.api.resumeMyCompany());
+      messenger.showSnackBar(SnackBar(
+        content: Text(wasTaking ? t.pausedNoNewOrders : t.resumedTakingOrders),
+      ));
+      await _load();
+    } catch (e) {
+      // The server's own sentence where it has one: it is the side that knows a suspended carrier
+      // cannot resume itself, and says so.
+      messenger.showSnackBar(SnackBar(content: Text(serverMessage(e, t))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final DeliveryProviderInfo? company = _company;
+    if (company == null) return const SizedBox.shrink();
     final bool suspended = company.status == ProviderStatus.suspended;
 
-    return ConsoleCard(
-      title: t.takingOrders,
-      trailing: ConsoleStatusPill(
-        label: company.canTakeWork ? t.takingWork : company.status.label,
-        accent: company.canTakeWork ? DeliveryAccent.positive : DeliveryAccent.caution,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+    return Tooltip(
+      message: suspended ? t.suspendedByPlatform : t.pauseExplanation,
+      // A Wrap, so a narrow header puts the button under the status instead of overflowing.
+      child: Wrap(
+        spacing: DeliverySpacing.sm,
+        runSpacing: DeliverySpacing.xs,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: <Widget>[
-          Text(
-            company.canTakeWork ? t.youAreTakingOrders : t.youAreNotTakingOrders,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: DeliveryColors.ink,
-            ),
+          ConsoleStatusPill(
+            label: company.canTakeWork ? t.takingWork : company.status.label,
+            accent: company.canTakeWork ? DeliveryAccent.positive : DeliveryAccent.caution,
           ),
-          const SizedBox(height: DeliverySpacing.xs),
-          Text(
-            suspended ? t.suspendedByPlatform : t.pauseExplanation,
-            style: ConsoleText.body.copyWith(color: DeliveryColors.muted, height: 1.4),
-          ),
-          // A suspended carrier cannot let itself back in — that is the platform's decision, and a
-          // button that silently fails would be worse than no button.
-          if (!suspended) ...<Widget>[
-            const SizedBox(height: DeliverySpacing.md),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: ConsolePrimaryButton(
-                label: company.canTakeWork ? t.pauseNewOrders : t.startTakingOrders,
-                icon: company.canTakeWork ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                busy: _busy,
-                onPressed: _busy ? null : () => _toggleAvailability(company),
-              ),
+          if (!suspended)
+            ConsoleButton(
+              label: company.canTakeWork ? t.pauseNewOrders : t.startTakingOrders,
+              icon: company.canTakeWork ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              tone: company.canTakeWork ? ConsoleButtonTone.outlined : ConsoleButtonTone.tinted,
+              busy: _busy,
+              onPressed: _busy ? null : () => _toggle(company),
             ),
-          ],
         ],
       ),
     );
   }
-
-  static String _minutes(Duration? d) => d == null ? '—' : '${d.inMinutes}m';
 }
 
 /// One of the four numbers inside the score card, in the console's KPI proportions without the

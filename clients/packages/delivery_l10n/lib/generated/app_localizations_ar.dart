@@ -7526,7 +7526,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get carrRidersLastSeen => 'آخر ظهور';
 
   @override
-  String get carrRidersNoPresenceYet => 'ليس ضمن سجل التواجد لديك بعد';
+  String get carrRidersNoPresenceYet => 'لا توجد حالة خدمة أو موقع بعد';
 
   @override
   String get carrRidersStaleNote =>
@@ -7646,8 +7646,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String get carrRidersHoursNone =>
-      'لا يوجد سجل خدمة لهذا السائق. لا يُستكمل أي شيء من قبل بدء تتبّع الخدمة.';
+  String get carrRidersHoursNone => 'لا توجد ساعات خدمة لعرضها لشركتك.';
 
   @override
   String carrRidersHoursZone(String zone) {
@@ -7687,7 +7686,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String carrRidersTerminateBody(String name) {
-    return 'يخرج $name من أسطولك فوراً ويتوقف عرض عملك عليه. يحتفظ بتسجيل دخوله في YouDrop ويعود إلى سائقي YouDrop، حيث يمكن أن يُعرض عليه عمل المنصّة.';
+    return 'يخرج $name من أسطولك فوراً ولا يُعرض عليه أي من عملك. يحتفظ بتسجيل دخوله في YouDrop وبسجلّه، لكنه لا يصبح من سائقي YouDrop: لا يمكنه تولّي أي عمل إلى أن تعيّنه شركة أخرى أو تضمّه YouDrop إلى سائقيها.';
   }
 
   @override
@@ -7696,11 +7695,11 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get carrRidersTerminateMoney =>
-      'لا يسوّي هذا أي مبالغ: ما كسبه وما حصّله يبقى في السجل كما هو تماماً.';
+      'استلم منه أولاً أي نقد تحصيل يحمله لك. إنهاء العقد لا يسوّي أي مبالغ: ما كسبه وما حصّله يبقى في السجل كما هو تماماً.';
 
   @override
   String get carrRidersTerminateUndo =>
-      'لا يمكن إعادته إلى أسطولك بعد ذلك إلا عن طريق YouDrop.';
+      'إعادته إلى أسطولك لاحقاً تعني تعيينه من جديد.';
 
   @override
   String get carrRidersTerminateConfirm => 'إنهاء العقد';
@@ -7736,19 +7735,19 @@ class DeliveryStringsAr extends DeliveryStrings {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count سائق آخر ليسوا ضمن سجل التواجد بعد',
-      many: '$count سائقاً آخر ليسوا ضمن سجل التواجد بعد',
-      few: '$count سائقين آخرين ليسوا ضمن سجل التواجد بعد',
-      two: 'سائقان آخران ليسا ضمن سجل التواجد بعد',
-      one: 'سائق آخر ليس ضمن سجل التواجد بعد',
-      zero: 'لا أحد غيرهم خارج سجل التواجد',
+      other: '$count سائق آخر بلا حالة خدمة أو موقع بعد',
+      many: '$count سائقاً آخر بلا حالة خدمة أو موقع بعد',
+      few: '$count سائقين آخرين بلا حالة خدمة أو موقع بعد',
+      two: 'سائقان آخران بلا حالة خدمة أو موقع بعد',
+      one: 'سائق آخر بلا حالة خدمة أو موقع بعد',
+      zero: 'لا أحد غيرهم بلا حالة خدمة أو موقع',
     );
     return '$_temp0';
   }
 
   @override
   String get carrRidersNoPresenceNote =>
-      'ينضمّ السائق إلى سجل التواجد لديك بعد أن يحمل عملاً لشركتك. وحتى ذلك الحين لا تستطيع هذه الصفحة معرفة ما إذا كان في الخدمة.';
+      'تظهر حالة خدمته وموقعه هنا بعد أن تربطه YouDrop بأسطولك — على أبعد تقدير بعد أول توصيل له لشركتك. وحتى ذلك الحين لا تستطيع هذه الصفحة معرفة ما إذا كان في الخدمة.';
 
   @override
   String get carrRidersVehicleModel => 'طراز المركبة';
@@ -7767,4 +7766,17 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get carrRidersVehicleYear => 'سنة صنع المركبة';
+
+  @override
+  String get carrRidersTerminateReason => 'السبب، ويُحفظ في السجل';
+
+  @override
+  String get carrRidersTerminateReasonHint => 'لماذا ينتهي هذا العقد؟';
+
+  @override
+  String get carrRidersStatusStandingUnknown => 'الوضع غير معروف';
+
+  @override
+  String get carrRidersStandingUnknownNote =>
+      'تعذّرت معرفة ما إذا كان هذا السائق موقوفاً حالياً، لذلك لا يُعرض الإيقاف ولا إعادة التفعيل. أعد تحميل الصفحة للمحاولة مجدداً.';
 }

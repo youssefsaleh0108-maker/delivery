@@ -1,3 +1,5 @@
+import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_portal/src/carrier/fleet_roster.dart';
 import 'package:delivery_portal/src/carrier/rider_profile_screen.dart';
 import 'package:delivery_portal/src/shell/console_controls.dart';
 import 'package:delivery_portal/src/shell/shell.dart';
@@ -13,7 +15,8 @@ import 'riders_harness.dart';
 /// presence, thirty days of work in this company's own scope, hours online, suspension — alongside
 /// the design's additions built from what the platform actually records: papers, the rating's
 /// histogram, the day-by-day chart and ending a contract. What the design draws with no source
-/// behind it (an emergency contact, an on-time rate, a pay rate, a rank) is pinned as absent.
+/// behind it (an emergency contact, an on-time rate, a pay rate, a rank) is pinned as absent, and so
+/// is what the page could not read: an unknown standing is never drawn as a good one.
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
@@ -21,11 +24,21 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+/// Opens "Terminate Contract", gives [reason], and confirms.
+Future<void> _terminateWith(WidgetTester tester, String reason) async {
+  await _tapVisible(tester, find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminate));
+  await tester.enterText(
+      find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)), reason);
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(ConsolePrimaryButton, en.carrRidersTerminateConfirm));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   String kpi(WidgetTester tester, String label) =>
       tester.widget<ConsoleKpiCard>(find.widgetWithText(ConsoleKpiCard, label)).value;
 
-  testWidgets('identity is the rider\'s own application to this company',
+  testWidgets('identity is the rider\'s own application to this company, and no more of it than needed',
       (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub());
     await openProfile(tester);
@@ -33,13 +46,16 @@ void main() {
     expect(find.text(en.carrRidersProfileTitle), findsOneWidget);
     expect(find.text('Nadia Haddad'), findsOneWidget);
     // The application's reference: the platform issues no badge numbers, and none is invented.
-    expect(find.text(en.carrRidersBadgeId('REF-app-1')), findsOneWidget);
+    expect(find.text(en.carrRidersBadgeId(ltrIsolate('REF-app-1'))), findsOneWidget);
     expect(find.text('+96170000000'), findsOneWidget);
     expect(find.text('nadia@example.com'), findsOneWidget);
-    // What the rider wizard took down, under the reader's own labels rather than its keys.
-    expect(find.text(en.carrRidersDateOfBirth.toUpperCase()), findsOneWidget);
-    expect(find.text('1998-03-14'), findsOneWidget);
-    expect(find.text('LB-000123456'), findsOneWidget);
+    // The national ID to its last three characters; the whole number is on the verified document.
+    expect(find.text(en.carrRidersNationalIdNumber.toUpperCase()), findsOneWidget);
+    expect(find.text(ltrIsolate('•••456')), findsOneWidget);
+    expect(find.textContaining('000123456'), findsNothing);
+    // No date of birth at all: the verified document carries it, and dispatching needs none.
+    expect(find.text(en.carrRidersDateOfBirth.toUpperCase()), findsNothing);
+    expect(find.textContaining('1998'), findsNothing);
     // When she last went on or off duty, off the roster — the old rider drawer's "Changed".
     expect(find.text(en.carrRidersDutyChanged.toUpperCase()), findsOneWidget);
     expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusActive), findsOneWidget);
@@ -47,12 +63,18 @@ void main() {
     expect(find.textContaining('mergency'), findsNothing);
   });
 
+  test('a national ID keeps only its last three characters, and a short one keeps none', () {
+    expect(maskedNationalId('LB-000123456'), '•••456');
+    expect(maskedNationalId('12 34 56 78'), '•••678');
+    expect(maskedNationalId('A12'), '•••');
+  });
+
   testWidgets('the thirty days are this company\'s, and completion is the server\'s',
       (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub());
     await openProfile(tester);
 
-    // Labelled as the rolling window the server counts, not "this month".
+    // Labelled as the window the server counts, not "this month".
     expect(kpi(tester, en.carrRidersDeliveriesWindow(30)), '11');
     expect(find.text(en.carrRidersClaimedCaption(12, 1)), findsOneWidget);
     // In the design's on-time slot: nothing records when a delivery was due, so on-time cannot be
@@ -143,6 +165,30 @@ void main() {
     expect(find.text(en.carrRidersHoursZone('UTC')), findsOneWidget);
   });
 
+  testWidgets('hours the tracking service will not show this company are "none to show", nothing more',
+      (WidgetTester tester) async {
+    // A 404 is the service declining to show this company the rider's hours — nothing recorded for
+    // them here, or a rider it no longer counts as theirs — so "no duty history" would be a claim
+    // about the rider the page cannot make.
+    await pumpDirectory(tester, FleetStub(failing: const <String, (int, Object?)>{
+      '/duty/hours': (404, <String, dynamic>{'detail': 'No presence information for that rider'}),
+    }));
+    await openProfile(tester);
+
+    expect(find.text(en.carrRidersHoursNone), findsOneWidget);
+    expect(find.text(en.carrRidersCouldNotRead), findsNothing);
+  });
+
+  testWidgets('hours that could not be read say exactly that', (WidgetTester tester) async {
+    await pumpDirectory(tester, FleetStub(failing: const <String, (int, Object?)>{
+      '/duty/hours': (503, null),
+    }));
+    await openProfile(tester);
+
+    expect(find.text(en.carrRidersCouldNotRead), findsOneWidget);
+    expect(find.text(en.carrRidersHoursNone), findsNothing);
+  });
+
   testWidgets('papers: a verdict per kind, a replaced upload hidden, a missing one said',
       (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub());
@@ -190,6 +236,40 @@ void main() {
     expect(find.text(en.carrRidersNoPresenceNote), findsOneWidget);
   });
 
+  testWidgets('with the applications unread, the profile says so and offers no suspension',
+      (WidgetTester tester) async {
+    await pumpDirectory(tester, FleetStub(failing: const <String, (int, Object?)>{
+      'GET =/applications/for-company/p1': (503, null),
+    }));
+    await openProfile(tester);
+
+    // Not "the platform attached this rider directly": with nothing read, the page cannot know.
+    expect(find.text(en.carrRidersNoApplication), findsNothing);
+    expect(find.text(en.carrRidersCouldNotRead), findsNWidgets(2));
+    // A rider who may be suspended is neither called active nor offered Suspend.
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusStandingUnknown),
+        findsOneWidget);
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusActive), findsNothing);
+    expect(find.text(en.carrRidersStandingUnknownNote), findsOneWidget);
+    expect(find.widgetWithText(ConsoleSoftButton, en.carrRidersSuspendRider), findsNothing);
+    expect(find.widgetWithText(ConsoleSoftButton, en.carrRidersReinstateRider), findsNothing);
+  });
+
+  testWidgets('a standing the listing did not carry is unknown: neither Suspend nor Reinstate',
+      (WidgetTester tester) async {
+    await pumpDirectory(tester, FleetStub(suspended: null));
+    await openProfile(tester);
+
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusStandingUnknown),
+        findsOneWidget);
+    expect(find.widgetWithText(ConsoleStatusPill, en.carrRidersStatusActive), findsNothing);
+    expect(find.text(en.carrRidersStandingUnknownNote), findsOneWidget);
+    expect(find.widgetWithText(ConsoleSoftButton, en.carrRidersSuspendRider), findsNothing);
+    expect(find.widgetWithText(ConsoleSoftButton, en.carrRidersReinstateRider), findsNothing);
+    // Ending the contract does not turn on standing, so it stays.
+    expect(find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminate), findsOneWidget);
+  });
+
   testWidgets('employment is what the platform records, and says what it does not',
       (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub());
@@ -211,6 +291,18 @@ void main() {
     expect(find.text('Swift Couriers'), findsNothing);
     // No contract type, pay rate or zone assignment exists, and a rate nobody pays is not drawn.
     expect(find.text(en.carrRidersEmploymentNote), findsOneWidget);
+  });
+
+  testWidgets('with no decision date there is no start date: the day they applied is not one',
+      (WidgetTester tester) async {
+    await pumpDirectory(tester, FleetStub(applications: <Map<String, dynamic>>[
+      applicationJson(id: 'app-1', name: 'Nadia Haddad', riderRef: nadia, decided: false),
+    ]));
+    await openProfile(tester);
+
+    expect(find.text(en.carrRidersStartDate.toUpperCase()), findsOneWidget);
+    // 1 July is when she applied, shown once under that label — not again as a start date.
+    expect(find.text('Jul 1, 2026'), findsOneWidget);
   });
 
   testWidgets('suspending sends the typed reason the server insists on',
@@ -256,7 +348,7 @@ void main() {
     expect(stub.called('POST', '/for-company/p1/app-1/unsuspend'), isTrue);
   });
 
-  testWidgets('Terminate Contract says what happens, jobs in flight included, before sending',
+  testWidgets('Terminate Contract says what really happens, and asks why, before anything is sent',
       (WidgetTester tester) async {
     final FleetStub stub = FleetStub();
     await pumpDirectory(tester, stub);
@@ -264,21 +356,36 @@ void main() {
 
     await _tapVisible(tester, find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminate));
     expect(find.text(en.carrRidersTerminateTitle('Nadia Haddad')), findsOneWidget);
+    // Where the rider goes: to no fleet at all, not to YouDrop's own riders.
     expect(find.text(en.carrRidersTerminateBody('Nadia Haddad')), findsOneWidget);
     expect(find.text(en.carrRidersTerminateJobs), findsOneWidget);
+    // Door cash first: ending a contract settles nothing.
     expect(find.text(en.carrRidersTerminateMoney), findsOneWidget);
+
+    // Solid and destructive, and dead until a reason is given — the release is kept on record
+    // with it, so a blank one is not a reason.
+    final Finder confirm = find.widgetWithText(ConsolePrimaryButton, en.carrRidersTerminateConfirm);
+    expect(tester.widget<ConsolePrimaryButton>(confirm).color, DeliveryAccent.critical.color);
+    expect(tester.widget<ConsolePrimaryButton>(confirm).onPressed, isNull);
+    await tester.enterText(
+        find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)), '   ');
+    await tester.pumpAndSettle();
+    expect(tester.widget<ConsolePrimaryButton>(confirm).onPressed, isNull);
 
     // Cancel sends nothing.
     await tester.tap(find.text(en.cancel));
     await tester.pumpAndSettle();
-    expect(stub.called('DELETE', '/my-company/riders/'), isFalse);
+    expect(stub.called('POST', '/my-company/riders/'), isFalse);
 
-    await _tapVisible(tester, find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminate));
-    await tester.tap(find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminateConfirm));
-    await tester.pumpAndSettle();
+    await _terminateWith(tester, '  Repeatedly missed agreed shifts ');
 
-    // Addressed to the caller's own company by the route itself: no company id is sent.
-    expect(stub.called('DELETE', '/api/delivery-providers/my-company/riders/$nadia'), isTrue);
+    // Addressed to the caller's own company by the route itself, with the reason as typed.
+    expect(stub.called('POST', '/api/delivery-providers/my-company/riders/$nadia/release'), isTrue);
+    expect(
+      stub.adapter.bodies
+          .any((Object? b) => b is Map && b['reason'] == 'Repeatedly missed agreed shifts'),
+      isTrue,
+    );
     // Back on the directory, which says what happened.
     expect(find.text(en.carrRidersTitle), findsOneWidget);
     expect(find.text(en.carrRidersTerminated('Nadia Haddad')), findsOneWidget);
@@ -287,7 +394,7 @@ void main() {
   testWidgets('a rider carrying your work is not released, and the page says why',
       (WidgetTester tester) async {
     final FleetStub stub = FleetStub(failing: <String, (int, Object?)>{
-      'DELETE /my-company/riders/': (409, <String, dynamic>{
+      'POST /my-company/riders/': (409, <String, dynamic>{
         'title': 'Rider still carrying',
         'detail': 'This rider is carrying 2 of your jobs.',
         'jobs': 2,
@@ -296,9 +403,7 @@ void main() {
     await pumpDirectory(tester, stub);
     await openProfile(tester);
 
-    await _tapVisible(tester, find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminate));
-    await tester.tap(find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminateConfirm));
-    await tester.pumpAndSettle();
+    await _terminateWith(tester, 'Missed agreed shifts');
 
     expect(find.text(en.carrRidersTerminateCarrying(2)), findsOneWidget);
     // Nothing changed, so the profile stays.
@@ -308,16 +413,14 @@ void main() {
   testWidgets('a rider already off the fleet is said, and the fleet is read again',
       (WidgetTester tester) async {
     final FleetStub stub = FleetStub(failing: <String, (int, Object?)>{
-      'DELETE /my-company/riders/': (404, <String, dynamic>{
+      'POST /my-company/riders/': (404, <String, dynamic>{
         'detail': 'No rider by that reference is on your fleet',
       }),
     });
     await pumpDirectory(tester, stub);
     await openProfile(tester);
 
-    await _tapVisible(tester, find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminate));
-    await tester.tap(find.widgetWithText(ConsoleSoftButton, en.carrRidersTerminateConfirm));
-    await tester.pumpAndSettle();
+    await _terminateWith(tester, 'Missed agreed shifts');
 
     expect(find.text(en.carrRidersNotOnFleet), findsOneWidget);
     expect(
@@ -353,13 +456,15 @@ void main() {
     expect(find.text(en.carrRidersProfileTitle), findsOneWidget);
   });
 
-  testWidgets('reads in Arabic, right to left', (WidgetTester tester) async {
+  testWidgets('reads in Arabic, right to left, with the reference kept in its own order',
+      (WidgetTester tester) async {
     await pumpDirectory(tester, FleetStub(), locale: const Locale('ar'));
     await openProfile(tester, strings: ar);
 
     expect(Directionality.of(tester.element(find.byType(RiderProfileScreen))),
         TextDirection.rtl);
     expect(find.text(ar.carrRidersProfileTitle), findsOneWidget);
+    expect(find.text(ar.carrRidersBadgeId(ltrIsolate('REF-app-1'))), findsOneWidget);
     expect(find.text(ar.carrRidersDocNationalId), findsOneWidget);
     expect(find.widgetWithText(ConsoleSoftButton, ar.carrRidersTerminate), findsOneWidget);
     expect(find.text(en.carrRidersTerminate), findsNothing);
