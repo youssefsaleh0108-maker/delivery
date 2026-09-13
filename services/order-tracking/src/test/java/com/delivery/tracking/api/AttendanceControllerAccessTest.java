@@ -157,7 +157,14 @@ class AttendanceControllerAccessTest {
             verify(attendance).riderSessions("r1", "op-1", true, OCTOBER);
         }
 
-        /** The same body the hours endpoint returns, so the two cannot be told apart. */
+        /**
+         * The same body the hours endpoint returns, so the two cannot be told apart.
+         *
+         * <p>The service is a mock here, so this and the write's twin below pin only how a refusal is
+         * answered. That the refusals happen — a rival's rider, a rival's shift or schedule, a rider
+         * the company let go, on every read and write — is proven against the real service and guard
+         * in AttendanceForeignFleetTest and AttendanceAfterReleaseTest.
+         */
         @Test
         void another_fleets_rider_is_the_same_404_as_an_unknown_one() throws Exception {
             signedInAs(DISPATCHER, "CARRIER");
