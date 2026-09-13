@@ -168,9 +168,20 @@ delivery:
         # merchant is told a scan was interrupted while it is still running. Raise one, check the
         # other. It also keeps the call inside the SDK's own ten-minute non-streaming guard.
         timeout: 240s
-        # The long edge each photo is shrunk to before it is sent. The API reads images at about
-        # this size anyway; sending more is paying to upload pixels it throws away.
-        max-long-edge-px: 1568
+        # The long edge each photo is shrunk to before it is sent: 2236 px, chosen against what the
+        # model reads. Claude Opus 5 reads images at high resolution — up to 2576 px on the long edge
+        # and about 3.75 MP, some 4,784 image tokens at one token per 28 x 28 px patch — and resizes
+        # anything larger itself. A phone's 4:3 photo reaches that area at 2236 x 1677, so this is the
+        # most of a camera photo the model can use: larger only adds upload and resize time for no
+        # more detail, smaller blurs the small print on packaging that tells a 1 L bottle from a
+        # 1.5 L one. The phone's camera is asked for 2400 px, so the server only ever shrinks.
+        #
+        # The cost, at Opus 5's $5 per million input tokens: about 4,780 tokens a photo, so a full
+        # six-photo scan sends about 28,700 image tokens — about $0.14 an attempt, against about
+        # 2,350 tokens a photo and $0.07 an attempt at the 1568 px this was before. At the caps above
+        # (five scans a day, two attempts each) that is at most about $1.44 a merchant a day in
+        # photos, before the prompt and the answer (up to max-tokens, at $25 per million).
+        max-long-edge-px: 2236
 
   geocoding:
     # Which geocoder answers. NOMINATIM is free and keyless and is what runs today; MAPBOX is

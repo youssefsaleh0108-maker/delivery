@@ -82,7 +82,7 @@ class CatalogScanAnalyzerTest {
         return out.toByteArray();
     }
 
-    /** The provider reads images at about this size; sending a phone's original is paying for pixels. */
+    /** No larger than the model reads: past that the API resizes a photo itself, so more is only upload time. */
     @Test
     void photos_are_shrunk_to_the_configured_edge_before_the_provider_sees_them() throws IOException {
         when(objects.read("product-images", "scans/s/shelf.png")).thenReturn(png(2400, 1200));

@@ -90,9 +90,11 @@ abstract class ShelfPhotoSource {
 class DeviceShelfPhotoSource extends ShelfPhotoSource {
   const DeviceShelfPhotoSource();
 
-  /// The long edge the camera is asked for. Past this a phone photo only adds upload time: the
-  /// server shrinks every shelf photo to about 1568px before the reader sees it.
-  static const double _cameraMaxEdge = 2400;
+  /// The long edge the camera is asked for — the same edge a shelf photo keeps if it has to be
+  /// shrunk for upload. The server sends the reader at most 2236 px on the long edge (the most of a
+  /// 4:3 photo Claude reads at full detail), so this sits a little above it: the server only ever
+  /// shrinks, and anything past it would only add upload time.
+  static final double _cameraMaxEdge = CatalogScanApi.shelfPhotoMaxEdge.toDouble();
 
   @override
   bool get canUseCamera =>

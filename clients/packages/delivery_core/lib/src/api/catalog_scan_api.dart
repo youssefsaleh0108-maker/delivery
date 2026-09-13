@@ -21,10 +21,16 @@ class CatalogScanApi {
   /// for why it must not be the app's own. Injectable so a test can see the PUT.
   final Dio Function() _uploadClient;
 
-  /// The largest shelf photo sent. Larger than a product photo's ceiling on purpose: the server
-  /// reads a shelf at about 1568px on the long edge, and small print on packaging is exactly what a
-  /// product-photo downscale would blur away.
+  /// The largest shelf photo sent. Larger than a product photo's ceiling on purpose: the small print
+  /// on packaging — what tells a 1 L bottle from a 1.5 L one — is exactly what a product photo's cap
+  /// would squeeze out.
   static const int maxShelfPhotoBytes = 2 * 1024 * 1024;
+
+  /// The longest edge a shelf photo keeps when it has to be shrunk to fit [maxShelfPhotoBytes]: the
+  /// 2400 px the camera is asked for. The server sends the reader at most 2236 px on the long edge —
+  /// the most of a 4:3 photo Claude reads at full detail — so cutting a shelf photo to a product
+  /// photo's 1600 px here would blur exactly what the reader needs.
+  static const int shelfPhotoMaxEdge = 2400;
 
   static const String _base = '/api/products/scans';
 
@@ -62,8 +68,8 @@ class CatalogScanApi {
     required String contentType,
   }) async {
     // Shrunk first, and presigned for what will actually be sent — re-encoding makes it JPEG.
-    final PreparedImage prepared =
-        ImagePrep.forUpload(bytes, contentType, maxBytes: maxShelfPhotoBytes);
+    final PreparedImage prepared = ImagePrep.forUpload(bytes, contentType,
+        maxBytes: maxShelfPhotoBytes, maxEdge: shelfPhotoMaxEdge);
 
     // 1. A one-shot URL. The server checks the scan is ours and still taking photos.
     final Response<dynamic> presign = await _dio.post<dynamic>(

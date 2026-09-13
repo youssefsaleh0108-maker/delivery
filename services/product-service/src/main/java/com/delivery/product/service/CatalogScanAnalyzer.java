@@ -67,7 +67,7 @@ public class CatalogScanAnalyzer implements DisposableBean {
             VisionProviders providers,
             ImageObjectStore objects,
             Thumbnailer thumbnailer,
-            @Value("${delivery.catalog.scan.claude.max-long-edge-px:1568}") int maxLongEdgePx) {
+            @Value("${delivery.catalog.scan.claude.max-long-edge-px:2236}") int maxLongEdgePx) {
         this(scans, providers, objects, thumbnailer, newPool(), maxLongEdgePx);
     }
 
@@ -104,8 +104,9 @@ public class CatalogScanAnalyzer implements DisposableBean {
         }
         AnalysisJob job = loaded.get();
 
-        // Shrunk before sending: the provider reads images at about this size anyway, so sending a
-        // phone's 12 MP original is paying to upload pixels it throws away. The same decoder guard
+        // Shrunk before sending, to the most the model reads (max-long-edge-px): past that the API
+        // resizes a photo itself, so a phone's 12 MP original would only add upload and resize time.
+        // Stood upright by its EXIF tag on the way (Thumbnailer), and behind the same decoder guard
         // as thumbnails, so a decompression bomb dressed as a shelf photo stops here.
         List<ShelfPhoto> prepared = new ArrayList<>(job.photos().size());
         for (PhotoRef photo : job.photos()) {

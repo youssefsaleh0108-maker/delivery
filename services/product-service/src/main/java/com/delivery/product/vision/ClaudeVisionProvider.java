@@ -46,8 +46,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
  *       and no "the model wrapped it in a code fence" failure mode. Prices travel as decimal
  *       STRINGS so no binary float ever sits between the model and a money column.</li>
  *   <li><strong>Images as base64 content blocks</strong>, each after a "Photo N" label so a line can
- *       say which photo it came from. The bytes are already shrunk to the size the API reads —
- *       see {@code delivery.catalog.scan.claude.max-long-edge-px}.</li>
+ *       say which photo it came from. The bytes are already upright and no larger than the model
+ *       reads at full detail — see {@code delivery.catalog.scan.claude.max-long-edge-px}.</li>
  *   <li><strong>Server-side fallbacks are ENABLED</strong>: beta {@value #FALLBACK_BETA} with
  *       {@code "fallbacks": "default"}. If Claude Opus 5's safety classifiers decline a request,
  *       the API re-runs it on Anthropic's recommended fallback model (routed by refusal category)

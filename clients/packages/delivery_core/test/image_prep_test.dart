@@ -68,6 +68,20 @@ void main() {
       expect(decoded.width / decoded.height, closeTo(4.0, 0.05));
     });
 
+    test('a caller that needs more of the photo keeps more of it when it has to be shrunk', () {
+      // A shelf photo: the server sends the reader up to 2236 px on the long edge, so the phone must
+      // not cut it down to a product photo's 1600 on the way.
+      final Uint8List big = jpeg(3000, 1500);
+
+      final PreparedImage out =
+          ImagePrep.forUpload(big, 'image/jpeg', maxBytes: big.length - 1, maxEdge: 2400);
+
+      expect(out.wasResized, isTrue);
+      final img.Image decoded = img.decodeImage(out.bytes)!;
+      expect(decoded.width, 2400);
+      expect(decoded.height, 1200);
+    });
+
     test('a camera photo it has to re-encode comes back upright, with no tag left to turn it twice',
         () {
       // Stored the way a phone camera stores a portrait photo: landscape pixels, and an EXIF tag
