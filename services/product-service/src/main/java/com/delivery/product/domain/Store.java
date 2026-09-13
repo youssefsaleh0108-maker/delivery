@@ -193,6 +193,15 @@ public class Store {
     private boolean verifiedLocal;
 
     /**
+     * When the shop first listed — what "New on YouDrop" means. Stamped by the first
+     * {@link #publish}, never moved by a later one: a shop suspended and listed again has not just
+     * joined. Null for a shop that has never listed. V32 backfilled it from {@code created_at} for
+     * shops already past DRAFT, which errs towards "not new" — see the migration.
+     */
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
+    /**
      * How far from the pin this shop delivers, in metres. Null keeps the old behaviour — the
      * platform's zones alone decide. Only meaningful with a pin; the service refuses to set it
      * without one, because a circle needs a centre.
@@ -336,13 +345,22 @@ public class Store {
         return merchantId.equals(candidateMerchantId);
     }
 
-    public void publish() {
+    /**
+     * Lists the store, stamping {@link #getPublishedAt} the first time.
+     *
+     * <p>Takes the instant rather than reading the clock, for the reason {@link #markBusyUntil}
+     * gives.
+     */
+    public void publish(Instant at) {
         if (hours.isEmpty()) {
             // Publishing without hours would list a store that can never be open, because
             // availability is derived entirely from them.
             throw new IllegalStateException("A store needs opening hours before it can be listed");
         }
         this.status = Status.ACTIVE;
+        if (publishedAt == null) {
+            publishedAt = at;
+        }
     }
 
     public void suspend() {
@@ -528,11 +546,27 @@ public class Store {
         return powerUpdatedAt;
     }
 
-    /** The merchant's declaration, stamped so the storefront can say how fresh it is. */
-    public void declarePower(PowerStatus status, String note) {
+    /**
+     * The merchant's declaration, stamped so the storefront can say how fresh it is.
+     *
+     * <p>Takes the instant, like {@link #markBusyUntil}. It used to read {@code Instant.now()}, which
+     * left "is this declaration still current" impossible to check at a chosen time.
+     */
+    public void declarePower(PowerStatus status, String note, Instant at) {
         this.powerStatus = status == null ? PowerStatus.UNKNOWN : status;
         this.powerNote = note;
-        this.powerUpdatedAt = Instant.now();
+        this.powerUpdatedAt = at;
+    }
+
+    /**
+     * Whether the merchant declared what the lights are doing at or after {@code since} — recent
+     * enough to be presented as happening now. A shop that never declared has nothing current to
+     * say, and neither does a declaration with no time on it.
+     */
+    public boolean powerDeclaredSince(Instant since) {
+        return powerStatus != PowerStatus.UNKNOWN
+                && powerUpdatedAt != null
+                && !powerUpdatedAt.isBefore(since);
     }
 
     public String getNeighborhood() {
@@ -594,6 +628,10 @@ public class Store {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
     }
 
     public Instant getUpdatedAt() {

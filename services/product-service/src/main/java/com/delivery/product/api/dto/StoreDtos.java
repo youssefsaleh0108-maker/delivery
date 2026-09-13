@@ -99,6 +99,12 @@ public final class StoreDtos {
             String powerNote,
             /** When the merchant last declared — what "auto-updated" honestly means. */
             Instant powerUpdatedAt,
+            /**
+             * Whether that declaration is recent enough to present as what the lights are doing NOW
+             * ({@code delivery.product.power-declaration-fresh-for}). False for a shop that never
+             * declared. A customer surface draws no power badge when it is false.
+             */
+            boolean powerCurrent,
             /** The merchant's delivery circle, or null for zones-only. */
             Integer deliveryRadiusMetres) {
     }
@@ -142,6 +148,13 @@ public final class StoreDtos {
             boolean verifiedLocal,
             Store.PowerStatus powerStatus,
             String powerNote,
+            /** When the merchant last declared, so a card can say how fresh the badge is. */
+            Instant powerUpdatedAt,
+            /**
+             * Whether the declaration is recent enough to present as happening NOW. False draws no
+             * badge: an old declaration is history, not the state of the shop.
+             */
+            boolean powerCurrent,
             /** The pin, so checkout can measure the customer's door against the circle below. */
             BigDecimal latitude,
             BigDecimal longitude,

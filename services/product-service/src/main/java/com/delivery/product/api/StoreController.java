@@ -33,6 +33,7 @@ import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
 import com.delivery.product.api.dto.GeoDtos.LocationRequest;
+import com.delivery.product.api.dto.GeoDtos.NearbyPageResponse;
 import com.delivery.product.api.dto.GeoDtos.NearbyStoreResponse;
 import com.delivery.product.api.dto.StoreDtos.AisleResponse;
 import com.delivery.product.api.dto.StoreDtos.BusyRequest;
@@ -98,7 +99,8 @@ public class StoreController {
      *
      * <p>The radius alone is not a bound: in a dense city a 50 km circle is every shop on the
      * platform. This caps what a single request can pull into memory to sort, and a caller who hits
-     * it gets the nearest 500 — which is the right subset to lose the rest from.
+     * it gets the nearest 500 shops that match the search — the right subset to lose the rest from —
+     * with {@code truncated} set, so that answer is never passed off as the whole radius.
      */
     static final int MAX_NEARBY_CANDIDATES = 500;
 
@@ -182,9 +184,12 @@ public class StoreController {
      *                     widest circle this endpoint supports genuinely answers that. Nothing
      *                     returned is untrue either way — every shop in the response really is
      *                     within the radius it was measured against.
+     * @return the storefront's page shape plus {@code truncated}: true when more shops matched inside
+     *         the radius than one search reads ({@link #MAX_NEARBY_CANDIDATES}), so the page and its
+     *         total cover the nearest of them only. See {@link NearbyPageResponse}.
      */
     @GetMapping("/nearby")
-    public PageResponse<NearbyStoreResponse> nearby(
+    public NearbyPageResponse nearby(
             @RequestParam BigDecimal latitude,
             @RequestParam BigDecimal longitude,
             @RequestParam(defaultValue = "5000") int radiusMetres,
@@ -218,19 +223,20 @@ public class StoreController {
                         : Math.min(Math.max(newSinceDays, 1), MAX_NEW_SINCE_DAYS),
                 verifiedLocal);
 
-        Page<StoreService.NearbyStoreView> page =
+        StoreService.NearbyResult result =
                 storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, filters, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
 
-        return PageResponse.of(page.map(near -> new NearbyStoreResponse(
-                toCard(near.store(), starred, offersByStore),
-                near.store().store().getLatitude(),
-                near.store().store().getLongitude(),
-                // Whole metres. The pin this is measured from was dropped by hand on a map, so a
-                // decimal place would be precision the number does not have.
-                Math.round(near.distanceMetres()))));
+        return NearbyPageResponse.of(result.page().map(near -> new NearbyStoreResponse(
+                        toCard(near.store(), starred, offersByStore),
+                        near.store().store().getLatitude(),
+                        near.store().store().getLongitude(),
+                        // Whole metres. The pin this is measured from was dropped by hand on a map,
+                        // so a decimal place would be precision the number does not have.
+                        Math.round(near.distanceMetres()))),
+                result.truncated(), MAX_NEARBY_CANDIDATES);
     }
 
     /**
@@ -629,6 +635,8 @@ public class StoreController {
                 store.isVerifiedLocal(),
                 store.getPowerStatus(),
                 store.getPowerNote(),
+                store.getPowerUpdatedAt(),
+                v.powerCurrent(),
                 store.getLatitude(),
                 store.getLongitude(),
                 store.getDeliveryRadiusMetres());
@@ -671,6 +679,7 @@ public class StoreController {
                 store.getPowerStatus(),
                 store.getPowerNote(),
                 store.getPowerUpdatedAt(),
+                v.powerCurrent(),
                 store.getDeliveryRadiusMetres());
     }
 

@@ -2,6 +2,7 @@ package com.delivery.product.service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -73,7 +74,8 @@ class StoreAdministrationTest {
     @BeforeEach
     void setUp() {
         service = new StoreService(stores, offers, favorites, products, categories,
-                Clock.fixed(Instant.parse("2026-09-09T09:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-09-09T09:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(4));
 
         store = new Store(MERCHANT, "Beirut Grill", Store.Vertical.RESTAURANT);
         when(stores.findByIdAndMerchantId(store.getId(), MERCHANT)).thenReturn(Optional.of(store));
@@ -233,6 +235,39 @@ class StoreAdministrationTest {
 
             assertThatThrownBy(() -> service.setVerifiedLocal(nothing, BACKOFFICE, true))
                     .isInstanceOf(StoreService.StoreNotFoundException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("what is stamped with the service's clock")
+    class Stamps {
+
+        private static final Instant CLOCK = Instant.parse("2026-09-09T09:00:00Z");
+
+        /**
+         * "New on YouDrop" counts from the listing, not from the draft — and a shop suspended and
+         * listed again keeps the day it first joined rather than turning new again.
+         */
+        @Test
+        void publishing_stamps_the_first_listing_and_a_relisting_keeps_it() {
+            service.replaceHours(store.getId(), MERCHANT, java.util.stream.IntStream.rangeClosed(1, 7)
+                    .mapToObj(day -> new HoursRequest(day, LocalTime.of(9, 0), LocalTime.of(17, 0)))
+                    .toList());
+
+            service.publish(store.getId(), MERCHANT);
+            assertThat(store.getPublishedAt()).isEqualTo(CLOCK);
+
+            store.suspend();
+            store.publish(CLOCK.plus(Duration.ofDays(40)));
+            assertThat(store.getPublishedAt()).isEqualTo(CLOCK);
+        }
+
+        /** How fresh the power badge is, and whether it still counts as now, are measured from this. */
+        @Test
+        void a_power_declaration_is_stamped_when_it_is_made() {
+            service.declarePower(store.getId(), MERCHANT, Store.PowerStatus.GENERATOR, "Ovens hot");
+
+            assertThat(store.getPowerUpdatedAt()).isEqualTo(CLOCK);
         }
     }
 

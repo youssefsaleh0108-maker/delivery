@@ -75,7 +75,7 @@ class StoreVerifiedLocalAccessTest {
         when(storeService.setVerifiedLocal(any(UUID.class), anyString(), anyBoolean()))
                 .thenAnswer(invocation -> {
                     store.setVerifiedLocal(invocation.getArgument(2));
-                    return new StoreView(store, Store.Availability.OPEN, null);
+                    return new StoreView(store, Store.Availability.OPEN, null, false);
                 });
 
         mvc = secured(new StoreController(storeService, mock(CatalogService.class),

@@ -1,5 +1,6 @@
 package com.delivery.product.api;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +25,9 @@ import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.service.StoreService.NearbyFilters;
+import com.delivery.product.service.StoreService.NearbyResult;
+import com.delivery.product.service.StoreService.NearbyStoreView;
+import com.delivery.product.service.StoreService.StoreView;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +38,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -56,7 +61,7 @@ class NearbySearchParamsTest {
         storeService = mock(StoreService.class);
         when(storeService.nearby(any(GeoPoint.class), anyDouble(), anyInt(),
                 any(NearbyFilters.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(new NearbyResult(new PageImpl<>(List.of()), false));
 
         mvc = MockMvcBuilders.standaloneSetup(new StoreController(storeService,
                         mock(CatalogService.class), mock(ProductImageService.class),
@@ -128,5 +133,44 @@ class NearbySearchParamsTest {
 
         verify(storeService, never()).nearby(any(GeoPoint.class), anyDouble(), anyInt(),
                 any(NearbyFilters.class), any(Pageable.class));
+    }
+
+    /**
+     * On the way back out: the ceiling is the one thing that can make a total smaller than the
+     * radius, so a search that reached it says so — with the ceiling, so a client can say "among
+     * the nearest 500" instead of "no shops match".
+     */
+    @Test
+    void a_search_that_reached_its_candidate_ceiling_says_so() throws Exception {
+        when(storeService.nearby(any(GeoPoint.class), anyDouble(), anyInt(),
+                any(NearbyFilters.class), any(Pageable.class)))
+                .thenReturn(new NearbyResult(new PageImpl<>(List.of()), true));
+
+        mvc.perform(get(NEAR_HAMRA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.truncated").value(true))
+                .andExpect(jsonPath("$.candidateLimit").value(StoreController.MAX_NEARBY_CANDIDATES))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    /** Each card carries when its power was declared and whether that still counts as now. */
+    @Test
+    void a_card_says_whether_its_power_declaration_is_still_current() throws Exception {
+        Store shop = new Store("merchant-1", "Abu Hassan", Store.Vertical.GROCERY);
+        shop.pinAt(GeoPoint.of(33.8990d, 35.4830d));
+        shop.declarePower(Store.PowerStatus.GENERATOR, null, Instant.parse("2026-09-13T08:00:00Z"));
+        NearbyStoreView near =
+                new NearbyStoreView(new StoreView(shop, Store.Availability.OPEN, null, true), 145d);
+        when(storeService.nearby(any(GeoPoint.class), anyDouble(), anyInt(),
+                any(NearbyFilters.class), any(Pageable.class)))
+                .thenReturn(new NearbyResult(new PageImpl<>(List.of(near)), false));
+
+        mvc.perform(get(NEAR_HAMRA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.content[0].distanceMetres").value(145))
+                .andExpect(jsonPath("$.content[0].store.powerStatus").value("GENERATOR"))
+                .andExpect(jsonPath("$.content[0].store.powerCurrent").value(true))
+                .andExpect(jsonPath("$.content[0].store.powerUpdatedAt").exists());
     }
 }

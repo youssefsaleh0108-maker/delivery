@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -59,15 +60,32 @@ public class StoreService {
     private final CategoryRepository categories;
     private final Clock clock;
 
+    /**
+     * How long a merchant's power declaration counts as what the lights are doing NOW —
+     * {@code delivery.product.power-declaration-fresh-for}, four hours unless configured.
+     *
+     * <p>A declaration is a statement about a moment, and nothing expires it by itself. Mains
+     * rationing and generator switch-overs can change a shop's power several times a day, so
+     * without a window "Generator active" drawn this evening could be this morning's news, and the
+     * "on generator now" filter would answer with it. Four hours keeps a declaration made at opening
+     * from being claimed at dinner, while a merchant who updates as the power changes is always
+     * shown. Past the window nothing is deleted: the declaration is still stored and still shown to
+     * its merchant — customers are just no longer told it is happening now.
+     */
+    private final Duration powerDeclarationFreshFor;
+
     public StoreService(StoreRepository stores, StoreOfferRepository offers,
                         StoreFavoriteRepository favorites, ProductRepository products,
-                        CategoryRepository categories, Clock clock) {
+                        CategoryRepository categories, Clock clock,
+                        @Value("${delivery.product.power-declaration-fresh-for:4h}")
+                        Duration powerDeclarationFreshFor) {
         this.stores = stores;
         this.offers = offers;
         this.favorites = favorites;
         this.products = products;
         this.categories = categories;
         this.clock = clock;
+        this.powerDeclarationFreshFor = powerDeclarationFreshFor;
     }
 
     // ---------------------------------------------------------------- storefront reads
@@ -80,13 +98,25 @@ public class StoreService {
      * transaction has closed, throws {@code LazyInitializationException}. Returning a view means
      * the walk happens inside the session (where {@code @BatchSize} makes it one extra query for
      * the whole page) and no lazy state ever escapes this service.
+     *
+     * <p>{@code powerCurrent} is here for the view's other reason to exist: it depends on the clock.
+     * It says whether the merchant's power declaration is recent enough to be presented as what the
+     * lights are doing now ({@link #powerDeclarationFreshFor}). A client draws "Generator active" or
+     * dims a dark shop only when it is true, and the nearby search's power filter matches only such
+     * declarations — so a card and the filter cannot disagree about the same shop.
      */
     public record StoreView(Store store, Store.Availability availability,
-                            java.time.LocalTime closesAt) {
+                            java.time.LocalTime closesAt, boolean powerCurrent) {
     }
 
     private StoreView view(Store store, Instant now) {
-        return new StoreView(store, store.availabilityAt(now), store.closingTimeAt(now));
+        return new StoreView(store, store.availabilityAt(now), store.closingTimeAt(now),
+                store.powerDeclaredSince(powerDeclaredSince(now)));
+    }
+
+    /** The oldest declaration still presented as now. See {@link #powerDeclarationFreshFor}. */
+    private Instant powerDeclaredSince(Instant now) {
+        return now.minus(powerDeclarationFreshFor);
     }
 
     @Transactional(readOnly = true)
@@ -176,7 +206,7 @@ public class StoreService {
     public StoreView declarePower(UUID id, String merchantId,
                                   Store.PowerStatus status, String note) {
         Store store = requireOwned(id, merchantId);
-        store.declarePower(status, note);
+        store.declarePower(status, note, clock.instant());
         return view(store, clock.instant());
     }
 
@@ -225,44 +255,67 @@ public class StoreService {
      * @param maxCandidates the ceiling on rows read from the database, so a very large radius in a
      *                      dense city cannot pull the whole table into memory. A caller who hits it
      *                      gets the nearest {@code maxCandidates} shops, which is the right subset
-     *                      to lose the rest from.
+     *                      to lose the rest from — and is told so, by {@link NearbyResult#truncated}.
      */
     @Transactional(readOnly = true)
-    public Page<NearbyStoreView> nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
-                                        Pageable pageable) {
+    public NearbyResult nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
+                               Pageable pageable) {
         return nearby(centre, radiusMetres, maxCandidates, NearbyFilters.NONE, pageable);
+    }
+
+    /**
+     * A page of "near me", and whether the search stopped at its candidate ceiling.
+     *
+     * @param truncated true when more shops inside the radius matched the search's database-side
+     *                  filters than the ceiling lets one search read. The page and its total then
+     *                  describe the nearest {@code maxCandidates} of them, not the whole radius: a
+     *                  shop further out was never looked at, so "no shop matches" over a truncated
+     *                  answer means "none among the nearest", and a client must say it that way.
+     */
+    public record NearbyResult(Page<NearbyStoreView> page, boolean truncated) {
     }
 
     /**
      * What the neighbourhood browse may narrow "near me" by — each one a fact the platform already
      * holds, and none of them a guess.
      *
-     * <p>Applied here, in Java, after the distance and before the page is cut, rather than in the
-     * candidate query. Two reasons. {@code openNow} cannot be SQL at all: availability is walked out
-     * of the opening hours at a given instant by {@link Store#availabilityAt}, and a second copy of
-     * that walk in SQL would be a second answer to "is it open" free to disagree with the card. And
-     * filtering before the page is cut is what keeps the pages full and the total honest — the
-     * alternative the client used to have, filtering what one page happened to contain, returns
-     * short pages and a count that is not a count of anything.
+     * <p><strong>Where each is applied.</strong> Every filter but {@code openNow} is pushed into the
+     * candidate query ({@link StoreRepository#findActiveIdsNear}), so the ceiling on candidates counts
+     * shops that match rather than shops that happen to be near. They used to run only here, after
+     * that ceiling: with 520 live shops inside the radius and the only one on a generator the 510th
+     * nearest, the database handed back the nearest 500, none matched, and the customer was told no
+     * shop did. {@code openNow} cannot be SQL at all: availability is walked out of the opening hours
+     * at a given instant by {@link Store#availabilityAt}, and a second copy of that walk in SQL would
+     * be a second answer to "is it open" free to disagree with the card.
      *
-     * <p>The filters narrow the nearest {@code maxCandidates} shops, not the whole table. Inside a
-     * neighbourhood-sized radius that cap is nowhere near reached; at the endpoint's widest radius in
-     * a dense city it means a filter answers over the nearest 500, which is the right subset to
-     * narrow.
+     * <p>Every filter is judged again here, on the rows as read, and this is what decides — the same
+     * rule as the radius. The ids and the rows come from two queries, so a shop that changed between
+     * them is judged on what it is now. The SQL and {@link #admits} must describe the same set, and
+     * {@code NearbyStoreSearchTest}'s stand-in for the query holds them to it.
+     *
+     * <p>Filtering before the page is cut is what keeps pages full and totals honest. The one limit
+     * left is the ceiling itself — within the nearest {@code maxCandidates} matching shops, which
+     * {@link NearbyResult#truncated} reports reaching. Inside a neighbourhood-sized radius it is
+     * nowhere near; at the endpoint's widest radius in a dense city, with "open now" narrowing a set
+     * the database could not, it can be.
      *
      * @param openNow           drops a shop whose card would read CLOSED. BUSY and CLOSING_SOON stay:
      *                          both still take orders, and a customer asking "what is open" is
      *                          asking what they can buy from.
      * @param powerStatus       an exact match on what the merchant last declared the lights to be
-     *                          doing. It is a statement about NOW — GENERATOR means "running on the
-     *                          generator at the moment", not "owns one" — and a shop that owns a
-     *                          generator but is on mains right now is correctly left out of a
-     *                          GENERATOR filter. Clients must label it that way.
+     *                          doing, while that declaration is still current
+     *                          ({@link StoreView#powerCurrent}). It is a statement about NOW —
+     *                          GENERATOR means "running on the generator at the moment", not "owns
+     *                          one" — so a shop that owns a generator but is on mains right now is
+     *                          correctly left out, and so is one that said "generator" this morning
+     *                          and has said nothing since. Clients must label it that way.
      * @param neighborhood      an exact match on the district the shop declared, the same rule as
      *                          the storefront's own filter and the district list. Trimmed; blank is
      *                          no filter.
-     * @param newSinceDays      shops whose row was created within this many days: "joined the
-     *                          platform recently". A shop with no creation time is not new — the
+     * @param newSinceDays      shops that first listed within this many days: "new on YouDrop".
+     *                          Read from when the shop was published, not when its row was created —
+     *                          a draft can sit for weeks before it lists, and it has not joined
+     *                          anything until it does. A shop with no listing time is not new: the
      *                          badge is a claim, and nothing supports it.
      * @param verifiedLocalOnly only shops Backoffice has granted the trust badge.
      */
@@ -281,7 +334,8 @@ public class StoreService {
             if (openNow && view.availability() == Store.Availability.CLOSED) {
                 return false;
             }
-            if (powerStatus != null && store.getPowerStatus() != powerStatus) {
+            if (powerStatus != null
+                    && (store.getPowerStatus() != powerStatus || !view.powerCurrent())) {
                 return false;
             }
             if (neighborhood != null && !neighborhood.equals(store.getNeighborhood())) {
@@ -291,10 +345,19 @@ public class StoreService {
                 return false;
             }
             if (newSinceDays != null) {
-                Instant joined = store.getCreatedAt();
-                return joined != null && !joined.isBefore(now.minus(Duration.ofDays(newSinceDays)));
+                Instant listed = store.getPublishedAt();
+                return listed != null && !listed.isBefore(listedSince(now));
             }
             return true;
+        }
+
+        /**
+         * The earliest first listing "new" admits. Never null, because it is bound into the
+         * candidate query beside the switch that says whether it applies — and a null bound into
+         * native SQL is a parameter PostgreSQL cannot type.
+         */
+        Instant listedSince(Instant now) {
+            return newSinceDays == null ? now : now.minus(Duration.ofDays(newSinceDays));
         }
     }
 
@@ -306,21 +369,34 @@ public class StoreService {
      * suspended — or pulled back to draft — between the two would otherwise be handed to a customer
      * on the strength of a status it no longer has. A DRAFT or SUSPENDED shop reaching a customer's
      * screen is the one thing every storefront read in this service is pinned against.
+     *
+     * <p>The database is asked for one row more than {@code maxCandidates}, so a search that reached
+     * the ceiling is seen to have reached it rather than guessed at: exactly {@code maxCandidates}
+     * rows back could be every shop there was.
      */
     @Transactional(readOnly = true)
-    public Page<NearbyStoreView> nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
-                                        NearbyFilters filters, Pageable pageable) {
-        List<UUID> candidateIds = stores.findActiveIdsNear(
+    public NearbyResult nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
+                               NearbyFilters filters, Pageable pageable) {
+        Instant now = clock.instant();
+        List<UUID> found = stores.findActiveIdsNear(
                 centre.latitude().doubleValue(),
                 centre.longitude().doubleValue(),
                 radiusMetres * RADIUS_SLACK,
-                maxCandidates);
+                filters.powerStatus() == null ? "" : filters.powerStatus().name(),
+                powerDeclaredSince(now),
+                filters.neighborhood() == null ? "" : filters.neighborhood(),
+                filters.verifiedLocalOnly(),
+                filters.newSinceDays() != null,
+                filters.listedSince(now),
+                maxCandidates + 1);
+        boolean truncated = found.size() > maxCandidates;
+        // Nearest first, so the row left over is the furthest one.
+        List<UUID> candidateIds = truncated ? found.subList(0, maxCandidates) : found;
 
         if (candidateIds.isEmpty()) {
-            return pageOf(List.of(), pageable);
+            return new NearbyResult(pageOf(List.of(), pageable), false);
         }
 
-        Instant now = clock.instant();
         List<NearbyStoreView> near = new ArrayList<>(candidateIds.size());
 
         for (Store store : stores.findAllById(candidateIds)) {
@@ -350,7 +426,7 @@ public class StoreService {
         near.sort(Comparator.comparingDouble(NearbyStoreView::distanceMetres)
                 .thenComparing(n -> n.store().store().getId()));
 
-        return pageOf(near, pageable);
+        return new NearbyResult(pageOf(near, pageable), truncated);
     }
 
     /** The opening hours themselves, materialised inside the transaction for the same reason. */
@@ -560,7 +636,7 @@ public class StoreService {
         store.replaceHours(java.util.Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, DEFAULT_OPENS, DEFAULT_CLOSES))
                 .toList());
-        store.publish();
+        store.publish(clock.instant());
         stores.save(store);
         log.info("Auto-provisioned store {} for merchant {}", store.getId(), merchantId);
         return store;
@@ -710,7 +786,7 @@ public class StoreService {
     public StoreView publish(UUID id, String merchantId) {
         Store store = requireOwned(id, merchantId);
         try {
-            store.publish();
+            store.publish(clock.instant());
         } catch (IllegalStateException e) {
             throw new CatalogService.CatalogRuleViolationException(e.getMessage());
         }

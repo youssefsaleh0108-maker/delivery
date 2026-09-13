@@ -125,6 +125,15 @@ delivery:
       # volume — the rail falls back to same-shelf suggestions, clearly labelled as such, either way.
       min-orders-together: 2
 
+  product:
+    # How long a merchant's power declaration (mains, generator, dark) is shown to customers as what
+    # the lights are doing NOW: the "Generator active" badge and its age, the dimmed dark shop, and the
+    # neighbourhood browse's "On generator now" filter. Past it the declaration is still stored and
+    # still shown to its merchant; customers are just not told it is happening now. Power can change
+    # several times a day and nothing expires a declaration by itself, so four hours keeps one made at
+    # opening from being claimed at dinner. See StoreService#powerDeclarationFreshFor.
+    power-declaration-fresh-for: 4h
+
   geocoding:
     # Which geocoder answers. NOMINATIM is free and keyless and is what runs today; MAPBOX is
     # written, has never made a successful call, and refuses everything until somebody provisions a
