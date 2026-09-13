@@ -34,10 +34,18 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
      *
      * <p>Prefer {@link #findStorefront} — the status is a parameter here only because a nested enum
      * constant is awkward to write as a JPQL literal, not because callers should choose it.
+     *
+     * <p><strong>Never a service shop, whatever the parameters say.</strong> This is the goods
+     * storefront: Home, its search, the shop lists and the category counts. Every installed app asks
+     * it for "all verticals" by sending none, and reads an unknown vertical as RESTAURANT, so a print
+     * shop listed here would be drawn as a restaurant. The exclusion is a literal rather than a
+     * default a caller could switch off. Service shops are listed by
+     * {@link #findServicesStorefront}, which exists so that this query never has to.
      */
     @Query("""
             SELECT s FROM Store s
             WHERE s.status = :status
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
               AND (:vertical IS NULL OR s.vertical = :vertical)
               AND (LOWER(s.name) LIKE :search)
               AND (:maxDeliveryFee IS NULL OR s.deliveryFee <= :maxDeliveryFee)
@@ -55,12 +63,48 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                          Pageable pageable);
 
     /**
+     * The Services tab's list: live service shops in the given categories, with the storefront's
+     * other filters.
+     *
+     * <p>Its own query rather than a switch inside {@link #findStorefrontWithStatus}, so that one can
+     * refuse service shops unconditionally. {@code categories} is never empty: {@code StoreService}
+     * answers an empty page itself when no category may be shown, rather than bind an empty
+     * {@code IN} list, which databases and Hibernate versions do not agree how to render.
+     *
+     * @param categories the open categories the read may show — the one it named, or all of them
+     */
+    @Query("""
+            SELECT s FROM Store s
+            WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.vertical = com.delivery.product.domain.Store$Vertical.SERVICES
+              AND s.serviceCategory IN :categories
+              AND (LOWER(s.name) LIKE :search)
+              AND (:maxDeliveryFee IS NULL OR s.deliveryFee <= :maxDeliveryFee)
+              AND (:maxEtaMinutes IS NULL OR s.etaMaxMinutes <= :maxEtaMinutes)
+              AND (:minRating IS NULL OR s.rating >= :minRating)
+              AND (:neighborhood IS NULL OR s.neighborhood = :neighborhood)
+            """)
+    Page<Store> findServicesStorefront(
+            @Param("categories") java.util.Collection<Store.ServiceCategory> categories,
+            @Param("search") String search,
+            @Param("maxDeliveryFee") BigDecimal maxDeliveryFee,
+            @Param("maxEtaMinutes") Integer maxEtaMinutes,
+            @Param("minRating") BigDecimal minRating,
+            @Param("neighborhood") String neighborhood,
+            Pageable pageable);
+
+    /**
      * The district chips, from the shops that actually declared one. Live shops only, so a draft
      * in a district nobody serves cannot conjure an empty chip.
+     *
+     * <p>Goods shops only. The chips narrow the goods browse, so a district where only a tailor
+     * trades would be a chip that opens onto nothing — or, on an app built before services existed,
+     * onto a tailor drawn as a restaurant.
      */
     @Query("""
             SELECT DISTINCT s.neighborhood FROM Store s
             WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
               AND s.neighborhood IS NOT NULL
             ORDER BY s.neighborhood
             """)
@@ -157,6 +201,12 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
      * @param neighborhood       {@code ''} for no district filter, else the exact district
      * @param newOnly            whether {@code listedSince} applies
      * @param listedSince        the earliest first listing that counts as new
+     * @param vertical           {@code ''} for every goods vertical and no service shop, else one
+     *                           {@link Store.Vertical} name — see {@code StoreService.ShopScope}
+     * @param serviceCategories  the open service categories a SERVICES read may show, comma-separated;
+     *                           {@code ''} shows no service shop. A string rather than a list so an
+     *                           empty set is still a typed, non-null value, and so no service shop can
+     *                           slip through a list the driver bound oddly.
      * @param maxCandidates      the {@code LIMIT}; the service asks for one more than it will use
      */
     @Query(value = """
@@ -176,6 +226,13 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                AND (NOT CAST(:verifiedLocalOnly AS boolean) OR s.verified_local)
                AND (NOT CAST(:newOnly AS boolean)
                     OR s.published_at >= CAST(:listedSince AS timestamptz))
+               AND (CASE WHEN CAST(:vertical AS varchar) = ''
+                         THEN s.vertical <> 'SERVICES'
+                         ELSE s.vertical = CAST(:vertical AS varchar)
+                    END)
+               AND (s.vertical <> 'SERVICES'
+                    OR s.service_category = ANY (
+                           string_to_array(CAST(:serviceCategories AS varchar), ',')))
              ORDER BY public.ST_Distance(
                        s.location,
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography)
@@ -190,6 +247,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                  @Param("verifiedLocalOnly") boolean verifiedLocalOnly,
                                  @Param("newOnly") boolean newOnly,
                                  @Param("listedSince") Instant listedSince,
+                                 @Param("vertical") String vertical,
+                                 @Param("serviceCategories") String serviceCategories,
                                  @Param("maxCandidates") int maxCandidates);
 
     /**

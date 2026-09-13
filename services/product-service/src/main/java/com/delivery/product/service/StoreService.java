@@ -74,9 +74,16 @@ public class StoreService {
      */
     private final Duration powerDeclarationFreshFor;
 
+    /**
+     * Which service categories are open. Consulted only by reads and writes about service shops, so a
+     * mistake in that setting cannot reach a goods read.
+     */
+    private final ServiceCategories serviceCategories;
+
     public StoreService(StoreRepository stores, StoreOfferRepository offers,
                         StoreFavoriteRepository favorites, ProductRepository products,
-                        CategoryRepository categories, Clock clock,
+                        CategoryRepository categories, ServiceCategories serviceCategories,
+                        Clock clock,
                         @Value("${delivery.product.power-declaration-fresh-for:4h}")
                         Duration powerDeclarationFreshFor) {
         this.stores = stores;
@@ -84,6 +91,7 @@ public class StoreService {
         this.favorites = favorites;
         this.products = products;
         this.categories = categories;
+        this.serviceCategories = serviceCategories;
         this.clock = clock;
         this.powerDeclarationFreshFor = powerDeclarationFreshFor;
     }
@@ -119,14 +127,112 @@ public class StoreService {
         return now.minus(powerDeclarationFreshFor);
     }
 
+    /** The storefront for a read that names no service category. See the overload below. */
     @Transactional(readOnly = true)
     public Page<StoreView> storefront(Store.Vertical vertical, String search,
                                       BigDecimal maxDeliveryFee, Integer maxEtaMinutes,
                                       BigDecimal minRating, String neighborhood,
                                       Pageable pageable) {
+        return storefront(vertical, null, search, maxDeliveryFee, maxEtaMinutes, minRating,
+                neighborhood, pageable);
+    }
+
+    /**
+     * The storefront, and the Services tab's lists.
+     *
+     * <p>Which shops may come back is {@link ShopScope}'s decision. A goods read goes to the goods
+     * query, which cannot return a service shop whatever it is passed. A services read goes to its
+     * own query with the open categories it may show. A read that may show nothing is answered here
+     * without asking the database.
+     */
+    @Transactional(readOnly = true)
+    public Page<StoreView> storefront(Store.Vertical vertical, Store.ServiceCategory serviceCategory,
+                                      String search, BigDecimal maxDeliveryFee,
+                                      Integer maxEtaMinutes, BigDecimal minRating,
+                                      String neighborhood, Pageable pageable) {
         Instant now = clock.instant();
-        return stores.findStorefront(vertical, SearchPatterns.like(search), maxDeliveryFee,
-                maxEtaMinutes, minRating, neighborhood, bestFirst(pageable)).map(s -> view(s, now));
+        ShopScope scope = scopeOf(vertical, serviceCategory);
+        if (!scope.services()) {
+            return stores.findStorefront(scope.vertical(), SearchPatterns.like(search),
+                            maxDeliveryFee, maxEtaMinutes, minRating, neighborhood,
+                            bestFirst(pageable))
+                    .map(s -> view(s, now));
+        }
+        if (scope.listsNothing()) {
+            return Page.empty(pageable);
+        }
+        return stores.findServicesStorefront(scope.categories(), SearchPatterns.like(search),
+                        maxDeliveryFee, maxEtaMinutes, minRating, neighborhood, bestFirst(pageable))
+                .map(s -> view(s, now));
+    }
+
+    /**
+     * Which shops one read may list, by vertical and service category. This is the one place
+     * storefront isolation is decided, so the storefront and "near me" cannot disagree about it.
+     *
+     * <ul>
+     *   <li>No vertical and no service category: every goods shop and no service shop. That is Home,
+     *       its search, the shop lists and "near me" as every installed app asks for them — and those
+     *       apps read an unknown vertical as a restaurant.
+     *   <li>A goods vertical: that vertical, as it always was.
+     *   <li>SERVICES, or a service category on its own: service shops, only in open categories
+     *       ({@link ServiceCategories}), and only in the named one when there is one. A closed
+     *       category shows nothing, even when asked for by name.
+     *   <li>A goods vertical together with a service category: nothing. Filters narrow each other,
+     *       and no goods shop has a service category.
+     * </ul>
+     *
+     * <p>Favourites are deliberately outside it: a customer who starred a print shop starred it.
+     *
+     * @param vertical   the one vertical listed, or null for every goods vertical
+     * @param categories for a services read, the categories it may show; empty shows no service shop
+     */
+    record ShopScope(Store.Vertical vertical, Set<Store.ServiceCategory> categories) {
+
+        static final ShopScope GOODS = new ShopScope(null, Set.of());
+
+        boolean services() {
+            return vertical == Store.Vertical.SERVICES;
+        }
+
+        /** Nothing can match, so the caller can answer without asking the database. */
+        boolean listsNothing() {
+            return services() && categories.isEmpty();
+        }
+
+        /** The queries' rule, judged again on a row as read. */
+        boolean admits(Store store) {
+            if (vertical == null) {
+                return store.getVertical() != Store.Vertical.SERVICES;
+            }
+            return store.getVertical() == vertical
+                    && (!services() || categories.contains(store.getServiceCategory()));
+        }
+    }
+
+    /**
+     * See {@link ShopScope}. The open categories are read only for a read about service shops, so a
+     * mistake in that setting can never break a goods read.
+     */
+    ShopScope scopeOf(Store.Vertical vertical, Store.ServiceCategory serviceCategory) {
+        if (serviceCategory == null && vertical != Store.Vertical.SERVICES) {
+            return vertical == null ? ShopScope.GOODS : new ShopScope(vertical, Set.of());
+        }
+        if (vertical != null && vertical != Store.Vertical.SERVICES) {
+            // A goods vertical and a service category: no shop is both.
+            return new ShopScope(Store.Vertical.SERVICES, Set.of());
+        }
+        Set<Store.ServiceCategory> open = serviceCategories.enabled();
+        if (serviceCategory == null) {
+            return new ShopScope(Store.Vertical.SERVICES, open);
+        }
+        return new ShopScope(Store.Vertical.SERVICES,
+                open.contains(serviceCategory) ? Set.of(serviceCategory) : Set.of());
+    }
+
+    /** The open service categories, in taxonomy order. */
+    public List<Store.ServiceCategory> openServiceCategories() {
+        return List.copyOf(serviceCategories.enabled());
     }
 
     /**
@@ -318,15 +424,27 @@ public class StoreService {
      *                          anything until it does. A shop with no listing time is not new: the
      *                          badge is a claim, and nothing supports it.
      * @param verifiedLocalOnly only shops Backoffice has granted the trust badge.
+     * @param vertical          one vertical only. Null is every goods vertical and no service shop,
+     *                          which is what the neighbourhood browse and every installed app ask for.
+     *                          Applied in SQL like the others; see {@link ShopScope}.
+     * @param serviceCategory   service shops in one open category. Asking for a category is asking
+     *                          for service shops; see {@link ShopScope}.
      */
     public record NearbyFilters(boolean openNow, Store.PowerStatus powerStatus,
                                 String neighborhood, Integer newSinceDays,
-                                boolean verifiedLocalOnly) {
+                                boolean verifiedLocalOnly, Store.Vertical vertical,
+                                Store.ServiceCategory serviceCategory) {
 
         public static final NearbyFilters NONE = new NearbyFilters(false, null, null, null, false);
 
         public NearbyFilters {
             neighborhood = neighborhood == null || neighborhood.isBlank() ? null : neighborhood.trim();
+        }
+
+        /** The neighbourhood browse's filters with no vertical: every goods shop, no service shop. */
+        public NearbyFilters(boolean openNow, Store.PowerStatus powerStatus, String neighborhood,
+                             Integer newSinceDays, boolean verifiedLocalOnly) {
+            this(openNow, powerStatus, neighborhood, newSinceDays, verifiedLocalOnly, null, null);
         }
 
         boolean admits(StoreView view, Instant now) {
@@ -378,6 +496,10 @@ public class StoreService {
     public NearbyResult nearby(GeoPoint centre, double radiusMetres, int maxCandidates,
                                NearbyFilters filters, Pageable pageable) {
         Instant now = clock.instant();
+        ShopScope scope = scopeOf(filters.vertical(), filters.serviceCategory());
+        if (scope.listsNothing()) {
+            return new NearbyResult(pageOf(List.of(), pageable), false);
+        }
         List<UUID> found = stores.findActiveIdsNear(
                 centre.latitude().doubleValue(),
                 centre.longitude().doubleValue(),
@@ -388,6 +510,9 @@ public class StoreService {
                 filters.verifiedLocalOnly(),
                 filters.newSinceDays() != null,
                 filters.listedSince(now),
+                scope.vertical() == null ? "" : scope.vertical().name(),
+                scope.categories().stream().map(Enum::name).sorted()
+                        .collect(Collectors.joining(",")),
                 maxCandidates + 1);
         boolean truncated = found.size() > maxCandidates;
         // Nearest first, so the row left over is the furthest one.
@@ -415,7 +540,10 @@ public class StoreService {
                 continue;
             }
             StoreView view = view(store, now);
-            if (filters.admits(view, now)) {
+            // The scope is judged again on the row as read, like every filter: the ids and the rows
+            // come from two queries, and a shop re-filed under another category in between is
+            // judged on what it is now.
+            if (scope.admits(store) && filters.admits(view, now)) {
                 near.add(new NearbyStoreView(view, metres));
             }
         }
@@ -655,13 +783,41 @@ public class StoreService {
         return stores.findByMerchantIdOrderByCreatedAtDesc(merchantId);
     }
 
+    /**
+     * Opens a shop.
+     *
+     * <p>A service shop is opened with its category, and only in an open one. The vertical and the
+     * category must agree (see {@link Store}); a mismatch is refused as a 422 with a sentence, not
+     * as a constraint name.
+     */
     @Transactional
     public StoreView create(String merchantId, StoreRequest request) {
-        Store store = new Store(merchantId, request.name(), request.vertical());
+        Store store;
+        try {
+            store = new Store(merchantId, request.name(), request.vertical(),
+                    request.serviceCategory());
+        } catch (IllegalArgumentException e) {
+            throw new CatalogService.CatalogRuleViolationException(e.getMessage());
+        }
+        if (store.isServices()) {
+            requireOpen(store.getServiceCategory());
+        }
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
         store.setNeighborhood(request.neighborhood());
         return view(stores.save(store), clock.instant());
+    }
+
+    /**
+     * Refuses a service category that is not open (422). Only a choice is judged: see
+     * {@link #update} for the shop already filed under a category that has since closed.
+     */
+    private void requireOpen(Store.ServiceCategory category) {
+        Set<Store.ServiceCategory> open = serviceCategories.enabled();
+        if (!open.contains(category)) {
+            throw new CatalogService.CatalogRuleViolationException(
+                    "Services in " + category + " are not offered yet. Open categories: " + open);
+        }
     }
 
     /**
@@ -677,12 +833,36 @@ public class StoreService {
      * <p>So: absent (null) leaves the district alone, blank clears it, anything else sets it. A client
      * that wants to clear it has to say so with an empty string, which only a client that knows the
      * field exists can do.
+     *
+     * <p><strong>The vertical never crosses into or out of SERVICES</strong> (422; see
+     * {@link Store.Vertical#SERVICES}). An app built before services existed reads a service shop's
+     * vertical as RESTAURANT and sends that back on every save. Refusing the move is what stops such
+     * a save from turning a print shop into a restaurant.
+     *
+     * <p>The service category follows the district's rule, minus clearing: absent leaves it, and
+     * anything else re-files the shop — a service shop only, and only under an open category. A shop
+     * already filed under a category that has since closed keeps it through every other save:
+     * closing a category is about what is offered, not a reason to rewrite a shop. The refusals leave
+     * nothing written, because they end the transaction.
      */
     @Transactional
     public StoreView update(UUID id, String merchantId, StoreRequest request) {
         Store store = requireOwned(id, merchantId);
-        store.updateProfile(request.name(), request.tagline(), request.description(),
-                request.vertical(), request.tags(), request.timezone(), request.address());
+        Store.ServiceCategory refiled = request.serviceCategory() != null
+                && request.serviceCategory() != store.getServiceCategory()
+                ? request.serviceCategory() : null;
+        try {
+            store.updateProfile(request.name(), request.tagline(), request.description(),
+                    request.vertical(), request.tags(), request.timezone(), request.address());
+            if (refiled != null) {
+                if (store.isServices()) {
+                    requireOpen(refiled);
+                }
+                store.changeServiceCategory(refiled);
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new CatalogService.CatalogRuleViolationException(e.getMessage());
+        }
         if (request.neighborhood() != null) {
             store.setNeighborhood(request.neighborhood());
         }

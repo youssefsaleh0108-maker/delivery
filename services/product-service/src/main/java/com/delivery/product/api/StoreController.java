@@ -138,7 +138,11 @@ public class StoreController {
      */
     @GetMapping
     public PageResponse<StoreCardResponse> browse(
+            // No vertical is every goods vertical and no service shop: what Home and every installed
+            // app ask for. SERVICES, or a serviceCategory on its own, lists service shops in the open
+            // categories only. The rule lives in StoreService.ShopScope.
             @RequestParam(required = false) Store.Vertical vertical,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) BigDecimal maxDeliveryFee,
             @RequestParam(required = false) Integer maxEtaMinutes,
@@ -147,8 +151,8 @@ public class StoreController {
             @PageableDefault(size = 20, sort = "rating", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        Page<StoreView> page = storeService.storefront(vertical, search, maxDeliveryFee,
-                maxEtaMinutes, minRating, neighborhood, pageable);
+        Page<StoreView> page = storeService.storefront(vertical, serviceCategory, search,
+                maxDeliveryFee, maxEtaMinutes, minRating, neighborhood, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
@@ -156,10 +160,26 @@ public class StoreController {
         return PageResponse.of(page.map(v -> toCard(v, starred, offersByStore)));
     }
 
-    /** The district chips for the hyperlocal browse — the distinct declared neighborhoods. */
+    /**
+     * The district chips for the hyperlocal browse — the distinct declared neighborhoods, of goods
+     * shops only.
+     */
     @GetMapping("/neighborhoods")
     public List<String> neighborhoods() {
         return storeService.neighborhoods();
+    }
+
+    /**
+     * The service categories open right now, in taxonomy order: what a provider may file a shop
+     * under, and what the Services tab may show. A closed category is in neither place.
+     *
+     * <p>Any signed-in caller, like the storefront it describes. The list is the same for everyone
+     * and names no shop.
+     */
+    @GetMapping("/service-categories")
+    @PreAuthorize("isAuthenticated()")
+    public List<Store.ServiceCategory> serviceCategories() {
+        return storeService.openServiceCategories();
     }
 
     /**
@@ -202,6 +222,10 @@ public class StoreController {
             @RequestParam(required = false) String neighborhood,
             @RequestParam(required = false) Integer newSinceDays,
             @RequestParam(defaultValue = "false") boolean verifiedLocal,
+            // As on the storefront: no vertical is every goods shop and no service shop; SERVICES
+            // or a serviceCategory is service shops in open categories. See StoreService.ShopScope.
+            @RequestParam(required = false) Store.Vertical vertical,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
             @PageableDefault(size = 20) Pageable pageable) {
 
         // Built here rather than passed on as two loose numbers, so an out-of-range or (0, 0)
@@ -221,7 +245,9 @@ public class StoreController {
                 // asking for "every shop", which the widest window genuinely answers.
                 newSinceDays == null ? null
                         : Math.min(Math.max(newSinceDays, 1), MAX_NEW_SINCE_DAYS),
-                verifiedLocal);
+                verifiedLocal,
+                vertical,
+                serviceCategory);
 
         StoreService.NearbyResult result =
                 storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, filters, pageable);
@@ -639,7 +665,8 @@ public class StoreController {
                 v.powerCurrent(),
                 store.getLatitude(),
                 store.getLongitude(),
-                store.getDeliveryRadiusMetres());
+                store.getDeliveryRadiusMetres(),
+                store.getServiceCategory());
     }
 
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
@@ -680,7 +707,8 @@ public class StoreController {
                 store.getPowerNote(),
                 store.getPowerUpdatedAt(),
                 v.powerCurrent(),
-                store.getDeliveryRadiusMetres());
+                store.getDeliveryRadiusMetres(),
+                store.getServiceCategory());
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {

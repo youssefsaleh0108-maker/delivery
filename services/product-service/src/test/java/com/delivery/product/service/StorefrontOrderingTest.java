@@ -74,6 +74,7 @@ class StorefrontOrderingTest {
     @BeforeEach
     void setUp() {
         service = new StoreService(stores, offers, favorites, products, categories,
+                new ServiceCategories(new org.springframework.mock.env.MockEnvironment()),
                 Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(4));
     }

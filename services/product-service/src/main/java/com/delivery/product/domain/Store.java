@@ -50,7 +50,42 @@ public class Store {
     private static final Duration CLOSING_SOON_WINDOW = Duration.ofMinutes(30);
 
     public enum Vertical {
-        RESTAURANT, COFFEE, GROCERY, CONVENIENCE, PHARMACY, ELECTRONICS, FLOWERS_GIFTS
+        RESTAURANT, COFFEE, GROCERY, CONVENIENCE, PHARMACY, ELECTRONICS, FLOWERS_GIFTS,
+
+        /**
+         * A shop that makes something to order instead of selling stock off a shelf: a print shop, a
+         * tailor, a repairer, a photo studio. It carries a {@link ServiceCategory}, and no other
+         * vertical does.
+         *
+         * <p>Left off every goods surface unless a read asks for it by name: the storefront and its
+         * search, "near me", the district chips, the catalogue, the Home strip, banners and the gift
+         * hub. The reason is on the phones: an installed app reads an unknown vertical as RESTAURANT,
+         * so a print shop that reached the Home storefront would be drawn as a restaurant.
+         *
+         * <p>A store never moves into or out of it ({@link Store#updateProfile}). A goods shop and a
+         * service shop are listed, ordered from and fulfilled differently, so a move would strand
+         * whatever was built for the other one. The same rule stops an old merchant app, which reads
+         * SERVICES as RESTAURANT, from rewriting a provider's shop on a profile save.
+         */
+        SERVICES
+    }
+
+    /**
+     * What a {@link Vertical#SERVICES} shop does.
+     *
+     * <p>The whole taxonomy lives here, including categories that are not offered yet. Which ones are
+     * open is configuration ({@code ServiceCategories}), so opening or closing one needs no migration
+     * and orphans no shop.
+     */
+    public enum ServiceCategory {
+        PRINTING,
+        /** Tailoring and alterations. */
+        TAILORING,
+        REPAIRS,
+        PHOTOGRAPHY,
+        CLEANING,
+        BEAUTY,
+        TUTORING
     }
 
     public enum Status {
@@ -101,6 +136,15 @@ public class Store {
     @Enumerated(EnumType.STRING)
     @Column(name = "vertical", nullable = false, length = 24)
     private Vertical vertical;
+
+    /**
+     * What a service shop does, and null for every other shop. V33's CHECKs hold the pair together in
+     * both directions, and so does this class: the constructor refuses a mismatch, and
+     * {@link #changeServiceCategory} only re-files a service shop.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_category", length = 24)
+    private ServiceCategory serviceCategory;
 
     @Column(name = "tagline", length = 240)
     private String tagline;
@@ -239,12 +283,31 @@ public class Store {
         // for JPA
     }
 
+    /** A goods shop. A service shop needs its category: see the constructor below. */
     public Store(String merchantId, String name, Vertical vertical) {
+        this(merchantId, name, vertical, null);
+    }
+
+    /**
+     * A shop, with what it does when it is a service shop.
+     *
+     * @throws IllegalArgumentException when the vertical and the category disagree: a service shop
+     *         with no category, or a goods shop with one. V33 refuses both; refusing here first turns
+     *         a constraint name into a sentence the merchant can act on.
+     */
+    public Store(String merchantId, String name, Vertical vertical, ServiceCategory serviceCategory) {
+        if (vertical == Vertical.SERVICES && serviceCategory == null) {
+            throw new IllegalArgumentException("A services shop needs a service category");
+        }
+        if (vertical != Vertical.SERVICES && serviceCategory != null) {
+            throw new IllegalArgumentException("Only a services shop has a service category");
+        }
         this.id = UUID.randomUUID();
         this.merchantId = merchantId;
         this.name = name;
         this.slug = slugify(name) + "-" + this.id.toString().substring(0, 8);
         this.vertical = vertical;
+        this.serviceCategory = serviceCategory;
         this.status = Status.DRAFT;
     }
 
@@ -418,8 +481,23 @@ public class Store {
         this.hours.addAll(replacement);
     }
 
+    /**
+     * Saves the profile form's fields.
+     *
+     * <p>The vertical may move between goods verticals — a café that turns out to be a bakery — but
+     * never into or out of {@link Vertical#SERVICES}; see there for why. The move is refused before
+     * anything is written, so a refused save leaves the shop exactly as it was.
+     *
+     * @throws IllegalStateException when the save would move the shop into or out of SERVICES
+     */
     public void updateProfile(String name, String tagline, String description, Vertical vertical,
                               List<String> tags, String timezone, String address) {
+        if (isServices() != (vertical == Vertical.SERVICES)) {
+            throw new IllegalStateException(isServices()
+                    ? "A services shop cannot become a goods shop. Open a separate shop to sell goods."
+                    : "A goods shop cannot become a services shop. Open a separate shop to offer "
+                            + "services.");
+        }
         // Note the slug is not touched. Renaming a shop must not break a shared link.
         this.name = name;
         this.tagline = tagline;
@@ -504,6 +582,36 @@ public class Store {
 
     public Vertical getVertical() {
         return vertical;
+    }
+
+    /** Whether this is a service shop: {@link Vertical#SERVICES}, with a {@link ServiceCategory}. */
+    public boolean isServices() {
+        return vertical == Vertical.SERVICES;
+    }
+
+    /** What a service shop does; null for a goods shop. */
+    public ServiceCategory getServiceCategory() {
+        return serviceCategory;
+    }
+
+    /**
+     * Re-files a service shop under another category — a print shop that turned out to be mostly a
+     * photo studio. The shop stays a service shop; a goods shop has no category to change.
+     *
+     * <p>Whether the category is open is not this class's to know: {@code StoreService} checks that
+     * first, because it reads configuration.
+     *
+     * @throws IllegalStateException    on a goods shop
+     * @throws IllegalArgumentException for null, because a service shop always has a category
+     */
+    public void changeServiceCategory(ServiceCategory category) {
+        if (!isServices()) {
+            throw new IllegalStateException("Only a services shop has a service category");
+        }
+        if (category == null) {
+            throw new IllegalArgumentException("A services shop needs a service category");
+        }
+        this.serviceCategory = category;
     }
 
     public String getTagline() {

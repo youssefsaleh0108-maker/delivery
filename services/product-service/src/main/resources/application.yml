@@ -192,6 +192,22 @@ delivery:
     # opening from being claimed at dinner. See StoreService#powerDeclarationFreshFor.
     power-declaration-fresh-for: 4h
 
+    services:
+      # Which service categories are open in the services marketplace. An open category is offered
+      # to providers setting up a shop and shown to customers wherever service shops are listed. A
+      # category left out can neither be chosen nor shown; a shop already in it keeps its category
+      # and is simply not listed.
+      #
+      # The taxonomy is Store.ServiceCategory: PRINTING, TAILORING, REPAIRS, PHOTOGRAPHY, CLEANING,
+      # BEAUTY, TUTORING. Cleaning, Beauty and Tutoring are appointments at the customer's place,
+      # which the order flow does not model yet, so they launch closed (owner default 1 in
+      # docs/figma-services-designs.md).
+      #
+      # Read per call (ServiceCategories), so a Config Server change plus /actuator/busrefresh opens
+      # one without a redeploy. A name that is not a category fails the services reads loudly rather
+      # than hiding a category nobody meant to close; goods reads never read this.
+      enabled-categories: PRINTING,TAILORING,REPAIRS,PHOTOGRAPHY
+
   geocoding:
     # Which geocoder answers. NOMINATIM is free and keyless and is what runs today; MAPBOX is
     # written, has never made a successful call, and refuses everything until somebody provisions a

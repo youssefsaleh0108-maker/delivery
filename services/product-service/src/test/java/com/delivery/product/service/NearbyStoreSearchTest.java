@@ -93,16 +93,20 @@ class NearbyStoreSearchTest {
      */
     private Runnable betweenTheQueries;
 
+    /** The service's configuration, so a test can open or close a service category. */
+    private org.springframework.mock.env.MockEnvironment environment;
+
     @BeforeEach
     void setUp() {
+        environment = new org.springframework.mock.env.MockEnvironment();
         service = new StoreService(stores, offers, favorites, products, categories,
-                Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR);
+                new ServiceCategories(environment), Clock.fixed(NOW, ZoneOffset.UTC), FRESH_FOR);
         world.clear();
         betweenTheQueries = () -> { };
 
         when(stores.findActiveIdsNear(anyDouble(), anyDouble(), anyDouble(), anyString(),
                 any(Instant.class), anyString(), anyBoolean(), anyBoolean(), any(Instant.class),
-                anyInt()))
+                anyString(), anyString(), anyInt()))
                 .thenAnswer(this::candidateQuery);
 
         when(stores.findAllById(any())).thenAnswer(invocation -> {
@@ -136,10 +140,17 @@ class NearbyStoreSearchTest {
         boolean verifiedLocalOnly = call.getArgument(6);
         boolean newOnly = call.getArgument(7);
         Instant listedSince = call.getArgument(8);
-        int limit = call.getArgument(9);
+        String vertical = call.getArgument(9);
+        List<String> openCategories = List.of(call.<String>getArgument(10).split(","));
+        int limit = call.getArgument(11);
 
         return world.values().stream()
                 .filter(s -> s.location() != null)
+                .filter(s -> vertical.isEmpty()
+                        ? s.getVertical() != Store.Vertical.SERVICES
+                        : s.getVertical().name().equals(vertical))
+                .filter(s -> s.getVertical() != Store.Vertical.SERVICES
+                        || openCategories.contains(s.getServiceCategory().name()))
                 .filter(s -> powerStatus.isEmpty()
                         || (s.getPowerStatus().name().equals(powerStatus)
                                 && s.getPowerUpdatedAt() != null
@@ -667,6 +678,115 @@ class NearbyStoreSearchTest {
 
             assertThat(nothing.page()).isEmpty();
             assertThat(nothing.truncated()).isFalse();
+        }
+    }
+
+    /**
+     * Service shops in "near me". The plain search is what the neighbourhood browse and every
+     * installed app make, and those apps read an unknown vertical as a restaurant — so a print shop
+     * round the corner must not be in that answer. The stand-in candidate query applies the vertical
+     * and category exactly as the SQL does, which is what makes these tests of the service's
+     * arguments rather than of the stub.
+     */
+    @Nested
+    @DisplayName("service shops")
+    class ServiceShops {
+
+        private Store serviceShopAt(String name, Store.ServiceCategory category, double latitude,
+                                    double longitude) {
+            Store store = new Store("merchant-2", name, Store.Vertical.SERVICES, category);
+            store.pinAt(GeoPoint.of(latitude, longitude));
+            store.replaceHours(everyDay(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)));
+            store.publish(LONG_AGO);
+            world.put(store.getId(), store);
+            return store;
+        }
+
+        private List<String> namesNear(StoreService.NearbyFilters filters) {
+            return names(service.nearby(CUSTOMER, 10_000, 500, filters, PageRequest.of(0, 20))
+                    .page());
+        }
+
+        private StoreService.NearbyFilters asking(Store.Vertical vertical,
+                                                  Store.ServiceCategory category) {
+            return new StoreService.NearbyFilters(false, null, null, null, false, vertical, category);
+        }
+
+        @Test
+        void the_plain_search_leaves_service_shops_out() {
+            shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            serviceShopAt("Al Fakhry Press", Store.ServiceCategory.PRINTING, 33.898000d, 35.483000d);
+
+            assertThat(namesNear(StoreService.NearbyFilters.NONE)).containsExactly("Corner Cafe");
+        }
+
+        @Test
+        void asking_for_services_lists_service_shops_in_open_categories_only() {
+            shopAt("Corner Cafe", 33.900800d, 35.482900d);
+            serviceShopAt("Al Fakhry Press", Store.ServiceCategory.PRINTING, 33.898000d, 35.483000d);
+            serviceShopAt("Spotless Cleaners", Store.ServiceCategory.CLEANING, 33.899000d, 35.484000d);
+
+            assertThat(namesNear(asking(Store.Vertical.SERVICES, null)))
+                    .containsExactly("Al Fakhry Press");
+        }
+
+        @Test
+        void a_category_narrows_to_that_category() {
+            serviceShopAt("Al Fakhry Press", Store.ServiceCategory.PRINTING, 33.898000d, 35.483000d);
+            serviceShopAt("Hamra Tailors", Store.ServiceCategory.TAILORING, 33.899000d, 35.484000d);
+
+            assertThat(namesNear(asking(null, Store.ServiceCategory.TAILORING)))
+                    .containsExactly("Hamra Tailors");
+        }
+
+        @Test
+        void a_closed_category_answers_nothing_without_asking_the_database() {
+            serviceShopAt("Spotless Cleaners", Store.ServiceCategory.CLEANING, 33.899000d, 35.484000d);
+
+            StoreService.NearbyResult result = service.nearby(CUSTOMER, 10_000, 500,
+                    asking(Store.Vertical.SERVICES, Store.ServiceCategory.CLEANING),
+                    PageRequest.of(0, 20));
+
+            assertThat(result.page()).isEmpty();
+            org.mockito.Mockito.verify(stores, org.mockito.Mockito.never()).findActiveIdsNear(
+                    anyDouble(), anyDouble(), anyDouble(), anyString(), any(Instant.class),
+                    anyString(), anyBoolean(), anyBoolean(), any(Instant.class), anyString(),
+                    anyString(), anyInt());
+        }
+
+        @Test
+        void opening_a_category_lists_its_shops() {
+            environment.setProperty("delivery.product.services.enabled-categories",
+                    "PRINTING,CLEANING");
+            serviceShopAt("Spotless Cleaners", Store.ServiceCategory.CLEANING, 33.899000d, 35.484000d);
+
+            assertThat(namesNear(asking(Store.Vertical.SERVICES, null)))
+                    .containsExactly("Spotless Cleaners");
+        }
+
+        /**
+         * The ids and the rows come from two queries. A shop re-filed under another category in
+         * between is judged on what it is now, the same rule every other filter follows.
+         */
+        @Test
+        void a_shop_refiled_between_the_two_queries_is_judged_on_what_it_is_now() {
+            Store press = serviceShopAt("Al Fakhry Press", Store.ServiceCategory.PRINTING,
+                    33.898000d, 35.483000d);
+            betweenTheQueries = () -> press.changeServiceCategory(Store.ServiceCategory.PHOTOGRAPHY);
+
+            assertThat(namesNear(asking(null, Store.ServiceCategory.PRINTING))).isEmpty();
+        }
+
+        @Test
+        void the_browse_filters_still_narrow_service_shops() {
+            Store press = serviceShopAt("Al Fakhry Press", Store.ServiceCategory.PRINTING,
+                    33.898000d, 35.483000d);
+            press.setVerifiedLocal(true);
+            serviceShopAt("Unvetted Prints", Store.ServiceCategory.PRINTING, 33.899000d, 35.484000d);
+
+            assertThat(namesNear(new StoreService.NearbyFilters(false, null, null, null, true,
+                    Store.Vertical.SERVICES, null)))
+                    .containsExactly("Al Fakhry Press");
         }
     }
 }

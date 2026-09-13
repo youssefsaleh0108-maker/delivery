@@ -106,7 +106,9 @@ public final class StoreDtos {
              */
             boolean powerCurrent,
             /** The merchant's delivery circle, or null for zones-only. */
-            Integer deliveryRadiusMetres) {
+            Integer deliveryRadiusMetres,
+            /** What a SERVICES shop does. Always set for a service shop and null for every other. */
+            Store.ServiceCategory serviceCategory) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */
@@ -159,7 +161,12 @@ public final class StoreDtos {
             BigDecimal latitude,
             BigDecimal longitude,
             /** The merchant's delivery circle, or null for zones-only. */
-            Integer deliveryRadiusMetres) {
+            Integer deliveryRadiusMetres,
+            /**
+             * What a SERVICES shop does, for the Services tab's "Printing • 0.5 km" line. Null on
+             * every goods card, which is every card a read that does not ask for services returns.
+             */
+            Store.ServiceCategory serviceCategory) {
     }
 
     public record OfferResponse(
@@ -214,7 +221,14 @@ public final class StoreDtos {
             @Size(max = 64) String timezone,
             @Size(max = 400) String address,
             /** District identity for the hyperlocal browse. Free text; the chips are distinct values. */
-            @Size(max = 80) String neighborhood) {
+            @Size(max = 80) String neighborhood,
+            /**
+             * What a SERVICES shop does. Required when creating one, and refused with any other
+             * vertical. On a save, null leaves the shop's category as it is — the rule the district
+             * follows — so a client that predates the field cannot clear it. Any other value re-files
+             * the shop, and only under a category that is open.
+             */
+            Store.ServiceCategory serviceCategory) {
     }
 
     /**
