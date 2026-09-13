@@ -132,6 +132,9 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Timer? _poll;
 
+  /// Customers' unread messages, on Settings' messages row. Owner-only, like the row.
+  ShopUnreadCount? _shopUnread;
+
   @override
   void initState() {
     super.initState();
@@ -142,11 +145,19 @@ class _MerchantShellState extends State<MerchantShell> {
       // racing another rider for, and the queue itself refreshes when it is opened.
       _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBadge());
     }
+    final ShopChatApi? shopChat = widget.shopChatApi;
+    if (_access.isOwner && shopChat != null) {
+      // From the start, not from the first visit to the inbox. Without it a customer's message
+      // showed nowhere until the merchant happened to open that page — and, since it is reading the
+      // inbox that tells the server who owns the shop, it never arrived live before then either.
+      _shopUnread = ShopUnreadCount(api: shopChat, socket: widget.chatSocket)..start();
+    }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _shopUnread?.dispose();
     super.dispose();
   }
 
@@ -268,6 +279,7 @@ class _MerchantShellState extends State<MerchantShell> {
           // Product Service's "shops you own", so an employee's inbox would always be empty.
           onShopMessages:
               _access.isOwner && widget.shopChatApi != null ? _openShopMessages : null,
+          shopMessagesUnread: _shopUnread,
           onNotificationSettings:
               widget.prefsApi == null ? null : _openNotificationPreferences,
           aggregates: _access.isOwner ? widget.aggregatesApi : null,
@@ -345,12 +357,16 @@ class _MerchantShellState extends State<MerchantShell> {
     ));
   }
 
-  void _openShopMessages() {
+  Future<void> _openShopMessages() async {
     final ShopChatApi? api = widget.shopChatApi;
     if (api == null) return;
-    Navigator.of(context).push(MaterialPageRoute<void>(
+    await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ShopInboxScreen(api: api, socket: widget.chatSocket),
     ));
+    // Reading conversations is what changes the count: ask as the merchant comes back, not a minute
+    // later.
+    final ShopUnreadCount? unread = _shopUnread;
+    if (mounted && unread != null) unawaited(unread.refresh());
   }
 
   void _openStaff() {

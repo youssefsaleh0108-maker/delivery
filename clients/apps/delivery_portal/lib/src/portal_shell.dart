@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -132,10 +134,14 @@ class PortalDestination {
     required this.selectedIcon,
     required this.label,
     required this.build,
+    this.badge,
   });
 
   final IconData icon;
   final IconData selectedIcon;
+
+  /// The live number this destination's rail row carries, if any.
+  final PortalBadge? badge;
 
   /// Resolved against the active locale rather than stored, so switching language re-labels the
   /// rail without rebuilding the area list.
@@ -145,6 +151,15 @@ class PortalDestination {
   /// this takes a callback rather than returning a bare widget.
   final Widget Function(PortalApis apis, LocaleController locale,
       Future<void> Function() onSignOut, void Function(int) jump) build;
+}
+
+/// A live number a rail row can carry.
+///
+/// Named here rather than handed over as a callback, so the area lists stay plain data and the shell
+/// — which owns the requests — decides how each number is kept current and when to stop asking.
+enum PortalBadge {
+  /// Customers' messages the signed-in merchant has not read (`ShopUnreadCount`).
+  shopUnread,
 }
 
 /// One of the three former portals, as a role and the destinations it grants.
@@ -305,6 +320,8 @@ class PortalArea {
         icon: Icons.forum_outlined,
         selectedIcon: Icons.forum,
         label: (DeliveryStrings t) => t.chatShopInboxTitle,
+        // The sign that a customer wrote: the portal has no push and no socket.
+        badge: PortalBadge.shopUnread,
         build: (PortalApis a, _, __, ___) => ShopInboxScreen(api: a.shopChat, embedded: true),
       ),
     ],
@@ -609,6 +626,23 @@ class _PortalShellState extends State<PortalShell> {
   int _area = 0;
   int _index = 0;
 
+  /// The merchant's unread customer messages, for the rail. Held only while the area on screen has a
+  /// row showing it, so a back-office or carrier session never asks.
+  ShopUnreadCount? _shopUnread;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncBadges();
+  }
+
+  @override
+  void dispose() {
+    _shopUnread?.removeListener(_badgeChanged);
+    _shopUnread?.dispose();
+    super.dispose();
+  }
+
   void _switchArea(int area) {
     setState(() {
       _area = area;
@@ -616,6 +650,53 @@ class _PortalShellState extends State<PortalShell> {
       // happened to share that position in the other area.
       _index = 0;
     });
+    _syncBadges();
+  }
+
+  /// Starts or stops the numbers the current area's rail shows.
+  ///
+  /// The portal has no socket, so [ShopUnreadCount] polls: once a minute, and only while the tab is
+  /// on screen. Without it a merchant working here had no sign a customer had written until they
+  /// opened the inbox and pulled to refresh — a gesture a mouse cannot make.
+  void _syncBadges() {
+    final bool wanted = widget.areas[_area].destinations
+        .any((PortalDestination d) => d.badge == PortalBadge.shopUnread);
+    final ShopUnreadCount? current = _shopUnread;
+    if (wanted && current == null) {
+      _shopUnread = ShopUnreadCount(api: widget.apis.shopChat)
+        ..addListener(_badgeChanged)
+        ..start();
+    } else if (!wanted && current != null) {
+      current.removeListener(_badgeChanged);
+      current.dispose();
+      _shopUnread = null;
+    }
+  }
+
+  void _badgeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  ConsoleNavEntry _entry(PortalDestination destination, DeliveryStrings t) {
+    final int? count = switch (destination.badge) {
+      PortalBadge.shopUnread => _shopUnread?.value,
+      null => null,
+    };
+    return ConsoleNavEntry(
+      icon: destination.icon,
+      label: destination.label(t),
+      badgeCount: count,
+      badgeLabel: count == null ? null : t.chatShopUnreadCount(count),
+    );
+  }
+
+  void _select(PortalArea area, int index) {
+    final bool leavingBadged = area.destinations[_index].badge != null;
+    setState(() => _index = index);
+    // Reading conversations is what changes the count: ask as the merchant leaves them, not a minute
+    // later.
+    final ShopUnreadCount? unread = _shopUnread;
+    if (leavingBadged && unread != null) unawaited(unread.refresh());
   }
 
   /// The sidebar footer's menu: the two things that used to live in the crimson AppBar.
@@ -692,11 +773,10 @@ class _PortalShellState extends State<PortalShell> {
             areaIndex: _area,
             onAreaSelected: widget.areas.length > 1 ? _switchArea : null,
             entries: <ConsoleNavEntry>[
-              for (final PortalDestination d in area.destinations)
-                ConsoleNavEntry(icon: d.icon, label: d.label(t)),
+              for (final PortalDestination d in area.destinations) _entry(d, t),
             ],
             selectedIndex: _index,
-            onSelected: (int i) => setState(() => _index = i),
+            onSelected: (int i) => _select(area, i),
             userName: widget.session.displayName,
             userRole: area.accountRole(t),
             accountMenu: _accountMenu(t),

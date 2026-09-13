@@ -6,6 +6,8 @@ import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import 'visible_poller.dart';
+
 /// One conversation between a customer and a shop, drawn for whichever side is reading it.
 ///
 /// A customer reaches it from the chat pill on a shop's page: [open] asks the server for the thread,
@@ -16,9 +18,13 @@ import 'package:flutter/material.dart';
 /// conversation cannot drift apart.
 ///
 /// Live over the app's one STOMP socket when the host has it, refetching from its sequence cursor on
-/// every reconnect, so a dropped connection loses nothing. A thread goes quiet two weeks after the
-/// customer's last activity: the customer is offered Reopen, and the shop is told why it cannot
-/// write, because only the customer can start a quiet conversation again.
+/// every reconnect, so a dropped connection loses nothing. A host without one — the portal on the
+/// web — gets a refresh button in the header and a catch-up every fifteen seconds while the
+/// conversation is on screen, since nothing else would bring the other side's reply.
+///
+/// A thread goes quiet two weeks after the customer's last activity: the customer is offered Reopen,
+/// and the shop is told why it cannot write, because only the customer can start a quiet
+/// conversation again.
 class ShopThreadScreen extends StatefulWidget {
   const ShopThreadScreen({
     super.key,
@@ -76,6 +82,13 @@ class _ShopThreadScreenState extends State<ShopThreadScreen> {
   StreamSubscription<ShopMessage>? _live;
   bool _wasConnected = false;
 
+  /// Without a live feed, how often the conversation catches up while on screen: quick enough to read
+  /// as a conversation, and each time one small request against the thread's cursor.
+  static const Duration _pollEvery = Duration(seconds: 15);
+
+  /// Only for a host with no socket; see the class doc.
+  VisiblePoller? _poller;
+
   int get _cursor => _messages.isEmpty ? 0 : _messages.last.sequence;
 
   bool get _customerSide {
@@ -100,6 +113,12 @@ class _ShopThreadScreenState extends State<ShopThreadScreen> {
       });
       _wasConnected = socket.connected.value;
       socket.connected.addListener(_onConnectivity);
+    } else {
+      _poller = VisiblePoller(
+        every: _pollEvery,
+        // Not while the first load is running: it is already doing exactly this.
+        onTick: () => _loading ? Future<void>.value() : _catchUp(),
+      )..start();
     }
   }
 
@@ -107,6 +126,7 @@ class _ShopThreadScreenState extends State<ShopThreadScreen> {
   void dispose() {
     widget.socket?.connected.removeListener(_onConnectivity);
     _live?.cancel();
+    _poller?.dispose();
     _composer.dispose();
     super.dispose();
   }
@@ -243,6 +263,26 @@ class _ShopThreadScreenState extends State<ShopThreadScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// The header's refresh: the catch-up the poll makes, except that a failure is said rather than
+  /// swallowed — somebody who asked should learn it did not work.
+  Future<void> _refreshNow() async {
+    try {
+      await _catchUp(rethrowFailure: true);
+    } catch (_) {
+      if (mounted) _say(DeliveryStrings.of(context).chatShopCouldNotLoad);
+    }
+  }
+
+  /// Only where nothing else keeps the conversation current, and only once there is one to refresh.
+  Widget? _refreshButton(DeliveryStrings t) {
+    if (widget.socket != null || _thread == null || _loading || _loadFailed) return null;
+    return IconButton(
+      tooltip: t.refresh,
+      icon: const Icon(Icons.refresh_rounded, color: DeliveryColors.ink),
+      onPressed: () => unawaited(_refreshNow()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
@@ -253,6 +293,7 @@ class _ShopThreadScreenState extends State<ShopThreadScreen> {
         title: _title(t),
         onBack: () => Navigator.of(context).maybePop(),
         backSemanticLabel: t.back,
+        trailing: _refreshButton(t),
       ),
       body: SafeArea(
         top: false,

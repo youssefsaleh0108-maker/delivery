@@ -1,6 +1,7 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'merchant_analytics_screen.dart';
@@ -46,6 +47,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onEditAccount,
     this.onShopProfile,
     this.onShopMessages,
+    this.shopMessagesUnread,
     this.onCategories,
     this.onStaff,
     this.onStockCount,
@@ -76,6 +78,11 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// profile, because both are the shop as customers meet it. Absent, not disabled, when the host has
   /// no chat client — the same contract as the management rows below.
   final VoidCallback? onShopMessages;
+
+  /// How many customer messages are unread, drawn on the messages row while above zero — the one
+  /// sign on this screen that a customer wrote. The host keeps it current (`ShopUnreadCount`); null
+  /// draws no number, because an unknown count is not a zero.
+  final ValueListenable<int?>? shopMessagesUnread;
 
   /// The merchant suite's three management pages, hung off Settings rather than given a tab
   /// each: a shop reorganises its shelves and its roster a few times a year, not a few times a
@@ -266,6 +273,7 @@ class MerchantSettingsScreen extends StatelessWidget {
               icon: Icons.forum_outlined,
               title: t.chatShopInboxTitle,
               onTap: onShopMessages,
+              count: shopMessagesUnread,
             ),
           ],
           if (onCategories != null) ...<Widget>[
@@ -544,6 +552,7 @@ class _MenuRow extends StatelessWidget {
     required this.title,
     this.onTap,
     this.soonLabel,
+    this.count,
   });
 
   final IconData icon;
@@ -556,9 +565,22 @@ class _MenuRow extends StatelessWidget {
   /// Non-null marks the row as drawn-but-not-yet-working: no chevron, no tap, a chip instead.
   final String? soonLabel;
 
+  /// A live count drawn before the chevron while it is above zero.
+  final ValueListenable<int?>? count;
+
   @override
   Widget build(BuildContext context) {
+    final ValueListenable<int?>? count = this.count;
+    if (count == null) return _card(null);
+    return ValueListenableBuilder<int?>(
+      valueListenable: count,
+      builder: (BuildContext context, int? value, _) => _card(value),
+    );
+  }
+
+  Widget _card(int? countValue) {
     final bool inert = soonLabel != null;
+    final int shown = countValue ?? 0;
 
     return YdCard.bordered(
       onTap: inert ? null : onTap,
@@ -569,8 +591,52 @@ class _MenuRow extends StatelessWidget {
         titleColor: inert ? DeliveryColors.muted : DeliveryColors.ink,
         iconColor: inert ? DeliveryColors.faint : DeliveryColors.ink,
         onTap: inert ? null : onTap,
-        trailing: inert ? YdComingSoon(label: soonLabel!) : null,
+        trailing: inert
+            ? YdComingSoon(label: soonLabel!)
+            : shown > 0
+                ? _CountThenChevron(count: shown)
+                : null,
       ),
+    );
+  }
+}
+
+/// A count pill, then the chevron [YdListRow] draws only when it has no trailing widget of its own —
+/// so a row carrying a count still reads as a row that opens.
+class _CountThenChevron extends StatelessWidget {
+  const _CountThenChevron({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Semantics(
+          label: DeliveryStrings.of(context).chatShopUnreadCount(count),
+          child: ExcludeSemantics(
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 22),
+              height: 22,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brand,
+                borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: DeliveryColors.white),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: DeliverySpacing.sm),
+        Icon(rtl ? Icons.chevron_left : Icons.chevron_right, size: 14, color: DeliveryColors.faint),
+      ],
     );
   }
 }

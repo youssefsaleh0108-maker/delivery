@@ -6,6 +6,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
 import 'shop_thread_screen.dart';
+import 'visible_poller.dart';
 
 /// The shop's conversations with its customers, newest first.
 ///
@@ -16,6 +17,11 @@ import 'shop_thread_screen.dart';
 ///
 /// Shared by the mobile merchant shell (pushed from Settings, with a back header) and the portal's
 /// merchant rail ([embedded], where the rail draws the chrome and the page carries its own title).
+///
+/// Without a [socket] — the portal on the web has none — nothing tells the page a customer wrote,
+/// and pull-to-refresh is a gesture a desktop mouse cannot make. Such a host gets a refresh button by
+/// the title, and the list asks again every half-minute while it is actually on screen: not from a
+/// hidden tab, and not while a conversation is open over it.
 class ShopInboxScreen extends StatefulWidget {
   const ShopInboxScreen({super.key, required this.api, this.socket, this.embedded = false});
 
@@ -31,11 +37,18 @@ class ShopInboxScreen extends StatefulWidget {
 }
 
 class _ShopInboxScreenState extends State<ShopInboxScreen> {
+  /// Without a live feed, how often the list asks again while on screen. Gentle: a customer's
+  /// question can wait half a minute, and a shop may leave the page open all day.
+  static const Duration _pollEvery = Duration(seconds: 30);
+
   List<ShopThread>? _threads;
   bool _failed = false;
 
   StreamSubscription<ShopMessage>? _live;
   bool _wasConnected = false;
+
+  /// Only for a host with no socket; see the class doc.
+  VisiblePoller? _poller;
 
   @override
   void initState() {
@@ -48,6 +61,8 @@ class _ShopInboxScreenState extends State<ShopInboxScreen> {
       _live = ShopChatApi.live(socket).listen((_) => unawaited(_refresh()));
       _wasConnected = socket.connected.value;
       socket.connected.addListener(_onConnectivity);
+    } else {
+      _poller = VisiblePoller(every: _pollEvery, onTick: _refresh)..start();
     }
   }
 
@@ -55,6 +70,7 @@ class _ShopInboxScreenState extends State<ShopInboxScreen> {
   void dispose() {
     widget.socket?.connected.removeListener(_onConnectivity);
     _live?.cancel();
+    _poller?.dispose();
     super.dispose();
   }
 
@@ -79,10 +95,19 @@ class _ShopInboxScreenState extends State<ShopInboxScreen> {
   }
 
   Future<void> _open(ShopThread thread) async {
+    final VisiblePoller? poller = _poller;
+    // The conversation covers the list and keeps itself current; the list waits underneath.
+    poller?.paused = true;
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ShopThreadScreen(api: widget.api, thread: thread, socket: widget.socket),
     ));
-    if (mounted) unawaited(_refresh());
+    if (!mounted) return;
+    if (poller != null) {
+      // Uncovering asks at once: what was read and what arrived meanwhile both change the list.
+      poller.paused = false;
+    } else {
+      unawaited(_refresh());
+    }
   }
 
   @override
@@ -103,15 +128,35 @@ class _ShopInboxScreenState extends State<ShopInboxScreen> {
         title: t.chatShopInboxTitle,
         onBack: () => Navigator.of(context).maybePop(),
         backSemanticLabel: t.back,
+        trailing: _refreshButton(t),
       ),
       body: content,
     );
   }
 
+  /// Only where nothing else keeps the list current. With a live feed it would be a second way of
+  /// doing what already happens by itself.
+  Widget? _refreshButton(DeliveryStrings t) {
+    if (widget.socket != null) return null;
+    return IconButton(
+      tooltip: t.refresh,
+      icon: const Icon(Icons.refresh_rounded, color: DeliveryColors.ink),
+      onPressed: () => unawaited(_refresh()),
+    );
+  }
+
   Widget _list(BuildContext context, DeliveryStrings t) {
+    final Widget? refresh = _refreshButton(t);
     final List<Widget> heading = widget.embedded
         ? <Widget>[
-            Text(t.chatShopInboxTitle, style: Theme.of(context).textTheme.headlineMedium),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(t.chatShopInboxTitle, style: Theme.of(context).textTheme.headlineMedium),
+                ),
+                if (refresh != null) refresh,
+              ],
+            ),
             const SizedBox(height: DeliverySpacing.md),
           ]
         : const <Widget>[];

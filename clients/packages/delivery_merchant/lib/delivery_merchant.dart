@@ -47,6 +47,8 @@ export 'src/product_list_screen.dart';
 // shop's page, so both ends of one conversation are one widget and cannot drift apart.
 export 'src/shop_inbox_screen.dart';
 export 'src/shop_thread_screen.dart';
+// The number both hosts put on their way into that inbox, kept current without a push.
+export 'src/shop_unread_count.dart';
 export 'src/store_screen.dart';
 // The map pin's own parts — the preview that sits in the shop-config frame's map slot and the
 // picker behind it. Exported for the same reason the metric cards are: a host or a test has to be

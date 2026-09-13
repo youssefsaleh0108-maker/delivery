@@ -5,10 +5,17 @@ import 'console_chrome.dart';
 
 /// One row in the console's dark rail.
 class ConsoleNavEntry {
-  const ConsoleNavEntry({required this.icon, required this.label});
+  const ConsoleNavEntry({required this.icon, required this.label, this.badgeCount, this.badgeLabel});
 
   final IconData icon;
   final String label;
+
+  /// A count at the row's end — unread customer messages — drawn while non-null and above zero. An
+  /// unknown count draws nothing rather than a zero the rail does not have.
+  final int? badgeCount;
+
+  /// What a screen reader says for [badgeCount]; the digits alone do not say what they count.
+  final String? badgeLabel;
 }
 
 /// One console a signed-in account can switch to, as it appears under the wordmark.
@@ -262,6 +269,10 @@ class _NavItem extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if ((entry.badgeCount ?? 0) > 0) ...<Widget>[
+                    const SizedBox(width: DeliverySpacing.sm),
+                    _CountBadge(count: entry.badgeCount!, label: entry.badgeLabel),
+                  ],
                 ],
               ),
             ),
@@ -272,6 +283,38 @@ class _NavItem extends StatelessWidget {
                 child: _ActiveBar(),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A count on a rail row, in the brand red the platform's other count badges use.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, this.label});
+
+  final int count;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: label,
+      child: ExcludeSemantics(
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 20),
+          height: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: DeliveryColors.brand,
+            borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: DeliveryColors.white),
+          ),
         ),
       ),
     );
