@@ -47,10 +47,10 @@ void main() {
   group('a gift basket', () {
     Cart basket() => Cart()..add(product('a', 's1', 10), from: storeCard('s1'));
 
-    test('stays a gift when it moves to another shop, and ends when it is emptied', () {
+    test('stays a gift when another shop\'s items join it, and ends when it is emptied', () {
       final Cart cart = basket()..startGift();
 
-      cart.switchTo(storeCard('s2'));
+      cart.add(product('b', 's2', 4), from: storeCard('s2'));
       expect(cart.isGift, isTrue);
 
       cart.giftNote = 'Love you';

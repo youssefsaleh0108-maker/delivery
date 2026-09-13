@@ -408,6 +408,18 @@ class _OrderCard extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
+                    // One of several shops' orders placed in one checkout, said on every one of
+                    // them — so the cards a multi-shop basket became read as one purchase, not as
+                    // orders the customer does not remember making.
+                    if (order.isPartOfCheckout) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.xs),
+                      YdBadge(
+                        label: t.multiCartPartOfOrder(order.checkoutSize!),
+                        color: DeliveryColors.brand,
+                        background: DeliveryColors.brandSoft,
+                        uppercase: false,
+                      ),
+                    ],
                   ],
                 ),
               ),

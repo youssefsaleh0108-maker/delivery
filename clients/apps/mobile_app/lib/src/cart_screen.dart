@@ -1,11 +1,11 @@
-import 'dart:async';
-
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import 'basket_quote.dart';
 import 'cart.dart';
 import 'checkout_screen.dart';
 import 'delivery_terms_book.dart';
@@ -17,16 +17,34 @@ import 'delivery_address.dart';
 import 'product_detail_screen.dart' show CustomerPhoto, QuantityStepper;
 import 'product_options_sheet.dart';
 
-/// The basket (Figma `customer-basket`, node 3:389).
+/// The basket (Figma `customer-basket`, node 3:389), and the Smart Basket it becomes when it holds
+/// several shops (Figma `multi-merchant-cart`, node 121:358).
 ///
-/// A white header, the lines as cards with a stepper each, the promo row, and then the money —
-/// itemised on a white plinth with the checkout button under it.
+/// One shop: a white header, the lines as cards with a stepper each, the promo row, and then the
+/// money — itemised on a white plinth with the checkout button under it.
 ///
-/// The promo row is live when a [PromoApi] is provided: the code is quoted against the basket as
-/// the customer types (debounced — the server answers sub-three-character queries with nothing
-/// anyway), the Discounts line shows what the server says the code is worth, and the code itself
-/// travels with the order at placement, where the discount is recomputed against the basket the
-/// server priced. Nothing here trusts the quote; it only decides what the summary shows.
+/// Several shops: the header names the basket and counts its shops, and each shop's lines sit in a
+/// bordered card of their own under "FROM {SHOP} (n ITEMS)", with that shop's delivery fee and —
+/// when the server says so — why its part cannot be checked out yet (under its minimum, closed, not
+/// delivering to the address), beside a way to take that shop out. The frame draws the lines
+/// read-only; the steppers stay, because this is where quantities are changed.
+///
+/// **Every figure is the server's** (`POST /api/orders/quote`, kept current by a [BasketQuoter]):
+/// the fee for the selected address's area, each shop's minimum for it, any waiver, and what the
+/// promo code is worth on this basket — so the total here is the total checkout charges. Before the
+/// server has answered, or when it cannot, a one-shop basket shows its card's figures where those
+/// are the platform's own (an address with no area) and a dash where they are not; a basket from
+/// several shops shows dashes, and is not checked out until the server has priced it.
+///
+/// **What the frame draws and this does not:** a "Unified Delivery Fee" and a "You save" badge
+/// beside the struck-through sum of every shop's fee. The platform has no bundle price — each
+/// shop's order is priced, dispatched and settled on its own, so the customer pays each shop's own
+/// fee — and a saving the server does not give is not shown. The checkout button carries the full
+/// total, delivery included, which the frame's "$34.50" (the goods alone) did not.
+///
+/// The promo code the customer types is judged by that same quote as they type (debounced), and
+/// travels with the order at placement, where the discount is decided again. Nothing here trusts a
+/// figure for money; it only decides what the summary shows.
 class CartScreen extends StatefulWidget {
   const CartScreen({
     super.key,
@@ -36,7 +54,6 @@ class CartScreen extends StatefulWidget {
     required this.offerApi,
     required this.onOrderPlaced,
     this.zoneApi,
-    this.promoApi,
     this.transferApi,
     this.splitApi,
     this.profileApi,
@@ -57,12 +74,8 @@ class CartScreen extends StatefulWidget {
   /// Used to re-ask what the basket qualifies for when its contents change on this screen.
   final OfferApi offerApi;
 
-  /// Validates promo codes. Optional so the screen still builds where the shell has not been
-  /// handed one; the promo row then stays the drawn-and-inert affordance it was.
-  final PromoApi? promoApi;
-
-  /// Checkout's money surface (rate lock, split, wallet methods). Optional for the same reason
-  /// as [promoApi].
+  /// Checkout's money surface (rate lock, split, wallet methods). Optional so the screen still
+  /// builds without a server behind it, as a test pumps it.
   final TransferApi? transferApi;
 
   /// The group split flow (Figma 83:*). All three arrive together or the Split tab stays
@@ -72,18 +85,18 @@ class CartScreen extends StatefulWidget {
   final AuthSession? session;
 
   /// Handed through to checkout's address sheet for the place search. Optional for the same
-  /// reason as [promoApi].
+  /// reason as [transferApi].
   final GeocodingApi? geocodingApi;
 
   /// Handed to checkout, which queues a checkout here when the platform cannot be reached.
-  /// Optional for the same reason as [promoApi]; without it checkout offers no queue.
+  /// Optional for the same reason as [transferApi]; without it checkout offers no queue.
   final OrderOutbox? outbox;
 
   /// Handed to checkout, so it knows the platform is unreachable before it tries.
   final ValueListenable<bool>? connectivity;
 
-  /// Handed to checkout, which prices delivery to an address's area from it. Optional for the same
-  /// reason as [promoApi]; without it checkout shows the shop's flat fee.
+  /// Handed to checkout, which prices delivery to an address's area from it when the platform
+  /// cannot quote. Optional for the same reason as [transferApi].
   final DeliveryTermsBook? deliveryTerms;
 
   /// After a placement AND after a checkout is queued: either way the customer's next question is
@@ -97,131 +110,88 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   static const double _gutter = DeliverySpacing.lg;
 
-  /// Long enough that a customer typing a code does not fire a request per keystroke, short
-  /// enough that the answer appears as soon as they pause.
-  static const Duration _debounce = Duration(milliseconds: 450);
+  /// What a figure the platform has not given reads as: a dash, never a zero or a guess.
+  static const String _dash = '—';
 
   final TextEditingController _promo = TextEditingController();
-  Timer? _promoDebounce;
 
-  /// The server's last answer about the code in the field, or null while the field is empty or a
-  /// quote is still owed. Never trusted for money — only for what the summary shows.
-  PromoQuote? _quote;
-  bool _checking = false;
-
-  /// True when the last quote attempt could not reach the server at all — a different sentence
-  /// from a code the server looked at and refused.
-  bool _quoteFailed = false;
-
-  /// What the last quote was measured against, so a basket edit re-asks and a rebuild does not.
-  String? _quotedSignature;
+  /// The server's price for this basket, delivered to the selected address, with the code in the
+  /// promo field — kept current as any of the three changes.
+  late final BasketQuoter _quoter = BasketQuoter(widget.orderApi);
 
   @override
   void initState() {
     super.initState();
-    // A basket edit changes what a code is worth — crossing a minimum is exactly the moment the
-    // Discounts line must change.
-    widget.cart.addListener(_onCartChanged);
+    // Asked first and listened to after, so the first ask's own notification does not rebuild a
+    // screen that has not been built yet.
+    _askForQuote();
+    _quoter.addListener(_onQuote);
+    // A basket edit changes every figure — crossing a shop's minimum or an offer's is exactly the
+    // moment the summary must change — and so does another delivery address, priced by its area.
+    widget.cart.addListener(_askForQuote);
+    widget.addresses.addListener(_askForQuote);
   }
 
   @override
   void dispose() {
-    widget.cart.removeListener(_onCartChanged);
-    _promoDebounce?.cancel();
+    widget.cart.removeListener(_askForQuote);
+    widget.addresses.removeListener(_askForQuote);
+    _quoter.removeListener(_onQuote);
+    _quoter.dispose();
     _promo.dispose();
     super.dispose();
   }
 
-  void _onCartChanged() {
-    if (!mounted || widget.promoApi == null) return;
-    if (_promo.text.trim().isEmpty) return;
-    final String signature =
-        '${_promo.text.trim()}|${widget.cart.subtotal.toStringAsFixed(2)}';
-    if (signature == _quotedSignature) return;
-    _scheduleQuote();
+  void _onQuote() {
+    if (mounted) setState(() {});
+  }
+
+  /// The area of the selected address. Null prices every shop at its flat fee, which is what Order
+  /// Manager charges an address with no area — and so the one case in which a shop card's fee is
+  /// the platform's own figure.
+  String? get _zoneId => widget.addresses.selected?.zoneId;
+
+  void _askForQuote() {
+    if (!mounted) return;
+    _quoter.ask(questionFor(widget.cart, zoneId: _zoneId, promoCode: _promo.text));
   }
 
   void _onPromoTyped(String _) {
-    setState(() {
-      _quote = null;
-      _quoteFailed = false;
-    });
-    _scheduleQuote();
-  }
-
-  void _scheduleQuote() {
-    _promoDebounce?.cancel();
-    if (_promo.text.trim().isEmpty) {
-      setState(() {
-        _quote = null;
-        _checking = false;
-        _quoteFailed = false;
-        _quotedSignature = null;
-      });
-      return;
-    }
-    _promoDebounce = Timer(_debounce, _requestQuote);
-  }
-
-  Future<void> _requestQuote() async {
-    final PromoApi? api = widget.promoApi;
-    final String code = _promo.text.trim();
-    if (api == null || code.isEmpty || !mounted) return;
-
-    final String signature = '$code|${widget.cart.subtotal.toStringAsFixed(2)}';
-    setState(() {
-      _checking = true;
-      _quoteFailed = false;
-    });
-    try {
-      final PromoQuote quote = await api.quote(
-        code,
-        subtotal: widget.cart.subtotal,
-        deliveryFee: widget.cart.deliveryFeeCharged,
-      );
-      if (!mounted) return;
-      // Answers can cross when typing continues past the debounce; only the answer to the code
-      // still in the field may land.
-      if (_promo.text.trim() != code) return;
-      setState(() {
-        _quote = quote;
-        _checking = false;
-        _quotedSignature = signature;
-      });
-    } catch (_) {
-      if (!mounted || _promo.text.trim() != code) return;
-      setState(() {
-        _checking = false;
-        _quoteFailed = true;
-        _quote = null;
-        _quotedSignature = signature;
-      });
-    }
+    // The quoter waits for the typing to pause, and only the answer about the code still in the
+    // field is ever shown.
+    _askForQuote();
+    setState(() {});
   }
 
   void _removePromo() {
-    _promoDebounce?.cancel();
-    setState(() {
-      _promo.clear();
-      _quote = null;
-      _checking = false;
-      _quoteFailed = false;
-      _quotedSignature = null;
-    });
+    _promo.clear();
+    _askForQuote();
+    if (mounted) setState(() {});
   }
 
-  /// The advisory discount the summary shows. Zero unless the server said the code applies.
+  /// What the server said the code in the field is worth on this basket — the answer on screen,
+  /// kept while a newer one is on its way. Null while the field is empty, or when the basket could
+  /// not be priced and so the code was not judged. Never trusted for money.
+  PromoQuote? get _shownPromo => _promo.text.trim().isEmpty ? null : _quoter.shown?.promo;
+
+  /// A code checkout may send: one the server judged valid for this very basket, as it stands now.
+  /// Placing with a refused code fails the whole order, so a refused one is never handed on.
+  PromoQuote? get _validPromo {
+    final PromoQuote? outcome = _quoter.quote?.promo;
+    return _promo.text.trim().isNotEmpty && outcome != null && outcome.valid ? outcome : null;
+  }
+
+  /// The discount the summary shows: every shop's share of the code, as the server shared it out.
+  /// Zero unless the server said the code applies.
   double get _promoDiscount {
-    final PromoQuote? quote = _quote;
-    if (quote == null || !quote.valid) return 0;
-    // Clamped against the payable total as a belt over the server's own clamp — the summary must
-    // never show a negative amount to pay.
-    final double payable = widget.cart.total;
-    return quote.discount > payable ? payable : quote.discount;
+    final PromoQuote? outcome = _shownPromo;
+    return outcome != null && outcome.valid ? (_quoter.shown?.discountAmount ?? 0) : 0;
   }
 
   Future<void> _checkout(BuildContext context) async {
-    final PromoQuote? quote = _quote;
+    // A gift is sent from one shop at a time: its checkout waits until only one shop is left.
+    if (widget.cart.isGift && widget.cart.isMultiShop) return;
+    final PromoQuote? quote = _validPromo;
     // A placed order, a checkout queued for when the connection returns, or nothing (backed out).
     final Object? outcome = await Navigator.of(context).push<Object>(
       MaterialPageRoute<Object>(
@@ -264,6 +234,15 @@ class _CartScreenState extends State<CartScreen> {
       widget.onOrderPlaced();
       return;
     }
+    if (outcome is CheckoutPlaced) {
+      // Every shop's order at once; the code, if there was one, went with them.
+      _removePromo();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context).multiCartPlaced(
+              outcome.orders.length, '\$${outcome.totalAmount.toStringAsFixed(2)}'))));
+      widget.onOrderPlaced();
+      return;
+    }
     final DeliveryOrder? order = outcome is DeliveryOrder ? outcome : null;
     if (order == null) return;
 
@@ -295,10 +274,26 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final List<CartLine> lines = widget.cart.lines;
+    final bool severalShops = widget.cart.isMultiShop;
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
-      appBar: YdScreenHeader(title: t.custMyBasket),
+      // A tab, so no back chevron whatever the frame draws: there is nothing behind a tab to go
+      // back to.
+      appBar: severalShops
+          ? YdScreenHeader(
+              title: t.multiCartTitle,
+              subtitle: t.multiCartSubtitle,
+              // Shops, not merchants: the basket and the server both count shops, and one merchant
+              // may run several.
+              trailing: YdBadge(
+                label: t.multiCartShopCount(widget.cart.storeCount),
+                color: DeliveryColors.brand,
+                background: DeliveryColors.brandSoft,
+                uppercase: false,
+              ),
+            )
+          : YdScreenHeader(title: t.custMyBasket),
       body: lines.isEmpty
           ? YdEmptyState(
               icon: Icons.shopping_bag_outlined,
@@ -308,25 +303,30 @@ class _CartScreenState extends State<CartScreen> {
           : ListView(
               padding: EdgeInsets.zero,
               children: <Widget>[
-                _storeStrip(context),
-                if (_splitAvailable) _modeToggle(context),
-                if (_splitting) _participantsRow(context),
-                Padding(
-                  padding: const EdgeInsetsDirectional.all(_gutter),
-                  child: Column(
-                    children: <Widget>[
-                      for (int i = 0; i < lines.length; i++) ...<Widget>[
-                        if (i > 0) const SizedBox(height: DeliverySpacing.md - 4),
-                        _basketRow(context, lines[i]),
-                        if (_splitting) _assignChip(context, lines[i]),
+                if (severalShops)
+                  for (final String storeId in widget.cart.storeIds) _shopGroup(context, storeId)
+                else ...<Widget>[
+                  _storeStrip(context),
+                  if (_splitAvailable) _modeToggle(context),
+                  if (_splitting) _participantsRow(context),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.all(_gutter),
+                    child: Column(
+                      children: <Widget>[
+                        for (int i = 0; i < lines.length; i++) ...<Widget>[
+                          if (i > 0) const SizedBox(height: DeliverySpacing.md - 4),
+                          _basketRow(context, lines[i]),
+                          if (_splitting) _assignChip(context, lines[i]),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                if (_splitting) _splitSummary(context),
+                  if (_splitting) _splitSummary(context),
+                ],
+                if (severalShops) const SizedBox(height: _gutter),
                 _promoSection(context),
                 const SizedBox(height: DeliverySpacing.lg),
-                _summary(context),
+                if (severalShops) _severalShopsSummary(context) else _summary(context),
               ],
             ),
     );
@@ -336,12 +336,14 @@ class _CartScreenState extends State<CartScreen> {
 
   /// Whether this basket may be split with friends. Never a gift: the gift checkout attaches no
   /// split plan, and placing the gift settles the basket — which clears the plan and would orphan
-  /// the payment requests the friends were sent.
+  /// the payment requests the friends were sent. Never a basket from several shops either: a plan
+  /// closes over exactly one order, and that basket becomes several.
   bool get _splitAvailable =>
       widget.splitApi != null &&
       widget.profileApi != null &&
       widget.session != null &&
-      !widget.cart.isGift;
+      !widget.cart.isGift &&
+      !widget.cart.isMultiShop;
 
   /// Split mode as drawn: chosen, and still available — a basket made a gift after Split was chosen
   /// shows none of it.
@@ -776,9 +778,9 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  /// Names the shop the basket is locked to, so the one-store rule is visible rather than only
-  /// discovered when adding something from somewhere else is refused. The frame has no such row —
-  /// it is kept because the rule it explains is real.
+  /// Names the one shop a basket holds, with its delivery estimate. The frame has no such row; it is
+  /// kept because it is the one place a one-shop basket says where it is ordering from. A basket
+  /// from several shops names each shop over its own group instead.
   Widget _storeStrip(BuildContext context) {
     final StoreCard? store = widget.cart.store;
     if (store == null) return const SizedBox.shrink();
@@ -909,20 +911,17 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  /// The promo row, live against the promotions API.
+  /// The promo row, judged by the basket's quote.
   ///
-  /// It used to have a second face: with no [PromoApi] it drew the field greyed under a
-  /// coming-soon chip. That chip is gone. The promotions API is wired for every customer the app
-  /// signs in, so the only thing the inert face ever described was a screen pumped without a
-  /// server — and drawing a dead control for that is worse than drawing nothing. Without an API
-  /// there is now simply no promo row, and every path a customer can actually reach has the real
-  /// one.
+  /// The code in the field rides on the question the basket already asks Order Manager, so what the
+  /// row says a code is worth is what it is worth on THIS basket at THIS address. The promotions
+  /// endpoint it used to ask could only be told a shop card's flat fee, and a free-delivery code
+  /// quoted against that was not what an address priced by its area would be charged. Drawn
+  /// whenever the basket is, because the quote that judges the code always is.
   Widget _promoSection(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-
-    if (widget.promoApi == null) return const SizedBox.shrink();
-
-    final PromoQuote? quote = _quote;
+    final PromoQuote? quote = _shownPromo;
+    final bool checking = _promo.text.trim().isNotEmpty && _quoter.asking;
     return Padding(
       padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
       child: Column(
@@ -933,7 +932,10 @@ class _CartScreenState extends State<CartScreen> {
             field: TextField(
               controller: _promo,
               onChanged: _onPromoTyped,
-              onSubmitted: (_) => _requestQuote(),
+              onSubmitted: (_) => _quoter.retry(),
+              // A code is at most 32 characters. Anything longer is not one, and would only make the
+              // basket's quote refuse the whole question.
+              inputFormatters: <TextInputFormatter>[LengthLimitingTextInputFormatter(32)],
               textInputAction: TextInputAction.done,
               textCapitalization: TextCapitalization.characters,
               style: const TextStyle(
@@ -947,12 +949,9 @@ class _CartScreenState extends State<CartScreen> {
                     const TextStyle(fontSize: 14, color: DeliveryColors.faint),
               ),
             ),
-            onApply: () {
-              _promoDebounce?.cancel();
-              _requestQuote();
-            },
+            onApply: _quoter.retry,
           ),
-          if (_checking) ...<Widget>[
+          if (checking) ...<Widget>[
             const SizedBox(height: DeliverySpacing.sm),
             Row(
               children: <Widget>[
@@ -1012,7 +1011,7 @@ class _CartScreenState extends State<CartScreen> {
                 height: 1.35,
               ),
             ),
-          ] else if (_quoteFailed) ...<Widget>[
+          ] else if (_quoter.failed && _promo.text.trim().isNotEmpty) ...<Widget>[
             const SizedBox(height: DeliverySpacing.sm),
             Text(
               // The server was not reached — a different fact from a refused code, and the Apply
@@ -1084,18 +1083,38 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  /// The money, itemised.
+  /// The money, itemised, for a basket from one shop.
   ///
   /// The delivery fee is shown as its own line rather than folded into one number, because a
   /// customer comparing shops is comparing exactly that split — and because a total that silently
   /// grew between the shelf and the basket is the classic reason a basket gets abandoned.
+  ///
+  /// The server's figures once it has priced the basket; until then, or when it cannot, the shop
+  /// card's — but only for an address with no area, where the card's fee IS what Order Manager
+  /// charges. At an address priced by its area the fee and the total are a dash until the server
+  /// says: the card's flat fee there was the Basket tab quoting a fee nobody would be charged.
   Widget _summary(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final StoreCard? store = widget.cart.store;
-    final bool blocked = !widget.cart.meetsMinimum;
-    final double promoDiscount = _promoDiscount;
-    final double payable =
-        (widget.cart.total - promoDiscount).clamp(0, double.infinity).toDouble();
+    final BasketQuote? quote = _quoter.shown;
+    final ShopQuote? shop = quote?.shops.firstOrNull;
+    final bool priced = quote != null && shop != null && shop.priced;
+    final bool fromCard = !priced && _zoneId == null;
+
+    final double subtotal = priced ? (quote.subtotal ?? widget.cart.subtotal) : widget.cart.subtotal;
+    final double? deliveryCharged =
+        priced ? shop.deliveryFeeCharged : (fromCard ? widget.cart.deliveryFeeCharged : null);
+    final bool waived = priced ? shop.deliveryFeeWaived : fromCard && widget.cart.deliveryIsFree;
+    final double waivedFee = priced ? (shop.deliveryFee ?? 0) : widget.cart.deliveryFee;
+    final String offerTitle =
+        (priced ? shop.offerTitle : widget.cart.waiver?.offerTitle) ?? t.freeDelivery;
+    final double promoDiscount = priced ? _promoDiscount : 0;
+    final double? payable = priced ? quote.totalAmount : (fromCard ? widget.cart.total : null);
+
+    final String? refusal = _oneShopRefusal(t, shop, store);
+    final bool underMinimum = shop?.refusal == ShopRefusal.belowMinimum ||
+        (shop == null && !widget.cart.meetsMinimum);
+    final bool blocked = refusal != null;
 
     return Container(
       width: double.infinity,
@@ -1119,8 +1138,7 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             const SizedBox(height: DeliverySpacing.md),
-            _summaryRow(t.subtotal, '\$${widget.cart.subtotal.toStringAsFixed(2)}',
-                lbpOf: widget.cart.subtotal),
+            _summaryRow(t.subtotal, '\$${subtotal.toStringAsFixed(2)}', lbpOf: subtotal),
             if (store != null) ...<Widget>[
               const SizedBox(height: DeliverySpacing.sm),
               _summaryRow(
@@ -1128,21 +1146,21 @@ class _CartScreenState extends State<CartScreen> {
                 // What will be CHARGED. Adding the shop's fee to the subtotal here, when the
                 // platform is absorbing it, quoted the customer a total the server would not bill.
                 // "Free" is the thing worth reading; 0.00 makes the eye do arithmetic.
-                widget.cart.deliveryFeeCharged == 0
-                    ? t.free
-                    : '\$${widget.cart.deliveryFeeCharged.toStringAsFixed(2)}',
-                lbpOf: widget.cart.deliveryFeeCharged == 0
-                    ? null
-                    : widget.cart.deliveryFeeCharged,
+                deliveryCharged == null
+                    ? _dash
+                    : deliveryCharged == 0
+                        ? t.free
+                        : '\$${deliveryCharged.toStringAsFixed(2)}',
+                lbpOf: deliveryCharged == null || deliveryCharged == 0 ? null : deliveryCharged,
               ),
               // The discounts line, and only when there is a real discount to put on it. Names the
               // promotion underneath: a customer who is not told why their delivery was free has
               // been given something that changes nothing about what they do next.
-              if (widget.cart.deliveryIsFree) ...<Widget>[
+              if (waived) ...<Widget>[
                 const SizedBox(height: DeliverySpacing.sm),
                 _summaryRow(
                   t.custDiscounts,
-                  '-${widget.cart.deliveryFee.toStringAsFixed(2)}',
+                  '-${waivedFee.toStringAsFixed(2)}',
                   valueColor: DeliveryAccent.positive.color,
                 ),
                 const SizedBox(height: DeliverySpacing.xs),
@@ -1152,7 +1170,7 @@ class _CartScreenState extends State<CartScreen> {
                     const SizedBox(width: DeliverySpacing.xs),
                     Expanded(
                       child: Text(
-                        widget.cart.waiver?.offerTitle ?? t.freeDelivery,
+                        offerTitle,
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -1169,7 +1187,7 @@ class _CartScreenState extends State<CartScreen> {
             if (promoDiscount > 0) ...<Widget>[
               const SizedBox(height: DeliverySpacing.sm),
               _summaryRow(
-                _quote?.code ?? t.custPromoCode,
+                _shownPromo?.code ?? t.custPromoCode,
                 '-${promoDiscount.toStringAsFixed(2)}',
                 valueColor: DeliveryAccent.positive.color,
               ),
@@ -1178,62 +1196,11 @@ class _CartScreenState extends State<CartScreen> {
               padding: EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
               child: Divider(height: 1, thickness: 1, color: DeliveryColors.border),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                Text(
-                  t.custTotalAmount,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: DeliveryColors.ink,
-                  ),
-                ),
-                Text.rich(
-                  TextSpan(
-                    children: <InlineSpan>[
-                      TextSpan(
-                        text: '\$${payable.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: DeliveryColors.brand,
-                        ),
-                      ),
-                      if (MarketRates.instance.lbpParen(payable)
-                          case final String lbp)
-                        TextSpan(
-                          text: ' $lbp',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: DeliveryColors.muted,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            _totalRow(t, payable),
+            if (payable == null) _quoteNote(t),
             if (blocked) ...<Widget>[
               const SizedBox(height: DeliverySpacing.sm),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Icon(Icons.info_outline, size: 16, color: DeliveryColors.brand),
-                  const SizedBox(width: DeliverySpacing.sm),
-                  Expanded(
-                    child: Text(
-                      t.minimumExplanationFull(
-                        (store?.minOrder ?? 0).toStringAsFixed(2),
-                        widget.cart.amountBelowMinimum.toStringAsFixed(2),
-                      ),
-                      style: const TextStyle(
-                          fontSize: 12, color: DeliveryColors.brand, height: 1.35),
-                    ),
-                  ),
-                ],
-              ),
+              _explanation(refusal),
             ],
             if (widget.cart.isGift) ...<Widget>[
               const SizedBox(height: DeliverySpacing.md),
@@ -1243,12 +1210,360 @@ class _CartScreenState extends State<CartScreen> {
             YdPillButton(
               // Disabled rather than hidden: a customer needs to see that checkout exists and why
               // it is not available yet.
-              label: blocked ? t.minimumNotReached : t.custProceedToCheckout,
+              label: underMinimum ? t.minimumNotReached : t.custProceedToCheckout,
               onPressed: blocked ? null : () => _checkout(context),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Why a one-shop basket cannot be checked out as it stands, in the customer's words — or null.
+  /// The server's reason once it has priced the basket; the shop card's minimum until then.
+  String? _oneShopRefusal(DeliveryStrings t, ShopQuote? shop, StoreCard? store) {
+    final ShopRefusal? refusal = shop?.refusal;
+    if (shop != null && refusal != null) {
+      final String name = shop.storeName ?? store?.name ?? t.tabShop;
+      return switch (refusal) {
+        ShopRefusal.belowMinimum => t.minimumExplanationFull(
+            (shop.minimumOrder ?? 0).toStringAsFixed(2), (shop.shortfall ?? 0).toStringAsFixed(2)),
+        ShopRefusal.closed => t.multiCartShopClosed(name),
+        ShopRefusal.notServed => t.multiCartShopNotServing(name),
+        ShopRefusal.unknown => shop.refusalMessage ?? t.multiCartShopUnavailable(name),
+      };
+    }
+    if (shop == null && !widget.cart.meetsMinimum) {
+      return t.minimumExplanationFull((store?.minOrder ?? 0).toStringAsFixed(2),
+          widget.cart.amountBelowMinimum.toStringAsFixed(2));
+    }
+    return null;
+  }
+
+  /// The money for a basket from several shops: the goods, every shop's delivery — each shop's own
+  /// fee, added up (see the class comment for the unified fee this deliberately does not show) — the
+  /// code's discount, and the total the button carries.
+  ///
+  /// The server's figures only. A sum of shop cards' fees is not what such a basket is charged —
+  /// areas, waivers and minimums differ shop by shop — so the figures are a dash until the server has
+  /// priced every shop, and the basket is not checked out before it has.
+  Widget _severalShopsSummary(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final BasketQuote? quote = _quoter.shown;
+    final double subtotal = quote?.subtotal ?? widget.cart.subtotal;
+    final double? delivery = quote?.deliveryFeeCharged;
+    final double promoDiscount = _promoDiscount;
+    final double? payable = quote?.totalAmount;
+    final BasketQuote? current = _quoter.quote;
+    final bool canCheckOut = current != null &&
+        current.placeable &&
+        current.totalAmount != null &&
+        !widget.cart.isGift;
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: DeliveryColors.white,
+        border: Border(top: BorderSide(color: DeliveryColors.border)),
+      ),
+      padding: const EdgeInsetsDirectional.all(_gutter),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _summaryRow(t.subtotal, '\$${subtotal.toStringAsFixed(2)}', lbpOf: subtotal),
+            const SizedBox(height: DeliverySpacing.sm),
+            _summaryRow(
+              t.multiCartDeliveryFromShops(widget.cart.storeCount),
+              delivery == null
+                  ? _dash
+                  : delivery == 0
+                      ? t.free
+                      : '\$${delivery.toStringAsFixed(2)}',
+              lbpOf: delivery == null || delivery == 0 ? null : delivery,
+            ),
+            if (promoDiscount > 0) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.sm),
+              _summaryRow(
+                _shownPromo?.code ?? t.custPromoCode,
+                '-${promoDiscount.toStringAsFixed(2)}',
+                valueColor: DeliveryAccent.positive.color,
+              ),
+            ],
+            const Padding(
+              padding: EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
+              child: Divider(height: 1, thickness: 1, color: DeliveryColors.border),
+            ),
+            _totalRow(t, payable),
+            _quoteNote(t),
+            if (widget.cart.isGift) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.md),
+              _giftBanner(t),
+              const SizedBox(height: DeliverySpacing.sm),
+              _explanation(t.multiCartGiftOneShop),
+            ],
+            const SizedBox(height: DeliverySpacing.md),
+            YdPillButton(
+              // The frame's "Checkout — $34.50" was the goods alone. The button carries what the
+              // customer will be charged: the goods and every shop's delivery, less any code.
+              label: payable == null
+                  ? t.checkout
+                  : t.multiCartCheckoutAmount('\$${payable.toStringAsFixed(2)}'),
+              busy: _quoter.asking,
+              onPressed: canCheckOut ? () => _checkout(context) : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One shop's part of a basket from several shops (Figma 121:358): the uppercase "FROM {SHOP}
+  /// (n ITEMS)" label, then a bordered card holding that shop's lines, the shop's own delivery fee,
+  /// and — when the shop's part cannot be checked out yet — why, with a way to take the shop out.
+  Widget _shopGroup(BuildContext context, String storeId) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<CartLine> lines = widget.cart.linesFor(storeId);
+    final ShopQuote? priced = _quoter.shown?.shop(storeId);
+    final String name = widget.cart.storeFor(storeId)?.name ?? priced?.storeName ?? t.tabShop;
+    final int items = lines.fold(0, (int count, CartLine line) => count + line.qty);
+    final double? delivery = priced?.deliveryFeeCharged;
+    final String? warning = _shopWarning(t, storeId, priced, name);
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(_gutter, _gutter, _gutter, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            t.multiCartFromShop(items, name).toUpperCase(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: DeliveryColors.muted,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.sm),
+          YdCard.bordered(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                for (int i = 0; i < lines.length; i++) ...<Widget>[
+                  if (i > 0) const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                  _groupRow(context, lines[i]),
+                ],
+                const Padding(
+                  padding: EdgeInsetsDirectional.symmetric(
+                      vertical: DeliverySpacing.md - DeliverySpacing.xs),
+                  child: Divider(height: 1, thickness: 1, color: DeliveryColors.borderFaint),
+                ),
+                // Each shop's own fee: every order is its own delivery, from its own counter.
+                _summaryRow(
+                  t.multiCartShopDelivery,
+                  delivery == null
+                      ? _dash
+                      : delivery == 0
+                          ? t.free
+                          : '\$${delivery.toStringAsFixed(2)}',
+                ),
+                if (warning != null) ...<Widget>[
+                  const SizedBox(height: DeliverySpacing.sm),
+                  _explanation(warning),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton(
+                      onPressed: () => widget.cart.removeStore(storeId),
+                      style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+                      child: Text(t.multiCartRemoveShop(name)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A line inside a shop's group: "2× Beef Shawarma Sandwich", its options, its total, and the
+  /// stepper. The frame draws the line read-only; the stepper stays, because the basket is where
+  /// quantities are changed and a basket that cannot be edited is not shippable.
+  Widget _groupRow(BuildContext context, CartLine line) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                t.giftLineQty(line.qty, line.product.name),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, color: DeliveryColors.ink, height: 1.3),
+              ),
+              if (line.optionsSummary.isNotEmpty)
+                Text(
+                  line.optionsSummary,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.3),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: DeliverySpacing.sm),
+        Text(
+          '\$${line.lineTotal.toStringAsFixed(2)}',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+          ),
+        ),
+        const SizedBox(width: DeliverySpacing.sm),
+        QuantityStepper(
+          quantity: line.qty,
+          decreaseIcon: line.qty > 1 ? Icons.remove : Icons.delete_outline,
+          onDecrease: () => widget.cart.remove(line.key),
+          onIncrease: () => widget.cart.addConfigured(ConfiguredProduct(
+            product: line.product,
+            optionIds: line.optionIds,
+            unitPrice: line.unitPrice,
+            summary: line.optionsSummary,
+          )),
+        ),
+      ],
+    );
+  }
+
+  /// Why one shop's part cannot be checked out yet, naming the shop — or null when it can.
+  ///
+  /// The server's reason once it has priced the shop. Until then, the shop card's minimum, which is
+  /// the platform's own for an address with no area; the server's minimum for an area may differ,
+  /// and replaces it as soon as it answers.
+  String? _shopWarning(DeliveryStrings t, String storeId, ShopQuote? priced, String name) {
+    final ShopRefusal? refusal = priced?.refusal;
+    if (priced != null && refusal != null) {
+      return switch (refusal) {
+        ShopRefusal.belowMinimum =>
+          t.multiCartBelowMinimum('\$${(priced.shortfall ?? 0).toStringAsFixed(2)}', name),
+        ShopRefusal.closed => t.multiCartShopClosed(name),
+        ShopRefusal.notServed => t.multiCartShopNotServing(name),
+        ShopRefusal.unknown => priced.refusalMessage ?? t.multiCartShopUnavailable(name),
+      };
+    }
+    if (priced == null) {
+      final double shortfall = widget.cart.shortfallAt(storeId);
+      if (shortfall > 0) return t.multiCartBelowMinimum('\$${shortfall.toStringAsFixed(2)}', name);
+    }
+    return null;
+  }
+
+  /// The summary's total line: the amount with its LBP conversion, or a dash while the platform has
+  /// not given one.
+  Widget _totalRow(DeliveryStrings t, double? payable) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: <Widget>[
+        Text(
+          t.custTotalAmount,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: DeliveryColors.ink,
+          ),
+        ),
+        Text.rich(
+          TextSpan(
+            children: <InlineSpan>[
+              TextSpan(
+                text: payable == null ? _dash : '\$${payable.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: DeliveryColors.brand,
+                ),
+              ),
+              if (payable == null ? null : MarketRates.instance.lbpParen(payable)
+                  case final String lbp)
+                TextSpan(
+                  text: ' $lbp',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: DeliveryColors.muted,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Why the figures are what they are: the server's price on its way, or not to be had just now —
+  /// with a way to ask again. Nothing while the figures are the server's own.
+  Widget _quoteNote(DeliveryStrings t) {
+    if (_quoter.asking) {
+      return Padding(
+        padding: const EdgeInsetsDirectional.only(top: DeliverySpacing.sm),
+        child: Row(
+          children: <Widget>[
+            const SizedBox.square(
+              dimension: 12,
+              child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.sm),
+            Text(
+              t.multiCartPricesUpdating,
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_quoter.failed) {
+      return Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              t.multiCartPricesFailed,
+              style: TextStyle(fontSize: 12, color: DeliveryAccent.critical.color, height: 1.35),
+            ),
+          ),
+          TextButton(
+            onPressed: _quoter.retry,
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+            child: Text(t.tryAgain),
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  /// A sentence about why checkout is held back, in the brand's warning voice.
+  Widget _explanation(String message) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Icon(Icons.info_outline, size: 16, color: DeliveryColors.brand),
+        const SizedBox(width: DeliverySpacing.sm),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(fontSize: 12, color: DeliveryColors.brand, height: 1.35),
+          ),
+        ),
+      ],
     );
   }
 

@@ -52,6 +52,17 @@ void main() {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+        // Checkout asks for the server's quote as it opens (POST /api/orders/quote). Not a
+        // placement, so not recorded; refused here, so the screen shows what it shows without one —
+        // which is what these cases were written against.
+        if (options.path == '/api/orders/quote') {
+          handler.reject(DioException(
+            requestOptions: options,
+            type: DioExceptionType.badResponse,
+            response: Response<dynamic>(requestOptions: options, statusCode: 404),
+          ));
+          return;
+        }
         sent.add(options);
         handler.resolve(Response<dynamic>(
           requestOptions: options,
@@ -266,5 +277,187 @@ void main() {
     // No request, and a reason on screen rather than a silent no-op.
     expect(recorder.sent, isEmpty);
     expect(find.text('We need somewhere to deliver to'), findsOneWidget);
+  });
+
+  final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
+
+  Map<String, dynamic> orderJson(String id, String storeId, double total) => <String, dynamic>{
+        'id': id,
+        'customerId': 'user-1',
+        'merchantId': storeId,
+        'riderId': null,
+        'status': 'PLACED',
+        'totalAmount': total,
+        'storeId': storeId,
+        'deliveryAddress': '12 Rose Street',
+        'paymentMethod': 'CASH',
+        'paymentStatus': 'DUE',
+        'items': <dynamic>[],
+        'availableActions': <dynamic>[],
+        'checkoutId': 'checkout-1',
+        'checkoutSize': 2,
+      };
+
+  /// Order Manager answering the quote with [quote] (a 404 when null) and a checkout or placement
+  /// with [placement] (every order of a two-shop checkout when null). Records every request that is
+  /// not a quote.
+  ({Dio dio, List<RequestOptions> sent}) orderManager({
+    Map<String, dynamic>? Function(Map<String, dynamic> question)? quote,
+    void Function(RequestOptions o, RequestInterceptorHandler h)? placement,
+  }) {
+    final List<RequestOptions> sent = <RequestOptions>[];
+    final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (RequestOptions o, RequestInterceptorHandler h) {
+        if (o.path == '/api/orders/quote') {
+          final Map<String, dynamic>? answer = quote?.call(o.data as Map<String, dynamic>);
+          if (answer == null) {
+            h.reject(DioException(
+              requestOptions: o,
+              type: DioExceptionType.badResponse,
+              response: Response<dynamic>(requestOptions: o, statusCode: 404),
+            ));
+          } else {
+            h.resolve(Response<dynamic>(requestOptions: o, statusCode: 200, data: answer));
+          }
+          return;
+        }
+        sent.add(o);
+        if (placement != null) {
+          placement(o, h);
+          return;
+        }
+        h.resolve(Response<dynamic>(requestOptions: o, statusCode: 201, data: <String, dynamic>{
+          'checkoutId': 'checkout-1',
+          'orders': <dynamic>[orderJson('order-1', 's1', 9.75), orderJson('order-2', 's2', 4)],
+          'totalAmount': 13.75,
+        }));
+      },
+    ));
+    return (dio: dio, sent: sent);
+  }
+
+  Cart twoShops({StoreCard? second}) => Cart()
+    ..add(product('a', 's1', 9.75), from: storeCard('s1'))
+    ..add(product('b', 's2', 4.00), from: second ?? storeCard('s2'));
+
+  testWidgets('a basket from several shops is sent once, as one checkout of every shop',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = orderManager();
+    final Cart cart = twoShops();
+    await pumpCheckout(tester, dio: recorder.dio, addresses: await storeWithAddresses(), cart: cart);
+
+    // No USD/LBP split card: several orders have no one total to split.
+    expect(find.text(en.custSplitPayment), findsNothing);
+
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+
+    expect(recorder.sent.map((RequestOptions o) => o.path), <String>['/api/orders/checkout']);
+    final Map<String, dynamic> body = recorder.sent.single.data as Map<String, dynamic>;
+    expect(body['items'], hasLength(2));
+    expect(recorder.sent.single.headers[OrderApi.idempotencyKeyHeader], isNotNull);
+    // Placed: the attempt is over, and the basket with it.
+    expect(cart.isEmpty, isTrue);
+  });
+
+  testWidgets('a shop that refuses the checkout is named, and the basket is kept',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = orderManager(
+      placement: (RequestOptions o, RequestInterceptorHandler h) => h.reject(DioException(
+        requestOptions: o,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(requestOptions: o, statusCode: 422, data: <String, dynamic>{
+          'code': 'SHOP_REFUSED',
+          'refusal': 'CLOSED',
+          'storeId': 's2',
+          'detail': 'Shop s2 is closed and is not taking orders right now',
+        }),
+      )),
+    );
+    final Cart cart = twoShops();
+    await pumpCheckout(tester, dio: recorder.dio, addresses: await storeWithAddresses(), cart: cart);
+
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shop s2 is closed and is not taking orders right now'), findsOneWidget);
+    expect(cart.storeIds, <String>['s1', 's2']);
+  });
+
+  testWidgets('every shop\'s delivery circle is checked before anything is sent',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = orderManager();
+    final DeliveryAddressStore addresses = DeliveryAddressStore(ownerId: 'test-user');
+    await addresses.select(const DeliveryAddress(
+        line: '12 Rose Street', label: 'Home', latitude: 33.8938, longitude: 35.5018));
+    // The second shop is 10 km away and delivers within 2 km.
+    final Cart cart = twoShops(
+      second: const StoreCard(
+        id: 's2',
+        slug: 's2',
+        name: 'Shop s2',
+        vertical: StoreVertical.pharmacy,
+        availability: StoreAvailability.open,
+        latitude: 33.98,
+        longitude: 35.52,
+        deliveryRadiusMetres: 2000,
+      ),
+    );
+    await pumpCheckout(tester, dio: recorder.dio, addresses: addresses, cart: cart);
+
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+
+    expect(recorder.sent, isEmpty);
+    expect(find.text(en.custOutsideDeliveryArea('Shop s2', '2.0')), findsOneWidget);
+  });
+
+  testWidgets('the total on the button is the server\'s quote, Express premium included',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = orderManager(
+      quote: (Map<String, dynamic> question) {
+        final bool express = question['deliveryTier'] == 'EXPRESS';
+        return <String, dynamic>{
+          'shops': <dynamic>[
+            <String, dynamic>{
+              'storeId': 's1',
+              'storeName': 'Shop s1',
+              'subtotal': 9.75,
+              'minimumOrder': 0,
+              'shortfall': 0,
+              'deliveryFee': 1.25,
+              'deliveryFeeCharged': 1.25,
+              'deliveryFeeWaived': false,
+              'expressSurcharge': express ? 2 : 0,
+              'discountAmount': 0,
+              'totalAmount': express ? 13 : 11,
+            },
+          ],
+          'placeable': true,
+          'subtotal': 9.75,
+          'deliveryFeeCharged': 1.25,
+          'expressSurcharge': express ? 2 : 0,
+          'discountAmount': 0,
+          'totalAmount': express ? 13 : 11,
+          'maxShops': 3,
+        };
+      },
+    );
+    await pumpCheckout(
+        tester, dio: recorder.dio, addresses: await storeWithAddresses(), cart: cartWithOneItem());
+    // The quote is asked once the screen has been still for a moment, and nothing on it animates
+    // meanwhile for pumpAndSettle to wait on.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(YdPillButton, en.custPlaceOrderAmount('\$11.00')), findsOneWidget);
+
+    await tester.tap(find.text(en.deliveryTierExpress));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(YdPillButton, en.custPlaceOrderAmount('\$13.00')), findsOneWidget);
+    expect(recorder.sent, isEmpty, reason: 'Quoting places nothing.');
   });
 }

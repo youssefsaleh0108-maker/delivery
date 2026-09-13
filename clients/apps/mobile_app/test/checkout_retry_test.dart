@@ -230,8 +230,9 @@ void main() {
       cart.add(product('a', 's1', 2), from: storeCard('s1'));
       keys.add(cart.checkoutKey);
 
-      // Started again at another shop.
-      cart.switchTo(storeCard('s2'));
+      // Emptied, and started again at another shop.
+      cart.clear();
+      cart.add(product('b', 's2', 3), from: storeCard('s2'));
       keys.add(cart.checkoutKey);
 
       expect(keys, hasLength(4));
@@ -248,7 +249,7 @@ void main() {
       cart.add(product('b', 's1', 3), from: storeCard('s1'));
       expect(cart.checkoutKey, key);
       cart.clear();
-      cart.switchTo(storeCard('s2'));
+      cart.add(product('c', 's2', 4), from: storeCard('s2'));
       expect(cart.checkoutKey, key);
 
       // Placed, found already placed, or queued: the outcome is known, and the next basket is new.

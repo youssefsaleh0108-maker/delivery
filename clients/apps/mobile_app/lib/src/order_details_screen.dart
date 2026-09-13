@@ -203,20 +203,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return;
       }
 
-      // Starting a fresh basket is the honest behaviour: the one-store rule means we would
-      // otherwise have to silently discard whatever was already in it.
-      if (widget.cart.isNotEmpty && widget.cart.storeId != storeId) {
-        final bool? replace = await _confirmReplaceBasket();
-        if (replace != true || !mounted) return;
-      }
-      widget.cart.switchTo(_store?.toCard() ??
+      // Added beside whatever is already in the basket, as this shop's group: a basket holds
+      // several shops now, so reordering never throws anything away. The one refusal is the shop
+      // limit, said before anything is added.
+      final StoreCard card = _store?.toCard() ??
           StoreCard(
             id: storeId,
             slug: '',
             name: order.storeName ?? DeliveryStrings.of(context).tabShop,
             vertical: StoreVertical.restaurant,
             availability: StoreAvailability.open,
-          ));
+          );
+      if (widget.cart.exceedsShopLimit(byId.values.first, from: card)) {
+        _say(DeliveryStrings.of(context).multiCartShopLimitTitle(Cart.maxShops));
+        return;
+      }
 
       int added = 0;
       int missing = 0;
@@ -227,7 +228,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           continue;
         }
         for (int i = 0; i < line.qty; i++) {
-          widget.cart.add(product);
+          widget.cart.add(product, from: card);
         }
         added++;
       }
@@ -242,28 +243,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     } finally {
       if (mounted) setState(() => _reordering = false);
     }
-  }
-
-  Future<bool?> _confirmReplaceBasket() {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(DeliveryStrings.of(context).replaceYourBasket),
-        content: Text(
-            '${DeliveryStrings.of(context).basketFromShopReplace(widget.cart.store?.name ?? '')} '
-            '${DeliveryStrings.of(context).reorderWillReplace}'),
-        actions: <Widget>[
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(DeliveryStrings.of(context).keepIt)),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
-            child: Text(DeliveryStrings.of(context).replace),
-          ),
-        ],
-      ),
-    );
   }
 
   void _say(String message) {
@@ -425,6 +404,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         height: 1.3,
                       ),
                     ),
+                    // Checked out together with other shops' orders: said here as on the Orders
+                    // list, so this order is never mistaken for the whole purchase.
+                    if (order.isPartOfCheckout) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.xs),
+                      YdBadge(
+                        label: t.multiCartPartOfOrder(order.checkoutSize!),
+                        color: DeliveryColors.brand,
+                        background: DeliveryColors.brandSoft,
+                        uppercase: false,
+                      ),
+                    ],
                   ],
                 ),
               ),

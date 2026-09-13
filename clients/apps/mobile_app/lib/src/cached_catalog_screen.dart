@@ -52,11 +52,13 @@ class CachedCatalogScreen extends StatelessWidget {
   void _quickAdd(BuildContext context, CachedProduct item) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
-    // The basket's one-shop rule, told at the tap. Replacing somebody's basket from a screen they
-    // may have opened only to look is not this screen's call; the shop page offers that.
-    if (cart.conflictsWith(item.product)) {
-      messenger.showSnackBar(
-          SnackBar(content: Text(t.basketFromAnotherShop(cart.store?.name ?? ''))));
+    // The basket's one limit, told at the tap: items from at most Cart.maxShops shops. Making room is
+    // the customer's call, made in the basket — never something a Quick Add does by itself.
+    if (cart.exceedsShopLimit(item.product, from: catalog.store)) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(t.multiCartShopLimitTitle(Cart.maxShops)),
+        action: SnackBarAction(label: t.viewBasket, onPressed: onOpenBasket),
+      ));
       return;
     }
     cart.add(item.product, from: catalog.store);

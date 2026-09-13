@@ -245,8 +245,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// The options are fetched on demand rather than with the shelf: most products have none, and
   /// loading every product's option tree to render a list would undo the paging.
   Future<void> _add(Product product) async {
-    if (widget.cart.conflictsWith(product)) {
-      await _askToSwitchStore(product);
+    if (widget.cart.exceedsShopLimit(product, from: _card)) {
+      await _explainShopLimit();
       return;
     }
 
@@ -287,8 +287,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// Opening a row rather than its add button: the detail screen is the frame's own destination
   /// for a product, options or not.
   Future<void> _openProduct(Product product) async {
-    if (widget.cart.conflictsWith(product)) {
-      await _askToSwitchStore(product);
+    if (widget.cart.exceedsShopLimit(product, from: _card)) {
+      await _explainShopLimit();
       return;
     }
     List<OptionGroup> groups = _optionGroups[product.id] ?? const <OptionGroup>[];
@@ -305,27 +305,31 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     await _openDetail(product, groups);
   }
 
-  /// The one-store rule, explained at the moment of the tap rather than as a 422 at checkout.
-  Future<void> _askToSwitchStore(Product product) async {
-    final bool? discard = await showDialog<bool>(
+  /// The one limit a basket still has, explained at the moment of the tap rather than as a 422 at
+  /// checkout: items from at most [Cart.maxShops] shops at once.
+  ///
+  /// It used to be one shop, and adding from a second offered to throw the first shop's basket
+  /// away. Nothing is thrown away now: the customer is shown the way to the basket, where they
+  /// choose which shop to check out or remove.
+  Future<void> _explainShopLimit() async {
+    final bool? openBasket = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         backgroundColor: DeliveryColors.white,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
-        title: Text(DeliveryStrings.of(context).startNewBasket,
+        title: Text(DeliveryStrings.of(context).multiCartShopLimitTitle(Cart.maxShops),
             style: const TextStyle(
                 fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
         content: Text(
-          '${DeliveryStrings.of(context).basketFromShopReplace(widget.cart.store?.name ?? '')} '
-          '${DeliveryStrings.of(context).basketFromAnotherShopSingle}',
+          DeliveryStrings.of(context).multiCartShopLimitBody,
           style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4),
         ),
         actions: <Widget>[
           TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
-              child: Text(DeliveryStrings.of(context).keepIt)),
+              child: Text(DeliveryStrings.of(context).close)),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
@@ -333,15 +337,12 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(DeliveryRadius.md)),
             ),
-            child: Text(DeliveryStrings.of(context).startHere),
+            child: Text(DeliveryStrings.of(context).viewBasket),
           ),
         ],
       ),
     );
-    if (discard == true) {
-      widget.cart.switchTo(_card);
-      widget.cart.add(product, from: _card);
-    }
+    if (openBasket == true && mounted) widget.onOpenBasket();
   }
 
   Future<void> _toggleFavorite() async {
@@ -446,18 +447,16 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                 itemCount: widget.cart.itemCount,
                 total: widget.cart.subtotal.toStringAsFixed(2),
                 label: DeliveryStrings.of(context).viewBasket,
-                // The shortfall only on the page of the shop the basket belongs to.
-                //
-                // The minimum is the BASKET's shop's (Cart measures against the store of its first
-                // add), not this page's. With shop A's basket under A's minimum, shop B's page
-                // used to say "add 3.50 to reach the minimum" — advice that cannot be followed
-                // there, because adding anything on B asks to throw A's basket away rather than
-                // counting towards it. On any other shop's page the bar is simply the way to the
-                // basket, and the basket explains A's minimum itself.
-                blockedReason: widget.cart.meetsMinimum || widget.cart.storeId != widget.storeId
+                // THIS shop's shortfall, on this shop's page — the one piece of minimum advice the
+                // page can act on, because anything added here counts towards it. Another shop in
+                // the basket that is under its own minimum is not mentioned here, where nothing can
+                // be done about it; the basket names that shop on its own line. (When a basket held
+                // one shop, shop B's page used to repeat shop A's shortfall as advice it could not
+                // follow.)
+                blockedReason: widget.cart.shortfallAt(widget.storeId) == 0
                     ? null
                     : DeliveryStrings.of(context).addToReachMinimumShort(
-                        widget.cart.amountBelowMinimum.toStringAsFixed(2)),
+                        widget.cart.shortfallAt(widget.storeId).toStringAsFixed(2)),
                 // To the basket itself, not back to wherever this page was opened from. See
                 // [StorePageScreen.onOpenBasket] for what the old pop() did instead.
                 onTap: widget.onOpenBasket,
