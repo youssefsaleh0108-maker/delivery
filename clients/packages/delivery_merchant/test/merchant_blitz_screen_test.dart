@@ -17,12 +17,18 @@ import 'fixtures/sideways_camera_jpeg.dart';
 ///
 /// What is held down here:
 ///  * opening the page spends nothing — no scan is started, and so no daily allowance used, until a
-///    photo is actually picked;
+///    photo is actually picked — but it does pick up a scan left waiting (a reading still running, a
+///    review not yet saved, a photo Android recovered), and nothing that would start a second scan
+///    can be tapped until it has asked;
 ///  * "Take photo" exists only where a camera does, so the portal never draws a dead button;
 ///  * photos go up one after another on a scan the first one started, and the review button waits,
 ///    disabled, while the photos are read;
-///  * sample results say they are samples, a reading that found nothing says so, and a failure
-///    offers a retry only while the server says one is left;
+///  * a camera photo's orientation tag is honoured, so tags lie over the upright photo the reader
+///    was sent;
+///  * sample results say they are samples before anything else and draw no tags on the merchant's
+///    own photo, a reading that found nothing says so, and a failure offers a retry only while the
+///    server says one is left;
+///  * closing the review reads the scan again, so lines already saved are not offered twice;
 ///  * a spent daily allowance is worded with its own number;
 ///  * the finished page in Arabic on a 320-wide phone does not overflow;
 ///  * and the Inventory tab is where the door is, when — and only when — its host wires it.
@@ -537,6 +543,92 @@ void main() {
     expect(frames, anyElement(closeTo(0.5, 0.001)));
     expect(frames, isNot(anyElement(closeTo(2.0, 0.001))));
     expect(find.textContaining('Pepsi 1L'), findsOneWidget);
+  });
+
+  testWidgets('sample lines tag nothing on the shelf photo, and say they are samples before all else',
+      (WidgetTester tester) async {
+    // A photo that really decodes in a widget test — the camera JPEG, as the orientation test above
+    // shows. Tags are laid out on the decoded photo's own size, so one that never decoded would draw
+    // no tags either way and prove nothing.
+    final Uint8List shelf = Uint8List.fromList(sidewaysCameraJpeg);
+
+    Future<DeliveryStrings> finishReading({required bool sample}) async {
+      await tester.pumpWidget(const SizedBox());
+      final _FakeScanApi api = _FakeScanApi()
+        ..analyzeResult = (CatalogScan c) => _scan(
+              status: CatalogScanStatus.complete,
+              photos: c.photos,
+              sample: sample,
+              lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+            );
+      final DeliveryStrings t = await _pump(
+        tester,
+        _blitz(api,
+            photos: _FakePhotos(photo: PickedShelfPhoto(bytes: shelf, contentType: 'image/jpeg'))),
+      );
+      await _choose(tester, t);
+      await tester.tap(find.text(t.blitzScanPhotos(1)));
+      await tester.pump();
+      // The photo is decoded off the test's fake clock, and tags are laid out once it is.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      return t;
+    }
+
+    // A real reading tags its line where the reader found it...
+    await finishReading(sample: false);
+    expect(find.textContaining('Pepsi 1L'), findsOneWidget);
+
+    // ...a sample, whose boxes are made up, tags nothing on the merchant's own shelf.
+    final DeliveryStrings t = await finishReading(sample: true);
+    expect(find.textContaining('Pepsi 1L'), findsNothing);
+    final double notice = tester.getTopLeft(find.text(t.blitzSampleTitle)).dy;
+    final Finder photo =
+        find.byWidgetPredicate((Widget w) => w is Image && w.image is MemoryImage);
+    expect(notice, lessThan(tester.getTopLeft(photo.first).dy));
+    expect(notice, lessThan(tester.getTopLeft(find.text(t.blitzScanComplete)).dy));
+  });
+
+  testWidgets('closing the review reads the scan again, so lines already saved are not offered again',
+      (WidgetTester tester) async {
+    const List<ScanPhoto> photos = <ScanPhoto>[
+      ScanPhoto(fileId: 'file-1', position: 0, uploaded: true),
+    ];
+    final _FakeScanApi api = _FakeScanApi()
+      ..resumable = _scan(
+        status: CatalogScanStatus.complete,
+        photos: photos,
+        lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+      );
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+    await tester.pump();
+
+    await tester.tap(find.text(t.blitzReviewCta));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Saved meanwhile (its answer lost, say), and the review left with the back button.
+    api.reads.add(_scan(
+      status: CatalogScanStatus.complete,
+      photos: photos,
+      lines: const <ScanLine>[
+        ScanLine(
+          id: 'line-1',
+          name: 'Pepsi 1L',
+          confidence: 0.9,
+          status: ScanLineStatus.accepted,
+          photoFileId: 'file-1',
+          productId: 'product-1',
+        ),
+      ],
+    ));
+    await tester.state<NavigatorState>(find.byType(Navigator)).maybePop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(api.calls, <String>['read']);
+    expect(find.text(t.blitzReviewCta), findsNothing);
+    expect(find.text(t.blitzSavedTitle), findsOneWidget);
   });
 
   testWidgets('Inventory opens the scan when its host hands it the client',

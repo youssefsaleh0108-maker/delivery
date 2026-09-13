@@ -7570,4 +7570,14 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get blitzSettingsRow => 'أنشئ الكتالوج من الصور';
+
+  @override
+  String get blitzSaveFailed => 'تعذّر الحفظ. تحقّق من اتصالك وحاول مرة أخرى.';
+
+  @override
+  String get blitzSavedEarlier => 'كانت هذه الأصناف قد حُفظت من قبل.';
+
+  @override
+  String get blitzListChanged =>
+      'حُسم أمر بعض الأصناف في مكان آخر فخرجت من القائمة. راجع الباقي ثم احفظ مرة أخرى.';
 }

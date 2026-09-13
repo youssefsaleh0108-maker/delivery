@@ -3542,5 +3542,8 @@
   "@blitzTooManyPhotos": { "placeholders": { "max": { "type": "int" } } },
   "blitzSectionsUnavailable": "Sections couldn't load, so each item keeps the section we suggested.",
   "blitzEntryAction": "Scan shelves",
-  "blitzSettingsRow": "Build catalogue from photos"
+  "blitzSettingsRow": "Build catalogue from photos",
+  "blitzSaveFailed": "Couldn't save. Check your connection and try again.",
+  "blitzSavedEarlier": "These items had already been saved.",
+  "blitzListChanged": "Some items were already decided elsewhere, so they've left the list. Check the rest and save again."
 }

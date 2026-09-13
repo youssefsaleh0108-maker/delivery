@@ -490,9 +490,11 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
         ),
       ),
     );
-    if (updated != null && mounted) {
-      setState(() => _apply(updated));
-    }
+    if (!mounted) return;
+    if (updated != null) setState(() => _apply(updated));
+    // And read it again however the review closed: a save whose answer was lost, then a back press,
+    // would otherwise leave this page offering to review lines that are already drafts.
+    unawaited(_refresh());
   }
 
   void _snack(String message) {
@@ -547,6 +549,17 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
                       DeliverySpacing.lg + MediaQuery.paddingOf(context).bottom,
                     ),
                     children: <Widget>[
+                      // A sample result is read as a sample before anything else on the page:
+                      // above the photo, and above the green "Scan complete".
+                      if (_showsSamples(scan)) ...<Widget>[
+                        _Notice(
+                          accent: DeliveryAccent.caution,
+                          icon: Icons.science_outlined,
+                          title: t.blitzSampleTitle,
+                          body: t.blitzSampleBody,
+                        ),
+                        const SizedBox(height: DeliverySpacing.md),
+                      ],
                       _viewfinder(t, scan),
                       if ((scan?.photos.length ?? 0) > 1) ...<Widget>[
                         const SizedBox(height: DeliverySpacing.sm),
@@ -564,6 +577,13 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
       ),
     );
   }
+
+  /// A finished reading made of sample lines: the page says so first.
+  static bool _showsSamples(CatalogScan? scan) =>
+      scan != null &&
+      scan.sample &&
+      scan.status == CatalogScanStatus.complete &&
+      scan.lines.isNotEmpty;
 
   /// 1 while photos are being gathered, 2 from the reading until every line is decided.
   static int _stepOf(CatalogScan? scan) {
@@ -594,7 +614,9 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
       }
     }
 
-    final List<ScanLine> tagged = shown == null || scan == null
+    // Sample lines are not a reading of this photo: their boxes are made up, and a tag drawn on the
+    // merchant's own shelf would say the reader found that product there. So samples get none.
+    final List<ScanLine> tagged = shown == null || scan == null || scan.sample
         ? const <ScanLine>[]
         : (scan.lines
                 .where((ScanLine l) => l.photoFileId == shown.fileId && l.box != null)
@@ -793,20 +815,11 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
 
   List<Widget> _complete(DeliveryStrings t, CatalogScan scan) {
     final int found = scan.lines.length;
+    // A sample notice, when there is one, is already at the top of the page — see [_showsSamples].
     final List<Widget> out = <Widget>[
       _CompleteBanner(title: t.blitzScanComplete, count: t.blitzItemsFound(found)),
       const SizedBox(height: DeliverySpacing.md),
     ];
-    if (scan.sample && found > 0) {
-      out
-        ..add(_Notice(
-          accent: DeliveryAccent.caution,
-          icon: Icons.science_outlined,
-          title: t.blitzSampleTitle,
-          body: t.blitzSampleBody,
-        ))
-        ..add(const SizedBox(height: DeliverySpacing.md));
-    }
 
     if (found == 0) {
       return out

@@ -74,8 +74,9 @@ class _CatalogScanReviewScreenState extends State<CatalogScanReviewScreen> {
   static final RegExp _tooPrecise = RegExp(r'^\d{1,10}\.\d{3,}$');
 
   /// Doubtful lines first: they are the ones that need the merchant's eye, and at the top they are
-  /// seen before a long list wears that attention out. Otherwise the reader's own order.
-  late final List<_Draft> _drafts = <ScanLine>[
+  /// seen before a long list wears that attention out. Otherwise the reader's own order. Not final:
+  /// a save that meets lines decided elsewhere takes those out (see [_afterFailedSave]).
+  late List<_Draft> _drafts = <ScanLine>[
     ...widget.scan.pendingLines.where((ScanLine l) => l.isDoubtful),
     ...widget.scan.pendingLines.where((ScanLine l) => !l.isDoubtful),
   ].map(_Draft.new).toList();
@@ -201,11 +202,69 @@ class _CatalogScanReviewScreenState extends State<CatalogScanReviewScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(_messageFor(e, fallback: t.somethingWentWrong))),
-      );
+      await _afterFailedSave(t, e);
     }
+  }
+
+  /// A save that failed may not have.
+  ///
+  /// On a phone it is the answer that gets lost: the save lands, the connection drops before the
+  /// reply, and saving again is refused — correctly — because those lines are already decided. The
+  /// refusal's own sentence names line ids, in English, so it would be wrong twice over. The page
+  /// reads the scan again instead, keeping the save button busy meanwhile, and follows the server:
+  ///  * none of these lines waits any more — the save landed, or they were decided elsewhere: the
+  ///    result, from the server's own record of it;
+  ///  * some wait and some do not — decided elsewhere meanwhile, so this save, all or nothing, did
+  ///    not land: the decided lines leave the list, and what the merchant typed on the rest stays;
+  ///  * every one still waits — it really failed: it says so, and nothing on the page is lost.
+  Future<void> _afterFailedSave(DeliveryStrings t, Object error) async {
+    CatalogScan? fresh;
+    try {
+      fresh = await widget.api.read(widget.scan.id);
+    } catch (_) {
+      // Cannot even look, so nothing is known to have landed: the plain failure it most likely is.
+    }
+    if (!mounted) return;
+    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
+    final CatalogScan? known = fresh;
+    final Set<String> waiting = <String>{
+      for (final ScanLine line in known?.pendingLines ?? const <ScanLine>[]) line.id,
+    };
+    final List<_Draft> stillWaiting =
+        _drafts.where((_Draft d) => waiting.contains(d.line.id)).toList();
+
+    if (known == null || stillWaiting.length == _drafts.length) {
+      setState(() => _saving = false);
+      messenger?.showSnackBar(SnackBar(content: Text(_failureMessage(t, error))));
+    } else if (stillWaiting.isEmpty) {
+      setState(() {
+        _saving = false;
+        _saved = known;
+      });
+      messenger?.showSnackBar(SnackBar(content: Text(t.blitzSavedEarlier)));
+    } else {
+      final List<_Draft> decided =
+          _drafts.where((_Draft d) => !waiting.contains(d.line.id)).toList();
+      setState(() {
+        _saving = false;
+        _drafts = stillWaiting;
+      });
+      // Their fields are still attached to the list being rebuilt; they are let go once it is.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final _Draft draft in decided) {
+          draft.dispose();
+        }
+      });
+      messenger?.showSnackBar(SnackBar(content: Text(t.blitzListChanged)));
+    }
+  }
+
+  /// What to say when a save truly did not land: the server's own sentence for a refusal it
+  /// explains (a section that no longer exists, say), but never a conflict's, which names line ids —
+  /// and a conflict that reaches here is one the re-read could not explain.
+  static String _failureMessage(DeliveryStrings t, Object error) {
+    if (error is DioException && error.response?.statusCode == 409) return t.blitzSaveFailed;
+    return _messageFor(error, fallback: t.blitzSaveFailed);
   }
 
   // ---------------------------------------------------------------- build

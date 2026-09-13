@@ -7552,4 +7552,15 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get blitzSettingsRow => 'Build catalogue from photos';
+
+  @override
+  String get blitzSaveFailed =>
+      'Couldn\'t save. Check your connection and try again.';
+
+  @override
+  String get blitzSavedEarlier => 'These items had already been saved.';
+
+  @override
+  String get blitzListChanged =>
+      'Some items were already decided elsewhere, so they\'ve left the list. Check the rest and save again.';
 }

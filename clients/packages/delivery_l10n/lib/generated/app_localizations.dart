@@ -13333,6 +13333,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Build catalogue from photos'**
   String get blitzSettingsRow;
+
+  /// No description provided for @blitzSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save. Check your connection and try again.'**
+  String get blitzSaveFailed;
+
+  /// No description provided for @blitzSavedEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'These items had already been saved.'**
+  String get blitzSavedEarlier;
+
+  /// No description provided for @blitzListChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items were already decided elsewhere, so they\'ve left the list. Check the rest and save again.'**
+  String get blitzListChanged;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

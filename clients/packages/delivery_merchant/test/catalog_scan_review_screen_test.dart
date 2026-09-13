@@ -19,6 +19,9 @@ import 'package:flutter_test/flutter_test.dart';
 ///    carries every keep and every skip;
 ///  * a suggested section the shop does not have is shown, and saved, as no section;
 ///  * after saving, the page says the drafts are hidden and need a photo, and hands the scan back;
+///  * a save that seems to fail is checked against the server before anything is said: found saved,
+///    it shows the result; partly decided elsewhere, those lines leave the list; really failed, it
+///    says so in the merchant's language — never a refusal's English sentence about line ids;
 ///  * and the page in Arabic on a 320-wide phone does not overflow.
 CatalogScan _scanWith(List<ScanLine> lines, {bool sample = false}) => CatalogScan(
       id: 'scan-1',
@@ -67,6 +70,19 @@ class _FakeScanApi extends CatalogScanApi {
   /// When set, the commit's answer waits for it: a save still on the wire.
   Completer<void>? gate;
 
+  /// What the commit throws instead of answering: a save whose reply was lost, say.
+  Object? commitError;
+
+  /// What reading the scan again answers; the scan as first opened when unset.
+  CatalogScan? reread;
+  int reads = 0;
+
+  @override
+  Future<CatalogScan> read(String scanId) async {
+    reads++;
+    return reread ?? base;
+  }
+
   @override
   Future<CatalogScan> commit({
     required String scanId,
@@ -78,6 +94,8 @@ class _FakeScanApi extends CatalogScanApi {
     rejected = reject;
     final Completer<void>? held = gate;
     if (held != null) await held.future;
+    final Object? error = commitError;
+    if (error != null) throw error;
     final Set<String> kept = accept.map((ScanLineDecision d) => d.lineId).toSet();
     return CatalogScan(
       id: base.id,
@@ -100,6 +118,48 @@ class _FakeScanApi extends CatalogScanApi {
     );
   }
 }
+
+/// The refusal a retried save gets once the first one has landed.
+DioException _conflict(String detail) {
+  final RequestOptions request = RequestOptions(path: '/api/products/scans/scan-1/commit');
+  return DioException(
+    requestOptions: request,
+    type: DioExceptionType.badResponse,
+    response: Response<dynamic>(
+      requestOptions: request,
+      statusCode: 409,
+      data: <String, dynamic>{'title': 'Scan not ready for that', 'detail': detail},
+    ),
+  );
+}
+
+/// [base] as the server holds it after some of its lines were decided.
+CatalogScan _decided(
+  CatalogScan base, {
+  Set<String> accepted = const <String>{},
+  Set<String> rejected = const <String>{},
+}) =>
+    CatalogScan(
+      id: base.id,
+      storeId: base.storeId,
+      status: CatalogScanStatus.complete,
+      photos: base.photos,
+      lines: <ScanLine>[
+        for (final ScanLine l in base.lines)
+          ScanLine(
+            id: l.id,
+            name: l.name,
+            confidence: l.confidence,
+            photoFileId: l.photoFileId,
+            status: accepted.contains(l.id)
+                ? ScanLineStatus.accepted
+                : (rejected.contains(l.id) ? ScanLineStatus.rejected : ScanLineStatus.pending),
+            productId: accepted.contains(l.id) ? 'product-${l.id}' : null,
+          ),
+      ],
+      attemptsLeft: 1,
+      scansLeftToday: 4,
+    );
 
 class _FakeCatalog extends CatalogApi {
   _FakeCatalog() : super(Dio());
@@ -323,6 +383,76 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(CatalogScanReviewScreen), findsNothing);
     expect(results.single?.lines.single.status, ScanLineStatus.accepted);
+  });
+
+  testWidgets("a save whose reply was lost is found saved, in the merchant's words, not refused",
+      (WidgetTester tester) async {
+    final List<CatalogScan?> results = <CatalogScan?>[];
+    final _FakeScanApi api =
+        _FakeScanApi(_scanWith(<ScanLine>[_line('line-1', 'Pepsi 1L', price: 2.5)]));
+    api
+      ..commitError = _conflict('Line line-1 was already decided')
+      ..reread = _decided(api.base, accepted: <String>{'line-1'});
+    final DeliveryStrings t = await _open(tester, api: api, results: results);
+
+    await _tapSave(tester, t.blitzSaveDrafts(1));
+    await tester.pump();
+
+    expect(api.reads, 1);
+    expect(find.textContaining('already decided'), findsNothing);
+    expect(find.text(t.blitzSavedTitle), findsOneWidget);
+    expect(find.text(t.blitzSavedCount(1)), findsOneWidget);
+    expect(find.text(t.blitzSavedEarlier), findsOneWidget);
+
+    await tester.tap(find.text(t.blitzDone));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(results.single?.lines.single.status, ScanLineStatus.accepted);
+  });
+
+  testWidgets('a save that really failed keeps every line and says so in the merchant\'s language',
+      (WidgetTester tester) async {
+    final _FakeScanApi api =
+        _FakeScanApi(_scanWith(<ScanLine>[_line('line-1', 'Pepsi 1L', price: 2.5)]))
+          ..commitError = DioException(
+            requestOptions: RequestOptions(path: '/api/products/scans/scan-1/commit'),
+            type: DioExceptionType.connectionError,
+          );
+    final DeliveryStrings t = await _open(tester, api: api);
+
+    await _tapSave(tester, t.blitzSaveDrafts(1));
+    await tester.pump();
+
+    expect(api.reads, 1);
+    expect(find.text(t.blitzSaveFailed), findsOneWidget);
+    expect(find.text(t.blitzSavedTitle), findsNothing);
+    // Nothing on the page was lost, and saving again is one tap.
+    expect(find.widgetWithText(TextField, '2.50'), findsOneWidget);
+    expect(find.text(t.blitzSaveDrafts(1)), findsOneWidget);
+  });
+
+  testWidgets('lines decided elsewhere leave the list, and what was typed on the rest stays',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi(_scanWith(<ScanLine>[
+      _line('line-1', 'Pepsi 1L', price: 2.5),
+      _line('line-2', 'Kinder Bueno'),
+    ]));
+    api
+      ..commitError = _conflict('Line line-1 was already decided')
+      ..reread = _decided(api.base, rejected: <String>{'line-1'});
+    final DeliveryStrings t = await _open(tester, api: api);
+
+    await tester.enterText(_priceFields(t).last, '1.75');
+    await tester.pump();
+    await _tapSave(tester, t.blitzSaveDrafts(2));
+    await tester.pump();
+
+    expect(find.text(t.blitzListChanged), findsOneWidget);
+    expect(find.text('Pepsi 1L'), findsNothing);
+    expect(find.widgetWithText(TextField, '1.75'), findsOneWidget);
+    expect(find.text(t.blitzSaveDrafts(1)), findsOneWidget);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('in Arabic on a 320-wide phone the review lays out without overflowing',
