@@ -172,7 +172,7 @@ class DeliveryZoneServiceTest {
             when(zones.existsByNameIgnoreCase("Hamra")).thenReturn(true);
 
             org.assertj.core.api.Assertions
-                    .assertThatThrownBy(() -> service.create("Hamra", "Beirut", 10))
+                    .assertThatThrownBy(() -> service.create("Hamra", "Beirut", 10, null))
                     .isInstanceOf(DeliveryZoneService.ZoneConflictException.class);
         }
 
@@ -194,7 +194,7 @@ class DeliveryZoneServiceTest {
             when(zones.findById(any())).thenReturn(Optional.of(hamra));
             when(zones.findByNameIgnoreCase("Hamra")).thenReturn(Optional.of(hamra));
 
-            service.rename(hamra.getId(), "Hamra", "Beirut", 5);
+            service.rename(hamra.getId(), "Hamra", "Beirut", 5, null);
 
             assertThat(hamra.getSortOrder()).isEqualTo(5);
         }
