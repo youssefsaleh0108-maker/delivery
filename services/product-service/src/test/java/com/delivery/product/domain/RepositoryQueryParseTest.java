@@ -118,15 +118,17 @@ class RepositoryQueryParseTest {
     }
 
     /**
-     * Merchant Blitz's two locking reads, read straight off the repository's annotations so this
-     * cannot drift from what actually runs — plus the scan tables' columns as the entities map them,
-     * which is what {@code ddl-auto: validate} would otherwise be the first to check, at deploy.
+     * Merchant Blitz's JPQL, read straight off the repository's annotations so this cannot drift from
+     * what actually runs — plus the scan tables' columns as the entities map them, which is what
+     * {@code ddl-auto: validate} would otherwise be the first to check, at deploy. The merchant lock
+     * is native SQL, which Hibernate does not parse; CatalogScanServiceTest pins where it is taken.
      */
     @Test
     void the_merchant_blitz_queries_parse() throws NoSuchMethodException {
-        parses(CatalogScanRepository.class.getMethod("lockStore", java.util.UUID.class)
-                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
         parses(CatalogScanRepository.class.getMethod("lockOwned", java.util.UUID.class, String.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses(CatalogScanRepository.class.getMethod("countOtherLiveAnalyses", String.class,
+                        java.util.UUID.class, CatalogScan.Status.class, java.time.Instant.class)
                 .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
 
         // What the derived quota count generates.

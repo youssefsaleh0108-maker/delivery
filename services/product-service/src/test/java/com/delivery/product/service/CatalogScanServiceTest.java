@@ -165,11 +165,11 @@ class CatalogScanServiceTest {
             assertThatThrownBy(() -> service.create(MERCHANT, theirs.getId()))
                     .isInstanceOf(StoreNotFoundException.class);
             verify(scans, never()).save(any());
-            verify(scans, never()).lockStore(any());
+            verify(scans, never()).countByMerchantIdAndCreatedAtAfter(any(), any());
         }
 
         /**
-         * Counted under the store's lock, so two starts racing each other cannot both see the last
+         * Counted under the merchant's lock, so two starts racing each other cannot both see the last
          * free slot — and counted over a rolling day, so a burst cannot straddle midnight.
          */
         @Test
@@ -183,9 +183,31 @@ class CatalogScanServiceTest {
                     .satisfies(e -> assertThat(((ScanQuotaExceededException) e).getLimit()).isEqualTo(5));
 
             InOrder order = inOrder(scans);
-            order.verify(scans).lockStore(store.getId());
+            order.verify(scans).lockMerchant(MERCHANT);
             order.verify(scans).countByMerchantIdAndCreatedAtAfter(MERCHANT, NOW.minus(Duration.ofHours(24)));
             verify(scans, never()).save(any());
+        }
+
+        /**
+         * The quota counts every store a merchant owns, so the lock must be the merchant's: starts in
+         * two of their shops queue on the one lock. A lock per store — what this used to take — let
+         * parallel starts in different shops each see room for one more.
+         */
+        @Test
+        void starts_in_two_of_a_merchants_stores_queue_on_the_same_merchant_lock() {
+            Store second = new Store(MERCHANT, "Second Shop", Store.Vertical.RESTAURANT);
+            when(stores.ownedBy(MERCHANT)).thenReturn(List.of(store, second));
+
+            service.create(MERCHANT, store.getId());
+            service.create(MERCHANT, second.getId());
+
+            InOrder order = inOrder(scans);
+            for (int start = 0; start < 2; start++) {
+                order.verify(scans).lockMerchant(MERCHANT);
+                order.verify(scans).countByMerchantIdAndCreatedAtAfter(MERCHANT, NOW.minus(Duration.ofHours(24)));
+                order.verify(scans).save(any(CatalogScan.class));
+            }
+            verify(scans, org.mockito.Mockito.times(2)).lockMerchant(MERCHANT);
         }
     }
 
@@ -335,6 +357,63 @@ class CatalogScanServiceTest {
             assertThatThrownBy(() -> service.startAnalysis(scan.getId(), MERCHANT))
                     .isInstanceOf(ScanStateException.class)
                     .hasMessageContaining("start a new scan");
+        }
+
+        /**
+         * One reading at a time per merchant: the analyser's pool is shared by every shop, and a few
+         * accounts firing scans side by side must not turn everybody else's into BUSY. Checked under
+         * the merchant's lock; a reading lost with its pod stops counting once stale.
+         */
+        @Test
+        void a_merchant_has_one_scan_read_at_a_time() {
+            CatalogScan scan = uploading();
+            uploadedPhoto(scan);
+            when(scans.countOtherLiveAnalyses(MERCHANT, scan.getId(), CatalogScan.Status.ANALYZING,
+                    NOW.minus(STALE))).thenReturn(1L);
+
+            assertThatThrownBy(() -> service.startAnalysis(scan.getId(), MERCHANT))
+                    .isInstanceOf(ScanStateException.class);
+            assertThat(scan.getStatus()).isEqualTo(CatalogScan.Status.UPLOADING);
+            assertThat(scan.getAnalysisAttempts()).isZero();
+            InOrder order = inOrder(scans);
+            order.verify(scans).lockMerchant(MERCHANT);
+            order.verify(scans).countOtherLiveAnalyses(MERCHANT, scan.getId(),
+                    CatalogScan.Status.ANALYZING, NOW.minus(STALE));
+
+            // Once the other reading has finished, or gone stale, this one starts.
+            when(scans.countOtherLiveAnalyses(MERCHANT, scan.getId(), CatalogScan.Status.ANALYZING,
+                    NOW.minus(STALE))).thenReturn(0L);
+            assertThat(service.startAnalysis(scan.getId(), MERCHANT).attempt()).isEqualTo(1);
+        }
+
+        /** Nothing was sent while the queue was full, so the attempt comes back for the retry. */
+        @Test
+        void a_busy_refusal_fails_the_scan_but_gives_the_attempt_back() {
+            CatalogScan scan = uploading();
+            uploadedPhoto(scan);
+            int attempt = service.startAnalysis(scan.getId(), MERCHANT).attempt();
+
+            service.recordBusy(scan.getId(), attempt);
+
+            ScanDetails read = service.read(scan.getId(), MERCHANT);
+            assertThat(read.status()).isEqualTo(CatalogScan.Status.FAILED);
+            assertThat(read.failure()).isEqualTo(CatalogScan.FailureCode.BUSY);
+            assertThat(read.attemptsLeft()).isEqualTo(2);
+            assertThat(service.startAnalysis(scan.getId(), MERCHANT).attempt()).isEqualTo(1);
+        }
+
+        @Test
+        void a_busy_refusal_for_an_attempt_that_has_moved_on_changes_nothing() {
+            CatalogScan scan = uploading();
+            uploadedPhoto(scan);
+            int first = service.startAnalysis(scan.getId(), MERCHANT).attempt();
+            service.recordFailure(scan.getId(), first, CatalogScan.FailureCode.PROVIDER_ERROR);
+            service.startAnalysis(scan.getId(), MERCHANT);
+
+            service.recordBusy(scan.getId(), first);
+
+            assertThat(scan.getStatus()).isEqualTo(CatalogScan.Status.ANALYZING);
+            assertThat(scan.getAnalysisAttempts()).isEqualTo(2);
         }
 
         /** A job lost with its pod must not leave the merchant watching a scan line forever. */

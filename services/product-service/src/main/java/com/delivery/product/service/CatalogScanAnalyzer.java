@@ -82,13 +82,18 @@ public class CatalogScanAnalyzer implements DisposableBean {
         this.maxLongEdgePx = maxLongEdgePx;
     }
 
-    /** Queues the analysis. Never throws: a full queue becomes a BUSY failure on the scan. */
+    /**
+     * Queues the analysis. Never throws: a full queue fails the scan as BUSY at once and gives the
+     * attempt back, since nothing was sent. The pool cannot be filled by one account — a merchant
+     * has one scan read at a time (CatalogScanService#startAnalysis) — so BUSY means the platform is
+     * busy, not that a neighbour is flooding it.
+     */
     public void submit(UUID scanId, int attempt) {
         try {
             executor.execute(() -> run(scanId, attempt));
         } catch (RejectedExecutionException e) {
             log.warn("Scan {} attempt {} refused: the analysis queue is full", scanId, attempt);
-            scans.recordFailure(scanId, attempt, FailureCode.BUSY);
+            scans.recordBusy(scanId, attempt);
         }
     }
 

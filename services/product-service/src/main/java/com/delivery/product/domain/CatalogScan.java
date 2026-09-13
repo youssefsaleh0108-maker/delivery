@@ -187,6 +187,17 @@ public class CatalogScan {
         completedAt = now;
     }
 
+    /**
+     * Fails an attempt that never ran because the analyser's queue was full, and hands the attempt
+     * back: it was never sent and never billed, so it must not count against the scan's retries.
+     */
+    public void refuseAsBusy(Instant now) {
+        if (analysisAttempts > 0) {
+            analysisAttempts--;
+        }
+        fail(FailureCode.BUSY, now);
+    }
+
     public UUID getId() {
         return id;
     }

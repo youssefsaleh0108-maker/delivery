@@ -38,16 +38,37 @@ public interface CatalogScanRepository extends JpaRepository<CatalogScan, UUID> 
     List<CatalogScan> findByMerchantIdAndCreatedAtAfterOrderByCreatedAtDesc(String merchantId,
                                                                            Instant since);
 
+    /** The merchant lock's first key: its own name among every advisory lock in the database. */
+    int MERCHANT_SCAN_LOCK = 29_001;
+
     /**
-     * Takes the store row's write lock for the rest of the transaction.
+     * Serialises this merchant's scan starts and readings for the rest of the transaction.
      *
-     * <p>The quota is a count-then-insert, and two requests racing through it would both see room
-     * for one more. Serialising scan creation on the store row closes that — a burst of parallel
-     * "start scan" calls queues here instead of each spending a paid analysis. A plain
-     * {@code SELECT ... FOR UPDATE}, chosen over an advisory lock because it is portable JPQL the
-     * query-parse test can hold down, and because the row it locks is the one the scan hangs off.
+     * <p>Both checks it guards count across ALL of a merchant's scans — the daily quota, and one
+     * reading at a time — and a merchant may own several stores. So the lock is the merchant's, not a
+     * store's: this used to lock the store row, which let parallel starts in two of the merchant's
+     * stores each see room for one more. There is no merchant row in this service to lock, so it is a
+     * transaction-scoped advisory lock on the merchant's id, released at commit or rollback and
+     * never leaked by a request that dies.
+     *
+     * <p>The two-key form, with a fixed first key naming this lock, so it cannot collide with any
+     * other advisory lock in the database — Flyway's included, which uses the single-key form, a
+     * separate key space. {@code hashtext} folds the id into the second key: two merchants who share
+     * a hash only ever wait for each other, never get past each other. Selected FROM the function
+     * because it returns void, which has no Java type to map to.
      */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT s FROM Store s WHERE s.id = :storeId")
-    Optional<Store> lockStore(@Param("storeId") UUID storeId);
+    @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(" + MERCHANT_SCAN_LOCK + ", hashtext(:merchantId))",
+            nativeQuery = true)
+    int lockMerchant(@Param("merchantId") String merchantId);
+
+    /**
+     * How many of this merchant's OTHER scans are being read by a job that may still be alive: one
+     * started at or after {@code aliveSince}. A reading lost with its pod stops counting once it is
+     * stale, as it does everywhere else.
+     */
+    @Query("SELECT COUNT(s) FROM CatalogScan s WHERE s.merchantId = :merchantId AND s.id <> :scanId "
+            + "AND s.status = :status AND s.analysisStartedAt >= :aliveSince")
+    long countOtherLiveAnalyses(@Param("merchantId") String merchantId, @Param("scanId") UUID scanId,
+                                @Param("status") CatalogScan.Status status,
+                                @Param("aliveSince") Instant aliveSince);
 }

@@ -185,12 +185,14 @@ public class CatalogScanService {
      */
     @Transactional
     public ScanDetails create(String merchantId, UUID requestedStoreId) {
+        // The merchant's lock before anything is counted, and before the store is resolved, so two
+        // first scans from a merchant with no shop yet queue here too. The quota counts every store
+        // the merchant owns, so a store's lock would not do — see CatalogScanRepository#lockMerchant.
+        scans.lockMerchant(merchantId);
         Store store = requestedStoreId == null
                 ? stores.requireStoreFor(merchantId)
                 : requireOwnedStore(merchantId, requestedStoreId);
 
-        // Serialise concurrent starts before counting — see CatalogScanRepository#lockStore.
-        scans.lockStore(store.getId());
         long recent = recentScans(merchantId);
         if (recent >= limits.maxScansPerDay()) {
             throw new ScanQuotaExceededException(limits.maxScansPerDay());
@@ -254,6 +256,9 @@ public class CatalogScanService {
      */
     @Transactional
     public Started startAnalysis(UUID scanId, String merchantId) {
+        // The merchant's lock, then the scan's: the one order any path taking both uses, so two
+        // requests can never each hold one and wait for the other.
+        scans.lockMerchant(merchantId);
         CatalogScan scan = lockOwned(scanId, merchantId);
 
         boolean anyUploaded = photos.findByScanIdOrderByPositionAsc(scanId).stream()
@@ -262,10 +267,20 @@ public class CatalogScanService {
             throw new ScanStateException("Add at least one shelf photo before scanning");
         }
 
+        // One reading at a time per merchant. The analyser's two threads and short queue are shared
+        // by every shop on the platform, so without this a few accounts firing scans side by side
+        // could fill it and turn everybody else's scan into BUSY. Checked under the merchant's lock,
+        // so two scans started together cannot each see the other still idle.
+        Instant now = clock.instant();
+        if (scans.countOtherLiveAnalyses(merchantId, scanId, CatalogScan.Status.ANALYZING,
+                now.minus(limits.staleAfter())) > 0) {
+            throw new ScanStateException(
+                    "Another of your scans is still being read; start this one when it has finished");
+        }
+
         int attempt;
         try {
-            attempt = scan.startAnalysis(clock.instant(), limits.maxAnalysisAttempts(),
-                    limits.staleAfter());
+            attempt = scan.startAnalysis(now, limits.maxAnalysisAttempts(), limits.staleAfter());
         } catch (IllegalStateException e) {
             throw new ScanStateException(e.getMessage());
         }
@@ -329,6 +344,19 @@ public class CatalogScanService {
         scans.findById(scanId)
                 .filter(scan -> scan.awaits(attempt))
                 .ifPresent(scan -> scan.fail(code, clock.instant()));
+    }
+
+    /**
+     * The analyser could not even queue this attempt: its pool was full. Nothing was sent to the
+     * provider and nothing billed, so the attempt is handed back — a pool filled by other shops must
+     * not use up this merchant's retries. The scan still fails as BUSY, which the client words as
+     * "try again shortly" and offers the retry for.
+     */
+    @Transactional
+    public void recordBusy(UUID scanId, int attempt) {
+        scans.findById(scanId)
+                .filter(scan -> scan.awaits(attempt))
+                .ifPresent(scan -> scan.refuseAsBusy(clock.instant()));
     }
 
     // ---------------------------------------------------------------- reading and deciding

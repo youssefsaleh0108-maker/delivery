@@ -158,12 +158,14 @@ class CatalogScanAnalyzerTest {
 
     /** A backlog of paid calls behind a slow provider is worse than an honest "busy, try again". */
     @Test
-    void a_full_queue_fails_the_scan_as_busy_at_once() {
+    void a_full_queue_fails_the_scan_as_busy_at_once_and_gives_the_attempt_back() {
         analyzer(runnable -> {
             throw new RejectedExecutionException("full");
         }).submit(SCAN, 1);
 
-        verify(scans).recordFailure(SCAN, 1, FailureCode.BUSY);
+        // recordBusy, not a plain failure: nothing was sent, so the attempt must not be used up.
+        verify(scans).recordBusy(SCAN, 1);
+        verify(scans, never()).recordFailure(any(), anyInt(), any());
         verifyNoInteractions(objects, providers);
     }
 
