@@ -32,19 +32,46 @@ order-tracking.
 
 | Endpoint | BACKOFFICE | CARRIER | anyone else |
 |---|---|---|---|
-| every `GET` below | any rider / any named fleet | only riders whose `rider_presence.carrier_id` is the caller's own fleet | 403 (401 unsigned) |
-| every write | 403 | own fleet only | 403 (401 unsigned) |
+| every `GET` below | any rider / any named fleet | only riders on the caller's own fleet now, and only for the time they were its riders (see *Whose time a company sees*) | 403 (401 unsigned) |
+| every write | 403 | riders on its own fleet now | 403 (401 unsigned) |
 
 - A carrier's fleet always comes from its token (the membership row, or Order Manager's directory
   when this service has not learned it yet), never from the request. A `carrierId` a carrier
   passes is ignored.
 - A rider on another fleet and a rider that does not exist are the **identical 404**
   (`"title": "Rider not found"`). A shift id from another fleet is `404 "Shift not found"`.
+- "Now" is Order Manager's answer, asked with the caller's own token and held for 30 s
+  (`delivery.tracking.fleet-check.ttl`): from the moment a company lets a rider go, every read and
+  write about that rider is the same 404, and the shift-assignment listing leaves them out.
 - A CARRIER account attached to no company: 403 `"No delivery company"`. Order Manager unreachable
-  with no cached answer: 503 `"Fleet unavailable"`.
+  with no fresh answer: 503 `"Fleet unavailable"` — never a guess from the older linkage.
 - Service-to-service: forward the signed-in user's token (the way order-tracking's
   `CarrierDirectoryClient` does), so the carrier's own scoping applies to the pay run. There is no
   service role on these endpoints.
+
+## Whose time a company sees
+
+A company sees a rider's duty only for the time the rider was its rider. The windows come from
+`carrier_membership_periods`, kept from Order Manager's `carrier.member_joined` and
+`carrier.member_left` events, and every figure read in a company's name is clipped to them:
+
+- **Sessions are cut at a hire and at a departure.** A session already running when the company
+  hired the rider counts, for it, from the hire; one still running when the rider left counts up
+  to the departure. Nothing from before the hire, after the departure, or a spell away in between
+  is shown or counted.
+- **A shift day is judged only when its shift began while the rider was on the fleet**, and a day
+  spent wholly off the fleet has no schedule and no manual entry. A shift that began before the
+  hire or after the departure is never a late or an absence for that company.
+- **A rider who moved mid-period appears under each company only for their own part.** The company
+  they left keeps their hours up to the departure in its pay-run read; the company they joined sees
+  nothing from before the hire.
+- **A departure ends the schedule.** When a rider leaves — or joins another company — their shift
+  assignments with the company they left end the day before the day they left, and any that had
+  not started are removed. The day they left is judged with no schedule for that company (its
+  hours up to the departure still count there), and a leaver never keeps a shift from being retired.
+- **BACKOFFICE** reads a fleet (`carrierId`) clipped the same way, and one rider's attendance month
+  as the rider's current company sees it. Its `/duty/sessions` and `/duty/hours` reads are the
+  rider's whole record.
 
 ## Periods
 
@@ -62,8 +89,10 @@ Query: the period, plus `carrierId` (UUID) — required for BACKOFFICE, ignored 
   "riders": [ { "riderId": "kc-sub", "hasSchedule": true, "totals": { …AttendanceTotals… } } ] }
 ```
 
-`riders` is every rider **currently** linked to the fleet (`rider_presence.carrier_id`), sorted by
-id, each computed exactly as the per-rider read below — the two always agree. `asOf` is the one
+`riders` is every rider who was on the fleet at any point in the period, by the membership record —
+riders who have left since included — sorted by id, each only for their own part of the period
+(see *Whose time a company sees*) and computed exactly as the per-rider read below, so the two
+always agree. `asOf` is the one
 instant every rider's figures were computed at; the figures are not final, so keep it with what you
 pay (see *When a period's figures are final*).
 
@@ -88,7 +117,8 @@ pay (see *When a period's figures are final*).
 ## GET /api/tracking/riders/{riderId}/attendance
 
 Query: the period. `riderId` is the rider's Keycloak subject. BACKOFFICE reads the rider against
-their current fleet's schedule (a rider on no fleet has none).
+their current fleet's schedule, clipped to their time on that fleet exactly as that company sees it
+(a rider on no fleet has no schedule, and nothing is clipped).
 
 ```json
 { "riderId": "kc-sub", "carrierId": "uuid|null", "zone": "Asia/Beirut",
@@ -156,7 +186,10 @@ the day it starts on, and arriving at 00:10 is late for it. This deliberately di
 ## GET /api/tracking/riders/{riderId}/duty/sessions
 
 Query: the period. The clock-in/clock-out rows, whole (a session crossing an edge of the period is
-listed once, not clipped).
+listed once, not clipped). For a CARRIER, only their parts inside the rider's time on its fleet: a
+session already running when the company hired the rider starts at the hire, and one still running
+when the rider left ends there, with `endReason` null and `open` false. BACKOFFICE reads the rider's
+whole record.
 
 ```json
 { "riderId": "kc-sub", "zone": "Asia/Beirut", "from": "2026-10-01", "to": "2026-10-31",
@@ -180,9 +213,12 @@ and the last sighting for one whose rider went quiet — the same rule as `/duty
   before the start ends the next morning; equal times are refused. **The hours can never be
   edited**: re-timing would re-judge days already paid. Add a new shift and move riders onto it.
 - `DELETE /api/tracking/carrier/shifts/{shiftId}` → `ShiftView` (archived). **409** with
-  `"riders": n` while anybody is on it or about to start it.
+  `"riders": n` while anybody is on it or about to start it. A rider who has left the company never
+  counts: their schedule ends with the contract (see *Whose time a company sees*).
 - `GET /api/tracking/carrier/shift-assignments` → `[{riderId, shiftId, shiftName, effectiveFrom,
-  effectiveTo}]` running today or starting later (`effectiveTo` inclusive, null = open-ended).
+  effectiveTo}]` running today or starting later (`effectiveTo` inclusive, null = open-ended), for
+  the riders on the fleet now — by Order Manager's answer for a CARRIER, by the membership record
+  for BACKOFFICE.
 - `PUT /api/tracking/riders/{riderId}/shift-assignment` `{shiftId: uuid|null, effectiveFrom:
   "YYYY-MM-DD"|omitted}` → the rider's assignments from today. Omitted date = today in the zone;
   never before today (400), at most 90 days ahead. **A change asked for today starts tomorrow once
@@ -231,12 +267,11 @@ run — re-reading the paid period and comparing it with the snapshot is how tha
 
 ## Known limits a pay run must allow for
 
-- **Fleet linkage.** A carrier reads a rider only once `rider_presence.carrier_id` names its fleet,
-  which today happens when the rider carries an order for it. A newly hired rider who has not is a
-  404 on every read and is missing from the fleet read.
-- **Duty sessions carry no fleet.** A rider who moved companies inside the period brings the
-  sessions they worked before the move into the new fleet's `workedSeconds` (on days with no
-  assignment there, as `WORKED`). The fleet read lists only riders linked to the fleet now, so a
-  rider who left mid-period is absent from the old fleet's read. Settle a leaver's final period
-  before the move, or read by range up to their last day.
+- **Fleet linkage.** A carrier reads or writes about a rider only while `rider_presence.carrier_id`
+  names its fleet — set when Order Manager announces the hire, or earlier when the rider carries an
+  order for it — and Order Manager still lists the rider on it.
+- **Membership comes from events.** The windows are kept from Order Manager's membership events, so
+  they trail a change by the time its event takes to arrive, and a rider whose hire was never
+  announced has no history a company can see: their month reads empty and they are absent from the
+  fleet read.
 - **Open sessions** are credited to the last sighting; the figure only ever grows or stays.

@@ -28,6 +28,7 @@ import com.delivery.tracking.domain.AttendanceEntry;
 import com.delivery.tracking.domain.AttendanceEntryRepository;
 import com.delivery.tracking.domain.DutySession;
 import com.delivery.tracking.domain.DutySessionRepository;
+import com.delivery.tracking.domain.MembershipWindow;
 import com.delivery.tracking.domain.RiderPresence;
 import com.delivery.tracking.domain.RiderPresenceRepository;
 import com.delivery.tracking.domain.RiderShiftAssignment;
@@ -88,6 +89,7 @@ class AttendanceServiceTest {
     private ShiftTemplateRepository templates;
     private RiderShiftAssignmentRepository assignments;
     private AttendanceEntryRepository entries;
+    private FleetMembershipGuard guard;
     private AttendanceService service;
 
     private final List<DutySession> sessionRows = new ArrayList<>();
@@ -154,12 +156,22 @@ class AttendanceServiceTest {
         when(entries.findByRiderIdAndCarrierIdAndWorkDateAndRevokedAtIsNull(anyString(), any(),
                 any())).thenReturn(Optional.empty());
 
+        // On the fleet now, and for as long as anything here looks. Whose time a company may see is
+        // AttendanceAfterReleaseTest's, with the real guard.
+        guard = mock(FleetMembershipGuard.class);
+        when(guard.membershipWindows(any(), anyString(), any(), any())).thenAnswer(call ->
+                List.of(new MembershipWindow(call.getArgument(2), call.getArgument(3))));
+        when(guard.membershipWindowsByRider(eq(CARRIER), any(), any())).thenAnswer(call ->
+                Map.of(RIDER, List.of(new MembershipWindow(call.getArgument(1),
+                        call.getArgument(2)))));
+        when(guard.retainCallersFleet(anyString(), any(), any())).thenAnswer(call ->
+                List.copyOf(call.<Collection<?>>getArgument(1)));
+
         PresenceService presence = mock(PresenceService.class);
         DutySessionService duty = new DutySessionService(sessions, presenceRows, carrierScope,
-                presence, "Asia/Beirut", Duration.ofMinutes(2), Duration.ofHours(4),
-                mock(FleetMembershipGuard.class));
-        service = new AttendanceService(duty, carrierScope, presenceRows, templates, assignments,
-                entries, 400);
+                presence, "Asia/Beirut", Duration.ofMinutes(2), Duration.ofHours(4), guard);
+        service = new AttendanceService(duty, carrierScope, templates, assignments, entries, guard,
+                400);
     }
 
     // ------------------------------------------------------------------------------- helpers
@@ -1044,6 +1056,122 @@ class AttendanceServiceTest {
                     .extracting(RiderShiftAssignment::getEffectiveFrom)
                     .containsExactly(monday);
         }
+
+        // ------------------------------------------------------------ a rider leaving the company
+
+        /** How many riders a shift has today or later, counted from the rows as the query counts. */
+        private void countRidersFromRows() {
+            when(assignments.countActiveOrUpcoming(any(), any())).thenAnswer(call -> assignmentRows
+                    .stream()
+                    .filter(a -> a.getTemplateId().equals(call.getArgument(0))
+                            && (a.getEffectiveTo() == null
+                                    || !a.getEffectiveTo().isBefore(call.<LocalDate>getArgument(1))))
+                    .count());
+        }
+
+        /**
+         * A leaver is off the company's Shifts page, so nobody there could move them off a shift: their
+         * schedule has to end by itself, or the shift could never be retired.
+         */
+        @Test
+        void a_departure_ends_the_schedule_so_its_shift_can_be_retired_that_afternoon() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            ShiftTemplate night = shift("Night", "22:00", "06:00", DayOfWeek.values());
+            RiderShiftAssignment running = onShift(day, LocalDate.of(2026, 10, 1), monday.plusDays(4));
+            onShift(night, monday.plusDays(5), null);
+            keepWrites();
+            countRidersFromRows();
+
+            service.endScheduleOnDeparture(RIDER, CARRIER, local("2026-10-12T14:00"));
+
+            // Running on the day they left: ended the day before. Not started yet: gone.
+            assertThat(running.getEffectiveTo()).isEqualTo(monday.minusDays(1));
+            assertThat(assignmentRows).containsExactly(running);
+            Instant thatAfternoon = local("2026-10-12T15:00");
+            assertThat(service.archiveShift(DISPATCHER, day.getId(), thatAfternoon).archived()).isTrue();
+            assertThat(service.archiveShift(DISPATCHER, night.getId(), thatAfternoon).archived())
+                    .isTrue();
+            // The days before stay judged against the shift; the day they left has no schedule there.
+            RiderAttendance month = service.compute(RIDER, CARRIER, OCTOBER, NOW);
+            assertThat(day(month, "2026-10-09").scheduled()).isNotNull();
+            assertThat(day(month, "2026-10-12").scheduled()).isNull();
+        }
+
+        /** The record says the rider is back on the fleet: this departure is not the last word. */
+        @Test
+        void a_departure_the_rider_has_since_come_back_from_leaves_the_schedule() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            RiderShiftAssignment current = onShift(day, LocalDate.of(2026, 10, 1), null);
+            when(guard.isCurrentMember(CARRIER, RIDER)).thenReturn(true);
+
+            service.endScheduleOnDeparture(RIDER, CARRIER, local("2026-10-05T14:00"));
+
+            assertThat(current.getEffectiveTo()).isNull();
+            verify(assignments, never()).save(any());
+            verify(assignments, never()).delete(any());
+        }
+    }
+
+    // ------------------------------------------------------------- the rider's time on the fleet
+
+    @Nested
+    @DisplayName("only the rider's time on the fleet")
+    class Membership {
+
+        /** Wednesday 7 October, 13:00 — halfway through the Day shift. */
+        private final Instant left = local("2026-10-07T13:00");
+
+        /** Left on the 7th, with the schedule row still running: a departure whose event is late. */
+        @BeforeEach
+        void leftMidMonth() {
+            when(guard.membershipWindows(eq(CARRIER), eq(RIDER), any(), any())).thenAnswer(call ->
+                    List.of(new MembershipWindow(call.getArgument(2), left)));
+        }
+
+        @Test
+        void shifts_after_the_departure_are_not_the_companys_to_judge() {
+            onDayShiftAllMonth();
+            worked("2026-10-06T08:05", "2026-10-06T18:00");
+            worked("2026-10-07T08:00", "2026-10-07T17:00");
+            worked("2026-10-08T08:00", "2026-10-08T18:00");
+            entry("2026-10-09", AttendanceEntry.Kind.SICK, null, null);
+
+            RiderAttendance month = october();
+
+            assertThat(day(month, "2026-10-06").status()).isEqualTo(Status.PRESENT);
+            // The shift began while the rider was the company's, and they came — judged, with only the
+            // hours up to the departure, closed there by nobody's tap.
+            AttendanceDay lastDay = day(month, "2026-10-07");
+            assertThat(lastDay.status()).isEqualTo(Status.PRESENT);
+            assertThat(lastDay.workedSeconds()).isEqualTo(5 * 3600);
+            assertThat(lastDay.clockOut()).isEqualTo(left);
+            assertThat(lastDay.clockOutReason()).isNull();
+            // After it: somebody else's day. No shift, no evidence, no entry, and never an absence.
+            assertThat(day(month, "2026-10-08").scheduled()).isNull();
+            assertThat(day(month, "2026-10-08").workedSeconds()).isZero();
+            assertThat(day(month, "2026-10-09").entry()).isNull();
+            assertThat(month.totals().sickDays()).isZero();
+            assertThat(month.days()).filteredOn(d -> d.date().isAfter(LocalDate.of(2026, 10, 7)))
+                    .noneMatch(d -> d.status() == Status.ABSENT);
+        }
+
+        @Test
+        void nothing_from_before_the_hire_is_the_companys() {
+            Instant hired = local("2026-10-14T10:00");
+            when(guard.membershipWindows(eq(CARRIER), eq(RIDER), any(), any())).thenAnswer(call ->
+                    List.of(new MembershipWindow(hired, call.getArgument(3))));
+            worked("2026-10-13T08:00", "2026-10-13T12:00");
+            worked("2026-10-14T08:00", "2026-10-14T12:00");
+
+            RiderAttendance month = service.compute(RIDER, CARRIER, OCTOBER,
+                    local("2026-10-20T12:00"));
+
+            assertThat(day(month, "2026-10-13").sessions()).isEmpty();
+            AttendanceDay hireDay = day(month, "2026-10-14");
+            assertThat(hireDay.clockIn()).isEqualTo(hired);
+            assertThat(hireDay.workedSeconds()).isEqualTo(2 * 3600);
+            assertThat(month.totals().workedSeconds()).isEqualTo(2 * 3600);
+        }
     }
 
     // ------------------------------------------------------------------------ the whole fleet
@@ -1054,23 +1182,18 @@ class AttendanceServiceTest {
 
         @Test
         void a_carrier_reads_only_its_own_fleet_whatever_it_names() {
-            when(presenceRows.findByCarrierIdOrderByLastSeenAtDesc(CARRIER))
-                    .thenReturn(List.of(riderRow));
-
             AttendanceService.FleetAttendance fleet = service.fleetAttendance(DISPATCHER, false,
                     OTHER_CARRIER, OCTOBER);
 
             assertThat(fleet.carrierId()).isEqualTo(CARRIER);
             assertThat(fleet.riders()).extracting(AttendanceService.RiderTotals::riderId)
                     .containsExactly(RIDER);
-            verify(presenceRows, never()).findByCarrierIdOrderByLastSeenAtDesc(OTHER_CARRIER);
+            verify(guard, never()).membershipWindowsByRider(eq(OTHER_CARRIER), any(), any());
         }
 
         /** Figures are never final, so every read says when it was computed — one instant a fleet. */
         @Test
         void every_read_says_the_instant_its_figures_were_computed() {
-            when(presenceRows.findByCarrierIdOrderByLastSeenAtDesc(CARRIER))
-                    .thenReturn(List.of(riderRow));
             Instant before = Instant.now();
 
             AttendanceService.FleetAttendance fleet = service.fleetAttendance(DISPATCHER, false,

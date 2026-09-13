@@ -9,7 +9,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -108,23 +110,20 @@ public class DutySessionService {
      * rider, or about an id that does not exist, gets the same not-found, so this endpoint cannot
      * be used to enumerate riders any more than the location one can.
      *
-     * <p>Backoffice may ask about any rider, but an id nobody has ever heard of is still a 404
-     * rather than an empty history — "no such rider" and "a rider who has not worked yet" are
-     * different answers and conflating them would make every typo look like a lazy new hire.
+     * <p>...and on that fleet now, by Order Manager's account ({@link #requireOwnFleet}), and only
+     * for the time the rider was the company's: never a shift from before it hired them — worked
+     * for another company, or for YouDrop — nor from after it let them go, nor from a spell away in
+     * between ({@link FleetMembershipGuard#membershipWindows}).
+     *
+     * <p>Backoffice may ask about any rider, and sees every session: the rider's own record. An id
+     * nobody has ever heard of is still a 404 rather than an empty history — "no such rider" and "a
+     * rider who has not worked yet" are different answers and conflating them would make every typo
+     * look like a lazy new hire.
      */
     @Transactional(readOnly = true)
     public HoursOnline riderHours(String riderId, String callerId, boolean isBackoffice, int days) {
         ReadAccess access = requireReadable(riderId, callerId, isBackoffice);
-        if (isBackoffice) {
-            return aggregate(riderId, days, Instant.now());
-        }
-        // ...and still on that fleet now, by Order Manager's account: the linkage requireReadable
-        // checked is only cleared by a membership event. The same not-found; an unreachable Order
-        // Manager refuses.
-        fleetGuard.requireOnCallersFleet(callerId, riderId);
-        // Only the time they were this company's rider: never a shift from before it hired them —
-        // worked for another company, or for YouDrop — nor from a spell away in between.
-        return aggregate(riderId, days, Instant.now(), access.carrierId());
+        return aggregate(riderId, days, Instant.now(), isBackoffice ? null : access.carrierId());
     }
 
     /**
@@ -132,9 +131,10 @@ public class DutySessionService {
      *
      * <p>The one answer shared by the hours column, the sessions list and the attendance month, so
      * the three can never disagree about who sees whom. The rules are the ones {@link #riderHours}
-     * documents: Backoffice sees any rider who exists; a carrier sees only riders whose
-     * {@code rider_presence.carrier_id} is their own fleet, resolved from their token; everybody
-     * else, and every unknown id, gets the same not-found.
+     * documents: Backoffice sees any rider who exists; a carrier sees only riders on its own fleet
+     * now ({@link #requireOwnFleet}); everybody else, and every unknown id, gets the same not-found.
+     * How much of the rider's history each may see is the caller's to clip to the rider's time on
+     * the fleet ({@link FleetMembershipGuard#membershipWindows}).
      *
      * @return the fleet the rider is read in — the caller's own for a carrier, the rider's current
      *         one for Backoffice (null for one of the platform's own riders)
@@ -149,12 +149,19 @@ public class DutySessionService {
     }
 
     /**
-     * The caller's fleet, provided this rider rides for it — the gate on every carrier write about
-     * a rider (their shift, a manual attendance entry).
+     * The caller's fleet, provided this rider rides for it now — the gate on every carrier read about
+     * one rider (hours, sessions, the attendance month) and every write about one (their shift, a
+     * manual attendance entry).
      *
-     * <p>Same resolution as the roster: a carrier's own fleet comes from Order Manager when this
-     * service has not learned it yet, never from the request. A foreign rider and an unknown one
-     * are the same not-found, as on every read.
+     * <p>Two checks. First the linkage, resolved as the roster resolves it: the caller's fleet comes
+     * from their token — or from Order Manager when this service has not learned it yet — never from
+     * the request, and the rider's {@code rider_presence.carrier_id} must name it. Then Order
+     * Manager, asked with the caller's own token, must still put the rider on that fleet
+     * ({@link FleetMembershipGuard#requireOnCallersFleet}): the linkage is learned from events and
+     * only a membership event clears it, so on its own it would let a company that let a rider go
+     * keep reading and scheduling them for as long as that event was late or lost. A foreign rider,
+     * a released one and an unknown one are the same not-found; an Order Manager that cannot be
+     * reached refuses (503) rather than trusting the linkage.
      */
     public UUID requireOwnFleet(String riderId, String callerId) {
         UUID scope = carrierScope.requireScopeFor(callerId);
@@ -164,6 +171,7 @@ public class DutySessionService {
         if (!owned) {
             throw new PresenceNotFoundException(riderId);
         }
+        fleetGuard.requireOnCallersFleet(callerId, riderId);
         return scope;
     }
 
@@ -179,12 +187,59 @@ public class DutySessionService {
      * <p>A session that crosses either edge of the period is listed whole rather than clipped:
      * this answers "when did they go on and off duty", and a clipped row would print a clock-in
      * nobody made. The per-day split is {@link #aggregate}'s job.
+     *
+     * <p>Membership is the exception. With {@code clipToCarrier} set — a company's read — only the
+     * parts of each session inside the rider's time on that company's fleet are listed
+     * ({@link #clippedTo}): what the rider did before the company hired them, after it let them go,
+     * or for anybody else in between is not the company's to see, and a session that runs across a
+     * hire starts, for that company, at the hire. Null lists every session: the rider's own record.
      */
-    DutySessions sessionsIn(String riderId, AttendancePeriod period, Instant now) {
+    DutySessions sessionsIn(String riderId, AttendancePeriod period, Instant now,
+                            UUID clipToCarrier) {
         Instant from = period.from().atStartOfDay(dayZone).toInstant();
         Instant until = period.to().plusDays(1).atStartOfDay(dayZone).toInstant();
-        return new DutySessions(riderId, dayZone.getId(), period.from(), period.to(),
-                views(riderId, from, until, now));
+        List<SessionView> whole = views(riderId, from, until, now);
+        List<SessionView> listed = clipToCarrier == null || whole.isEmpty()
+                ? whole
+                : clippedTo(whole, windowsAround(clipToCarrier, riderId, from, until, whole));
+        return new DutySessions(riderId, dayZone.getId(), period.from(), period.to(), listed);
+    }
+
+    /** Every session, unclipped — see {@link #sessionsIn(String, AttendancePeriod, Instant, UUID)}. */
+    DutySessions sessionsIn(String riderId, AttendancePeriod period, Instant now) {
+        return sessionsIn(riderId, period, now, null);
+    }
+
+    /**
+     * The rider's windows on {@code carrierId}'s fleet around these sessions: asked over
+     * {@code [from, until)} widened to take in every one of them, so that a window's edge is always
+     * a hire or a departure — never the edge of the question — and a session the company may see
+     * whole is not cut where the period happens to begin.
+     */
+    private List<MembershipWindow> windowsAround(UUID carrierId, String riderId, Instant from,
+                                                 Instant until, List<SessionView> sessions) {
+        Instant start = from;
+        Instant end = until;
+        for (SessionView session : sessions) {
+            start = min(start, session.startedAt());
+            end = max(end, session.countedUntil());
+        }
+        return fleetGuard.membershipWindows(carrierId, riderId, start, end);
+    }
+
+    /**
+     * The parts of these sessions inside the windows, in order — a rider's sessions as a company may
+     * see them ({@link FleetMembershipGuard#membershipWindows}). A session no window reaches is left
+     * out, and one a window's edge crosses is cut there ({@link SessionView#within}).
+     */
+    List<SessionView> clippedTo(List<SessionView> sessions, List<MembershipWindow> windows) {
+        List<SessionView> parts = new ArrayList<>();
+        for (SessionView session : sessions) {
+            for (MembershipWindow window : windows) {
+                session.within(window, dayZone).ifPresent(parts::add);
+            }
+        }
+        return List.copyOf(parts);
     }
 
     /**
@@ -402,7 +457,8 @@ public class DutySessionService {
     }
 
     /**
-     * One duty session as a console shows it.
+     * One duty session as a console shows it — for a company's read, only its part inside the
+     * rider's time on that company's fleet ({@link #within}).
      *
      * @param endedAt        when it was closed; null while it is still open
      * @param endReason      who closed it — RIDER, BACKOFFICE, or EXPIRED for a rider who went
@@ -435,6 +491,35 @@ public class DutySessionService {
                     session.getEndReason(), session.isOpen(), countedUntil, seconds,
                     hours(seconds), localStamp(session.getStartedAt(), zone),
                     localStamp(countedUntil, zone));
+        }
+
+        /**
+         * This session as a company may see it: its part inside one window of the rider's time on
+         * that company's fleet, if it has one.
+         *
+         * <p>A part that begins at the window's start began at the hire — the clock-in a company sees
+         * for a rider who was already on duty when it hired them. A part whose credited time runs
+         * past the window's end is closed there, with no end reason: the rider did not go off duty,
+         * they stopped being this company's rider, and what they did next is not its to see. A
+         * session with nothing credited is kept where it began inside the window, and nowhere else.
+         */
+        Optional<SessionView> within(MembershipWindow window, ZoneId zone) {
+            if (!countedUntil.isAfter(startedAt)) {
+                return window.contains(startedAt) ? Optional.of(this) : Optional.empty();
+            }
+            Instant start = startedAt.isAfter(window.start()) ? startedAt : window.start();
+            boolean cut = countedUntil.isAfter(window.end());
+            Instant counted = cut ? window.end() : countedUntil;
+            if (!start.isBefore(counted)) {
+                return Optional.empty();
+            }
+            if (start.equals(startedAt) && !cut) {
+                return Optional.of(this);
+            }
+            long seconds = Duration.between(start, counted).getSeconds();
+            return Optional.of(new SessionView(id, start, cut ? counted : endedAt,
+                    cut ? null : endReason, !cut && open, counted, seconds, hours(seconds),
+                    localStamp(start, zone), localStamp(counted, zone)));
         }
     }
 

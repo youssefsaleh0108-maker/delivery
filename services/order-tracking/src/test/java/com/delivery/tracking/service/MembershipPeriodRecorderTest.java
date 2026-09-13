@@ -52,6 +52,8 @@ class MembershipPeriodRecorderTest {
     private RiderPresenceRepository presence;
     private CarrierMembershipRepository memberships;
     private MembershipPeriodRecorder recorder;
+    /** Told to end a leaver's schedule; what ending one does is AttendanceServiceTest's. */
+    private final AttendanceService attendance = mock(AttendanceService.class);
 
     @BeforeEach
     void setUp() {
@@ -86,7 +88,7 @@ class MembershipPeriodRecorderTest {
                         .anyMatch(row -> row.getCarrierId().equals(call.getArgument(1))
                                 && call.getArgument(2).equals(row.getLeftAt())));
 
-        recorder = new MembershipPeriodRecorder(periods, presence, memberships);
+        recorder = new MembershipPeriodRecorder(periods, presence, memberships, attendance);
     }
 
     private List<CarrierMembershipPeriod> rowsOf(String rider) {
@@ -223,5 +225,34 @@ class MembershipPeriodRecorderTest {
 
         recorder.left(RIDER, SWIFT, T2);
         assertThat(recorder.mayInferFromOrder(RIDER, SWIFT)).isFalse();
+    }
+
+    @Test
+    @DisplayName("leaving ends the rider's shift schedule with the company they left")
+    void a_leave_ends_the_schedule_there() {
+        recorder.joined(RIDER, SWIFT, T1);
+        recorder.left(RIDER, SWIFT, T2);
+
+        verify(attendance).endScheduleOnDeparture(RIDER, SWIFT, T2);
+    }
+
+    @Test
+    @DisplayName("a move ends the schedule with the company moved from, with no leave to follow")
+    void a_move_ends_the_schedule_with_the_old_company() {
+        recorder.joined(RIDER, SWIFT, T1);
+        recorder.joined(RIDER, RAPID, T2);
+
+        verify(attendance).endScheduleOnDeparture(RIDER, SWIFT, T2);
+        verify(attendance, never()).endScheduleOnDeparture(RIDER, RAPID, T2);
+    }
+
+    @Test
+    @DisplayName("the end of an earlier spell, arriving after the rider came back, keeps the schedule")
+    void a_leave_from_before_a_return_keeps_the_schedule() {
+        recorder.joined(RIDER, SWIFT, T3);
+        // The leave from a spell before this one, delivered late: the rider is on the fleet again.
+        recorder.left(RIDER, SWIFT, T2);
+
+        verify(attendance, never()).endScheduleOnDeparture(anyString(), any(), any());
     }
 }

@@ -28,8 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.delivery.tracking.domain.AttendanceEntry;
 import com.delivery.tracking.domain.AttendanceEntryRepository;
 import com.delivery.tracking.domain.DutySession;
-import com.delivery.tracking.domain.RiderPresence;
-import com.delivery.tracking.domain.RiderPresenceRepository;
+import com.delivery.tracking.domain.MembershipWindow;
 import com.delivery.tracking.domain.RiderShiftAssignment;
 import com.delivery.tracking.domain.RiderShiftAssignmentRepository;
 import com.delivery.tracking.domain.ShiftTemplate;
@@ -76,6 +75,18 @@ import com.delivery.tracking.service.DutySessionService.SessionView;
  * exactly one day and counted whole there, so a period's total is never double-counted; this is the
  * deliberate difference from {@code /duty/hours}, which splits a session at every midnight.
  *
+ * <h2>Whose time a company sees</h2>
+ *
+ * <p>Only the time the rider was its rider. Every read in a company's name — the company's own, and
+ * Backoffice's reads of that company — is clipped to the rider's windows on its fleet
+ * ({@link FleetMembershipGuard#membershipWindows}, kept from Order Manager's membership events): a
+ * session is cut where the rider joined or left, a shift day whose shift began while the rider was
+ * not on the fleet is not judged against the schedule, and a day spent wholly off the fleet has
+ * neither schedule nor manual entry. A rider who moved companies inside a period appears under each
+ * only for their own part, and a company that let a rider go keeps their hours up to the departure
+ * in its pay-run read. A read or a write about one rider also needs the rider on the caller's fleet
+ * now, by Order Manager's account ({@link DutySessionService#requireOwnFleet}).
+ *
  * <p>Every date and wall-clock time is in the platform day zone
  * ({@code delivery.tracking.duty-session.day-zone}), and every conversion to an instant goes through
  * that zone's own rules — Beirut's summer and winter offsets included — never a fixed offset.
@@ -91,28 +102,29 @@ public class AttendanceService {
 
     private final DutySessionService dutySessions;
     private final CarrierScopeResolver carrierScope;
-    private final RiderPresenceRepository presenceRows;
     private final ShiftTemplateRepository templates;
     private final RiderShiftAssignmentRepository assignments;
     private final AttendanceEntryRepository entries;
+    /** Who is on a company's fleet now, and when each rider was. */
+    private final FleetMembershipGuard fleetGuard;
     private final int retentionDays;
 
     public AttendanceService(DutySessionService dutySessions,
                              CarrierScopeResolver carrierScope,
-                             RiderPresenceRepository presenceRows,
                              ShiftTemplateRepository templates,
                              RiderShiftAssignmentRepository assignments,
                              AttendanceEntryRepository entries,
+                             FleetMembershipGuard fleetGuard,
                              // Duty sessions are deleted after this many days
                              // (TrackingPartitionMaintenance). A period older than that would read
                              // every scheduled day as ABSENT, which is a lie about somebody's pay.
                              @Value("${delivery.tracking.duty-event-retention-days:400}") int retentionDays) {
         this.dutySessions = dutySessions;
         this.carrierScope = carrierScope;
-        this.presenceRows = presenceRows;
         this.templates = templates;
         this.assignments = assignments;
         this.entries = entries;
+        this.fleetGuard = fleetGuard;
         this.retentionDays = retentionDays;
     }
 
@@ -120,21 +132,26 @@ public class AttendanceService {
     // Reading
     // -----------------------------------------------------------------------------------------
 
-    /** One rider's sessions over a period, whole. Scoped exactly as {@code /duty/hours} is. */
+    /**
+     * One rider's sessions over a period, whole. Scoped exactly as {@code /duty/hours} is: a company
+     * sees only the parts inside the rider's time on its fleet, Backoffice the rider's own record.
+     */
     @Transactional(readOnly = true)
     public DutySessions riderSessions(String riderId, String callerId, boolean isBackoffice,
                                       AttendancePeriod period) {
-        dutySessions.requireReadable(riderId, callerId, isBackoffice);
+        ReadAccess access = dutySessions.requireReadable(riderId, callerId, isBackoffice);
         Instant now = Instant.now();
         requireWithinHistory(period, today(now));
-        return dutySessions.sessionsIn(riderId, period, now);
+        return dutySessions.sessionsIn(riderId, period, now,
+                isBackoffice ? null : access.carrierId());
     }
 
     /**
      * One rider's attendance for a period: every day judged, and the totals payroll consumes.
      *
      * <p>Scoped exactly as {@code /duty/hours} is — see {@link DutySessionService#requireReadable}.
-     * Backoffice reads the rider against their current fleet's schedule.
+     * A company sees only the time the rider was its rider. Backoffice reads the rider against their
+     * current fleet's schedule, clipped the same way: what that company sees.
      */
     @Transactional(readOnly = true)
     public RiderAttendance riderAttendance(String riderId, String callerId, boolean isBackoffice,
@@ -146,9 +163,12 @@ public class AttendanceService {
     /**
      * Every rider in a fleet, totals only — the one call a pay run makes.
      *
-     * <p>The fleet is the one this service can see: riders whose presence row carries the fleet,
-     * the same set the roster and every per-rider read are scoped to. One computation per rider;
-     * a fleet is tens of riders, and the per-rider read is what this must agree with exactly.
+     * <p>The fleet is every rider who was on it at any point in the period, by the membership record
+     * ({@link FleetMembershipGuard#membershipWindowsByRider}) — a rider who has left since included,
+     * whose hours up to the departure are this company's to pay — and each only for their own part
+     * of it: a rider who moved companies mid-period appears under each, for their time there. One
+     * computation per rider; a fleet is tens of riders, and the per-rider read is what this must
+     * agree with exactly, which is why both ask for the rider's windows over the same range.
      */
     @Transactional(readOnly = true)
     public FleetAttendance fleetAttendance(String callerId, boolean isBackoffice, UUID requested,
@@ -156,28 +176,57 @@ public class AttendanceService {
         UUID carrier = fleetOf(callerId, isBackoffice, requested);
         Instant now = Instant.now();
         requireWithinHistory(period, today(now));
-        List<RiderTotals> riders = presenceRows.findByCarrierIdOrderByLastSeenAtDesc(carrier)
+        ZoneId zone = zone();
+        Instant periodStart = period.from().atStartOfDay(zone).toInstant();
+        Instant periodEnd = period.to().plusDays(1).atStartOfDay(zone).toInstant();
+        List<RiderTotals> riders = fleetGuard
+                .membershipWindowsByRider(carrier, membershipFrom(period), membershipUntil(period, now))
+                .entrySet()
                 .stream()
-                .map(RiderPresence::getRiderId)
-                .sorted()
-                .map(riderId -> {
-                    RiderAttendance month = compute(riderId, carrier, period, now);
-                    return new RiderTotals(riderId, month.hasSchedule(), month.totals());
+                // Asked wider than the period (see membershipFrom): a rider whose time on the fleet
+                // does not reach the period itself is not part of it.
+                .filter(rider -> rider.getValue().stream().anyMatch(window ->
+                        window.start().isBefore(periodEnd) && window.end().isAfter(periodStart)))
+                .sorted(Map.Entry.comparingByKey())
+                .map(rider -> {
+                    RiderAttendance month = compute(rider.getKey(), carrier, period, now,
+                            rider.getValue());
+                    return new RiderTotals(rider.getKey(), month.hasSchedule(), month.totals());
                 })
                 .toList();
-        return new FleetAttendance(carrier, zone().getId(), period.from(), period.to(), now, riders);
+        return new FleetAttendance(carrier, zone.getId(), period.from(), period.to(), now, riders);
     }
 
-    /** The whole derivation. Package-private with an explicit clock for the tests. */
+    /**
+     * The whole derivation, as {@code carrierId} sees it: clipped to the rider's time on that fleet,
+     * or whole for one of the platform's own riders (null). Package-private with an explicit clock
+     * for the tests.
+     */
     RiderAttendance compute(String riderId, UUID carrierId, AttendancePeriod period, Instant now) {
+        requireWithinHistory(period, today(now));
+        return compute(riderId, carrierId, period, now, carrierId == null
+                ? null
+                : fleetGuard.membershipWindows(carrierId, riderId, membershipFrom(period),
+                        membershipUntil(period, now)));
+    }
+
+    /**
+     * The whole derivation, with the rider's windows on the fleet already in hand — null for nothing
+     * to clip to. The fleet read hands in the windows it read for every rider at once.
+     */
+    RiderAttendance compute(String riderId, UUID carrierId, AttendancePeriod period, Instant now,
+                            List<MembershipWindow> windows) {
         ZoneId zone = zone();
         LocalDate today = LocalDate.ofInstant(now, zone);
         requireWithinHistory(period, today);
 
-        Schedule schedule = scheduleFor(riderId, carrierId, period);
+        // The schedule as it stood while the rider was on the fleet, and the office's entries for
+        // the days they were on it.
+        Schedule schedule = scheduleFor(riderId, carrierId, period).within(windows, zone);
         Map<LocalDate, AttendanceEntry> manual = carrierId == null
                 ? Map.of()
                 : entries.findLive(riderId, carrierId, period.from(), period.to()).stream()
+                        .filter(entry -> schedule.onFleet(entry.getWorkDate()))
                         .collect(Collectors.toMap(AttendanceEntry::getWorkDate, Function.identity(),
                                 (a, b) -> b));
 
@@ -185,8 +234,14 @@ public class AttendanceService {
         // early start just before midnight, can own a session that lies partly outside it.
         Instant fetchFrom = period.from().minusDays(1).atStartOfDay(zone).toInstant();
         Instant fetchUntil = period.to().plusDays(2).atStartOfDay(zone).toInstant();
+        List<SessionView> sessions = dutySessions.views(riderId, fetchFrom, fetchUntil, now);
+        if (windows != null) {
+            // Cut to the rider's time on the fleet before anything is attributed, so a session never
+            // lands on a day by a part the company may not see.
+            sessions = dutySessions.clippedTo(sessions, windows);
+        }
         Map<LocalDate, List<SessionView>> byDay = new TreeMap<>();
-        for (SessionView session : dutySessions.views(riderId, fetchFrom, fetchUntil, now)) {
+        for (SessionView session : sessions) {
             LocalDate day = attribute(session, schedule, zone);
             if (period.contains(day)) {
                 byDay.computeIfAbsent(day, d -> new ArrayList<>()).add(session);
@@ -200,6 +255,26 @@ public class AttendanceService {
         }
         return new RiderAttendance(riderId, carrierId, zone.getId(), period.from(), period.to(),
                 today, now, schedule.touches(period), days, AttendanceTotals.of(days));
+    }
+
+    /**
+     * Where a read of this period asks for the rider's windows on a fleet from: two days before it.
+     * Sessions are fetched from the day before, and a session belongs to a day by where it starts,
+     * so a window cut any nearer the period could move a session into it that belongs before it.
+     * The fleet read and the per-rider read both ask over exactly this range, so they always agree.
+     */
+    private Instant membershipFrom(AttendancePeriod period) {
+        return period.from().minusDays(2).atStartOfDay(zone()).toInstant();
+    }
+
+    /**
+     * ...and until: the end of the last day sessions are fetched for, or now if that is later. No
+     * session is credited past now, so none is ever cut where the question ends rather than where
+     * the rider left.
+     */
+    private Instant membershipUntil(AttendancePeriod period, Instant now) {
+        Instant fetched = period.to().plusDays(2).atStartOfDay(zone()).toInstant();
+        return now.isAfter(fetched) ? now : fetched;
     }
 
     /**
@@ -372,28 +447,95 @@ public class AttendanceService {
      *
      * <p>Refused while anybody is on it or about to start it: archiving would otherwise leave
      * riders on a shift the page no longer lists, with nothing to tell the office they are there.
+     * A rider who leaves the company does not count from the day they leave: their schedule ends
+     * with their contract ({@link #endScheduleOnDeparture}).
      */
     @Transactional
     public ShiftView archiveShift(String callerId, UUID shiftId) {
+        return archiveShift(callerId, shiftId, Instant.now());
+    }
+
+    /** The whole of {@link #archiveShift}. Package-private with an explicit clock for the tests. */
+    ShiftView archiveShift(String callerId, UUID shiftId, Instant now) {
         UUID carrier = carrierScope.requireScopeFor(callerId);
         ShiftTemplate shift = templates.findByIdAndCarrierId(shiftId, carrier)
                 .orElseThrow(ShiftNotFoundException::new);
-        long riders = assignments.countActiveOrUpcoming(shift.getId(), today(Instant.now()));
+        long riders = assignments.countActiveOrUpcoming(shift.getId(), today(now));
         if (riders > 0) {
             throw new ConflictException("Move the riders on this shift to another one first.",
                     riders);
         }
-        shift.archive(Instant.now());
+        shift.archive(now);
         templates.save(shift);
         return ShiftView.of(shift, 0);
     }
 
-    /** Who in the fleet is on which shift, today and from later dates. */
+    /**
+     * Who in the fleet is on which shift, today and from later dates — for the riders on the fleet
+     * now. A rider the company has let go is not listed, even should their row outlive them.
+     */
     @Transactional(readOnly = true)
     public List<AssignmentView> fleetAssignments(String callerId, boolean isBackoffice,
                                                  UUID requested) {
         UUID carrier = fleetOf(callerId, isBackoffice, requested);
-        return views(assignments.findCurrentAndUpcoming(carrier, today(Instant.now())));
+        Instant now = Instant.now();
+        List<RiderShiftAssignment> rows = assignments.findCurrentAndUpcoming(carrier, today(now));
+        return views(onFleetNow(callerId, isBackoffice, carrier, rows, now));
+    }
+
+    /**
+     * The rows whose rider is on the fleet now. A company's own read asks Order Manager, with the
+     * company's own token ({@link FleetMembershipGuard#retainCallersFleet}). Backoffice holds no
+     * token Order Manager answers a company's roster for, so its read goes by the membership record,
+     * which trails a change by the time the change's event takes to arrive.
+     */
+    private List<RiderShiftAssignment> onFleetNow(String callerId, boolean isBackoffice,
+                                                  UUID carrier, List<RiderShiftAssignment> rows,
+                                                  Instant now) {
+        if (!isBackoffice) {
+            return fleetGuard.retainCallersFleet(callerId, rows, RiderShiftAssignment::getRiderId);
+        }
+        if (rows.isEmpty()) {
+            return rows;
+        }
+        Set<String> members = fleetGuard
+                .membershipWindowsByRider(carrier, now, now.plusSeconds(1))
+                .keySet();
+        return rows.stream().filter(row -> members.contains(row.getRiderId())).toList();
+    }
+
+    /**
+     * Ends a rider's shift schedule with a company they have left — Order Manager's
+     * {@code carrier.member_left}, or a join to another company, which ends this one
+     * ({@link MembershipPeriodRecorder}).
+     *
+     * <p>Left alone, the rider's open assignment would outlive them: the Shifts page lists only the
+     * riders a company has now, so nobody could move them off it, and {@link #archiveShift} would
+     * refuse to retire that shift for as long as the row stood. So a row still running on the day
+     * they left ends the day before, and a row that had not started by then is removed: from that
+     * day on nothing of theirs counts toward any of the company's shifts. The day they left is
+     * therefore judged with no schedule for the company they left — their hours up to the departure
+     * still count there, and no late or absence is charged against a shift that ended with their
+     * contract.
+     *
+     * <p>Run from the membership event, with no caller token to ask Order Manager with, so the
+     * membership record decides ({@link FleetMembershipGuard#isCurrentMember}): a leave that arrives
+     * after the rider is already back on the same company's fleet leaves their schedule as it is.
+     */
+    @Transactional
+    public void endScheduleOnDeparture(String riderId, UUID carrierId, Instant leftAt) {
+        if (fleetGuard.isCurrentMember(carrierId, riderId)) {
+            return;
+        }
+        LocalDate leftOn = LocalDate.ofInstant(leftAt, zone());
+        for (RiderShiftAssignment row : assignments.findFrom(riderId, carrierId, leftOn)) {
+            if (row.getEffectiveFrom().isBefore(leftOn)) {
+                row.endOn(leftOn.minusDays(1));
+                assignments.save(row);
+            } else {
+                assignments.delete(row);
+            }
+        }
     }
 
     /**
@@ -667,36 +809,95 @@ public class AttendanceService {
         }
     }
 
-    /** The schedule that applies to one rider in one fleet over a period. */
+    /**
+     * The schedule that applies to one rider in one fleet over a period — once clipped
+     * ({@link #within}), only while the rider was on that fleet.
+     */
     static final class Schedule {
 
         static final Schedule NONE = new Schedule(List.of(), Map.of());
 
         private final List<RiderShiftAssignment> rows;
         private final Map<UUID, ShiftTemplate> shifts;
+        /** The rider's windows on the fleet; null when nothing is clipped. */
+        private final List<MembershipWindow> windows;
+        private final ZoneId zone;
 
         Schedule(List<RiderShiftAssignment> rows, Map<UUID, ShiftTemplate> shifts) {
-            this.rows = rows;
-            this.shifts = shifts;
+            this(rows, shifts, null, null);
         }
 
+        private Schedule(List<RiderShiftAssignment> rows, Map<UUID, ShiftTemplate> shifts,
+                         List<MembershipWindow> windows, ZoneId zone) {
+            this.rows = rows;
+            this.shifts = shifts;
+            this.windows = windows;
+            this.zone = zone;
+        }
+
+        /**
+         * This schedule as it applies to the rider's time on the fleet: a shift day counts only when
+         * its shift began while they were on it, and a day spent wholly off the fleet is no day of
+         * the schedule's at all — a shift that began before the hire or after the departure was never
+         * the company's to be late for or absent from. Null windows change nothing.
+         */
+        Schedule within(List<MembershipWindow> windows, ZoneId zone) {
+            return windows == null ? this : new Schedule(rows, shifts, windows, zone);
+        }
+
+        /** Whether any part of {@code day} fell inside the rider's time on the fleet. */
+        boolean onFleet(LocalDate day) {
+            if (windows == null) {
+                return true;
+            }
+            Instant start = day.atStartOfDay(zone).toInstant();
+            Instant end = day.plusDays(1).atStartOfDay(zone).toInstant();
+            return windows.stream()
+                    .anyMatch(window -> window.start().isBefore(end) && window.end().isAfter(start));
+        }
+
+        /** Whether the rider's week was scheduled on {@code day} — a shift day or a day off. */
         boolean assignedOn(LocalDate day) {
-            return rows.stream().anyMatch(row -> row.covers(day));
+            RiderShiftAssignment row = covering(day);
+            if (row == null || !onFleet(day)) {
+                return false;
+            }
+            // A day off on the fleet is still the schedule's; a shift that began off it is not.
+            ShiftTemplate shift = runningOn(row, day);
+            return shift == null || beganOnFleet(shift, day);
         }
 
         /** The shift the rider works on {@code day}, or null for a day off or no schedule. */
         ShiftTemplate shiftOn(LocalDate day) {
+            RiderShiftAssignment row = covering(day);
+            ShiftTemplate shift = row == null ? null : runningOn(row, day);
+            return shift != null && beganOnFleet(shift, day) ? shift : null;
+        }
+
+        boolean touches(AttendancePeriod period) {
+            return period.dates().stream().anyMatch(this::assignedOn);
+        }
+
+        private RiderShiftAssignment covering(LocalDate day) {
             for (RiderShiftAssignment row : rows) {
                 if (row.covers(day)) {
-                    ShiftTemplate shift = shifts.get(row.getTemplateId());
-                    return shift != null && shift.runsOn(day.getDayOfWeek()) ? shift : null;
+                    return row;
                 }
             }
             return null;
         }
 
-        boolean touches(AttendancePeriod period) {
-            return period.dates().stream().anyMatch(this::assignedOn);
+        private ShiftTemplate runningOn(RiderShiftAssignment row, LocalDate day) {
+            ShiftTemplate shift = shifts.get(row.getTemplateId());
+            return shift != null && shift.runsOn(day.getDayOfWeek()) ? shift : null;
+        }
+
+        private boolean beganOnFleet(ShiftTemplate shift, LocalDate day) {
+            if (windows == null) {
+                return true;
+            }
+            Instant start = shift.window(day, zone).start();
+            return windows.stream().anyMatch(window -> window.contains(start));
         }
     }
 

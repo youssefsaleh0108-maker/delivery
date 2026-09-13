@@ -42,6 +42,11 @@ import com.delivery.tracking.domain.RiderPresenceRepository;
  * {@code carrier_membership} row — because no order event ever says a rider left, and keeping it
  * kept the rider on the former company's roster. Once the record holds anything for a rider, an
  * order may only confirm the fleet the record has them on ({@link #mayInferFromOrder}).
+ *
+ * <p><strong>The schedule.</strong> A departure — a leave, or a join to another company — also ends
+ * the rider's shift schedule with the company they left
+ * ({@link AttendanceService#endScheduleOnDeparture}): off that company's roster, nobody there could
+ * end it, and it would keep one of the company's shifts from ever being retired.
  */
 @Service
 public class MembershipPeriodRecorder {
@@ -51,13 +56,16 @@ public class MembershipPeriodRecorder {
     private final CarrierMembershipPeriodRepository periods;
     private final RiderPresenceRepository presence;
     private final CarrierMembershipRepository memberships;
+    private final AttendanceService attendance;
 
     public MembershipPeriodRecorder(CarrierMembershipPeriodRepository periods,
                                     RiderPresenceRepository presence,
-                                    CarrierMembershipRepository memberships) {
+                                    CarrierMembershipRepository memberships,
+                                    AttendanceService attendance) {
         this.periods = periods;
         this.presence = presence;
         this.memberships = memberships;
+        this.attendance = attendance;
     }
 
     /** A rider joined {@code carrierId}'s fleet at {@code at}. */
@@ -86,6 +94,9 @@ public class MembershipPeriodRecorder {
         }
         periods.save(CarrierMembershipPeriod.open(riderId, carrierId, at));
         link(riderId, carrierId);
+        // A move is a departure from the old company too, and its own leave event may never come.
+        open.ifPresent(previous ->
+                attendance.endScheduleOnDeparture(riderId, previous.getCarrierId(), at));
     }
 
     /** A rider left {@code carrierId}'s fleet at {@code at}. */
@@ -110,6 +121,7 @@ public class MembershipPeriodRecorder {
                 .isPresent();
         if (!backOnThisFleet) {
             unlink(riderId, carrierId);
+            attendance.endScheduleOnDeparture(riderId, carrierId, at);
         }
     }
 
