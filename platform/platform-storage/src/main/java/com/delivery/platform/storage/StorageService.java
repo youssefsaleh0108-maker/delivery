@@ -1,6 +1,8 @@
 package com.delivery.platform.storage;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -36,26 +38,46 @@ public class StorageService {
     private final FileMetadataRepository repository;
     private final StorageProperties properties;
 
+    @SuppressWarnings("deprecation")
     public StorageService(MinioClient internalClient, MinioClient presignClient,
                           FileMetadataRepository repository, StorageProperties properties) {
         this.internalClient = internalClient;
         this.presignClient = presignClient;
         this.repository = repository;
         this.properties = properties;
+        if (properties.getAllowedImageContentTypes() != null) {
+            // Said out loud because the setting now does nothing. A service that WIDENED the old
+            // global list (onboarding-service added PDF for applicant documents) loses nothing it
+            // needs, since the purpose carries that rule now; one that NARROWED it would silently
+            // accept more than it meant to. Startup is the one moment anybody reads this log.
+            log.warn("delivery.storage.minio.allowed-image-content-types is no longer consulted: "
+                    + "content types are per purpose since platform-storage 0.1.3. Remove it, and set "
+                    + "delivery.storage.minio.allowed-content-types.<PURPOSE> for any purpose whose "
+                    + "built-in list does not suit.");
+        }
+    }
+
+    /**
+     * The content types {@link #presignUpload} accepts for this purpose, so a caller can refuse a
+     * type with a message its user can act on before asking for a URL — without keeping a second
+     * list of its own that drifts from this one.
+     */
+    public List<String> allowedContentTypes(FilePurpose purpose) {
+        return properties.allowedContentTypesFor(purpose);
     }
 
     /**
      * Issues a presigned PUT and records a PENDING metadata row.
      *
      * @param ownerId     the caller's Keycloak {@code sub}; ownership of the resulting object
-     * @param purpose     determines the bucket and the read policy
-     * @param contentType validated against the allow-list before a URL is issued
+     * @param purpose     determines the bucket, the read policy and the content types allowed
+     * @param contentType validated against the purpose's allow-list before a URL is issued
      * @param keyPrefix   caller-supplied path prefix, e.g. {@code products/{productId}}
      */
     @Transactional
     public PresignedUpload presignUpload(String ownerId, FilePurpose purpose,
                                          String contentType, String keyPrefix) {
-        if (!properties.getAllowedImageContentTypes().contains(contentType)) {
+        if (contentType == null || !properties.allowedContentTypesFor(purpose).contains(contentType)) {
             throw new StorageException(
                     "Content type '" + contentType + "' is not allowed for " + purpose);
         }
@@ -140,6 +162,13 @@ public class StorageService {
      * <p>Publicly-readable buckets get a plain URL so the CDN can cache it; everything else gets a
      * short-TTL presigned GET, because those objects are private and a cacheable URL would defeat
      * the point.
+     *
+     * <p>A private object is also <strong>served as the content type that was checked</strong>
+     * ({@code response-content-type}), not as whatever header the uploader's PUT happened to carry.
+     * The presigned PUT cannot bind a Content-Type, so a file declared as a PDF at presign could be
+     * stored as {@code text/html} and would then render — script and all — in the MinIO origin for
+     * whoever opened it: a provider opening a customer's artwork, a reviewer opening a document.
+     * Pinning the served type to the allow-listed one closes that without reading the bytes.
      */
     public String readUrl(FileMetadata metadata) {
         if (metadata.getPurpose().isPubliclyReadable()) {
@@ -153,6 +182,7 @@ public class StorageService {
                             .bucket(metadata.getBucket())
                             .object(metadata.getObjectKey())
                             .expiry((int) properties.getPresignTtl().toSeconds(), TimeUnit.SECONDS)
+                            .extraQueryParams(Map.of("response-content-type", metadata.getContentType()))
                             .build());
         } catch (Exception e) {
             throw new StorageException("Could not presign download for " + metadata.getObjectKey(), e);
@@ -189,6 +219,7 @@ public class StorageService {
             case "image/jpeg" -> ".jpg";
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
             default -> "";
         };
         String prefix = (keyPrefix == null || keyPrefix.isBlank()) ? "" : requireSafe(keyPrefix) + "/";

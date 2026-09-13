@@ -193,6 +193,125 @@ class StorageServiceTest {
         }
     }
 
+    /**
+     * One allow-list per purpose. The global image list this replaced forced a service that needed
+     * PDF for one purpose to accept PDF for all of them, its public product-images bucket included.
+     */
+    @Nested
+    @DisplayName("content types, per purpose")
+    class ContentTypesPerPurpose {
+
+        @Test
+        void a_product_image_still_refuses_a_pdf() throws Exception {
+            assertThatThrownBy(() -> storage.presignUpload(
+                    "m", FilePurpose.PRODUCT_IMAGE, "application/pdf", "products/abc"))
+                    .isInstanceOf(StorageException.class)
+                    .hasMessageContaining("not allowed for PRODUCT_IMAGE");
+
+            verify(presignClient, never()).getPresignedObjectUrl(any());
+            verify(repository, never()).save(any());
+        }
+
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.ValueSource(strings = {
+                "application/pdf", "image/jpeg", "image/png"})
+        void an_order_attachment_may_be_a_pdf_a_jpeg_or_a_png(String contentType) throws Exception {
+            storage.presignUpload("customer-sub", FilePurpose.ORDER_ATTACHMENT, contentType,
+                    "attachments/customer-sub");
+
+            assertThat(capturePresign().bucket()).isEqualTo("order-attachments");
+            assertThat(captureSaved().getPurpose()).isEqualTo(FilePurpose.ORDER_ATTACHMENT);
+        }
+
+        /** WebP is a photo type every other purpose takes; a print shop's tools cannot be assumed to. */
+        @org.junit.jupiter.params.ParameterizedTest
+        @org.junit.jupiter.params.provider.ValueSource(strings = {
+                "image/webp", "image/svg+xml", "application/zip", "application/postscript",
+                "application/illustrator", "text/html"})
+        void an_order_attachment_refuses_everything_else(String contentType) throws Exception {
+            assertThatThrownBy(() -> storage.presignUpload("customer-sub",
+                    FilePurpose.ORDER_ATTACHMENT, contentType, "attachments/customer-sub"))
+                    .isInstanceOf(StorageException.class)
+                    .hasMessageContaining("not allowed for ORDER_ATTACHMENT");
+
+            verify(presignClient, never()).getPresignedObjectUrl(any());
+            verify(repository, never()).save(any());
+        }
+
+        @Test
+        void an_order_attachment_is_private() {
+            assertThat(FilePurpose.ORDER_ATTACHMENT.isPubliclyReadable()).isFalse();
+            assertThat(FilePurpose.ORDER_ATTACHMENT.bucket()).isEqualTo("order-attachments");
+        }
+
+        /** What onboarding-service used to get by widening the global list, now the purpose's own. */
+        @Test
+        void a_kyc_document_may_be_a_pdf() throws Exception {
+            storage.presignUpload("applicant", FilePurpose.MERCHANT_KYC, "application/pdf",
+                    "applications/1");
+
+            assertThat(capturePresign().bucket()).isEqualTo("merchant-kyc");
+        }
+
+        @Test
+        void a_missing_content_type_is_refused() {
+            assertThatThrownBy(() -> storage.presignUpload(
+                    "m", FilePurpose.ORDER_ATTACHMENT, null, "attachments/m"))
+                    .isInstanceOf(StorageException.class);
+        }
+
+        @Test
+        void a_configured_list_replaces_that_purpose_s_list_and_no_other() throws Exception {
+            properties.getAllowedContentTypes().put(FilePurpose.ORDER_ATTACHMENT,
+                    java.util.List.of("application/pdf"));
+
+            assertThatThrownBy(() -> storage.presignUpload(
+                    "m", FilePurpose.ORDER_ATTACHMENT, "image/jpeg", "attachments/m"))
+                    .isInstanceOf(StorageException.class);
+            storage.presignUpload("m", FilePurpose.PRODUCT_IMAGE, "image/jpeg", "products/abc");
+
+            assertThat(capturePresign().bucket()).isEqualTo("product-images");
+            assertThat(storage.allowedContentTypes(FilePurpose.ORDER_ATTACHMENT))
+                    .containsExactly("application/pdf");
+        }
+
+        /**
+         * onboarding-service still sets the old global list with PDF on it. On this version that
+         * must widen nothing — the whole point of the change.
+         */
+        @Test
+        @SuppressWarnings("deprecation")
+        void the_retired_global_image_list_widens_no_purpose() {
+            properties.setAllowedImageContentTypes(java.util.List.of(
+                    "image/jpeg", "image/png", "image/webp", "application/pdf"));
+            StorageService configured =
+                    new StorageService(internalClient, presignClient, repository, properties);
+
+            assertThatThrownBy(() -> configured.presignUpload(
+                    "m", FilePurpose.PRODUCT_IMAGE, "application/pdf", "products/abc"))
+                    .isInstanceOf(StorageException.class);
+            assertThatThrownBy(() -> configured.presignUpload(
+                    "m", FilePurpose.USER_AVATAR, "application/pdf", null))
+                    .isInstanceOf(StorageException.class);
+        }
+
+        @Test
+        void a_caller_can_read_the_list_it_will_be_held_to() {
+            assertThat(storage.allowedContentTypes(FilePurpose.ORDER_ATTACHMENT))
+                    .containsExactlyInAnyOrder("application/pdf", "image/jpeg", "image/png");
+            assertThat(storage.allowedContentTypes(FilePurpose.PRODUCT_IMAGE))
+                    .doesNotContain("application/pdf");
+        }
+
+        @Test
+        void a_pdf_keeps_its_extension() {
+            storage.presignUpload("m", FilePurpose.ORDER_ATTACHMENT, "application/pdf",
+                    "attachments/m");
+
+            assertThat(captureSaved().getObjectKey()).startsWith("attachments/m/").endsWith(".pdf");
+        }
+    }
+
     @Nested
     @DisplayName("confirming an upload")
     class Confirming {
@@ -326,6 +445,22 @@ class StorageServiceTest {
             GetPresignedObjectUrlArgs args = capturePresign();
             assertThat(args.method()).isEqualTo(Method.GET);
             assertThat(args.expiry()).isEqualTo((int) properties.getPresignTtl().toSeconds());
+        }
+
+        /**
+         * A presigned PUT cannot bind a Content-Type, so the served type is pinned when the read URL
+         * is signed, to the type the allow-list checked: HTML uploaded under a PDF's name must reach
+         * the provider who opens it as a PDF, never render as a page in the storage origin.
+         */
+        @Test
+        void a_private_file_is_served_as_the_type_that_was_checked() throws Exception {
+            FileMetadata artwork = new FileMetadata("order-attachments", "attachments/c/x.pdf",
+                    "customer", "application/pdf", FilePurpose.ORDER_ATTACHMENT);
+
+            storage.readUrl(artwork);
+
+            assertThat(capturePresign().extraQueryParams().get("response-content-type"))
+                    .containsExactly("application/pdf");
         }
 
         @Test
