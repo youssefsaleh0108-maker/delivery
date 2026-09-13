@@ -223,9 +223,11 @@ and the last sighting for one whose rider went quiet — the same rule as `/duty
   "YYYY-MM-DD"|omitted}` → the rider's assignments from today. Omitted date = today in the zone;
   never before today (400), at most 90 days ahead. **A change asked for today starts tomorrow once
   today is under way** — once the window of the rider's shift today, or of the shift they are
-  moving to, has begun — so assigning an 08:00–18:00 shift at 19:00 does not make today an absence,
-  and moving or freeing a rider does not rewrite or erase a late or an absence today already
-  earned. The answer's rows show the date the change took. The running assignment is closed the
+  moving to, has begun, or once the rider has worked today (credited duty time since midnight, or a
+  manual `PRESENT` for today) — so assigning an 08:00–18:00 shift at 19:00 does not make today an
+  absence, moving or freeing a rider does not rewrite or erase a late or an absence today already
+  earned, and a schedule set after a freelancer's morning does not turn that morning into overtime.
+  The answer's rows show the date the change took. The running assignment is closed the
   day before the change; one that had not started yet is replaced; a row that covered a window that
   has begun is always ended, never deleted. `shiftId: null` makes the rider a freelancer from that
   date. Assigning the shift a rider is already on is a no-op. A retired shift is 409.

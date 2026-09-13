@@ -13625,7 +13625,7 @@ abstract class DeliveryStrings {
   /// No description provided for @attendanceAssignNote.
   ///
   /// In en, this message translates to:
-  /// **'Schedules start today or later. Once today\'s shift has begun, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.'**
+  /// **'Schedules start today or later. Once today\'s shift has begun, or once the rider has worked today, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.'**
   String get attendanceAssignNote;
 
   /// No description provided for @attendanceAssignSave.

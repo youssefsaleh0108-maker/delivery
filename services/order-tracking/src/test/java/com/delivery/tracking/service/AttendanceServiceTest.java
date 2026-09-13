@@ -1073,6 +1073,42 @@ class AttendanceServiceTest {
                     .containsExactly(monday, monday.plusDays(1));
         }
 
+        /**
+         * Saturday the 10th is a day off in a weekday shift. The freelancer worked 07:00-09:00, and at
+         * 10:00 is put on the weekday shift from today: applied today, that morning would become
+         * overtime on a scheduled day off. So the change waits for tomorrow.
+         */
+        @Test
+        void a_change_for_today_after_the_rider_worked_today_starts_tomorrow() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            worked("2026-10-10T07:00", "2026-10-10T09:00");
+            keepWrites();
+            Instant tenAm = local("2026-10-10T10:00");
+
+            service.assign(RIDER, DISPATCHER, day.getId(), null, tenAm);
+
+            assertThat(assignmentRows).extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(LocalDate.of(2026, 10, 11));
+            AttendanceDay saturday = day(service.compute(RIDER, CARRIER, OCTOBER, tenAm), "2026-10-10");
+            assertThat(saturday.status()).isEqualTo(Status.WORKED);
+            assertThat(saturday.overtimeSeconds()).isZero();
+        }
+
+        /** Work the office typed in for today holds a change back just as the app's evidence does. */
+        @Test
+        void a_change_for_today_after_a_present_was_logged_today_starts_tomorrow() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            AttendanceEntry typed = entry("2026-10-10", AttendanceEntry.Kind.PRESENT, "07:00", "09:00");
+            when(entries.findByRiderIdAndCarrierIdAndWorkDateAndRevokedAtIsNull(RIDER, CARRIER,
+                    LocalDate.of(2026, 10, 10))).thenReturn(Optional.of(typed));
+            keepWrites();
+
+            service.assign(RIDER, DISPATCHER, day.getId(), null, local("2026-10-10T10:00"));
+
+            assertThat(assignmentRows).extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(LocalDate.of(2026, 10, 11));
+        }
+
         /** Before either shift has begun today, a change for today still applies to today. */
         @Test
         void before_todays_shifts_begin_a_change_for_today_applies_today() {

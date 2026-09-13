@@ -548,8 +548,9 @@ public class AttendanceService {
      * day before, and anything that had been set up to start later is replaced.
      *
      * <p>Nor does it re-judge a day already under way. Once the window of the rider's shift today,
-     * or of the shift they are moving to, has begun, a change asked for today starts tomorrow —
-     * so a row that covered a window that has begun is always ended, never deleted.
+     * or of the shift they are moving to, has begun — or once the rider has worked today — a change
+     * asked for today starts tomorrow, so a row that covered a window that has begun is always
+     * ended, never deleted.
      *
      * <p>A rider can be scheduled the day they are hired: Order Manager's word that they are on the
      * fleet is enough ({@link DutySessionService#requireWritable}), with no wait for tracking to link
@@ -594,8 +595,13 @@ public class AttendanceService {
         // rider is on, or the one they are moving to — so from then a change asked for today waits
         // for tomorrow. Otherwise an 08:00-18:00 shift assigned at 19:00 would mark the day just
         // gone absent, and moving or freeing a rider would rewrite or erase a late or an absence
-        // already earned. Before either window begins, today is still ahead of both schedules.
-        LocalDate from = requested.equals(today) && todayUnderWay(riderId, carrier, shift, today, now)
+        // already earned. Before either window begins, today is still ahead of both schedules —
+        // unless the rider has worked today already. Those hours would be re-read against the new
+        // week (a freelancer's morning turned into overtime on a day off), so then too the change
+        // waits for tomorrow.
+        LocalDate from = requested.equals(today)
+                && (todayUnderWay(riderId, carrier, shift, today, now)
+                        || workedToday(riderId, carrier, today, now))
                 ? today.plusDays(1)
                 : requested;
 
@@ -639,6 +645,35 @@ public class AttendanceService {
         ShiftTemplate current = scheduleFor(riderId, carrier, new AttendancePeriod(today, today))
                 .shiftOn(today);
         return begun(current, today, zone, now) || begun(next, today, zone, now);
+    }
+
+    /**
+     * Whether today's record already holds work for this company: credited duty time since midnight
+     * inside the rider's time on the fleet, or a manual PRESENT for today. A schedule change for
+     * today would re-read that work against another week — a freelancer's morning becoming overtime
+     * on a day off, or an arrival becoming a late — so it waits for tomorrow instead.
+     */
+    private boolean workedToday(String riderId, UUID carrier, LocalDate today, Instant now) {
+        boolean typed = entries
+                .findByRiderIdAndCarrierIdAndWorkDateAndRevokedAtIsNull(riderId, carrier, today)
+                .filter(entry -> entry.getStatus() == AttendanceEntry.Kind.PRESENT)
+                .isPresent();
+        if (typed) {
+            return true;
+        }
+        Instant midnight = today.atStartOfDay(zone()).toInstant();
+        if (!midnight.isBefore(now)) {
+            return false;
+        }
+        List<SessionView> sessions = dutySessions.views(riderId, midnight, now, now);
+        if (sessions.isEmpty()) {
+            return false;
+        }
+        return dutySessions
+                .clippedTo(sessions, fleetGuard.membershipWindows(carrier, riderId, midnight, now))
+                .stream()
+                .anyMatch(session -> session.countedUntil().isAfter(
+                        session.startedAt().isAfter(midnight) ? session.startedAt() : midnight));
     }
 
     /** Whether {@code shift} runs on {@code day} and that day's window has started by {@code now}. */
