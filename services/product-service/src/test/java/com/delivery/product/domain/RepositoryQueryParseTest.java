@@ -50,6 +50,7 @@ class RepositoryQueryParseTest {
                 .addAnnotatedClass(ProductOption.class)
                 .addAnnotatedClass(ProductOptionGroup.class)
                 .addAnnotatedClass(ReviewableOrder.class)
+                .addAnnotatedClass(ServiceTerms.class)
                 .addAnnotatedClass(Store.class)
                 .addAnnotatedClass(StoreDeliveryZone.class)
                 .addAnnotatedClass(StoreFavorite.class)
@@ -161,6 +162,30 @@ class RepositoryQueryParseTest {
                 WHERE p.giftFeatured = true
                   AND p.status = com.delivery.product.domain.Product$Status.ACTIVE
                 ORDER BY p.giftFeaturedAt DESC, p.id ASC
+                """);
+    }
+
+    /**
+     * The services marketplace's reads, straight off the repositories' annotations so they cannot
+     * drift: the customer's offer search with its shop subquery, and the "Popular" count two subqueries
+     * deep. Plus what the derived status count generates, and the terms' columns as ServiceTerms maps
+     * them, which {@code ddl-auto: validate} would otherwise be the first to check.
+     */
+    @Test
+    void the_service_offer_queries_parse() throws NoSuchMethodException {
+        parses(ProductRepository.class.getMethod("findListedServiceOffers", java.util.Collection.class,
+                        String.class, org.springframework.data.domain.Pageable.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses(DeliveredOrderLineRepository.class.getMethod("countDeliveredOrdersOfListedServiceOffers",
+                        java.util.Collection.class, long.class,
+                        org.springframework.data.domain.Pageable.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+
+        parses("SELECT p FROM Product p WHERE p.merchantId = :merchantId AND p.status = :status");
+        parses("""
+                SELECT t.productId, t.pricingType, t.unitLabel, t.unitSize, t.turnaroundMinHours,
+                       t.turnaroundMaxHours, t.fulfilmentModes, t.attachmentPolicy, t.instructionsPrompt
+                FROM ServiceTerms t
                 """);
     }
 

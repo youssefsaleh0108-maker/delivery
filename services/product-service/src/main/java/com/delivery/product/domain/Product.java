@@ -29,6 +29,18 @@ public class Product {
         /** Visible to customers and orderable. */
         ACTIVE,
         /**
+         * A service offer its provider has taken off sale for now (V35).
+         *
+         * <p>Hidden from customers and refused at placement exactly like a draft: every customer read
+         * asks for ACTIVE, and order-manager refuses anything else. Unlike an archived product it is
+         * kept whole, with its photos, options and terms, so resuming it puts it back as it was.
+         *
+         * <p>Only service offers are paused ({@code CatalogService}). Installed goods merchant apps
+         * read a status they do not know as DRAFT, and archiving is already how those apps take a
+         * product off sale.
+         */
+        PAUSED,
+        /**
          * Withdrawn from sale. Products are archived, never deleted, because past orders reference
          * them and an order history that cannot name what was bought is worthless.
          */
@@ -205,6 +217,34 @@ public class Product {
     public void archive() {
         this.status = Status.ARCHIVED;
         unfeatureAsGift();
+    }
+
+    /**
+     * Takes a live offer off sale for now, keeping everything about it.
+     *
+     * <p>Only from ACTIVE: a draft was never on sale, and an archived product comes back by being
+     * published on purpose, not by a resume.
+     */
+    public void pause() {
+        if (this.status != Status.ACTIVE) {
+            throw new IllegalStateException("Only a live offer can be paused; this one is " + status);
+        }
+        this.status = Status.PAUSED;
+    }
+
+    /**
+     * Puts a paused offer back on sale, under the rule {@link #publish} applies: a listing with no
+     * photo would be a blank card, and a photo removed while the offer was paused is exactly that case.
+     */
+    public void resume() {
+        if (this.status != Status.PAUSED) {
+            throw new IllegalStateException("Only a paused offer can be resumed; this one is " + status);
+        }
+        if (this.imageRefs.isEmpty()) {
+            throw new IllegalStateException(
+                    "An offer needs at least one photo before it can be resumed");
+        }
+        this.status = Status.ACTIVE;
     }
 
     /**
