@@ -75,9 +75,14 @@ ALTER TABLE cash_float
 
 -- A company's own rows always carry its own id as the carrier, so "everything this company is
 -- answerable for" is one column to filter on rather than two that could disagree.
+--
+-- NOT NULL is spelt out because a CHECK only refuses a row when it is FALSE, and "carrier_ref =
+-- holder_ref" with no carrier_ref is NULL, not false: on its own it would let a company's row in
+-- with no company on it — exactly the row that filter would never find. Safe on existing data: no
+-- PROVIDER row was ever written before this migration, and the entity names the company on every one.
 ALTER TABLE cash_float
     ADD CONSTRAINT chk_float_provider_carrier
-        CHECK (holder_kind <> 'PROVIDER' OR carrier_ref = holder_ref);
+        CHECK (holder_kind <> 'PROVIDER' OR (carrier_ref IS NOT NULL AND carrier_ref = holder_ref));
 
 CREATE UNIQUE INDEX uq_float_request_key
     ON cash_float (request_key)
@@ -93,12 +98,18 @@ CREATE INDEX idx_float_carrier_created
     ON cash_float (carrier_ref, entry_kind, created_at DESC)
     WHERE carrier_ref IS NOT NULL;
 
--- BACKFILL: which company each historical collection was carried for.
+-- BACKFILL: which company each historical collection still outstanding was carried for.
 --
 -- From the order's own PROVIDER_CREDIT leg, which settlement attributes to the company (V47) — the
 -- same fact the new write path records, read from where it was already written. Only rider door
--- collections are touched; nothing is cleared or re-owned, so every outstanding balance, statement
--- and float total reads exactly as it did before this ran.
+-- collections are touched; nothing is cleared or re-owned, so every outstanding balance and float
+-- total reads exactly as it did before this ran.
+--
+-- And only collections nobody has cleared. Cash a company's rider had already banked with the
+-- platform before this ran was the platform's, and a remittance row says it arrived. Stamping the
+-- company on it would rewrite that history without moving a cent: the rider's past statements
+-- would call it owed to their company beside the "Cash banked" line that paid it, and the company's
+-- past days would show it collected and never handed over. Left unstamped, it reads as what it was.
 UPDATE cash_float f
    SET carrier_ref = t.counterparty_ref
   FROM transactions t
@@ -107,6 +118,7 @@ UPDATE cash_float f
    AND t.counterparty_kind = 'CARRIER'
    AND f.entry_kind = 'COLLECTED'
    AND f.holder_kind = 'RIDER'
+   AND f.cleared_by IS NULL
    AND f.carrier_ref IS NULL;
 
 -- A second source for orders settled before V47 attributed legs: the rider's own job row names the
@@ -124,4 +136,5 @@ UPDATE cash_float f
    AND r.carrier_ref IS NOT NULL
    AND f.entry_kind = 'COLLECTED'
    AND f.holder_kind = 'RIDER'
+   AND f.cleared_by IS NULL
    AND f.carrier_ref IS NULL;
