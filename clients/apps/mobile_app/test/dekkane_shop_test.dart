@@ -285,7 +285,7 @@ void main() {
       expect(cart.qtyOf('p-zaatar'), 0);
     });
 
-    testWidgets('from another shop\'s basket it asks before replacing it',
+    testWidgets('from another shop\'s basket the shelf item joins it, and nothing is replaced',
         (WidgetTester tester) async {
       final Cart cart = Cart()..add(product('p-other', 's2', 5), from: storeCard('s2'));
       await pumpShop(tester, cart: cart);
@@ -293,8 +293,30 @@ void main() {
       await tester.tap(addOn('Local Halloumi Cheese'));
       await tester.pumpAndSettle();
 
-      expect(find.text(en.startNewBasket), findsOneWidget);
-      expect(cart.storeId, 's2', reason: 'Nothing is replaced until the customer says so.');
+      // A basket holds several shops now: the dekkane's item is added, and nothing offers to throw
+      // the other shop's basket away.
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text(en.startNewBasket), findsNothing);
+      expect(cart.qtyOf('p-halloumi'), 1);
+      expect(cart.qtyOf('p-other'), 1, reason: 'The other shop\'s item is still in the basket.');
+      expect(cart.storeIds, containsAll(<String>['s1', 's2']));
+    });
+
+    testWidgets('past the basket\'s shop limit the tap is explained, and the basket keeps every shop',
+        (WidgetTester tester) async {
+      final Cart cart = Cart();
+      for (final String shop in <String>['s2', 's3', 's4']) {
+        cart.add(product('p-$shop', shop, 5), from: storeCard(shop));
+      }
+      await pumpShop(tester, cart: cart);
+
+      await tester.tap(addOn('Local Halloumi Cheese'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(en.multiCartShopLimitTitle(Cart.maxShops)), findsOneWidget);
+      expect(find.text(en.multiCartShopLimitBody), findsOneWidget);
+      expect(cart.qtyOf('p-halloumi'), 0);
+      expect(cart.storeIds, <String>['s2', 's3', 's4']);
     });
 
     testWidgets('the LBP line exists only once there is a rate to convert with',
