@@ -45,6 +45,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.accountContact,
     this.onEditAccount,
     this.onShopProfile,
+    this.onShopMessages,
     this.onCategories,
     this.onStaff,
     this.onStockCount,
@@ -70,6 +71,11 @@ class MerchantSettingsScreen extends StatelessWidget {
 
   /// Opens the shop's own configuration — `StoreScreen` in this package.
   final VoidCallback? onShopProfile;
+
+  /// Opens the shop's conversations with customers ([ShopInboxScreen]). Right under the shop's own
+  /// profile, because both are the shop as customers meet it. Absent, not disabled, when the host has
+  /// no chat client — the same contract as the management rows below.
+  final VoidCallback? onShopMessages;
 
   /// The merchant suite's three management pages, hung off Settings rather than given a tab
   /// each: a shop reorganises its shelves and its roster a few times a year, not a few times a
@@ -254,6 +260,14 @@ class MerchantSettingsScreen extends StatelessWidget {
             title: t.merchbShopProfile,
             onTap: onShopProfile,
           ),
+          if (onShopMessages != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.forum_outlined,
+              title: t.chatShopInboxTitle,
+              onTap: onShopMessages,
+            ),
+          ],
           if (onCategories != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             _MenuRow(

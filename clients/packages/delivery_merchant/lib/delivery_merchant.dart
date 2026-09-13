@@ -42,6 +42,11 @@ export 'src/order_detail_screen.dart';
 export 'src/orders_screen.dart';
 export 'src/product_form_screen.dart';
 export 'src/product_list_screen.dart';
+// A shop's conversations with its customers, and one conversation. Mounted by the mobile shell from
+// Settings and by the portal's merchant rail; the customer app opens the same thread screen from a
+// shop's page, so both ends of one conversation are one widget and cannot drift apart.
+export 'src/shop_inbox_screen.dart';
+export 'src/shop_thread_screen.dart';
 export 'src/store_screen.dart';
 // The map pin's own parts — the preview that sits in the shop-config frame's map slot and the
 // picker behind it. Exported for the same reason the metric cards are: a host or a test has to be
