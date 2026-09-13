@@ -265,6 +265,10 @@ Money? sumMoney(Iterable<Money?> amounts) {
 
 /// The rider balances as CSV: one header line, one line per rider, amounts exactly as the ledger
 /// wrote them.
+///
+/// Every cell is written either as text or as a figure, and the difference matters: text goes
+/// through [_csvText], which is what makes the file safe to open, while a figure the ledger wrote
+/// stays a number the spreadsheet can add up.
 String carrierCashCsv(DeliveryStrings t, CarrierCashOverview overview) {
   String standing(RiderCashLine l) => switch (l.standing) {
         RiderCashStanding.holding => t.carrCashStatusHolding,
@@ -275,30 +279,62 @@ String carrierCashCsv(DeliveryStrings t, CarrierCashOverview overview) {
 
   final List<List<String>> rows = <List<String>>[
     <String>[
-      t.carrCashColRider,
-      t.carrCashCsvRiderId,
-      t.carrCashColCollected,
-      t.carrCashColEarned,
-      t.carrCashColHolding,
-      t.carrCashCsvOrdersHeld,
-      t.carrCashCsvOldest,
-      t.carrCashColLastHandover,
-      t.carrCashColStatus,
+      for (final String heading in <String>[
+        t.carrCashColRider,
+        t.carrCashCsvRiderId,
+        t.carrCashColCollected,
+        t.carrCashColEarned,
+        t.carrCashColHolding,
+        t.carrCashCsvOrdersHeld,
+        t.carrCashCsvOldest,
+        t.carrCashColLastHandover,
+        t.carrCashColStatus,
+      ])
+        _csvText(heading),
     ],
     for (final RiderCashLine l in overview.riders)
       <String>[
-        l.name ?? '',
-        l.riderRef,
-        l.collected?.amount ?? '',
-        l.earned?.amount ?? '',
-        l.holding?.amount ?? '',
+        _csvText(l.name ?? ''),
+        _csvText(l.riderRef),
+        _csvMoney(l.collected),
+        _csvMoney(l.earned),
+        _csvMoney(l.holding),
         '${l.orders}',
         l.oldest == null ? '' : l.oldest!.toUtc().toIso8601String(),
         l.lastHandoverAt == null ? '' : l.lastHandoverAt!.toUtc().toIso8601String(),
-        standing(l),
+        _csvText(standing(l)),
       ],
   ];
-  return '${rows.map((List<String> r) => r.map(_csvField).join(',')).join('\r\n')}\r\n';
+  return '${rows.map((List<String> r) => r.join(',')).join('\r\n')}\r\n';
+}
+
+/// What a spreadsheet reads as the start of a formula. See [_csvText].
+const List<String> _formulaLeads = <String>['=', '+', '-', '@', '\t', '\r'];
+
+/// A cell of text, made safe to open in a spreadsheet and then quoted the way [_csvField] quotes.
+///
+/// Excel, Google Sheets and LibreOffice run a cell that starts with `=`, `+`, `-` or `@` as a
+/// formula, and a leading tab or carriage return is on the same list because some of them skip it
+/// and read the formula behind. A rider's name here is whatever they typed into their own account,
+/// so a rider calling themselves `=HYPERLINK(...)` would have it run on the hub's computer the
+/// moment somebody opened the export. A leading apostrophe is the spreadsheet's own mark for "this
+/// is text", and the quotes keep it inside the one cell.
+///
+/// Applied to every text cell, headings and labels included — not only to the name a stranger
+/// types today, because the next column somebody adds is the one nobody thinks to check.
+String _csvText(String value) {
+  if (_formulaLeads.any(value.startsWith)) {
+    return '"\'${value.replaceAll('"', '""')}"';
+  }
+  return _csvField(value);
+}
+
+/// A figure exactly as the ledger wrote it, left a number the sheet can add — a leading minus and
+/// all. Only a figure this client can read as one ([Money.isReadable]) is written bare: anything
+/// else the server sent is text, and gets the text treatment.
+String _csvMoney(Money? money) {
+  if (money == null) return '';
+  return money.isReadable ? money.amount : _csvText(money.amount);
 }
 
 /// Quoted when it has to be, with quotes doubled — RFC 4180, which every spreadsheet reads.

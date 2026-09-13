@@ -416,6 +416,48 @@ void main() {
     expect(lines[3], startsWith('Rania Ghandour,rider-rania,0.00,0.00,0.00,0,,'));
   });
 
+  testWidgets('Export CSV cannot slip a formula into the hub\'s spreadsheet',
+      (WidgetTester tester) async {
+    // A rider's name is whatever they typed into their own account. A cell that starts with = + - @
+    // (or a tab or carriage return) runs as a formula when the file is opened, so every text cell
+    // leads with an apostrophe and is quoted — while a figure the ledger wrote, minus sign and all,
+    // stays a number.
+    Map<String, dynamic> named(String ref, String name, {String earned = '0.00'}) => _rider(
+          ref,
+          name,
+          collected: '0.00',
+          earned: earned,
+          holding: '0.00',
+          orders: 0,
+          standing: 'SETTLED',
+        );
+    server.respond = (_) => _json(_overview(riders: <Map<String, dynamic>>[
+          named('rider-1', '=HYPERLINK("http://evil.example","Payslip")', earned: '-0.75'),
+          named('rider-2', '+1+1'),
+          named('rider-3', '-2+3'),
+          named('rider-4', '@SUM(A1:A9)'),
+          named('rider-5', '\t=1+1'),
+          named('rider-6', '\r=1+1'),
+          named('rider-7', 'Kanaan, Youssef'),
+        ]));
+    await pump(tester);
+
+    await tester.tap(find.text('Export CSV'));
+    await tester.pumpAndSettle();
+
+    final String csv = savedCsv!;
+    expect(csv,
+        contains('\r\n"\'=HYPERLINK(""http://evil.example"",""Payslip"")",rider-1,0.00,-0.75,'));
+    expect(csv, contains('\r\n"\'+1+1",rider-2,'));
+    expect(csv, contains('\r\n"\'-2+3",rider-3,'));
+    expect(csv, contains('\r\n"\'@SUM(A1:A9)",rider-4,'));
+    expect(csv, contains('\r\n"\'\t=1+1",rider-5,'));
+    expect(csv, contains('\r\n"\'\r=1+1",rider-6,'));
+    // Ordinary text is quoted only where RFC 4180 already asked for it, and never marked.
+    expect(csv, contains('\r\n"Kanaan, Youssef",rider-7,'));
+    expect(csv, isNot(contains('\r\n=')));
+  });
+
   testWidgets('View opens the rider\'s settlement page in place, and Back returns to the list',
       (WidgetTester tester) async {
     await pump(tester);
