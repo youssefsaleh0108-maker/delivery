@@ -24,6 +24,10 @@ dependencies:
   # implementation, and it has an endorsed Android one too — which is what lets these screens run
   # on the phone unchanged.
   file_selector: ^1.0.3
+  # Merchant Blitz's "Take photo", and nothing else. file_selector opens a file picker on every
+  # platform and cannot start the camera, which is the whole point of photographing a shelf. Used
+  # only where a camera exists (Android and iOS); the web and the gallery path stay on file_selector.
+  image_picker: ^1.0.7
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
 

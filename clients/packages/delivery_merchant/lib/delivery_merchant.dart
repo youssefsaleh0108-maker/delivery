@@ -23,6 +23,11 @@ export 'src/pos/pos_terminal_screen.dart';
 export 'src/staff_screen.dart';
 export 'src/stock_alerts_screen.dart';
 export 'src/stock_count_screen.dart';
+// Merchant Blitz: the shelf-photo scan and the review behind it. The review is exported with the
+// scan because the scan pushes it and a host's tests have to be able to name both; the photo source
+// seam is exported so a host (or a test) can stand in for the camera.
+export 'src/catalog_scan_review_screen.dart';
+export 'src/merchant_blitz_screen.dart';
 // The shop's own daily series as a page. Exported as well as reachable from settings, so a host
 // with room for it in a rail can mount it directly instead of hiding it one tap into a menu.
 export 'src/merchant_analytics_screen.dart';
