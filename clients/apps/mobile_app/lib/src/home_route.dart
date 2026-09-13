@@ -29,6 +29,10 @@ enum HomeSurface {
 /// would land in the rider queue, because the priority below puts riders first — the opposite of
 /// what they had just said. It lasts for the session; a cold start routes on priority alone.
 ///
+/// It is also the role switch. A customer who became a services provider holds CUSTOMER and MERCHANT,
+/// and priority alone would keep them in the shop for good; the profile menu's "Switch to your shop"
+/// and the shop's "Switch to shopping" set the preference, and this honours it.
+///
 /// The pending check comes before the preference on purpose: somebody holding APPLICANT and no
 /// explorable surface has nowhere else to go, whatever they asked for.
 HomeSurface homeFor(Set<DeliveryRole> roles, {DeliveryRole? preferred}) {

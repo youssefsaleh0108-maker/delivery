@@ -1,13 +1,13 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'application_documents_step.dart';
+import 'application_refusals.dart';
 import 'one_time_code.dart';
 import 'passcode_pad.dart';
 import 'payout_details_step.dart';
@@ -429,14 +429,9 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
 
   // ---------------------------------------------------------------- the calls
 
-  /// The server's own words where it has any — they are written to be acted on.
-  String _messageFrom(Object e) {
-    if (e is DioException) {
-      final Object? body = e.response?.data;
-      if (body is Map && body['message'] is String) return body['message'] as String;
-    }
-    return DeliveryStrings.of(context).thatDidNotGoThrough;
-  }
+  /// The server's own words where it has any — they are written to be acted on. Shared with the
+  /// services signup; see application_refusals.dart.
+  String _messageFrom(Object e) => applicationServerMessage(DeliveryStrings.of(context), e);
 
   Future<void> _sendCode(String channel, String destination) async {
     setState(() {
@@ -691,23 +686,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
   /// added. The server now names the refusals it knows with a `code`, and a 502 there always means
   /// the same thing, so those are said here. Anything else — the domain's own refusals, or a code
   /// this build does not know — falls back to [_messageFrom], exactly as on the open form.
-  String _accountRefusalFrom(Object e) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    if (e is DioException) {
-      // The record is in and only the roles are missing; the same call, retried, finishes it.
-      if (e.response?.statusCode == 502) return t.wizAccountRolesRetry;
-      final Object? body = e.response?.data;
-      switch (body is Map ? body['code'] : null) {
-        case 'already-partner':
-          return t.accountAlreadyPartner;
-        case 'other-application':
-          return t.accountOtherApplication;
-        case 'email-unverified':
-          return t.accountEmailUnverified;
-      }
-    }
-    return _messageFrom(e);
-  }
+  String _accountRefusalFrom(Object e) => applicationRefusal(DeliveryStrings.of(context), e);
 
   /// Creates the applicant's account and signs them in with the passcode they chose on step one.
   ///

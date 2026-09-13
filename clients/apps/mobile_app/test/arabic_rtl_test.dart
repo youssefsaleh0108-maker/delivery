@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:dio/dio.dart';
 import 'package:mobile_app/src/butler_screen.dart';
@@ -8,6 +10,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/address_sheet.dart';
 import 'package:mobile_app/src/delivery_address.dart';
+import 'package:mobile_app/src/service_signup_screen.dart';
 
 // Arabic is not a translation file — it is whether the app works for the people it is for.
 //
@@ -208,4 +211,99 @@ void main() {
           TextDirection.ltr);
     });
   });
+
+  group('the services signup in Arabic', () {
+    testWidgets('lays out right-to-left, in Arabic, down to the service names',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+      final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+        ..httpClientAdapter = _ServiceOptionsServer();
+
+      await tester.pumpWidget(MaterialApp(
+        locale: const Locale('ar'),
+        supportedLocales: LocaleController.supported,
+        localizationsDelegates: const <LocalizationsDelegate<Object>>[
+          DeliveryStrings.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: ServiceProviderSignupScreen(
+          api: OnboardingApi(dio),
+          authService: AuthService(
+            config: const AuthConfig(
+              issuer: 'https://iam.test/realms/delivery-platform',
+              clientId: 'mobile-app',
+              redirectUrl: 'com.delivery.app://oauth2redirect',
+            ),
+            oidcClient: _NoBrowser(),
+          ),
+          onFinished: (AuthSession _) {},
+          onClose: () {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
+      final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
+
+      expect(Directionality.of(tester.element(find.text(ar.svcSignupTitle))), TextDirection.rtl);
+      expect(find.text(ar.svcSignupBannerTitle), findsOneWidget);
+      expect(find.text(ar.svcSignupBannerBody), findsOneWidget);
+      expect(find.text(ar.svcApplyCta), findsOneWidget);
+      expect(find.text(en.svcSignupTitle), findsNothing);
+      expect(find.text(en.svcApplyCta), findsNothing);
+
+      // The services are named in Arabic too — and only the open ones are offered.
+      await tester.tap(find.text(ar.svcServiceCategoryHint));
+      await tester.pumpAndSettle();
+      expect(find.text(ar.svcCategoryPrinting), findsOneWidget);
+      expect(find.text(en.svcCategoryPrinting), findsNothing);
+      expect(find.text(ar.svcCategoryCleaning), findsNothing);
+    });
+  });
+}
+
+/// The services signup's options, as onboarding-service serves them. Nothing else is expected.
+class _ServiceOptionsServer implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? requestStream,
+      Future<void>? cancelFuture) async {
+    final bool options_ = options.path == '/api/onboarding/service-options';
+    return ResponseBody.fromString(
+      jsonEncode(options_
+          ? <String, Object?>{
+              'categories': <String>['PRINTING', 'TAILORING'],
+              'areas': <Map<String, String>>[
+                <String, String>{'zoneId': 'zone-hamra', 'name': 'الحمرا'},
+              ],
+            }
+          : <String, Object?>{'message': 'not expected'}),
+      options_ ? 200 : 404,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// An identity provider nobody signs in through: the screen is only drawn here, never submitted.
+class _NoBrowser implements OidcClient {
+  @override
+  Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async => null;
+
+  @override
+  Future<TokenSet?> completeRedirect(AuthConfig config) async => null;
+
+  @override
+  Future<TokenSet> refresh(AuthConfig config, String refreshToken) =>
+      throw UnsupportedError('not signed in');
+
+  @override
+  Future<void> signOut(AuthConfig config, String? refreshToken) async {}
 }

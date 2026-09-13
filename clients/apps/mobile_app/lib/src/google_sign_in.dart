@@ -59,6 +59,11 @@ class AccountIntentOptions extends StatelessWidget {
         const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
         option(AccountIntent.seller, Icons.storefront_outlined, t.accountIntentSeller,
             t.accountIntentSellerBlurb),
+        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+        // A print shop, a tailor, a repairer: a seller to the platform, but one the services signup
+        // asks the right questions of.
+        option(AccountIntent.services, Icons.design_services_outlined, t.svcIntent,
+            t.svcIntentBlurb),
       ],
     );
   }

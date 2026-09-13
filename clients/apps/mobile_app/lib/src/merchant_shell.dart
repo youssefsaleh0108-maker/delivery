@@ -7,6 +7,7 @@ import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:flutter/material.dart';
 
 import 'notifications_screen.dart' show NotificationPrefsScreen;
+import 'services_shop_bootstrap.dart';
 import 'settings_screen.dart';
 
 /// The shop's surface: the five-tab app the merchant suite draws.
@@ -47,6 +48,8 @@ class MerchantShell extends StatefulWidget {
     required this.session,
     required this.locale,
     this.pendingApproval = false,
+    this.onboardingApi,
+    this.onSwitchToShopping,
     required this.onSignOut,
   });
 
@@ -100,6 +103,15 @@ class MerchantShell extends StatefulWidget {
   /// True while the application behind this account is still being decided.
   final bool pendingApproval;
 
+  /// The account's own application, for opening an approved services provider's shop on their first
+  /// entry ([ServicesShopBootstrap]). Null skips that, which is where every shell stood before
+  /// services existed.
+  final OnboardingApi? onboardingApi;
+
+  /// Takes an owner who is also a customer to the customer app — the Settings row of the role switch.
+  /// Null hides the row.
+  final VoidCallback? onSwitchToShopping;
+
   final Future<void> Function() onSignOut;
 
   @override
@@ -133,6 +145,13 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Timer? _poll;
 
+  /// True while an approved services provider's shop is being opened: the one moment the shell shows
+  /// nothing else, because every tab needs the shop.
+  bool _openingServicesShop = false;
+
+  /// Opening that shop failed. The shell says so and offers a retry rather than tabs that cannot work.
+  bool _servicesShopFailed = false;
+
   @override
   void initState() {
     super.initState();
@@ -153,11 +172,40 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Future<void> _resolveStore() async {
     String? storeId;
-    try {
-      final Paged<Store> mine = await widget.storeApi.mine(size: 1);
-      if (mine.content.isNotEmpty) storeId = mine.content.first.id;
-    } catch (_) {
-      // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
+    final OnboardingApi? onboarding = widget.onboardingApi;
+    if (onboarding != null && widget.session.hasRole(DeliveryRole.merchant)) {
+      // An approved services provider's shop is opened here, before anything else, from their
+      // application (see [ServicesShopBootstrap]). Everybody else gets the shop `mine` always gave
+      // them, and the shell carries on exactly as before.
+      final ServicesShopOutcome outcome = await ServicesShopBootstrap(
+        stores: widget.storeApi,
+        onboarding: onboarding,
+      ).run(onOpening: () {
+        if (mounted) setState(() => _openingServicesShop = true);
+      });
+      if (!mounted) return;
+      switch (outcome) {
+        case ServicesShopReady(:final Store store):
+          storeId = store.id;
+        case NotServicesProvider(storeId: final String? standing):
+          storeId = standing;
+        case ServicesApplicationPending(storeId: final String? standing):
+          storeId = standing;
+        case ServicesShopFailed():
+          setState(() {
+            _openingServicesShop = false;
+            _servicesShopFailed = true;
+          });
+          return;
+      }
+      if (_openingServicesShop) setState(() => _openingServicesShop = false);
+    } else {
+      try {
+        final Paged<Store> mine = await widget.storeApi.mine(size: 1);
+        if (mine.content.isNotEmpty) storeId = mine.content.first.id;
+      } catch (_) {
+        // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
+      }
     }
     if (storeId == null && widget.staffApi != null) {
       // An employee owns no store, so `mine` is empty for them; their membership names the shop.
@@ -304,6 +352,7 @@ class _MerchantShellState extends State<MerchantShell> {
               ? _openStockCount
               : null,
           onCatalogScan: _mayScan && widget.catalogScanApi != null ? _openBlitz : null,
+          onSwitchToShopping: widget.onSwitchToShopping,
           onSignOut: () => widget.onSignOut(),
         );
     }
@@ -438,6 +487,17 @@ class _MerchantShellState extends State<MerchantShell> {
     final List<MerchantTab> tabs = _visibleTabs();
     final int current = tabs.indexOf(_tab).clamp(0, tabs.length - 1);
 
+    if (_openingServicesShop || _servicesShopFailed) {
+      return _ServicesShopGate(
+        failed: _servicesShopFailed,
+        onRetry: () {
+          setState(() => _servicesShopFailed = false);
+          _resolveStore();
+        },
+        onSignOut: widget.onSignOut,
+      );
+    }
+
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       // Edge-to-edge: the shell paints its background behind the now-transparent status bar, and
@@ -455,6 +515,64 @@ class _MerchantShellState extends State<MerchantShell> {
         currentIndex: current,
         onTap: (int index) => _open(tabs[index]),
         items: <YdBottomNavItem>[for (final MerchantTab tab in tabs) _itemFor(tab, t)],
+      ),
+    );
+  }
+}
+
+/// What an approved services provider sees while their shop is being opened, or when it could not be.
+///
+/// Nothing else is drawn: every tab needs the shop, and a dashboard for a shop that does not exist
+/// would only fail five different ways. Sign-out stays in reach, so nobody is trapped behind a retry
+/// that keeps failing.
+class _ServicesShopGate extends StatelessWidget {
+  const _ServicesShopGate({
+    required this.failed,
+    required this.onRetry,
+    required this.onSignOut,
+  });
+
+  final bool failed;
+  final VoidCallback onRetry;
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      body: SafeArea(
+        child: Center(
+          child: failed
+              ? YdEmptyState(
+                  icon: Icons.storefront_outlined,
+                  title: t.svcOpeningShopFailed,
+                  message: t.thatDidNotGoThrough,
+                  action: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      YdPillButton(label: t.tryAgain, onPressed: onRetry),
+                      const SizedBox(height: DeliverySpacing.sm),
+                      TextButton(
+                        onPressed: () => onSignOut(),
+                        child: Text(t.merchbLogOutAccount),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const CircularProgressIndicator(color: DeliveryColors.brand),
+                    const SizedBox(height: DeliverySpacing.md),
+                    Text(
+                      t.svcOpeningShop,
+                      style: const TextStyle(fontSize: 14, color: DeliveryColors.muted),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }

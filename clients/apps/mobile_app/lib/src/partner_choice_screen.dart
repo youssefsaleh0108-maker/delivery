@@ -17,15 +17,23 @@ import 'partner_application_screen.dart';
 ///
 /// Nothing here needs an account. Both paths run on the open endpoints and create the account only
 /// once somebody is approved, which is said on the screen rather than left to be discovered.
+///
+/// A print shop, a tailor or a repairer gets a card of their own. They apply as a shop, but through
+/// the one-page services signup (Figma 126:11) rather than the shop wizard, which would ask a tailor
+/// what kind of food they sell.
 class PartnerChoiceScreen extends StatelessWidget {
   const PartnerChoiceScreen({
     super.key,
     required this.onChoose,
     required this.onClose,
+    this.onChooseServices,
   });
 
   final void Function(PartnerKind kind) onChoose;
   final VoidCallback onClose;
+
+  /// Opens the services signup for somebody with no account. Null leaves the card off the screen.
+  final VoidCallback? onChooseServices;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +65,15 @@ class PartnerChoiceScreen extends StatelessWidget {
               blurb: t.applyAsMerchantBlurb,
               onTap: () => onChoose(PartnerKind.merchant),
             ),
+            if (onChooseServices != null) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+              _RoleCard(
+                icon: Icons.design_services_outlined,
+                title: t.svcChoiceCard,
+                blurb: t.svcChoiceCardBlurb,
+                onTap: onChooseServices!,
+              ),
+            ],
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             _RoleCard(
               icon: Icons.two_wheeler,

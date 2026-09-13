@@ -49,6 +49,8 @@ class CustomerShell extends StatefulWidget {
     required this.session,
     required this.locale,
     required this.onSignOut,
+    this.onOfferServices,
+    this.onSwitchToShop,
   });
 
   final StoreApi storeApi;
@@ -96,6 +98,14 @@ class CustomerShell extends StatefulWidget {
   /// Passed to the home screen for the language toggle in the app bar.
   final LocaleController locale;
   final Future<void> Function() onSignOut;
+
+  /// Opens the services signup (Figma 126:11) for this account, from the profile menu. Null hides
+  /// the row; the host leaves it null for an account the server would refuse an application from.
+  final VoidCallback? onOfferServices;
+
+  /// Takes a customer who also runs a shop to it — the menu's half of the role switch homeFor's
+  /// preferred-role rule honours. Null hides the row: with no shop there is nowhere to switch to.
+  final VoidCallback? onSwitchToShop;
 
   @override
   State<CustomerShell> createState() => _CustomerShellState();
@@ -512,6 +522,8 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
               profileApi: widget.profileApi,
               onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
               onOpenGiftHub: _giftHubEntry,
+              onOfferServices: widget.onOfferServices,
+              onSwitchToShop: widget.onSwitchToShop,
             ),
             // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight
             // requests alive, so switching to the basket and back does not refetch the catalog.
