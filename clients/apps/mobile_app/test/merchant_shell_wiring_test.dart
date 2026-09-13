@@ -106,4 +106,99 @@ void main() {
             tester.element(find.byType(MerchantShell)))
         .title), findsNothing);
   });
+
+  // The Demand Radar (Figma 121:8) has two doors, and the shell decides who gets them: the owner,
+  // with the client wired. An employee carries a MERCHANT_STAFF token that Order Manager refuses, so
+  // a door for them would open onto a 403.
+  group('the Demand Radar', () {
+    Future<DeliveryStrings> pumpShell(
+      WidgetTester tester, {
+      required bool wireDemand,
+      Set<DeliveryRole> roles = const <DeliveryRole>{DeliveryRole.merchant},
+    }) async {
+      tester.view.physicalSize = const Size(1100, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(MaterialApp(
+        theme: DeliveryTheme.light(),
+        localizationsDelegates: DeliveryStrings.localizationsDelegates,
+        supportedLocales: DeliveryStrings.supportedLocales,
+        home: MerchantShell(
+          orderApi: OrderApi(dio),
+          storeApi: StoreApi(dio),
+          catalogApi: CatalogApi(dio),
+          demandApi: wireDemand ? DemandApi(dio) : null,
+          session: AuthSession(
+            accessToken: 'token',
+            refreshToken: null,
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+            roles: roles,
+            subject: 'merchant-sub',
+          ),
+          locale: LocaleController(
+            read: () async => 'en',
+            write: (String _) async {},
+          ),
+          onSignOut: () async {},
+        ),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      return DeliveryStrings.of(tester.element(find.byType(MerchantShell)));
+    }
+
+    Future<void> openSettings(WidgetTester tester, DeliveryStrings t) async {
+      await tester.tap(find.text(t.navSettings).last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    Finder settingsRow(DeliveryStrings t) => find.descendant(
+        of: find.byType(MerchantSettingsScreen), matching: find.text(t.heatmapTitle));
+
+    testWidgets('the owner reaches it from the dashboard and from Settings',
+        (WidgetTester tester) async {
+      final DeliveryStrings t = await pumpShell(tester, wireDemand: true);
+
+      // The dashboard is handed its door; what the card looks like is the merchant package's test.
+      expect(
+        tester.widget<MerchantDashboardScreen>(find.byType(MerchantDashboardScreen)).onDemandRadar,
+        isNotNull,
+      );
+
+      await openSettings(tester, t);
+      await tester.tap(settingsRow(t));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byType(DemandRadarScreen), findsOneWidget);
+    });
+
+    testWidgets('an employee is given no door at all', (WidgetTester tester) async {
+      final DeliveryStrings t = await pumpShell(
+        tester,
+        wireDemand: true,
+        roles: const <DeliveryRole>{DeliveryRole.merchantStaff},
+      );
+
+      await openSettings(tester, t);
+
+      expect(find.byType(MerchantSettingsScreen), findsOneWidget);
+      expect(settingsRow(t), findsNothing);
+      expect(find.byType(MerchantDashboardScreen), findsNothing);
+    });
+
+    testWidgets('a host that does not wire the client draws no door rather than a dead one',
+        (WidgetTester tester) async {
+      final DeliveryStrings t = await pumpShell(tester, wireDemand: false);
+
+      expect(
+        tester.widget<MerchantDashboardScreen>(find.byType(MerchantDashboardScreen)).onDemandRadar,
+        isNull,
+      );
+      await openSettings(tester, t);
+      expect(settingsRow(t), findsNothing);
+    });
+  });
 }

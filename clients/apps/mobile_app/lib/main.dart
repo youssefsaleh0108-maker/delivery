@@ -164,6 +164,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final PromoApi _promoApi = PromoApi(_dio);
   late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
   late final AggregatesApi _aggregatesApi = AggregatesApi(_dio);
+
+  /// How busy the areas around a shop are — the merchant Demand Radar. Owner-only, like every
+  /// order-backed number a shop sees; MerchantShell decides who gets the door.
+  late final DemandApi _demandApi = DemandApi(_dio);
   late final RiderMoneyApi _riderMoneyApi = RiderMoneyApi(_dio);
 
   /// The rider's own completion rate and claimed/delivered counts, behind the Earnings tab.
@@ -908,6 +912,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               inventoryApi: _inventoryApi,
               staffApi: _storeStaffApi,
               reportsApi: _reportsApi,
+              demandApi: _demandApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,
