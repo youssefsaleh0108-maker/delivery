@@ -163,6 +163,18 @@ class TrackingApi {
     return RiderAttendance.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// One rider's attendance over [from]..[to] — inclusive dates in the server's zone, at most 31
+  /// days. A single day is what the Manual Attendance Log reads to learn a day's live entry when
+  /// that day lies outside the month on screen.
+  Future<RiderAttendance> riderAttendanceBetween(String riderId,
+      {required DateTime from, required DateTime to}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/riders/$riderId/attendance',
+      queryParameters: <String, dynamic>{'from': _day(from), 'to': _day(to)},
+    );
+    return RiderAttendance.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// One rider's duty sessions over at most 31 days, whole (a session crossing an edge is listed
   /// once, not clipped).
   Future<List<DutySessionView>> riderDutySessions(String riderId,

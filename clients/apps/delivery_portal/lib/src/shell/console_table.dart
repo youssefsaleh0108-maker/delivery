@@ -55,6 +55,7 @@ class ConsoleTable extends StatelessWidget {
     this.minWidth = 900,
     this.empty,
     this.footer,
+    this.title,
   });
 
   final List<ConsoleColumn> columns;
@@ -69,62 +70,89 @@ class ConsoleTable extends StatelessWidget {
   /// Pinned under the last row inside the card: a pager, a total, a "showing 20 of 400".
   final Widget? footer;
 
+  /// A heading inside the card, above the column headings — the attendance log's card in Figma
+  /// 112:945. It stays put while a narrow table scrolls sideways beneath it.
+  final Widget? title;
+
   @override
   Widget build(BuildContext context) {
+    final Widget? heading = title;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: ConsoleSurface.card(),
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final double width =
-              constraints.maxWidth.isFinite && constraints.maxWidth > minWidth
-                  ? constraints.maxWidth
-                  : minWidth;
-
-          final Widget table = SizedBox(
-            width: width,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: heading == null
+          ? _body()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                _HeaderRow(columns: columns),
-                if (rows.isEmpty && empty != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ConsoleMetrics.cellPaddingX,
-                      vertical: DeliverySpacing.xl,
-                    ),
-                    child: empty!,
-                  )
-                else
-                  for (int i = 0; i < rows.length; i++)
-                    _BodyRow(
-                      columns: columns,
-                      row: rows[i],
-                      // The card's own border draws the last hairline, so the last row does not.
-                      divided: i < rows.length - 1 || footer != null,
-                    ),
-                if (footer != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ConsoleMetrics.cellPaddingX,
-                      vertical: ConsoleMetrics.cellPaddingY,
-                    ),
-                    child: footer!,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ConsoleMetrics.cellPaddingX,
+                    vertical: DeliverySpacing.lg - DeliverySpacing.xs,
                   ),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: DeliveryColors.border)),
+                  ),
+                  child: heading,
+                ),
+                _body(),
               ],
             ),
-          );
+    );
+  }
 
-          if (constraints.maxWidth.isFinite && constraints.maxWidth >= minWidth) {
-            return table;
-          }
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: table,
-          );
-        },
-      ),
+  Widget _body() {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double width =
+            constraints.maxWidth.isFinite && constraints.maxWidth > minWidth
+                ? constraints.maxWidth
+                : minWidth;
+
+        final Widget table = SizedBox(
+          width: width,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _HeaderRow(columns: columns),
+              if (rows.isEmpty && empty != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ConsoleMetrics.cellPaddingX,
+                    vertical: DeliverySpacing.xl,
+                  ),
+                  child: empty!,
+                )
+              else
+                for (int i = 0; i < rows.length; i++)
+                  _BodyRow(
+                    columns: columns,
+                    row: rows[i],
+                    // The card's own border draws the last hairline, so the last row does not.
+                    divided: i < rows.length - 1 || footer != null,
+                  ),
+              if (footer != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ConsoleMetrics.cellPaddingX,
+                    vertical: ConsoleMetrics.cellPaddingY,
+                  ),
+                  child: footer!,
+                ),
+            ],
+          ),
+        );
+
+        if (constraints.maxWidth.isFinite && constraints.maxWidth >= minWidth) {
+          return table;
+        }
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: table,
+        );
+      },
     );
   }
 }

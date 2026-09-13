@@ -361,6 +361,7 @@ class RiderAttendance {
     required this.hasSchedule,
     required this.days,
     required this.totals,
+    this.asOf,
   });
 
   final String riderId;
@@ -372,6 +373,11 @@ class RiderAttendance {
 
   /// Today in [zone]; days after it are [AttendanceStatus.upcoming].
   final DateTime today;
+
+  /// When the server computed these figures. They are never final — a night shift past the
+  /// period's end, an open session or a manual entry can still move them — so anything that pays
+  /// from them keeps this beside what it paid. Null from a server that predates it.
+  final DateTime? asOf;
 
   /// False: a freelancer for the whole period. Show time on duty only — no late or absent legend.
   final bool hasSchedule;
@@ -386,6 +392,7 @@ class RiderAttendance {
         from: _date(json['from']),
         to: _date(json['to']),
         today: _date(json['today']),
+        asOf: _instant(json['asOf']),
         hasSchedule: json['hasSchedule'] as bool? ?? false,
         days: (json['days'] as List<dynamic>? ?? <dynamic>[])
             .map((dynamic d) => AttendanceDay.fromJson(d as Map<String, dynamic>))
@@ -508,12 +515,16 @@ class FleetAttendance {
     required this.from,
     required this.to,
     required this.riders,
+    this.asOf,
   });
 
   final String carrierId;
   final String zone;
   final DateTime from;
   final DateTime to;
+
+  /// The one instant every rider's figures were computed at — see [RiderAttendance.asOf].
+  final DateTime? asOf;
   final List<RiderAttendanceTotals> riders;
 
   factory FleetAttendance.fromJson(Map<String, dynamic> json) => FleetAttendance(
@@ -521,6 +532,7 @@ class FleetAttendance {
         zone: json['zone'] as String? ?? 'UTC',
         from: _date(json['from']),
         to: _date(json['to']),
+        asOf: _instant(json['asOf']),
         riders: (json['riders'] as List<dynamic>? ?? <dynamic>[])
             .map((dynamic r) => RiderAttendanceTotals.fromJson(r as Map<String, dynamic>))
             .toList(),

@@ -113,6 +113,7 @@ void main() {
         'from': '2026-10-01',
         'to': '2026-10-31',
         'today': '2026-10-12',
+        'asOf': '2026-10-12T17:00:00Z',
         'hasSchedule': true,
         'days': <Map<String, dynamic>>[lateDay()],
         'totals': totals(),
@@ -120,6 +121,8 @@ void main() {
 
       expect(month.zone, 'Asia/Beirut');
       expect(month.today, DateTime(2026, 10, 12));
+      // When the figures were computed — what anything paying from them keeps beside them.
+      expect(month.asOf!.isAtSameMomentAs(DateTime.utc(2026, 10, 12, 17)), isTrue);
       expect(month.hasSchedule, isTrue);
       expect(month.days, hasLength(1));
       expect(month.totals.workedSeconds, 250000);

@@ -26,7 +26,8 @@ import '../shell/shell.dart';
 ///   day zone, so a manager reading from abroad still sees the rider's 07:56.
 ///
 /// The design's month has no navigation drawn but says "for October 2026"; the chevrons beside the
-/// month are that implied control. The design's sample figures (22 days worked by the 21st with
+/// month are that implied control. The header's live badge is the fleet's on-duty count from the
+/// tracking roster, and is not drawn at all when the roster cannot be read. The design's sample figures (22 days worked by the 21st with
 /// weekends off) are impossible and are not reproduced — every figure here is the server's.
 class RiderAttendanceScreen extends StatefulWidget {
   const RiderAttendanceScreen({
@@ -60,12 +61,32 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
   late Future<RiderAttendance> _data;
   bool _busy = false;
 
+  /// Riders on duty right now, for the header's live badge. Null until the roster answers — and for
+  /// good if it cannot, in which case no badge is drawn rather than a guessed count.
+  int? _onDuty;
+
   @override
   void initState() {
     super.initState();
     final DateTime start = widget.initialMonth ?? DateTime.now();
     _month = DateTime(start.year, start.month);
     _data = _load();
+    _countOnDuty();
+  }
+
+  /// The live badge's figure: riders who declared duty and are still being sighted. The roster's
+  /// on-duty filter keeps a rider whose phone went quiet (marked stale) on purpose, for dispatch;
+  /// live they are not, so they are not counted.
+  Future<void> _countOnDuty() async {
+    try {
+      final List<RiderPresence> declared = await widget.api.roster(onDutyOnly: true);
+      if (!mounted) return;
+      setState(() {
+        _onDuty = declared.where((RiderPresence p) => p.state == PresenceState.onDuty).length;
+      });
+    } catch (_) {
+      // No figure beats a wrong one: the badge stays undrawn.
+    }
   }
 
   /// The month's read, marked handled the moment it is made. A chevron or a retry makes it outside a
@@ -100,6 +121,13 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
         title: t.attendanceTitle,
         subtitle: t.attendanceSubtitle,
         titleStyle: ConsoleText.pageTitleSmall,
+        actions: <Widget>[
+          if (_onDuty != null) _LiveBadge(label: t.attendanceLiveOnDuty(_onDuty!)),
+          // The console bell's slot, drawn off as on the other carrier pages: wiring it needs a
+          // NotificationApi threaded to the carrier area, which no carrier page has yet, and a
+          // greyed control is a truer picture than an empty corner.
+          ConsoleIconAction(icon: Icons.notifications_none, tooltip: t.notifications),
+        ],
       ),
       children: <Widget>[
         FutureBuilder<RiderAttendance>(
@@ -507,70 +535,45 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
     final List<AttendanceDay> days = month.days.where(_loggable).toList().reversed.toList();
     final MaterialLocalizations dates = MaterialLocalizations.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(t.attendanceLogsTitle, style: _heading),
-        const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-        ConsoleTable(
-          minWidth: 900,
-          columns: <ConsoleColumn>[
-            ConsoleColumn(label: t.attendanceColDate, width: 150),
-            if (scheduled) ConsoleColumn(label: t.attendanceColShift, width: 200),
-            ConsoleColumn(label: t.attendanceColClockIn, width: 110),
-            ConsoleColumn(label: t.attendanceColClockOut, width: 130),
-            ConsoleColumn(label: t.attendanceColHours, width: 100),
-            if (scheduled) ConsoleColumn(label: t.attendanceColStatus, width: 150),
-            ConsoleColumn(label: t.attendanceColNotes, flex: 1),
-          ],
-          empty: Text(t.attendanceEmptyMonth, style: ConsoleText.pageSubtitle),
-          rows: <ConsoleTableRow>[
-            for (final AttendanceDay d in days)
-              ConsoleTableRow(
-                cells: <Widget>[
-                  Text(dates.formatMediumDate(d.date), style: ConsoleText.cellStrong),
-                  if (scheduled)
-                    Text(
-                      d.scheduled == null
-                          ? '—'
-                          : t.attendanceShiftLabel(
-                              d.scheduled!.name, d.scheduled!.startTime, d.scheduled!.endTime),
-                      style: ConsoleText.body,
-                    ),
-                  Text(
-                    d.clockInLocal == null ? '—' : _clock(d.clockInLocal!, d.date),
-                    style: ConsoleText.body,
-                  ),
-                  d.onShiftNow
-                      ? Text(
-                          t.attendanceOnShiftNow,
-                          style: ConsoleText.body.copyWith(
-                            color: DeliveryAccent.positive.onTint,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      : Text(
-                          d.clockOutLocal == null ? '—' : _clock(d.clockOutLocal!, d.date),
-                          style: ConsoleText.body,
-                        ),
-                  Text(
-                    t.attendanceHoursShort(_hours(
-                        d.workedSeconds > 0 || d.manualSeconds == 0
-                            ? d.workedSeconds
-                            : d.manualSeconds)),
-                    style: ConsoleText.body.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                  if (scheduled) _statusPill(t, d.status),
-                  Text(
-                    _notes(t, d),
-                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
-                  ),
-                ],
-                onTap: _busy ? null : () => _openLog(month, d.date),
+    return ConsoleTable(
+      // Inside the card, as 112:945 draws it.
+      title: Text(t.attendanceLogsTitle, style: _heading),
+      minWidth: 900,
+      columns: <ConsoleColumn>[
+        ConsoleColumn(label: t.attendanceColDate, width: 150),
+        if (scheduled) ConsoleColumn(label: t.attendanceColShift, width: 200),
+        ConsoleColumn(label: t.attendanceColClockIn, width: 110),
+        ConsoleColumn(label: t.attendanceColClockOut, width: 130),
+        ConsoleColumn(label: t.attendanceColHours, width: 100),
+        if (scheduled) ConsoleColumn(label: t.attendanceColStatus, width: 150),
+        ConsoleColumn(label: t.attendanceColNotes, flex: 1),
+      ],
+      empty: Text(t.attendanceEmptyMonth, style: ConsoleText.pageSubtitle),
+      rows: <ConsoleTableRow>[
+        for (final AttendanceDay d in days)
+          ConsoleTableRow(
+            cells: <Widget>[
+              // "Oct 24, 2026", as drawn: a line of a pay record carries its year.
+              Text(dates.formatShortDate(d.date), style: ConsoleText.cellStrong),
+              if (scheduled)
+                Text(
+                  d.scheduled == null
+                      ? '—'
+                      : t.attendanceShiftLabel(
+                          d.scheduled!.name, d.scheduled!.startTime, d.scheduled!.endTime),
+                  style: ConsoleText.body,
+                ),
+              _clockInCell(t, d),
+              _clockOutCell(t, d),
+              _hoursCell(t, d),
+              if (scheduled) _statusPill(t, d.status),
+              Text(
+                _notes(t, d),
+                style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
               ),
-          ],
-        ),
+            ],
+            onTap: _busy ? null : () => _openLog(month, d.date),
+          ),
       ],
     );
   }
@@ -589,6 +592,87 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     final bool nextDay = local.year != day.year || local.month != day.month || local.day != day.day;
     return nextDay ? '$hhmm (+1)' : hhmm;
+  }
+
+  /// A time on the log, laid out left to right in either language. In a right-to-left row the bidi
+  /// algorithm would otherwise paint "06:30 (+1)" as "(1+) 06:30".
+  static Widget _time(String text, {TextStyle style = ConsoleText.body}) =>
+      Text(text, textDirection: TextDirection.ltr, style: style);
+
+  /// How a figure the office typed is printed: muted and italic, never in the app's own ink.
+  static const TextStyle _typedStyle =
+      TextStyle(fontSize: 13, color: DeliveryColors.muted, fontStyle: FontStyle.italic);
+
+  static Widget _clockInCell(DeliveryStrings t, AttendanceDay d) {
+    if (d.clockInLocal != null) return _time(_clock(d.clockInLocal!, d.date));
+    final ManualAttendanceEntry? typed = _typed(d);
+    if (typed != null) return _typedTime(t, typed.clockIn!, nextDay: false);
+    return const Text('—', style: ConsoleText.body);
+  }
+
+  static Widget _clockOutCell(DeliveryStrings t, AttendanceDay d) {
+    if (d.onShiftNow) {
+      return Text(
+        t.attendanceOnShiftNow,
+        style: ConsoleText.body.copyWith(
+          color: DeliveryAccent.positive.onTint,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    if (d.clockOutLocal != null) return _time(_clock(d.clockOutLocal!, d.date));
+    final ManualAttendanceEntry? typed = _typed(d);
+    if (typed != null) {
+      // A typed clock-out at or before the clock-in is the next morning, as the server counts it.
+      return _typedTime(t, typed.clockOut!,
+          nextDay: typed.clockOut!.compareTo(typed.clockIn!) <= 0);
+    }
+    return const Text('—', style: ConsoleText.body);
+  }
+
+  /// The office's typed times, on the one kind of day they are what the day has: a manual
+  /// "present" with times and nothing from the app (the server reports manual seconds only then).
+  /// On a day the app shows, typed times count for nothing, so none are printed.
+  static ManualAttendanceEntry? _typed(AttendanceDay d) {
+    final ManualAttendanceEntry? entry = d.entry;
+    if (d.manualSeconds <= 0 || entry?.clockIn == null || entry?.clockOut == null) return null;
+    return entry;
+  }
+
+  /// A typed time, beside the app's and never dressed as it: muted, pencil-marked, and saying on
+  /// hover where it came from.
+  static Widget _typedTime(DeliveryStrings t, String hhmm, {required bool nextDay}) {
+    return Tooltip(
+      message: t.attendanceTypedByHand,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _time(nextDay ? '$hhmm (+1)' : hhmm, style: _typedStyle),
+          const SizedBox(width: DeliverySpacing.xs),
+          const Icon(Icons.edit_outlined, size: 12, color: DeliveryColors.faint),
+        ],
+      ),
+    );
+  }
+
+  /// The app's hours — or, on a day it has none, the office's typed hours under a Manual tag.
+  /// Never one printed as though it were the other.
+  static Widget _hoursCell(DeliveryStrings t, AttendanceDay d) {
+    if (d.workedSeconds == 0 && d.manualSeconds > 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(t.attendanceHoursShort(_hours(d.manualSeconds)), style: _typedStyle),
+          const SizedBox(height: 2),
+          ConsoleQuietChip(label: t.attendanceManualTag),
+        ],
+      );
+    }
+    return Text(
+      t.attendanceHoursShort(_hours(d.workedSeconds)),
+      style: ConsoleText.body.copyWith(fontWeight: FontWeight.w500),
+    );
   }
 
   String _notes(DeliveryStrings t, AttendanceDay d) {
@@ -695,9 +779,6 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
 
   Future<void> _openLog(RiderAttendance month, DateTime? date) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final Map<String, AttendanceDay> byDate = <String, AttendanceDay>{
-      for (final AttendanceDay d in month.days) _key(d.date): d,
-    };
     // The month on screen when it contains today, otherwise its last day — whichever the office
     // is most likely correcting.
     DateTime initial = date ??
@@ -717,7 +798,8 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
         riderName: widget.riderName,
         today: month.today,
         initialDate: initial,
-        entryFor: (DateTime d) => byDate[_key(d)]?.entry,
+        month: month,
+        loadEntry: _entryOn,
       ),
     );
     if (answer == null || !mounted) return;
@@ -749,6 +831,17 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// The live entry of one day outside the month on screen, read on its own. A save replaces
+  /// whatever entry a day has, so the log must know that entry before it offers to save.
+  Future<ManualAttendanceEntry?> _entryOn(DateTime day) async {
+    final RiderAttendance read =
+        await widget.api.riderAttendanceBetween(widget.riderId, from: day, to: day);
+    return read.days
+        .where((AttendanceDay d) => DateUtils.isSameDay(d.date, day))
+        .firstOrNull
+        ?.entry;
   }
 
   void _tell(String message, {bool bad = false}) {
@@ -803,6 +896,45 @@ class _CellLook {
       };
 }
 
+/// The header's live badge — the design's "Beirut Live (34 Riders)" pill: a dot and the count of
+/// riders the platform can see on duty now, on the positive accent's wash.
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    const DeliveryAccent accent = DeliveryAccent.positive;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: accent.tint,
+        border: Border.all(color: accent.color),
+        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: accent.color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: accent.onTint),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// What the Manual Attendance Log dialog decided.
 class _LogAnswer {
   const _LogAnswer({
@@ -828,12 +960,17 @@ class _LogAnswer {
 /// anything is sent: a status is required, clock times only on a present day and in pairs, and a
 /// day that has not happened can only be leave, sickness or an excused absence. The note is capped
 /// at the server's 500 characters by the field itself.
+///
+/// A day outside the month on screen is read on its own first. Until that read answers nothing is
+/// prefilled or offered for removal, and if it fails nothing can be saved: a save replaces the day's
+/// entry, and must never replace one nobody has seen.
 class _ManualLogDialog extends StatefulWidget {
   const _ManualLogDialog({
     required this.riderName,
     required this.today,
     required this.initialDate,
-    required this.entryFor,
+    required this.month,
+    required this.loadEntry,
   });
 
   final String riderName;
@@ -842,8 +979,11 @@ class _ManualLogDialog extends StatefulWidget {
   final DateTime today;
   final DateTime initialDate;
 
-  /// The live entry for a day, when the loaded month knows it.
-  final ManualAttendanceEntry? Function(DateTime day) entryFor;
+  /// The month on screen, whose days' entries are already known.
+  final RiderAttendance month;
+
+  /// Reads the live entry of a day outside [month].
+  final Future<ManualAttendanceEntry?> Function(DateTime day) loadEntry;
 
   @override
   State<_ManualLogDialog> createState() => _ManualLogDialogState();
@@ -855,6 +995,16 @@ class _ManualLogDialogState extends State<_ManualLogDialog> {
   late DateTime _date;
   AttendanceEntryKind? _kind;
   ManualAttendanceEntry? _existing;
+
+  /// The chosen day lies outside the month on screen and is being read for its entry.
+  bool _checking = false;
+
+  /// That read failed, so the day's entry is unknown and nothing may be saved over it.
+  bool _checkFailed = false;
+
+  /// Counts the dates chosen, so a read for an earlier choice that answers late is ignored.
+  int _lookup = 0;
+
   final TextEditingController _clockIn = TextEditingController();
   final TextEditingController _clockOut = TextEditingController();
   final TextEditingController _note = TextEditingController();
@@ -875,11 +1025,41 @@ class _ManualLogDialogState extends State<_ManualLogDialog> {
 
   void _prefill(DateTime day) {
     _date = DateTime(day.year, day.month, day.day);
-    _existing = widget.entryFor(_date);
-    _kind = _existing?.status;
-    _clockIn.text = _existing?.clockIn ?? '';
-    _clockOut.text = _existing?.clockOut ?? '';
-    _note.text = _existing?.note ?? '';
+    final int lookup = ++_lookup;
+    _checkFailed = false;
+    final RiderAttendance month = widget.month;
+    if (!_date.isBefore(month.from) && !_date.isAfter(month.to)) {
+      _checking = false;
+      _fill(month.days
+          .where((AttendanceDay d) => DateUtils.isSameDay(d.date, _date))
+          .firstOrNull
+          ?.entry);
+      return;
+    }
+    _checking = true;
+    _fill(null);
+    widget.loadEntry(_date).then((ManualAttendanceEntry? entry) {
+      if (!mounted || lookup != _lookup) return;
+      setState(() {
+        _checking = false;
+        // With no entry there is nothing to prefill, and whatever was chosen meanwhile stays.
+        if (entry != null) _fill(entry);
+      });
+    }, onError: (Object _) {
+      if (!mounted || lookup != _lookup) return;
+      setState(() {
+        _checking = false;
+        _checkFailed = true;
+      });
+    });
+  }
+
+  void _fill(ManualAttendanceEntry? entry) {
+    _existing = entry;
+    _kind = entry?.status;
+    _clockIn.text = entry?.clockIn ?? '';
+    _clockOut.text = entry?.clockOut ?? '';
+    _note.text = entry?.note ?? '';
   }
 
   String? _problem(DeliveryStrings t) {
@@ -925,7 +1105,8 @@ class _ManualLogDialogState extends State<_ManualLogDialog> {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final String? problem = _problem(t);
-    final bool ready = _kind != null && problem == null;
+    // Never a save while the day's own entry is unknown: it would replace an entry nobody saw.
+    final bool ready = _kind != null && problem == null && !_checking && !_checkFailed;
     final bool present = _kind == AttendanceEntryKind.present;
 
     return AlertDialog(
@@ -947,6 +1128,30 @@ class _ManualLogDialogState extends State<_ManualLogDialog> {
                 icon: Icons.event_outlined,
                 onPressed: _pickDate,
               ),
+              if (_checking) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.sm),
+                Row(
+                  children: <Widget>[
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: DeliveryColors.brand,
+                      ),
+                    ),
+                    const SizedBox(width: DeliverySpacing.sm),
+                    Expanded(child: Text(t.attendanceLogChecking, style: ConsoleText.meta)),
+                  ],
+                ),
+              ],
+              if (_checkFailed) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.sm),
+                Text(
+                  t.attendanceLogCheckFailed,
+                  style: TextStyle(fontSize: 12, color: DeliveryAccent.critical.onTint),
+                ),
+              ],
               const SizedBox(height: DeliverySpacing.md),
               Text(t.attendanceLogStatus, style: ConsoleText.fieldLabel),
               const SizedBox(height: 6),
@@ -970,7 +1175,11 @@ class _ManualLogDialogState extends State<_ManualLogDialog> {
                   ],
                 ),
                 const SizedBox(height: DeliverySpacing.sm),
+                // The two rules the server applies to a "present" entry, said before it is saved:
+                // typed hours give way to the app's, and being present does not excuse a late.
                 Text(t.attendanceLogManualNote, style: ConsoleText.meta),
+                const SizedBox(height: DeliverySpacing.xs),
+                Text(t.attendanceLogPresentKeepsLate, style: ConsoleText.meta),
               ],
               const SizedBox(height: DeliverySpacing.md),
               _field(_note, t.attendanceLogNote, maxLength: 500, maxLines: 3),
