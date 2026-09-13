@@ -7272,4 +7272,168 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get offlinePill => 'OFFLINE';
+
+  @override
+  String get offlineBanner =>
+      'You\'re offline. Orders you queue will be sent when you\'re back online.';
+
+  @override
+  String get offlineBackOnline => 'Back online';
+
+  @override
+  String get offlineSavedItems => 'Saved items';
+
+  @override
+  String get offlineModeBadge => 'Offline Mode';
+
+  @override
+  String get offlineCachedCatalogTitle => 'Cached Catalog';
+
+  @override
+  String get offlineLastPurchases => 'Your Last Cached Purchases';
+
+  @override
+  String offlinePricesAsOf(String when) {
+    return 'Prices as of $when. They may have changed since.';
+  }
+
+  @override
+  String get offlineQuickAdd => 'Quick Add';
+
+  @override
+  String get offlineNeedsOptions => 'Choose options when you\'re online';
+
+  @override
+  String get offlineNothingSaved => 'Nothing saved for offline yet';
+
+  @override
+  String get offlineNothingSavedHint =>
+      'What you order while online is saved here, so you can order it again when the connection drops.';
+
+  @override
+  String get offlineOutboxTitle => 'Waiting to send';
+
+  @override
+  String offlineQueuedTitle(String store) {
+    return '$store — Queued';
+  }
+
+  @override
+  String get offlineWillSend => 'Will send as soon as you\'re back online';
+
+  @override
+  String get offlineSending => 'Sending…';
+
+  @override
+  String offlinePriceChanged(String total) {
+    return 'The total is now $total. Confirm to send it at this price.';
+  }
+
+  @override
+  String offlineSendAt(String total) {
+    return 'Send at $total';
+  }
+
+  @override
+  String get offlineStale =>
+      'This has been waiting a while. Do you still want it?';
+
+  @override
+  String get offlineSendNow => 'Send now';
+
+  @override
+  String offlineFailed(String reason) {
+    return 'Couldn\'t place this order: $reason';
+  }
+
+  @override
+  String get offlineDiscard => 'Discard';
+
+  @override
+  String get offlineDiscardTitle => 'Discard this order?';
+
+  @override
+  String get offlineDiscardBody =>
+      'It hasn\'t been placed, and it won\'t be sent.';
+
+  @override
+  String get offlineQueueTitle => 'Couldn\'t reach YouDrop';
+
+  @override
+  String get offlineQueueBody =>
+      'Your order hasn\'t gone through. We can keep it on this phone and send it automatically when you\'re back online — and if the price changes, we\'ll ask you first.';
+
+  @override
+  String get offlineQueueAction => 'Place when back online';
+
+  @override
+  String get offlineQueueCashOnly =>
+      'Only cash orders can wait for the connection. Choose cash, or try again when you\'re back online.';
+
+  @override
+  String get offlineQueued =>
+      'Order saved on this phone. It will be sent when you\'re back online.';
+
+  @override
+  String get offlineQueueSaveFailed =>
+      'Couldn\'t save the order on this phone, so nothing was queued.';
+
+  @override
+  String get offlineAlreadyPlaced =>
+      'Your earlier try already went through, so that\'s the order we placed.';
+
+  @override
+  String offlineSent(String store) {
+    return 'Your queued order from $store was placed.';
+  }
+
+  @override
+  String get offlineQueueUnavailable =>
+      'Orders split with friends can\'t wait for the connection: each friend\'s share is linked to the order the moment it\'s placed. Try again when you\'re back online.';
+
+  @override
+  String offlineQueuedWhenAmount(String when, String amount) {
+    return 'Queued $when • $amount';
+  }
+
+  @override
+  String get offlineMaybePlaced =>
+      'We couldn\'t confirm this went through. We\'ll check again automatically — it won\'t be placed twice.';
+
+  @override
+  String get offlineStaleMaybePlaced =>
+      'We couldn\'t confirm this went through, and it has been waiting a while. Send it again to find out: if it already went through, you\'ll get that order, not a second one.';
+
+  @override
+  String get offlineSendAgain => 'Send again';
+
+  @override
+  String get offlineDiscardMaybePlacedBody =>
+      'It may already have been placed — we couldn\'t confirm it. Discarding only removes it from this phone, so check Orders to see whether it went through.';
+
+  @override
+  String get offlineUnconfirmedTitle => 'We couldn\'t confirm your order';
+
+  @override
+  String get offlineUnconfirmedLead =>
+      'It may have gone through before the connection dropped — check Orders once you\'re back online.';
+
+  @override
+  String get offlineQueueResendBody =>
+      'We can keep it on this phone and send it again when you\'re back online. If it already went through, you\'ll get that order, not a second one — and if the price changes, we\'ll ask you first.';
+
+  @override
+  String get offlineUnconfirmedRetry =>
+      'We couldn\'t confirm your order — it may have gone through. Trying again is safe: it won\'t be placed twice.';
+
+  @override
+  String get offlineQueueStandardOnly =>
+      'Express orders can\'t wait for the connection: the express price is only set when the order is placed. Choose Standard, or try again when you\'re back online.';
+
+  @override
+  String get offlineQueueTotalUnknown =>
+      'We couldn\'t confirm this order\'s total for this address, so it can\'t wait for the connection. Try again when you\'re back online.';
 }

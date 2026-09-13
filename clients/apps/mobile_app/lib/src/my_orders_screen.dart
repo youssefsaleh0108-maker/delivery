@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 
 import 'cart.dart';
 import 'order_details_screen.dart';
+import 'order_outbox.dart';
+import 'outbox_card.dart';
 import 'store_page_screen.dart';
 
 /// The customer's orders, and live tracking for the one currently out for delivery.
@@ -26,9 +28,14 @@ class MyOrdersScreen extends StatefulWidget {
     this.chatApi,
     required this.cart,
     required this.onOpenBasket,
+    this.outbox,
   });
 
   final OrderApi api;
+
+  /// Checkouts queued while offline, drawn above the live orders (Figma 121:279's outbox). Null
+  /// draws none — a test that is not about them.
+  final OrderOutbox? outbox;
 
   /// Both are handed to the details page, which resolves the shop and can rebuild the basket.
   final StoreApi storeApi;
@@ -59,17 +66,29 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   bool _loading = true;
   Object? _error;
 
+  StreamSubscription<OutboxPlaced>? _placedFromOutbox;
+
   @override
   void initState() {
     super.initState();
     _refresh();
     _poll = Timer.periodic(_pollInterval, (_) => _refresh(silent: true));
+    widget.outbox?.addListener(_onOutbox);
+    // A queued checkout just became an order: fetch it now rather than on the next poll, so its
+    // card leaves the queue and the order appears in the same moment.
+    _placedFromOutbox = widget.outbox?.placed.listen((_) => _refresh(silent: true));
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    widget.outbox?.removeListener(_onOutbox);
+    _placedFromOutbox?.cancel();
     super.dispose();
+  }
+
+  void _onOutbox() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _refresh({bool silent = false}) async {
@@ -92,7 +111,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        if (!silent) _error = e;
+        // Only when there is nothing to show. The list loaded a minute ago is still the best
+        // answer the phone has once the connection drops, and swapping it for an error would take
+        // away the one thing a customer offline can still read. The banner says why it is not
+        // updating.
+        if (!silent && _orders.isEmpty) _error = e;
         _loading = false;
       });
     }
@@ -187,6 +210,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final OrderOutbox? outbox = widget.outbox;
+    // On Active only: a queued checkout is the most "active" order there is, and it has no place
+    // among the finished ones.
+    final bool showQueued = !_past && outbox != null && !outbox.isEmpty;
 
     return Container(
       color: DeliveryColors.background,
@@ -195,7 +222,17 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         children: <Widget>[
           SafeArea(bottom: false, child: YdScreenHeader(title: t.custYourOrders)),
           _tabBar(t),
-          Expanded(child: _body(t)),
+          if (showQueued)
+            ConstrainedBox(
+              constraints:
+                  BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.45),
+              child: SingleChildScrollView(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    DeliverySpacing.lg, DeliverySpacing.lg, DeliverySpacing.lg, 0),
+                child: OutboxSection(outbox: outbox),
+              ),
+            ),
+          Expanded(child: _body(t, hasQueued: showQueued)),
         ],
       ),
     );
@@ -250,8 +287,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     );
   }
 
-  Widget _body(DeliveryStrings t) {
-    if (_error != null) {
+  Widget _body(DeliveryStrings t, {required bool hasQueued}) {
+    if (_error != null && _orders.isEmpty) {
       return YdEmptyState(
         icon: Icons.cloud_off_rounded,
         title: t.couldNotLoadOrders,
@@ -269,6 +306,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     }
     final List<DeliveryOrder> showing = _past ? _pastOrders : _active;
     if (showing.isEmpty) {
+      // "No orders yet" under a queued order would be untrue in the way that matters most.
+      if (hasQueued) return const SizedBox.shrink();
       return YdEmptyState(
         icon: Icons.receipt_long_outlined,
         title: t.noOrdersYet,

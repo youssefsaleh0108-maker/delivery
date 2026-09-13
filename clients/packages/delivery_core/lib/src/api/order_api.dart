@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
 import '../models/order_models.dart';
+import '../models/order_submission.dart';
 import '../models/provider_models.dart';
 import '../models/rating_models.dart';
 import '../models/summary_models.dart';
@@ -18,73 +19,79 @@ class OrderApi {
 
   // ---------------------------------------------------------------- customer
 
-  Future<DeliveryOrder> place({
-    required List<({String productId, int qty, List<String> optionIds})> items,
-    required String deliveryAddress,
-    String? contactPhone,
-    String? notes,
-    /// The area the address is in, when the customer picked one.
-    ///
-    /// Optional: an address saved before areas existed has none, and the server prices those at
-    /// the shop's flat fee rather than refusing them.
-    String? deliveryZoneId,
+  /// The header that makes a retried placement safe. See [OrderSubmission].
+  static const String idempotencyKeyHeader = 'Idempotency-Key';
 
-    /// How the customer intends to pay. Cash is what the server assumes when this is absent —
-    /// sent explicitly all the same, so the order records a choice the customer actually made
-    /// rather than a default nobody saw. Non-cash methods need [paymentInstrumentToken] and
-    /// authorise against whatever provider is configured — the DEV one until a real credential
-    /// exists, which the offering screen must label as a test payment.
-    PaymentMethod paymentMethod = PaymentMethod.cash,
+  /// Sends one checkout attempt.
+  ///
+  /// Always carries [OrderSubmission.idempotencyKey], so this is safe to call again with the
+  /// **same** submission whenever an earlier call's outcome is unknown — a timeout, a dropped
+  /// connection, an app killed mid-request. The server answers a repeat with the order the first
+  /// copy placed ([OrderPlaced.replayed]), never with a second one.
+  ///
+  /// [expectedTotal] is the total the customer agreed to. When given, the server refuses to place
+  /// at any other and this returns [OrderPriceChanged] with the new one; nothing is placed, and the
+  /// same submission may be sent again once the customer has confirmed the new total. The live
+  /// checkout sends none — the customer is looking at the screen and the confirmation shows the
+  /// server's total — while the offline outbox always does, because its customer is not.
+  ///
+  /// [OrderAlreadyPlaced] means this attempt's key had already placed an order for a different
+  /// basket; read that order and show it.
+  ///
+  /// Everything else — 422 (item gone, shop closed, below the minimum), 402 (payment declined),
+  /// 400, and any network failure — is thrown as a `DioException`, exactly as before.
+  Future<PlaceOrderResult> place(OrderSubmission submission, {double? expectedTotal}) async {
+    try {
+      final Response<dynamic> response = await _dio.post<dynamic>(
+        '/api/orders',
+        data: submission.toBody(expectedTotal: expectedTotal),
+        options: Options(
+            headers: <String, dynamic>{idempotencyKeyHeader: submission.idempotencyKey}),
+      );
+      return OrderPlaced(
+        DeliveryOrder.fromJson(response.data as Map<String, dynamic>),
+        // 201 is a new order; 200 is this attempt's earlier order, answered to a retry.
+        replayed: response.statusCode == 200,
+      );
+    } on DioException catch (e) {
+      final Object? body = e.response?.data;
+      if (e.response?.statusCode == 409 && body is Map<String, dynamic>) {
+        switch (body['code']) {
+          case 'PRICE_CHANGED':
+            return OrderPriceChanged(
+              total: (body['total'] as num).toDouble(),
+              expectedTotal: (body['expectedTotal'] as num).toDouble(),
+            );
+          case 'IDEMPOTENCY_KEY_REUSED':
+            return OrderAlreadyPlaced(body['orderId'] as String);
+        }
+      }
+      rethrow;
+    }
+  }
 
-    /// A promo code, exactly as the customer typed it. The code and nothing else — what it is
-    /// worth is decided server-side against the server's own subtotal, and comes back on the
-    /// order as `discountAmount` and the canonical `promoCode`.
-    String? promoCode,
-
-    /// The payment processor's opaque handle for a card or wallet, minted by its own SDK on the
-    /// customer's device. Null on a cash order. Never a card number — the platform stays out of
-    /// PCI scope by never seeing one.
-    String? paymentInstrumentToken,
-
-    /// How fast the customer asked for it. Standard is what the server assumes when absent —
-    /// sent explicitly all the same, like [paymentMethod], so the order records a choice the
-    /// customer actually made. The tier and nothing else: the EXPRESS premium is priced
-    /// server-side and comes back on the order as `expressSurcharge`.
-    DeliveryTier deliveryTier = DeliveryTier.standard,
-
-    /// The map pin for [deliveryAddress], as the address picker resolved it. Both or neither —
-    /// the server drops half a pair rather than route to the wrong hemisphere. Without a pin the
-    /// order is placed and delivered exactly as before; what it does not get is a live ETA.
-    double? deliveryLatitude,
-    double? deliveryLongitude,
-  }) async {
-    final Response<dynamic> response = await _dio.post<dynamic>(
-      '/api/orders',
-      data: <String, dynamic>{
-        'items': items
-            .map((({String productId, int qty, List<String> optionIds}) i) =>
-                <String, dynamic>{
-                  'productId': i.productId,
-                  'qty': i.qty,
-                  if (i.optionIds.isNotEmpty) 'optionIds': i.optionIds,
-                })
-            .toList(),
-        'deliveryAddress': deliveryAddress,
-        if (deliveryZoneId != null) 'deliveryZoneId': deliveryZoneId,
-        if (contactPhone != null && contactPhone.isNotEmpty) 'contactPhone': contactPhone,
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
-        'paymentMethod': paymentMethod.wire,
-        'deliveryTier': deliveryTier.wire,
-        if (promoCode != null && promoCode.isNotEmpty) 'promoCode': promoCode,
-        if (paymentInstrumentToken != null && paymentInstrumentToken.isNotEmpty)
-          'paymentInstrumentToken': paymentInstrumentToken,
-        if (deliveryLatitude != null && deliveryLongitude != null) ...<String, dynamic>{
-          'deliveryLatitude': deliveryLatitude,
-          'deliveryLongitude': deliveryLongitude,
-        },
-      },
-    );
-    return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
+  /// Whether a [place] that threw may nonetheless have placed the order.
+  ///
+  /// **True for every failure with no answer but one.** Dio raises a connect timeout before a byte
+  /// of the request has left, so that one proves nothing was placed. Everything else without a
+  /// response can follow a request the server received: a receive timeout plainly does, and a
+  /// "connection error" is what Dio calls both a refused socket and a connection that closed
+  /// while the answer was awaited — which the phone cannot tell apart.
+  ///
+  /// **True for a server or gateway error (5xx).** A gateway gives up on a placement that goes on
+  /// to commit (504), and a proxy answers for an upstream it lost mid-request (502).
+  ///
+  /// **False for any other answer.** The platform refused the request, and the refusal left nothing
+  /// behind.
+  ///
+  /// What follows from true, for every checkout built on [place] (live, queued, gift, multi-shop):
+  /// the attempt keeps its key; trying again resends the SAME [OrderSubmission], which the server
+  /// answers with the order if there is one; and nothing tells the customer the order "did not go
+  /// through".
+  static bool mayHavePlaced(DioException e) {
+    final int? status = e.response?.statusCode;
+    if (status != null) return status >= 500;
+    return e.type != DioExceptionType.connectionTimeout;
   }
 
   Future<Paged<DeliveryOrder>> mine({int page = 0, int size = 20}) =>

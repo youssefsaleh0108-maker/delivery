@@ -7279,4 +7279,166 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get offlinePill => 'غير متصل';
+
+  @override
+  String get offlineBanner =>
+      'أنت غير متصل. سنرسل الطلبات المنتظِرة فور عودة الاتصال.';
+
+  @override
+  String get offlineBackOnline => 'عاد الاتصال';
+
+  @override
+  String get offlineSavedItems => 'المحفوظات';
+
+  @override
+  String get offlineModeBadge => 'وضع عدم الاتصال';
+
+  @override
+  String get offlineCachedCatalogTitle => 'الكتالوج المحفوظ';
+
+  @override
+  String get offlineLastPurchases => 'آخر مشترياتك المحفوظة';
+
+  @override
+  String offlinePricesAsOf(String when) {
+    return 'الأسعار كما كانت في $when، وقد تكون تغيّرت منذ ذلك الحين.';
+  }
+
+  @override
+  String get offlineQuickAdd => 'إضافة سريعة';
+
+  @override
+  String get offlineNeedsOptions => 'اختر الإضافات عند عودة الاتصال';
+
+  @override
+  String get offlineNothingSaved => 'لا شيء محفوظ بعد';
+
+  @override
+  String get offlineNothingSavedHint =>
+      'نحفظ هنا ما تطلبه أثناء الاتصال، لتطلبه مجدداً حين ينقطع الإنترنت.';
+
+  @override
+  String get offlineOutboxTitle => 'بانتظار الإرسال';
+
+  @override
+  String offlineQueuedTitle(String store) {
+    return '$store — بالانتظار';
+  }
+
+  @override
+  String get offlineWillSend => 'سيُرسَل فور عودة الاتصال';
+
+  @override
+  String get offlineSending => 'جارٍ الإرسال…';
+
+  @override
+  String offlinePriceChanged(String total) {
+    return 'أصبح المجموع $total. أكّد لإرسال الطلب بهذا السعر.';
+  }
+
+  @override
+  String offlineSendAt(String total) {
+    return 'أرسِل بـ $total';
+  }
+
+  @override
+  String get offlineStale => 'ينتظر هذا الطلب منذ مدة. هل ما زلت تريده؟';
+
+  @override
+  String get offlineSendNow => 'أرسِل الآن';
+
+  @override
+  String offlineFailed(String reason) {
+    return 'تعذّر تنفيذ هذا الطلب: $reason';
+  }
+
+  @override
+  String get offlineDiscard => 'حذف';
+
+  @override
+  String get offlineDiscardTitle => 'حذف هذا الطلب؟';
+
+  @override
+  String get offlineDiscardBody => 'لم يُنفَّذ هذا الطلب، ولن يُرسَل.';
+
+  @override
+  String get offlineQueueTitle => 'تعذّر الوصول إلى YouDrop';
+
+  @override
+  String get offlineQueueBody =>
+      'لم يصل طلبك بعد. يمكننا الاحتفاظ به على هذا الهاتف وإرساله تلقائياً عند عودة الاتصال، وإن تغيّر السعر فسنسألك أولاً.';
+
+  @override
+  String get offlineQueueAction => 'اطلب عند عودة الاتصال';
+
+  @override
+  String get offlineQueueCashOnly =>
+      'وحدها الطلبات النقدية يمكنها انتظار عودة الاتصال. اختر الدفع نقداً، أو حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String get offlineQueued =>
+      'حُفظ الطلب على هذا الهاتف، وسيُرسَل عند عودة الاتصال.';
+
+  @override
+  String get offlineQueueSaveFailed =>
+      'تعذّر حفظ الطلب على هذا الهاتف، لذا لم يُحفَظ أي طلب.';
+
+  @override
+  String get offlineAlreadyPlaced =>
+      'نجحت محاولتك السابقة بالفعل، وهذا هو الطلب الذي نفّذناه.';
+
+  @override
+  String offlineSent(String store) {
+    return 'تم تنفيذ طلبك المنتظِر من $store.';
+  }
+
+  @override
+  String get offlineQueueUnavailable =>
+      'لا يمكن للطلبات المقسومة مع الأصدقاء انتظار عودة الاتصال، لأن حصة كل صديق تُربط بالطلب لحظة تنفيذه. حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String offlineQueuedWhenAmount(String when, String amount) {
+    return 'حُفظ $when • $amount';
+  }
+
+  @override
+  String get offlineMaybePlaced =>
+      'تعذّر التأكد من وصول هذا الطلب. سنتحقق مجدداً تلقائياً، ولن يُنفَّذ مرتين.';
+
+  @override
+  String get offlineStaleMaybePlaced =>
+      'تعذّر التأكد من وصول هذا الطلب، وقد مضى على انتظاره وقت. أرسِله مجدداً لتعرف: إن كان قد وصل فستحصل على ذلك الطلب نفسه، لا على طلب ثانٍ.';
+
+  @override
+  String get offlineSendAgain => 'أرسِل مجدداً';
+
+  @override
+  String get offlineDiscardMaybePlacedBody =>
+      'ربما نُفِّذ هذا الطلب بالفعل، فقد تعذّر علينا التأكد. الحذف يزيله من هذا الهاتف فقط، لذا راجع «الطلبات» لتعرف إن كان قد وصل.';
+
+  @override
+  String get offlineUnconfirmedTitle => 'تعذّر تأكيد طلبك';
+
+  @override
+  String get offlineUnconfirmedLead =>
+      'ربما وصل طلبك قبل انقطاع الاتصال، فراجع «الطلبات» عند عودة الاتصال.';
+
+  @override
+  String get offlineQueueResendBody =>
+      'يمكننا الاحتفاظ به على هذا الهاتف وإرساله مجدداً عند عودة الاتصال. إن كان قد وصل فستحصل على ذلك الطلب لا على طلب ثانٍ، وإن تغيّر السعر فسنسألك أولاً.';
+
+  @override
+  String get offlineUnconfirmedRetry =>
+      'تعذّر تأكيد طلبك، وربما يكون قد وصل. إعادة المحاولة آمنة ولن يُنفَّذ الطلب مرتين.';
+
+  @override
+  String get offlineQueueStandardOnly =>
+      'لا يمكن للطلبات السريعة انتظار عودة الاتصال، لأن سعر التوصيل السريع لا يُحدَّد إلا عند تنفيذ الطلب. اختر «عادي»، أو حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String get offlineQueueTotalUnknown =>
+      'تعذّر علينا تأكيد مجموع هذا الطلب لهذا العنوان، لذا لا يمكنه انتظار عودة الاتصال. حاول مجدداً عند عودة الاتصال.';
 }

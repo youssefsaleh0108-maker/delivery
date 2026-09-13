@@ -18,13 +18,34 @@ Conventions used below:
 
 ### POST /api/orders — place an order (changed)
 
-Role: `CUSTOMER`. Status: **201**.
+Role: `CUSTOMER`. Status: **201** (**200** when a retried `Idempotency-Key` is answered with the
+order it already placed).
 
-Request (`PlaceOrderRequest`) — new field only; the rest is unchanged:
+Request (`PlaceOrderRequest`) — new fields only; the rest is unchanged:
 
 | field | type | rules |
 |---|---|---|
 | `deliveryTier` | string enum `"STANDARD"` \| `"EXPRESS"`, optional | `null`/absent = `STANDARD`. **There is no surcharge field and never will be** — the EXPRESS price comes from server config `delivery.orders.express-surcharge` (default `2.00`), snapshotted onto the order at placement. Unknown enum value = 400. |
+| `expectedTotal` | decimal, optional, ≥ 0, 2 dp | The total the customer agreed to — an assertion, never a price. The server prices everything itself; if its total differs, nothing is placed (no hold, no row, no promo redemption) and the answer is **409** `{"code":"PRICE_CHANGED","total":…,"expectedTotal":…}`. The live checkout sends none; the offline outbox always does. |
+
+Header `Idempotency-Key`, optional (order-manager V31): 8–64 characters of `[A-Za-z0-9._:-]` — the
+app sends a UUID v4 minted once per checkout attempt and reused on every retry of that attempt.
+
+- Scoped to the caller (the token's subject). The same key from the same customer is answered
+  **200** with the order it already placed — nothing is priced, held, redeemed or announced again.
+  Another customer sending the same string places their own order.
+- The same key with a *different* request (lines, address, zone, phone, notes, payment method,
+  promo, pin or tier — never `expectedTotal`) is **409** `{"code":"IDEMPOTENCY_KEY_REUSED","orderId":…}`,
+  naming the caller's own order that the key placed.
+- Two copies racing: the unique `(customer_id, client_request_id)` constraint is claimed before the
+  payment provider is asked for anything, so the loser never holds money and is answered with the
+  winner's order.
+- Malformed key: **400**. No header: placed exactly as before.
+
+Clients: build an `OrderSubmission` (delivery_core) per order and send it with
+`OrderApi.place(submission, expectedTotal: …)`, which returns `OrderPlaced` (with `replayed`),
+`OrderPriceChanged` or `OrderAlreadyPlaced`; everything else is thrown as the `DioException` it
+always was.
 
 Response: `OrderResponse` (below). Every endpoint that returns `OrderResponse` (including
 `GET /api/orders/available`, `/mine`, `/merchant`, `/carrier`, `/{id}`, transition endpoints)

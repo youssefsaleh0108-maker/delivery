@@ -95,6 +95,16 @@ abstract final class DeliveryColors {
 
   /// Border for [onBrandSurface] cards.
   static const Color onBrandBorder = Color(0x33FFFFFF);
+
+  /// Amber-100: the ground of a whole-width caution strip — the customer offline banner, the
+  /// chip behind a queued order's icon.
+  ///
+  /// A solid colour rather than [DeliveryAccent.caution]'s 12% tint because it spans the full
+  /// width over whatever is scrolling underneath, where a translucent fill would take on the
+  /// colour of the content behind it. Words on it use [DeliveryAccent.caution]'s `onTint`
+  /// (amber-700, 4.9:1 here) rather than the design's amber-600, which measures 2.9:1 on this
+  /// ground and fails an 11-13px label.
+  static const Color cautionSoft = Color(0xFFFEF3C7);
 }
 
 /// The semantic accents, added 2026-08-12 to soften the interface.
