@@ -47,7 +47,15 @@ void main() {
     dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
   });
 
-  Future<void> pumpSettingsTab(WidgetTester tester, {required bool wireStatements}) async {
+  /// Pumps the shell and opens one of its tabs the way a merchant does, through the shell's own
+  /// bottom bar: Settings, or the shelves when [inventory].
+  Future<DeliveryStrings> pumpShell(
+    WidgetTester tester, {
+    bool wireStatements = false,
+    bool wireScan = false,
+    bool inventory = false,
+    Set<DeliveryRole> roles = const <DeliveryRole>{DeliveryRole.merchant},
+  }) async {
     tester.view.physicalSize = const Size(1100, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -61,11 +69,12 @@ void main() {
         storeApi: StoreApi(dio),
         catalogApi: CatalogApi(dio),
         statementsApi: wireStatements ? StatementsApi(dio) : null,
+        catalogScanApi: wireScan ? CatalogScanApi(dio) : null,
         session: AuthSession(
           accessToken: 'token',
           refreshToken: null,
           expiresAt: DateTime.now().add(const Duration(hours: 1)),
-          roles: const <DeliveryRole>{DeliveryRole.merchant},
+          roles: roles,
           subject: 'merchant-sub',
         ),
         locale: LocaleController(
@@ -78,16 +87,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    // The Settings tab, reached the way a merchant reaches it: through the shell's own bottom bar.
     final DeliveryStrings t =
         DeliveryStrings.of(tester.element(find.byType(MerchantShell)));
-    await tester.tap(find.text(t.navSettings).last);
+    await tester.tap(find.text(inventory ? t.navInventory : t.navSettings).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    return t;
   }
 
   testWidgets('the shop can open its own statement from Settings', (WidgetTester tester) async {
-    await pumpSettingsTab(tester, wireStatements: true);
+    await pumpShell(tester, wireStatements: true);
 
     // The row the app shipped without. Its title comes from the statement screen's own words, so
     // this also proves the two halves agree about what it is called.
@@ -98,12 +107,48 @@ void main() {
 
   testWidgets('and the row hides rather than dying when a host does not wire it',
       (WidgetTester tester) async {
-    await pumpSettingsTab(tester, wireStatements: false);
+    await pumpShell(tester, wireStatements: false);
 
     // The optional-client convention this shell uses throughout: no client, no row. Correct on its
     // own — it is only a problem when the real host forgets, which the test above now catches.
     expect(find.text(MerchantStatementWords.of(
             tester.element(find.byType(MerchantShell)))
         .title), findsNothing);
+  });
+
+  // Merchant Blitz (Figma 121:198) — the same seam, for a screen with two doors.
+
+  testWidgets('the owner can build the catalogue from shelf photos, from Settings',
+      (WidgetTester tester) async {
+    final DeliveryStrings t = await pumpShell(tester, wireScan: true);
+
+    await tester.tap(find.text(t.blitzSettingsRow));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(MerchantBlitzScreen), findsOneWidget);
+  });
+
+  testWidgets('and from the shelves themselves', (WidgetTester tester) async {
+    final DeliveryStrings t = await pumpShell(tester, wireScan: true, inventory: true);
+
+    await tester.tap(find.text(t.blitzEntryAction).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(MerchantBlitzScreen), findsOneWidget);
+  });
+
+  testWidgets('an employee is not offered it: the scan endpoints refuse a staff token',
+      (WidgetTester tester) async {
+    final DeliveryStrings t = await pumpShell(
+      tester,
+      wireScan: true,
+      roles: const <DeliveryRole>{DeliveryRole.merchantStaff},
+    );
+
+    // On the Settings page — so the row's absence below is the gate, not an unopened tab.
+    expect(find.byType(MerchantSettingsScreen), findsOneWidget);
+    expect(find.text(t.blitzSettingsRow), findsNothing);
   });
 }
