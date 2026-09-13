@@ -86,6 +86,7 @@ public class CarrierCashService {
     private final RiderLedgerRepository riderLedger;
     private final AccountDirectory accounts;
     private final int overdueAfterHours;
+    private final int platformOverdueAfterHours;
     private final ZoneId zone;
     private final String currency;
     private final Clock clock;
@@ -94,31 +95,39 @@ public class CarrierCashService {
     public CarrierCashService(CashFloatRepository floats,
                               RiderLedgerRepository riderLedger,
                               AccountDirectory accounts,
-                              // How long cash may be held before it is overdue. The same number
-                              // the Back Office list is flagged with, so both sides of a hand-over
-                              // agree on what "late" means.
-                              @Value("${delivery.accounting.float.overdue-after-hours:48}")
+                              // How long cash in a delivery company's custody may be held before it
+                              // is overdue — with one of its riders, or with the company itself. The
+                              // number the company's page states and the Back Office flags it by,
+                              // so both sides of a hand-over agree on what "late" means.
+                              @Value("${delivery.accounting.float.carrier-overdue-after-hours:48}")
                               int overdueAfterHours,
+                              // The platform's own riders keep the line the Back Office always held
+                              // them to. See cashOnHand().
+                              @Value("${delivery.accounting.float.platform-overdue-after-hours:24}")
+                              int platformOverdueAfterHours,
                               // A "day" on this page is a local-calendar day, in the same zone the
                               // statements use.
                               @Value("${delivery.accounting.statements.zone:UTC}") String zone,
                               @Value("${delivery.accounting.currency:USD}") String currency) {
-        this(floats, riderLedger, accounts, overdueAfterHours, zone, currency, Clock.systemUTC());
+        this(floats, riderLedger, accounts, overdueAfterHours, platformOverdueAfterHours, zone,
+                currency, Clock.systemUTC());
     }
 
     /** For tests, which need "now" to hold still while they ask how old something is. */
     CarrierCashService(CashFloatRepository floats, RiderLedgerRepository riderLedger,
-                       AccountDirectory accounts, int overdueAfterHours, String zone,
-                       String currency, Clock clock) {
+                       AccountDirectory accounts, int overdueAfterHours,
+                       int platformOverdueAfterHours, String zone, String currency, Clock clock) {
         this.floats = floats;
         this.riderLedger = riderLedger;
         this.accounts = accounts;
         this.overdueAfterHours = overdueAfterHours;
+        this.platformOverdueAfterHours = platformOverdueAfterHours;
         this.zone = ZoneId.of(zone);
         this.currency = currency;
         this.clock = clock;
     }
 
+    /** The carrier-custody limit in hours: the one every page about a company's cash states. */
     public int overdueAfterHours() {
         return overdueAfterHours;
     }
@@ -137,14 +146,26 @@ public class CarrierCashService {
     }
 
     /**
-     * Whether cash collected at {@code oldest} has been held past the line.
+     * Whether cash in a delivery company's custody, collected at {@code oldest}, has been held past
+     * the carrier line — with one of its riders, or with the company itself.
      *
      * <p>Strictly past it: cash held for exactly the limit is on time, and one second more is not.
      * A missing timestamp is never overdue — a row that has not been read back yet is new.
      */
     public boolean isOverdue(Instant oldest) {
-        return oldest != null
-                && oldest.isBefore(clock.instant().minus(Duration.ofHours(overdueAfterHours)));
+        return heldPast(oldest, overdueAfterHours);
+    }
+
+    /**
+     * {@link #isOverdue}, by the platform-fleet line: cash a rider of the platform's own fleet owes
+     * the platform directly.
+     */
+    public boolean isPlatformOverdue(Instant oldest) {
+        return heldPast(oldest, platformOverdueAfterHours);
+    }
+
+    private boolean heldPast(Instant oldest, int hours) {
+        return oldest != null && oldest.isBefore(clock.instant().minus(Duration.ofHours(hours)));
     }
 
     // ---------------------------------------------------------------------------- the overview
@@ -489,6 +510,50 @@ public class CarrierCashService {
         out.sort(Comparator.comparing(CarrierHolding::held).reversed()
                 .thenComparing(CarrierHolding::withRiders, Comparator.reverseOrder()));
         return out;
+    }
+
+    /**
+     * One line of the Back Office's cash-on-hand list: a rider or a company holding cash that has
+     * not been banked.
+     *
+     * @param overdue judged by the limit for the cash this holder has — see {@link #cashOnHand()}
+     */
+    public record OnHand(String holderRef, HolderKind holderKind, BigDecimal amount, long orders,
+                         Instant oldest, boolean overdue) {
+    }
+
+    /**
+     * Everyone holding cash, largest first, each flagged late by the limit that applies to what they
+     * hold.
+     *
+     * <p><strong>Two limits, because the owner's decision changed one kind of cash and not the
+     * other.</strong> A rider of the platform's own fleet owes the platform directly and keeps the
+     * line the Back Office always held them to ({@code platform-overdue-after-hours}, a day). Cash
+     * in a delivery company's custody — with one of its riders, or with the company after a
+     * hand-over — is judged by the carrier limit, the one the company's own page states, so the two
+     * sides of a hand-over still agree on what "late" means.
+     *
+     * <p>A rider carrying both kinds at once is late when either part is, each by its own line: a
+     * day-old platform bag is not excused by a fresh company one beside it, and a company bag inside
+     * its limit is not made late by the platform's shorter one.
+     */
+    @Transactional(readOnly = true)
+    public List<OnHand> cashOnHand() {
+        Set<String> lateRiders = new java.util.HashSet<>();
+        for (Object[] row : floats.oldestHeldByRider()) {
+            Instant oldest = (Instant) row[2];
+            boolean late = row[1] == null ? isPlatformOverdue(oldest) : isOverdue(oldest);
+            if (late) {
+                lateRiders.add((String) row[0]);
+            }
+        }
+        return floats.outstandingByHolder().stream()
+                .map(row -> new OnHand(row.getHolderRef(), row.getHolderKind(), row.getAmount(),
+                        row.getOrders(), row.getOldest(),
+                        row.getHolderKind() == HolderKind.PROVIDER
+                                ? isOverdue(row.getOldest())
+                                : lateRiders.contains(row.getHolderRef())))
+                .toList();
     }
 
     // ------------------------------------------------------------------------------- plumbing

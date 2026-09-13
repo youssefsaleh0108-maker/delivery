@@ -1,6 +1,7 @@
 package com.delivery.accounting.api;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,6 +19,15 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  * controller, so the cash routes cannot drift into two slightly different ideas of "the caller".
  */
 final class Callers {
+
+    /**
+     * What a client's idempotency key may look like, on every cash route that takes one: a uuid or a
+     * similar opaque token, and never longer than the {@code request_key} column. Checked before
+     * anything is recorded, so a key the database would refuse at commit is a 400 the client can act
+     * on rather than a 500. Kept here, beside the caller, so the routes cannot accept two shapes —
+     * which is how one of them came to take a key its column could not hold.
+     */
+    static final Pattern REQUEST_KEY = Pattern.compile("^[A-Za-z0-9_-]{8,64}$");
 
     private Callers() {
     }

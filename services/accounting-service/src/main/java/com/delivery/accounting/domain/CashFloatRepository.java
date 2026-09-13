@@ -173,6 +173,23 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
         java.time.Instant getOldest();
     }
 
+    /**
+     * When each rider's oldest outstanding cash was collected, once per party it is owed to — a null
+     * company being the platform's own fleet. [holderRef, carrierRef, Instant].
+     *
+     * <p>What the Back Office's cash-on-hand list is flagged by. That list shows a rider's cash as
+     * one line, but a rider can carry the platform's cash and a company's at once and the two are
+     * late at different ages, so the oldest of each is read apart rather than the oldest of both.
+     */
+    @Query("""
+            SELECT f.holderRef, f.carrierRef, MIN(f.createdAt) FROM CashFloatEntry f
+            WHERE f.holderKind = com.delivery.accounting.domain.CashFloatEntry$HolderKind.RIDER
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            GROUP BY f.holderRef, f.carrierRef
+            """)
+    List<Object[]> oldestHeldByRider();
+
     // --------------------------------------------------------------- delivery-company custody
 
     /**

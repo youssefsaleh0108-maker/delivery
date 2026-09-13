@@ -114,6 +114,7 @@ class RepositoryQueriesParseTest {
                 "CashFloatRepository.handedOverBetween",
                 "CashFloatRepository.custodyReceivedBetween",
                 "CashFloatRepository.withRidersByCarrier",
+                "CashFloatRepository.oldestHeldByRider",
                 "CashFloatRepository.totalBetween",
                 "RiderLedgerRepository.jobsForCarrierBetween");
     }

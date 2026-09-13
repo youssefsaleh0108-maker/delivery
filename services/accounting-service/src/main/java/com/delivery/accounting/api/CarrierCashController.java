@@ -7,7 +7,6 @@ import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -51,9 +50,6 @@ public class CarrierCashController {
 
     /** More than any real hub note; a paragraph somebody pasted by mistake is not kept whole. */
     private static final int MAX_NOTE = 500;
-
-    /** What a client's idempotency key may look like: a uuid or a similar opaque token. */
-    private static final Pattern REQUEST_KEY = Pattern.compile("^[A-Za-z0-9_-]{8,64}$");
 
     private final CarrierCashService cash;
     private final CashFloatService cashFloat;
@@ -121,7 +117,7 @@ public class CarrierCashController {
             String key = body.requestKey() == null || body.requestKey().isBlank()
                     ? null
                     : body.requestKey().trim();
-            if (key != null && !REQUEST_KEY.matcher(key).matches()) {
+            if (key != null && !Callers.REQUEST_KEY.matcher(key).matches()) {
                 return badRequest("requestKey must be 8 to 64 letters, digits, - or _");
             }
             if (!cash.carriesFor(company, riderRef)) {

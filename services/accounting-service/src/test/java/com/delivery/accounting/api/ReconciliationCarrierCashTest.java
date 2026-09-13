@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,7 +35,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.delivery.accounting.domain.AccountingTransactionRepository;
 import com.delivery.accounting.domain.CashFloatEntry;
-import com.delivery.accounting.domain.CashFloatRepository;
 import com.delivery.accounting.domain.CoreBankingSyncLogRepository;
 import com.delivery.accounting.service.CarrierCashService;
 import com.delivery.accounting.service.CashFloatService;
@@ -48,18 +48,16 @@ class ReconciliationCarrierCashTest {
 
     private static final String COMPANY = "provider-77";
 
-    private CashFloatRepository floatEntries;
     private CashFloatService cashFloat;
     private CarrierCashService carrierCash;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        floatEntries = mock(CashFloatRepository.class);
         cashFloat = mock(CashFloatService.class);
         carrierCash = mock(CarrierCashService.class);
         mvc = MockMvcBuilders.standaloneSetup(new ReconciliationController(
-                        mock(AccountingTransactionRepository.class), floatEntries, cashFloat,
+                        mock(AccountingTransactionRepository.class), cashFloat,
                         mock(CoreBankingSyncLogRepository.class), carrierCash))
                 .build();
     }
@@ -139,6 +137,39 @@ class ReconciliationCarrierCashTest {
     }
 
     @Test
+    @DisplayName("refuses a request key its column could not hold, before recording anything")
+    void aMalformedKeyIsRefused() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+
+        // Too long for the column, too short to be a key, and not the shape of one at all. The first
+        // used to reach the database and fail at commit, as a 500.
+        for (String key : List.of("k".repeat(65), "short", "has spaces in it")) {
+            mvc.perform(post("/api/accounting/float/" + COMPANY + "/remit")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"expectedAmount\":\"485.00\",\"requestKey\":\"" + key
+                                    + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(cashFloat, never()).remit(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a payment the database already holds is a 409 that says so, not a 500")
+    void alreadyRecorded() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+        // Two presses with one key racing past the replay check: the unique index refuses the second
+        // at commit.
+        when(cashFloat.remit(eq(COMPANY), any(), any(), any()))
+                .thenThrow(new DataIntegrityViolationException("uq_float_request_key"));
+
+        mvc.perform(post("/api/accounting/float/" + COMPANY + "/remit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedAmount\":\"485.00\",\"requestKey\":\"key-0000-2222\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALREADY_RECORDED"));
+    }
+
+    @Test
     @DisplayName("a delivery company cannot mark its own debt paid")
     void aCarrierCannotRemit() throws Exception {
         signedInAs("carrier-staff", "CARRIER");
@@ -149,6 +180,22 @@ class ReconciliationCarrierCashTest {
 
         verify(cashFloat, never()).remit(any(), any(), any(), any());
         verify(carrierCash, never()).carriers();
+    }
+
+    /**
+     * The in-method lock, proved without the proxy: {@code @PreAuthorize} is invisible to a
+     * standalone test, so without the explicit check nothing here would notice the list of who holds
+     * the platform's money losing its lock.
+     */
+    @Test
+    @DisplayName("the cash-on-hand list is the Back Office's alone")
+    void floatIsBackOfficeOnly() throws Exception {
+        mvc.perform(get("/api/accounting/float")).andExpect(status().isUnauthorized());
+
+        signedInAs("carrier-staff", "CARRIER");
+        mvc.perform(get("/api/accounting/float")).andExpect(status().isForbidden());
+
+        verify(carrierCash, never()).cashOnHand();
     }
 
     @Test
@@ -171,22 +218,23 @@ class ReconciliationCarrierCashTest {
     }
 
     @Test
-    @DisplayName("flags an overdue holder by the server's own limit")
+    @DisplayName("sends each holder's overdue flag exactly as the service judged it")
     void floatCarriesOverdue() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
-        Instant old = Instant.parse("2026-10-20T09:00:00Z");
-        CashFloatRepository.HolderBalance row = mock(CashFloatRepository.HolderBalance.class);
-        when(row.getHolderRef()).thenReturn(COMPANY);
-        when(row.getHolderKind()).thenReturn(CashFloatEntry.HolderKind.PROVIDER);
-        when(row.getAmount()).thenReturn(new BigDecimal("485.00"));
-        when(row.getOrders()).thenReturn(3L);
-        when(row.getOldest()).thenReturn(old);
-        when(floatEntries.outstandingByHolder()).thenReturn(List.of(row));
-        when(carrierCash.isOverdue(old)).thenReturn(true);
+        when(carrierCash.cashOnHand()).thenReturn(List.of(
+                new CarrierCashService.OnHand(COMPANY, CashFloatEntry.HolderKind.PROVIDER,
+                        new BigDecimal("485.00"), 3, Instant.parse("2026-10-20T09:00:00Z"), true),
+                new CarrierCashService.OnHand("rider-1", CashFloatEntry.HolderKind.RIDER,
+                        new BigDecimal("13.25"), 1, Instant.parse("2026-10-24T09:00:00Z"),
+                        false)));
 
         mvc.perform(get("/api/accounting/float"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].holderRef").value(COMPANY))
                 .andExpect(jsonPath("$[0].holderKind").value("PROVIDER"))
-                .andExpect(jsonPath("$[0].overdue").value(true));
+                .andExpect(jsonPath("$[0].orders").value(3))
+                .andExpect(jsonPath("$[0].overdue").value(true))
+                .andExpect(jsonPath("$[1].holderKind").value("RIDER"))
+                .andExpect(jsonPath("$[1].overdue").value(false));
     }
 }

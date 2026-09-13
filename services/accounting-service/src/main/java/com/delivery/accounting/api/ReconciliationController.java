@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.slf4j.MDC;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
 import com.delivery.accounting.domain.CashFloatEntry;
-import com.delivery.accounting.domain.CashFloatRepository;
 import com.delivery.accounting.service.CarrierCashService;
 import com.delivery.accounting.service.CashFloatService;
 import com.delivery.accounting.service.Statement;
@@ -49,18 +49,15 @@ public class ReconciliationController {
     private static final int MAX_PAGE = 200;
 
     private final AccountingTransactionRepository transactions;
-    private final CashFloatRepository floatEntries;
     private final CashFloatService cashFloat;
     private final CoreBankingSyncLogRepository syncLog;
     private final CarrierCashService carrierCash;
 
     public ReconciliationController(AccountingTransactionRepository transactions,
-                                    CashFloatRepository floatEntries,
                                     CashFloatService cashFloat,
                                     CoreBankingSyncLogRepository syncLog,
                                     CarrierCashService carrierCash) {
         this.transactions = transactions;
-        this.floatEntries = floatEntries;
         this.cashFloat = cashFloat;
         this.syncLog = syncLog;
         this.carrierCash = carrierCash;
@@ -101,6 +98,13 @@ public class ReconciliationController {
         String key = body == null || body.requestKey() == null || body.requestKey().isBlank()
                 ? null
                 : body.requestKey().trim();
+        // The shape the carrier's hand-over route accepts too. Refused here, before anything is
+        // written: the column holds 64 characters, and a longer key used to fail only at commit — a
+        // 500 for a payment that was simply not recorded.
+        if (key != null && !Callers.REQUEST_KEY.matcher(key).matches()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "requestKey must be 8 to 64 letters, digits, - or _"));
+        }
 
         try {
             return cashFloat.remit(holderRef, MDC.get(CorrelationIdFilter.MDC_KEY),
@@ -131,6 +135,13 @@ public class ReconciliationController {
         } catch (CashFloatService.RequestKeyReusedException e) {
             return ResponseEntity.status(409).body(Map.of(
                     "error", e.getMessage(), "code", "REQUEST_KEY_REUSED"));
+        } catch (DataIntegrityViolationException e) {
+            // Two presses with one key racing past the replay check: the unique index refused the
+            // second at commit, and the first was recorded. Saying so is the honest answer, as on
+            // the carrier's hand-over route.
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", "That has already been recorded. Reload to see it.",
+                    "code", "ALREADY_RECORDED"));
         }
     }
 
@@ -148,23 +159,33 @@ public class ReconciliationController {
      * problem.
      *
      * <p>A delivery company appears here as a {@code PROVIDER} holder once its riders hand it cash.
-     * {@code overdue} is decided by the server's configured limit, so this list and the carrier's own
-     * reconciliation page cannot disagree about what "late" means.
+     * {@code overdue} is the server's call, by the limit for the cash each holder has: a day for a
+     * rider of the platform's own fleet, as this list always flagged them, and the carrier limit for
+     * a company's custody — the one the company's own reconciliation page states, so the two cannot
+     * disagree about what "late" means. See {@link CarrierCashService#cashOnHand()}.
+     *
+     * <p>The role is checked in the method as well as on the class, as on every cash route here: this
+     * list names who holds the platform's money, and a standalone test can only prove a lock it can
+     * see.
      */
     @GetMapping("/float")
-    public List<Map<String, Object>> outstandingFloat() {
-        return floatEntries.outstandingByHolder().stream()
-                .map(row -> {
+    public ResponseEntity<?> outstandingFloat() {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        return ResponseEntity.ok(carrierCash.cashOnHand().stream()
+                .map(holder -> {
                     Map<String, Object> out = new LinkedHashMap<String, Object>();
-                    out.put("holderRef", row.getHolderRef());
-                    out.put("holderKind", row.getHolderKind());
-                    out.put("amount", row.getAmount());
-                    out.put("orders", row.getOrders());
-                    out.put("oldest", row.getOldest());
-                    out.put("overdue", carrierCash.isOverdue(row.getOldest()));
+                    out.put("holderRef", holder.holderRef());
+                    out.put("holderKind", holder.holderKind());
+                    out.put("amount", holder.amount());
+                    out.put("orders", holder.orders());
+                    out.put("oldest", holder.oldest());
+                    out.put("overdue", holder.overdue());
                     return out;
                 })
-                .toList();
+                .toList());
     }
 
     /**
