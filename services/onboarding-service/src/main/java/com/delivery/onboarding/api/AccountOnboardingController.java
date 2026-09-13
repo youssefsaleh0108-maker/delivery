@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.onboarding.client.KeycloakAdminClient;
+import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.service.AccountApplicationService;
 import com.delivery.onboarding.service.OnboardingService;
@@ -149,6 +150,19 @@ public class AccountOnboardingController {
     public ResponseEntity<Map<String, String>> verification(
             VerificationService.VerificationException e) {
         return ResponseEntity.unprocessableEntity().body(Map.of("message", e.getMessage()));
+    }
+
+    /**
+     * 503: Product Service could not say which services are open, so an application to offer
+     * services was not judged. Nothing was recorded and nothing granted; the same call, retried, is
+     * the remedy. Coded, so the app says it in the reader's language.
+     */
+    @ExceptionHandler(PlatformClient.CatalogUnavailableException.class)
+    public ResponseEntity<Map<String, String>> catalogUnavailable(
+            PlatformClient.CatalogUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", e.getMessage(),
+                "code", PlatformClient.CatalogUnavailableException.CODE));
     }
 
     /**

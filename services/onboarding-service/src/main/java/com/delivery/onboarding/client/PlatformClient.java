@@ -2,6 +2,8 @@ package com.delivery.onboarding.client;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -9,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -29,6 +32,12 @@ import com.fasterxml.jackson.databind.JsonNode;
  * {@code delivery.security.allowed-client-ids} — which is a deliberate change: until now the
  * allow-list held only interactive clients, and the service accounts on it called Keycloak's admin
  * API rather than ours. This one calls ours, and it is the only one that does.
+ *
+ * <p>It also reads two lists from Product Service for somebody applying to offer services: which
+ * service categories are open, and the curated delivery zones they pick their area from. Product
+ * Service owns both — the category switch is its configuration, read per call — so asking it is what
+ * keeps this service from holding a second copy that drifts the first time a category opens. The
+ * service token is used because the open application form has no caller token to forward.
  */
 @Component
 public class PlatformClient {
@@ -37,6 +46,7 @@ public class PlatformClient {
 
     private final RestClient orderManager;
     private final RestClient notifications;
+    private final RestClient productService;
     private final RestClient keycloak;
     private final String realm;
     private final String clientId;
@@ -49,12 +59,16 @@ public class PlatformClient {
             @Value("${delivery.services.order-manager:http://localhost:8101}") String orderManagerUrl,
             @Value("${delivery.services.notifications-manager:http://localhost:8104}")
             String notificationsUrl,
+            @Value("${delivery.services.product-service:http://localhost:8103}")
+            String productServiceUrl,
             @Value("${delivery.keycloak.base-url:http://localhost:8180}") String baseUrl,
             @Value("${delivery.keycloak.realm:delivery-platform}") String realm,
             @Value("${delivery.keycloak.client-id:onboarding-service}") String clientId,
             @Value("${delivery.keycloak.client-secret:}") String clientSecret) {
         this.orderManager = builder.clone().baseUrl(orderManagerUrl).build();
         this.notifications = builder.clone().baseUrl(notificationsUrl).build();
+        this.productService = builder.clone().baseUrl(productServiceUrl)
+                .requestFactory(boundedWait()).build();
         this.keycloak = builder.clone().baseUrl(baseUrl).build();
         this.realm = realm;
         this.clientId = clientId;
@@ -215,6 +229,108 @@ public class PlatformClient {
                         "purpose", purpose))
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    /**
+     * Product Service could not say what is open. Never a refusal of the application: nothing about
+     * it was judged, so the applicant is told to try again rather than that their answer was wrong.
+     */
+    public static class CatalogUnavailableException extends RuntimeException {
+
+        /** What the 503 carries, so the app says "try again" in the reader's own language. */
+        public static final String CODE = "service-catalog-unavailable";
+
+        public CatalogUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /** A curated delivery zone, as a services applicant picks their area from it. */
+    public record ServiceArea(UUID zoneId, String name) {
+    }
+
+    /**
+     * The service categories open right now, as Product Service's wire names ({@code PRINTING}).
+     *
+     * <p>Read per call, as Product Service reads its own switch, so a category opened there is
+     * accepted here on the very next application.
+     *
+     * @throws CatalogUnavailableException when Product Service cannot be asked or answers nonsense
+     */
+    public List<String> openServiceCategories() {
+        JsonNode body = readProductService("/api/stores/service-categories", "service categories");
+        List<String> open = new ArrayList<>();
+        for (JsonNode name : body) {
+            if (name.isTextual()) {
+                open.add(name.asText());
+            }
+        }
+        return List.copyOf(open);
+    }
+
+    /**
+     * The areas a services applicant may pick: the same live delivery zones a customer picks from.
+     *
+     * @throws CatalogUnavailableException when Product Service cannot be asked or answers nonsense
+     */
+    public List<ServiceArea> serviceAreas() {
+        JsonNode body = readProductService("/api/delivery-zones", "delivery zones");
+        List<ServiceArea> areas = new ArrayList<>();
+        for (JsonNode zone : body) {
+            // The picker already hides retired zones; a zone marked inactive is skipped anyway,
+            // because an application filed under an area nobody delivers to is not a real area.
+            if (!zone.hasNonNull("id") || !zone.hasNonNull("name")
+                    || !zone.path("active").asBoolean(true)) {
+                continue;
+            }
+            try {
+                areas.add(new ServiceArea(UUID.fromString(zone.path("id").asText()),
+                        zone.path("name").asText()));
+            } catch (IllegalArgumentException notAnId) {
+                log.warn("Product Service listed a delivery zone whose id is not a UUID; skipped");
+            }
+        }
+        return List.copyOf(areas);
+    }
+
+    private JsonNode readProductService(String path, String what) {
+        JsonNode body;
+        try {
+            body = productService.get()
+                    .uri(path)
+                    .header("Authorization", "Bearer " + serviceToken())
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (RuntimeException e) {
+            // A refused connection, a timeout, a 5xx, or no service token to ask with. All the same
+            // to the applicant: nothing was judged, so this is "try again", never "not offered".
+            log.warn("Could not read the {} from Product Service: {}", what, e.getMessage());
+            throw new CatalogUnavailableException(
+                    "We could not check the services on offer just now. Please try again in a "
+                            + "moment.", e);
+        }
+        if (body == null || !body.isArray()) {
+            log.warn("Product Service answered the {} with something that is not a list", what);
+            throw new CatalogUnavailableException(
+                    "We could not check the services on offer just now. Please try again in a "
+                            + "moment.", null);
+        }
+        return body;
+    }
+
+    /**
+     * Timeouts for the two Product Service reads, which the provisioning calls above do without.
+     *
+     * <p>These sit on the application path itself — ApplicationIntake asks them inside its own short
+     * transaction, and an applicant is waiting — and the default request factory has no timeout at
+     * all, so a Product Service that stopped answering would hold a request thread and a database
+     * connection for as long as it liked.
+     */
+    private static SimpleClientHttpRequestFactory boundedWait() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(2));
+        factory.setReadTimeout(Duration.ofSeconds(3));
+        return factory;
     }
 
     /**

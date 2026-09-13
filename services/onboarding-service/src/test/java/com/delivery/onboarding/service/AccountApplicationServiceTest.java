@@ -410,6 +410,83 @@ class AccountApplicationServiceTest {
         }
     }
 
+    /**
+     * A print shop, tailor or repairer applying from a signed-in account: a MERCHANT application with
+     * businessType SERVICES. No kind of its own, so no switch of its own either — pinned both ways,
+     * because a services switch that silently followed the rider setting would let strangers take
+     * payment for print jobs nobody reviewed.
+     */
+    @Nested
+    @DisplayName("a services provider")
+    class ServicesProvider {
+
+        private final java.util.UUID hamra =
+                java.util.UUID.fromString("0f6f0b1e-3c1d-4a7e-8c8b-2f5d6e7a9b10");
+
+        private Answers printShop(String category) {
+            return new Answers(Kind.MERCHANT, "Al Fakhry Press", "Sam Salem", null, null, null,
+                    Map.of("businessType", "SERVICES", "serviceCategory", category,
+                            "area", Map.of("zoneId", hamra.toString(), "label", "Hamra")),
+                    null);
+        }
+
+        @Test
+        @DisplayName("is approved automatically exactly when shops are: the merchant switch")
+        void auto_approval_follows_the_merchant_switch() {
+            service = serviceWith(false, true);
+            OnboardingApplication application = recorded(Kind.MERCHANT);
+            intakeReturns(application);
+            when(onboarding.approve(application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true))
+                    .thenReturn(application);
+
+            service.apply(sam(), printShop("PRINTING"));
+
+            verify(onboarding).approve(application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true);
+        }
+
+        @Test
+        @DisplayName("waits for a reviewer, holding APPLICANT beside MERCHANT, while shops wait")
+        void waits_while_shops_wait() {
+            // Riders automatic, shops manual: the services application must follow the shops.
+            service = serviceWith(true, false);
+            intakeReturns(recorded(Kind.MERCHANT));
+
+            Result result = service.apply(sam(), printShop("PRINTING"));
+
+            assertThat(result.application().getStatus())
+                    .isEqualTo(OnboardingApplication.Status.SUBMITTED);
+            verify(onboarding, never()).approve(any(), anyString(), anyBoolean());
+            verify(keycloak).grantRealmRole(SAM, "APPLICANT");
+            verify(keycloak).grantRealmRole(SAM, "MERCHANT");
+        }
+
+        @Test
+        @DisplayName("in a closed category is refused before anything is recorded, reviewed or granted")
+        void a_closed_category_is_refused() {
+            com.delivery.onboarding.client.PlatformClient platform =
+                    mock(com.delivery.onboarding.client.PlatformClient.class);
+            when(platform.openServiceCategories())
+                    .thenReturn(java.util.List.of("PRINTING", "TAILORING", "REPAIRS", "PHOTOGRAPHY"));
+            when(platform.serviceAreas()).thenReturn(java.util.List.of(
+                    new com.delivery.onboarding.client.PlatformClient.ServiceArea(hamra, "Hamra")));
+            // A real intake, so the refusal is the one the intake enforces rather than a stub's —
+            // and with shops automatic, so a refusal that leaked through would be approved too.
+            ApplicationIntake realIntake = new ApplicationIntake(applications,
+                    mock(VerificationService.class), new ServiceProviderAnswers(platform));
+            service = new AccountApplicationService(applications, realIntake, onboarding, keycloak,
+                    new AutoApprovalPolicy(false, true, false, decisions,
+                            mock(AutoApprovalAuditRepository.class)));
+
+            assertThat(codeOf(() -> service.apply(sam(), printShop("CLEANING"))))
+                    .isEqualTo(ServiceProviderAnswers.ServiceAnswerException.CATEGORY_CLOSED);
+
+            verify(applications, never()).saveAndFlush(any());
+            verify(onboarding, never()).startReview(any());
+            verify(onboarding, never()).approve(any(), anyString(), anyBoolean());
+            verifyNoInteractions(keycloak);
+        }
+    }
+
     @Nested
     @DisplayName("becoming a customer")
     class Customer {

@@ -29,17 +29,28 @@ import com.delivery.onboarding.domain.OnboardingApplicationRepository;
  * <p>A separate bean rather than a second method on the caller, because Spring's transactions are
  * applied by a proxy: {@code this.record(...)} from inside the same class goes straight to the
  * method and gets no transaction at all.
+ *
+ * <p><strong>Both front doors come through here, which is why the services answers are checked
+ * here</strong> ({@link ServiceProviderAnswers}): an application to offer services is recorded only
+ * with an open category and a live area, whichever door it came in by. The check reads two lists
+ * from Product Service inside the write transaction. That is deliberate and bounded: it happens only
+ * for a services application, the reads time out within seconds, and the alternative — a check each
+ * caller has to remember before calling in — is exactly the kind of rule this class exists to keep in
+ * one place.
  */
 @Service
 public class ApplicationIntake {
 
     private final OnboardingApplicationRepository applications;
     private final VerificationService verifications;
+    private final ServiceProviderAnswers services;
 
     public ApplicationIntake(OnboardingApplicationRepository applications,
-                             VerificationService verifications) {
+                             VerificationService verifications,
+                             ServiceProviderAnswers services) {
         this.applications = applications;
         this.verifications = verifications;
+        this.services = services;
     }
 
     /**
@@ -57,6 +68,10 @@ public class ApplicationIntake {
                                         java.util.Map<String, Object> details,
                                         java.util.UUID targetProviderId) {
 
+        // Before any proof is spent: an answer the applicant has to change should cost them nothing,
+        // and a Product Service outage should not be discovered after a code was consumed.
+        java.util.Map<String, Object> answers = services.checked(kind, details);
+
         Instant emailVerifiedAt = verifications.consume(
                 emailVerificationToken, Channel.EMAIL, contactEmail);
 
@@ -69,7 +84,7 @@ public class ApplicationIntake {
                 kind, businessName.trim(), contactName.trim(),
                 verifications.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
                 phone == null ? null : verifications.normalise(Channel.PHONE, phone),
-                phoneVerifiedAt, notes, details, targetProviderId);
+                phoneVerifiedAt, notes, answers, targetProviderId);
 
         try {
             applications.saveAndFlush(application);
@@ -117,6 +132,9 @@ public class ApplicationIntake {
                                                   java.util.Map<String, Object> details,
                                                   java.util.UUID targetProviderId) {
 
+        // First, for the reason record() gives.
+        java.util.Map<String, Object> answers = services.checked(kind, details);
+
         String phone = contactPhone == null || contactPhone.isBlank() ? null : contactPhone;
         Instant phoneVerifiedAt = phone == null
                 ? null
@@ -126,7 +144,7 @@ public class ApplicationIntake {
                 kind, businessName.trim(), contactName.trim(),
                 verifications.normalise(Channel.EMAIL, contactEmail), emailVerifiedAt,
                 phone == null ? null : verifications.normalise(Channel.PHONE, phone),
-                phoneVerifiedAt, notes, details, targetProviderId);
+                phoneVerifiedAt, notes, answers, targetProviderId);
         application.applicantAccountCreated(userRef);
 
         try {

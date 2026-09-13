@@ -162,14 +162,23 @@ public class OnboardingController {
      * <p>Deliberately thin. It carries no reviewer name, no internal id and no screening flags: the
      * applicant is not authenticated, and everything here is readable by whoever holds the
      * reference — including somebody it was forwarded to.
+     *
+     * <p>{@code service} is the one piece of {@code details} it carries, and only for an application
+     * to offer services: the category and area the applicant chose, which the provider's app opens
+     * their shop from and Product Service reads to know not to open a restaurant instead. Null for
+     * every other application. The rest of {@code details} stays out — it can hold bank details.
      */
     public record ApplicationReceipt(String reference, String status, String businessName,
-                                     String kind, Instant submittedAt, String rejectionReason) {
+                                     String kind, Instant submittedAt, String rejectionReason,
+                                     com.delivery.onboarding.service.ServiceProviderAnswers.Summary
+                                             service) {
 
         static ApplicationReceipt of(OnboardingApplication a) {
             return new ApplicationReceipt(a.getReference(), a.getStatus().name(),
                     a.getBusinessName(), a.getKind().name(), a.getCreatedAt(),
-                    a.getRejectionReason());
+                    a.getRejectionReason(),
+                    com.delivery.onboarding.service.ServiceProviderAnswers.summaryOf(
+                            a.getDetails()));
         }
     }
 
@@ -863,10 +872,32 @@ public class OnboardingController {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
     }
 
-    /** 422: the application cannot be accepted or decided as asked, and the caller can act on why. */
+    /**
+     * 422: the application cannot be accepted or decided as asked, and the caller can act on why.
+     *
+     * <p>A refusal known by name carries its {@code code} as well, exactly as on the signed-in path.
+     * The services answers are checked on this front door too, and the app translates their codes.
+     */
     @ExceptionHandler(OnboardingService.ApplicationRuleException.class)
     public ResponseEntity<Map<String, String>> rule(OnboardingService.ApplicationRuleException e) {
+        if (e instanceof com.delivery.onboarding.service.AccountApplicationService.AccountRuleException
+                coded) {
+            return ResponseEntity.unprocessableEntity()
+                    .body(Map.of("message", e.getMessage(), "code", coded.code()));
+        }
         return ResponseEntity.unprocessableEntity().body(Map.of("message", e.getMessage()));
+    }
+
+    /**
+     * 503: Product Service could not say which services are open, so a services application was not
+     * judged at all. Retrying is the whole remedy; the code lets the app say so in its own words.
+     */
+    @ExceptionHandler(com.delivery.onboarding.client.PlatformClient.CatalogUnavailableException.class)
+    public ResponseEntity<Map<String, String>> catalogUnavailable(
+            com.delivery.onboarding.client.PlatformClient.CatalogUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", e.getMessage(),
+                "code", com.delivery.onboarding.client.PlatformClient.CatalogUnavailableException.CODE));
     }
 
     /**

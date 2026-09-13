@@ -218,10 +218,12 @@ class OnboardingApplicationDetailsTest {
         /**
          * The whole-body assertion, in case a field is added later that none of the paths above
          * happen to name. The receipt is a closed set: reference, status, business name, kind, when
-         * it was submitted, and why it was refused.
+         * it was submitted, why it was refused, and — only ever filled for an application to offer
+         * services — the category and area it was filed under. That seventh field was added on
+         * purpose, with its own test that no bank detail rides along (ServiceSignupAccessTest).
          */
         @Test
-        @DisplayName("is a closed set of six fields, so nothing new leaks into it by accident")
+        @DisplayName("is a closed set of seven fields, so nothing new leaks into it by accident")
         void is_a_closed_set_of_fields() throws Exception {
             OnboardingApplication application = application(WIZARD_DETAILS);
             when(onboarding.byReference("ref-3")).thenReturn(java.util.Optional.of(application));
@@ -234,7 +236,7 @@ class OnboardingApplicationDetailsTest {
             assertThat(JSON.readTree(body).fieldNames())
                     .toIterable()
                     .containsExactlyInAnyOrder("reference", "status", "businessName", "kind",
-                            "submittedAt", "rejectionReason");
+                            "submittedAt", "rejectionReason", "service");
         }
     }
 
