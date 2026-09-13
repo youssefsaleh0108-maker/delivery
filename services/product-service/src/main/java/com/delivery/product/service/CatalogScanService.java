@@ -182,6 +182,7 @@ public class CatalogScanService {
      * is "not found", the same answer every store-scoped write gives.
      *
      * @throws ScanQuotaExceededException past the daily limit
+     * @throws CatalogRuleViolationException for a service shop, before anything is counted (422)
      */
     @Transactional
     public ScanDetails create(String merchantId, UUID requestedStoreId) {
@@ -192,6 +193,14 @@ public class CatalogScanService {
         Store store = requestedStoreId == null
                 ? stores.requireStoreFor(merchantId)
                 : requireOwnedStore(merchantId, requestedStoreId);
+        if (store.isServices()) {
+            // Refused at the start: before the quota is counted, and before a photo can be uploaded or
+            // sent to a vision provider. A scan reads a shelf into goods lines, and an offer in a
+            // service shop needs terms no photo carries, so every line it found would be refused at
+            // commit, and the provider would have spent a scan, and a paid analysis, on nothing.
+            throw new CatalogRuleViolationException("Merchant Blitz builds a goods catalogue from "
+                    + "shelf photos, and this is a service shop. Add each offer with its terms instead.");
+        }
 
         long recent = recentScans(merchantId);
         if (recent >= limits.maxScansPerDay()) {
