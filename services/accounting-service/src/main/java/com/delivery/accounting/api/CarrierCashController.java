@@ -117,8 +117,9 @@ public class CarrierCashController {
             String key = body.requestKey() == null || body.requestKey().isBlank()
                     ? null
                     : body.requestKey().trim();
-            if (key != null && !Callers.REQUEST_KEY.matcher(key).matches()) {
-                return badRequest("requestKey must be 8 to 64 letters, digits, - or _");
+            String keyProblem = Callers.requestKeyProblem(key);
+            if (keyProblem != null) {
+                return badRequest(keyProblem);
             }
             if (!cash.carriesFor(company, riderRef)) {
                 return unknownRider();

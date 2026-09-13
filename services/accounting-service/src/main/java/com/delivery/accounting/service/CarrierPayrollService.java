@@ -904,10 +904,11 @@ public class CarrierPayrollService {
      * <p>Derived, never random: the same run and rider always give the same key, so however often a
      * run's approval is retried the custody model answers with the first deduction instead of taking
      * the cash again. "payroll-" and 32 hex characters — inside the hand-over key's shape and its
-     * column's 64.
+     * column's 64. The prefix is reserved ({@link CashFloatService#PAYROLL_KEY_PREFIX}): no route a
+     * person calls accepts it, so no counter hand-over can be recorded under a run's key first.
      */
     static String payrollKey(UUID runId, String riderRef) {
-        return "payroll-" + UUID.nameUUIDFromBytes(
+        return CashFloatService.PAYROLL_KEY_PREFIX + UUID.nameUUIDFromBytes(
                         (runId + ":" + riderRef).getBytes(StandardCharsets.UTF_8))
                 .toString()
                 .replace("-", "");

@@ -9,6 +9,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import com.delivery.accounting.service.CashFloatService;
+
 /**
  * Who is calling, read from the security context — the second lock behind {@code @PreAuthorize}.
  *
@@ -30,6 +32,29 @@ final class Callers {
     static final Pattern REQUEST_KEY = Pattern.compile("^[A-Za-z0-9_-]{8,64}$");
 
     private Callers() {
+    }
+
+    /**
+     * Why a client's request key is refused, or null when there is no key or it is fine.
+     *
+     * <p>The shape is {@link #REQUEST_KEY}. On top of it, a key starting {@code payroll-} is refused
+     * on every route a person calls: a pay run records its cash deduction under a key derived from
+     * the run and the rider, both of which are on the company's own pages, and a hand-over recorded
+     * under that key just before the run was approved would otherwise stand in for the deduction —
+     * see {@link CashFloatService#PAYROLL_KEY_PREFIX}. Nobody at a counter needs such a key.
+     */
+    static String requestKeyProblem(String key) {
+        if (key == null) {
+            return null;
+        }
+        if (!REQUEST_KEY.matcher(key).matches()) {
+            return "requestKey must be 8 to 64 letters, digits, - or _";
+        }
+        if (CashFloatService.isPayrollKey(key)) {
+            return "requestKey must not start with " + CashFloatService.PAYROLL_KEY_PREFIX
+                    + ": those keys belong to pay runs";
+        }
+        return null;
     }
 
     /** The caller's token, or null for an anonymous request. */
