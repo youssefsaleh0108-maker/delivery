@@ -19,6 +19,9 @@ import 'widget_test.dart' show sessionWith;
 /// storefront that never lists a service shop. These pin Home as it was before: the same seven chips
 /// in the same order, a storefront read that names no vertical, and no Services chip even if the
 /// server sent one.
+///
+/// The same holds for the "Your favourites" rail. The server leaves service shops out of that read;
+/// a service shop that arrived in it anyway is still not drawn on Home.
 void main() {
   const MethodChannel storageChannel =
       MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
@@ -48,10 +51,12 @@ void main() {
 
   late List<RequestOptions> requests;
   late List<Map<String, dynamic>> chips;
+  late List<Map<String, dynamic>> favourites;
 
   setUp(() {
     requests = <RequestOptions>[];
     chips = <Map<String, dynamic>>[];
+    favourites = <Map<String, dynamic>>[];
   });
 
   Map<String, dynamic> page(List<Map<String, dynamic>> content) => <String, dynamic>{
@@ -71,11 +76,36 @@ void main() {
     'ratingCount': 12,
   };
 
+  /// A shop the customer starred, which the favourites rail draws.
+  final Map<String, dynamic> starredBakery = <String, dynamic>{
+    'id': 's2',
+    'slug': 's2',
+    'name': 'Rose & Crust Bakery',
+    'vertical': 'RESTAURANT',
+    'availability': 'OPEN',
+    'rating': 4.8,
+    'ratingCount': 30,
+    'favorite': true,
+  };
+
+  /// A print shop the customer also starred. Service shops are never on Home.
+  final Map<String, dynamic> starredPrintShop = <String, dynamic>{
+    'id': 's3',
+    'slug': 's3',
+    'name': 'Al Fakhry Press',
+    'vertical': 'SERVICES',
+    'serviceCategory': 'PRINTING',
+    'availability': 'OPEN',
+    'rating': 4.9,
+    'ratingCount': 51,
+    'favorite': true,
+  };
+
   Object? answer(RequestOptions options) {
     if (options.path.startsWith('/api/orders')) return page(const <Map<String, dynamic>>[]);
     return switch (options.path) {
       '/api/stores' => page(<Map<String, dynamic>>[grocer]),
-      '/api/stores/favorites' => page(const <Map<String, dynamic>>[]),
+      '/api/stores/favorites' => page(favourites),
       '/api/banners' => const <dynamic>[],
       '/api/categories/chips' => chips,
       '/api/delivery-zones' => const <dynamic>[],
@@ -172,6 +202,27 @@ void main() {
     final CategoryStrip strip = tester.widget(find.byType(CategoryStrip));
     expect(strip.verticals, <StoreVertical>[StoreVertical.grocery]);
     expect(servicesOnTheStrip(), findsNothing);
+  });
+
+  testWidgets("a starred service shop in the favourites response is not drawn on Home's rail",
+      (WidgetTester tester) async {
+    favourites = <Map<String, dynamic>>[starredPrintShop, starredBakery];
+
+    await pumpHome(tester);
+
+    expect(find.text(en.yourFavourites), findsOneWidget);
+    expect(find.text('Rose & Crust Bakery'), findsOneWidget);
+    expect(find.text('Al Fakhry Press'), findsNothing);
+  });
+
+  testWidgets('favourites that are all service shops draw no favourites rail at all',
+      (WidgetTester tester) async {
+    favourites = <Map<String, dynamic>>[starredPrintShop];
+
+    await pumpHome(tester);
+
+    expect(find.text(en.yourFavourites), findsNothing);
+    expect(find.text('Al Fakhry Press'), findsNothing);
   });
 
   test('the services vertical has an icon of its own, so the switch over verticals is complete', () {

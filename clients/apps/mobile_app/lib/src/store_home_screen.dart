@@ -112,6 +112,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   List<StoreCard> _favorites = <StoreCard>[];
 
+  /// The starred shops the "Your favourites" rail draws: goods shops only.
+  ///
+  /// Service shops are never on Home. The server already leaves them out of the favourites read;
+  /// this holds the same rule again where the rail is drawn, so that neither a server that sent one
+  /// anyway nor a heart toggled on a service shop's own page (which reaches [_applyFavorite] like
+  /// any other) can put one here — or leave a favourites heading over an empty rail.
+  List<StoreCard> get _railFavorites => _favorites
+      .where((StoreCard s) => StoreVertical.pickerVerticals.contains(s.vertical))
+      .toList();
+
   /// Designed banners from the Backoffice, and the category strip. Both are small curated lists —
   /// a rail nobody can reach the end of does not need paging.
   List<HomeBanner> _banners = <HomeBanner>[];
@@ -424,7 +434,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
-                  if (_favorites.isNotEmpty)
+                  if (_railFavorites.isNotEmpty)
                     SliverToBoxAdapter(child: _featuredSection()),
                   SliverToBoxAdapter(
                     child: Padding(
@@ -1274,6 +1284,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// cards. The shops on it are the customer's own starred ones.
   Widget _featuredSection() {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<StoreCard> favorites = _railFavorites;
     return Padding(
       padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
       child: Column(
@@ -1300,9 +1311,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
-              itemCount: _favorites.length,
+              itemCount: favorites.length,
               separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
-              itemBuilder: (BuildContext context, int i) => _shopCard(_favorites[i]),
+              itemBuilder: (BuildContext context, int i) => _shopCard(favorites[i]),
             ),
           ),
         ],
