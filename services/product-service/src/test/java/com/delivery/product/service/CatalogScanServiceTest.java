@@ -514,6 +514,110 @@ class CatalogScanServiceTest {
         }
     }
 
+    /**
+     * What the screen asks on opening, so a scan it lost — an app killed mid-capture, a merchant who
+     * left during the reading, a reloaded tab — is carried on rather than stranded with its photos, a
+     * share of the day's allowance and a paid reading.
+     */
+    @Nested
+    @DisplayName("picking a scan up again")
+    class Resuming {
+
+        private final Instant since = NOW.minus(Duration.ofHours(24));
+
+        private CatalogScan failed(int attempts) {
+            CatalogScan scan = new CatalogScan(MERCHANT, store.getId());
+            for (int i = 0; i < attempts; i++) {
+                scan.startAnalysis(NOW, 2, STALE);
+                scan.fail(CatalogScan.FailureCode.PROVIDER_ERROR, NOW);
+            }
+            return scan;
+        }
+
+        private CatalogScan completeWith(boolean aLineStillWaits) {
+            CatalogScan scan = new CatalogScan(MERCHANT, store.getId());
+            scan.startAnalysis(NOW, 2, STALE);
+            scan.complete("CLAUDE", NOW);
+            when(items.existsByScanIdAndStatus(scan.getId(), CatalogScanItem.Status.PENDING))
+                    .thenReturn(aLineStillWaits);
+            return scan;
+        }
+
+        private void recent(String merchant, CatalogScan... newestFirst) {
+            when(scans.findByMerchantIdAndCreatedAtAfterOrderByCreatedAtDesc(merchant, since))
+                    .thenReturn(List.of(newestFirst));
+        }
+
+        /** Finished scans are passed over; the newest one the merchant can still act on answers. */
+        @Test
+        void the_newest_scan_still_waiting_on_the_merchant_is_the_one_picked_up() {
+            CatalogScan waiting = completeWith(true);
+            CatalogScan olderStillUploading = new CatalogScan(MERCHANT, store.getId());
+            recent(MERCHANT, completeWith(false), failed(2), waiting, olderStillUploading);
+
+            ScanDetails details = service.current(MERCHANT, null).orElseThrow();
+
+            assertThat(details.scan()).isSameAs(waiting);
+            assertThat(details.status()).isEqualTo(CatalogScan.Status.COMPLETE);
+            // All four in the window count against today's five.
+            assertThat(details.scansLeftToday()).isEqualTo(1);
+        }
+
+        @Test
+        void photos_to_add_a_reading_under_way_or_lost_and_a_retry_left_all_count_as_waiting() {
+            CatalogScan uploading = new CatalogScan(MERCHANT, store.getId());
+            recent(MERCHANT, uploading);
+            assertThat(service.current(MERCHANT, null).orElseThrow().scan()).isSameAs(uploading);
+
+            CatalogScan reading = new CatalogScan(MERCHANT, store.getId());
+            reading.startAnalysis(NOW.minusSeconds(30), 2, STALE);
+            recent(MERCHANT, reading);
+            assertThat(service.current(MERCHANT, null).orElseThrow().status())
+                    .isEqualTo(CatalogScan.Status.ANALYZING);
+
+            // Lost with its pod: reported as interrupted and restartable, so worth coming back to.
+            CatalogScan lost = new CatalogScan(MERCHANT, store.getId());
+            lost.startAnalysis(NOW.minus(Duration.ofHours(1)), 2, STALE);
+            recent(MERCHANT, lost);
+            ScanDetails interrupted = service.current(MERCHANT, null).orElseThrow();
+            assertThat(interrupted.failure()).isEqualTo(CatalogScan.FailureCode.INTERRUPTED);
+            assertThat(interrupted.attemptsLeft()).isEqualTo(1);
+
+            CatalogScan retryable = failed(1);
+            recent(MERCHANT, retryable);
+            assertThat(service.current(MERCHANT, null).orElseThrow().scan()).isSameAs(retryable);
+        }
+
+        /** Offering a dead end again would only stand between the merchant and a new scan. */
+        @Test
+        void a_finished_scan_is_not_offered_again() {
+            recent(MERCHANT, failed(2), completeWith(false));
+
+            assertThat(service.current(MERCHANT, null)).isEmpty();
+        }
+
+        @Test
+        void a_named_store_narrows_the_search_to_that_store() {
+            Store second = new Store(MERCHANT, "Second Shop", Store.Vertical.RESTAURANT);
+            CatalogScan elsewhere = new CatalogScan(MERCHANT, second.getId());
+            CatalogScan here = new CatalogScan(MERCHANT, store.getId());
+            recent(MERCHANT, elsewhere, here);
+
+            assertThat(service.current(MERCHANT, store.getId()).orElseThrow().scan()).isSameAs(here);
+            assertThat(service.current(MERCHANT, null).orElseThrow().scan()).isSameAs(elsewhere);
+        }
+
+        /** By the caller's own id, over the quota's day: another merchant's scan never answers. */
+        @Test
+        void the_lookup_is_the_callers_own_and_never_finds_another_merchants_scan() {
+            recent(MERCHANT, new CatalogScan(MERCHANT, store.getId()));
+
+            assertThat(service.current(OTHER, store.getId())).isEmpty();
+            verify(scans).findByMerchantIdAndCreatedAtAfterOrderByCreatedAtDesc(OTHER, since);
+            verify(scans, never()).findByMerchantIdAndCreatedAtAfterOrderByCreatedAtDesc(eq(MERCHANT), any());
+        }
+    }
+
     /** A box ending on the photo's edge must not round a hair past it and fail the whole scan. */
     @Test
     void a_box_rounded_for_storage_still_fits_inside_its_photo() {

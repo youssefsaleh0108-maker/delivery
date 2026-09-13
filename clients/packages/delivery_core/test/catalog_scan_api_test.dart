@@ -18,9 +18,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// `unknown` rather than as a guess, and a box that does not fit its photo is dropped so no tag is
 /// ever drawn where the product is not.
 class _Recorder implements HttpClientAdapter {
-  _Recorder(this.respond);
+  _Recorder(this.respond, {this.statusOf});
 
   final Object? Function(RequestOptions options) respond;
+
+  /// The status to answer with; 200 when unset.
+  final int Function(RequestOptions options)? statusOf;
   final List<RequestOptions> requests = <RequestOptions>[];
   final Map<String, Uint8List> bodies = <String, Uint8List>{};
 
@@ -36,8 +39,9 @@ class _Recorder implements HttpClientAdapter {
       bodies['${options.method} ${options.uri}'] = sent.takeBytes();
     }
     final Object? body = respond(options);
-    if (body == null) return ResponseBody.fromString('', 200);
-    return ResponseBody.fromString(jsonEncode(body), 200, headers: <String, List<String>>{
+    final int status = statusOf?.call(options) ?? 200;
+    if (body == null) return ResponseBody.fromString('', status);
+    return ResponseBody.fromString(jsonEncode(body), status, headers: <String, List<String>>{
       Headers.contentTypeHeader: <String>[Headers.jsonContentType],
     });
   }
@@ -75,8 +79,11 @@ void main() {
   late _Recorder app;
   late Dio dio;
 
-  Dio appDio(Object? Function(RequestOptions options) respond) {
-    app = _Recorder(respond);
+  Dio appDio(
+    Object? Function(RequestOptions options) respond, {
+    int Function(RequestOptions options)? statusOf,
+  }) {
+    app = _Recorder(respond, statusOf: statusOf);
     return Dio(BaseOptions(
       baseUrl: 'http://gateway',
       headers: <String, dynamic>{'Authorization': 'Bearer app-token'},
@@ -99,6 +106,25 @@ void main() {
           <String>['POST /api/products/scans', 'POST /api/products/scans']);
       expect(app.requests[0].data, <String, dynamic>{'storeId': 'store-9'});
       expect(app.requests[1].data, <String, dynamic>{});
+    });
+
+    test('the scan to pick up again is asked for per shop, and "none waiting" is no scan, not an error',
+        () async {
+      dio = appDio(
+        (RequestOptions o) => o.queryParameters.isEmpty ? null : _scan(status: 'ANALYZING'),
+        statusOf: (RequestOptions o) => o.queryParameters.isEmpty ? 204 : 200,
+      );
+      final CatalogScanApi api = CatalogScanApi(dio);
+
+      final CatalogScan? waiting = await api.current(storeId: 'store-9');
+      final CatalogScan? none = await api.current();
+
+      expect(app.requests.map((RequestOptions r) => '${r.method} ${r.path}'),
+          <String>['GET /api/products/scans/current', 'GET /api/products/scans/current']);
+      expect(app.requests[0].queryParameters, <String, dynamic>{'storeId': 'store-9'});
+      expect(app.requests[1].queryParameters, isEmpty);
+      expect(waiting?.status, CatalogScanStatus.analyzing);
+      expect(none, isNull);
     });
 
     test('analysing, reading, correcting and skipping each hit their own path', () async {

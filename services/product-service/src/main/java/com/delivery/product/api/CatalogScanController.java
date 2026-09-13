@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.security.CurrentUser;
@@ -107,6 +108,20 @@ public class CatalogScanController {
         // says UPLOADING.
         analyzer.submit(scanId, started.attempt());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(toResponse(started.details()));
+    }
+
+    /**
+     * The caller's newest scan from the last day that still waits on them — 200 with it, 204 when
+     * there is none — so a screen that lost its scan (an app killed mid-capture, a reloaded tab)
+     * picks it up instead of spending another. Looked up by the caller's own {@code sub}; the
+     * optional store id only narrows that. Declared before {@code /{scanId}}, and a literal segment
+     * wins over a pattern whatever the order.
+     */
+    @GetMapping("/current")
+    public ResponseEntity<ScanResponse> current(@RequestParam(required = false) UUID storeId) {
+        return scans.current(CurrentUser.requireId(), storeId)
+                .map(details -> ResponseEntity.ok(toResponse(details)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/{scanId}")

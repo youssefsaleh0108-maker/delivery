@@ -338,6 +338,45 @@ public class CatalogScanService {
         return details(requireOwned(scanId, merchantId));
     }
 
+    /**
+     * The merchant's newest scan from the last day that is still waiting on them, if any.
+     *
+     * <p>A scan lives here, not on the screen that started it. An Android process killed while the
+     * camera was open, a merchant who left while the photos were being read, a portal tab reloaded:
+     * each of those used to strand the scan — its photos, a share of the day's allowance and, with a
+     * real provider on, a paid reading — because nothing could find it again. This is what the
+     * screen asks on opening, so it carries on where the merchant left off.
+     *
+     * <p>"Still waiting" means there is something the merchant can still do with it: photos can be
+     * added; a reading is under way, or was lost with its pod and may be restarted; a failed reading
+     * has an attempt left; or a complete scan has a line not yet kept or skipped. A scan with none of
+     * those is finished, and offering it again would only stand between the merchant and a new one.
+     * The newest such scan wins — the one the merchant was last busy with.
+     *
+     * <p>The quota's own window, so the answer is always one of the scans counted against today.
+     * Keyed on the caller like every read here; a store id only narrows it, and a store the caller
+     * does not own simply matches none of their scans.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ScanDetails> current(String merchantId, UUID storeId) {
+        List<CatalogScan> recent = scans.findByMerchantIdAndCreatedAtAfterOrderByCreatedAtDesc(
+                merchantId, clock.instant().minus(QUOTA_WINDOW));
+        for (CatalogScan scan : recent) {
+            if ((storeId == null || storeId.equals(scan.getStoreId())) && stillWaiting(scan)) {
+                return Optional.of(details(scan, recent.size()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean stillWaiting(CatalogScan scan) {
+        return switch (scan.effectiveStatus(clock.instant(), limits.staleAfter())) {
+            case UPLOADING, ANALYZING -> true;
+            case FAILED -> scan.getAnalysisAttempts() < limits.maxAnalysisAttempts();
+            case COMPLETE -> items.existsByScanIdAndStatus(scan.getId(), CatalogScanItem.Status.PENDING);
+        };
+    }
+
     /** Saves a line's corrections without deciding it. */
     @Transactional
     public ScanDetails updateItem(UUID scanId, String merchantId, UUID itemId, String name,

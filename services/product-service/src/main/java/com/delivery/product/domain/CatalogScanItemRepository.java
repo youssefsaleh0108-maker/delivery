@@ -12,4 +12,7 @@ public interface CatalogScanItemRepository extends JpaRepository<CatalogScanItem
 
     /** Scoped to the scan, which the caller has already been proved to own. */
     Optional<CatalogScanItem> findByIdAndScanId(UUID id, UUID scanId);
+
+    /** Whether any line on the scan is still in {@code status} — PENDING: still waiting on the merchant. */
+    boolean existsByScanIdAndStatus(UUID scanId, CatalogScanItem.Status status);
 }

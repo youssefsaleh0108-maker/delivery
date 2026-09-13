@@ -1,6 +1,7 @@
 package com.delivery.product.api;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterAll;
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -29,6 +31,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogScanDtos.CommitRequest;
 import com.delivery.product.api.dto.CatalogScanDtos.ItemEditRequest;
+import com.delivery.product.api.dto.CatalogScanDtos.ScanResponse;
 import com.delivery.product.domain.CatalogScan;
 import com.delivery.product.service.CatalogScanAnalyzer;
 import com.delivery.product.service.CatalogScanService;
@@ -133,6 +136,7 @@ class CatalogScanAccessTest {
                 c -> c.presignPhoto(SCAN, new PresignUploadRequest("image/jpeg")),
                 c -> c.confirmPhoto(SCAN, FILE),
                 c -> c.analyze(SCAN),
+                c -> c.current(null),
                 c -> c.read(SCAN),
                 c -> c.updateItem(SCAN, ITEM, new ItemEditRequest("Pepsi", null, null)),
                 c -> c.rejectItem(SCAN, ITEM),
@@ -183,6 +187,28 @@ class CatalogScanAccessTest {
 
         ProblemDetail problem = new ApiExceptionHandler().onScanNotFound(refused);
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+    }
+
+    /**
+     * The scan to pick up again is looked up for the caller's own sub — there is no id in the request
+     * to name somebody else's — and "nothing to pick up" is a 204, not an error for the screen to word.
+     */
+    @Test
+    void the_scan_to_pick_up_again_is_the_callers_own_and_none_is_a_204() {
+        UUID store = UUID.randomUUID();
+        signInAs("merchant-sub", "ROLE_MERCHANT");
+        when(scans.current("merchant-sub", store)).thenReturn(Optional.of(emptyScan()));
+
+        ResponseEntity<ScanResponse> found = controller.current(store);
+        assertThat(found.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(found.getBody().status()).isEqualTo(CatalogScan.Status.UPLOADING);
+        verify(scans).current("merchant-sub", store);
+
+        signInAs("intruder-sub", "ROLE_MERCHANT");
+        when(scans.current("intruder-sub", store)).thenReturn(Optional.empty());
+
+        assertThat(controller.current(store).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        verify(scans).current("intruder-sub", store);
     }
 
     /** The job is queued only after the transaction that marked the scan ANALYZING has returned. */

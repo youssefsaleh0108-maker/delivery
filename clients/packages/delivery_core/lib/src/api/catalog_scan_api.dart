@@ -7,9 +7,10 @@ import '../util/image_prep.dart';
 
 /// Merchant Blitz, over product-service's `/api/products/scans`.
 ///
-/// The flow the screen drives: [start] a scan, [addPhoto] once per shelf photo, [analyze], then
-/// [read] until the status leaves `analyzing`, and finally [commit] the merchant's review. Every
-/// call is MERCHANT-only on the server and scoped to the caller's own scans.
+/// The flow the screen drives: [current] first, to pick up a scan left waiting; otherwise [start] a
+/// scan, [addPhoto] once per shelf photo, [analyze], then [read] until the status leaves
+/// `analyzing`, and finally [commit] the merchant's review. Every call is MERCHANT-only on the server
+/// and scoped to the caller's own scans.
 class CatalogScanApi {
   CatalogScanApi(this._dio, {Dio Function()? uploadClient})
       : _uploadClient = uploadClient ?? Dio.new;
@@ -26,6 +27,23 @@ class CatalogScanApi {
   static const int maxShelfPhotoBytes = 2 * 1024 * 1024;
 
   static const String _base = '/api/products/scans';
+
+  /// The merchant's newest scan from the last day that still waits on them — photos still to add, a
+  /// reading under way or retryable, lines not yet decided — or null when there is none.
+  ///
+  /// What the screen asks on opening, so a scan it lost (an app Android killed mid-capture, a
+  /// merchant who left during the reading, a reloaded tab) is picked up rather than a new one spent.
+  /// [storeId] narrows it to one of the merchant's shops.
+  Future<CatalogScan?> current({String? storeId}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '$_base/current',
+      queryParameters: <String, dynamic>{if (storeId != null) 'storeId': storeId},
+    );
+    final Object? body = response.data;
+    // 204 when nothing is waiting.
+    if (response.statusCode == 204 || body is! Map<String, dynamic>) return null;
+    return CatalogScan.fromJson(body);
+  }
 
   /// Starts a scan. Fails with 429 once the day's scans are spent.
   Future<CatalogScan> start({String? storeId}) async {

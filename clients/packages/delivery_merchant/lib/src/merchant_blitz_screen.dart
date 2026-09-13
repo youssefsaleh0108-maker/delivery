@@ -20,6 +20,13 @@
 /// with fixed example lines and marks the scan `sample`; presenting those as a reading of the
 /// merchant's shelf would be showing items the platform does not actually have.
 ///
+/// A scan belongs to the server, not to this screen. Opening the page picks up the merchant's newest
+/// scan that still waits on them — photos still to add, a reading under way, lines to check — so an
+/// app Android killed while the camera was open, a merchant who left during the reading, or a
+/// reloaded portal tab carries on instead of stranding the scan with its photos, a share of the day's
+/// allowance and a paid reading. On Android a photo the camera took while the app was gone is
+/// recovered too.
+///
 /// Host-agnostic like the rest of the package: the phone pushes it from the Inventory tab and from
 /// Settings, the portal from its Inventory page — where there is no camera, so "Choose photos" is
 /// the only way in and "Take photo" is never drawn.
@@ -36,7 +43,7 @@ import 'package:file_selector/file_selector.dart' show XFile, XTypeGroup, openFi
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource;
+import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource, LostDataResponse;
 
 import 'catalog_scan_review_screen.dart';
 import 'order_detail_screen.dart';
@@ -69,6 +76,14 @@ abstract class ShelfPhotoSource {
   /// Photos from the gallery or the file system — several at once, one per shelf. Empty when the
   /// merchant backed out.
   Future<List<PickedShelfPhoto>> choosePhotos({required String label});
+
+  /// A photo the camera took while Android had destroyed this app, handed back once, the next time
+  /// the flow starts. Null when there is none, and everywhere but Android.
+  ///
+  /// Android may destroy the app's activity — often its whole process — while the camera app is in
+  /// front, and memory is shortest on exactly the phones shops use. The photo is still taken and the
+  /// picker keeps it for the app to ask for once it runs again; if nothing asks, it is gone.
+  Future<PickedShelfPhoto?> retrieveLostPhoto() async => null;
 }
 
 /// The real device: image_picker's camera on a phone, file_selector everywhere for the gallery.
@@ -114,6 +129,17 @@ class DeviceShelfPhotoSource extends ShelfPhotoSource {
       picked.add(PickedShelfPhoto(bytes: await file.readAsBytes(), contentType: _typeOf(file)));
     }
     return picked;
+  }
+
+  @override
+  Future<PickedShelfPhoto?> retrieveLostPhoto() async {
+    // Android only: image_picker keeps lost data nowhere else, and says so by throwing.
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
+    final LostDataResponse lost = await ImagePicker().retrieveLostData();
+    final XFile? file = lost.file;
+    // A capture that failed comes back as an exception with no file: nothing to recover.
+    if (lost.isEmpty || file == null) return null;
+    return PickedShelfPhoto(bytes: await file.readAsBytes(), contentType: _typeOf(file));
   }
 
   static String _typeOf(XFile file) {
@@ -169,8 +195,14 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
 
   CatalogScan? _scan;
 
+  /// True until the server has said whether a scan is waiting to be picked up. Nothing that would
+  /// start a scan can be tapped meanwhile: a merchant quick enough to pick a photo first would
+  /// otherwise spend a second scan beside the one being fetched.
+  bool _resuming = true;
+
   /// The photos this visit uploaded, by file id, so the viewfinder draws them from memory instead of
-  /// downloading what the phone already holds.
+  /// downloading what the phone already holds. A scan picked up again has none here and draws its
+  /// photos from the server.
   final Map<String, Uint8List> _bytesByFile = <String, Uint8List>{};
 
   String? _selectedFileId;
@@ -193,6 +225,49 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
 
   bool get _uploading => _uploadTotal > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_resume());
+  }
+
+  /// Picks up where the merchant left off: the newest scan still waiting on them, then — on Android
+  /// — a photo the camera took while the app was gone, sent on that scan, or on a new one exactly as
+  /// a first photo always starts one.
+  Future<void> _resume() async {
+    CatalogScan? waiting;
+    try {
+      waiting = await widget.api.current(storeId: widget.storeId);
+    } catch (e) {
+      // Not being able to look is no reason to lock the merchant out: the page opens fresh, as it
+      // did before a scan could be picked up again.
+      debugPrint('BLITZ RESUME FAILED: $e');
+    }
+    if (!mounted) return;
+    final CatalogScan? found = waiting;
+    setState(() {
+      _resuming = false;
+      if (found != null) _apply(found);
+    });
+
+    PickedShelfPhoto? lost;
+    try {
+      lost = await widget.photoSource.retrieveLostPhoto();
+    } catch (e) {
+      debugPrint('BLITZ LOST PHOTO FAILED: $e');
+    }
+    if (lost == null || !mounted) return;
+    final CatalogScan? scan = _scan;
+    if (scan != null && scan.status != CatalogScanStatus.uploading) {
+      // Only reachable from another device: the camera is only offered while a scan takes photos,
+      // and nothing moved this one on while the app was dead. Starting a scan the merchant did not
+      // ask for would spend their allowance, so the photo is left.
+      debugPrint('BLITZ LOST PHOTO LEFT: scan ${scan.id} is ${scan.status.wireValue}');
+      return;
+    }
+    await _upload(<PickedShelfPhoto>[lost]);
+  }
 
   @override
   void dispose() {
@@ -628,7 +703,7 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
   /// No scan yet, or photos still being added.
   List<Widget> _gathering(DeliveryStrings t, CatalogScan? scan) {
     final int uploaded = scan?.uploadedPhotos.length ?? 0;
-    final bool busy = _starting || _uploading || _requestingAnalysis;
+    final bool busy = _resuming || _starting || _uploading || _requestingAnalysis;
     final bool full = scan != null && scan.photos.length >= scan.maxPhotos;
     final bool camera = widget.photoSource.canUseCamera;
     final VoidCallback? take = busy || full ? null : _takePhoto;
@@ -655,7 +730,7 @@ class _MerchantBlitzScreenState extends State<MerchantBlitzScreen>
           value: _uploadDone / _uploadTotal,
         ),
         const SizedBox(height: DeliverySpacing.md),
-      ] else if (_starting) ...<Widget>[
+      ] else if (_starting || _resuming) ...<Widget>[
         const _Progress(),
         const SizedBox(height: DeliverySpacing.md),
       ],

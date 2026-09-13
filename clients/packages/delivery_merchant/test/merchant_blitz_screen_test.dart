@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -59,13 +60,24 @@ ScanLine _line(String id, String name, {double confidence = 0.9, double? guess})
       box: const ScanBox(left: 0.1, top: 0.1, width: 0.3, height: 0.3),
     );
 
-/// The scan client, scripted. Records every call in order.
+/// The scan client, scripted. Records every call in order — all but the look for a scan to pick up
+/// again, which is counted apart so the flows below read as what the merchant did.
 class _FakeScanApi extends CatalogScanApi {
   _FakeScanApi() : super(Dio());
 
   final List<String> calls = <String>[];
   Object? startError;
-  CatalogScan current = _scan();
+
+  /// The scan as the server last answered it.
+  CatalogScan latest = _scan();
+
+  /// What the look for a scan to pick up again finds. Null: nothing is waiting.
+  CatalogScan? resumable;
+
+  /// When set, that look waits for it.
+  Completer<void>? resumeGate;
+  int looks = 0;
+  String? lookedInStore;
 
   /// What "analyze" answers. Defaults to the scan moving to ANALYZING.
   CatalogScan Function(CatalogScan current)? analyzeResult;
@@ -74,11 +86,22 @@ class _FakeScanApi extends CatalogScanApi {
   final List<CatalogScan> reads = <CatalogScan>[];
 
   @override
+  Future<CatalogScan?> current({String? storeId}) async {
+    looks++;
+    lookedInStore = storeId;
+    final Completer<void>? gate = resumeGate;
+    if (gate != null) await gate.future;
+    final CatalogScan? found = resumable;
+    if (found != null) latest = found;
+    return found;
+  }
+
+  @override
   Future<CatalogScan> start({String? storeId}) async {
     calls.add('start');
     final Object? error = startError;
     if (error != null) throw error;
-    return current = _scan();
+    return latest = _scan();
   }
 
   @override
@@ -88,9 +111,9 @@ class _FakeScanApi extends CatalogScanApi {
     required String contentType,
   }) async {
     calls.add('addPhoto $contentType');
-    final int n = current.photos.length + 1;
-    return current = _scan(photos: <ScanPhoto>[
-      ...current.photos,
+    final int n = latest.photos.length + 1;
+    return latest = _scan(photos: <ScanPhoto>[
+      ...latest.photos,
       ScanPhoto(fileId: 'file-$n', position: n - 1, uploaded: true),
     ]);
   }
@@ -100,19 +123,19 @@ class _FakeScanApi extends CatalogScanApi {
     calls.add('analyze');
     final CatalogScan Function(CatalogScan) answer = analyzeResult ??
         (CatalogScan c) => _scan(status: CatalogScanStatus.analyzing, photos: c.photos);
-    return current = answer(current);
+    return latest = answer(latest);
   }
 
   @override
   Future<CatalogScan> read(String scanId) async {
     calls.add('read');
-    if (reads.isNotEmpty) current = reads.length == 1 ? reads.first : reads.removeAt(0);
-    return current;
+    if (reads.isNotEmpty) latest = reads.length == 1 ? reads.first : reads.removeAt(0);
+    return latest;
   }
 }
 
 class _FakePhotos extends ShelfPhotoSource {
-  _FakePhotos({this.camera = true, this.picks = 1, this.cameraError});
+  _FakePhotos({this.camera = true, this.picks = 1, this.cameraError, this.lost});
 
   final bool camera;
   final int picks;
@@ -120,8 +143,14 @@ class _FakePhotos extends ShelfPhotoSource {
   /// What opening the camera throws — image_picker's answer to a refused camera permission, say.
   final Object? cameraError;
 
+  /// A photo the camera took while Android had closed the app, for the next start to recover.
+  final PickedShelfPhoto? lost;
+
   @override
   bool get canUseCamera => camera;
+
+  @override
+  Future<PickedShelfPhoto?> retrieveLostPhoto() async => lost;
 
   @override
   Future<PickedShelfPhoto?> takePhoto() async {
@@ -196,8 +225,10 @@ void main() {
     expect(find.text(t.blitzChoosePhotos), findsOneWidget);
     // The honest footer, not the frame's "Your shop online in 24 hours".
     expect(find.text(t.blitzFooter), findsOneWidget);
-    // No scan started, so none of the day's allowance used, by merely looking.
+    // No scan started, so none of the day's allowance used, by merely looking. The one thing opening
+    // does is ask whether a scan is waiting to be picked up again.
     expect(api.calls, isEmpty);
+    expect(api.looks, 1);
   });
 
   testWidgets('where there is no camera there is no camera button', (WidgetTester tester) async {
@@ -251,7 +282,7 @@ void main() {
     // The reading finishes between two polls.
     api.reads.add(_scan(
       status: CatalogScanStatus.complete,
-      photos: api.current.photos,
+      photos: api.latest.photos,
       sample: true,
       lines: <ScanLine>[
         _line('line-1', 'Pepsi 1L', guess: 1.2),
@@ -379,6 +410,94 @@ void main() {
 
     expect(find.text(t.blitzScanComplete), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a scan left waiting is picked up on opening, and its review opens and opens again',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..resumable = _scan(
+        status: CatalogScanStatus.complete,
+        photos: const <ScanPhoto>[ScanPhoto(fileId: 'file-1', position: 0, uploaded: true)],
+        lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+        scansLeftToday: 3,
+      );
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+    await tester.pump();
+
+    expect(api.looks, 1);
+    expect(api.lookedInStore, 'store-1');
+    expect(find.text(t.blitzScanComplete), findsOneWidget);
+    expect(find.text(t.blitzScansLeft(3)), findsOneWidget);
+    // Nothing started or uploaded: the scan, its photos and its reading are the ones already spent.
+    expect(api.calls, isEmpty);
+
+    for (int visit = 0; visit < 2; visit++) {
+      await tester.tap(find.text(t.blitzReviewCta));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(CatalogScanReviewScreen), findsOneWidget);
+
+      await tester.state<NavigatorState>(find.byType(Navigator)).maybePop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(CatalogScanReviewScreen), findsNothing);
+    }
+  });
+
+  testWidgets('a reading left running is watched again, and its result arrives',
+      (WidgetTester tester) async {
+    const List<ScanPhoto> photos = <ScanPhoto>[
+      ScanPhoto(fileId: 'file-1', position: 0, uploaded: true),
+    ];
+    final _FakeScanApi api = _FakeScanApi()
+      ..resumable = _scan(status: CatalogScanStatus.analyzing, photos: photos);
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+    await tester.pump();
+
+    expect(find.text(t.blitzAnalyzing), findsOneWidget);
+
+    api.reads.add(_scan(
+      status: CatalogScanStatus.complete,
+      photos: photos,
+      lines: <ScanLine>[_line('line-1', 'Pepsi 1L')],
+    ));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    expect(api.calls, <String>['read']);
+    expect(find.text(t.blitzScanComplete), findsOneWidget);
+  });
+
+  testWidgets('until the look for a waiting scan answers, nothing that would start one can be tapped',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()..resumeGate = Completer<void>();
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    expect(_buttonWith(tester, t.blitzTakePhoto).onPressed, isNull);
+    await tester.tap(find.text(t.blitzChoosePhotos));
+    await tester.pump();
+    expect(api.calls, isEmpty);
+
+    api.resumeGate!.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(_buttonWith(tester, t.blitzTakePhoto).onPressed, isNotNull);
+  });
+
+  testWidgets('a photo the camera took while Android had closed the app is sent on the waiting scan',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()..resumable = _scan();
+    final DeliveryStrings t = await _pump(
+      tester,
+      _blitz(api,
+          photos: _FakePhotos(lost: PickedShelfPhoto(bytes: _png, contentType: 'image/jpeg'))),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // On the scan already started for it, not a new one that would spend another of the day's.
+    expect(api.calls, <String>['addPhoto image/jpeg']);
+    expect(find.text(t.blitzPhotoCount(1, 6)), findsOneWidget);
   });
 
   testWidgets('Inventory opens the scan when its host hands it the client',

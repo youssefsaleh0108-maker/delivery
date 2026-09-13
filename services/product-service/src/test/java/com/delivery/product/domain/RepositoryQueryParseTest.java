@@ -131,6 +131,10 @@ class RepositoryQueryParseTest {
 
         // What the derived quota count generates.
         parses("SELECT COUNT(s) FROM CatalogScan s WHERE s.merchantId = :merchantId AND s.createdAt > :since");
+        // And the two derived reads behind "pick up where I left off".
+        parses("SELECT s FROM CatalogScan s WHERE s.merchantId = :merchantId AND s.createdAt > :since "
+                + "ORDER BY s.createdAt DESC");
+        parses("SELECT i.id FROM CatalogScanItem i WHERE i.scanId = :scanId AND i.status = :status");
 
         parses("""
                 SELECT s.id, s.merchantId, s.storeId, s.status, s.provider, s.failureCode,

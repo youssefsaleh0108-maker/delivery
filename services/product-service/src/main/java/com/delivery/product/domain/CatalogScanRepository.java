@@ -1,6 +1,7 @@
 package com.delivery.product.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +30,13 @@ public interface CatalogScanRepository extends JpaRepository<CatalogScan, UUID> 
 
     /** The daily quota: scans this merchant started since {@code since}. */
     long countByMerchantIdAndCreatedAtAfter(String merchantId, Instant since);
+
+    /**
+     * The same scans as the quota counts, newest first: what "pick up where I left off" chooses
+     * from. Bounded by that quota, so a handful of rows at most.
+     */
+    List<CatalogScan> findByMerchantIdAndCreatedAtAfterOrderByCreatedAtDesc(String merchantId,
+                                                                           Instant since);
 
     /**
      * Takes the store row's write lock for the rest of the transaction.
