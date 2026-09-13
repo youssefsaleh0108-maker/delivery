@@ -294,12 +294,7 @@ public class SettlementService {
                 cashHolder, correlationId, waivers, rider, earnedAt, Parties.none());
     }
 
-    /**
-     * @param rider     who carried it, or null when the event does not say
-     * @param earnedAt  when it was delivered, for the rider's per-day statement. The row must land
-     *                  in the day the work happened, not the day a slow bus delivered the event
-     * @param parties   who each leg is about. See {@link Parties}; never null
-     */
+    /** The pre-gift signature: settles exactly as it did before a gift's wrapping was paid out. */
     @Transactional
     public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
                                               BigDecimal merchantBase,
@@ -308,6 +303,29 @@ public class SettlementService {
                                               CashHolder cashHolder, String correlationId,
                                               Waivers waivers, Rider rider,
                                               java.time.Instant earnedAt, Parties parties) {
+        return settle(orderId, total, merchantBase, customerAccount, merchantAccount, carrierAccount,
+                cashHolder, correlationId, waivers, rider, earnedAt, parties, null);
+    }
+
+    /**
+     * @param rider       who carried it, or null when the event does not say
+     * @param earnedAt    when it was delivered, for the rider's per-day statement. The row must
+     *                    land in the day the work happened, not the day a slow bus delivered the
+     *                    event
+     * @param parties     who each leg is about. See {@link Parties}; never null
+     * @param giftWrapFee what wrapping a gift added to the total, paid to the shop in full as its
+     *                    own {@link Leg#GIFT_WRAP_CREDIT}. Null or zero on every order that is not
+     *                    a wrapped gift, which then settles exactly as before
+     */
+    @Transactional
+    public List<AccountingTransaction> settle(UUID orderId, BigDecimal total,
+                                              BigDecimal merchantBase,
+                                              String customerAccount, String merchantAccount,
+                                              String carrierAccount,
+                                              CashHolder cashHolder, String correlationId,
+                                              Waivers waivers, Rider rider,
+                                              java.time.Instant earnedAt, Parties parties,
+                                              BigDecimal giftWrapFee) {
 
         // At-least-once bus delivery means order.delivered can arrive twice. Settling twice would
         // really move money twice, so this check — backed by the unique constraint on
@@ -356,6 +374,26 @@ public class SettlementService {
             goods = gross;
         }
 
+        // What wrapping a gift added, and it is the shop's: they did the wrapping. Paid in full as
+        // its own leg — commission is a share of the goods the platform sold on the shop's behalf,
+        // and the wrap is neither goods nor anything the platform did.
+        //
+        // Read from the event, never derived. Unread, the fee is inside the total and outside every
+        // credit, so the subtraction below handed it to the platform's leg: posted as commission,
+        // reported as "Commission earned", and the shop that wrapped the gift paid nothing for it.
+        //
+        // Clamped to what the customer paid. Order Manager never discounts the wrap, so the total
+        // always covers it; a wrap larger than the total is an inconsistent event, and crediting it
+        // would pay the shop money nobody handed over.
+        BigDecimal wrapShare = giftWrapFee == null || giftWrapFee.signum() <= 0
+                ? BigDecimal.ZERO
+                : giftWrapFee.setScale(2, RoundingMode.HALF_UP);
+        if (wrapShare.compareTo(amount) > 0) {
+            log.warn("Order {} has a gift wrap fee of {} against a total of {}; paying the total",
+                    orderId, wrapShare, amount);
+            wrapShare = amount;
+        }
+
         // No commission at all when the merchant's fee was waived: they keep the whole goods amount
         // and the platform absorbs what it would have taken.
         BigDecimal commission = waivers.merchantWaived()
@@ -375,10 +413,11 @@ public class SettlementService {
         // The fallback subtracts from the gross for the same reason the clamp compares against it:
         // a discount comes off the total, not off the delivery. In practice the two are identical —
         // an event old enough to omit the fee is older than promo codes — but a subtraction that is
-        // only right when a field happens to be absent is a trap for whoever reads it next.
+        // only right when a field happens to be absent is a trap for whoever reads it next. The wrap
+        // comes out of it for the same reason: it is inside the total, and it is not delivery.
         BigDecimal deliveryFee = waivers.deliveryFee() != null
                 ? waivers.deliveryFee().setScale(2, RoundingMode.HALF_UP)
-                : gross.subtract(goods);
+                : gross.subtract(goods).subtract(wrapShare);
 
         // When the platform's own riders carried the order there is no carrier account and the fee
         // stays with the platform, exactly as it did before delivery could be bought from anybody
@@ -411,16 +450,17 @@ public class SettlementService {
             riderShare = riderShareOf(deliveryFee, waivers.carrierWaived());
         }
 
-        // Everything the customer paid that neither the merchant nor the carrier receives. Derived
-        // by subtraction so the legs sum to the total exactly whatever the rounding did.
+        // Everything the customer paid that neither the merchant — for goods or wrapping — nor the
+        // carrier receives. Derived by subtraction so the legs sum to the total exactly whatever the
+        // rounding did.
         //
         // This goes NEGATIVE when the platform gave away more than it took — most obviously a free
         // delivery whose fee exceeds the commission on a small basket. That is the offer working as
         // intended, not a fault: the platform is buying the order. It is also precisely what the
         // budget in FeeWaiverService exists to bound, and why the leg below is only posted when
         // there is something positive to post.
-        BigDecimal platformShare =
-                amount.subtract(merchantShare).subtract(carrierShare).subtract(riderShare);
+        BigDecimal platformShare = amount.subtract(merchantShare).subtract(wrapShare)
+                .subtract(carrierShare).subtract(riderShare);
 
         // Each leg is attributed as it is built, from the identifiers the event already carried.
         // Attaching it here rather than in a pass afterwards is what makes it impossible to add a
@@ -437,6 +477,13 @@ public class SettlementService {
         if (merchantShare.signum() > 0) {
             legs.add(new AccountingTransaction(orderId, Leg.MERCHANT_CREDIT, merchantAccount,
                     merchantShare, currency, Direction.CREDIT, correlationId)
+                    .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
+        }
+
+        // The shop's wrapping, beside its goods and never inside them: see wrapShare above.
+        if (wrapShare.signum() > 0) {
+            legs.add(new AccountingTransaction(orderId, Leg.GIFT_WRAP_CREDIT, merchantAccount,
+                    wrapShare, currency, Direction.CREDIT, correlationId)
                     .attributedTo(CounterpartyKind.MERCHANT, parties.merchantRef()));
         }
 
@@ -469,9 +516,9 @@ public class SettlementService {
 
         transactions.saveAll(legs);
         log.info("Settling order {}: total {} (goods {} + delivery {}) "
-                        + "= merchant {} + carrier {} + rider {} + platform {}",
-                orderId, amount, goods, deliveryFee, merchantShare, carrierShare, riderShare,
-                platformShare);
+                        + "= merchant {} + wrapping {} + carrier {} + rider {} + platform {}",
+                orderId, amount, goods, deliveryFee, merchantShare, wrapShare, carrierShare,
+                riderShare, platformShare);
 
         // The rider's own ledger row, written in THIS transaction.
         //
@@ -786,9 +833,11 @@ public class SettlementService {
         // company pays a merchant and a carrier, and one carried by the platform's own fleet now
         // pays a merchant AND a rider. Missing legs are skipped by the null check below, exactly as
         // a zero-commission order's missing commission leg is. Leaving RIDER_CREDIT out of this
-        // list would debit the customer for an errand and then never pay anybody.
-        for (Leg next : List.of(Leg.MERCHANT_CREDIT, Leg.RIDER_CREDIT, Leg.PROVIDER_CREDIT,
-                Leg.PLATFORM_COMMISSION)) {
+        // list would debit the customer for an errand and then never pay anybody — and leaving
+        // GIFT_WRAP_CREDIT out would leave a shop's wrapping PENDING forever. It follows the goods:
+        // a wrap is only ever paid to a shop whose goods credit has already posted.
+        for (Leg next : List.of(Leg.MERCHANT_CREDIT, Leg.GIFT_WRAP_CREDIT, Leg.RIDER_CREDIT,
+                Leg.PROVIDER_CREDIT, Leg.PLATFORM_COMMISSION)) {
             AccountingTransaction leg = legs.stream()
                     .filter(t -> t.getLeg() == next)
                     .findFirst()

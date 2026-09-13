@@ -100,6 +100,7 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
     /** The legs that pay somebody. What "unattributed money" means. */
     Set<AccountingTransaction.Leg> PAYEE_LEGS = Set.of(
             AccountingTransaction.Leg.MERCHANT_CREDIT,
+            AccountingTransaction.Leg.GIFT_WRAP_CREDIT,
             AccountingTransaction.Leg.RIDER_CREDIT,
             AccountingTransaction.Leg.PROVIDER_CREDIT);
 
@@ -166,6 +167,7 @@ public interface AccountingTransactionRepository extends JpaRepository<Accountin
      */
     Set<AccountingTransaction.Leg> COUNTERPART_LEGS = Set.of(
             AccountingTransaction.Leg.MERCHANT_CREDIT,
+            AccountingTransaction.Leg.GIFT_WRAP_CREDIT,
             AccountingTransaction.Leg.RIDER_CREDIT,
             AccountingTransaction.Leg.PROVIDER_CREDIT,
             AccountingTransaction.Leg.CUSTOMER_REFUND);

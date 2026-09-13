@@ -32,6 +32,11 @@ final class Legs {
                 CounterpartyKind.MERCHANT, merchantRef);
     }
 
+    static AccountingTransaction giftWrapCredit(UUID orderId, String amount, String merchantRef) {
+        return of(orderId, Leg.GIFT_WRAP_CREDIT, amount, Direction.CREDIT,
+                CounterpartyKind.MERCHANT, merchantRef);
+    }
+
     static AccountingTransaction commission(UUID orderId, String amount) {
         return of(orderId, Leg.PLATFORM_COMMISSION, amount, Direction.CREDIT,
                 CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF);
