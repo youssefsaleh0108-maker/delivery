@@ -180,6 +180,27 @@ class NeighbourhoodRoomServiceTest {
             verifyNoInteractions(directory);
         }
 
+        /**
+         * A mute is recorded on a membership. If a move closed that membership and opened a clean
+         * one, a mute of a year would last exactly until the member changed their address.
+         */
+        @Test
+        @DisplayName("while muted, keeps a member where they are until the mute ends, cooldown long over")
+        void a_muted_member_cannot_move_away_from_the_mute() {
+            ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now().minus(Duration.ofDays(30)));
+            Instant muteEnds = Instant.now().plus(Duration.ofDays(90));
+            when(members.activeMuteOf(eq(CUSTOMER), any(Instant.class))).thenReturn(muteEnds);
+
+            NeighbourhoodRoomService.Placement placement = service.place(CUSTOMER, OTHER_ZONE, "Tania K.");
+
+            assertThat(placement.room()).isSameAs(room);
+            assertThat(placement.moveBlockedUntil()).isEqualTo(muteEnds);
+            assertThat(placement.mutedUntil()).isEqualTo(muteEnds);
+            assertThat(member.isCurrent()).isTrue();
+            verify(members, never()).saveAndFlush(any());
+            verifyNoInteractions(directory);
+        }
+
         @Test
         @DisplayName("after the cooldown, closes the old membership before opening the new one")
         void after_the_cooldown_a_member_moves() {
@@ -321,12 +342,31 @@ class NeighbourhoodRoomServiceTest {
             ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now());
             Instant until = Instant.now().plus(Duration.ofHours(24));
             member.muteUntil(until);
+            when(members.activeMuteOf(eq(CUSTOMER), any(Instant.class))).thenReturn(until);
 
             assertThatThrownBy(() -> service.post(room.getId(), CUSTOMER, "hello", null, null))
                     .isInstanceOfSatisfying(MemberMutedException.class,
                             e -> assertThat(e.getMutedUntil()).isEqualTo(until));
             verify(messages, never()).save(any());
             verifyNoInteractions(delivery);
+        }
+
+        /**
+         * The other half of the move rule. A moderator can mute somebody at the moment their app
+         * moves them, so the mute lands on the row they just left; it must still hold where they are.
+         */
+        @Test
+        @DisplayName("refuses a member whose mute sits on a room they have since left")
+        void a_mute_left_behind_in_another_room_still_holds() {
+            ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now());
+            Instant until = Instant.now().plus(Duration.ofDays(30));
+            when(members.activeMuteOf(eq(CUSTOMER), any(Instant.class))).thenReturn(until);
+
+            assertThatThrownBy(() -> service.post(room.getId(), CUSTOMER, "I'm back", null, null))
+                    .isInstanceOfSatisfying(MemberMutedException.class,
+                            e -> assertThat(e.getMutedUntil()).isEqualTo(until));
+            assertThat(member.getMutedUntil()).isNull();
+            verify(messages, never()).save(any());
         }
 
         @Test

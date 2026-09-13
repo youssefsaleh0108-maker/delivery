@@ -139,7 +139,7 @@ class NeighbourhoodChatAccessTest {
         @DisplayName("is placed by the token's subject and name, and gets the room without anybody's account id")
         void placed_as_themselves() throws Exception {
             when(rooms.place(CUSTOMER, ZONE, "Tania K."))
-                    .thenReturn(new NeighbourhoodRoomService.Placement(room, member, 12L, null));
+                    .thenReturn(new NeighbourhoodRoomService.Placement(room, member, 12L, null, null));
 
             mvc.perform(get("/api/chat/rooms/mine").param("zoneId", ZONE.toString()))
                     .andExpect(status().isOk())

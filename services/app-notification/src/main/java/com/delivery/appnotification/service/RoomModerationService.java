@@ -151,18 +151,21 @@ public class RoomModerationService {
                 .collect(Collectors.toMap(ChatRoom::getId, Function.identity()));
         Map<UUID, List<ChatRoomReport>> openByMessage = reports.findByMessageIdInAndResolvedAtIsNull(ids).stream()
                 .collect(Collectors.groupingBy(ChatRoomReport::getMessageId));
-        Map<String, ChatRoomMember> authors = roomIds.isEmpty() ? Map.of()
-                : members.findByRoomIdInAndUserIdIn(roomIds, authorIds).stream()
-                        .collect(Collectors.toMap(m -> m.getRoomId() + "|" + m.getUserId(),
-                                Function.identity(), (first, second) -> first));
 
+        // Whether each author is muted is a question about the person, not about the room the
+        // reported message was said in — they may have moved since, and the mute follows them.
         Instant now = Instant.now();
+        Map<String, Instant> mutedUntilByAuthor = authorIds.isEmpty() ? Map.of()
+                : members.findByUserIdIn(authorIds).stream()
+                        .filter(membership -> membership.isMutedAt(now))
+                        .collect(Collectors.toMap(ChatRoomMember::getUserId, ChatRoomMember::getMutedUntil,
+                                (a, b) -> a.isAfter(b) ? a : b));
+
         return tallies.stream()
                 .filter(tally -> byId.containsKey(tally.getMessageId()))
                 .map(tally -> {
                     ChatRoomMessage message = byId.get(tally.getMessageId());
                     ChatRoom room = roomsById.get(message.getRoomId());
-                    ChatRoomMember author = authors.get(message.getRoomId() + "|" + message.getSenderId());
                     List<String> reasons = openByMessage.getOrDefault(message.getId(), List.of()).stream()
                             .map(report -> report.getReason().name())
                             .distinct()
@@ -181,7 +184,7 @@ public class RoomModerationService {
                             reasons,
                             tally.getFirstReportedAt(),
                             tally.getLastReportedAt(),
-                            author != null && author.isMutedAt(now) ? author.getMutedUntil() : null);
+                            mutedUntilByAuthor.get(message.getSenderId()));
                 })
                 .toList();
     }
@@ -224,7 +227,15 @@ public class RoomModerationService {
     }
 
     /**
-     * Mutes the author of a message in that message's room, for a while.
+     * Mutes the author of a message, wherever they are now, for a while.
+     *
+     * <p><strong>The mute lands on the author's current membership</strong>, not on the one in the
+     * room the message was said in. Reports arrive late and moderators work a queue: by the time the
+     * message is read, its author may have moved to another area, and a mute written on the room
+     * they left would silence nobody. Posting refuses a mute found on any of the person's rows, and
+     * a muted member cannot move until the mute ends (see {@code NeighbourhoodRoomService}), so the
+     * room they are in is the room the mute has to hold. The audit row still names the room of the
+     * message, which is where the reason for the mute lives.
      *
      * <p>Always bounded. A permanent mute is a ban, and a ban is a decision about an account that
      * belongs to a process with an appeal, not to a click in a queue. A mute also survives the member
@@ -237,29 +248,40 @@ public class RoomModerationService {
                               String correlationId) {
         ChatRoomMessage message = messages.findById(messageId)
                 .orElseThrow(() -> new RoomNotFoundException(messageId));
-        ChatRoomMember author = members.findByRoomIdAndUserId(message.getRoomId(), message.getSenderId())
+        ChatRoomMember author = members.findByUserIdAndLeftAtIsNull(message.getSenderId())
+                // Nobody who has spoken is ever without a current room (a move closes one row and
+                // opens another in the same transaction), but a missing one must not become a no-op.
+                .or(() -> members.findByRoomIdAndUserId(message.getRoomId(), message.getSenderId()))
                 .orElseThrow(() -> new RoomNotFoundException(messageId));
 
         Instant until = Instant.now().plus(duration);
         actions.save(new ChatModerationAction(actorId, ChatModerationAction.Type.MUTE_MEMBER, message,
                 author.getUserId(), until, reason, correlationId));
         author.muteUntil(until);
-        log.info("Backoffice {} muted a member of room {} until {}", actorId, message.getRoomId(), until);
+        log.info("Backoffice {} muted the author of a message in room {} (now in room {}) until {}",
+                actorId, message.getRoomId(), author.getRoomId(), until);
         return until;
     }
 
-    /** Lifts a mute early — a mistake, or an appeal upheld. */
+    /**
+     * Lifts a mute early — a mistake, or an appeal upheld.
+     *
+     * <p>From every membership of the author, for the reason a mute is enforced from every one: an
+     * unmute that cleared only one row would leave the person silenced by a copy on another.
+     */
     @Transactional
     public void unmuteAuthor(UUID messageId, String actorId, String reason, String correlationId) {
         ChatRoomMessage message = messages.findById(messageId)
                 .orElseThrow(() -> new RoomNotFoundException(messageId));
-        ChatRoomMember author = members.findByRoomIdAndUserId(message.getRoomId(), message.getSenderId())
-                .orElseThrow(() -> new RoomNotFoundException(messageId));
+        List<ChatRoomMember> memberships = members.findByUserId(message.getSenderId());
+        if (memberships.isEmpty()) {
+            throw new RoomNotFoundException(messageId);
+        }
 
         actions.save(new ChatModerationAction(actorId, ChatModerationAction.Type.UNMUTE_MEMBER, message,
-                author.getUserId(), null, reason, correlationId));
-        author.unmute();
-        log.info("Backoffice {} unmuted a member of room {}", actorId, message.getRoomId());
+                message.getSenderId(), null, reason, correlationId));
+        memberships.forEach(ChatRoomMember::unmute);
+        log.info("Backoffice {} unmuted the author of a message in room {}", actorId, message.getRoomId());
     }
 
     // ---------------------------------------------------------------------------------- internals
@@ -299,7 +321,8 @@ public class RoomModerationService {
      * <p>The text is included even for a message already hidden — a moderator deciding whether to mute
      * needs to read what was said. No account ids: the author is the handle and name the room shows.
      *
-     * @param authorMutedUntil present only while the author is muted in that room
+     * @param authorMutedUntil present only while the author is muted, whichever of their memberships
+     *                         the mute is recorded on
      */
     public record ReportedMessage(
             UUID messageId,

@@ -8,6 +8,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.DynamicUpdate;
+
 /**
  * One person's place in one neighbourhood room.
  *
@@ -19,9 +21,16 @@ import jakarta.persistence.Table;
  * <p>Kept, not deleted, when the person moves to another neighbourhood. Deleting it would let a
  * muted neighbour shed the mute by moving away and back, and would hand them a new handle that their
  * neighbours' blocks no longer recognise.
+ *
+ * <p><strong>Updated column by column</strong> ({@link DynamicUpdate}). Two writers touch this row
+ * at the same moment in ordinary use: a moderator muting the member, and the member's own app
+ * re-placing them (a visit refreshes the name, a move sets {@code left_at}). A whole-row update
+ * would write back the {@code muted_until} it loaded before the mute landed, and the mute would
+ * silently vanish; with only the changed columns written, each writer keeps the other's change.
  */
 @Entity
 @Table(name = "chat_room_members")
+@DynamicUpdate
 public class ChatRoomMember {
 
     @Id

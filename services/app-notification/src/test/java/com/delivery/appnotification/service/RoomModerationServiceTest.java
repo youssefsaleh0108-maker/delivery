@@ -82,6 +82,8 @@ class RoomModerationServiceTest {
         when(members.existsByRoomIdAndUserIdAndLeftAtIsNull(room.getId(), NEIGHBOUR)).thenReturn(true);
         when(members.existsByRoomIdAndUserIdAndLeftAtIsNull(room.getId(), AUTHOR)).thenReturn(true);
         when(members.findByRoomIdAndUserId(room.getId(), AUTHOR)).thenReturn(Optional.of(author));
+        when(members.findByUserIdAndLeftAtIsNull(AUTHOR)).thenReturn(Optional.of(author));
+        when(members.findByUserId(AUTHOR)).thenReturn(List.of(author));
         when(actions.save(any(ChatModerationAction.class))).thenAnswer(call -> call.getArgument(0));
     }
 
@@ -260,6 +262,40 @@ class RoomModerationServiceTest {
             assertThat(audited().getAction()).isEqualTo(ChatModerationAction.Type.UNMUTE_MEMBER);
         }
 
+        /** Reports are read late. By then the author may live, and post, somewhere else. */
+        @Test
+        @DisplayName("mutes the author where they are now, even when the reported message is from a room they left")
+        void mutes_the_author_in_the_room_they_are_in_now() {
+            ChatRoomMember nowIn = new ChatRoomMember(UUID.randomUUID(), AUTHOR, "Hadi S.", Instant.now());
+            author.leave(Instant.now().minus(Duration.ofDays(1)));
+            when(members.findByUserIdAndLeftAtIsNull(AUTHOR)).thenReturn(Optional.of(nowIn));
+
+            Instant until = service.muteAuthor(message.getId(), MODERATOR, Duration.ofDays(30),
+                    "harassment", null);
+
+            assertThat(nowIn.getMutedUntil()).isEqualTo(until);
+            assertThat(nowIn.isMutedAt(Instant.now())).isTrue();
+            ChatModerationAction action = audited();
+            assertThat(action.getTargetUserId()).isEqualTo(AUTHOR);
+            // The trail keeps the room the message was said in: that is where the reason lives.
+            assertThat(action.getRoomId()).isEqualTo(room.getId());
+        }
+
+        @Test
+        @DisplayName("lifting a mute clears it from every room the author has been in")
+        void unmuting_clears_every_membership() {
+            ChatRoomMember elsewhere = new ChatRoomMember(UUID.randomUUID(), AUTHOR, "Hadi S.", Instant.now());
+            author.muteUntil(Instant.now().plus(Duration.ofDays(7)));
+            elsewhere.muteUntil(Instant.now().plus(Duration.ofDays(7)));
+            when(members.findByUserId(AUTHOR)).thenReturn(List.of(author, elsewhere));
+
+            service.unmuteAuthor(message.getId(), MODERATOR, "appeal upheld", null);
+
+            assertThat(author.getMutedUntil()).isNull();
+            assertThat(elsewhere.getMutedUntil()).isNull();
+            verify(actions, times(1)).save(any(ChatModerationAction.class));
+        }
+
         @Test
         @DisplayName("sees the queue with the room, the words, the reasons and whether the author is muted")
         void reads_the_queue() {
@@ -271,8 +307,10 @@ class RoomModerationServiceTest {
             when(reports.findByMessageIdInAndResolvedAtIsNull(List.of(message.getId()))).thenReturn(List.of(
                     new ChatRoomReport(message, NEIGHBOUR, ChatRoomReport.Reason.SPAM, first),
                     new ChatRoomReport(message, "another-sub", ChatRoomReport.Reason.PERSONAL_INFO, last)));
-            author.muteUntil(Instant.now().plus(Duration.ofDays(1)));
-            when(members.findByRoomIdInAndUserIdIn(any(), any())).thenReturn(List.of(author));
+            // Muted in the room they moved to, not the one the report came from: the queue shows it.
+            ChatRoomMember nowIn = new ChatRoomMember(UUID.randomUUID(), AUTHOR, "Hadi S.", Instant.now());
+            nowIn.muteUntil(Instant.now().plus(Duration.ofDays(1)));
+            when(members.findByUserIdIn(any())).thenReturn(List.of(author, nowIn));
 
             List<RoomModerationService.ReportedMessage> queue = service.openQueue();
 
@@ -283,7 +321,7 @@ class RoomModerationServiceTest {
             assertThat(line.authorName()).isEqualTo("Hadi S.");
             assertThat(line.reportCount()).isEqualTo(2L);
             assertThat(line.reasons()).containsExactly("PERSONAL_INFO", "SPAM");
-            assertThat(line.authorMutedUntil()).isEqualTo(author.getMutedUntil());
+            assertThat(line.authorMutedUntil()).isEqualTo(nowIn.getMutedUntil());
         }
     }
 

@@ -104,7 +104,11 @@ public class NeighbourhoodRoomService {
                 return placement(room, member, null);
             }
 
-            Instant movableAt = member.getJoinedAt().plus(properties.getMoveCooldown());
+            // A muted member stays where the mute found them until it ends, exactly as they stay
+            // through the cooldown. A mute recorded on this room's membership is otherwise a mute
+            // on a room they can walk out of: move, and the next room hears them.
+            Instant movableAt = later(member.getJoinedAt().plus(properties.getMoveCooldown()),
+                    members.activeMuteOf(userId, now));
             if (now.isBefore(movableAt)) {
                 // Not an error. The caller still has a neighbourhood — the one they are in — and the
                 // app says when they can move rather than showing nothing.
@@ -206,8 +210,10 @@ public class NeighbourhoodRoomService {
         }
 
         Instant now = Instant.now();
-        if (member.isMutedAt(now)) {
-            throw new MemberMutedException(member.getMutedUntil());
+        // Asked of every membership the person has, not only this room's: see activeMuteOf.
+        Instant mutedUntil = members.activeMuteOf(userId, now);
+        if (mutedUntil != null) {
+            throw new MemberMutedException(mutedUntil);
         }
 
         long recent = messages.countBySenderIdAndCreatedAtAfter(userId, now.minus(properties.getSendWindow()));
@@ -234,7 +240,11 @@ public class NeighbourhoodRoomService {
 
     private Placement placement(ChatRoom room, ChatRoomMember member, Instant moveBlockedUntil) {
         return new Placement(room, member, members.countByRoomIdAndLeftAtIsNull(room.getId()),
-                moveBlockedUntil);
+                moveBlockedUntil, members.activeMuteOf(member.getUserId(), Instant.now()));
+    }
+
+    private static Instant later(Instant a, Instant b) {
+        return b != null && b.isAfter(a) ? b : a;
     }
 
     private void broadcastAfterCommit(ChatRoomMessage message) {
@@ -260,10 +270,13 @@ public class NeighbourhoodRoomService {
      * @param memberCount      people currently in the room — a real count of rows, which is what the
      *                         header shows instead of the design's invented "active" figure
      * @param moveBlockedUntil set only when the caller asked for a different area and must stay put
-     *                         until then
+     *                         until then — the end of the move cooldown or of a mute, whichever is
+     *                         later
+     * @param mutedUntil       set only while a mute is in force on the caller, whichever of their
+     *                         memberships it was recorded on
      */
     public record Placement(ChatRoom room, ChatRoomMember member, long memberCount,
-                            Instant moveBlockedUntil) {
+                            Instant moveBlockedUntil, Instant mutedUntil) {
     }
 
     /** @param more whether further messages exist beyond this page, in the direction asked */

@@ -113,7 +113,7 @@ public class NeighbourhoodChatController {
         String me = CurrentUser.requireId();
         NeighbourhoodRoomService.Placement placement =
                 rooms.place(me, zoneId, ChatDisplayName.from(CurrentUser.jwt().orElse(null)));
-        return RoomView.of(placement, Instant.now());
+        return RoomView.of(placement);
     }
 
     /** History, newest page first; see {@code NeighbourhoodRoomService.history} for the cursors. */
@@ -170,7 +170,7 @@ public class NeighbourhoodChatController {
             Instant mutedUntil,
             Instant moveBlockedUntil) {
 
-        static RoomView of(NeighbourhoodRoomService.Placement placement, Instant now) {
+        static RoomView of(NeighbourhoodRoomService.Placement placement) {
             ChatRoomMember member = placement.member();
             return new RoomView(
                     placement.room().getId(),
@@ -180,7 +180,7 @@ public class NeighbourhoodChatController {
                     placement.room().getNextSequence() - 1,
                     member.getHandle(),
                     member.getDisplayName(),
-                    member.isMutedAt(now) ? member.getMutedUntil() : null,
+                    placement.mutedUntil(),
                     placement.moveBlockedUntil());
         }
     }

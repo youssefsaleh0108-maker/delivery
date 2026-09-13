@@ -1,5 +1,6 @@
 package com.delivery.appnotification.domain;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -24,8 +25,22 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
 
     long countByRoomIdAndLeftAtIsNull(UUID roomId);
 
-    /** Authors' memberships for the moderation queue, in one query rather than one per line. */
-    List<ChatRoomMember> findByRoomIdInAndUserIdIn(Collection<UUID> roomIds, Collection<String> userIds);
+    /** Every room this person has been in — one row per room, so a handful at most. */
+    List<ChatRoomMember> findByUserId(String userId);
+
+    /** The authors in the moderation queue, every membership of each, in one query. */
+    List<ChatRoomMember> findByUserIdIn(Collection<String> userIds);
+
+    /**
+     * When the mute in force on this person ends, or null if none is.
+     *
+     * <p>Across every membership, not only the current one. A mute is a judgement about a person,
+     * and it can land on a row they are leaving at that very moment — a moderator muting the author
+     * of an old message while the author's app moves them to another area. Asking about all their
+     * rows means no row they left behind can be where a mute goes to be forgotten.
+     */
+    @Query("select max(m.mutedUntil) from ChatRoomMember m where m.userId = :userId and m.mutedUntil > :now")
+    Instant activeMuteOf(@Param("userId") String userId, @Param("now") Instant now);
 
     /**
      * Which of these connected people are still in the room.
