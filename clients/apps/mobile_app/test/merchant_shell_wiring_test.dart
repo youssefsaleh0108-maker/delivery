@@ -25,10 +25,18 @@ class _StubAdapter implements HttpClientAdapter {
   Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? requestStream,
       Future<void>? cancelFuture) async {
     calls.add('${options.method} ${options.path}');
-    // Empty collections and a bare object satisfy every screen the shell builds on open.
-    final String body = options.path.contains('orders') || options.path.contains('products')
-        ? '{"content":[],"totalElements":0}'
-        : '{}';
+    // Empty collections and a bare object satisfy every screen the shell builds on open — except an
+    // employee's two staff lookups, which say where they work and what they may do there.
+    final String body;
+    if (options.path.endsWith('/staff/membership')) {
+      body = '{"member":true,"storeId":"store-1"}';
+    } else if (options.path.endsWith('/staff/me')) {
+      body = '{"member":true,"owner":false,"permissions":["MODIFY_INVENTORY_PRICING"]}';
+    } else if (options.path.contains('orders') || options.path.contains('products')) {
+      body = '{"content":[],"totalElements":0}';
+    } else {
+      body = '{}';
+    }
     return ResponseBody.fromString(body, 200, headers: <String, List<String>>{
       Headers.contentTypeHeader: <String>[Headers.jsonContentType]
     });
@@ -53,6 +61,7 @@ void main() {
     WidgetTester tester, {
     bool wireStatements = false,
     bool wireScan = false,
+    bool wireStaff = false,
     bool inventory = false,
     Set<DeliveryRole> roles = const <DeliveryRole>{DeliveryRole.merchant},
   }) async {
@@ -70,6 +79,7 @@ void main() {
         catalogApi: CatalogApi(dio),
         statementsApi: wireStatements ? StatementsApi(dio) : null,
         catalogScanApi: wireScan ? CatalogScanApi(dio) : null,
+        staffApi: wireStaff ? StoreStaffApi(dio) : null,
         session: AuthSession(
           accessToken: 'token',
           refreshToken: null,
@@ -150,5 +160,21 @@ void main() {
     // On the Settings page — so the row's absence below is the gate, not an unopened tab.
     expect(find.byType(MerchantSettingsScreen), findsOneWidget);
     expect(find.text(t.blitzSettingsRow), findsNothing);
+  });
+
+  testWidgets('nor on the shelves, even for an employee the shop lets manage its stock',
+      (WidgetTester tester) async {
+    final DeliveryStrings t = await pumpShell(
+      tester,
+      wireScan: true,
+      wireStaff: true,
+      inventory: true,
+      roles: const <DeliveryRole>{DeliveryRole.merchantStaff},
+    );
+
+    // On the shelves, which this employee may manage — so the button's absence below is the role
+    // gate on the Inventory wiring, not a tab the employee was never given.
+    expect(find.byType(InventoryScreen), findsOneWidget);
+    expect(find.text(t.blitzEntryAction), findsNothing);
   });
 }
