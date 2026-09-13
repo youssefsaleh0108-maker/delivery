@@ -8,6 +8,7 @@ import 'package:delivery_portal/src/carrier/cash_reconciliation_screen.dart';
 import 'package:delivery_portal/src/carrier/dashboard_screen.dart';
 import 'package:delivery_portal/src/carrier/earnings_screen.dart';
 import 'package:delivery_portal/src/carrier/jobs_screen.dart';
+import 'package:delivery_portal/src/carrier/payroll_screen.dart';
 import 'package:delivery_portal/src/carrier/rider_attendance_screen.dart';
 import 'package:delivery_portal/src/carrier/rider_profile_screen.dart';
 import 'package:delivery_portal/src/carrier/riders_directory_screen.dart';
@@ -142,7 +143,8 @@ void main() {
     // The seven destinations of the rail this replaced: Dashboard, Jobs, Earnings, Statement, the
     // riders page (now the directory), Applicants and Settings — and Shifts & attendance, which
     // had its own destination until it was filed under Riders HR, and the rider cash
-    // reconciliation, which had its own until it was filed under Reconciliation.
+    // reconciliation and payroll, which each had their own until they were filed under
+    // Reconciliation and Riders HR.
     expect(
       reachable,
       unorderedEquals(<Type>[
@@ -153,6 +155,7 @@ void main() {
         RidersDirectoryScreen,
         ApplicantsScreen,
         ShiftScheduleScreen,
+        CarrierPayrollScreen,
         EarningsScreen,
         CarrierSettingsScreen,
       ]),
@@ -174,7 +177,12 @@ void main() {
     expect(ridersHr.build(apis, _locale, () async {}, (int _) {}), isA<RidersDirectoryScreen>());
     expect(
       <String>[for (final PortalPage p in ridersHr.pages) p.label(en)],
-      <String>[en.carrRidersNavDirectory, en.navApplicants, en.attendanceNavShifts],
+      <String>[
+        en.carrRidersNavDirectory,
+        en.navApplicants,
+        en.attendanceNavShifts,
+        en.payrollNavLabel,
+      ],
     );
     // A page the heading does not have opens the first rather than throwing.
     expect(_page(ridersHr, 9, apis), isA<RidersDirectoryScreen>());
@@ -190,14 +198,29 @@ void main() {
     expect(screen.orderApi, same(apis.order), reason: 'each rider\'s settlement page');
   });
 
+  test('payroll is filed last under Riders HR, and built with the clients it reads', () {
+    final PortalApis apis = _apis();
+    final PortalDestination ridersHr = rail[3];
+
+    // The design files payroll (Figma 112:1162) under Riders HR, after the shifts it pays for.
+    final CarrierPayrollScreen screen =
+        _page(ridersHr, ridersHr.pages.length - 1, apis) as CarrierPayrollScreen;
+    expect(screen.api, isA<CarrierPayrollApi>());
+    // Optional, so withholding it still compiles and leaves the page's bell dead.
+    expect(screen.notificationApi, same(apis.notification), reason: 'the bell');
+  });
+
   test('Shifts & attendance is filed under Riders HR, and built with every client it reads', () {
     final PortalApis apis = _apis();
     final PortalDestination ridersHr = rail[3];
     final int shifts =
         ridersHr.pages.indexWhere((PortalPage p) => p.label(en) == en.attendanceNavShifts);
+    final int applicants =
+        ridersHr.pages.indexWhere((PortalPage p) => p.label(en) == en.navApplicants);
 
-    // After the applicant queue, where the shell files pages about the whole fleet's people.
-    expect(shifts, ridersHr.pages.length - 1);
+    // Straight after the applicant queue, where the shell files pages about the whole fleet's
+    // people; payroll, which pays for the shifts, follows it.
+    expect(shifts, applicants + 1);
     final ShiftScheduleScreen screen = _page(ridersHr, shifts, apis) as ShiftScheduleScreen;
     expect(screen.api, same(apis.tracking), reason: 'shifts, schedules and each month');
     expect(screen.providerApi, same(apis.provider), reason: 'the company and its riders');
