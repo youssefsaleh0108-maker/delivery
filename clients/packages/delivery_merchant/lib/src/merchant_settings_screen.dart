@@ -52,6 +52,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.aggregates,
     this.documents,
     this.statements,
+    this.onDemandRadar,
     this.onSignOut,
   });
 
@@ -102,6 +103,14 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// all, so a host that has not wired it is simply a host that does not offer the page. A "Soon"
   /// chip on a row the design never drew would promise a shop something no roadmap has agreed.
   final StatementsApi? statements;
+
+  /// Opens the Demand Radar, beside Shop Analytics.
+  ///
+  /// A host callback rather than a client, because the radar needs the shop's id and only the host
+  /// knows it. Null hides the row, like the statement row and for the same reason: the settings
+  /// frame does not draw it, so an unwired host simply does not offer it. The host wires it for the
+  /// owner only.
+  final VoidCallback? onDemandRadar;
 
   /// Ends the session. Null hides the button entirely — a sign-out that does nothing is worse
   /// than no sign-out at all.
@@ -315,6 +324,16 @@ class MerchantSettingsScreen extends StatelessWidget {
             onTap: aggregates == null ? null : () => _openAnalytics(context),
             soonLabel: aggregates == null ? t.merchbSoon : null,
           ),
+          // Beside Shop Analytics because it is the other half of the same question: that row is
+          // how this shop is trading, this one is where around it people are ordering.
+          if (onDemandRadar != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.radar,
+              title: t.heatmapTitle,
+              onTap: onDemandRadar,
+            ),
+          ],
           if (onSignOut != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             _LogOutButton(
