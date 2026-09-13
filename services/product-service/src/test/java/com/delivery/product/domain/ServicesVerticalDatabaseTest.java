@@ -149,7 +149,10 @@ class ServicesVerticalDatabaseTest {
         em.persist(cleaners);
         em.persist(liveProduct(grill, "Mixed grill platter", aisle));
         em.persist(liveProduct(press, "500 business cards", aisle));
+        // Starred: a goods shop, a service shop in an open category, and one in a closed category.
+        em.persist(new StoreFavorite("customer-it", grill.getId()));
         em.persist(new StoreFavorite("customer-it", press.getId()));
+        em.persist(new StoreFavorite("customer-it", cleaners.getId()));
         em.getTransaction().commit();
         em.clear();
 
@@ -281,12 +284,25 @@ class ServicesVerticalDatabaseTest {
                 .getTotalElements()).isZero();
     }
 
+    /**
+     * Home's "Your favourites" rail, which every installed app draws. The customer starred a goods
+     * shop, an open service shop and one in a closed category; Home lists only the goods shop, so the
+     * print shop is not drawn there as a restaurant and the cleaners are not shown at all. The stars
+     * themselves are kept: only the listing leaves the service shops out.
+     */
     @Test
-    @DisplayName("a service shop a customer starred stays in their favourites")
-    void favourites_keep_a_starred_service_shop() {
+    @DisplayName("Home's favourites never list a service shop, and every star is kept")
+    void home_favourites_never_list_a_service_shop() {
         assertThat(stores.findFavoritesOf("customer-it", PageRequest.of(0, 20)).getContent())
                 .extracting(Store::getName)
-                .containsExactly("Al Fakhry Press");
+                .containsExactly("Hamra Kebab Corner");
+        assertThat(service.favoritesOf("customer-it", PageRequest.of(0, 20)).getContent().stream()
+                .map(view -> view.store().getName()).toList())
+                .containsExactly("Hamra Kebab Corner");
+
+        assertThat(repositories.getRepository(StoreFavoriteRepository.class)
+                .findStoreIdsByUserId("customer-it"))
+                .containsExactlyInAnyOrder(grill.getId(), press.getId(), cleaners.getId());
     }
 
     // ------------------------------------------------------------------------------------ helpers

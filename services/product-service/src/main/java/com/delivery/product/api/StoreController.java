@@ -266,10 +266,16 @@ public class StoreController {
     }
 
     /**
-     * The starred row at the top of the home screen.
+     * The starred row at the top of the home screen: goods shops only.
      *
      * <p>Paged like everything else. A customer who has starred two hundred shops should not send
      * two hundred cards down the wire to fill a rail that shows four.
+     *
+     * <p>A starred service shop is kept but not listed here. This is Home, where service shops never
+     * appear, and every installed app would draw one as a restaurant; see
+     * {@code StoreRepository#findFavoritesOfWithStatus}. No Services screen draws favourites yet, so
+     * there is no services read of them. One would take a vertical and a category exactly as
+     * {@link #browse} does, and be scoped by {@code StoreService.ShopScope} to open categories.
      */
     @GetMapping("/favorites")
     public PageResponse<StoreCardResponse> favorites(

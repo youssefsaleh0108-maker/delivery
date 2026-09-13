@@ -182,7 +182,9 @@ public class StoreService {
      *       and no goods shop has a service category.
      * </ul>
      *
-     * <p>Favourites are deliberately outside it: a customer who starred a print shop starred it.
+     * <p>Home's favourites keep to the first rule, as a literal in their own query: a starred service
+     * shop keeps its star but is not listed on Home. No Services screen draws favourites yet; a
+     * services read of them would take its scope from here, as the storefront does.
      *
      * @param vertical   the one vertical listed, or null for every goods vertical
      * @param categories for a services read, the categories it may show; empty shows no service shop

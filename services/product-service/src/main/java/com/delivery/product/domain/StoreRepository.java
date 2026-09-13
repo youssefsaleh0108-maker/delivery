@@ -123,18 +123,34 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                 maxDeliveryFee, maxEtaMinutes, minRating, neighborhood, pageable);
     }
 
+    /**
+     * A customer's starred stores in one status, most recently starred first.
+     *
+     * <p>Prefer {@link #findFavoritesOf}, for the same reason as {@link #findStorefront}.
+     *
+     * <p><strong>Never a service shop, whatever the parameters say.</strong> This is Home's "Your
+     * favourites" rail, and service shops are never on Home (owner default 14). Every installed app
+     * reads an unknown vertical as RESTAURANT, so a print shop starred here would be drawn on Home as
+     * a restaurant; and a shop in a category that has since closed would be shown, which a closed
+     * category never is (owner default 1). The star itself is kept. This decides only where it is
+     * listed, so a later Services read can list it without the customer starring it again.
+     */
     @Query("""
             SELECT s FROM Store s
             JOIN StoreFavorite f ON f.id.storeId = s.id
             WHERE f.id.userId = :userId
               AND s.status = :status
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
             ORDER BY f.createdAt DESC
             """)
     Page<Store> findFavoritesOfWithStatus(@Param("userId") String userId,
                                           @Param("status") Store.Status status,
                                           Pageable pageable);
 
-    /** A customer's starred stores, most recently starred first. The home screen's top row. */
+    /**
+     * A customer's starred goods shops, most recently starred first. The home screen's top row; see
+     * {@link #findFavoritesOfWithStatus} for why a service shop is never in it.
+     */
     default Page<Store> findFavoritesOf(String userId, Pageable pageable) {
         return findFavoritesOfWithStatus(userId, Store.Status.ACTIVE, pageable);
     }
