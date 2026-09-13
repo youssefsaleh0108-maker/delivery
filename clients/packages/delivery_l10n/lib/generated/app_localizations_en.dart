@@ -7425,4 +7425,266 @@ class DeliveryStringsEn extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get chatRoomEntryTitle => 'Neighbourhood chat';
+
+  @override
+  String get chatRoomEntrySub => 'Talk with the people who live around you';
+
+  @override
+  String chatRoomTitle(String area) {
+    return '$area chat';
+  }
+
+  @override
+  String get chatRoomLive => 'LIVE';
+
+  @override
+  String chatRoomMembers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count neighbours',
+      one: '1 neighbour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatRoomCommunity => 'Community';
+
+  @override
+  String get chatRoomComposerHint => 'Type a message or ask a neighbour…';
+
+  @override
+  String get chatRoomEmpty => 'No messages yet. Say hello to your neighbours.';
+
+  @override
+  String get chatRoomCouldNotLoad => 'Could not load your neighbourhood chat';
+
+  @override
+  String get chatRoomPickAreaTitle => 'Choose your area to join its chat';
+
+  @override
+  String get chatRoomPickAreaBody =>
+      'Neighbourhood chat follows the area of your delivery address.';
+
+  @override
+  String get chatRoomChooseArea => 'Choose area';
+
+  @override
+  String get chatRoomUnknownAreaTitle => 'Your area has no neighbourhood chat';
+
+  @override
+  String get chatRoomUnknownAreaBody =>
+      'Pick one of the delivery areas for your address to join its chat.';
+
+  @override
+  String chatRoomMoveBlocked(String date) {
+    return 'You can move to your new area\'s chat from $date.';
+  }
+
+  @override
+  String chatRoomMuted(String date) {
+    return 'A moderator has paused your messages here until $date.';
+  }
+
+  @override
+  String get chatRoomHidden => 'This message was removed';
+
+  @override
+  String get chatRoomNeighbour => 'Neighbour';
+
+  @override
+  String get chatRoomReport => 'Report';
+
+  @override
+  String get chatRoomReportTitle => 'Why are you reporting this message?';
+
+  @override
+  String get chatRoomReasonSpam => 'Spam or advertising';
+
+  @override
+  String get chatRoomReasonAbuse => 'Abuse or harassment';
+
+  @override
+  String get chatRoomReasonPersonalInfo => 'Someone\'s personal details';
+
+  @override
+  String get chatRoomReasonOther => 'Something else';
+
+  @override
+  String get chatRoomReportSent => 'Thanks. A moderator will review it.';
+
+  @override
+  String get chatRoomBlock => 'Block';
+
+  @override
+  String chatRoomBlockTitle(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String get chatRoomBlockBody =>
+      'You won\'t see their messages in neighbourhood chat. They won\'t be told.';
+
+  @override
+  String get chatRoomBlockedToast => 'Blocked. You won\'t see their messages.';
+
+  @override
+  String get chatRoomCopy => 'Copy';
+
+  @override
+  String get chatRoomCopied => 'Copied';
+
+  @override
+  String get chatRoomRulesTitle => 'Community rules';
+
+  @override
+  String get chatRoomRulesBody =>
+      'Be kind to your neighbours. No spam or advertising, no harassment, and never post anyone\'s phone number or address. Moderators remove messages that break these rules.';
+
+  @override
+  String get chatRoomBlockedPeople => 'People you blocked';
+
+  @override
+  String get chatRoomNoBlocks => 'You haven\'t blocked anyone.';
+
+  @override
+  String get chatRoomUnblock => 'Unblock';
+
+  @override
+  String get chatSlowDown =>
+      'You\'re sending messages too fast. Wait a moment and try again.';
+
+  @override
+  String get chatTooLong => 'That message is too long.';
+
+  @override
+  String get chatActionFailed => 'That didn\'t work. Try again.';
+
+  @override
+  String chatShopWith(String shop) {
+    return 'Chat with $shop';
+  }
+
+  @override
+  String get chatShopHintCustomer => 'Message the shop…';
+
+  @override
+  String get chatShopHintMerchant => 'Reply to the customer…';
+
+  @override
+  String get chatShopEmptyCustomer =>
+      'Ask the shop anything: what\'s in stock, prices, opening hours.';
+
+  @override
+  String get chatShopEmptyMerchant => 'No messages in this conversation yet.';
+
+  @override
+  String get chatShopCouldNotLoad => 'Could not load this conversation';
+
+  @override
+  String get chatShopQuietCustomer => 'This chat has gone quiet.';
+
+  @override
+  String get chatShopReopen => 'Reopen';
+
+  @override
+  String get chatShopQuietMerchant =>
+      'This conversation has gone quiet. The customer can start it again from your shop\'s page.';
+
+  @override
+  String get chatShopInboxTitle => 'Customer messages';
+
+  @override
+  String get chatShopInboxEmpty => 'No customer messages yet';
+
+  @override
+  String get chatShopInboxEmptySub =>
+      'Customers can message your shop from its page in the app.';
+
+  @override
+  String get chatShopInboxCouldNotLoad => 'Could not load customer messages';
+
+  @override
+  String get chatShopCustomer => 'Customer';
+
+  @override
+  String chatShopYouPrefix(String text) {
+    return 'You: $text';
+  }
+
+  @override
+  String get chatShopQuietBadge => 'Quiet';
+
+  @override
+  String get chatModerationTitle => 'Moderation';
+
+  @override
+  String get chatModerationSub =>
+      'Reported neighbourhood chat messages, oldest first.';
+
+  @override
+  String get chatModerationEmpty => 'No reports waiting';
+
+  @override
+  String get chatModerationCouldNotLoad =>
+      'Could not load the moderation queue';
+
+  @override
+  String chatModerationReports(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reports',
+      one: '1 report',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatModerationHide => 'Hide message';
+
+  @override
+  String get chatModerationDismiss => 'Dismiss';
+
+  @override
+  String get chatModerationMute => 'Mute author';
+
+  @override
+  String get chatModerationUnmute => 'Unmute author';
+
+  @override
+  String get chatModerationMute24h => 'For 24 hours';
+
+  @override
+  String get chatModerationMute7d => 'For 7 days';
+
+  @override
+  String get chatModerationMute30d => 'For 30 days';
+
+  @override
+  String get chatModerationReasonLabel => 'Reason (kept in the audit trail)';
+
+  @override
+  String get chatModerationReasonTooShort => 'Write at least 3 characters';
+
+  @override
+  String get chatModerationConfirm => 'Confirm';
+
+  @override
+  String get chatModerationRemoved => 'Removed';
+
+  @override
+  String chatModerationMutedUntil(String date) {
+    return 'Author muted until $date';
+  }
+
+  @override
+  String get chatModerationDone => 'Done';
+
+  @override
+  String get chatModerationRefresh => 'Refresh';
 }

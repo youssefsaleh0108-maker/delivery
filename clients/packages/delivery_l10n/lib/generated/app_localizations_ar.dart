@@ -7441,4 +7441,273 @@ class DeliveryStringsAr extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get chatRoomEntryTitle => 'دردشة الحي';
+
+  @override
+  String get chatRoomEntrySub => 'تحدّث مع الناس الذين يسكنون حولك';
+
+  @override
+  String chatRoomTitle(String area) {
+    return 'دردشة $area';
+  }
+
+  @override
+  String get chatRoomLive => 'مباشر';
+
+  @override
+  String chatRoomMembers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count جار',
+      many: '$count جاراً',
+      few: '$count جيران',
+      two: 'جاران',
+      one: 'جار واحد',
+      zero: 'لا جيران',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatRoomCommunity => 'المجتمع';
+
+  @override
+  String get chatRoomComposerHint => 'اكتب رسالة أو اسأل جارك…';
+
+  @override
+  String get chatRoomEmpty => 'لا رسائل بعد. ألقِ التحية على جيرانك.';
+
+  @override
+  String get chatRoomCouldNotLoad => 'تعذّر تحميل دردشة الحي';
+
+  @override
+  String get chatRoomPickAreaTitle => 'اختر منطقتك لتنضمّ إلى دردشتها';
+
+  @override
+  String get chatRoomPickAreaBody =>
+      'تتبع دردشة الحي منطقة عنوان التوصيل الخاص بك.';
+
+  @override
+  String get chatRoomChooseArea => 'اختر المنطقة';
+
+  @override
+  String get chatRoomUnknownAreaTitle => 'لا توجد دردشة حي لمنطقتك';
+
+  @override
+  String get chatRoomUnknownAreaBody =>
+      'اختر إحدى مناطق التوصيل لعنوانك لتنضمّ إلى دردشتها.';
+
+  @override
+  String chatRoomMoveBlocked(String date) {
+    return 'يمكنك الانتقال إلى دردشة منطقتك الجديدة ابتداءً من $date.';
+  }
+
+  @override
+  String chatRoomMuted(String date) {
+    return 'أوقف أحد المشرفين رسائلك هنا حتى $date.';
+  }
+
+  @override
+  String get chatRoomHidden => 'أُزيلت هذه الرسالة';
+
+  @override
+  String get chatRoomNeighbour => 'جار';
+
+  @override
+  String get chatRoomReport => 'إبلاغ';
+
+  @override
+  String get chatRoomReportTitle => 'لماذا تبلّغ عن هذه الرسالة؟';
+
+  @override
+  String get chatRoomReasonSpam => 'رسائل مزعجة أو إعلانات';
+
+  @override
+  String get chatRoomReasonAbuse => 'إساءة أو مضايقة';
+
+  @override
+  String get chatRoomReasonPersonalInfo => 'معلومات شخصية لأحدهم';
+
+  @override
+  String get chatRoomReasonOther => 'سبب آخر';
+
+  @override
+  String get chatRoomReportSent => 'شكراً. سيراجعها أحد المشرفين.';
+
+  @override
+  String get chatRoomBlock => 'حظر';
+
+  @override
+  String chatRoomBlockTitle(String name) {
+    return 'حظر $name؟';
+  }
+
+  @override
+  String get chatRoomBlockBody =>
+      'لن ترى رسائله في دردشة الحي، ولن يُبلَّغ بذلك.';
+
+  @override
+  String get chatRoomBlockedToast => 'تم الحظر. لن ترى رسائله.';
+
+  @override
+  String get chatRoomCopy => 'نسخ';
+
+  @override
+  String get chatRoomCopied => 'تم النسخ';
+
+  @override
+  String get chatRoomRulesTitle => 'قواعد المجتمع';
+
+  @override
+  String get chatRoomRulesBody =>
+      'كن لطيفاً مع جيرانك. لا رسائل مزعجة أو إعلانات، ولا مضايقات، ولا تنشر أبداً رقم هاتف أحد أو عنوانه. يزيل المشرفون الرسائل التي تخالف هذه القواعد.';
+
+  @override
+  String get chatRoomBlockedPeople => 'الأشخاص الذين حظرتهم';
+
+  @override
+  String get chatRoomNoBlocks => 'لم تحظر أحداً.';
+
+  @override
+  String get chatRoomUnblock => 'إلغاء الحظر';
+
+  @override
+  String get chatSlowDown =>
+      'ترسل الرسائل بسرعة كبيرة. انتظر قليلاً ثم حاول مجدداً.';
+
+  @override
+  String get chatTooLong => 'هذه الرسالة طويلة جداً.';
+
+  @override
+  String get chatActionFailed => 'لم ينجح ذلك. حاول مجدداً.';
+
+  @override
+  String chatShopWith(String shop) {
+    return 'دردش مع $shop';
+  }
+
+  @override
+  String get chatShopHintCustomer => 'راسل المحل…';
+
+  @override
+  String get chatShopHintMerchant => 'ردّ على الزبون…';
+
+  @override
+  String get chatShopEmptyCustomer =>
+      'اسأل المحل عن أي شيء: البضاعة المتوفرة، الأسعار، مواعيد العمل.';
+
+  @override
+  String get chatShopEmptyMerchant => 'لا رسائل في هذه المحادثة بعد.';
+
+  @override
+  String get chatShopCouldNotLoad => 'تعذّر تحميل هذه المحادثة';
+
+  @override
+  String get chatShopQuietCustomer => 'هدأت هذه المحادثة.';
+
+  @override
+  String get chatShopReopen => 'إعادة فتح';
+
+  @override
+  String get chatShopQuietMerchant =>
+      'هدأت هذه المحادثة. يستطيع الزبون استئنافها من صفحة محلك.';
+
+  @override
+  String get chatShopInboxTitle => 'رسائل الزبائن';
+
+  @override
+  String get chatShopInboxEmpty => 'لا رسائل من الزبائن بعد';
+
+  @override
+  String get chatShopInboxEmptySub =>
+      'يستطيع الزبائن مراسلة محلك من صفحته في التطبيق.';
+
+  @override
+  String get chatShopInboxCouldNotLoad => 'تعذّر تحميل رسائل الزبائن';
+
+  @override
+  String get chatShopCustomer => 'زبون';
+
+  @override
+  String chatShopYouPrefix(String text) {
+    return 'أنت: $text';
+  }
+
+  @override
+  String get chatShopQuietBadge => 'هادئة';
+
+  @override
+  String get chatModerationTitle => 'الإشراف';
+
+  @override
+  String get chatModerationSub =>
+      'رسائل دردشة الحي المُبلَّغ عنها، الأقدم أولاً.';
+
+  @override
+  String get chatModerationEmpty => 'لا بلاغات بانتظار المراجعة';
+
+  @override
+  String get chatModerationCouldNotLoad => 'تعذّر تحميل قائمة الإشراف';
+
+  @override
+  String chatModerationReports(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count بلاغ',
+      many: '$count بلاغاً',
+      few: '$count بلاغات',
+      two: 'بلاغان',
+      one: 'بلاغ واحد',
+      zero: 'لا بلاغات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatModerationHide => 'إخفاء الرسالة';
+
+  @override
+  String get chatModerationDismiss => 'تجاهل';
+
+  @override
+  String get chatModerationMute => 'كتم الكاتب';
+
+  @override
+  String get chatModerationUnmute => 'إلغاء كتم الكاتب';
+
+  @override
+  String get chatModerationMute24h => 'لمدة 24 ساعة';
+
+  @override
+  String get chatModerationMute7d => 'لمدة 7 أيام';
+
+  @override
+  String get chatModerationMute30d => 'لمدة 30 يوماً';
+
+  @override
+  String get chatModerationReasonLabel => 'السبب (يُحفظ في سجل التدقيق)';
+
+  @override
+  String get chatModerationReasonTooShort => 'اكتب 3 أحرف على الأقل';
+
+  @override
+  String get chatModerationConfirm => 'تأكيد';
+
+  @override
+  String get chatModerationRemoved => 'أُزيلت';
+
+  @override
+  String chatModerationMutedUntil(String date) {
+    return 'الكاتب مكتوم حتى $date';
+  }
+
+  @override
+  String get chatModerationDone => 'تم';
+
+  @override
+  String get chatModerationRefresh => 'تحديث';
 }
