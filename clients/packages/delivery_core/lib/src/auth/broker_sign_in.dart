@@ -17,7 +17,14 @@ enum AccountIntent {
   rider(DeliveryRole.delivery),
 
   /// "I want to sell."
-  seller(DeliveryRole.merchant);
+  seller(DeliveryRole.merchant),
+
+  /// "I offer a service" — a print shop, a tailor, a repairer.
+  ///
+  /// A seller in every way the platform checks: the same MERCHANT role, and the same merchant
+  /// application, whose answers say SERVICES. It is its own answer only so the app can show the
+  /// services signup (Figma 126:11) instead of the shop wizard.
+  services(DeliveryRole.merchant);
 
   const AccountIntent(this.role);
 
@@ -28,7 +35,7 @@ enum AccountIntent {
   OnboardingKind? get applicationKind => switch (this) {
         AccountIntent.customer => null,
         AccountIntent.rider => OnboardingKind.rider,
-        AccountIntent.seller => OnboardingKind.merchant,
+        AccountIntent.seller || AccountIntent.services => OnboardingKind.merchant,
       };
 }
 

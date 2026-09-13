@@ -17533,6 +17533,228 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Tutoring'**
   String get svcCategoryTutoring;
+
+  /// No description provided for @svcSignupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grow your business on YouDrop'**
+  String get svcSignupTitle;
+
+  /// No description provided for @svcSignupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach customers in your neighbourhood.'**
+  String get svcSignupSubtitle;
+
+  /// No description provided for @svcSignupBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lebanese services'**
+  String get svcSignupBannerTitle;
+
+  /// No description provided for @svcSignupBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Printing, tailoring, repairs, photography and more — collected at your shop or delivered by YouDrop.'**
+  String get svcSignupBannerBody;
+
+  /// No description provided for @svcBusinessName.
+  ///
+  /// In en, this message translates to:
+  /// **'Business name'**
+  String get svcBusinessName;
+
+  /// No description provided for @svcBusinessNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Al Fakhry Press'**
+  String get svcBusinessNameHint;
+
+  /// No description provided for @svcServiceCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Service category'**
+  String get svcServiceCategory;
+
+  /// No description provided for @svcServiceCategoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what you offer'**
+  String get svcServiceCategoryHint;
+
+  /// No description provided for @svcPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'+961 71 234 567'**
+  String get svcPhoneHint;
+
+  /// No description provided for @svcPhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a Lebanese number, e.g. 71 234 567'**
+  String get svcPhoneInvalid;
+
+  /// No description provided for @svcArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Location / area'**
+  String get svcArea;
+
+  /// No description provided for @svcAreaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your area'**
+  String get svcAreaHint;
+
+  /// No description provided for @svcApplyCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to sell services'**
+  String get svcApplyCta;
+
+  /// No description provided for @svcOptionsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load the services on offer. Check your connection and try again.'**
+  String get svcOptionsFailed;
+
+  /// No description provided for @svcNoCategoriesOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop isn\'t taking applications to sell services right now.'**
+  String get svcNoCategoriesOpen;
+
+  /// No description provided for @svcPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Application sent'**
+  String get svcPendingTitle;
+
+  /// No description provided for @svcPendingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A YouDrop reviewer reads every application to sell services. We\'ll email {email} once it\'s decided.'**
+  String svcPendingBody(String email);
+
+  /// No description provided for @svcPendingBodyNoEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'A YouDrop reviewer reads every application to sell services, and we\'ll let you know once it\'s decided.'**
+  String get svcPendingBodyNoEmail;
+
+  /// No description provided for @svcPendingDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'To help the review, add your ID and commercial registration from Settings in your shop.'**
+  String get svcPendingDocuments;
+
+  /// No description provided for @svcReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference: {reference}'**
+  String svcReference(String reference);
+
+  /// No description provided for @svcApprovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re approved'**
+  String get svcApprovedTitle;
+
+  /// No description provided for @svcApprovedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We open your services shop the first time you go to it.'**
+  String get svcApprovedBody;
+
+  /// No description provided for @svcErrCategoryClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop isn\'t taking applications for that service yet. Choose another.'**
+  String get svcErrCategoryClosed;
+
+  /// No description provided for @svcErrCategoryMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the service you offer.'**
+  String get svcErrCategoryMissing;
+
+  /// No description provided for @svcErrAreaUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'That area is no longer on the list. Choose your area again.'**
+  String get svcErrAreaUnknown;
+
+  /// No description provided for @svcErrAreaMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the area your business is in.'**
+  String get svcErrAreaMissing;
+
+  /// No description provided for @svcErrCatalogUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check the services on offer just now. Try again in a moment.'**
+  String get svcErrCatalogUnavailable;
+
+  /// No description provided for @svcOfferYourServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer your services'**
+  String get svcOfferYourServices;
+
+  /// No description provided for @svcOfferYourServicesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Printing, tailoring, repairs or photography'**
+  String get svcOfferYourServicesSub;
+
+  /// No description provided for @svcSwitchToShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to your shop'**
+  String get svcSwitchToShop;
+
+  /// No description provided for @svcSwitchToShopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to shopping'**
+  String get svcSwitchToShopping;
+
+  /// No description provided for @svcChoiceCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer services'**
+  String get svcChoiceCard;
+
+  /// No description provided for @svcChoiceCardBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Print, tailor, repair or take photos for your neighbourhood, from your own shop.'**
+  String get svcChoiceCardBlurb;
+
+  /// No description provided for @svcIntent.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get svcIntent;
+
+  /// No description provided for @svcIntentBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I print, tailor, repair or take photos'**
+  String get svcIntentBlurb;
+
+  /// No description provided for @svcOpeningShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening your services shop…'**
+  String get svcOpeningShop;
+
+  /// No description provided for @svcOpeningShopFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open your services shop.'**
+  String get svcOpeningShopFailed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

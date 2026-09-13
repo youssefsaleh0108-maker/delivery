@@ -10265,4 +10265,130 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcCategoryTutoring => 'Tutoring';
+
+  @override
+  String get svcSignupTitle => 'Grow your business on YouDrop';
+
+  @override
+  String get svcSignupSubtitle => 'Reach customers in your neighbourhood.';
+
+  @override
+  String get svcSignupBannerTitle => 'Lebanese services';
+
+  @override
+  String get svcSignupBannerBody =>
+      'Printing, tailoring, repairs, photography and more — collected at your shop or delivered by YouDrop.';
+
+  @override
+  String get svcBusinessName => 'Business name';
+
+  @override
+  String get svcBusinessNameHint => 'e.g. Al Fakhry Press';
+
+  @override
+  String get svcServiceCategory => 'Service category';
+
+  @override
+  String get svcServiceCategoryHint => 'Choose what you offer';
+
+  @override
+  String get svcPhoneHint => '+961 71 234 567';
+
+  @override
+  String get svcPhoneInvalid => 'Enter a Lebanese number, e.g. 71 234 567';
+
+  @override
+  String get svcArea => 'Location / area';
+
+  @override
+  String get svcAreaHint => 'Choose your area';
+
+  @override
+  String get svcApplyCta => 'Apply to sell services';
+
+  @override
+  String get svcOptionsFailed =>
+      'We couldn\'t load the services on offer. Check your connection and try again.';
+
+  @override
+  String get svcNoCategoriesOpen =>
+      'YouDrop isn\'t taking applications to sell services right now.';
+
+  @override
+  String get svcPendingTitle => 'Application sent';
+
+  @override
+  String svcPendingBody(String email) {
+    return 'A YouDrop reviewer reads every application to sell services. We\'ll email $email once it\'s decided.';
+  }
+
+  @override
+  String get svcPendingBodyNoEmail =>
+      'A YouDrop reviewer reads every application to sell services, and we\'ll let you know once it\'s decided.';
+
+  @override
+  String get svcPendingDocuments =>
+      'To help the review, add your ID and commercial registration from Settings in your shop.';
+
+  @override
+  String svcReference(String reference) {
+    return 'Reference: $reference';
+  }
+
+  @override
+  String get svcApprovedTitle => 'You\'re approved';
+
+  @override
+  String get svcApprovedBody =>
+      'We open your services shop the first time you go to it.';
+
+  @override
+  String get svcErrCategoryClosed =>
+      'YouDrop isn\'t taking applications for that service yet. Choose another.';
+
+  @override
+  String get svcErrCategoryMissing => 'Choose the service you offer.';
+
+  @override
+  String get svcErrAreaUnknown =>
+      'That area is no longer on the list. Choose your area again.';
+
+  @override
+  String get svcErrAreaMissing => 'Choose the area your business is in.';
+
+  @override
+  String get svcErrCatalogUnavailable =>
+      'We couldn\'t check the services on offer just now. Try again in a moment.';
+
+  @override
+  String get svcOfferYourServices => 'Offer your services';
+
+  @override
+  String get svcOfferYourServicesSub =>
+      'Printing, tailoring, repairs or photography';
+
+  @override
+  String get svcSwitchToShop => 'Switch to your shop';
+
+  @override
+  String get svcSwitchToShopping => 'Switch to shopping';
+
+  @override
+  String get svcChoiceCard => 'Offer services';
+
+  @override
+  String get svcChoiceCardBlurb =>
+      'Print, tailor, repair or take photos for your neighbourhood, from your own shop.';
+
+  @override
+  String get svcIntent => 'Services';
+
+  @override
+  String get svcIntentBlurb => 'I print, tailor, repair or take photos';
+
+  @override
+  String get svcOpeningShop => 'Opening your services shop…';
+
+  @override
+  String get svcOpeningShopFailed => 'We couldn\'t open your services shop.';
 }
