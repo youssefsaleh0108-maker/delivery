@@ -90,6 +90,16 @@ class CatalogApi {
         .toList();
   }
 
+  /// Puts a live product on the customer gift hub, or takes it off. BACKOFFICE only; the server
+  /// refuses a product that is not live (422). Answers with what the switch now says.
+  Future<bool> setGiftFeatured(String id, {required bool featured}) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/products/$id/gift-featured',
+      data: <String, dynamic>{'featured': featured},
+    );
+    return (response.data as Map<String, dynamic>)['giftFeatured'] as bool? ?? false;
+  }
+
   /// Archive, not delete. Past orders still reference the product.
   Future<Product> archive(String id) async {
     final Response<dynamic> response = await _dio.delete<dynamic>('/api/products/$id');

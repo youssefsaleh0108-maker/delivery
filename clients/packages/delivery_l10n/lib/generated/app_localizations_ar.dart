@@ -7441,4 +7441,187 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get offlineQueueTotalUnknown =>
       'تعذّر علينا تأكيد مجموع هذا الطلب لهذا العنوان، لذا لا يمكنه انتظار عودة الاتصال. حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String get giftHubTitle => 'أرسل هدية';
+
+  @override
+  String get giftHubBannerTitle => 'الحوالة الحقيقية';
+
+  @override
+  String get giftHubBannerBody =>
+      'ساند أحبّاءك في لبنان. اختر الأساسيات الحقيقية أو البقالة أو الوجبات الساخنة، وتصل إلى بابهم — غالباً في اليوم نفسه.';
+
+  @override
+  String get giftHowItWorks => 'كيف تعمل';
+
+  @override
+  String get giftStep1Title => 'اختر من المتاجر المحلية';
+
+  @override
+  String get giftStep1Body =>
+      'اختر البقالة أو الحلويات أو منتجات الصيدلية أو سلة رعاية جاهزة.';
+
+  @override
+  String get giftStep2Title => 'أدخل عنوانهم في لبنان';
+
+  @override
+  String get giftStep2Body => 'نوصل إلى أي مكان يوصل إليه المتجر الذي تختاره.';
+
+  @override
+  String get giftStep3Title => 'توصيل في اليوم نفسه';
+
+  @override
+  String get giftStep3Body =>
+      'يسلّمها السائق مع رسالتك الشخصية — في اليوم نفسه، ما دام المتجر مفتوحاً.';
+
+  @override
+  String get giftCategories => 'فئات الهدايا';
+
+  @override
+  String get giftCatCarePackage => 'سلة رعاية';
+
+  @override
+  String get giftCatGroceries => 'بقالة';
+
+  @override
+  String get giftCatSweets => 'حلويات ومعجنات';
+
+  @override
+  String get giftCatBabyKids => 'الرضّع والأطفال';
+
+  @override
+  String get giftCatMedicine => 'الدواء والصحة';
+
+  @override
+  String get giftRecentRecipients => 'المستلمون مؤخراً';
+
+  @override
+  String get giftAddRecipient => 'أضف مستلماً';
+
+  @override
+  String get giftFeaturedBundles => 'سلال رعاية مختارة';
+
+  @override
+  String get giftSameDayDeliverable => 'يصل في اليوم نفسه';
+
+  @override
+  String get giftHomeEntryTitle => 'أرسل هدية إلى لبنان';
+
+  @override
+  String get giftHomeEntrySub =>
+      'بقالة وحلويات وسلال رعاية للعائلة، تصل إلى بابهم';
+
+  @override
+  String get giftDetailsTitle => 'تفاصيل الهدية';
+
+  @override
+  String get giftCheckoutSub => 'دفع المغتربين';
+
+  @override
+  String get giftRecipientInfo => 'معلومات المستلم';
+
+  @override
+  String get giftRecipientName => 'اسم المستلم';
+
+  @override
+  String get giftRecipientNameRequired => 'من سيستلمها؟';
+
+  @override
+  String get giftRecipientPhone => 'رقم الهاتف (لبنان)';
+
+  @override
+  String get giftPhoneInvalid => 'أدخل رقماً لبنانياً، مثل 71 234 567';
+
+  @override
+  String get giftDeliveryDate => 'تاريخ التوصيل';
+
+  @override
+  String get giftToday => 'اليوم';
+
+  @override
+  String get giftTomorrow => 'غداً';
+
+  @override
+  String get giftSchedule => 'جدولة';
+
+  @override
+  String get giftNoteTitle => 'أرفق رسالة شخصية';
+
+  @override
+  String get giftNoteHelper => 'يرسل المتجر رسالتك مع الهدية.';
+
+  @override
+  String get giftWrapTitle => 'تغليف هدايا فاخر';
+
+  @override
+  String giftWrapSubtitle(String amount) {
+    return 'تغليف احتفالي مع رسالتك على بطاقة (+$amount)';
+  }
+
+  @override
+  String get giftPaymentTitle => 'الدفع';
+
+  @override
+  String get giftCashNotAllowed =>
+      'تُدفع الهدايا عبر الإنترنت — لا يُطلب من المستلم أن يدفع أبداً.';
+
+  @override
+  String get giftNoPaymentMethods =>
+      'تُدفع الهدايا عبر الإنترنت، والدفع عبر الإنترنت غير مفعّل بعد — لذا لا يمكن إرسال هدية الآن.';
+
+  @override
+  String get giftTermsFailed => 'تعذّر تحميل خيارات الدفع للهدية.';
+
+  @override
+  String get giftOfflineCannotWait =>
+      'لا يمكن للهدية انتظار عودة الاتصال كما يفعل الطلب النقدي، لأنها تُدفع عبر الإنترنت. أرسلها عند عودة الاتصال.';
+
+  @override
+  String get giftOrderSummary => 'ملخص الطلب';
+
+  @override
+  String giftLineQty(int qty, String name) {
+    return '$qty× $name';
+  }
+
+  @override
+  String get giftWrapLine => 'تغليف الهدية';
+
+  @override
+  String get giftDeliveryFee => 'رسوم التوصيل';
+
+  @override
+  String get giftTotalUsd => 'المجموع بالدولار';
+
+  @override
+  String giftApproxLbp(String amount) {
+    return '≈ $amount';
+  }
+
+  @override
+  String get giftTotalConfirmed => 'يُؤكَّد المجموع النهائي عند إرسال هديتك.';
+
+  @override
+  String get giftSendAndPay => 'أرسل الهدية وادفع';
+
+  @override
+  String giftForName(String name) {
+    return 'هدية إلى $name';
+  }
+
+  @override
+  String get giftWrapRequested => 'مطلوب تغليف الهدية';
+
+  @override
+  String get giftCardMessage => 'رسالة البطاقة';
+
+  @override
+  String get giftRecipientPhoneLabel => 'هاتف المستلم';
+
+  @override
+  String get giftBasketBanner => 'ترسل هذه السلة كهدية';
+
+  @override
+  String get giftBasketNotGift => 'ليست هدية';
 }

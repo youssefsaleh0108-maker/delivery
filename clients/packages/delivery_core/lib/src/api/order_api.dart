@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
+import '../models/gift_models.dart';
 import '../models/order_models.dart';
 import '../models/order_submission.dart';
 import '../models/provider_models.dart';
@@ -92,6 +93,13 @@ class OrderApi {
     final int? status = e.response?.statusCode;
     if (status != null) return status >= 500;
     return e.type != DioExceptionType.connectionTimeout;
+  }
+
+  /// What a gift checkout needs before an order exists — `GET /api/orders/gift-terms`: what
+  /// wrapping costs, and the methods a gift can be paid with here (never cash, possibly none).
+  Future<GiftTerms> giftTerms() async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/orders/gift-terms');
+    return GiftTerms.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<Paged<DeliveryOrder>> mine({int page = 0, int size = 20}) =>
