@@ -22,6 +22,10 @@ import 'store_page_screen.dart';
 /// ([Cart.startGift]), which is what sends Proceed to Checkout to the gift checkout; the basket
 /// says so and lets the customer undo it.
 ///
+/// A gift is never cash, and the shell draws no way in here until Order Manager accepts a method
+/// that can pay for one ([giftTerms]). Reached anyway while none can, the hub says so first, above
+/// everything that would start a gift.
+///
 /// Where the frame promised more than the platform does, the copy is narrower: shops deliver where
 /// they deliver, the shop receives the note rather than printing it, and "same day" is said only on
 /// a bundle whose shop could still make it today.
@@ -39,6 +43,7 @@ class GiftHubScreen extends StatefulWidget {
     required this.onOpenBasket,
     this.geocodingApi,
     this.onStartShopping,
+    this.giftTerms,
   });
 
   final StoreApi storeApi;
@@ -61,43 +66,46 @@ class GiftHubScreen extends StatefulWidget {
   /// customer on Home to shop for the recipient. Null just closes the hub.
   final VoidCallback? onStartShopping;
 
+  /// What a gift can be paid with, as the shell already asked; null and the hub asks for itself.
+  ///
+  /// Where it names no method the hub says a gift cannot be sent yet, at its top — rather than let
+  /// the customer choose shops and type a recipient to meet a button that cannot work.
+  final GiftTerms? giftTerms;
+
   @override
   State<GiftHubScreen> createState() => _GiftHubScreenState();
 }
 
-/// A gift category, mapped onto what the platform actually has.
+/// A gift category: a store vertical under the gift hub's name for it.
 ///
-/// There is no gift taxonomy. Care Package, Groceries and Medicine & Health are store verticals
-/// outright; Baby & Kids is the pharmacies, which is where baby care is sold; Sweets & Pastries has
-/// no vertical at all, so it searches shop names — which finds only shops that say so in their
-/// name. The two that are not a vertical's own list carry their category as the listing's title, so
-/// a narrowed list is never passed off as the whole vertical.
+/// There is no gift taxonomy, so a category is drawn only where a vertical backs it — Care Package,
+/// Groceries and Medicine & Health are verticals outright. The frame's Sweets & Pastries (no
+/// vertical: a search of shop names, which misses every shop named in Arabic) and Baby & Kids (the
+/// pharmacies again, under a second title) are left out until a vertical or a tag backs them.
 class _GiftCategory {
-  const _GiftCategory(this.label, this.icon, {this.vertical, this.search, this.titled = false});
+  const _GiftCategory(this.label, this.icon, this.vertical);
 
   final String Function(DeliveryStrings t) label;
   final IconData icon;
-  final StoreVertical? vertical;
-  final String? search;
-  final bool titled;
+  final StoreVertical vertical;
 }
 
 final List<_GiftCategory> _categories = <_GiftCategory>[
   _GiftCategory((DeliveryStrings t) => t.giftCatCarePackage, Icons.card_giftcard_rounded,
-      vertical: StoreVertical.flowersGifts),
+      StoreVertical.flowersGifts),
   _GiftCategory((DeliveryStrings t) => t.giftCatGroceries, Icons.local_grocery_store_outlined,
-      vertical: StoreVertical.grocery),
-  _GiftCategory((DeliveryStrings t) => t.giftCatSweets, Icons.cake_outlined,
-      search: 'sweet', titled: true),
-  _GiftCategory((DeliveryStrings t) => t.giftCatBabyKids, Icons.child_friendly_outlined,
-      vertical: StoreVertical.pharmacy, titled: true),
+      StoreVertical.grocery),
   _GiftCategory((DeliveryStrings t) => t.giftCatMedicine, Icons.medical_services_outlined,
-      vertical: StoreVertical.pharmacy),
+      StoreVertical.pharmacy),
 ];
 
 class _GiftHubScreenState extends State<GiftHubScreen> {
   List<GiftBundle> _bundles = const <GiftBundle>[];
   bool _bundlesLoading = true;
+
+  /// The gift terms: the shell's, or asked for here. Null while unknown, and then nothing is said —
+  /// not knowing is not "cannot", and the gift checkout says for itself when it cannot load them.
+  GiftTerms? _terms;
 
   @override
   void initState() {
@@ -105,6 +113,17 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
     widget.addresses.addListener(_repaint);
     widget.cart.addListener(_repaint);
     _loadBundles();
+    _terms = widget.giftTerms;
+    if (_terms == null) _loadTerms();
+  }
+
+  Future<void> _loadTerms() async {
+    try {
+      final GiftTerms terms = await widget.orderApi.giftTerms();
+      if (mounted) setState(() => _terms = terms);
+    } catch (_) {
+      // Unknown stays unknown: nothing is said.
+    }
   }
 
   @override
@@ -163,7 +182,7 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
     }
   }
 
-  void _openCategory(_GiftCategory category, DeliveryStrings t) {
+  void _openCategory(_GiftCategory category) {
     widget.cart.startGift();
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ShopsListingScreen(
@@ -172,8 +191,6 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
         cart: widget.cart,
         onOpenBasket: widget.onOpenBasket,
         initialVertical: category.vertical,
-        initialSearch: category.search,
-        title: category.titled ? category.label(t) : null,
       ),
     ));
   }
@@ -216,6 +233,8 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
       body: ListView(
         padding: const EdgeInsets.only(top: DeliverySpacing.md, bottom: DeliverySpacing.lg),
         children: <Widget>[
+          // First, above everything that would mark the basket as a gift.
+          if (_terms != null && !_terms!.canPay) _padded(_cannotSendYet(t)),
           _padded(_hero(t)),
           _sectionLabel(t.giftHowItWorks),
           _padded(_steps(t)),
@@ -264,6 +283,32 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
           ),
         ),
       );
+
+  /// No method this platform accepts can pay for a gift yet, so a basket started here could not be
+  /// sent. Said before the customer spends any effort on one.
+  static Widget _cannotSendYet(DeliveryStrings t) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: DeliverySpacing.md),
+      padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Icon(Icons.info_outline_rounded, size: 16, color: DeliveryColors.brand),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Text(
+              t.giftNoPaymentMethods,
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.ink, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// The frame's banner. A brand gradient where the frame has a photograph: the photo is a Figma
   /// asset the app does not ship, and a hero that fails to load is worse than none.
@@ -381,7 +426,7 @@ class _GiftHubScreenState extends State<GiftHubScreen> {
             width: 100,
             child: YdCard.bordered(
               padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
-              onTap: () => _openCategory(category, t),
+              onTap: () => _openCategory(category),
               child: Column(
                 children: <Widget>[
                   Container(

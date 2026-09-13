@@ -25,8 +25,6 @@ class ShopsListingScreen extends StatefulWidget {
     required this.onOpenBasket,
     this.initialVertical,
     this.chips = const <CategoryChip>[],
-    this.initialSearch,
-    this.title,
   });
 
   final StoreApi storeApi;
@@ -41,14 +39,6 @@ class ShopsListingScreen extends StatefulWidget {
   /// The category tapped on home. Null lists everything.
   final StoreVertical? initialVertical;
 
-  /// A shop-name search the list starts with, for an entry that is not a vertical — the gift
-  /// hub's Sweets & Pastries. Null searches nothing.
-  final String? initialSearch;
-
-  /// The header, when the caller's name for this list is not the vertical's, so a narrowed list
-  /// is never titled as though it were the whole vertical. Null titles it by the vertical.
-  final String? title;
-
   /// The curated strip, passed through from home so this screen does not refetch it.
   final List<CategoryChip> chips;
 
@@ -57,8 +47,7 @@ class ShopsListingScreen extends StatefulWidget {
 }
 
 class _ShopsListingScreenState extends State<ShopsListingScreen> {
-  late StoreFilters _filters =
-      StoreFilters(vertical: widget.initialVertical, search: widget.initialSearch);
+  late StoreFilters _filters = StoreFilters(vertical: widget.initialVertical);
   bool _filtersOpen = false;
 
   late final PagedList<StoreCard> _stores = PagedList<StoreCard>(
@@ -112,7 +101,8 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final String title = widget.title ?? _filters.vertical?.labelIn(t) ?? t.allStores;
+    final String title =
+        _filters.vertical?.labelIn(t) ?? t.allStores;
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,

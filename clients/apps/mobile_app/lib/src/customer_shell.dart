@@ -209,9 +209,36 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
         geocodingApi: widget.geocodingApi,
         onOpenBasket: _openBasket,
         onStartShopping: () => _open(CustomerNavBar.homeIndex),
+        giftTerms: _giftTerms,
       ),
     ));
   }
+
+  /// What a gift can be paid with, asked of Order Manager once — and again only if it did not
+  /// answer. Null until it has.
+  ///
+  /// The gift hub's ways in, Home's card and the profile menu's row, are drawn only when this names
+  /// at least one method. Order Manager accepts cash alone until a payment provider exists, and a
+  /// gift is never cash: a way in drawn before then walks the customer through choosing shops and
+  /// typing a recipient, to a button that cannot work.
+  GiftTerms? _giftTerms;
+  bool _askingGiftTerms = false;
+
+  Future<void> _loadGiftTerms() async {
+    if (_giftTerms != null || _askingGiftTerms) return;
+    _askingGiftTerms = true;
+    try {
+      final GiftTerms terms = await widget.orderApi.giftTerms();
+      if (mounted) setState(() => _giftTerms = terms);
+    } catch (_) {
+      // No way in rather than an error; asked again when the connection comes back.
+    } finally {
+      _askingGiftTerms = false;
+    }
+  }
+
+  /// [_openGiftHub] where a gift can be paid for; null — which draws no way in — everywhere else.
+  VoidCallback? get _giftHubEntry => (_giftTerms?.canPay ?? false) ? _openGiftHub : null;
 
   /// Re-asks the server what this basket qualifies for, when the basket has actually changed.
   ///
@@ -264,6 +291,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     if (!_online.value) return;
     _refreshCatalog();
     _learnDeliveryTerms();
+    unawaited(_loadGiftTerms());
   }
 
   /// A queued checkout became an order: say so, whichever tab the customer is on.
@@ -311,6 +339,8 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     _deliveryTerms.load().then((_) => _learnDeliveryTerms());
     _catalog.addListener(_learnDeliveryTerms);
     _addresses.addListener(_learnDeliveryTerms);
+    // Whether the gift hub gets a way in at all.
+    unawaited(_loadGiftTerms());
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -364,7 +394,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           transferApi: widget.transferApi,
           onSignOut: widget.onSignOut,
           onOpenBasket: _openBasket,
-          onOpenGiftHub: _openGiftHub,
+          onOpenGiftHub: _giftHubEntry,
         );
       case CustomerNavBar.ordersIndex:
         // The order list stays mounted under the catalog, so closing the catalog lands back on the
@@ -481,7 +511,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
               inbox: _inbox,
               profileApi: widget.profileApi,
               onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
-              onOpenGiftHub: _openGiftHub,
+              onOpenGiftHub: _giftHubEntry,
             ),
             // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight
             // requests alive, so switching to the basket and back does not refetch the catalog.

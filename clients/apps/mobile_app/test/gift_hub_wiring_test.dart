@@ -76,7 +76,9 @@ void main() {
     return dio;
   }
 
-  Future<void> pumpShell(WidgetTester tester) async {
+  /// The real shell, over a gateway whose gift terms accept [giftMethods].
+  Future<void> pumpShell(WidgetTester tester,
+      {List<String> giftMethods = const <String>['CARD']}) async {
     tester.view.physicalSize = const Size(1000, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -88,6 +90,7 @@ void main() {
       '/api/notifications/unread-count': const <String, dynamic>{'unread': 0},
       '/api/butler/mine': page(const <Map<String, dynamic>>[]),
       '/api/gift-bundles': const <dynamic>[],
+      '/api/orders/gift-terms': <String, dynamic>{'wrapFee': 3.0, 'paymentMethods': giftMethods},
     });
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
@@ -134,5 +137,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(GiftHubScreen), findsOneWidget);
+  });
+
+  testWidgets('while no method can pay for a gift, neither door is drawn', (WidgetTester tester) async {
+    // What Order Manager answers today: cash alone, and a gift is never paid in cash.
+    await pumpShell(tester, giftMethods: const <String>['CASH']);
+
+    expect(find.text(en.giftHomeEntryTitle), findsNothing);
+
+    tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
+    await tester.pumpAndSettle();
+    // The menu is open, and has no gift row in it.
+    expect(find.text(en.custMyAddresses), findsOneWidget);
+    expect(find.text(en.giftHubTitle), findsNothing);
   });
 }

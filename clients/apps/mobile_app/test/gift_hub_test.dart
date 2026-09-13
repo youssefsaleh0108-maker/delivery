@@ -45,11 +45,20 @@ void main() {
         'sameDayDeliverable': today,
       };
 
-  /// A gateway answering the bundles (or failing them) and an empty shop listing.
-  Dio gateway({List<Map<String, dynamic>>? bundles, bool bundlesFail = false}) {
+  /// A gateway answering the bundles (or failing them), the gift terms when [giftMethods] are given,
+  /// and an empty shop listing.
+  Dio gateway(
+      {List<Map<String, dynamic>>? bundles, bool bundlesFail = false, List<String>? giftMethods}) {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway.test'));
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (RequestOptions o, RequestInterceptorHandler h) {
+        if (o.path == '/api/orders/gift-terms' && giftMethods != null) {
+          h.resolve(Response<dynamic>(
+              requestOptions: o,
+              statusCode: 200,
+              data: <String, dynamic>{'wrapFee': 3.0, 'paymentMethods': giftMethods}));
+          return;
+        }
         if (o.path == '/api/gift-bundles') {
           if (bundlesFail) {
             h.reject(DioException(
@@ -85,6 +94,7 @@ void main() {
     required DeliveryAddressStore addresses,
     required Cart cart,
     Locale locale = const Locale('en'),
+    GiftTerms? giftTerms,
   }) async {
     tester.view.physicalSize = const Size(1000, 2600);
     tester.view.devicePixelRatio = 1.0;
@@ -107,6 +117,7 @@ void main() {
         addresses: addresses,
         zoneApi: DeliveryZoneApi(dio),
         onOpenBasket: () {},
+        giftTerms: giftTerms,
       ),
     ));
     await tester.pumpAndSettle();
@@ -122,7 +133,7 @@ void main() {
     return store;
   }
 
-  testWidgets('shows the promise, the three steps and the five gift categories',
+  testWidgets('shows the promise, the three steps and only the categories a store vertical backs',
       (WidgetTester tester) async {
     await pumpHub(tester,
         dio: gateway(), addresses: DeliveryAddressStore(ownerId: 'test-user'), cart: Cart());
@@ -136,15 +147,18 @@ void main() {
     for (final String category in <String>[
       en.giftCatCarePackage,
       en.giftCatGroceries,
-      en.giftCatSweets,
-      en.giftCatBabyKids,
       en.giftCatMedicine,
     ]) {
       expect(find.text(category), findsOneWidget);
     }
+    // And nothing else: no shop-name search passed off as a category, no vertical twice over.
+    final Finder rail =
+        find.ancestor(of: find.text(en.giftCatCarePackage), matching: find.byType(ListView)).first;
+    expect(find.descendant(of: rail, matching: find.byType(YdCard)), findsNWidgets(3));
   });
 
-  testWidgets('a category opens its shops and makes the basket a gift', (WidgetTester tester) async {
+  testWidgets('a category opens its vertical\'s shops and makes the basket a gift',
+      (WidgetTester tester) async {
     final Cart cart = Cart();
     await pumpHub(tester,
         dio: gateway(), addresses: DeliveryAddressStore(ownerId: 'test-user'), cart: cart);
@@ -152,24 +166,55 @@ void main() {
     await tester.tap(find.text(en.giftCatGroceries));
     await tester.pumpAndSettle();
 
-    final ShopsListingScreen groceries =
-        tester.widget<ShopsListingScreen>(find.byType(ShopsListingScreen));
-    expect(groceries.initialVertical, StoreVertical.grocery);
-    expect(groceries.title, isNull);
+    expect(tester.widget<ShopsListingScreen>(find.byType(ShopsListingScreen)).initialVertical,
+        StoreVertical.grocery);
     expect(cart.isGift, isTrue);
 
     // YdScreenHeader draws its own back button, so pop the route rather than look for Material's.
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
-    await tester.tap(find.text(en.giftCatSweets));
+    await tester.tap(find.text(en.giftCatMedicine));
     await tester.pumpAndSettle();
 
-    // No vertical sells sweets: a name search, titled so it is not passed off as every store.
-    final ShopsListingScreen sweets =
-        tester.widget<ShopsListingScreen>(find.byType(ShopsListingScreen));
-    expect(sweets.initialVertical, isNull);
-    expect(sweets.initialSearch, 'sweet');
-    expect(sweets.title, en.giftCatSweets);
+    expect(tester.widget<ShopsListingScreen>(find.byType(ShopsListingScreen)).initialVertical,
+        StoreVertical.pharmacy);
+  });
+
+  testWidgets('where no method can pay for a gift, says so first, above anything that starts one',
+      (WidgetTester tester) async {
+    final Cart cart = Cart();
+    await pumpHub(tester,
+        dio: gateway(giftMethods: const <String>['CASH']),
+        addresses: DeliveryAddressStore(ownerId: 'test-user'),
+        cart: cart);
+
+    expect(find.text(en.giftNoPaymentMethods), findsOneWidget);
+    expect(tester.getTopLeft(find.text(en.giftNoPaymentMethods)).dy,
+        lessThan(tester.getTopLeft(find.text(en.giftHubBannerTitle)).dy));
+    expect(tester.getTopLeft(find.text(en.giftNoPaymentMethods)).dy,
+        lessThan(tester.getTopLeft(find.text(en.giftCatCarePackage)).dy));
+    expect(cart.isGift, isFalse);
+  });
+
+  testWidgets('says nothing of the kind when a method can pay', (WidgetTester tester) async {
+    await pumpHub(tester,
+        dio: gateway(giftMethods: const <String>['CARD']),
+        addresses: DeliveryAddressStore(ownerId: 'test-user'),
+        cart: Cart());
+
+    expect(find.text(en.giftNoPaymentMethods), findsNothing);
+    expect(find.text(en.giftHubBannerTitle), findsOneWidget);
+  });
+
+  testWidgets('takes the shell\'s answer as given', (WidgetTester tester) async {
+    // This gateway cannot answer the terms, so the notice can only come from the shell's copy.
+    await pumpHub(tester,
+        dio: gateway(),
+        addresses: DeliveryAddressStore(ownerId: 'test-user'),
+        cart: Cart(),
+        giftTerms: const GiftTerms(wrapFee: 3, paymentMethods: <PaymentMethod>[]));
+
+    expect(find.text(en.giftNoPaymentMethods), findsOneWidget);
   });
 
   testWidgets('recipients are the saved addresses that name a person; choosing one is the gift\'s',
