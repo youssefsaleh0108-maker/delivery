@@ -4,6 +4,7 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_portal/src/carrier/applicants_screen.dart';
+import 'package:delivery_portal/src/carrier/cash_reconciliation_screen.dart';
 import 'package:delivery_portal/src/carrier/dashboard_screen.dart';
 import 'package:delivery_portal/src/carrier/earnings_screen.dart';
 import 'package:delivery_portal/src/carrier/jobs_screen.dart';
@@ -138,12 +139,14 @@ void main() {
 
     // The seven destinations of the rail this replaced: Dashboard, Jobs, Earnings, Statement, the
     // riders page (now the directory), Applicants and Settings — and Shifts & attendance, which
-    // had its own destination until it was filed under Riders HR.
+    // had its own destination until it was filed under Riders HR, and the rider cash
+    // reconciliation, which had its own until it was filed under Reconciliation.
     expect(
       reachable,
       unorderedEquals(<Type>[
         CarrierDashboardScreen,
         JobsScreen,
+        CarrierCashScreen,
         CarrierStatementScreen,
         RidersDirectoryScreen,
         ApplicantsScreen,
@@ -159,8 +162,13 @@ void main() {
     final PortalDestination reconciliation = rail[2];
     final PortalDestination ridersHr = rail[3];
 
-    expect(reconciliation.build(apis, _locale, () async {}, (int _) {}),
-        isA<CarrierStatementScreen>());
+    // The rider cash reconciliation is the page the design draws under this heading (Figma 112:9),
+    // and its row is the page's title: the design's own label for it is the heading's word.
+    expect(reconciliation.build(apis, _locale, () async {}, (int _) {}), isA<CarrierCashScreen>());
+    expect(
+      <String>[for (final PortalPage p in reconciliation.pages) p.label(en)],
+      <String>[en.carrCashTitle, en.carrRidersNavStatement],
+    );
     expect(ridersHr.build(apis, _locale, () async {}, (int _) {}), isA<RidersDirectoryScreen>());
     expect(
       <String>[for (final PortalPage p in ridersHr.pages) p.label(en)],
@@ -168,6 +176,16 @@ void main() {
     );
     // A page the heading does not have opens the first rather than throwing.
     expect(_page(ridersHr, 9, apis), isA<RidersDirectoryScreen>());
+  });
+
+  test('the rider cash reconciliation is built with every client it reads', () {
+    final PortalApis apis = _apis();
+    final CarrierCashScreen screen = _page(rail[2], 0, apis) as CarrierCashScreen;
+
+    // Both optional, so withholding either still compiles and leaves part of the page dead in the
+    // deployed build, the fault the riders page once shipped with.
+    expect(screen.notificationApi, same(apis.notification), reason: 'the bell');
+    expect(screen.orderApi, same(apis.order), reason: 'each rider\'s settlement page');
   });
 
   test('Shifts & attendance is filed under Riders HR, and built with every client it reads', () {
@@ -276,11 +294,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CarrierDashboardScreen), findsOneWidget);
 
-    // A heading with one page is that page's own row: no row under it repeats its name.
-    expect(find.text(en.carrRidersNavStatement), findsNothing);
+    // Reconciliation has two pages, so both are rows beneath it and the heading opens the first:
+    // the rider cash reconciliation. The statement opens from its own row.
     await tester.tap(find.text(en.carrRidersNavReconciliation));
     await tester.pumpAndSettle();
+    expect(find.byType(CarrierCashScreen), findsOneWidget);
+    await tester.tap(find.text(en.carrRidersNavStatement));
+    await tester.pumpAndSettle();
     expect(find.byType(CarrierStatementScreen), findsOneWidget);
+    expect(find.byType(CarrierCashScreen), findsNothing);
 
     // A heading with two draws both beneath it, and opens on the first.
     await tester.tap(find.text(en.carrRidersNavRidersHr));
