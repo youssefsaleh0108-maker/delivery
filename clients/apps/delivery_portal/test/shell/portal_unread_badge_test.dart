@@ -60,6 +60,8 @@ PortalApis _apis(Dio dio) => PortalApis(
       inventory: InventoryApi(dio),
       staff: StoreStaffApi(dio),
       reports: ReportsApi(dio),
+      catalogScan: CatalogScanApi(dio),
+      demand: DemandApi(dio),
       shopChat: ShopChatApi(dio),
       moderation: ChatModerationApi(dio),
     );

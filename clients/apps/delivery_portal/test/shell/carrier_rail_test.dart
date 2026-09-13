@@ -64,6 +64,8 @@ PortalApis _apis({HttpClientAdapter? adapter}) {
     reports: ReportsApi(dio),
     catalogScan: CatalogScanApi(dio),
     demand: DemandApi(dio),
+    shopChat: ShopChatApi(dio),
+    moderation: ChatModerationApi(dio),
   );
 }
 
