@@ -117,13 +117,15 @@ class CarrierPayrollApi {
   /// Approves the figures of [revision] — the ones on screen.
   ///
   /// Throws [PayrollRefused] with FIGURES_CHANGED or NEEDS_ACKNOWLEDGEMENT and the run as it now is,
-  /// or CASH_CHANGED; nothing is approved in any of them. Freezes the payslips and nets riders' cash
-  /// for good, so nothing should call it without an explicit human confirmation.
-  Future<PayRun> approve(String runId, {required int revision, bool acknowledgeMissingHours = false}) =>
+  /// RECOMPUTE_NEEDED when the figures were read before the period ended, or CASH_CHANGED; nothing is
+  /// approved in any of them. [acknowledgeMissing] says the approver was shown what is missing — some
+  /// riders' hours, or deliveries that earned no fee — and approves anyway. Freezes the payslips and
+  /// nets riders' cash for good, so nothing should call it without an explicit human confirmation.
+  Future<PayRun> approve(String runId, {required int revision, bool acknowledgeMissing = false}) =>
       _write(
         () => _dio.post<dynamic>('$_base/runs/${_seg(runId)}/approve', data: <String, dynamic>{
           'revision': revision,
-          'acknowledgeMissingHours': acknowledgeMissingHours,
+          'acknowledgeMissing': acknowledgeMissing,
         }),
         PayRun.fromJson,
       );

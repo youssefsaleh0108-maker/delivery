@@ -13973,8 +13973,8 @@ abstract class DeliveryStrings {
   /// No description provided for @payrollLineDeliveries.
   ///
   /// In en, this message translates to:
-  /// **'{count} deliveries × {rate}'**
-  String payrollLineDeliveries(String count, String rate);
+  /// **'{count, plural, =1{1 delivery × {rate}} other{{count} deliveries × {rate}}}'**
+  String payrollLineDeliveries(int count, String rate);
 
   /// No description provided for @payrollLineHours.
   ///
@@ -14003,14 +14003,14 @@ abstract class DeliveryStrings {
   /// No description provided for @payrollLineLate.
   ///
   /// In en, this message translates to:
-  /// **'{days} late days × {rate}'**
-  String payrollLineLate(String days, String rate);
+  /// **'{days, plural, =1{1 late day × {rate}} other{{days} late days × {rate}}}'**
+  String payrollLineLate(int days, String rate);
 
   /// No description provided for @payrollLineAbsence.
   ///
   /// In en, this message translates to:
-  /// **'{days} absences × {rate}'**
-  String payrollLineAbsence(String days, String rate);
+  /// **'{days, plural, =1{1 absence × {rate}} other{{days} absences × {rate}}}'**
+  String payrollLineAbsence(int days, String rate);
 
   /// No description provided for @payrollLineCash.
   ///
@@ -14057,8 +14057,8 @@ abstract class DeliveryStrings {
   /// No description provided for @payrollCashKept.
   ///
   /// In en, this message translates to:
-  /// **'Holds {amount} of the company\'s cash, more than this pay covers. It stays for the hub to collect.'**
-  String payrollCashKept(String amount);
+  /// **'Holds {amount} of the company\'s cash collected by {date}, more than this pay covers. It stays for the hub to collect.'**
+  String payrollCashKept(String amount, String date);
 
   /// No description provided for @payrollHoursFacts.
   ///
@@ -14261,14 +14261,8 @@ abstract class DeliveryStrings {
   /// No description provided for @payrollApproveCash.
   ///
   /// In en, this message translates to:
-  /// **'{amount} of company cash your riders hold is kept from their pay and recorded as handed to your company.'**
-  String payrollApproveCash(String amount);
-
-  /// No description provided for @payrollApproveWithoutHours.
-  ///
-  /// In en, this message translates to:
-  /// **'Approve without the missing hours'**
-  String get payrollApproveWithoutHours;
+  /// **'{amount} of company cash your riders collected by {date} and still hold is kept from their pay and recorded as handed to your company.'**
+  String payrollApproveCash(String amount, String date);
 
   /// No description provided for @payrollApproveYes.
   ///
@@ -14329,12 +14323,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'The figures changed since you looked. Check the new ones, then approve again.'**
   String get payrollErrFiguresChanged;
-
-  /// No description provided for @payrollErrNeedsHours.
-  ///
-  /// In en, this message translates to:
-  /// **'Hours are missing. Tick the box to approve without them.'**
-  String get payrollErrNeedsHours;
 
   /// No description provided for @payrollErrCashChanged.
   ///
@@ -14473,6 +14461,78 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'No day is open for new rules right now.'**
   String get payrollRulesNoStart;
+
+  /// No description provided for @payrollCashMethodKeptFromPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept from pay'**
+  String get payrollCashMethodKeptFromPay;
+
+  /// No description provided for @payrollReadBeforeEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'These figures were read on {time}, before the period ended. Recompute to count the whole period before approving.'**
+  String payrollReadBeforeEnd(String time);
+
+  /// No description provided for @payrollDeliveriesNotDeployed.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries cannot be counted from orders on this platform yet, so these figures count only deliveries that earned a fee: free deliveries are missing from them.'**
+  String get payrollDeliveriesNotDeployed;
+
+  /// No description provided for @payrollDeliveriesMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries could not be counted from orders just now, so these figures count only deliveries that earned a fee. Recompute to count every delivery.'**
+  String get payrollDeliveriesMissing;
+
+  /// No description provided for @payrollHoursMissingFor.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Hours could not be read for {names}, so their pay leaves hours out.} other{Hours could not be read for {names}, so their pay leaves hours out.}}'**
+  String payrollHoursMissingFor(int count, String names);
+
+  /// No description provided for @payrollNamesMore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{names} and 1 other} other{{names} and {count} others}}'**
+  String payrollNamesMore(String names, int count);
+
+  /// No description provided for @payrollListSeparator.
+  ///
+  /// In en, this message translates to:
+  /// **', '**
+  String get payrollListSeparator;
+
+  /// No description provided for @payrollApproveDeliveriesLedger.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries were counted only from jobs that earned a fee, so free deliveries are missing from this pay.'**
+  String get payrollApproveDeliveriesLedger;
+
+  /// No description provided for @payrollApproveWithoutMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve without what is missing'**
+  String get payrollApproveWithoutMissing;
+
+  /// No description provided for @payrollErrNeedsAcknowledgement.
+  ///
+  /// In en, this message translates to:
+  /// **'Something is missing from these figures. Tick the box to approve without it.'**
+  String get payrollErrNeedsAcknowledgement;
+
+  /// No description provided for @payrollErrRecomputeNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'These figures were read before the period ended. Recompute, check them and approve again.'**
+  String get payrollErrRecomputeNeeded;
+
+  /// No description provided for @payrollHoursNotListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance shows no time this rider worked for your company in this period, so their hours are not known.'**
+  String get payrollHoursNotListed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

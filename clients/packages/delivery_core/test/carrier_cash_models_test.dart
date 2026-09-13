@@ -199,6 +199,14 @@ void main() {
       expect(s.handovers.single.recordedByName, 'Kamal M.');
       expect(s.handovers.single.amount?.amount, '232.00');
     });
+
+    test('cash a pay run kept from pay is known for what it is, and is not a method anyone records', () {
+      expect(CashMethod.fromWire('PAYROLL_DEDUCTION'), CashMethod.payrollDeduction);
+      expect(CashMethod.recordable,
+          <CashMethod>[CashMethod.cash, CashMethod.bankDeposit, CashMethod.wallet]);
+      expect(CashMethod.payrollDeduction.isRecordable, isFalse);
+      expect(CashMethod.recordable.every((CashMethod m) => m.isRecordable), isTrue);
+    });
   });
 
   group('recording a hand-over', () {

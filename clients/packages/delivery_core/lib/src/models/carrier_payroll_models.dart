@@ -109,6 +109,46 @@ enum PayrollAttendance {
       );
 }
 
+/// Where a run's delivery counts came from.
+enum PayrollDeliveries {
+  /// Every order each rider delivered for the company, as Order Manager counted them — fee or none.
+  orders('ORDERS'),
+
+  /// Order Manager could not be asked, so only deliveries that earned a fee were counted: free
+  /// deliveries are missing. See [PayRun.deliveriesReason].
+  ledger('LEDGER'),
+
+  unknown('UNKNOWN');
+
+  const PayrollDeliveries(this.wire);
+
+  final String wire;
+
+  static PayrollDeliveries fromWire(Object? value) => PayrollDeliveries.values.firstWhere(
+        (PayrollDeliveries d) => d.wire == value,
+        orElse: () => PayrollDeliveries.unknown,
+      );
+}
+
+/// A rider on a run whose hours the rules need and the run does not have.
+class PayrollMissingHours {
+  const PayrollMissingHours({required this.riderRef, required this.name, required this.reason});
+
+  final String riderRef;
+
+  /// What Keycloak calls them, or null.
+  final String? name;
+
+  /// Why, as a code: UNREADABLE, NOT_LISTED, or the whole read's own reason.
+  final String? reason;
+
+  factory PayrollMissingHours.fromJson(Map<String, dynamic> json) => PayrollMissingHours(
+        riderRef: _text(json['riderRef']) ?? '',
+        name: _text(json['name']),
+        reason: _text(json['reason']),
+      );
+}
+
 /// What one payslip line is.
 enum PayLineKind {
   deliveries('DELIVERIES'),
@@ -474,6 +514,7 @@ class Payslip {
     required this.lates,
     required this.absences,
     required this.hoursUnknown,
+    required this.hoursReason,
     required this.basePay,
     required this.deliveryPay,
     required this.bonuses,
@@ -512,6 +553,10 @@ class Payslip {
 
   /// The rules pay or judge hours and none were read for this rider.
   final bool hoursUnknown;
+
+  /// Why not, when [hoursUnknown]: NOT_LISTED when attendance shows no time of theirs with the company
+  /// in the period, UNREADABLE for figures that could not be believed, or the whole read's reason.
+  final String? hoursReason;
 
   /// Paid for hours: ordinary, overtime, and typed hours when the rules pay them.
   final Money? basePay;
@@ -562,6 +607,7 @@ class Payslip {
         lates: _intOrNull(json['lates']),
         absences: _intOrNull(json['absences']),
         hoursUnknown: json['hoursUnknown'] == true,
+        hoursReason: _text(json['hoursReason']),
         basePay: Money.parse(json['basePay']),
         deliveryPay: Money.parse(json['deliveryPay']),
         bonuses: Money.parse(json['bonuses']),
@@ -717,6 +763,11 @@ class PayRun {
     required this.attendance,
     required this.attendanceReason,
     required this.attendanceAt,
+    required this.deliveries,
+    required this.deliveriesReason,
+    required this.deliveriesAt,
+    required this.readBeforePeriodEnd,
+    required this.hoursMissingFor,
     required this.periodOver,
     required this.jobsSinceComputed,
     required this.needsAcknowledgement,
@@ -748,12 +799,30 @@ class PayRun {
 
   /// When the hours in the figures were read.
   final DateTime? attendanceAt;
+
+  /// Where the delivery counts came from.
+  final PayrollDeliveries deliveries;
+
+  /// Why deliveries could not be counted from orders, as a code: NOT_DEPLOYED, REFUSED,
+  /// PERIOD_REFUSED, UNREACHABLE, MISMATCH or UNREADABLE.
+  final String? deliveriesReason;
+
+  /// When the figures were last read afresh.
+  final DateTime? deliveriesAt;
+
+  /// The figures were last read before the period ended, so the rest of it is missing from them: a
+  /// draft is recomputed before it can be approved.
+  final bool readBeforePeriodEnd;
+
+  /// The riders whose hours the rules need and this run does not have, named, in payslip order.
+  final List<PayrollMissingHours> hoursMissingFor;
   final bool periodOver;
 
   /// Deliveries of the period that reached the ledger after the figures were computed.
   final int jobsSinceComputed;
 
-  /// Approving this draft means approving it without some hours.
+  /// Approving this draft means approving it without some riders' hours, or with deliveries counted
+  /// only from jobs that earned a fee.
   final bool needsAcknowledgement;
 
   /// The rules now cut these days into a different period; the draft can only be discarded.
@@ -782,6 +851,13 @@ class PayRun {
         attendance: PayrollAttendance.fromWire(json['attendance']),
         attendanceReason: _text(json['attendanceReason']),
         attendanceAt: _instant(json['attendanceAt']),
+        deliveries: PayrollDeliveries.fromWire(json['deliveries']),
+        deliveriesReason: _text(json['deliveriesReason']),
+        deliveriesAt: _instant(json['deliveriesAt']),
+        readBeforePeriodEnd: json['readBeforePeriodEnd'] == true,
+        hoursMissingFor: _maps(json['hoursMissingFor'])
+            .map(PayrollMissingHours.fromJson)
+            .toList(growable: false),
         periodOver: json['periodOver'] == true,
         jobsSinceComputed: _int(json['jobsSinceComputed']),
         needsAcknowledgement: json['needsAcknowledgement'] == true,

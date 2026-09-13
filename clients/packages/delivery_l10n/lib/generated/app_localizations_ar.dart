@@ -8036,8 +8036,18 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get payrollSectionPayment => 'الدفع';
 
   @override
-  String payrollLineDeliveries(String count, String rate) {
-    return '$count توصيلة × $rate';
+  String payrollLineDeliveries(int count, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توصيلة × $rate',
+      many: '$count توصيلة × $rate',
+      few: '$count توصيلات × $rate',
+      two: 'توصيلتان × $rate',
+      one: 'توصيلة واحدة × $rate',
+      zero: 'لا توصيلات × $rate',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -8061,13 +8071,33 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String payrollLineLate(String days, String rate) {
-    return '$days يوم تأخير × $rate';
+  String payrollLineLate(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days يوم تأخير × $rate',
+      many: '$days يوم تأخير × $rate',
+      few: '$days أيام تأخير × $rate',
+      two: 'يوما تأخير × $rate',
+      one: 'يوم تأخير واحد × $rate',
+      zero: 'لا أيام تأخير × $rate',
+    );
+    return '$_temp0';
   }
 
   @override
-  String payrollLineAbsence(String days, String rate) {
-    return '$days يوم غياب × $rate';
+  String payrollLineAbsence(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days يوم غياب × $rate',
+      many: '$days يوم غياب × $rate',
+      few: '$days أيام غياب × $rate',
+      two: 'يوما غياب × $rate',
+      one: 'يوم غياب واحد × $rate',
+      zero: 'لا أيام غياب × $rate',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -8103,8 +8133,8 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String payrollCashKept(String amount) {
-    return 'يحتفظ بمبلغ $amount من نقد الشركة، وهو أكثر مما يغطيه هذا الأجر. يبقى ليُستلم في المركز.';
+  String payrollCashKept(String amount, String date) {
+    return 'يحتفظ بمبلغ $amount من نقد الشركة جمعه حتى $date، وهو أكثر مما يغطيه هذا الأجر. يبقى ليُستلم في المركز.';
   }
 
   @override
@@ -8247,12 +8277,9 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String payrollApproveCash(String amount) {
-    return 'يُقتطع من أجور سائقيك $amount من نقد الشركة الذي بحوزتهم، ويُسجَّل على أنه سُلِّم إلى شركتك.';
+  String payrollApproveCash(String amount, String date) {
+    return 'يُقتطع من أجور سائقيك $amount من نقد الشركة الذي جمعوه حتى $date وما زال بحوزتهم، ويُسجَّل على أنه سُلِّم إلى شركتك.';
   }
-
-  @override
-  String get payrollApproveWithoutHours => 'الاعتماد من دون الساعات الناقصة';
 
   @override
   String get payrollApproveYes => 'اعتماد';
@@ -8297,10 +8324,6 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get payrollErrFiguresChanged =>
       'تغيّرت الأرقام منذ اطّلعت عليها. راجع الأرقام الجديدة ثم اعتمد مجدداً.';
-
-  @override
-  String get payrollErrNeedsHours =>
-      'هناك ساعات ناقصة. حدّد الخانة للاعتماد من دونها.';
 
   @override
   String get payrollErrCashChanged =>
@@ -8381,4 +8404,70 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get payrollRulesNoStart => 'لا يوجد يوم متاح لقواعد جديدة حالياً.';
+
+  @override
+  String get payrollCashMethodKeptFromPay => 'مقتطع من الأجر';
+
+  @override
+  String payrollReadBeforeEnd(String time) {
+    return 'قُرئت هذه الأرقام في $time، قبل انتهاء الفترة. أعد الحساب لاحتساب الفترة كاملة قبل الاعتماد.';
+  }
+
+  @override
+  String get payrollDeliveriesNotDeployed =>
+      'لا يمكن بعدُ احتساب التوصيلات من الطلبات على هذه المنصة، لذا لا تحتسب هذه الأرقام إلا التوصيلات التي حقّقت أجرة، وتنقصها التوصيلات المجانية.';
+
+  @override
+  String get payrollDeliveriesMissing =>
+      'تعذّر احتساب التوصيلات من الطلبات حالياً، لذا لا تحتسب هذه الأرقام إلا التوصيلات التي حقّقت أجرة. أعد الحساب لاحتساب كل التوصيلات.';
+
+  @override
+  String payrollHoursMissingFor(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهم أي ساعات.',
+      many: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهم أي ساعات.',
+      few: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهم أي ساعات.',
+      two: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهما أي ساعات.',
+      one: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجره أي ساعات.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollNamesMore(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$names و$count سائق آخر',
+      many: '$names و$count سائقاً آخر',
+      few: '$names و$count سائقين آخرين',
+      two: '$names وسائقان آخران',
+      one: '$names وسائق آخر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollListSeparator => '، ';
+
+  @override
+  String get payrollApproveDeliveriesLedger =>
+      'احتُسبت التوصيلات من المهام التي حقّقت أجرة فقط، لذا تنقص التوصيلات المجانية من هذا الأجر.';
+
+  @override
+  String get payrollApproveWithoutMissing => 'الاعتماد من دون ما ينقص';
+
+  @override
+  String get payrollErrNeedsAcknowledgement =>
+      'تنقص هذه الأرقام بعض المعطيات. حدّد الخانة للاعتماد من دونها.';
+
+  @override
+  String get payrollErrRecomputeNeeded =>
+      'قُرئت هذه الأرقام قبل انتهاء الفترة. أعد الحساب وراجع الأرقام ثم اعتمد مجدداً.';
+
+  @override
+  String get payrollHoursNotListed =>
+      'لا يُظهر الحضور أي وقت عمل فيه هذا السائق لشركتك خلال هذه الفترة، لذا ساعاته غير معروفة.';
 }

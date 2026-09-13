@@ -246,8 +246,8 @@ class _CarrierPayrollScreenState extends State<CarrierPayrollScreen> {
   }
 
   /// What can be done with the period now, and nothing else: start, then recompute and approve,
-  /// then record payments. Approve stays drawn but disabled while the period is open or empty; the
-  /// note above the cards says why.
+  /// then record payments. Approve stays drawn but disabled while the period is open or empty, or
+  /// while the figures were read before it ended; the note above the cards says why.
   List<Widget> _primary(DeliveryStrings t, PayPeriod period, PayRun? run) {
     if (run == null) {
       return <Widget>[
@@ -280,7 +280,11 @@ class _CarrierPayrollScreenState extends State<CarrierPayrollScreen> {
             label: t.payrollApprove,
             icon: Icons.check,
             busy: _busy,
-            onPressed: !_busy && run.periodOver && run.payslips.isNotEmpty && !run.periodChanged
+            onPressed: !_busy &&
+                    run.periodOver &&
+                    run.payslips.isNotEmpty &&
+                    !run.periodChanged &&
+                    !run.readBeforePeriodEnd
                 ? () => _approve(run)
                 : null,
           ),
@@ -314,6 +318,12 @@ class _CarrierPayrollScreenState extends State<CarrierPayrollScreen> {
           accent: DeliveryAccent.caution,
           icon: Icons.schedule_rounded,
         ),
+      if (run.isDraft && run.readBeforePeriodEnd)
+        SoftNote(
+          text: t.payrollReadBeforeEnd(payStamp(context, run.deliveriesAt)),
+          accent: DeliveryAccent.caution,
+          icon: Icons.refresh,
+        ),
       if (run.attendance == PayrollAttendance.unavailable)
         SoftNote(
           text: switch (run.attendanceReason) {
@@ -323,6 +333,22 @@ class _CarrierPayrollScreenState extends State<CarrierPayrollScreen> {
           },
           accent: DeliveryAccent.caution,
           icon: Icons.timer_off_outlined,
+        )
+      // Read, but not for everyone: whose hours are missing, by name.
+      else if (run.hoursMissingFor.isNotEmpty)
+        SoftNote(
+          text: t.payrollHoursMissingFor(
+              run.hoursMissingFor.length, riderNames(t, run.hoursMissingFor)),
+          accent: DeliveryAccent.caution,
+          icon: Icons.timer_off_outlined,
+        ),
+      if (run.isDraft && deliveriesCountedFromLedger(run))
+        SoftNote(
+          text: run.deliveriesReason == 'NOT_DEPLOYED'
+              ? t.payrollDeliveriesNotDeployed
+              : t.payrollDeliveriesMissing,
+          accent: DeliveryAccent.caution,
+          icon: Icons.local_shipping_outlined,
         ),
       if (run.jobsSinceComputed > 0)
         SoftNote(
@@ -509,10 +535,10 @@ class _CarrierPayrollScreenState extends State<CarrierPayrollScreen> {
 
   Future<void> _approve(PayRun run) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final bool? withoutHours = await confirmApproval(context, run: run);
-    if (withoutHours == null || !mounted) return;
+    final bool? withoutMissing = await confirmApproval(context, run: run);
+    if (withoutMissing == null || !mounted) return;
     await _change(
-      () => widget.api.approve(run.id, revision: run.revision, acknowledgeMissingHours: withoutHours),
+      () => widget.api.approve(run.id, revision: run.revision, acknowledgeMissing: withoutMissing),
       done: t.payrollApproved,
     );
   }

@@ -51,6 +51,13 @@ Map<String, dynamic> runJson({String status = 'DRAFT', int revision = 3}) => <St
       'attendance': 'INCLUDED',
       'attendanceReason': null,
       'attendanceAt': '2026-10-20T09:00:00Z',
+      'deliveries': 'ORDERS',
+      'deliveriesReason': null,
+      'deliveriesAt': '2026-10-20T09:00:00Z',
+      'readBeforePeriodEnd': false,
+      'hoursMissingFor': <dynamic>[
+        <String, dynamic>{'riderRef': 'rider-rania', 'name': null, 'reason': 'NOT_LISTED'},
+      ],
       'periodOver': true,
       'jobsSinceComputed': 2,
       'needsAcknowledgement': false,
@@ -99,6 +106,7 @@ Map<String, dynamic> runJson({String status = 'DRAFT', int revision = 3}) => <St
           'lates': 0,
           'absences': 0,
           'hoursUnknown': false,
+          'hoursReason': null,
           'basePay': '32.00',
           'deliveryPay': '39.95',
           'bonuses': '25.00',
@@ -162,6 +170,13 @@ void main() {
       expect(run.revision, 3);
       expect(run.attendance, PayrollAttendance.included);
       expect(run.jobsSinceComputed, 2);
+      expect(run.deliveries, PayrollDeliveries.orders);
+      expect(run.deliveriesAt, DateTime.parse('2026-10-20T09:00:00Z').toLocal());
+      expect(run.readBeforePeriodEnd, isFalse);
+      // A rider whose hours are missing is kept by reference, and a name nobody knows stays unknown.
+      expect(run.hoursMissingFor.single.riderRef, 'rider-rania');
+      expect(run.hoursMissingFor.single.name, isNull);
+      expect(run.hoursMissingFor.single.reason, 'NOT_LISTED');
       expect(run.totals.payable?.amount, '36.95');
       expect(run.policy?.perDeliveryRate?.amount, '2.35');
       expect(run.policy?.hourlyRate, isNull);
@@ -181,6 +196,7 @@ void main() {
 
     test('unknown statuses and kinds are unknown, never guessed into known ones', () {
       final Map<String, dynamic> json = runJson(status: 'ARCHIVED');
+      json['deliveries'] = 'GUESSED';
       final Map<String, dynamic> slip =
           (json['payslips'] as List<dynamic>).cast<Map<String, dynamic>>().first;
       slip['status'] = 'REVERSED';
@@ -189,6 +205,7 @@ void main() {
       final PayRun run = PayRun.fromJson(json);
 
       expect(run.status, PayRunStatus.unknown);
+      expect(run.deliveries, PayrollDeliveries.unknown);
       expect(run.isDraft, isFalse);
       expect(run.payslips.single.status, PayslipStatus.unknown);
       expect(run.payslips.single.outstanding, isFalse);
@@ -295,7 +312,7 @@ void main() {
       );
       expect(adapter.calls.single.path, '/api/accounting/carrier/payroll/runs/run-1/approve');
       expect(adapter.calls.single.data,
-          <String, dynamic>{'revision': 3, 'acknowledgeMissingHours': false});
+          <String, dynamic>{'revision': 3, 'acknowledgeMissing': false});
     });
 
     test('paying everything sends the total as the server wrote it; a moved total comes back as the current figure', () async {

@@ -7988,8 +7988,14 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get payrollSectionPayment => 'Payment';
 
   @override
-  String payrollLineDeliveries(String count, String rate) {
-    return '$count deliveries × $rate';
+  String payrollLineDeliveries(int count, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count deliveries × $rate',
+      one: '1 delivery × $rate',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -8013,13 +8019,25 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String payrollLineLate(String days, String rate) {
-    return '$days late days × $rate';
+  String payrollLineLate(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days late days × $rate',
+      one: '1 late day × $rate',
+    );
+    return '$_temp0';
   }
 
   @override
-  String payrollLineAbsence(String days, String rate) {
-    return '$days absences × $rate';
+  String payrollLineAbsence(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days absences × $rate',
+      one: '1 absence × $rate',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -8054,8 +8072,8 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String payrollCashKept(String amount) {
-    return 'Holds $amount of the company\'s cash, more than this pay covers. It stays for the hub to collect.';
+  String payrollCashKept(String amount, String date) {
+    return 'Holds $amount of the company\'s cash collected by $date, more than this pay covers. It stays for the hub to collect.';
   }
 
   @override
@@ -8193,12 +8211,9 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String payrollApproveCash(String amount) {
-    return '$amount of company cash your riders hold is kept from their pay and recorded as handed to your company.';
+  String payrollApproveCash(String amount, String date) {
+    return '$amount of company cash your riders collected by $date and still hold is kept from their pay and recorded as handed to your company.';
   }
-
-  @override
-  String get payrollApproveWithoutHours => 'Approve without the missing hours';
 
   @override
   String get payrollApproveYes => 'Approve';
@@ -8240,10 +8255,6 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get payrollErrFiguresChanged =>
       'The figures changed since you looked. Check the new ones, then approve again.';
-
-  @override
-  String get payrollErrNeedsHours =>
-      'Hours are missing. Tick the box to approve without them.';
 
   @override
   String get payrollErrCashChanged =>
@@ -8324,4 +8335,65 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get payrollRulesNoStart => 'No day is open for new rules right now.';
+
+  @override
+  String get payrollCashMethodKeptFromPay => 'Kept from pay';
+
+  @override
+  String payrollReadBeforeEnd(String time) {
+    return 'These figures were read on $time, before the period ended. Recompute to count the whole period before approving.';
+  }
+
+  @override
+  String get payrollDeliveriesNotDeployed =>
+      'Deliveries cannot be counted from orders on this platform yet, so these figures count only deliveries that earned a fee: free deliveries are missing from them.';
+
+  @override
+  String get payrollDeliveriesMissing =>
+      'Deliveries could not be counted from orders just now, so these figures count only deliveries that earned a fee. Recompute to count every delivery.';
+
+  @override
+  String payrollHoursMissingFor(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Hours could not be read for $names, so their pay leaves hours out.',
+      one: 'Hours could not be read for $names, so their pay leaves hours out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollNamesMore(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$names and $count others',
+      one: '$names and 1 other',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollListSeparator => ', ';
+
+  @override
+  String get payrollApproveDeliveriesLedger =>
+      'Deliveries were counted only from jobs that earned a fee, so free deliveries are missing from this pay.';
+
+  @override
+  String get payrollApproveWithoutMissing => 'Approve without what is missing';
+
+  @override
+  String get payrollErrNeedsAcknowledgement =>
+      'Something is missing from these figures. Tick the box to approve without it.';
+
+  @override
+  String get payrollErrRecomputeNeeded =>
+      'These figures were read before the period ended. Recompute, check them and approve again.';
+
+  @override
+  String get payrollHoursNotListed =>
+      'Attendance shows no time this rider worked for your company in this period, so their hours are not known.';
 }

@@ -77,21 +77,28 @@ String runStateText(DeliveryStrings t, PayRunStatus? status) => switch (status) 
       PayRunStatus.unknown => '—',
     };
 
-/// What one payslip line is, in a sentence: "17 deliveries × $2.35".
+/// What one payslip line is, in a sentence: "17 deliveries × $2.35", "1 late day × $5.00".
+///
+/// Counts reach the strings as numbers, so each language words its own plurals — Arabic has six
+/// forms. A count the server did not write as a whole number is not guessed at: the line reads as
+/// other, beside its amount.
 String payLineText(DeliveryStrings t, PayLine line, String currency) {
   final String quantity = line.quantity ?? '—';
+  final int? count = line.quantity == null ? null : int.tryParse(line.quantity!.trim());
   final String rate = line.rate == null ? '—' : cashText(Money(line.rate!), currency);
   final String label = line.label ?? '—';
   final bool correction = line.source == PayLineSource.adjustment;
   return switch (line.kind) {
-    PayLineKind.deliveries => t.payrollLineDeliveries(quantity, rate),
+    PayLineKind.deliveries =>
+      count == null ? t.payrollLineOther : t.payrollLineDeliveries(count, rate),
     PayLineKind.hours => t.payrollLineHours(quantity, rate),
     PayLineKind.overtime => t.payrollLineOvertime(quantity, rate),
     PayLineKind.manualHours => line.rate == null
         ? t.payrollLineTypedUnpaid(quantity)
         : t.payrollLineTyped(quantity, rate),
-    PayLineKind.lateDeduction => t.payrollLineLate(quantity, rate),
-    PayLineKind.absenceDeduction => t.payrollLineAbsence(quantity, rate),
+    PayLineKind.lateDeduction => count == null ? t.payrollLineOther : t.payrollLineLate(count, rate),
+    PayLineKind.absenceDeduction =>
+      count == null ? t.payrollLineOther : t.payrollLineAbsence(count, rate),
     PayLineKind.cashHeld => t.payrollLineCash,
     PayLineKind.bonus => correction ? t.payrollLineCorrection(label) : t.payrollLineBonus(label),
     PayLineKind.deduction =>
@@ -100,11 +107,29 @@ String payLineText(DeliveryStrings t, PayLine line, String currency) {
   };
 }
 
+/// Riders named in a sentence: the first three — by a short reference when Keycloak knows no name —
+/// and how many more, so a long list still fits a note or a confirmation.
+String riderNames(DeliveryStrings t, List<PayrollMissingHours> riders) {
+  const int shown = 3;
+  final String listed = riders
+      .take(shown)
+      .map((PayrollMissingHours r) => r.name ?? shortRef(r.riderRef))
+      .join(t.payrollListSeparator);
+  return riders.length > shown ? t.payrollNamesMore(listed, riders.length - shown) : listed;
+}
+
+/// Pay per delivery counted only from jobs that earned a fee, because Order Manager could not be
+/// asked: free deliveries are missing from the figures.
+bool deliveriesCountedFromLedger(PayRun run) =>
+    run.deliveries == PayrollDeliveries.ledger &&
+    (run.policy?.perDeliveryRate?.minorUnits ?? 0) > 0;
+
 /// Why the server did not do what was asked, in a sentence somebody can act on.
 String refusalText(DeliveryStrings t, PayrollRefused refused, String currency) =>
     switch (refused.code) {
       'FIGURES_CHANGED' => t.payrollErrFiguresChanged,
-      'NEEDS_ACKNOWLEDGEMENT' => t.payrollErrNeedsHours,
+      'NEEDS_ACKNOWLEDGEMENT' => t.payrollErrNeedsAcknowledgement,
+      'RECOMPUTE_NEEDED' => t.payrollErrRecomputeNeeded,
       'CASH_CHANGED' => t.payrollErrCashChanged,
       'TOTAL_CHANGED' => t.payrollErrTotalChanged(cashText(refused.current, currency)),
       'NOT_A_PERIOD_START' ||
@@ -219,7 +244,8 @@ class PayslipPanel extends StatelessWidget {
               if (slip.cashNotNetted) ...<Widget>[
                 const SizedBox(height: DeliverySpacing.sm),
                 SoftNote(
-                  text: t.payrollCashKept(cashText(slip.cashHeld, currency)),
+                  text: t.payrollCashKept(
+                      cashText(slip.cashHeld, currency), payDay(context, run.to)),
                   accent: DeliveryAccent.caution,
                   icon: Icons.payments_outlined,
                 ),
@@ -240,7 +266,10 @@ class PayslipPanel extends StatelessWidget {
             title: t.payrollSectionAttendance,
             child: slip.hoursUnknown
                 ? Text(
-                    t.payrollHoursUnknown,
+                    // Not listed is a fact about the rider's time with the company, not a failure.
+                    slip.hoursReason == 'NOT_LISTED'
+                        ? t.payrollHoursNotListed
+                        : t.payrollHoursUnknown,
                     style: ConsoleText.body.copyWith(color: DeliveryColors.muted),
                   )
                 : Column(
@@ -707,7 +736,8 @@ class _FailureDialogState extends State<_FailureDialog> {
 }
 
 /// Asks before a period's pay is frozen. Null when cancelled; otherwise whether the approver said to
-/// go ahead without missing hours — which is required, not offered, when hours are missing.
+/// go ahead without what is missing — which is required, not offered, when something is: the riders
+/// whose hours were not read, by name, or the deliveries that earned no fee.
 Future<bool?> confirmApproval(BuildContext context, {required PayRun run}) {
   return showDialog<bool>(
     context: context,
@@ -725,13 +755,14 @@ class _ApprovalDialog extends StatefulWidget {
 }
 
 class _ApprovalDialogState extends State<_ApprovalDialog> {
-  bool _withoutHours = false;
+  bool _withoutMissing = false;
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final PayRun run = widget.run;
     final bool netsCash = (run.totals.cashNetted?.minorUnits ?? 0) > 0;
+    final bool fromLedger = deliveriesCountedFromLedger(run);
     return AlertDialog(
       title: Text(t.payrollApproveTitle(payDay(context, run.from), payDay(context, run.to))),
       content: SizedBox(
@@ -743,21 +774,40 @@ class _ApprovalDialogState extends State<_ApprovalDialog> {
             Text(t.payrollApproveBody(run.totals.riders, cashText(run.totals.payable, run.currency))),
             if (netsCash) ...<Widget>[
               const SizedBox(height: DeliverySpacing.sm),
-              Text(t.payrollApproveCash(cashText(run.totals.cashNetted, run.currency))),
+              Text(t.payrollApproveCash(
+                  cashText(run.totals.cashNetted, run.currency), payDay(context, run.to))),
             ],
             if (run.needsAcknowledgement) ...<Widget>[
               const SizedBox(height: DeliverySpacing.md),
-              SoftNote(
-                text: t.payrollHoursMissing,
-                accent: DeliveryAccent.caution,
-                icon: Icons.timer_off_outlined,
-              ),
+              // Whose hours, by name: approving without them is a decision about those riders.
+              if (run.hoursMissingFor.isNotEmpty)
+                SoftNote(
+                  text: t.payrollHoursMissingFor(
+                      run.hoursMissingFor.length, riderNames(t, run.hoursMissingFor)),
+                  accent: DeliveryAccent.caution,
+                  icon: Icons.timer_off_outlined,
+                ),
+              if (fromLedger) ...<Widget>[
+                if (run.hoursMissingFor.isNotEmpty) const SizedBox(height: DeliverySpacing.sm),
+                SoftNote(
+                  text: t.payrollApproveDeliveriesLedger,
+                  accent: DeliveryAccent.caution,
+                  icon: Icons.local_shipping_outlined,
+                ),
+              ],
+              // Something to acknowledge that this build cannot name: said, never hidden.
+              if (run.hoursMissingFor.isEmpty && !fromLedger)
+                SoftNote(
+                  text: t.payrollErrNeedsAcknowledgement,
+                  accent: DeliveryAccent.caution,
+                  icon: Icons.info_outline,
+                ),
               CheckboxListTile(
-                value: _withoutHours,
+                value: _withoutMissing,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
-                onChanged: (bool? on) => setState(() => _withoutHours = on ?? false),
-                title: Text(t.payrollApproveWithoutHours),
+                onChanged: (bool? on) => setState(() => _withoutMissing = on ?? false),
+                title: Text(t.payrollApproveWithoutMissing),
               ),
             ],
           ],
@@ -766,9 +816,9 @@ class _ApprovalDialogState extends State<_ApprovalDialog> {
       actions: <Widget>[
         TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.cancel)),
         FilledButton(
-          onPressed: run.needsAcknowledgement && !_withoutHours
+          onPressed: run.needsAcknowledgement && !_withoutMissing
               ? null
-              : () => Navigator.of(context).pop(_withoutHours),
+              : () => Navigator.of(context).pop(_withoutMissing),
           child: Text(t.payrollApproveYes),
         ),
       ],

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:delivery_portal/src/carrier/payroll_parts.dart';
 import 'package:delivery_portal/src/carrier/payroll_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -94,6 +95,11 @@ Map<String, dynamic> _run({
   bool needsAcknowledgement = false,
   String attendance = 'INCLUDED',
   String? attendanceReason,
+  String deliveries = 'ORDERS',
+  String? deliveriesReason,
+  String deliveriesAt = '2026-10-20T09:00:00Z',
+  bool readBeforePeriodEnd = false,
+  List<dynamic> hoursMissingFor = const <dynamic>[],
   String from = '2026-10-01',
   String to = '2026-10-15',
 }) {
@@ -112,6 +118,11 @@ Map<String, dynamic> _run({
     'attendance': attendance,
     'attendanceReason': attendanceReason,
     'attendanceAt': attendance == 'INCLUDED' ? '2026-10-20T09:00:00Z' : null,
+    'deliveries': deliveries,
+    'deliveriesReason': deliveriesReason,
+    'deliveriesAt': deliveriesAt,
+    'readBeforePeriodEnd': readBeforePeriodEnd,
+    'hoursMissingFor': hoursMissingFor,
     'periodOver': periodOver,
     'jobsSinceComputed': 0,
     'needsAcknowledgement': needsAcknowledgement,
@@ -341,7 +352,9 @@ void main() {
     expect(dialog, findsOneWidget);
     expect(find.descendant(of: dialog, matching: find.text(t.payrollApproveBody(2, '\$39.30'))),
         findsOneWidget);
-    expect(find.descendant(of: dialog, matching: find.text(t.payrollApproveCash('\$60.00'))),
+    expect(
+        find.descendant(
+            of: dialog, matching: find.text(t.payrollApproveCash('\$60.00', 'Oct 15, 2026'))),
         findsOneWidget);
 
     await tester.tap(find.widgetWithText(TextButton, t.cancel));
@@ -373,26 +386,36 @@ void main() {
 
     final RequestOptions post = server.posts.single;
     expect(post.path, '$_base/runs/run-1/approve');
-    expect(post.data, <String, dynamic>{'revision': 3, 'acknowledgeMissingHours': false});
+    expect(post.data, <String, dynamic>{'revision': 3, 'acknowledgeMissing': false});
     expect(find.text(t.payrollErrFiguresChanged), findsOneWidget);
     expect(find.textContaining(t.payrollRunRevision(4)), findsOneWidget);
   });
 
-  testWidgets('missing hours are said, and must be acknowledged before approving',
+  testWidgets('missing hours are named rider by rider, and must be acknowledged before approving',
       (WidgetTester tester) async {
     server.respond = (RequestOptions o) => o.path.endsWith('/periods')
         ? _json(_periods())
         : _json(_run(
-            attendance: 'UNAVAILABLE',
-            attendanceReason: 'UNREACHABLE',
             needsAcknowledgement: true,
+            hoursMissingFor: <dynamic>[
+              <String, dynamic>{
+                'riderRef': 'rider-rania',
+                'name': 'Rania Ghandour',
+                'reason': 'UNREADABLE',
+              },
+            ],
           ));
     await pump(tester);
 
-    expect(find.text(t.payrollHoursMissing), findsOneWidget);
+    // Youssef's hours were read; only Rania's are missing, and the page says whose.
+    final String named = t.payrollHoursMissingFor(1, 'Rania Ghandour');
+    expect(find.text(named), findsOneWidget);
+    expect(find.text(t.payrollHoursMissing), findsNothing);
     await tester.tap(find.text(t.payrollApprove));
     await tester.pumpAndSettle();
 
+    expect(find.descendant(of: find.byType(AlertDialog), matching: find.text(named)),
+        findsOneWidget);
     FilledButton approve() =>
         tester.widget<FilledButton>(find.widgetWithText(FilledButton, t.payrollApproveYes));
     expect(approve().onPressed, isNull);
@@ -403,8 +426,71 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, t.payrollApproveYes));
     await tester.pumpAndSettle();
 
-    expect(server.posts.single.data,
-        <String, dynamic>{'revision': 3, 'acknowledgeMissingHours': true});
+    expect(server.posts.single.data, <String, dynamic>{'revision': 3, 'acknowledgeMissing': true});
+  });
+
+  testWidgets('hours that could not be read at all are said for the run, and everyone left without them is named',
+      (WidgetTester tester) async {
+    server.respond = (RequestOptions o) => o.path.endsWith('/periods')
+        ? _json(_periods())
+        : _json(_run(
+            attendance: 'UNAVAILABLE',
+            attendanceReason: 'UNREACHABLE',
+            needsAcknowledgement: true,
+            hoursMissingFor: <dynamic>[
+              <String, dynamic>{'riderRef': 'rider-youssef', 'name': 'Youssef Kanaan'},
+              <String, dynamic>{'riderRef': 'rider-rania-0001', 'name': null},
+            ],
+          ));
+    await pump(tester);
+
+    expect(find.text(t.payrollHoursMissing), findsOneWidget);
+    await tester.tap(find.text(t.payrollApprove));
+    await tester.pumpAndSettle();
+
+    // A rider Keycloak knows no name for is named by a short reference, never left out.
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(t.payrollHoursMissingFor(2, 'Youssef Kanaan, RIDER-RA'))),
+        findsOneWidget);
+  });
+
+  testWidgets('deliveries counted only from paid jobs are said, and acknowledged at approval',
+      (WidgetTester tester) async {
+    server.respond = (RequestOptions o) => o.path.endsWith('/periods')
+        ? _json(_periods())
+        : _json(_run(
+            deliveries: 'LEDGER',
+            deliveriesReason: 'NOT_DEPLOYED',
+            needsAcknowledgement: true,
+          ));
+    await pump(tester);
+
+    expect(find.text(t.payrollDeliveriesNotDeployed), findsOneWidget);
+    await tester.tap(find.text(t.payrollApprove));
+    await tester.pumpAndSettle();
+
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.text(t.payrollApproveDeliveriesLedger)),
+        findsOneWidget);
+    expect(
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, t.payrollApproveYes)).onPressed,
+        isNull);
+  });
+
+  testWidgets('figures read before the period ended ask for a recompute, and Approve is not live',
+      (WidgetTester tester) async {
+    server.respond = (RequestOptions o) => o.path.endsWith('/periods')
+        ? _json(_periods())
+        : _json(_run(readBeforePeriodEnd: true, deliveriesAt: '2026-10-10T09:00:00Z'));
+    await pump(tester);
+
+    expect(button(tester, t.payrollApprove).onTap, isNull);
+    // Worded with the moment of the read, which the reader's own clock prints.
+    expect(find.textContaining(t.payrollReadBeforeEnd(' ').split(' ').last),
+        findsOneWidget);
   });
 
   testWidgets('Approve is drawn but not live while the period is still running',
@@ -455,7 +541,7 @@ void main() {
     await tester.tap(find.text(t.payrollPayslip).first);
     await tester.pumpAndSettle();
 
-    expect(find.text(t.payrollLineDeliveries('17', '\$2.35')), findsOneWidget);
+    expect(find.text(t.payrollLineDeliveries(17, '\$2.35')), findsOneWidget);
     expect(find.text(t.payrollLineHours('8.00', '\$4.00')), findsOneWidget);
     expect(find.text(t.payrollLineBonus('Eid bonus')), findsOneWidget);
     expect(find.text(t.payrollLineCash), findsOneWidget);
@@ -475,7 +561,8 @@ void main() {
     await tester.tap(find.text(t.payrollPayslip).last);
     await tester.pumpAndSettle();
 
-    expect(find.text(t.payrollCashKept('\$30.00')), findsOneWidget);
+    // Cash collected by the period's last day: what the rider took since is not this run's.
+    expect(find.text(t.payrollCashKept('\$30.00', 'Oct 15, 2026')), findsOneWidget);
     expect(find.text(t.payrollHoursUnknown), findsOneWidget);
   });
 
@@ -503,5 +590,52 @@ void main() {
 
     expect(find.text(t.noCompanyYet), findsOneWidget);
     expect(find.text(t.payrollNobody), findsNothing);
+  });
+
+  testWidgets('a rider attendance does not list is told so on their payslip, not that reading failed',
+      (WidgetTester tester) async {
+    final Map<String, dynamic> run = _run();
+    ((run['payslips'] as List<dynamic>).last as Map<String, dynamic>)['hoursReason'] = 'NOT_LISTED';
+    server.respond =
+        (RequestOptions o) => o.path.endsWith('/periods') ? _json(_periods()) : _json(run);
+    await pump(tester);
+
+    await tester.tap(find.text(t.payrollPayslip).last);
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.payrollHoursNotListed), findsOneWidget);
+    expect(find.text(t.payrollHoursUnknown), findsNothing);
+  });
+
+  test('a line\'s count is worded with each language\'s own plurals, never "1 deliveries"', () async {
+    final DeliveryStrings ar = await DeliveryStrings.delegate.load(const Locale('ar'));
+    PayLine line(String kind, String quantity) => PayLine.fromJson(<String, dynamic>{
+          'id': 'line-$kind-$quantity',
+          'kind': kind,
+          'source': 'COMPUTED',
+          'quantity': quantity,
+          'rate': '2.00',
+          'amount': '2.00',
+        });
+
+    expect(payLineText(t, line('DELIVERIES', '1'), 'USD'), t.payrollLineDeliveries(1, '\$2.00'));
+    expect(payLineText(t, line('DELIVERIES', '1'), 'USD'), startsWith('1 delivery '));
+    expect(payLineText(t, line('DELIVERIES', '17'), 'USD'), startsWith('17 deliveries '));
+    expect(payLineText(t, line('LATE_DEDUCTION', '1'), 'USD'), startsWith('1 late day '));
+    expect(payLineText(t, line('ABSENCE_DEDUCTION', '1'), 'USD'), startsWith('1 absence '));
+    expect(payLineText(t, line('ABSENCE_DEDUCTION', '3'), 'USD'), startsWith('3 absences '));
+
+    // One, two, a few (3–10) and many (11–99) are four different words in Arabic.
+    expect(payLineText(ar, line('DELIVERIES', '1'), 'USD'), contains('توصيلة واحدة'));
+    expect(payLineText(ar, line('DELIVERIES', '2'), 'USD'), contains('توصيلتان'));
+    expect(payLineText(ar, line('DELIVERIES', '3'), 'USD'), contains('توصيلات'));
+    expect(payLineText(ar, line('DELIVERIES', '11'), 'USD'),
+        allOf(contains('توصيلة'), isNot(contains('توصيلات')), isNot(contains('واحدة'))));
+    expect(payLineText(ar, line('LATE_DEDUCTION', '2'), 'USD'), contains('يوما تأخير'));
+    expect(payLineText(ar, line('LATE_DEDUCTION', '5'), 'USD'), contains('أيام تأخير'));
+    expect(payLineText(ar, line('ABSENCE_DEDUCTION', '1'), 'USD'), contains('يوم غياب واحد'));
+
+    // A count the server did not write as a whole number is not guessed at.
+    expect(payLineText(t, line('DELIVERIES', '2.5'), 'USD'), t.payrollLineOther);
   });
 }

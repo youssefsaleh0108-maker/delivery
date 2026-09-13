@@ -76,6 +76,7 @@ String methodLabel(DeliveryStrings t, CashMethod method) => switch (method) {
       CashMethod.cash => t.carrCashMethodCash,
       CashMethod.bankDeposit => t.carrCashMethodBank,
       CashMethod.wallet => t.carrCashMethodWallet,
+      CashMethod.payrollDeduction => t.payrollCashMethodKeptFromPay,
     };
 
 /// How the money moved. Recorded with the hand-over; nothing moves money because of it.
@@ -92,7 +93,8 @@ class CashMethodSelect extends StatelessWidget {
       label: methodLabel(t, value),
       icon: Icons.payments_outlined,
       options: <ConsoleOption>[
-        for (final CashMethod m in CashMethod.values)
+        // Only what a person may record: cash kept from pay is read in a history, never picked.
+        for (final CashMethod m in CashMethod.recordable)
           ConsoleOption(label: methodLabel(t, m), value: m.wire),
       ],
       onSelected: (String? wire) {
