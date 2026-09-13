@@ -10,8 +10,9 @@ import '../network/user_queue_socket.dart';
 /// checks that membership on every read, post, report and live subscription.
 ///
 /// Refusals the screen acts on arrive as typed exceptions — [NoNeighbourhoodException] (choose an
-/// area), [RoomMutedException] (explain the pause), [ChatRateLimitedException] (slow down) — rather
-/// than as status codes each screen would have to decode the same way.
+/// area), [RoomMutedException] (explain the pause), [RoomPostingLockedException] (read-only until a
+/// delivery in the area), [ChatRateLimitedException] (slow down) — rather than as status codes each
+/// screen would have to decode the same way.
 class NeighbourhoodChatApi {
   NeighbourhoodChatApi(this._dio);
 
@@ -110,8 +111,9 @@ class NeighbourhoodChatApi {
   }
 
   /// The refusals a chat post can meet that deserve a sentence rather than a generic failure: a
-  /// mute (403 carrying `mutedUntil`) and a rate limit (429 with Retry-After). Anything else is left
-  /// to the caller as the original [DioException].
+  /// mute (403 carrying `mutedUntil`), no delivery in the room's area yet (403 with `reason`
+  /// NEEDS_DELIVERY) and a rate limit (429 with Retry-After). Anything else is left to the caller as
+  /// the original [DioException].
   static Exception? refusalOf(DioException e) {
     final Response<dynamic>? response = e.response;
     if (response == null) return null;
@@ -124,6 +126,9 @@ class NeighbourhoodChatApi {
     }
     if (response.statusCode == 403 && body is Map && body.containsKey('mutedUntil')) {
       return RoomMutedException(_date(body['mutedUntil']));
+    }
+    if (response.statusCode == 403 && body is Map && body['reason'] == RoomPosting.needsDelivery.wire) {
+      return const RoomPostingLockedException();
     }
     return null;
   }

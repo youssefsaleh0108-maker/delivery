@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -16,8 +18,13 @@ typedef _Answer = ({int status, Object? body});
 /// of their own address and never picks a room; neighbours are names and initials, never accounts;
 /// a removed message stays a tombstone; report and block reach the server and a blocked neighbour
 /// leaves the screen; a muted neighbour is told until when instead of being handed a composer that
-/// fails; and a customer with no area is asked for one. Nothing the frame draws that the platform
+/// fails; a customer with no delivery in the area reads the room with the reason in place of the
+/// composer; and a customer with no area is asked for one. Nothing the frame draws that the platform
 /// does not have — the AI card, the camera, the shared location, a made-up "active" count — is here.
+///
+/// And what a live room has to get right on a phone's network: nothing said while the room loads is
+/// lost, a removal made while offline shows once back online, and a failed page of older history
+/// waits for a tap instead of asking again on every frame.
 void main() {
   const MethodChannel storageChannel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
 
@@ -40,7 +47,8 @@ void main() {
     zoneName: 'Mar Mikhael',
   );
 
-  Map<String, dynamic> room({String name = 'Mar Mikhael', String? mutedUntil}) => <String, dynamic>{
+  Map<String, dynamic> room({String name = 'Mar Mikhael', String? mutedUntil, String posting = 'OPEN'}) =>
+      <String, dynamic>{
         'id': 'r1',
         'zoneId': 'z-mar-mikhael',
         'name': name,
@@ -49,6 +57,7 @@ void main() {
         'yourHandle': 'h-me',
         'yourName': 'Maya R.',
         'mutedUntil': mutedUntil,
+        'posting': posting,
       };
 
   Map<String, dynamic> said(int sequence, String handle, String? name, String? text,
@@ -144,6 +153,8 @@ void main() {
     DeliveryAddressStore? addresses,
     Future<void> Function(BuildContext context)? onChooseArea,
     Locale locale = const Locale('en'),
+    UserQueueSocket? socket,
+    bool settle = true,
   }) async {
     tester.view.physicalSize = const Size(900, 1800);
     tester.view.devicePixelRatio = 1.0;
@@ -158,9 +169,14 @@ void main() {
         api: NeighbourhoodChatApi(dio),
         addresses: addresses ?? await addressBook(home),
         onChooseArea: onChooseArea,
+        socket: socket,
       ),
     ));
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
   }
 
   testWidgets(
@@ -369,4 +385,165 @@ void main() {
     expect(tester.getTopLeft(find.text(mine)).dx, lessThan(tester.getTopLeft(find.text(knefeh)).dx));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('with no delivery in the area yet, reads the room and says what would let them post',
+      (WidgetTester tester) async {
+    await pumpRoom(tester, serve(roomServer(place: room(posting: 'NEEDS_DELIVERY'))));
+
+    expect(find.text(knefeh), findsOneWidget, reason: 'Reading needs no delivery.');
+    expect(find.text(en.chatRoomPostAfterDelivery), findsOneWidget);
+    expect(find.byType(TextField), findsNothing,
+        reason: 'A composer whose every send the server refuses is a control that cannot work.');
+  });
+
+  testWidgets('a post refused for want of a delivery swaps the composer for the reason',
+      (WidgetTester tester) async {
+    await pumpRoom(
+        tester,
+        serve(roomServer(
+            post: (RequestOptions r) => (
+                  status: 403,
+                  body: <String, dynamic>{'title': 'Posting locked', 'reason': 'NEEDS_DELIVERY'}
+                ))));
+
+    await tester.enterText(find.byType(TextField), 'hello neighbours');
+    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text(en.chatRoomPostAfterDelivery), findsOneWidget);
+    expect(find.text(en.chatCouldNotSend), findsNothing,
+        reason: 'It is a reason to explain, not a failure to retry.');
+  });
+
+  testWidgets('while deliveries cannot be checked, says posting is paused and offers to ask again',
+      (WidgetTester tester) async {
+    await pumpRoom(tester, serve(roomServer(place: room(posting: 'UNVERIFIED'))));
+
+    expect(find.text(knefeh), findsOneWidget);
+    expect(find.text(en.chatRoomPostingUnavailable), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.tap(find.text(en.tryAgain));
+    await tester.pumpAndSettle();
+
+    expect(asked('GET', '/api/chat/rooms/mine'), hasLength(2));
+  });
+
+  testWidgets('older history that fails to load waits for a tap instead of asking again every frame',
+      (WidgetTester tester) async {
+    final Dio dio = serve((RequestOptions r) {
+      if (r.path == '/api/chat/rooms/r1/messages') {
+        return r.queryParameters['beforeSequence'] == null
+            ? (status: 200, body: <String, dynamic>{'messages': thread, 'more': true})
+            : (status: 503, body: null);
+      }
+      return roomServer()(r);
+    });
+    Iterable<RequestOptions> older() => asked('GET', '/api/chat/rooms/r1/messages')
+        .where((RequestOptions r) => r.queryParameters['beforeSequence'] != null);
+
+    // Settling at all is part of the proof: a loader that re-asks on every rebuild never settles.
+    await pumpRoom(tester, dio);
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(older(), hasLength(1), reason: 'One failure is one request, not one per frame.');
+    expect(find.text(en.chatRoomOlderFailed), findsOneWidget);
+
+    await tester.tap(find.text(en.chatRoomOlderFailed));
+    await tester.pumpAndSettle();
+
+    expect(older(), hasLength(2), reason: 'A tap asks once more.');
+  });
+
+  testWidgets('a message said while the room is still loading is kept, not lost between page and feed',
+      (WidgetTester tester) async {
+    final _FakeSocket socket = _FakeSocket();
+    final Completer<void> history = Completer<void>();
+    requests = <RequestOptions>[];
+    final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (RequestOptions options, RequestInterceptorHandler handler) async {
+        requests.add(options);
+        if (options.path == '/api/chat/rooms/r1/messages') await history.future;
+        final _Answer answer = roomServer()(options);
+        handler.resolve(
+            Response<dynamic>(requestOptions: options, statusCode: answer.status, data: answer.body));
+      },
+    ));
+
+    await pumpRoom(tester, dio, socket: socket, settle: false);
+    for (int i = 0; i < 20 && asked('GET', '/api/chat/rooms/r1/messages').isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    expect(asked('GET', '/api/chat/rooms/r1/messages'), hasLength(1),
+        reason: 'The room is placed and its newest page is on the way.');
+
+    // A neighbour speaks after the page was asked for and before it arrives.
+    socket.frame('${NeighbourhoodChatApi.liveDestinationPrefix}r1',
+        said(5, 'h-hadi', 'Hadi S.', 'Fresh manakish at the corner bakery'));
+    history.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fresh manakish at the corner bakery'), findsOneWidget,
+        reason: 'Listening began before the page was read, so the frame had somewhere to land.');
+    expect(find.text(knefeh), findsOneWidget);
+  });
+
+  testWidgets('a message removed while the socket was down reads as removed once it reconnects',
+      (WidgetTester tester) async {
+    final _FakeSocket socket = _FakeSocket();
+    bool removedMeanwhile = false;
+    final Dio dio = serve((RequestOptions r) {
+      if (r.path == '/api/chat/rooms/r1/messages') {
+        if (r.queryParameters['afterSequence'] != null) {
+          // Nothing new was said while offline.
+          return (status: 200, body: <String, dynamic>{'messages': <dynamic>[], 'more': false});
+        }
+        return (
+          status: 200,
+          body: <String, dynamic>{
+            'messages': removedMeanwhile
+                ? <dynamic>[said(1, 'h-tania', null, null, hidden: true), ...thread.skip(1)]
+                : thread,
+            'more': false,
+          }
+        );
+      }
+      return roomServer()(r);
+    });
+
+    await pumpRoom(tester, dio, socket: socket);
+    expect(find.text(knefeh), findsOneWidget);
+
+    socket.connected.value = false;
+    await tester.pump();
+    removedMeanwhile = true;
+    socket.connected.value = true;
+    await tester.pumpAndSettle();
+
+    expect(find.text(knefeh), findsNothing,
+        reason: 'The removed words must not stay on screen for as long as the socket stays up.');
+    expect(find.text(en.chatRoomHidden), findsNWidgets(2));
+  });
+}
+
+/// The app's socket without the network. Frames are pushed by the test and, as with the real one, a
+/// frame for a destination nobody is subscribed to reaches nobody.
+class _FakeSocket implements UserQueueSocket {
+  final Map<String, StreamController<Map<String, dynamic>>> _feeds =
+      <String, StreamController<Map<String, dynamic>>>{};
+
+  @override
+  final ValueNotifier<bool> connected = ValueNotifier<bool>(true);
+
+  @override
+  Stream<Map<String, dynamic>> subscribe(String destination) => _feeds
+      .putIfAbsent(destination, () => StreamController<Map<String, dynamic>>.broadcast())
+      .stream;
+
+  void frame(String destination, Map<String, dynamic> body) => _feeds[destination]?.add(body);
+
+  @override
+  Future<void> close() async {}
 }

@@ -7687,4 +7687,27 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get chatModerationRefresh => 'Refresh';
+
+  @override
+  String get chatRoomOlderFailed =>
+      'Couldn\'t load earlier messages. Tap to try again.';
+
+  @override
+  String get chatRoomPostAfterDelivery =>
+      'You can post here after your first delivery to this area.';
+
+  @override
+  String get chatRoomPostingUnavailable =>
+      'Posting is paused while we check your deliveries. Try again shortly.';
+
+  @override
+  String chatShopUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread messages',
+      one: '1 unread message',
+    );
+    return '$_temp0';
+  }
 }

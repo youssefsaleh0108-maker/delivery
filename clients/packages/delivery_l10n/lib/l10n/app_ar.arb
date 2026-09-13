@@ -2531,5 +2531,9 @@
   "chatModerationRemoved": "أُزيلت",
   "chatModerationMutedUntil": "الكاتب مكتوم حتى {date}",
   "chatModerationDone": "تم",
-  "chatModerationRefresh": "تحديث"
+  "chatModerationRefresh": "تحديث",
+  "chatRoomOlderFailed": "تعذّر تحميل الرسائل الأقدم. اضغط للمحاولة مجدداً.",
+  "chatRoomPostAfterDelivery": "يمكنك الكتابة هنا بعد أول توصيل لك إلى هذه المنطقة.",
+  "chatRoomPostingUnavailable": "الكتابة متوقفة مؤقتاً ريثما نتحقق من طلباتك. حاول مجدداً بعد قليل.",
+  "chatShopUnreadCount": "{count, plural, zero{لا رسائل غير مقروءة} one{رسالة واحدة غير مقروءة} two{رسالتان غير مقروءتين} few{{count} رسائل غير مقروءة} many{{count} رسالة غير مقروءة} other{{count} رسالة غير مقروءة}}"
 }

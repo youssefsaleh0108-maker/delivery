@@ -77,6 +77,27 @@ void main() {
       expect(room.moveBlockedUntil, isNull);
       expect(room.withMutedUntil(null).isMutedAt(DateTime.now()), isFalse);
     });
+
+    test('a room reads whether its reader may post there', () {
+      NeighbourhoodRoom read(String? posting) => NeighbourhoodRoom.fromJson(<String, dynamic>{
+            'id': 'r1',
+            'zoneId': 'z1',
+            'name': 'Mar Mikhael',
+            'memberCount': 3,
+            'lastSequence': 0,
+            'yourHandle': 'h',
+            if (posting != null) 'posting': posting,
+          });
+
+      expect(read('OPEN').posting, RoomPosting.open);
+      expect(read('NEEDS_DELIVERY').posting, RoomPosting.needsDelivery);
+      expect(read('UNVERIFIED').posting, RoomPosting.unverified);
+      expect(read(null).posting, RoomPosting.open,
+          reason: 'A server that says nothing still refuses what it refuses; the refusal tells.');
+      expect(read('NEEDS_DELIVERY').withMutedUntil(null).posting, RoomPosting.needsDelivery,
+          reason: 'Clearing a mute must not quietly reopen a composer the server locked.');
+      expect(read('OPEN').withPosting(RoomPosting.needsDelivery).posting, RoomPosting.needsDelivery);
+    });
   });
 
   group('the room client', () {
@@ -127,6 +148,13 @@ void main() {
         throwsA(isA<ChatRateLimitedException>().having(
             (ChatRateLimitedException e) => e.retryAfter, 'retry', const Duration(seconds: 42))),
       );
+    });
+
+    test('a post refused for want of a delivery in the area arrives as that, not as a mute', () async {
+      final NeighbourhoodChatApi api = NeighbourhoodChatApi(answering(403,
+          <String, dynamic>{'title': 'Posting locked', 'reason': 'NEEDS_DELIVERY'}));
+
+      await expectLater(api.send('r1', 'hello'), throwsA(isA<RoomPostingLockedException>()));
     });
 
     test('any other refusal stays the original error', () async {

@@ -3702,5 +3702,16 @@
     }
   },
   "chatModerationDone": "Done",
-  "chatModerationRefresh": "Refresh"
+  "chatModerationRefresh": "Refresh",
+  "chatRoomOlderFailed": "Couldn't load earlier messages. Tap to try again.",
+  "chatRoomPostAfterDelivery": "You can post here after your first delivery to this area.",
+  "chatRoomPostingUnavailable": "Posting is paused while we check your deliveries. Try again shortly.",
+  "chatShopUnreadCount": "{count, plural, =1{1 unread message} other{{count} unread messages}}",
+  "@chatShopUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

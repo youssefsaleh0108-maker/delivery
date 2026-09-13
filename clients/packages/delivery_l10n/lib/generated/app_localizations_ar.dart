@@ -7710,4 +7710,31 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get chatModerationRefresh => 'تحديث';
+
+  @override
+  String get chatRoomOlderFailed =>
+      'تعذّر تحميل الرسائل الأقدم. اضغط للمحاولة مجدداً.';
+
+  @override
+  String get chatRoomPostAfterDelivery =>
+      'يمكنك الكتابة هنا بعد أول توصيل لك إلى هذه المنطقة.';
+
+  @override
+  String get chatRoomPostingUnavailable =>
+      'الكتابة متوقفة مؤقتاً ريثما نتحقق من طلباتك. حاول مجدداً بعد قليل.';
+
+  @override
+  String chatShopUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count رسالة غير مقروءة',
+      many: '$count رسالة غير مقروءة',
+      few: '$count رسائل غير مقروءة',
+      two: 'رسالتان غير مقروءتين',
+      one: 'رسالة واحدة غير مقروءة',
+      zero: 'لا رسائل غير مقروءة',
+    );
+    return '$_temp0';
+  }
 }

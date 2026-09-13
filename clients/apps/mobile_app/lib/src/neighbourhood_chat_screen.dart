@@ -31,6 +31,11 @@ import 'delivery_address.dart';
 /// blocked. A removed message stays in place as "This message was removed", and a muted neighbour
 /// sees until when instead of a composer. All of it is enforced by the server — this screen only
 /// makes it visible.
+///
+/// **Reading is open; speaking needs a delivery in the area.** The server lets any customer read the
+/// room of the area they choose, and lets them post once an order of theirs has been delivered there.
+/// Until then the composer is replaced by that sentence, rather than drawn as a box whose every send
+/// the server would refuse.
 class NeighbourhoodChatScreen extends StatefulWidget {
   const NeighbourhoodChatScreen({
     super.key,
@@ -78,6 +83,10 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
   List<RoomMessage> _messages = <RoomMessage>[];
   bool _olderAvailable = false;
   bool _loadingOlder = false;
+
+  /// Set when older history failed to load; cleared only by the reader tapping to try again.
+  bool _olderFailed = false;
+
   bool _sending = false;
 
   /// The idempotency key of a send that got no answer, reused only for the same words.
@@ -110,27 +119,35 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
 
   // ------------------------------------------------------------------------------------ loading
 
-  /// Asks for the caller's room from their address's area, then its newest page, then listens.
+  /// Asks for the caller's room from their address's area, listens to it, then reads its newest page.
+  ///
+  /// Listening starts BEFORE the first read. The other way round, a message said between the page
+  /// being read and the subscription being made lands in neither — too new for the page, sent before
+  /// anybody was listening — and while the socket stays up no reconnect ever fetches it. A frame and
+  /// the page can carry the same message; [_fold] merges them by id.
   Future<void> _enter() async {
     setState(() {
       _loading = true;
       _loadFailed = false;
       _noRoom = null;
+      _olderFailed = false;
     });
     await _live?.cancel();
     _live = null;
+    _messages = <RoomMessage>[];
     try {
       final NeighbourhoodRoom room =
           await widget.api.myRoom(zoneId: widget.addresses.selected?.zoneId);
+      if (!mounted) return;
+      _listen(room);
       final RoomHistoryPage page = await widget.api.messages(room.id);
       if (!mounted) return;
       setState(() {
         _room = room;
-        _messages = page.messages;
         _olderAvailable = page.more;
         _loading = false;
       });
-      _listen(room);
+      _fold(page.messages);
     } on NoNeighbourhoodException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -165,6 +182,13 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
     _wasConnected = connected;
   }
 
+  /// What changed while the socket was down: everything newer than the cursor, then the newest page
+  /// again.
+  ///
+  /// The second read is for removals. A message a moderator hid while this screen was offline is not
+  /// new — it keeps its sequence, so no page after the cursor carries it — and without the re-read
+  /// its words would stay on screen for as long as the socket then stays up. The newest page is where
+  /// a removal matters most: what the room shows without scrolling.
   Future<void> _catchUp() async {
     final NeighbourhoodRoom? room = _room;
     if (room == null) return;
@@ -177,14 +201,24 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
         if (!result.more || result.messages.isEmpty) break;
         cursor = result.messages.last.sequence;
       }
+      final RoomHistoryPage newest = await widget.api.messages(room.id);
+      if (!mounted) return;
+      _fold(newest.messages);
     } catch (_) {
       // The next reconnect or reopen catches up; nothing is lost, the rows are on the server.
     }
   }
 
+  /// The page before the oldest message on screen.
+  ///
+  /// A failure is recorded and drawn as a row to tap; nothing retries by itself. The loader row asks
+  /// for this page each time it is built, so without the flag a failure's own rebuild would ask again
+  /// at once — a request every frame for as long as the phone stays offline.
   Future<void> _loadOlder() async {
     final NeighbourhoodRoom? room = _room;
-    if (room == null || _messages.isEmpty || _loadingOlder || !_olderAvailable) return;
+    if (room == null || _messages.isEmpty || _loadingOlder || !_olderAvailable || _olderFailed) {
+      return;
+    }
     setState(() => _loadingOlder = true);
     try {
       final RoomHistoryPage page =
@@ -193,10 +227,15 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
       _fold(page.messages);
       setState(() => _olderAvailable = page.more);
     } catch (_) {
-      // Scrolling back up retries.
+      if (mounted) setState(() => _olderFailed = true);
     } finally {
       if (mounted) setState(() => _loadingOlder = false);
     }
+  }
+
+  void _retryOlder() {
+    setState(() => _olderFailed = false);
+    unawaited(_loadOlder());
   }
 
   /// Merges rows by id, so a moderator's removal replaces the message it removes and a frame and a
@@ -219,7 +258,13 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final NeighbourhoodRoom? room = _room;
     final String text = _composer.text.trim();
-    if (room == null || text.isEmpty || _sending || room.isMutedAt(DateTime.now())) return;
+    if (room == null ||
+        text.isEmpty ||
+        _sending ||
+        room.isMutedAt(DateTime.now()) ||
+        room.posting != RoomPosting.open) {
+      return;
+    }
     if (text.runes.length > _maxCodePoints) {
       _say(t.chatTooLong);
       return;
@@ -246,6 +291,11 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
       } else {
         _say(t.chatActionFailed);
       }
+    } on RoomPostingLockedException {
+      // The room said OPEN when it was entered; the server has since decided otherwise. Say why, in
+      // place of the composer, rather than failing this send and the next.
+      if (!mounted) return;
+      setState(() => _room = room.withPosting(RoomPosting.needsDelivery));
     } on ChatRateLimitedException {
       if (!mounted) return;
       _say(t.chatSlowDown);
@@ -623,6 +673,7 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
                   itemCount: _messages.length + (_olderAvailable ? 1 : 0),
                   itemBuilder: (BuildContext context, int index) {
                     if (index == _messages.length) {
+                      if (_olderFailed) return _olderRetry(t);
                       WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_loadOlder()));
                       return const Padding(
                         padding: EdgeInsets.all(DeliverySpacing.sm),
@@ -640,6 +691,20 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
                 ),
         ),
       ],
+    );
+  }
+
+  /// Where older history would have loaded, after it failed to: one tap asks again.
+  Widget _olderRetry(DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsets.all(DeliverySpacing.sm),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: _retryOlder,
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: Text(t.chatRoomOlderFailed, textAlign: TextAlign.center),
+        ),
+      ),
     );
   }
 
@@ -770,13 +835,15 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
     );
   }
 
-  /// The composer, or — while a moderator's mute is in force — until when it lasts.
+  /// The composer — or, where the server says this person may not speak here, why not: a moderator's
+  /// mute and until when, no delivery in the area yet, or deliveries that cannot be checked just now.
   Widget _footer(DeliveryStrings t) {
     final NeighbourhoodRoom room = _room!;
     const BoxDecoration bar = BoxDecoration(
       color: DeliveryColors.white,
       border: Border(top: BorderSide(color: DeliveryColors.border)),
     );
+    const TextStyle explanation = TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.4);
     final DateTime? mutedUntil = room.mutedUntil;
     if (mutedUntil != null && room.isMutedAt(DateTime.now())) {
       return Container(
@@ -786,9 +853,38 @@ class _NeighbourhoodChatScreenState extends State<NeighbourhoodChatScreen> {
         child: Text(
           t.chatRoomMuted(_moment(mutedUntil)),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.4),
+          style: explanation,
         ),
       );
+    }
+    switch (room.posting) {
+      case RoomPosting.needsDelivery:
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(DeliverySpacing.md),
+          decoration: bar,
+          child: Text(t.chatRoomPostAfterDelivery, textAlign: TextAlign.center, style: explanation),
+        );
+      case RoomPosting.unverified:
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(DeliverySpacing.md),
+          decoration: bar,
+          child: Row(
+            children: <Widget>[
+              Expanded(child: Text(t.chatRoomPostingUnavailable, style: explanation)),
+              const SizedBox(width: DeliverySpacing.sm),
+              YdPillButton(
+                label: t.tryAgain,
+                onPressed: () => unawaited(_enter()),
+                size: YdPillButtonSize.compact,
+                expand: false,
+              ),
+            ],
+          ),
+        );
+      case RoomPosting.open:
+        break;
     }
     return Container(
       padding: const EdgeInsetsDirectional.symmetric(

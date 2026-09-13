@@ -13573,6 +13573,30 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Refresh'**
   String get chatModerationRefresh;
+
+  /// No description provided for @chatRoomOlderFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load earlier messages. Tap to try again.'**
+  String get chatRoomOlderFailed;
+
+  /// No description provided for @chatRoomPostAfterDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'You can post here after your first delivery to this area.'**
+  String get chatRoomPostAfterDelivery;
+
+  /// No description provided for @chatRoomPostingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Posting is paused while we check your deliveries. Try again shortly.'**
+  String get chatRoomPostingUnavailable;
+
+  /// No description provided for @chatShopUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread message} other{{count} unread messages}}'**
+  String chatShopUnreadCount(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

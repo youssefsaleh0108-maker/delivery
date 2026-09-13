@@ -17,6 +17,7 @@ class NeighbourhoodRoom {
     this.yourName,
     this.mutedUntil,
     this.moveBlockedUntil,
+    this.posting = RoomPosting.open,
   });
 
   final String id;
@@ -25,8 +26,9 @@ class NeighbourhoodRoom {
   /// The delivery area's name as the platform names it — the room is the area.
   final String name;
 
-  /// People currently in the room. Membership, not presence: nothing on the platform knows how many
-  /// are "active", so the header counts neighbours rather than inventing that figure.
+  /// Neighbours in the room: people in it now who may speak there, because an order of theirs was
+  /// delivered in the area recently. Membership, not presence — nothing on the platform knows how
+  /// many are "active" — and not everybody reading, so the header counts neighbours, not visitors.
   final int memberCount;
 
   /// The newest message's number, 0 for an empty room.
@@ -43,9 +45,17 @@ class NeighbourhoodRoom {
   /// Present only when the caller's address is in another area they cannot move to yet.
   final DateTime? moveBlockedUntil;
 
+  /// Whether the caller may speak here. Reading needs nothing; see [RoomPosting].
+  final RoomPosting posting;
+
   bool isMutedAt(DateTime now) => mutedUntil != null && now.isBefore(mutedUntil!);
 
-  NeighbourhoodRoom withMutedUntil(DateTime? until) => NeighbourhoodRoom(
+  NeighbourhoodRoom withMutedUntil(DateTime? until) => _copy(mutedUntil: until, posting: posting);
+
+  NeighbourhoodRoom withPosting(RoomPosting value) => _copy(mutedUntil: mutedUntil, posting: value);
+
+  NeighbourhoodRoom _copy({required DateTime? mutedUntil, required RoomPosting posting}) =>
+      NeighbourhoodRoom(
         id: id,
         zoneId: zoneId,
         name: name,
@@ -53,8 +63,9 @@ class NeighbourhoodRoom {
         lastSequence: lastSequence,
         yourHandle: yourHandle,
         yourName: yourName,
-        mutedUntil: until,
+        mutedUntil: mutedUntil,
         moveBlockedUntil: moveBlockedUntil,
+        posting: posting,
       );
 
   factory NeighbourhoodRoom.fromJson(Map<String, dynamic> json) => NeighbourhoodRoom(
@@ -67,7 +78,33 @@ class NeighbourhoodRoom {
         yourName: json['yourName'] as String?,
         mutedUntil: _date(json['mutedUntil']),
         moveBlockedUntil: _date(json['moveBlockedUntil']),
+        posting: RoomPosting.fromWire(json['posting'] as String?),
       );
+}
+
+/// Whether the caller may speak in the room they are reading, as the server decided it.
+///
+/// Any customer may read the room of the area they choose. Speaking needs an order of theirs
+/// delivered in that area recently — the platform's own evidence that they live there, where the
+/// area on an address is only their say-so.
+enum RoomPosting {
+  /// A recent delivery in the area: the composer is theirs.
+  open('OPEN'),
+
+  /// No such delivery: they read, and may post after their first delivery to the area.
+  needsDelivery('NEEDS_DELIVERY'),
+
+  /// The platform could not check just now. Posting waits rather than guessing either way.
+  unverified('UNVERIFIED');
+
+  const RoomPosting(this.wire);
+
+  final String wire;
+
+  /// Anything unrecognised reads as [open]. The server refuses what it refuses regardless, and a
+  /// refusal turns the composer read-only with the reason ([RoomPostingLockedException]).
+  static RoomPosting fromWire(String? value) => RoomPosting.values
+      .firstWhere((RoomPosting p) => p.wire == value, orElse: () => RoomPosting.open);
 }
 
 enum RoomMessageKind {
@@ -208,6 +245,15 @@ class RoomMutedException implements Exception {
   String toString() => 'RoomMutedException(until $mutedUntil)';
 }
 
+/// A post refused because no order of the caller's has been delivered in the room's area recently
+/// enough. The room stays readable; the composer says what would open it.
+class RoomPostingLockedException implements Exception {
+  const RoomPostingLockedException();
+
+  @override
+  String toString() => 'RoomPostingLockedException()';
+}
+
 /// A post refused for sending too fast; shop threads use it too.
 class ChatRateLimitedException implements Exception {
   const ChatRateLimitedException(this.retryAfter);
@@ -252,7 +298,7 @@ class ReportedRoomMessage {
   final DateTime? firstReportedAt;
   final DateTime? lastReportedAt;
 
-  /// Present only while the author is muted in that room.
+  /// Present only while the author is muted — wherever they are now, since a mute follows the person.
   final DateTime? authorMutedUntil;
 
   factory ReportedRoomMessage.fromJson(Map<String, dynamic> json) => ReportedRoomMessage(
