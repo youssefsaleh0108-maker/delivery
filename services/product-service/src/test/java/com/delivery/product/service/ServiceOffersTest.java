@@ -732,7 +732,8 @@ class ServiceOffersTest {
             when(products.findByMerchantIdAndStatus(PROVIDER, Product.Status.ACTIVE, oneRow))
                     .thenReturn(new PageImpl<>(List.of(live), oneRow, 3));
 
-            assertThat(catalog.listOwnedBy(PROVIDER, Product.Status.ACTIVE, oneRow).getTotalElements())
+            assertThat(catalog.listOwnedBy(PROVIDER, null, Product.Status.ACTIVE, oneRow)
+                    .getTotalElements())
                     .isEqualTo(3);
             verify(products, never()).findByMerchantId(anyString(), any(Pageable.class));
         }
@@ -742,10 +743,53 @@ class ServiceOffersTest {
             Pageable page = PageRequest.of(0, 20);
             when(products.findByMerchantId(PROVIDER, page)).thenReturn(new PageImpl<>(List.of()));
 
-            catalog.listOwnedBy(PROVIDER, null, page);
+            catalog.listOwnedBy(PROVIDER, null, null, page);
 
             verify(products).findByMerchantId(PROVIDER, page);
             verify(products, never()).findByMerchantIdAndStatus(anyString(), any(), any(Pageable.class));
+        }
+
+        /**
+         * "Active offers" is the service shop's. This account owns a grill as well, and its dishes are
+         * not the provider's offers.
+         */
+        @Test
+        void naming_one_of_the_merchants_shops_counts_that_shop_alone() {
+            Pageable oneRow = PageRequest.of(0, 1);
+            Product live = offer(press, Fulfilment.BOTH, Product.Status.ACTIVE);
+            when(products.findByMerchantIdAndStoreIdAndStatus(PROVIDER, press.getId(),
+                    Product.Status.ACTIVE, oneRow))
+                    .thenReturn(new PageImpl<>(List.of(live), oneRow, 2));
+
+            assertThat(catalog.listOwnedBy(PROVIDER, press.getId(), Product.Status.ACTIVE, oneRow)
+                    .getTotalElements())
+                    .isEqualTo(2);
+            verify(products, never()).findByMerchantIdAndStatus(anyString(), any(), any(Pageable.class));
+        }
+
+        @Test
+        void naming_a_shop_without_a_status_lists_that_shop_in_every_status() {
+            Pageable page = PageRequest.of(0, 20);
+            when(products.findByMerchantIdAndStoreId(PROVIDER, grill.getId(), page))
+                    .thenReturn(new PageImpl<>(List.of()));
+
+            catalog.listOwnedBy(PROVIDER, grill.getId(), null, page);
+
+            verify(products).findByMerchantIdAndStoreId(PROVIDER, grill.getId(), page);
+            verify(products, never()).findByMerchantId(anyString(), any(Pageable.class));
+        }
+
+        /** Another merchant's shop is indistinguishable from an id that was never issued. */
+        @Test
+        void a_shop_the_merchant_does_not_own_is_not_found_and_nothing_is_counted() {
+            Store theirs = new Store(RIVAL, "Rival Press", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING);
+
+            assertThatThrownBy(() -> catalog.listOwnedBy(PROVIDER, theirs.getId(), Product.Status.ACTIVE,
+                    PageRequest.of(0, 1)))
+                    .isInstanceOf(StoreNotFoundException.class);
+            verify(products, never()).findByMerchantIdAndStoreIdAndStatus(anyString(), any(), any(),
+                    any(Pageable.class));
         }
     }
 

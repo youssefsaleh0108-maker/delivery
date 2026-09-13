@@ -156,17 +156,27 @@ public class CatalogService {
     }
 
     /**
-     * The merchant's own products, in any status or in the one asked for.
+     * The merchant's own products, in any status or in the one asked for, from every shop they own or
+     * from the one named.
      *
-     * <p>{@code status} is how the provider dashboard counts "Active offers". It narrows a list the
-     * merchant may already read in full, so it reveals nothing new, and it is never another
-     * merchant's list: the id comes from the token.
+     * <p>{@code storeId} and {@code status} are how the provider dashboard counts "Active offers": the
+     * live offers of its service shop, not of every shop the account owns, which may include a goods
+     * shop. Both narrow a list the merchant may already read in full, so they reveal nothing new, and
+     * it is never another merchant's list: the merchant comes from the token, and a shop they do not
+     * own is "not found", as every store-scoped read and write answers.
      */
     @Transactional(readOnly = true)
-    public Page<Product> listOwnedBy(String merchantId, Product.Status status, Pageable pageable) {
+    public Page<Product> listOwnedBy(String merchantId, UUID storeId, Product.Status status,
+                                     Pageable pageable) {
+        if (storeId == null) {
+            return status == null
+                    ? products.findByMerchantId(merchantId, pageable)
+                    : products.findByMerchantIdAndStatus(merchantId, status, pageable);
+        }
+        requireOwnedStore(merchantId, storeId);
         return status == null
-                ? products.findByMerchantId(merchantId, pageable)
-                : products.findByMerchantIdAndStatus(merchantId, status, pageable);
+                ? products.findByMerchantIdAndStoreId(merchantId, storeId, pageable)
+                : products.findByMerchantIdAndStoreIdAndStatus(merchantId, storeId, status, pageable);
     }
 
     /**

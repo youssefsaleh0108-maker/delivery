@@ -98,11 +98,14 @@ public class ProductController {
     }
 
     /**
-     * The Merchant Portal's list: everything the caller owns, in any status, or in the one asked for.
+     * The Merchant Portal's list: everything the caller owns, in any status or in the one asked for,
+     * from every shop they own or from the one named.
      *
-     * <p>{@code status} is how the provider dashboard counts "Active offers": {@code ?status=ACTIVE}
-     * with {@code size=1}, then the page's {@code totalElements}. A status this service does not have
-     * is a 400 rather than an unfiltered list.
+     * <p>{@code storeId} and {@code status} are how the provider dashboard counts "Active offers":
+     * {@code ?storeId=<its service shop>&status=ACTIVE} with {@code size=1}, then the page's
+     * {@code totalElements}. Per shop, because one account may own a goods shop and a service shop.
+     * A shop the caller does not own is a 404, and a status this service does not have is a 400,
+     * rather than an unfiltered list either way.
      *
      * <p>Declared before {@code /{id}} would otherwise be ambiguous — Spring resolves the literal
      * path first, but keeping them adjacent makes the intent obvious to the next reader.
@@ -110,11 +113,12 @@ public class ProductController {
     @GetMapping("/mine")
     @PreAuthorize("hasRole('MERCHANT')")
     public PageResponse<ProductResponse> mine(
+            @RequestParam(required = false) UUID storeId,
             @RequestParam(required = false) Product.Status status,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        Page<Product> page = catalog.listOwnedBy(CurrentUser.requireId(), status, pageable);
+        Page<Product> page = catalog.listOwnedBy(CurrentUser.requireId(), storeId, status, pageable);
         return PageResponse.of(catalog.views(page).map(this::toResponse));
     }
 

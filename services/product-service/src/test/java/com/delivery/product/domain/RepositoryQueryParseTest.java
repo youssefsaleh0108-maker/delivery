@@ -182,6 +182,11 @@ class RepositoryQueryParseTest {
                 .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
 
         parses("SELECT p FROM Product p WHERE p.merchantId = :merchantId AND p.status = :status");
+        parses("SELECT p FROM Product p WHERE p.merchantId = :merchantId AND p.storeId = :storeId");
+        parses("""
+                SELECT p FROM Product p
+                WHERE p.merchantId = :merchantId AND p.storeId = :storeId AND p.status = :status
+                """);
         parses("""
                 SELECT t.productId, t.pricingType, t.unitLabel, t.unitSize, t.turnaroundMinHours,
                        t.turnaroundMaxHours, t.fulfilmentModes, t.attachmentPolicy, t.instructionsPrompt

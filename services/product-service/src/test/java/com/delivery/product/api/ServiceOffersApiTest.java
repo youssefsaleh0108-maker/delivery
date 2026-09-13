@@ -397,6 +397,45 @@ class ServiceOffersApiTest {
 
             verify(products, never()).findByMerchantId(anyString(), any(Pageable.class));
         }
+
+        /** One account, a bakery and a print shop: "Active offers" is the print shop's alone. */
+        @Test
+        void a_two_shop_account_counts_the_active_offers_of_the_shop_it_names() throws Exception {
+            Store bakery = new Store(PROVIDER, "Fakhry Bakery", Store.Vertical.RESTAURANT);
+            when(storeService.ownedBy(PROVIDER)).thenReturn(List.of(bakery, press));
+            signedInAs(PROVIDER, "MERCHANT");
+            when(products.findByMerchantIdAndStoreIdAndStatus(eq(PROVIDER), eq(press.getId()),
+                    eq(Product.Status.ACTIVE), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(offer),
+                            org.springframework.data.domain.PageRequest.of(0, 1), 2));
+
+            mvc.perform(get("/api/products/mine")
+                            .param("storeId", press.getId().toString())
+                            .param("status", "ACTIVE")
+                            .param("size", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(2));
+
+            verify(products, never()).findByMerchantIdAndStatus(anyString(), any(), any(Pageable.class));
+            verify(products, never()).findByMerchantIdAndStoreIdAndStatus(anyString(), eq(bakery.getId()),
+                    any(), any(Pageable.class));
+        }
+
+        @Test
+        void a_shop_the_merchant_does_not_own_is_a_404_not_somebody_elses_count() throws Exception {
+            Store rivals = new Store(RIVAL, "Rival Press", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING);
+            when(storeService.ownedBy(PROVIDER)).thenReturn(List.of(press));
+            signedInAs(PROVIDER, "MERCHANT");
+
+            mvc.perform(get("/api/products/mine")
+                            .param("storeId", rivals.getId().toString())
+                            .param("status", "ACTIVE"))
+                    .andExpect(status().isNotFound());
+
+            verify(products, never()).findByMerchantIdAndStoreIdAndStatus(anyString(), any(), any(),
+                    any(Pageable.class));
+        }
     }
 
     @Nested

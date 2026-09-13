@@ -23,6 +23,22 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
      */
     Page<Product> findByMerchantIdAndStatus(String merchantId, Product.Status status, Pageable pageable);
 
+    /**
+     * The merchant's list in one of their shops, in any status.
+     *
+     * <p>Scoped by merchant as well as by shop, although the caller has already checked the shop is the
+     * merchant's: a row that disagreed about its owner is one this list must not show.
+     */
+    Page<Product> findByMerchantIdAndStoreId(String merchantId, UUID storeId, Pageable pageable);
+
+    /**
+     * One shop's products in one status: how the provider dashboard counts its service shop's "Active
+     * offers" when the account owns a goods shop too
+     * ({@code GET /api/products/mine?storeId=&status=ACTIVE&size=1}).
+     */
+    Page<Product> findByMerchantIdAndStoreIdAndStatus(String merchantId, UUID storeId,
+                                                     Product.Status status, Pageable pageable);
+
     Optional<Product> findByIdAndMerchantId(UUID id, String merchantId);
 
     /**

@@ -382,6 +382,44 @@ class ServiceOffersDatabaseTest {
     }
 
     @Test
+    @DisplayName("an account with a goods shop and a print shop counts each shop's offers apart")
+    void a_two_shop_account_counts_each_shop_apart() {
+        String merchant = "merchant-two-shops";
+        Store bakery = transaction(() -> {
+            Store shop = listed(new Store(merchant, "Two Shops Bakery", Store.Vertical.RESTAURANT));
+            em.persist(shop);
+            return shop;
+        });
+        Store printer = transaction(() -> {
+            Store shop = listed(new Store(merchant, "Two Shops Printer", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING));
+            em.persist(shop);
+            return shop;
+        });
+        transaction(() -> {
+            for (String name : List.of("Two shops cake", "Two shops bread")) {
+                Product dish = catalog.create(merchant, new ProductRequest(name, null,
+                        new BigDecimal("4.00"), null, bakery.getId(), null, null, null));
+                dish.addImage("products/" + UUID.randomUUID() + ".jpg");
+                catalog.publish(dish.getId(), merchant);
+            }
+            liveOffer(printer, "Two shops invitations", ServiceTerms.Fulfilment.PICKUP);
+            return null;
+        });
+        em.clear();
+
+        assertThat(products.findByMerchantIdAndStatus(merchant, Product.Status.ACTIVE,
+                PageRequest.of(0, 1)).getTotalElements()).isEqualTo(3);
+        assertThat(products.findByMerchantIdAndStoreIdAndStatus(merchant, printer.getId(),
+                Product.Status.ACTIVE, PageRequest.of(0, 1)).getTotalElements()).isEqualTo(1);
+        assertThat(products.findByMerchantIdAndStoreIdAndStatus(merchant, bakery.getId(),
+                Product.Status.ACTIVE, PageRequest.of(0, 1)).getTotalElements()).isEqualTo(2);
+        assertThat(names(products.findByMerchantIdAndStoreId(merchant, printer.getId(), PAGE)))
+                .containsExactly("Two shops invitations");
+        em.clear();
+    }
+
+    @Test
     @DisplayName("Popular counts delivered orders of listed offers only, and below the floor it is nothing")
     void popular_counts_only_real_orders_of_listed_offers() {
         assertThat(search.popular(null, 10))
