@@ -194,6 +194,10 @@ public class Thumbnailer {
      * pixel budget in front of the decoder is the part that stops a decompression bomb, and a
      * second copy of it written for one caller is the copy that would drift. So this is the one
      * implementation, and {@link #render} is this at {@link #LONG_EDGE_PX}.
+     *
+     * <p>The result is always upright. A camera photo's EXIF orientation is applied, because every
+     * viewer that shows the original honours it — see {@link ExifOrientation} for what went wrong
+     * without it.
      */
     public byte[] renderLongEdge(byte[] source, int longEdgePx) {
         if (source == null || source.length == 0) {
@@ -205,7 +209,12 @@ public class Thumbnailer {
 
         BufferedImage decoded = decodeWithinBudget(source);
         try {
-            return encodeJpeg(scale(decoded, longEdgePx));
+            // Stood upright after shrinking rather than before: a quarter turn only swaps which edge
+            // is the long one, so the picture is the same, and turning a 40 MP decode at full size
+            // would hold a second full-size raster — hundreds of megabytes, on a pod allowed 512 —
+            // for nothing.
+            return encodeJpeg(ExifOrientation.apply(scale(decoded, longEdgePx),
+                    ExifOrientation.of(source)));
         } catch (IOException | RuntimeException e) {
             throw new ThumbnailUnavailableException("could not encode the thumbnail", e);
         } finally {

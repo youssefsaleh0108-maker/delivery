@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fixtures/sideways_camera_jpeg.dart';
+
 /// Merchant Blitz, Figma 121:198, driven the way a shopkeeper drives it.
 ///
 /// What is held down here:
@@ -135,10 +137,13 @@ class _FakeScanApi extends CatalogScanApi {
 }
 
 class _FakePhotos extends ShelfPhotoSource {
-  _FakePhotos({this.camera = true, this.picks = 1, this.cameraError, this.lost});
+  _FakePhotos({this.camera = true, this.picks = 1, this.cameraError, this.lost, this.photo});
 
   final bool camera;
   final int picks;
+
+  /// What the camera and the gallery hand over; a 1x1 PNG unless a test says otherwise.
+  final PickedShelfPhoto? photo;
 
   /// What opening the camera throws — image_picker's answer to a refused camera permission, say.
   final Object? cameraError;
@@ -156,13 +161,13 @@ class _FakePhotos extends ShelfPhotoSource {
   Future<PickedShelfPhoto?> takePhoto() async {
     final Object? error = cameraError;
     if (error != null) throw error;
-    return PickedShelfPhoto(bytes: _png, contentType: 'image/png');
+    return photo ?? PickedShelfPhoto(bytes: _png, contentType: 'image/png');
   }
 
   @override
   Future<List<PickedShelfPhoto>> choosePhotos({required String label}) async =>
       List<PickedShelfPhoto>.generate(
-          picks, (_) => PickedShelfPhoto(bytes: _png, contentType: 'image/png'));
+          picks, (_) => photo ?? PickedShelfPhoto(bytes: _png, contentType: 'image/png'));
 }
 
 class _FakeCatalog extends CatalogApi {
@@ -498,6 +503,40 @@ void main() {
     // On the scan already started for it, not a new one that would spend another of the day's.
     expect(api.calls, <String>['addPhoto image/jpeg']);
     expect(find.text(t.blitzPhotoCount(1, 6)), findsOneWidget);
+  });
+
+  testWidgets('a camera photo tagged to be turned is drawn upright: the frame its tags are measured in',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..analyzeResult = (CatalogScan c) => _scan(
+            status: CatalogScanStatus.complete,
+            photos: c.photos,
+            lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+          );
+    final DeliveryStrings t = await _pump(
+      tester,
+      _blitz(api,
+          photos: _FakePhotos(
+              photo: PickedShelfPhoto(bytes: sidewaysCameraJpeg, contentType: 'image/jpeg'))),
+    );
+
+    await _choose(tester, t);
+    await tester.tap(find.text(t.blitzScanPhotos(1)));
+    await tester.pump();
+    // The photo is decoded off the test's fake clock.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump();
+
+    // The server stands a photo upright by this tag before the reader sees it (ExifOrientationTest),
+    // so the boxes come back measured on the upright photo. The viewfinder lays its tags over the
+    // photo as decoded here, so that must be the same upright frame: 20 wide and 40 tall, not the
+    // 40 x 20 the pixels are stored in.
+    final Iterable<double> frames = tester
+        .widgetList<AspectRatio>(find.byType(AspectRatio))
+        .map((AspectRatio frame) => frame.aspectRatio);
+    expect(frames, anyElement(closeTo(0.5, 0.001)));
+    expect(frames, isNot(anyElement(closeTo(2.0, 0.001))));
+    expect(find.textContaining('Pepsi 1L'), findsOneWidget);
   });
 
   testWidgets('Inventory opens the scan when its host hands it the client',

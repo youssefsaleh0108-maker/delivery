@@ -102,6 +102,28 @@ class CatalogScanAnalyzerTest {
         verify(scans, never()).recordFailure(any(), anyInt(), any());
     }
 
+    /**
+     * A portrait photo as a phone camera stores it — landscape pixels and a tag to turn them — goes
+     * to the provider upright: the frame the merchant's screen draws it in, and so the frame its
+     * boxes have to come back in.
+     */
+    @Test
+    void a_camera_photo_tagged_to_be_turned_reaches_the_provider_upright() throws IOException {
+        when(objects.read(any(), any())).thenReturn(TaggedJpeg.of(2400, 1200, 6, false));
+        when(provider.detect(anyList(), anyList())).thenReturn(List.of());
+
+        analyzer(INLINE).submit(SCAN, 1);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ShelfPhoto>> sent = ArgumentCaptor.forClass(List.class);
+        verify(provider).detect(sent.capture(), anyList());
+        BufferedImage prepared = ImageIO.read(new ByteArrayInputStream(sent.getValue().get(0).jpeg()));
+        assertThat(prepared.getWidth()).isEqualTo(MAX_EDGE / 2);
+        assertThat(prepared.getHeight()).isEqualTo(MAX_EDGE);
+        // The corner stored top-left is where a quarter turn clockwise puts it: top right.
+        assertThat(TaggedJpeg.isRed(prepared.getRGB(MAX_EDGE / 2 - 10, 10))).isTrue();
+    }
+
     @Test
     void an_unreadable_photo_fails_the_scan_without_spending_a_provider_call() {
         when(objects.read(any(), any())).thenReturn("not an image".getBytes());
