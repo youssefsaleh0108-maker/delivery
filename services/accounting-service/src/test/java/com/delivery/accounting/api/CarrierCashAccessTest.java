@@ -372,6 +372,9 @@ class CarrierCashAccessTest {
             for (String body : List.of(
                     "{}",
                     "{\"expectedAmount\":\"10.00\",\"method\":\"CHEQUE\"}",
+                    // Only an approved pay run writes this. A counter claiming it would mark cash
+                    // taken against a rider's pay that nobody took.
+                    "{\"expectedAmount\":\"10.00\",\"method\":\"PAYROLL_DEDUCTION\"}",
                     "{\"expectedAmount\":\"10.00\",\"requestKey\":\"a b\"}")) {
                 mvc.perform(post("/api/accounting/carrier/cash/riders/" + RIDER + "/handovers")
                                 .contentType(MediaType.APPLICATION_JSON)

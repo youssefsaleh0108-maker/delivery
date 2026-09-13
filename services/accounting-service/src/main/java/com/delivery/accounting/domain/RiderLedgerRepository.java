@@ -129,4 +129,46 @@ public interface RiderLedgerRepository extends JpaRepository<RiderLedgerEntry, U
      */
     boolean existsByRiderRefAndCarrierRefAndFleet(String riderRef, String carrierRef,
                                                   RiderLedgerEntry.Fleet fleet);
+
+    /**
+     * Every tip a delivery company's riders were given on its jobs in a window, by when the work
+     * happened.
+     *
+     * <p>For payroll's information column and nothing else. A tip is the rider's own money — paid to
+     * them by the platform when it came online, already in their pocket when it came as cash — and
+     * never the company's to pay. A payslip that added it to what the company owes would pay it a
+     * second time, which is the one mistake this ledger was built to make impossible.
+     */
+    @Query("""
+            SELECT e FROM RiderLedgerEntry e
+             WHERE e.carrierRef = :carrier
+               AND e.fleet = com.delivery.accounting.domain.RiderLedgerEntry$Fleet.CARRIER
+               AND e.entryType = com.delivery.accounting.domain.RiderLedgerEntry$EntryType.TIP
+               AND e.earnedAt >= :from AND e.earnedAt < :to
+             ORDER BY e.earnedAt ASC
+            """)
+    List<RiderLedgerEntry> tipsForCarrierBetween(@Param("carrier") String carrier,
+                                                 @Param("from") Instant from,
+                                                 @Param("to") Instant to);
+
+    /**
+     * How many of a company's jobs in a window reached this ledger after a moment.
+     *
+     * <p>The bus is at-least-once and can be late, and a job is dated by when it was delivered, not
+     * when its row was written. So a pay run computed at {@code after} can have missed jobs that
+     * belong to its period: on a draft that means "recompute", on an approved run it means "add a
+     * correction", and either way the page has to be able to say so.
+     */
+    @Query("""
+            SELECT COUNT(e) FROM RiderLedgerEntry e
+             WHERE e.carrierRef = :carrier
+               AND e.fleet = com.delivery.accounting.domain.RiderLedgerEntry$Fleet.CARRIER
+               AND e.entryType = com.delivery.accounting.domain.RiderLedgerEntry$EntryType.JOB_EARNING
+               AND e.earnedAt >= :from AND e.earnedAt < :to
+               AND e.createdAt > :after
+            """)
+    long countJobsForCarrierRecordedAfter(@Param("carrier") String carrier,
+                                          @Param("from") Instant from,
+                                          @Param("to") Instant to,
+                                          @Param("after") Instant after);
 }

@@ -78,15 +78,28 @@ public class CashFloatEntry {
         /** Paid into a bank account and the slip shown. */
         BANK_DEPOSIT,
         /** A money-transfer or wallet app. */
-        WALLET;
+        WALLET,
+        /**
+         * Kept out of the rider's pay by their company's payroll (V51). The rider keeps the notes as
+         * part of their pay, so the company answers for them from then on — a hand-over in every
+         * sense the float cares about, with no counter involved.
+         *
+         * <p>Written only by an approved pay run, through {@code CashFloatService.handOver}. Never a
+         * person's choice: {@link #parse} does not accept it, so no hub counter and no remittance
+         * form can claim that cash was taken against somebody's pay.
+         */
+        PAYROLL_DEDUCTION;
 
-        /** Parses a request value case-insensitively; null for anything that is not one. */
+        /**
+         * Parses a request value case-insensitively; null for anything that is not a method a person
+         * may record — including {@link #PAYROLL_DEDUCTION}, which only payroll writes.
+         */
         public static Method parse(String value) {
             if (value == null || value.isBlank()) {
                 return null;
             }
             for (Method method : values()) {
-                if (method.name().equalsIgnoreCase(value.trim())) {
+                if (method != PAYROLL_DEDUCTION && method.name().equalsIgnoreCase(value.trim())) {
                     return method;
                 }
             }
