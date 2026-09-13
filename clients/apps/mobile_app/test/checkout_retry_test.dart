@@ -151,9 +151,12 @@ void main() {
     final checkout = await openCheckout(tester, dio: s.dio, cart: cart, addresses: await home());
 
     await tapPlace(tester);
-    // Nothing is known yet, so nothing is cleared: the basket is still there to try again with.
-    expect(find.text(en.couldNotPlaceOrder), findsOneWidget);
+    // Nothing is known yet, so nothing is cleared: the basket is still there to try again with —
+    // and the customer is not told it failed, because it may not have.
+    expect(find.text(en.offlineUnconfirmedRetry), findsOneWidget);
+    expect(find.text(en.couldNotPlaceOrder), findsNothing);
     expect(cart.isNotEmpty, isTrue);
+    expect(cart.checkoutUnconfirmed, isTrue);
     tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
     await tester.pumpAndSettle();
 
@@ -233,5 +236,65 @@ void main() {
 
       expect(keys, hasLength(4));
     });
+
+    test('outlives the basket after a send that may have placed an order, until checkout settles '
+        'the attempt', () {
+      final Cart cart = Cart()..add(product('a', 's1', 2), from: storeCard('s1'));
+      final String key = cart.checkoutKey;
+      cart.markCheckoutUnconfirmed(key);
+
+      // Emptied and refilled, cleared, even moved to another shop: still the same attempt.
+      cart.remove('a');
+      cart.add(product('b', 's1', 3), from: storeCard('s1'));
+      expect(cart.checkoutKey, key);
+      cart.clear();
+      cart.switchTo(storeCard('s2'));
+      expect(cart.checkoutKey, key);
+
+      // Placed, found already placed, or queued: the outcome is known, and the next basket is new.
+      cart.settleCheckout();
+      expect(cart.checkoutUnconfirmed, isFalse);
+      expect(cart.checkoutKey, isNot(key));
+    });
+  });
+
+  testWidgets('a basket emptied and refilled after a try whose answer was lost goes under that '
+      'try\'s key, so the order that may exist is the answer rather than a second order',
+      (WidgetTester tester) async {
+    final Cart cart = Cart()..add(product('a', 's1', 9.75), from: storeCard('s1'));
+    final s = server(
+      <void Function(RequestOptions, RequestInterceptorHandler)>[
+        unanswered,
+        // The first try had landed; the refilled basket is refused under its key.
+        (RequestOptions o, RequestInterceptorHandler h) => h.reject(DioException(
+              requestOptions: o,
+              type: DioExceptionType.badResponse,
+              response: Response<dynamic>(requestOptions: o, statusCode: 409, data: <String, dynamic>{
+                'code': 'IDEMPOTENCY_KEY_REUSED',
+                'orderId': 'order-earlier',
+              }),
+            )),
+      ],
+      gets: <String, Object>{'/api/orders/order-earlier': orderJson('order-earlier')},
+    );
+    await openCheckout(tester, dio: s.dio, cart: cart, addresses: await home());
+
+    await tapPlace(tester);
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
+    await tester.pumpAndSettle();
+
+    // The customer takes everything out, and puts something else in.
+    cart.remove('a');
+    expect(cart.isEmpty, isTrue);
+    cart.add(product('b', 's1', 4.50), from: storeCard('s1'));
+
+    await tapPlace(tester);
+
+    expect(s.placed, hasLength(2));
+    expect(s.placed[1].headers[OrderApi.idempotencyKeyHeader],
+        s.placed[0].headers[OrderApi.idempotencyKeyHeader]);
+    expect(find.text(en.offlineAlreadyPlaced), findsOneWidget);
+    // The attempt has its answer now, so the next basket is a new one.
+    expect(cart.checkoutUnconfirmed, isFalse);
   });
 }

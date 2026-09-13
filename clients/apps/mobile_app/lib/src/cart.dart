@@ -198,6 +198,10 @@ class Cart extends ChangeNotifier {
   /// Checkout attaches the placed order to it; same order-scoped lifetime as [giftNote].
   String? splitPlanId;
 
+  /// Empties the basket and its order-scoped state.
+  ///
+  /// Not the end of a checkout attempt that may have placed an order ([checkoutUnconfirmed]) — its
+  /// key stays. Checkout ends an attempt with [settleCheckout].
   void clear() {
     _lines.clear();
     _releaseStore();
@@ -209,7 +213,7 @@ class Cart extends ChangeNotifier {
   /// Empties the basket and immediately re-locks it to a new store, for "discard and start here".
   void switchTo(StoreCard store) {
     _lines.clear();
-    _checkoutKey = null;
+    if (!_checkoutUnconfirmed) _checkoutKey = null;
     _storeId = store.id;
     _store = store;
     notifyListeners();
@@ -218,10 +222,13 @@ class Cart extends ChangeNotifier {
   void _releaseStore() {
     _storeId = null;
     _store = null;
-    _checkoutKey = null;
+    // An attempt whose outcome is unknown outlives the basket it came from; see
+    // [checkoutUnconfirmed].
+    if (!_checkoutUnconfirmed) _checkoutKey = null;
   }
 
   String? _checkoutKey;
+  bool _checkoutUnconfirmed = false;
 
   /// The idempotency key of this basket's checkout attempt — minted on first use, kept for as long
   /// as the basket has anything in it.
@@ -232,9 +239,41 @@ class Cart extends ChangeNotifier {
   /// Editing the basket in between keeps the key too — the server then answers with the order the
   /// first try placed rather than placing the edited one as well (see [OrderAlreadyPlaced]).
   ///
-  /// A fresh key only when the basket is emptied: by a placement, by being queued, by the customer
-  /// removing everything, or by starting again at another shop — each of which ends the attempt.
+  /// A fresh key when the attempt ends: when checkout settles it ([settleCheckout]: placed, found
+  /// already placed, or queued), or when the customer empties the basket or starts again at
+  /// another shop — except while [checkoutUnconfirmed], when only [settleCheckout] ends it.
   String get checkoutKey => _checkoutKey ??= newIdempotencyKey();
+
+  /// True from the moment a send of this basket's checkout may have placed an order with its answer
+  /// lost ([OrderApi.mayHavePlaced]) until checkout learns the outcome ([settleCheckout]).
+  ///
+  /// While true, [checkoutKey] survives the basket being emptied, refilled, or moved to another
+  /// shop. That is what stops the second order: whatever the customer checks out next goes under
+  /// the same key, and the server answers it with the first order if that one landed — the same
+  /// basket as a replay, a different one as [OrderAlreadyPlaced] — or places it normally if it did
+  /// not. A fresh key would place the refilled basket beside an order that may already exist.
+  ///
+  /// A later refusal does not clear it. A request turned away before Order Manager reads its key
+  /// says nothing about the one that went unanswered, and keeping the key is always safe.
+  bool get checkoutUnconfirmed => _checkoutUnconfirmed;
+
+  /// Records that the send carrying [key] went unanswered and may have placed an order.
+  ///
+  /// Takes the key of the send itself, so an attempt still in flight when the customer emptied the
+  /// basket is held onto all the same.
+  void markCheckoutUnconfirmed(String key) {
+    _checkoutKey = key;
+    _checkoutUnconfirmed = true;
+  }
+
+  /// Ends the checkout attempt because its outcome is known — the order was placed, turned out to
+  /// be placed already, or the attempt was handed to the offline outbox, which carries its key on
+  /// from here — and empties the basket. The next basket is a new attempt under a new key.
+  void settleCheckout() {
+    _checkoutUnconfirmed = false;
+    _checkoutKey = null;
+    clear();
+  }
 
   /// The payload Order Manager expects: ids and quantities only, never prices.
   List<({String productId, int qty, List<String> optionIds})> toOrderLines() => _lines.values

@@ -85,8 +85,18 @@ void main() {
     return (dio: dio, placed: placed);
   }
 
+  /// The connection failed — and Dio cannot say whether before the request left or while its
+  /// answer was awaited.
   void unreachable(RequestOptions o, RequestInterceptorHandler h) =>
       h.reject(DioException(requestOptions: o, type: DioExceptionType.connectionError));
+
+  /// No connection was ever made: the one failure that proves nothing left the phone.
+  void neverConnected(RequestOptions o, RequestInterceptorHandler h) =>
+      h.reject(DioException(requestOptions: o, type: DioExceptionType.connectionTimeout));
+
+  /// The request left and no answer came back: the order may or may not exist.
+  void unanswered(RequestOptions o, RequestInterceptorHandler h) =>
+      h.reject(DioException(requestOptions: o, type: DioExceptionType.receiveTimeout));
 
   Cart basket() => Cart()..add(product('a', 's1', 9.75), from: storeCard('s1'));
 
@@ -164,22 +174,25 @@ void main() {
   testWidgets('a placement that never reached the platform offers to send it later, and the '
       'queued checkout is that same attempt', (WidgetTester tester) async {
     final Cart cart = basket();
-    final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[unreachable]);
+    final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[neverConnected]);
     final OrderOutbox outbox = outboxOver(s.dio, _MemoryStore());
     final checkout = await openCheckout(tester, dio: s.dio, cart: cart, outbox: outbox);
 
     await tapPlace(tester);
 
+    // Nothing left the phone, so this — and only this — may say the order hasn't gone through.
     expect(find.text(en.offlineQueueTitle), findsOneWidget);
     expect(find.text(en.offlineQueueBody), findsOneWidget);
+    expect(find.text(en.offlineUnconfirmedLead), findsNothing);
 
     await tester.tap(find.text(en.offlineQueueAction));
     await tester.pumpAndSettle();
 
     final PendingOrder queued = outbox.items.single;
-    // The attempt that went unanswered, not a new one: if it did reach the kitchen, the outbox's
-    // send is answered with that order.
+    // The attempt that failed, not a new one: had it reached the kitchen, the outbox's send would be
+    // answered with that order.
     expect(queued.key, s.placed.single.headers[OrderApi.idempotencyKeyHeader]);
+    expect(queued.maybePlaced, isFalse);
     // What the button said is what the customer agreed to, and what the server must match.
     expect(queued.expectedTotal, 9.75);
     expect(queued.storeId, 's1');
@@ -191,6 +204,48 @@ void main() {
     expect(checkout.returned(), isTrue);
     expect(checkout.result(),
         isA<PendingOrder>().having((PendingOrder p) => p.key, 'key', queued.key));
+  });
+
+  testWidgets('a placement whose answer never came says it may have gone through — never that it '
+      'has not — and its basket, however it is refilled, stays that same attempt',
+      (WidgetTester tester) async {
+    final Cart cart = basket();
+    final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[
+      unanswered,
+      unanswered,
+    ]);
+    final OrderOutbox outbox = outboxOver(s.dio, _MemoryStore());
+    await openCheckout(tester, dio: s.dio, cart: cart, outbox: outbox);
+
+    await tapPlace(tester);
+
+    expect(find.text(en.offlineUnconfirmedTitle), findsOneWidget);
+    expect(find.text(en.offlineUnconfirmedLead), findsOneWidget);
+    expect(find.text(en.offlineQueueResendBody), findsOneWidget);
+    expect(find.text(en.offlineQueueTitle), findsNothing);
+    expect(find.text(en.offlineQueueBody), findsNothing);
+
+    // Not now — and then the customer empties the basket and fills it with something else.
+    await tester.tap(find.text(en.notNow));
+    await tester.pumpAndSettle();
+    cart.remove('a');
+    expect(cart.isEmpty, isTrue);
+    cart.add(product('b', 's1', 4.50), from: storeCard('s1'));
+
+    await tapPlace(tester);
+    expect(find.text(en.offlineUnconfirmedTitle), findsOneWidget);
+    await tester.tap(find.text(en.offlineQueueAction));
+    await tester.pumpAndSettle();
+
+    // Still the first try's key: if that try landed, the queued send is answered with its order.
+    final Object? firstKey = s.placed.first.headers[OrderApi.idempotencyKeyHeader];
+    expect(s.placed.last.headers[OrderApi.idempotencyKeyHeader], firstKey);
+    final PendingOrder queued = outbox.items.single;
+    expect(queued.key, firstKey);
+    expect(queued.maybePlaced, isTrue);
+    // Handed to the outbox, so the next basket is a new attempt.
+    expect(cart.checkoutUnconfirmed, isFalse);
+    expect(cart.isEmpty, isTrue);
   });
 
   testWidgets('already known to be offline, it offers the queue without spending a request',

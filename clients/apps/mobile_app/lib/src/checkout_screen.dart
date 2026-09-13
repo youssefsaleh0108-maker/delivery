@@ -299,10 +299,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     // Already known to be unreachable: offer the queue now rather than prove it with a timeout.
+    // Nothing leaves the phone this time — but an earlier try of this same basket may have, and
+    // then the offer must not say the order hasn't gone through.
     if (widget.outbox != null && widget.connectivity?.value == false) {
       await widget.addresses.select(address);
       if (!mounted) return;
-      await _offerToQueue(submission);
+      await _offerToQueue(submission, unconfirmed: widget.cart.checkoutUnconfirmed);
       return;
     }
 
@@ -335,7 +337,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }
           if (existing == null) {
             // It exists; it just could not be fetched to show. The basket it came from is done.
-            widget.cart.clear();
+            widget.cart.settleCheckout();
             if (mounted) Navigator.of(context).pop();
             return;
           }
@@ -386,18 +388,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // The order stands; the ceremony can be skipped, the ledger cannot.
         }
       }
-      widget.cart.clear();
+      // Placed: the attempt has its answer, and the next basket is a new one under a new key.
+      widget.cart.settleCheckout();
       if (!mounted) return;
       Navigator.of(context).pop(order);
     } on DioException catch (e) {
+      // First, and whether or not this screen is still up: a send that may have placed the order
+      // pins the basket's key, so nothing the customer does to the basket next can place a second
+      // order beside it (see [Cart.checkoutUnconfirmed]).
+      final bool mayHavePlaced = OrderApi.mayHavePlaced(e);
+      if (mayHavePlaced) widget.cart.markCheckoutUnconfirmed(submission.idempotencyKey);
       if (!mounted) return;
       setState(() => _placing = false);
 
-      // The answer never came. The order may not exist — or it may, with the confirmation lost on
-      // the way back — so this is not a failure to report as one. The basket and its key stay, and
-      // the customer can have this same attempt sent when the connection returns.
+      // The platform could not be reached, or the answer never came. The order may not exist — or
+      // it may, with the confirmation lost on the way back — so this is not a failure to report as
+      // one. The basket and its key stay, and the customer can have this same attempt sent when
+      // the connection returns; the offer says whether it may already have gone through.
       if (widget.outbox != null && ConnectivityService.outcomeUnknown(e)) {
-        await _offerToQueue(submission);
+        await _offerToQueue(submission, unconfirmed: widget.cart.checkoutUnconfirmed);
+        return;
+      }
+
+      // No queue to offer, or a server error after the request arrived: still never "it didn't go
+      // through". Trying again is safe — it sends this same attempt.
+      if (mayHavePlaced) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(t.offlineUnconfirmedRetry)));
         return;
       }
 
@@ -429,33 +446,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// while the customer waits, and a split plan closes over its order the moment it exists. The
   /// dialog says so rather than offering a queue that could only fail later.
   ///
+  /// [unconfirmed] is true when a send of this attempt may already have placed the order
+  /// ([Cart.checkoutUnconfirmed]). The dialog then never says the order hasn't gone through: it
+  /// says it may have, points at Orders, and offers the queue as sending it again — which the
+  /// server answers with the existing order if there is one. The queued checkout carries the same
+  /// knowledge, as [PendingOrder.maybePlaced].
+  ///
   /// What is queued is this exact [submission] — the key of the attempt that just went unanswered —
   /// so if that attempt did reach the server, the outbox's send is answered with the order it placed
   /// instead of placing another. It carries the total on this screen's button as the total the
   /// customer agreed to; if the server's is different when it is sent, the customer is asked again.
-  /// The basket is cleared only once the checkout is safely written to the phone.
-  Future<void> _offerToQueue(OrderSubmission submission) async {
+  /// The basket is cleared, and the attempt handed to the outbox, only once the checkout is safely
+  /// written to the phone.
+  Future<void> _offerToQueue(OrderSubmission submission, {required bool unconfirmed}) async {
     final OrderOutbox? outbox = widget.outbox;
     if (outbox == null) return;
     final DeliveryStrings t = DeliveryStrings.of(context);
     final bool cash = submission.paymentMethod == PaymentMethod.cash;
     final bool queueable = cash && widget.cart.splitPlanId == null;
     final String explanation = queueable
-        ? t.offlineQueueBody
+        ? (unconfirmed ? t.offlineQueueResendBody : t.offlineQueueBody)
         // A split basket already pays cash: telling its host to "choose cash" would be advice they
         // cannot follow.
         : (cash ? t.offlineQueueUnavailable : t.offlineQueueCashOnly);
+    const TextStyle bodyStyle = TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4);
 
     final bool? queue = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
         backgroundColor: DeliveryColors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
-        title: Text(t.offlineQueueTitle,
+        title: Text(unconfirmed ? t.offlineUnconfirmedTitle : t.offlineQueueTitle,
             style: const TextStyle(
                 fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
-        content: Text(explanation,
-            style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // What matters most when it is true, so it comes first: the order may exist already.
+            if (unconfirmed) ...<Widget>[
+              Text(t.offlineUnconfirmedLead,
+                  style: bodyStyle.copyWith(
+                      color: DeliveryColors.ink, fontWeight: FontWeight.w600)),
+              const SizedBox(height: DeliverySpacing.sm),
+            ],
+            Text(explanation, style: bodyStyle),
+          ],
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -484,6 +521,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       storeName: widget.cart.store?.name ?? '',
       splitUsd: _splitUsdValue,
       createdAt: DateTime.now(),
+      maybePlaced: unconfirmed,
     );
     try {
       await outbox.enqueue(pending);
@@ -494,7 +532,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
       return;
     }
-    widget.cart.clear();
+    // The outbox carries the attempt, key and all, from here; the basket starts a new one.
+    widget.cart.settleCheckout();
     if (!mounted) return;
     Navigator.of(context).pop(pending);
   }
