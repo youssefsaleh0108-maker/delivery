@@ -143,8 +143,10 @@ class CarrierCashCollectionTest {
         private SettlementService.CashHolder holderSettled() {
             ArgumentCaptor<SettlementService.CashHolder> holder =
                     ArgumentCaptor.forClass(SettlementService.CashHolder.class);
+            // Every argument the listener passes, the gift-wrap fee last: a matcher list one short
+            // verifies an overload the listener no longer calls.
             verify(settlementsMock).settle(any(), any(), any(), any(), any(), any(),
-                    holder.capture(), any(), any(), any(), any(), any());
+                    holder.capture(), any(), any(), any(), any(), any(), any());
             return holder.getValue();
         }
 
