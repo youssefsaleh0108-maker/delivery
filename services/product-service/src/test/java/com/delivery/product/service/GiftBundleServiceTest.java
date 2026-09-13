@@ -71,7 +71,7 @@ class GiftBundleServiceTest {
         shop.replaceHours(Arrays.stream(DayOfWeek.values())
                 .map(day -> new StoreHours(day, LocalTime.of(8, 0), LocalTime.of(23, 0)))
                 .toList());
-        shop.publish();
+        shop.publish(utc(0, 0));
         return shop;
     }
 

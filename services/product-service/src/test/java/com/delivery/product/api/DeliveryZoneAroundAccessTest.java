@@ -1,6 +1,7 @@
 package com.delivery.product.api;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -84,7 +85,7 @@ class DeliveryZoneAroundAccessTest {
         Store store = new Store(OWNER, "Hamra Sushi", Store.Vertical.RESTAURANT);
         store.replaceHours(List.of(
                 new StoreHours(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(22, 0))));
-        store.publish();
+        store.publish(Instant.parse("2026-09-01T09:00:00Z"));
         return store;
     }
 
