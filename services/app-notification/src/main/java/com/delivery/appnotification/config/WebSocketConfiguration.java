@@ -20,6 +20,8 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import com.delivery.appnotification.service.RoomSubscriptionGuard;
+
 /**
  * STOMP over WebSocket for live in-app notifications (Section 9).
  *
@@ -56,11 +58,14 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
     static final String USER_SUBSCRIBE_PREFIX = "/user/";
 
     private final JwtDecoder jwtDecoder;
+    private final RoomSubscriptionGuard roomGuard;
     private final List<String> allowedOrigins;
 
     public WebSocketConfiguration(JwtDecoder jwtDecoder,
+                                  RoomSubscriptionGuard roomGuard,
                                   @Value("${delivery.websocket.allowed-origins:*}") String origins) {
         this.jwtDecoder = jwtDecoder;
+        this.roomGuard = roomGuard;
         this.allowedOrigins = List.of(origins.split(","));
     }
 
@@ -100,7 +105,20 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
 
                 switch (accessor.getCommand()) {
                     case CONNECT -> authenticate(accessor);
-                    case SUBSCRIBE -> requireOwnQueue(accessor);
+                    case SUBSCRIBE -> {
+                        requireOwnQueue(accessor);
+                        if (!mayListenToRoom(accessor)) {
+                            // Dropped, not refused. An exception here becomes a STOMP ERROR frame,
+                            // and an ERROR ends the client's whole session - the one socket that also
+                            // carries its order chat and notifications. A customer who moved
+                            // neighbourhood still has the old room in their client's subscription
+                            // list and re-sends it on every reconnect, so refusing loudly would give
+                            // them a socket that can never stay up. A dropped frame registers nothing
+                            // and delivers nothing, and leaves the rest of the session alone.
+                            log.debug("Dropped a room subscription the caller may not hold");
+                            return null;
+                        }
+                    }
                     // Refused rather than ignored. A silently dropped SEND would look to a client
                     // author like a delivery bug and invite them to keep trying; an error frame
                     // says "post over REST" the first time.
@@ -150,6 +168,16 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
                     throw new IllegalArgumentException(
                             "Subscriptions are only allowed under " + USER_SUBSCRIBE_PREFIX);
                 }
+            }
+
+            /**
+             * A neighbourhood room's feed carries many people's words rather than the caller's own,
+             * so being under /user/ is not enough for it: the caller must currently be in that room,
+             * checked exactly as the history and post endpoints check it.
+             */
+            private boolean mayListenToRoom(StompHeaderAccessor accessor) {
+                Principal user = accessor.getUser();
+                return roomGuard.mayListen(accessor.getDestination(), user == null ? null : user.getName());
             }
         });
     }

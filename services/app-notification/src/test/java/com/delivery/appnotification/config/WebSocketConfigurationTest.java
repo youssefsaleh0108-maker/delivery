@@ -1,6 +1,8 @@
 package com.delivery.appnotification.config;
 
+import java.security.Principal;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +18,9 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+
+import com.delivery.appnotification.domain.ChatRoomMemberRepository;
+import com.delivery.appnotification.service.RoomSubscriptionGuard;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -53,9 +58,93 @@ class WebSocketConfigurationTest {
     @BeforeEach
     void setUp() {
         jwtDecoder = mock(JwtDecoder.class);
+        roomMembers = mock(ChatRoomMemberRepository.class);
         CapturingRegistration registration = new CapturingRegistration();
-        new WebSocketConfiguration(jwtDecoder, "*").configureClientInboundChannel(registration);
+        new WebSocketConfiguration(jwtDecoder, new RoomSubscriptionGuard(roomMembers), "*")
+                .configureClientInboundChannel(registration);
         interceptor = registration.captured().get(0);
+    }
+
+    private ChatRoomMemberRepository roomMembers;
+
+    /** A SUBSCRIBE from a session whose CONNECT established {@code principal}. */
+    private static Message<byte[]> subscribeAs(String principal, String destination) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination(destination);
+        if (principal != null) {
+            accessor.setUser((Principal) () -> principal);
+        }
+        return message(accessor);
+    }
+
+    /**
+     * Neighbourhood rooms put many strangers' words on the socket, so a room's live feed is checked
+     * the way its history is: only a current member of that room may listen.
+     */
+    @Nested
+    @DisplayName("subscribing to a neighbourhood room")
+    class SubscribingToARoom {
+
+        private final UUID room = UUID.randomUUID();
+
+        @Test
+        @DisplayName("is allowed for somebody currently in that room")
+        void a_member_may_listen() {
+            when(roomMembers.existsByRoomIdAndUserIdAndLeftAtIsNull(room, "neighbour-sub")).thenReturn(true);
+
+            assertThat(interceptor.preSend(subscribeAs("neighbour-sub", "/user/queue/chat.rooms." + room), channel))
+                    .as("passed on to the broker")
+                    .isNotNull();
+        }
+
+        @Test
+        @DisplayName("is dropped for a customer of another neighbourhood, so no subscription ever exists")
+        void a_stranger_is_refused() {
+            when(roomMembers.existsByRoomIdAndUserIdAndLeftAtIsNull(room, "other-zone-sub")).thenReturn(false);
+
+            // Null is the interceptor's "do not deliver this frame": the broker never sees the
+            // SUBSCRIBE, and no ERROR frame tears down the session's other subscriptions.
+            assertThat(interceptor.preSend(subscribeAs("other-zone-sub", "/user/queue/chat.rooms." + room), channel))
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("is dropped without a principal, rather than checked against nobody")
+        void no_principal_is_refused() {
+            assertThat(interceptor.preSend(subscribeAs(null, "/user/queue/chat.rooms." + room), channel))
+                    .isNull();
+        }
+
+        /**
+         * Every spelling that is not exactly one canonical room id. {@code UUID.fromString} would
+         * accept some of these, and a guard that reads a destination differently from the broker is
+         * a guard with a gap in it.
+         */
+        @Test
+        @DisplayName("is dropped when the destination does not name exactly one room")
+        void malformed_room_destinations_are_refused() {
+            when(roomMembers.existsByRoomIdAndUserIdAndLeftAtIsNull(org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any())).thenReturn(true);
+
+            for (String destination : List.of(
+                    "/user/queue/chat.rooms",
+                    "/user/queue/chat.rooms.",
+                    "/user/queue/chat.rooms.not-a-room",
+                    "/user/queue/chat.rooms." + room.toString().toUpperCase(java.util.Locale.ROOT),
+                    "/user/queue/chat.rooms." + room + ".extra",
+                    "/user/queue/chat.roomsX" + room)) {
+                assertThat(interceptor.preSend(subscribeAs("neighbour-sub", destination), channel))
+                        .as(destination)
+                        .isNull();
+            }
+        }
+
+        @Test
+        @DisplayName("leaves the order chat and notification queues to their own rule")
+        void other_destinations_are_untouched() {
+            assertThat(interceptor.preSend(subscribeAs("rider-sub", "/user/queue/chat"), channel)).isNotNull();
+            assertThat(interceptor.preSend(subscribeAs("rider-sub", "/user/queue/chat.shops"), channel)).isNotNull();
+        }
     }
 
     private static Message<byte[]> frame(StompCommand command, String destination) {

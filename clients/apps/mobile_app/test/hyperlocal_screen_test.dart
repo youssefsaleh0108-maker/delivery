@@ -1,6 +1,7 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:delivery_merchant/delivery_merchant.dart' show ShopThreadScreen;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,7 @@ import 'package:mobile_app/src/cart_screen.dart' show CartScreen;
 import 'package:mobile_app/src/customer_shell.dart';
 import 'package:mobile_app/src/delivery_address.dart';
 import 'package:mobile_app/src/hyperlocal_screen.dart';
+import 'package:mobile_app/src/neighbourhood_chat_screen.dart';
 import 'package:mobile_app/src/neighbourhood_map_screen.dart';
 import 'package:mobile_app/src/store_page_screen.dart';
 import 'package:mobile_app/src/store_power_chip.dart' show DekkanePowerPill, DekkaneStatePill;
@@ -237,7 +239,8 @@ void main() {
   Finder cardOf(String name) => find.widgetWithText(DekkaneShopCard, name);
 
   group('the road to it', () {
-    Future<void> pumpShell(WidgetTester tester, {Locale locale = const Locale('en')}) async {
+    Future<void> pumpShell(WidgetTester tester,
+        {Locale locale = const Locale('en'), bool withChat = false}) async {
       tester.view.physicalSize = const Size(1000, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -251,6 +254,8 @@ void main() {
           butlerApi: ButlerApi(dio),
           zoneApi: DeliveryZoneApi(dio),
           offerApi: OfferApi(dio),
+          neighbourhoodChatApi: withChat ? NeighbourhoodChatApi(dio) : null,
+          shopChatApi: withChat ? ShopChatApi(dio) : null,
           session: sessionWith(<DeliveryRole>{DeliveryRole.customer}),
           locale: LocaleController(
               read: () async => locale.languageCode, write: (String _) async {}),
@@ -276,6 +281,55 @@ void main() {
           .widgetList<Transform>(find.descendant(of: chevron, matching: find.byType(Transform)));
       expect(flips, hasLength(1));
       expect(flips.single.transform.storage[0], -1);
+    });
+
+    /// The dekkane shop page left a slot for a shop chat; this is the whole road to it being filled:
+    /// the shell builds the pill from its chat client, Home hands it to the browse, and the browse
+    /// hands it to the shop — and without a chat client nothing is drawn at all.
+    testWidgets('a shop opened from the neighbourhood offers a chat with that shop, which opens it',
+        (WidgetTester tester) async {
+      await pumpShell(tester, withChat: true);
+      await tester.tap(find.text(en.dekkaneBrowseTitle));
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<HyperlocalScreen>(find.byType(HyperlocalScreen)).shopChatAction, isNotNull);
+
+      await tester.tap(find.text('Abu Hassan Mini Market'));
+      await tester.pumpAndSettle();
+      final Finder pill = find.text(en.chatShopWith('Abu Hassan Mini Market'));
+      expect(pill, findsOneWidget);
+
+      await tester.tap(pill);
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopThreadScreen), findsOneWidget);
+      expect(
+          requests.where((RequestOptions r) =>
+              r.method == 'POST' && r.path == '/api/chat/stores/s1/thread'),
+          hasLength(1),
+          reason: 'The pill asks for the conversation with the shop it is on, when tapped.');
+    });
+
+    testWidgets('without a chat client, a shop page offers no chat and Home no room',
+        (WidgetTester tester) async {
+      await pumpShell(tester);
+      expect(find.text(en.chatRoomEntryTitle), findsNothing);
+
+      await tester.tap(find.text(en.dekkaneBrowseTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Abu Hassan Mini Market'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(en.chatShopWith('Abu Hassan Mini Market')), findsNothing);
+    });
+
+    testWidgets('Home has a way into the neighbourhood chat, under the browse',
+        (WidgetTester tester) async {
+      await pumpShell(tester, withChat: true);
+
+      await tester.tap(find.text(en.chatRoomEntryTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NeighbourhoodChatScreen), findsOneWidget);
     });
 
     testWidgets('Home has a way in, and it opens the neighbourhood browse over the shell',

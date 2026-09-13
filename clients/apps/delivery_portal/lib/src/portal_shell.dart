@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -10,6 +12,7 @@ import 'backoffice/banners_screen.dart';
 import 'backoffice/catalog_screen.dart';
 import 'backoffice/categories_screen.dart';
 import 'backoffice/dashboard_screen.dart';
+import 'backoffice/moderation_screen.dart';
 import 'backoffice/offers_screen.dart';
 import 'backoffice/onboarding_screen.dart';
 import 'backoffice/overview_screen.dart';
@@ -75,6 +78,8 @@ class PortalApis {
     required this.reports,
     required this.catalogScan,
     required this.demand,
+    required this.shopChat,
+    required this.moderation,
   });
 
   final CatalogApi catalog;
@@ -131,6 +136,12 @@ class PortalApis {
 
   /// How busy the neighbourhoods around a shop are — the merchant Demand Radar.
   final DemandApi demand;
+
+  /// Customers' conversations with the merchant's shops.
+  final ShopChatApi shopChat;
+
+  /// The neighbourhood chat moderation queue. BACKOFFICE-only on the server.
+  final ChatModerationApi moderation;
 }
 
 /// How a page in the rail is built.
@@ -147,6 +158,7 @@ class PortalDestination {
     required this.selectedIcon,
     required this.label,
     required this.build,
+    this.badge,
   }) : pages = const <PortalPage>[];
 
   /// A heading with pages filed under it — the carrier rail's Reconciliation and Riders HR.
@@ -155,16 +167,22 @@ class PortalDestination {
   /// page as an indented row under the heading; with one, the heading is simply that page's row.
   /// So a heading is declared the day its first page exists — never before, which would be a menu
   /// item that opens nothing — and grows rows as the others arrive, with no change to the shell.
+  ///
+  /// A heading carries no [badge]: a count belongs to a row that is a single page.
   PortalDestination.section({
     required this.icon,
     required this.selectedIcon,
     required this.label,
     required this.pages,
   })  : assert(pages.isNotEmpty, 'a heading with no page under it would open nothing'),
-        build = pages.first.build;
+        build = pages.first.build,
+        badge = null;
 
   final IconData icon;
   final IconData selectedIcon;
+
+  /// The live number this destination's rail row carries, if any.
+  final PortalBadge? badge;
 
   /// Resolved against the active locale rather than stored, so switching language re-labels the
   /// rail without rebuilding the area list.
@@ -194,6 +212,15 @@ class PortalPage {
   final String Function(DeliveryStrings) label;
 
   final PortalPageBuilder build;
+}
+
+/// A live number a rail row can carry.
+///
+/// Named here rather than handed over as a callback, so the area lists stay plain data and the shell
+/// — which owns the requests — decides how each number is kept current and when to stop asking.
+enum PortalBadge {
+  /// Customers' messages the signed-in merchant has not read (`ShopUnreadCount`).
+  shopUnread,
 }
 
 /// One of the three former portals, as a role and the destinations it grants.
@@ -358,6 +385,16 @@ class PortalArea {
         label: (DeliveryStrings t) => t.heatmapTitle,
         build: (PortalApis a, _, __, ___) => _withStore(
             a, (String? storeId) => DemandRadarScreen(api: a.demand, storeId: storeId)),
+      ),
+      // Appended, like the suite above, so no earlier index moves. The server decides which shops'
+      // conversations the signed-in merchant reads, so the page needs no store id.
+      PortalDestination(
+        icon: Icons.forum_outlined,
+        selectedIcon: Icons.forum,
+        label: (DeliveryStrings t) => t.chatShopInboxTitle,
+        // The sign that a customer wrote: the portal has no push and no socket.
+        badge: PortalBadge.shopUnread,
+        build: (PortalApis a, _, __, ___) => ShopInboxScreen(api: a.shopChat, embedded: true),
       ),
     ],
   );
@@ -709,6 +746,15 @@ class PortalArea {
         build: (PortalApis a, _, __, ___) =>
             PromotionsScreen(api: a.promo, notificationApi: a.notification),
       ),
+      // Neighbourhood chat's reported messages. Late in the rail, because it is worked in bursts
+      // when reports come in, and before Settings, which stays last. Nothing jumps to an index
+      // after Orders, so no link moves.
+      PortalDestination(
+        icon: Icons.shield_outlined,
+        selectedIcon: Icons.shield,
+        label: (DeliveryStrings t) => t.chatModerationTitle,
+        build: (PortalApis a, _, __, ___) => ModerationScreen(api: a.moderation),
+      ),
       // Last, and deliberately so: the least-used and most consequential page here.
       PortalDestination(
         icon: Icons.settings_outlined,
@@ -763,6 +809,23 @@ class _PortalShellState extends State<PortalShell> {
   /// heading opens on its first page.
   int _page = 0;
 
+  /// The merchant's unread customer messages, for the rail. Held only while the area on screen has a
+  /// row showing it, so a back-office or carrier session never asks.
+  ShopUnreadCount? _shopUnread;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncBadges();
+  }
+
+  @override
+  void dispose() {
+    _shopUnread?.removeListener(_badgeChanged);
+    _shopUnread?.dispose();
+    super.dispose();
+  }
+
   void _switchArea(int area) {
     setState(() {
       _area = area;
@@ -771,6 +834,7 @@ class _PortalShellState extends State<PortalShell> {
       _index = 0;
       _page = 0;
     });
+    _syncBadges();
   }
 
   void _open(int index, {int page = 0}) {
@@ -778,6 +842,53 @@ class _PortalShellState extends State<PortalShell> {
       _index = index;
       _page = page;
     });
+  }
+
+  /// Starts or stops the numbers the current area's rail shows.
+  ///
+  /// The portal has no socket, so [ShopUnreadCount] polls: once a minute, and only while the tab is
+  /// on screen. Without it a merchant working here had no sign a customer had written until they
+  /// opened the inbox and pulled to refresh — a gesture a mouse cannot make.
+  void _syncBadges() {
+    final bool wanted = widget.areas[_area].destinations
+        .any((PortalDestination d) => d.badge == PortalBadge.shopUnread);
+    final ShopUnreadCount? current = _shopUnread;
+    if (wanted && current == null) {
+      _shopUnread = ShopUnreadCount(api: widget.apis.shopChat)
+        ..addListener(_badgeChanged)
+        ..start();
+    } else if (!wanted && current != null) {
+      current.removeListener(_badgeChanged);
+      current.dispose();
+      _shopUnread = null;
+    }
+  }
+
+  void _badgeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  ConsoleNavEntry _entry(PortalDestination destination, DeliveryStrings t) {
+    final int? count = switch (destination.badge) {
+      PortalBadge.shopUnread => _shopUnread?.value,
+      null => null,
+    };
+    return ConsoleNavEntry(
+      icon: destination.icon,
+      label: destination.label(t),
+      children: <String>[for (final PortalPage p in destination.pages) p.label(t)],
+      badgeCount: count,
+      badgeLabel: count == null ? null : t.chatShopUnreadCount(count),
+    );
+  }
+
+  void _select(PortalArea area, int index, {int page = 0}) {
+    final bool leavingBadged = area.destinations[_index].badge != null;
+    _open(index, page: page);
+    // Reading conversations is what changes the count: ask as the merchant leaves them, not a minute
+    // later.
+    final ShopUnreadCount? unread = _shopUnread;
+    if (leavingBadged && unread != null) unawaited(unread.refresh());
   }
 
   /// The sidebar footer's menu: the two things that used to live in the crimson AppBar.
@@ -854,17 +965,12 @@ class _PortalShellState extends State<PortalShell> {
             areaIndex: _area,
             onAreaSelected: widget.areas.length > 1 ? _switchArea : null,
             entries: <ConsoleNavEntry>[
-              for (final PortalDestination d in area.destinations)
-                ConsoleNavEntry(
-                  icon: d.icon,
-                  label: d.label(t),
-                  children: <String>[for (final PortalPage p in d.pages) p.label(t)],
-                ),
+              for (final PortalDestination d in area.destinations) _entry(d, t),
             ],
             selectedIndex: _index,
-            onSelected: (int i) => _open(i),
+            onSelected: (int i) => _select(area, i),
             selectedChild: _page,
-            onChildSelected: (int i, int page) => _open(i, page: page),
+            onChildSelected: (int i, int page) => _select(area, i, page: page),
             userName: widget.session.displayName,
             userRole: area.accountRole(t),
             accountMenu: _accountMenu(t),

@@ -63,6 +63,7 @@ void main() {
     bool wireScan = false,
     bool wireStaff = false,
     bool inventory = false,
+    bool wireChat = false,
     Set<DeliveryRole> roles = const <DeliveryRole>{DeliveryRole.merchant},
   }) async {
     tester.view.physicalSize = const Size(1100, 2400);
@@ -80,6 +81,7 @@ void main() {
         statementsApi: wireStatements ? StatementsApi(dio) : null,
         catalogScanApi: wireScan ? CatalogScanApi(dio) : null,
         staffApi: wireStaff ? StoreStaffApi(dio) : null,
+        shopChatApi: wireChat ? ShopChatApi(dio) : null,
         session: AuthSession(
           accessToken: 'token',
           refreshToken: null,
@@ -271,5 +273,23 @@ void main() {
       await openSettings(tester, t);
       expect(settingsRow(t), findsNothing);
     });
+  });
+
+  /// Customers can message a shop from its page; without this row the shop could never read them.
+  testWidgets('the shop can open its customers\' messages from Settings', (WidgetTester tester) async {
+    final DeliveryStrings t = await pumpShell(tester, wireChat: true);
+
+    await tester.tap(find.text(t.chatShopInboxTitle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(ShopInboxScreen), findsOneWidget);
+  });
+
+  testWidgets('and without a chat client there is no messages row to open',
+      (WidgetTester tester) async {
+    final DeliveryStrings t = await pumpShell(tester);
+
+    expect(find.text(t.chatShopInboxTitle), findsNothing);
   });
 }

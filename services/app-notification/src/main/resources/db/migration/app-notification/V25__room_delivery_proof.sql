@@ -1,0 +1,16 @@
+-- Neighbourhood chat: speaking in a room, and counting in its member count, needs proof of living in
+-- its area. Owned by App Notification Service.
+--
+-- The area a customer's address names is their own statement, and until now it was the whole of
+-- their membership: a brand-new account could pick any area, post there and be counted there, and
+-- move on to the next area a week later. Reading stays that open - a neighbourhood's conversation is
+-- no secret from somebody thinking of moving there, and the platform cannot tell a new resident from
+-- a visitor anyway. Speaking now needs evidence the platform does have: an order of the customer's
+-- delivered in the area within the proof window (RoomChatProperties.deliveryProofWindow), as Order
+-- Manager reports it for the customer's own token.
+--
+-- This column keeps that report on the membership, so the member count stays one query: the latest
+-- delivery in the room's area plus the window, i.e. until when the member may speak there. NULL when
+-- there was no such delivery, or before anybody asked. Refreshed whenever the member opens the room or
+-- posts. Posting never trusts it on its own - it asks Order Manager again, through a cache of minutes.
+ALTER TABLE chat_room_members ADD COLUMN delivery_proven_until timestamptz;

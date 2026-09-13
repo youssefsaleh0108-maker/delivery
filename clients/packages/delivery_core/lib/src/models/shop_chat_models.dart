@@ -1,0 +1,160 @@
+/// Customer-to-shop threads, mirroring App Notification's `ShopChatController`.
+library;
+
+DateTime? _date(Object? value) => value is String ? DateTime.tryParse(value)?.toLocal() : null;
+
+/// The two sides of a shop thread. The shop side is a role, not a person: a customer is told "the
+/// shop" replied, never which account typed it.
+enum ShopThreadSide {
+  customer('CUSTOMER'),
+  shop('SHOP');
+
+  const ShopThreadSide(this.wire);
+
+  final String wire;
+
+  static ShopThreadSide fromWire(String? value) =>
+      value == shop.wire ? ShopThreadSide.shop : ShopThreadSide.customer;
+}
+
+/// One customer's conversation with one shop, as the caller's side sees it.
+class ShopThread {
+  const ShopThread({
+    required this.id,
+    required this.storeId,
+    required this.storeName,
+    required this.yourSide,
+    required this.open,
+    required this.lastSequence,
+    required this.unread,
+    this.customerName,
+    this.closesAt,
+    this.lastMessageAt,
+    this.lastMessagePreview,
+    this.lastMessageSide,
+  });
+
+  final String id;
+  final String storeId;
+  final String storeName;
+
+  /// What the shop sees of the customer: a first name and an initial, or null.
+  final String? customerName;
+
+  final ShopThreadSide yourSide;
+
+  /// Whether the composer should be enabled. A thread goes quiet two weeks after the customer's
+  /// last activity; only the customer can start it again.
+  final bool open;
+
+  final DateTime? closesAt;
+  final DateTime? lastMessageAt;
+  final int lastSequence;
+
+  /// What the other side said that the caller's side has not read.
+  final int unread;
+
+  /// The inbox preview; null outside the inbox.
+  final String? lastMessagePreview;
+  final ShopThreadSide? lastMessageSide;
+
+  ShopThread copyWith({bool? open, int? unread}) => ShopThread(
+        id: id,
+        storeId: storeId,
+        storeName: storeName,
+        customerName: customerName,
+        yourSide: yourSide,
+        open: open ?? this.open,
+        closesAt: closesAt,
+        lastMessageAt: lastMessageAt,
+        lastSequence: lastSequence,
+        unread: unread ?? this.unread,
+        lastMessagePreview: lastMessagePreview,
+        lastMessageSide: lastMessageSide,
+      );
+
+  factory ShopThread.fromJson(Map<String, dynamic> json) => ShopThread(
+        id: json['id'] as String,
+        storeId: json['storeId'] as String? ?? '',
+        storeName: json['storeName'] as String? ?? '',
+        customerName: json['customerName'] as String?,
+        yourSide: ShopThreadSide.fromWire(json['yourSide'] as String?),
+        open: json['open'] as bool? ?? false,
+        closesAt: _date(json['closesAt']),
+        lastMessageAt: _date(json['lastMessageAt']),
+        lastSequence: (json['lastSequence'] as num?)?.toInt() ?? 0,
+        unread: (json['unread'] as num?)?.toInt() ?? 0,
+        lastMessagePreview: json['lastMessagePreview'] as String?,
+        lastMessageSide: json['lastMessageSide'] == null
+            ? null
+            : ShopThreadSide.fromWire(json['lastMessageSide'] as String?),
+      );
+}
+
+/// One message in a shop thread, in history and in a live frame alike.
+class ShopMessage {
+  const ShopMessage({
+    required this.id,
+    required this.threadId,
+    required this.sequence,
+    required this.side,
+    required this.mine,
+    required this.text,
+    this.storeId,
+    this.sentAt,
+    this.readAt,
+  });
+
+  final String id;
+  final String threadId;
+  final String? storeId;
+  final int sequence;
+  final ShopThreadSide side;
+
+  /// Whether the viewer sent it, computed by the server against the caller's token.
+  final bool mine;
+
+  final String text;
+  final DateTime? sentAt;
+  final DateTime? readAt;
+
+  factory ShopMessage.fromJson(Map<String, dynamic> json) => ShopMessage(
+        id: json['id'] as String,
+        threadId: json['threadId'] as String? ?? '',
+        storeId: json['storeId'] as String?,
+        sequence: (json['sequence'] as num?)?.toInt() ?? 0,
+        side: ShopThreadSide.fromWire(json['side'] as String?),
+        mine: json['mine'] as bool? ?? false,
+        text: json['text'] as String? ?? '',
+        sentAt: _date(json['sentAt']),
+        readAt: _date(json['readAt']),
+      );
+}
+
+/// A post refused because the thread went quiet (409): the composer locks and says so. The
+/// customer can reopen it; the shop cannot.
+class ShopThreadQuietException implements Exception {
+  const ShopThreadQuietException(this.closedAt);
+
+  final DateTime? closedAt;
+
+  @override
+  String toString() => 'ShopThreadQuietException(closed at $closedAt)';
+}
+
+/// A thread with a page of its messages.
+class ShopThreadPage {
+  const ShopThreadPage({required this.thread, required this.messages, required this.more});
+
+  final ShopThread thread;
+  final List<ShopMessage> messages;
+  final bool more;
+
+  factory ShopThreadPage.fromJson(Map<String, dynamic> json) => ShopThreadPage(
+        thread: ShopThread.fromJson(json['thread'] as Map<String, dynamic>),
+        messages: (json['messages'] as List<dynamic>? ?? const <dynamic>[])
+            .map((dynamic e) => ShopMessage.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        more: json['more'] as bool? ?? false,
+      );
+}

@@ -44,6 +44,8 @@ class MerchantShell extends StatefulWidget {
     this.reportsApi,
     this.catalogScanApi,
     this.demandApi,
+    this.shopChatApi,
+    this.chatSocket,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -92,6 +94,13 @@ class MerchantShell extends StatefulWidget {
   /// Opened for the owner only: the density is order-backed, and Order Manager refuses staff tokens.
   final DemandApi? demandApi;
 
+  /// Customers' conversations with the shop, behind Settings' Customer messages row. Null leaves
+  /// the row undrawn.
+  final ShopChatApi? shopChatApi;
+
+  /// App Notification's socket, so a customer's message refreshes the inbox as it arrives.
+  final UserQueueSocket? chatSocket;
+
   final AuthSession session;
 
   /// Drives the EN/AR toggle on the Settings tab.
@@ -133,6 +142,9 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Timer? _poll;
 
+  /// Customers' unread messages, on Settings' messages row. Owner-only, like the row.
+  ShopUnreadCount? _shopUnread;
+
   @override
   void initState() {
     super.initState();
@@ -143,11 +155,19 @@ class _MerchantShellState extends State<MerchantShell> {
       // racing another rider for, and the queue itself refreshes when it is opened.
       _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refreshBadge());
     }
+    final ShopChatApi? shopChat = widget.shopChatApi;
+    if (_access.isOwner && shopChat != null) {
+      // From the start, not from the first visit to the inbox. Without it a customer's message
+      // showed nowhere until the merchant happened to open that page — and, since it is reading the
+      // inbox that tells the server who owns the shop, it never arrived live before then either.
+      _shopUnread = ShopUnreadCount(api: shopChat, socket: widget.chatSocket)..start();
+    }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _shopUnread?.dispose();
     super.dispose();
   }
 
@@ -287,6 +307,11 @@ class _MerchantShellState extends State<MerchantShell> {
           accountContact: widget.session.email ?? widget.session.username,
           onEditAccount: _openAccountPreferences,
           onShopProfile: _access.isOwner ? _openShopProfile : null,
+          // Owner-only, like the shop profile above it: which shop's threads a merchant may read is
+          // Product Service's "shops you own", so an employee's inbox would always be empty.
+          onShopMessages:
+              _access.isOwner && widget.shopChatApi != null ? _openShopMessages : null,
+          shopMessagesUnread: _shopUnread,
           onNotificationSettings:
               widget.prefsApi == null ? null : _openNotificationPreferences,
           aggregates: _access.isOwner ? widget.aggregatesApi : null,
@@ -382,6 +407,18 @@ class _MerchantShellState extends State<MerchantShell> {
         onBack: navigator.pop,
       ),
     ));
+  }
+
+  Future<void> _openShopMessages() async {
+    final ShopChatApi? api = widget.shopChatApi;
+    if (api == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ShopInboxScreen(api: api, socket: widget.chatSocket),
+    ));
+    // Reading conversations is what changes the count: ask as the merchant comes back, not a minute
+    // later.
+    final ShopUnreadCount? unread = _shopUnread;
+    if (mounted && unread != null) unawaited(unread.refresh());
   }
 
   void _openStaff() {

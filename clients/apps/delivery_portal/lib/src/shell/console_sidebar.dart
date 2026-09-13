@@ -9,6 +9,8 @@ class ConsoleNavEntry {
     required this.icon,
     required this.label,
     this.children = const <String>[],
+    this.badgeCount,
+    this.badgeLabel,
   });
 
   final IconData icon;
@@ -21,6 +23,13 @@ class ConsoleNavEntry {
   /// be found is a page nobody finds — and the first one to live here is the applicant queue,
   /// where somebody is waiting to be told yes or no.
   final List<String> children;
+
+  /// A count at the row's end — unread customer messages — drawn while non-null and above zero. An
+  /// unknown count draws nothing rather than a zero the rail does not have.
+  final int? badgeCount;
+
+  /// What a screen reader says for [badgeCount]; the digits alone do not say what they count.
+  final String? badgeLabel;
 }
 
 /// One console a signed-in account can switch to, as it appears under the wordmark.
@@ -292,6 +301,10 @@ class _NavItem extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if ((entry.badgeCount ?? 0) > 0) ...<Widget>[
+                    const SizedBox(width: DeliverySpacing.sm),
+                    _CountBadge(count: entry.badgeCount!, label: entry.badgeLabel),
+                  ],
                 ],
               ),
             ),
@@ -360,6 +373,38 @@ class _NavChild extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A count on a rail row, in the brand red the platform's other count badges use.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, this.label});
+
+  final int count;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: label,
+      child: ExcludeSemantics(
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 20),
+          height: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: DeliveryColors.brand,
+            borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: DeliveryColors.white),
           ),
         ),
       ),

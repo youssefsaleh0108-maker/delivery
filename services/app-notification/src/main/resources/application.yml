@@ -155,6 +155,45 @@ delivery:
     # same read happening through a psql prompt with no record.
     backoffice-transcript-access: ${CHAT_BACKOFFICE_READ:true}
     order-events-queue: app-notification.order-events
+    # Neighbourhood rooms, one per delivery zone. Policy, not tuning - see RoomChatProperties for the
+    # reasoning behind each number.
+    rooms:
+      # How long a neighbour stays in a room before their address may move them to another.
+      move-cooldown: ${CHAT_ROOM_MOVE_COOLDOWN:7d}
+      # How recent an order delivered in the area must be for its customer to post in the area's room
+      # and count in its member count. Reading needs no proof.
+      delivery-proof-window: ${CHAT_ROOM_DELIVERY_PROOF_WINDOW:365d}
+      history-page-size: 50
+      # The send rate limit: at most this many messages per window, per person, across all rooms.
+      send-window: 1m
+      max-messages-per-window: ${CHAT_ROOM_MAX_MESSAGES_PER_WINDOW:8}
+    # Customer <-> shop threads. See ShopChatProperties for the reasoning behind each number.
+    shop-threads:
+      # A thread closes this long after the customer's last activity; only the customer reopens it.
+      idle-close-after: ${CHAT_SHOP_THREAD_IDLE_CLOSE:14d}
+      history-page-size: 100
+      inbox-page-size: 100
+      send-window: 1m
+      max-messages-per-window: 20
+      # How long Product Service's "this merchant owns this shop" is trusted before asking again.
+      owner-confirmation-ttl: 10m
+
+  # Product Service answers what chat cannot know alone: whether a delivery area is real, whether a
+  # shop exists, which shops a merchant owns. Always asked with the caller's own token.
+  clients:
+    product-service:
+      base-url: ${PRODUCT_SERVICE_URL:http://localhost:8103}
+      connect-timeout: 2s
+      read-timeout: 5s
+    # Order Manager answers where the caller's own orders were delivered, which is what lets a
+    # customer post in a neighbourhood room. Always asked with the caller's own token; when it cannot
+    # be reached, rooms stay readable and nobody posts.
+    order-manager:
+      base-url: ${ORDER_MANAGER_URL:http://localhost:8101}
+      connect-timeout: 2s
+      read-timeout: 5s
+      # How long one customer's answer is reused before Order Manager is asked again.
+      proof-cache-ttl: 2m
 
 management:
   endpoints:

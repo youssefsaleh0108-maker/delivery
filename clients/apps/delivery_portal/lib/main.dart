@@ -120,6 +120,8 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     reports: ReportsApi(_dio),
     catalogScan: CatalogScanApi(_dio),
     demand: DemandApi(_dio),
+    shopChat: ShopChatApi(_dio),
+    moderation: ChatModerationApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

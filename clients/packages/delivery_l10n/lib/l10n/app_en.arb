@@ -5286,5 +5286,153 @@
   "payrollApproveWithoutMissing": "Approve without what is missing",
   "payrollErrNeedsAcknowledgement": "Something is missing from these figures. Tick the box to approve without it.",
   "payrollErrRecomputeNeeded": "These figures were read before the period ended. Recompute, check them and approve again.",
-  "payrollHoursNotListed": "Attendance shows no time this rider worked for your company in this period, so their hours are not known."
+  "payrollHoursNotListed": "Attendance shows no time this rider worked for your company in this period, so their hours are not known.",
+  "chatRoomEntryTitle": "Neighbourhood chat",
+  "chatRoomEntrySub": "Talk with the people who live around you",
+  "chatRoomTitle": "{area} chat",
+  "@chatRoomTitle": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomLive": "LIVE",
+  "chatRoomMembers": "{count, plural, =1{1 neighbour} other{{count} neighbours}}",
+  "@chatRoomMembers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatRoomCommunity": "Community",
+  "chatRoomComposerHint": "Type a message or ask a neighbour…",
+  "chatRoomEmpty": "No messages yet. Say hello to your neighbours.",
+  "chatRoomCouldNotLoad": "Could not load your neighbourhood chat",
+  "chatRoomPickAreaTitle": "Choose your area to join its chat",
+  "chatRoomPickAreaBody": "Neighbourhood chat follows the area of your delivery address.",
+  "chatRoomChooseArea": "Choose area",
+  "chatRoomUnknownAreaTitle": "Your area has no neighbourhood chat",
+  "chatRoomUnknownAreaBody": "Pick one of the delivery areas for your address to join its chat.",
+  "chatRoomMoveBlocked": "You can move to your new area's chat from {date}.",
+  "@chatRoomMoveBlocked": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomMuted": "A moderator has paused your messages here until {date}.",
+  "@chatRoomMuted": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomHidden": "This message was removed",
+  "chatRoomNeighbour": "Neighbour",
+  "chatRoomReport": "Report",
+  "chatRoomReportTitle": "Why are you reporting this message?",
+  "chatRoomReasonSpam": "Spam or advertising",
+  "chatRoomReasonAbuse": "Abuse or harassment",
+  "chatRoomReasonPersonalInfo": "Someone's personal details",
+  "chatRoomReasonOther": "Something else",
+  "chatRoomReportSent": "Thanks. A moderator will review it.",
+  "chatRoomBlock": "Block",
+  "chatRoomBlockTitle": "Block {name}?",
+  "@chatRoomBlockTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomBlockBody": "You won't see their messages in neighbourhood chat. They won't be told.",
+  "chatRoomBlockedToast": "Blocked. You won't see their messages.",
+  "chatRoomCopy": "Copy",
+  "chatRoomCopied": "Copied",
+  "chatRoomRulesTitle": "Community rules",
+  "chatRoomRulesBody": "Be kind to your neighbours. No spam or advertising, no harassment, and never post anyone's phone number or address. Moderators remove messages that break these rules.",
+  "chatRoomBlockedPeople": "People you blocked",
+  "chatRoomNoBlocks": "You haven't blocked anyone.",
+  "chatRoomUnblock": "Unblock",
+  "chatSlowDown": "You're sending messages too fast. Wait a moment and try again.",
+  "chatTooLong": "That message is too long.",
+  "chatActionFailed": "That didn't work. Try again.",
+  "chatShopWith": "Chat with {shop}",
+  "@chatShopWith": {
+    "placeholders": {
+      "shop": {
+        "type": "String"
+      }
+    }
+  },
+  "chatShopHintCustomer": "Message the shop…",
+  "chatShopHintMerchant": "Reply to the customer…",
+  "chatShopEmptyCustomer": "Ask the shop anything: what's in stock, prices, opening hours.",
+  "chatShopEmptyMerchant": "No messages in this conversation yet.",
+  "chatShopCouldNotLoad": "Could not load this conversation",
+  "chatShopQuietCustomer": "This chat has gone quiet.",
+  "chatShopReopen": "Reopen",
+  "chatShopQuietMerchant": "This conversation has gone quiet. The customer can start it again from your shop's page.",
+  "chatShopInboxTitle": "Customer messages",
+  "chatShopInboxEmpty": "No customer messages yet",
+  "chatShopInboxEmptySub": "Customers can message your shop from its page in the app.",
+  "chatShopInboxCouldNotLoad": "Could not load customer messages",
+  "chatShopCustomer": "Customer",
+  "chatShopYouPrefix": "You: {text}",
+  "@chatShopYouPrefix": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "chatShopQuietBadge": "Quiet",
+  "chatModerationTitle": "Moderation",
+  "chatModerationSub": "Reported neighbourhood chat messages, oldest first.",
+  "chatModerationEmpty": "No reports waiting",
+  "chatModerationCouldNotLoad": "Could not load the moderation queue",
+  "chatModerationReports": "{count, plural, =1{1 report} other{{count} reports}}",
+  "@chatModerationReports": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatModerationHide": "Hide message",
+  "chatModerationDismiss": "Dismiss",
+  "chatModerationMute": "Mute author",
+  "chatModerationUnmute": "Unmute author",
+  "chatModerationMute24h": "For 24 hours",
+  "chatModerationMute7d": "For 7 days",
+  "chatModerationMute30d": "For 30 days",
+  "chatModerationReasonLabel": "Reason (kept in the audit trail)",
+  "chatModerationReasonTooShort": "Write at least 3 characters",
+  "chatModerationConfirm": "Confirm",
+  "chatModerationRemoved": "Removed",
+  "chatModerationMutedUntil": "Author muted until {date}",
+  "@chatModerationMutedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatModerationDone": "Done",
+  "chatModerationRefresh": "Refresh",
+  "chatRoomOlderFailed": "Couldn't load earlier messages. Tap to try again.",
+  "chatRoomPostAfterDelivery": "You can post here after your first delivery to this area.",
+  "chatRoomPostingUnavailable": "Posting is paused while we check your deliveries. Try again shortly.",
+  "chatShopUnreadCount": "{count, plural, =1{1 unread message} other{{count} unread messages}}",
+  "@chatShopUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

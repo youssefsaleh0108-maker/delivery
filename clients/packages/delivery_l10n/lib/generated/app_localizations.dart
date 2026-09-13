@@ -17485,6 +17485,474 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Attendance shows no time this rider worked for your company in this period, so their hours are not known.'**
   String get payrollHoursNotListed;
+
+  /// No description provided for @chatRoomEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbourhood chat'**
+  String get chatRoomEntryTitle;
+
+  /// No description provided for @chatRoomEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk with the people who live around you'**
+  String get chatRoomEntrySub;
+
+  /// No description provided for @chatRoomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{area} chat'**
+  String chatRoomTitle(String area);
+
+  /// No description provided for @chatRoomLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get chatRoomLive;
+
+  /// No description provided for @chatRoomMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 neighbour} other{{count} neighbours}}'**
+  String chatRoomMembers(int count);
+
+  /// No description provided for @chatRoomCommunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get chatRoomCommunity;
+
+  /// No description provided for @chatRoomComposerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message or ask a neighbour…'**
+  String get chatRoomComposerHint;
+
+  /// No description provided for @chatRoomEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet. Say hello to your neighbours.'**
+  String get chatRoomEmpty;
+
+  /// No description provided for @chatRoomCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your neighbourhood chat'**
+  String get chatRoomCouldNotLoad;
+
+  /// No description provided for @chatRoomPickAreaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your area to join its chat'**
+  String get chatRoomPickAreaTitle;
+
+  /// No description provided for @chatRoomPickAreaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbourhood chat follows the area of your delivery address.'**
+  String get chatRoomPickAreaBody;
+
+  /// No description provided for @chatRoomChooseArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose area'**
+  String get chatRoomChooseArea;
+
+  /// No description provided for @chatRoomUnknownAreaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your area has no neighbourhood chat'**
+  String get chatRoomUnknownAreaTitle;
+
+  /// No description provided for @chatRoomUnknownAreaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one of the delivery areas for your address to join its chat.'**
+  String get chatRoomUnknownAreaBody;
+
+  /// No description provided for @chatRoomMoveBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'You can move to your new area\'s chat from {date}.'**
+  String chatRoomMoveBlocked(String date);
+
+  /// No description provided for @chatRoomMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'A moderator has paused your messages here until {date}.'**
+  String chatRoomMuted(String date);
+
+  /// No description provided for @chatRoomHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'This message was removed'**
+  String get chatRoomHidden;
+
+  /// No description provided for @chatRoomNeighbour.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbour'**
+  String get chatRoomNeighbour;
+
+  /// No description provided for @chatRoomReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get chatRoomReport;
+
+  /// No description provided for @chatRoomReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you reporting this message?'**
+  String get chatRoomReportTitle;
+
+  /// No description provided for @chatRoomReasonSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam or advertising'**
+  String get chatRoomReasonSpam;
+
+  /// No description provided for @chatRoomReasonAbuse.
+  ///
+  /// In en, this message translates to:
+  /// **'Abuse or harassment'**
+  String get chatRoomReasonAbuse;
+
+  /// No description provided for @chatRoomReasonPersonalInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone\'s personal details'**
+  String get chatRoomReasonPersonalInfo;
+
+  /// No description provided for @chatRoomReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get chatRoomReasonOther;
+
+  /// No description provided for @chatRoomReportSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks. A moderator will review it.'**
+  String get chatRoomReportSent;
+
+  /// No description provided for @chatRoomBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get chatRoomBlock;
+
+  /// No description provided for @chatRoomBlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {name}?'**
+  String chatRoomBlockTitle(String name);
+
+  /// No description provided for @chatRoomBlockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You won\'t see their messages in neighbourhood chat. They won\'t be told.'**
+  String get chatRoomBlockBody;
+
+  /// No description provided for @chatRoomBlockedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked. You won\'t see their messages.'**
+  String get chatRoomBlockedToast;
+
+  /// No description provided for @chatRoomCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatRoomCopy;
+
+  /// No description provided for @chatRoomCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get chatRoomCopied;
+
+  /// No description provided for @chatRoomRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Community rules'**
+  String get chatRoomRulesTitle;
+
+  /// No description provided for @chatRoomRulesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Be kind to your neighbours. No spam or advertising, no harassment, and never post anyone\'s phone number or address. Moderators remove messages that break these rules.'**
+  String get chatRoomRulesBody;
+
+  /// No description provided for @chatRoomBlockedPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'People you blocked'**
+  String get chatRoomBlockedPeople;
+
+  /// No description provided for @chatRoomNoBlocks.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t blocked anyone.'**
+  String get chatRoomNoBlocks;
+
+  /// No description provided for @chatRoomUnblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get chatRoomUnblock;
+
+  /// No description provided for @chatSlowDown.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re sending messages too fast. Wait a moment and try again.'**
+  String get chatSlowDown;
+
+  /// No description provided for @chatTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'That message is too long.'**
+  String get chatTooLong;
+
+  /// No description provided for @chatActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That didn\'t work. Try again.'**
+  String get chatActionFailed;
+
+  /// No description provided for @chatShopWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with {shop}'**
+  String chatShopWith(String shop);
+
+  /// No description provided for @chatShopHintCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the shop…'**
+  String get chatShopHintCustomer;
+
+  /// No description provided for @chatShopHintMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to the customer…'**
+  String get chatShopHintMerchant;
+
+  /// No description provided for @chatShopEmptyCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the shop anything: what\'s in stock, prices, opening hours.'**
+  String get chatShopEmptyCustomer;
+
+  /// No description provided for @chatShopEmptyMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages in this conversation yet.'**
+  String get chatShopEmptyMerchant;
+
+  /// No description provided for @chatShopCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this conversation'**
+  String get chatShopCouldNotLoad;
+
+  /// No description provided for @chatShopQuietCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat has gone quiet.'**
+  String get chatShopQuietCustomer;
+
+  /// No description provided for @chatShopReopen.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get chatShopReopen;
+
+  /// No description provided for @chatShopQuietMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation has gone quiet. The customer can start it again from your shop\'s page.'**
+  String get chatShopQuietMerchant;
+
+  /// No description provided for @chatShopInboxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer messages'**
+  String get chatShopInboxTitle;
+
+  /// No description provided for @chatShopInboxEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No customer messages yet'**
+  String get chatShopInboxEmpty;
+
+  /// No description provided for @chatShopInboxEmptySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can message your shop from its page in the app.'**
+  String get chatShopInboxEmptySub;
+
+  /// No description provided for @chatShopInboxCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load customer messages'**
+  String get chatShopInboxCouldNotLoad;
+
+  /// No description provided for @chatShopCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get chatShopCustomer;
+
+  /// No description provided for @chatShopYouPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'You: {text}'**
+  String chatShopYouPrefix(String text);
+
+  /// No description provided for @chatShopQuietBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet'**
+  String get chatShopQuietBadge;
+
+  /// No description provided for @chatModerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderation'**
+  String get chatModerationTitle;
+
+  /// No description provided for @chatModerationSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported neighbourhood chat messages, oldest first.'**
+  String get chatModerationSub;
+
+  /// No description provided for @chatModerationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reports waiting'**
+  String get chatModerationEmpty;
+
+  /// No description provided for @chatModerationCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the moderation queue'**
+  String get chatModerationCouldNotLoad;
+
+  /// No description provided for @chatModerationReports.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 report} other{{count} reports}}'**
+  String chatModerationReports(int count);
+
+  /// No description provided for @chatModerationHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide message'**
+  String get chatModerationHide;
+
+  /// No description provided for @chatModerationDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get chatModerationDismiss;
+
+  /// No description provided for @chatModerationMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute author'**
+  String get chatModerationMute;
+
+  /// No description provided for @chatModerationUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute author'**
+  String get chatModerationUnmute;
+
+  /// No description provided for @chatModerationMute24h.
+  ///
+  /// In en, this message translates to:
+  /// **'For 24 hours'**
+  String get chatModerationMute24h;
+
+  /// No description provided for @chatModerationMute7d.
+  ///
+  /// In en, this message translates to:
+  /// **'For 7 days'**
+  String get chatModerationMute7d;
+
+  /// No description provided for @chatModerationMute30d.
+  ///
+  /// In en, this message translates to:
+  /// **'For 30 days'**
+  String get chatModerationMute30d;
+
+  /// No description provided for @chatModerationReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (kept in the audit trail)'**
+  String get chatModerationReasonLabel;
+
+  /// No description provided for @chatModerationReasonTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Write at least 3 characters'**
+  String get chatModerationReasonTooShort;
+
+  /// No description provided for @chatModerationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get chatModerationConfirm;
+
+  /// No description provided for @chatModerationRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get chatModerationRemoved;
+
+  /// No description provided for @chatModerationMutedUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Author muted until {date}'**
+  String chatModerationMutedUntil(String date);
+
+  /// No description provided for @chatModerationDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get chatModerationDone;
+
+  /// No description provided for @chatModerationRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get chatModerationRefresh;
+
+  /// No description provided for @chatRoomOlderFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load earlier messages. Tap to try again.'**
+  String get chatRoomOlderFailed;
+
+  /// No description provided for @chatRoomPostAfterDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'You can post here after your first delivery to this area.'**
+  String get chatRoomPostAfterDelivery;
+
+  /// No description provided for @chatRoomPostingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Posting is paused while we check your deliveries. Try again shortly.'**
+  String get chatRoomPostingUnavailable;
+
+  /// No description provided for @chatShopUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread message} other{{count} unread messages}}'**
+  String chatShopUnreadCount(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

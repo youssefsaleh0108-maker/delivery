@@ -14,6 +14,7 @@ import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
 import 'friend_split_screen.dart';
 import 'hyperlocal_screen.dart';
+import 'neighbourhood_chat_screen.dart';
 import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
@@ -42,6 +43,9 @@ class StoreHomeScreen extends StatefulWidget {
     this.profileApi,
     this.splitApi,
     this.transferApi,
+    this.neighbourhoodChatApi,
+    this.chatSocket,
+    this.shopChatAction,
     required this.onSignOut,
     required this.onOpenBasket,
     this.onOpenGiftHub,
@@ -84,6 +88,16 @@ class StoreHomeScreen extends StatefulWidget {
 
   /// Opens the gift hub (Figma 112:1684) over the shell. Null draws no entry.
   final VoidCallback? onOpenGiftHub;
+
+  /// The neighbourhood room behind the chat entry under the browse entry. Null leaves it undrawn.
+  final NeighbourhoodChatApi? neighbourhoodChatApi;
+
+  /// App Notification's socket, for the room's live messages.
+  final UserQueueSocket? chatSocket;
+
+  /// What a dekkane shop page draws above its basket bar, from the shell — handed to the
+  /// neighbourhood browse, which passes it to every shop it opens. Null draws nothing.
+  final ShopChatActionBuilder? shopChatAction;
 
   @override
   State<StoreHomeScreen> createState() => _StoreHomeScreenState();
@@ -414,6 +428,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   SliverFillRemaining(hasScrollBody: false, child: _errorState())
                 else ...<Widget>[
                   SliverToBoxAdapter(child: _neighbourhoodEntry(t)),
+                  if (widget.neighbourhoodChatApi != null)
+                    SliverToBoxAdapter(child: _neighbourhoodChatEntry(t)),
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
@@ -927,12 +943,34 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// UNREACHABLE — so it gets a place on Home, just under the category tiles, where somebody asking
   /// "what is near me" already is. The frames draw no entry card of their own; this is the home
   /// feed's own card language, and it names the screen it opens.
-  Widget _neighbourhoodEntry(DeliveryStrings t) {
+  Widget _neighbourhoodEntry(DeliveryStrings t) => _homeEntryCard(
+        icon: Icons.storefront_rounded,
+        title: t.dekkaneBrowseTitle,
+        subtitle: t.dekkaneEntrySub,
+        onTap: _openNeighbourhood,
+      );
+
+  /// The door to the neighbourhood's chat room (Figma 121:102), right under the browse because it
+  /// is the same neighbourhood: the shops near the address, then the people. The frame marks Home
+  /// as the tab it belongs to and draws no entry of its own, so it takes the feed's card language.
+  Widget _neighbourhoodChatEntry(DeliveryStrings t) => _homeEntryCard(
+        icon: Icons.forum_rounded,
+        title: t.chatRoomEntryTitle,
+        subtitle: t.chatRoomEntrySub,
+        onTap: _openNeighbourhoodChat,
+      );
+
+  Widget _homeEntryCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(
           _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.sm),
       child: YdCard(
-        onTap: _openNeighbourhood,
+        onTap: onTap,
         padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
         child: Row(
           children: <Widget>[
@@ -942,7 +980,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               alignment: Alignment.center,
               decoration: const BoxDecoration(
                   color: DeliveryColors.brandSoft, shape: BoxShape.circle),
-              child: const Icon(Icons.storefront_rounded, size: 20, color: DeliveryColors.brand),
+              child: Icon(icon, size: 20, color: DeliveryColors.brand),
             ),
             const SizedBox(width: DeliverySpacing.md - 4),
             Expanded(
@@ -951,7 +989,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Text(
-                    t.dekkaneBrowseTitle,
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -963,7 +1001,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    t.dekkaneEntrySub,
+                    subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
@@ -991,6 +1029,23 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         addresses: widget.addresses,
         zoneApi: widget.zoneApi,
         onOpenBasket: widget.onOpenBasket,
+        shopChatAction: widget.shopChatAction,
+      ),
+    ));
+  }
+
+  /// Pushed over the shell like the browse. The room is the area of the same address this screen's
+  /// header shows, and a customer whose address has no area picks one on the shell's own sheet.
+  void _openNeighbourhoodChat() {
+    final NeighbourhoodChatApi? api = widget.neighbourhoodChatApi;
+    if (api == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NeighbourhoodChatScreen(
+        api: api,
+        addresses: widget.addresses,
+        socket: widget.chatSocket,
+        onChooseArea: (BuildContext sheetContext) =>
+            showAddressSheet(sheetContext, widget.addresses, zoneApi: widget.zoneApi),
       ),
     ));
   }
