@@ -404,23 +404,32 @@ public class AttendanceService {
      * 14th absent, least of all after those days were paid. The row that was running is closed the
      * day before, and anything that had been set up to start later is replaced.
      *
+     * <p>Nor does it re-judge a day already under way. Once the window of the rider's shift today,
+     * or of the shift they are moving to, has begun, a change asked for today starts tomorrow —
+     * so a row that covered a window that has begun is always ended, never deleted.
+     *
      * <p>Idempotent: putting a rider on the shift they are already on changes nothing.
      */
     @Transactional
     public List<AssignmentView> assign(String riderId, String callerId, UUID shiftId,
                                        String effectiveFrom) {
+        return assign(riderId, callerId, shiftId, effectiveFrom, Instant.now());
+    }
+
+    /** The whole of {@link #assign}. Package-private with an explicit clock for the tests. */
+    List<AssignmentView> assign(String riderId, String callerId, UUID shiftId,
+                                String effectiveFrom, Instant now) {
         UUID carrier = dutySessions.requireOwnFleet(riderId, callerId);
-        Instant now = Instant.now();
         LocalDate today = today(now);
-        LocalDate from = effectiveFrom == null || effectiveFrom.isBlank()
+        LocalDate requested = effectiveFrom == null || effectiveFrom.isBlank()
                 ? today
                 : AttendancePeriod.date(effectiveFrom, "effectiveFrom");
-        if (from.isBefore(today)) {
+        if (requested.isBefore(today)) {
             throw new InvalidRequestException(
                     "A schedule can start today or later. Past days keep the schedule they were "
                             + "worked against.");
         }
-        if (from.isAfter(today.plusDays(MAX_DAYS_AHEAD_FOR_SCHEDULE))) {
+        if (requested.isAfter(today.plusDays(MAX_DAYS_AHEAD_FOR_SCHEDULE))) {
             throw new InvalidRequestException("A schedule can be set up at most "
                     + MAX_DAYS_AHEAD_FOR_SCHEDULE + " days ahead.");
         }
@@ -433,6 +442,15 @@ public class AttendanceService {
                 throw new ConflictException("That shift has been retired. Choose a current one.", 0);
             }
         }
+
+        // Today is being judged from the moment a window of today's shift begins — the shift the
+        // rider is on, or the one they are moving to — so from then a change asked for today waits
+        // for tomorrow. Otherwise an 08:00-18:00 shift assigned at 19:00 would mark the day just
+        // gone absent, and moving or freeing a rider would rewrite or erase a late or an absence
+        // already earned. Before either window begins, today is still ahead of both schedules.
+        LocalDate from = requested.equals(today) && todayUnderWay(riderId, carrier, shift, today, now)
+                ? today.plusDays(1)
+                : requested;
 
         List<RiderShiftAssignment> fromThen = assignments.findFrom(riderId, carrier, from);
         if (shift != null && fromThen.size() == 1
@@ -447,7 +465,9 @@ public class AttendanceService {
                 row.endOn(from.minusDays(1));
                 assignments.save(row);
             } else {
-                // Had not started by the new date, so it never applied to anything that is kept.
+                // Had not started by the new date, so it never applied to anything that is kept —
+                // and none of its windows has begun: a row that started today with its shift under
+                // way moved the change to tomorrow above, and is ended by the branch before this.
                 assignments.delete(row);
             }
         }
@@ -460,6 +480,25 @@ public class AttendanceService {
                     callerId, now));
         }
         return views(assignments.findFrom(riderId, carrier, today));
+    }
+
+    /**
+     * Whether a window of today's shift has begun by {@code now} — the shift the rider is on today,
+     * or {@code next}, the one they are being moved to (null when they are being taken off).
+     */
+    private boolean todayUnderWay(String riderId, UUID carrier, ShiftTemplate next, LocalDate today,
+                                  Instant now) {
+        ZoneId zone = zone();
+        ShiftTemplate current = scheduleFor(riderId, carrier, new AttendancePeriod(today, today))
+                .shiftOn(today);
+        return begun(current, today, zone, now) || begun(next, today, zone, now);
+    }
+
+    /** Whether {@code shift} runs on {@code day} and that day's window has started by {@code now}. */
+    private static boolean begun(ShiftTemplate shift, LocalDate day, ZoneId zone, Instant now) {
+        return shift != null
+                && shift.runsOn(day.getDayOfWeek())
+                && !now.isBefore(shift.window(day, zone).start());
     }
 
     private List<AssignmentView> views(List<RiderShiftAssignment> rows) {

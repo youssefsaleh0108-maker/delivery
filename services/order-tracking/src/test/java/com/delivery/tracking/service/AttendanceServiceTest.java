@@ -46,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -938,6 +939,109 @@ class AttendanceServiceTest {
             assertThatThrownBy(() -> service.createShift(DISPATCHER, "Day", "8 o'clock", "18:00",
                     List.of("MONDAY"), null)).isInstanceOf(InvalidRequestException.class);
             verify(templates, never()).save(any());
+        }
+
+        // ------------------------------------------ a change asked for today, once it is under way
+
+        /** Monday 12 October 2026, when the Day shift runs 08:00-18:00. */
+        private final LocalDate monday = LocalDate.of(2026, 10, 12);
+
+        /** Keeps what the service saves and deletes, so a test can read the schedule it left. */
+        private void keepWrites() {
+            when(assignments.save(any(RiderShiftAssignment.class))).thenAnswer(call -> {
+                RiderShiftAssignment row = call.getArgument(0);
+                if (!assignmentRows.contains(row)) {
+                    assignmentRows.add(row);
+                }
+                return row;
+            });
+            doAnswer(call -> assignmentRows.remove(call.<RiderShiftAssignment>getArgument(0)))
+                    .when(assignments).delete(any(RiderShiftAssignment.class));
+        }
+
+        /** An 08:00-18:00 shift assigned at 19:00 must not turn the day just gone into an absence. */
+        @Test
+        void a_shift_assigned_after_its_window_began_today_starts_tomorrow() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            keepWrites();
+            Instant sevenPm = local("2026-10-12T19:00");
+
+            service.assign(RIDER, DISPATCHER, day.getId(), null, sevenPm);
+
+            assertThat(assignmentRows).extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(monday.plusDays(1));
+            RiderAttendance month = service.compute(RIDER, CARRIER, OCTOBER, sevenPm);
+            assertThat(day(month, "2026-10-12").status()).isEqualTo(Status.NO_DUTY);
+            assertThat(month.totals().absences()).isZero();
+        }
+
+        /** Once today's shift has begun, a move keeps today on it, and its late stays a late. */
+        @Test
+        void moving_a_rider_once_todays_shift_began_keeps_today_on_the_old_shift() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            ShiftTemplate late = shift("Late", "12:00", "20:00", WEEKDAYS);
+            RiderShiftAssignment old = onShift(day, LocalDate.of(2026, 10, 1), null);
+            worked("2026-10-12T08:30", "2026-10-12T09:30");
+            keepWrites();
+            Instant tenAm = local("2026-10-12T10:00");
+
+            service.assign(RIDER, DISPATCHER, late.getId(), null, tenAm);
+
+            assertThat(old.getEffectiveTo()).isEqualTo(monday);
+            assertThat(assignmentRows).filteredOn(a -> a != old)
+                    .extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(monday.plusDays(1));
+            AttendanceDay judged = day(service.compute(RIDER, CARRIER, OCTOBER, tenAm), "2026-10-12");
+            assertThat(judged.scheduled().name()).isEqualTo("Day");
+            assertThat(judged.status()).isEqualTo(Status.LATE);
+        }
+
+        /** Taking a rider off their schedule at 19:00 keeps the absence the day already earned. */
+        @Test
+        void freeing_a_rider_once_todays_shift_began_keeps_todays_absence() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            RiderShiftAssignment current = onShift(day, LocalDate.of(2026, 10, 1), null);
+            keepWrites();
+            Instant sevenPm = local("2026-10-12T19:00");
+
+            service.assign(RIDER, DISPATCHER, null, null, sevenPm);
+
+            assertThat(current.getEffectiveTo()).isEqualTo(monday);
+            assertThat(day(service.compute(RIDER, CARRIER, OCTOBER, sevenPm), "2026-10-12")
+                    .status()).isEqualTo(Status.ABSENT);
+        }
+
+        /** A schedule that began today, with its shift under way, is ended — never erased. */
+        @Test
+        void a_schedule_that_began_today_is_ended_not_deleted_once_its_shift_began() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            ShiftTemplate late = shift("Late", "12:00", "20:00", WEEKDAYS);
+            RiderShiftAssignment startedToday = onShift(day, monday, null);
+            keepWrites();
+
+            service.assign(RIDER, DISPATCHER, late.getId(), null, local("2026-10-12T09:00"));
+
+            verify(assignments, never()).delete(any());
+            assertThat(startedToday.getEffectiveTo()).isEqualTo(monday);
+            assertThat(assignmentRows).extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(monday, monday.plusDays(1));
+        }
+
+        /** Before either shift has begun today, a change for today still applies to today. */
+        @Test
+        void before_todays_shifts_begin_a_change_for_today_applies_today() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            ShiftTemplate late = shift("Late", "12:00", "20:00", WEEKDAYS);
+            RiderShiftAssignment old = onShift(day, LocalDate.of(2026, 10, 1), null);
+            keepWrites();
+
+            service.assign(RIDER, DISPATCHER, late.getId(), monday.toString(),
+                    local("2026-10-12T07:00"));
+
+            assertThat(old.getEffectiveTo()).isEqualTo(monday.minusDays(1));
+            assertThat(assignmentRows).filteredOn(a -> a != old)
+                    .extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(monday);
         }
     }
 

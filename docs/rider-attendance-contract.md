@@ -181,11 +181,16 @@ and the last sighting for one whose rider went quiet — the same rule as `/duty
   effectiveTo}]` running today or starting later (`effectiveTo` inclusive, null = open-ended).
 - `PUT /api/tracking/riders/{riderId}/shift-assignment` `{shiftId: uuid|null, effectiveFrom:
   "YYYY-MM-DD"|omitted}` → the rider's assignments from today. Omitted date = today in the zone;
-  never before today (400), at most 90 days ahead. The running assignment is closed the day before;
-  one that had not started yet is replaced. `shiftId: null` makes the rider a freelancer from that
+  never before today (400), at most 90 days ahead. **A change asked for today starts tomorrow once
+  today is under way** — once the window of the rider's shift today, or of the shift they are
+  moving to, has begun — so assigning an 08:00–18:00 shift at 19:00 does not make today an absence,
+  and moving or freeing a rider does not rewrite or erase a late or an absence today already
+  earned. The answer's rows show the date the change took. The running assignment is closed the
+  day before the change; one that had not started yet is replaced; a row that covered a window that
+  has begun is always ended, never deleted. `shiftId: null` makes the rider a freelancer from that
   date. Assigning the shift a rider is already on is a no-op. A retired shift is 409.
 
-A past day is always judged against the assignment that covered it then.
+A past day — and today, once under way — is always judged against the assignment that covered it.
 
 ## Manual Attendance Log (CARRIER, own fleet)
 
