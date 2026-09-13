@@ -1077,7 +1077,7 @@ class OsmBasemap extends StatefulWidget {
   /// Standard OSM raster tiles. Fixed rather than a parameter: one tile source means one
   /// attribution and one usage policy to honour.
   static const String tileUrlTemplate =
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+      mapTileUrlTemplate;
 
   /// How this app identifies itself to the tile servers, per their usage policy.
   static const String userAgentPackageName = 'shop.youdrop.app';

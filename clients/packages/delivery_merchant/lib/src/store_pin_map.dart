@@ -20,7 +20,7 @@ import 'package:latlong2/latlong.dart';
 /// before maps existed, not a broken one.
 
 /// OpenStreetMap's standard raster style.
-const String osmTileUrlTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const String osmTileUrlTemplate = mapTileUrlTemplate;
 
 /// Identifies this app to the tile server, as OSM's usage policy requires.
 const String osmUserAgentPackageName = 'shop.youdrop.app';
