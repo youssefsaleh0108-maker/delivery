@@ -4,6 +4,8 @@ library;
 export 'src/api/accounting_api.dart';
 export 'src/api/carrier_cash_api.dart';
 export 'src/models/carrier_cash_models.dart';
+export 'src/api/carrier_payroll_api.dart';
+export 'src/models/carrier_payroll_models.dart';
 export 'src/util/image_prep.dart';
 export 'src/util/device_location.dart';
 export 'src/util/market_rates.dart';

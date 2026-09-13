@@ -4,6 +4,7 @@ import '../models/accounting_models.dart';
 import '../models/carrier_cash_models.dart';
 import '../models/statement_models.dart' show Money;
 import 'carrier_cash_api.dart';
+import 'carrier_payroll_api.dart';
 
 /// Client for the reconciliation API — BACKOFFICE only (Phase 4).
 ///
@@ -22,6 +23,10 @@ class AccountingApi {
   /// routes can be reached through it by mistake. Offered here so the portal shell can hand a
   /// carrier page its client without growing its API bundle.
   CarrierCashApi get carrierCash => CarrierCashApi(_dio);
+
+  /// A delivery company's payroll for its own riders, over the same connection — CARRIER only on
+  /// the server, and offered here for the same reason as [carrierCash].
+  CarrierPayrollApi get carrierPayroll => CarrierPayrollApi(_dio);
 
   /// Cash held by delivery companies, and by their riders for them. BACKOFFICE only.
   ///
