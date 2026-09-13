@@ -7272,4 +7272,111 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get heatmapTitle => 'Demand Radar';
+
+  @override
+  String get heatmapSubtitle => 'Real-time neighborhood pulses';
+
+  @override
+  String get heatmapActiveOrderDensities => 'Active Order Densities';
+
+  @override
+  String get heatmapLiveSyncing => 'Live Syncing';
+
+  @override
+  String get heatmapCantRefresh => 'Can\'t refresh right now';
+
+  @override
+  String get heatmapLevelHigh => 'High';
+
+  @override
+  String get heatmapLevelMedium => 'Med';
+
+  @override
+  String get heatmapLevelLow => 'Low';
+
+  @override
+  String heatmapZoneWithLevel(String zone, String level) {
+    return '$zone ($level)';
+  }
+
+  @override
+  String get heatmapWindowHour => 'Last hour';
+
+  @override
+  String get heatmapWindowDay => 'Last 24 hours';
+
+  @override
+  String get heatmapWindowWeek => 'Last 7 days';
+
+  @override
+  String get heatmapAreasTitle => 'Areas around your shop';
+
+  @override
+  String get heatmapNotOnMap => 'Not on the map yet';
+
+  @override
+  String get heatmapNoneOnMap => 'These areas aren\'t on the map yet';
+
+  @override
+  String get heatmapMapUnavailable => 'The map can\'t load right now';
+
+  @override
+  String get heatmapNoAreaTitle => 'We don\'t know your neighbourhood yet';
+
+  @override
+  String get heatmapNoAreaMessage =>
+      'Add the areas you deliver to, or drop your shop\'s pin, and demand around your shop will show here.';
+
+  @override
+  String get heatmapNotEnoughTitle => 'Not enough orders nearby yet';
+
+  @override
+  String heatmapNotEnoughMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'An area appears once $count different customers have ordered there in this period, so no single customer can be picked out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapCouldNotLoad => 'Couldn\'t load demand right now';
+
+  @override
+  String get heatmapNoShopMessage =>
+      'Demand around your shop shows here once your shop is set up.';
+
+  @override
+  String get heatmapEntryBlurb =>
+      'See which neighbourhoods around your shop are ordering';
+
+  @override
+  String get heatmapZoneCentreLatitude => 'Centre latitude (optional)';
+
+  @override
+  String get heatmapZoneCentreLongitude => 'Centre longitude (optional)';
+
+  @override
+  String get heatmapZoneCentreHelp =>
+      'Roughly the middle of the area. It places the area on merchants\' demand map; pricing never uses it.';
+
+  @override
+  String get heatmapZoneCentreBoth => 'Enter both, or leave both empty';
+
+  @override
+  String get heatmapZoneCentreLatRange => 'A latitude between -90 and 90';
+
+  @override
+  String get heatmapZoneCentreLngRange => 'A longitude between -180 and 180';
+
+  @override
+  String get heatmapZoneOnMap => 'On the demand map';
+
+  @override
+  String get heatmapZoneNotOnMap => 'Not on the demand map';
 }

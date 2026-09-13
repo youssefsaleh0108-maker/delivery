@@ -37,6 +37,8 @@ export 'src/api/onboarding_api.dart';
 export 'src/models/onboarding_models.dart';
 export 'src/api/activity_api.dart';
 export 'src/api/aggregates_api.dart';
+export 'src/api/demand_api.dart';
+export 'src/models/demand_models.dart';
 export 'src/api/partner_api_keys_api.dart';
 export 'src/api/partner_jobs_api.dart';
 export 'src/api/partner_management_api.dart';

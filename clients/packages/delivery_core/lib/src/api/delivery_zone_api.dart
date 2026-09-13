@@ -28,27 +28,47 @@ class DeliveryZoneApi {
         .toList();
   }
 
+  /// Adds an area. [centerLat] and [centerLng] place it on the merchant demand map: both or
+  /// neither, which the server enforces with a 400.
   Future<DeliveryZone> create({
     required String name,
     String? region,
     int sortOrder = 100,
+    double? centerLat,
+    double? centerLng,
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '/api/delivery-zones',
-      data: <String, dynamic>{'name': name, 'region': region, 'sortOrder': sortOrder},
+      data: <String, dynamic>{
+        'name': name,
+        'region': region,
+        'sortOrder': sortOrder,
+        'centerLat': centerLat,
+        'centerLng': centerLng,
+      },
     );
     return DeliveryZone.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Replaces everything the back office edits about an area, the centre included — so leaving
+  /// the centre out takes the area off the demand map. Nothing about pricing reads it.
   Future<DeliveryZone> rename(
     String id, {
     required String name,
     String? region,
     int sortOrder = 100,
+    double? centerLat,
+    double? centerLng,
   }) async {
     final Response<dynamic> response = await _dio.put<dynamic>(
       '/api/delivery-zones/$id',
-      data: <String, dynamic>{'name': name, 'region': region, 'sortOrder': sortOrder},
+      data: <String, dynamic>{
+        'name': name,
+        'region': region,
+        'sortOrder': sortOrder,
+        'centerLat': centerLat,
+        'centerLng': centerLng,
+      },
     );
     return DeliveryZone.fromJson(response.data as Map<String, dynamic>);
   }

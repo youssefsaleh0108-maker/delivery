@@ -3460,5 +3460,55 @@
   "accountAlreadyPartner": "This account is already a YouDrop partner, and an account can hold only one partner role.",
   "accountOtherApplication": "This account already has an application for another role, and an account can apply for only one.",
   "accountEmailUnverified": "Your account's email address hasn't been verified, so we can't take an application on it yet.",
-  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again."
+  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again.",
+  "heatmapTitle": "Demand Radar",
+  "heatmapSubtitle": "Real-time neighborhood pulses",
+  "heatmapActiveOrderDensities": "Active Order Densities",
+  "heatmapLiveSyncing": "Live Syncing",
+  "heatmapCantRefresh": "Can't refresh right now",
+  "heatmapLevelHigh": "High",
+  "heatmapLevelMedium": "Med",
+  "heatmapLevelLow": "Low",
+  "heatmapZoneWithLevel": "{zone} ({level})",
+  "@heatmapZoneWithLevel": {
+    "description": "A map label: an area name and how busy it is, e.g. \"Hamra (High)\".",
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "heatmapWindowHour": "Last hour",
+  "heatmapWindowDay": "Last 24 hours",
+  "heatmapWindowWeek": "Last 7 days",
+  "heatmapAreasTitle": "Areas around your shop",
+  "heatmapNotOnMap": "Not on the map yet",
+  "heatmapNoneOnMap": "These areas aren't on the map yet",
+  "heatmapMapUnavailable": "The map can't load right now",
+  "heatmapNoAreaTitle": "We don't know your neighbourhood yet",
+  "heatmapNoAreaMessage": "Add the areas you deliver to, or drop your shop's pin, and demand around your shop will show here.",
+  "heatmapNotEnoughTitle": "Not enough orders nearby yet",
+  "heatmapNotEnoughMessage": "{count, plural, other{An area appears once {count} different customers have ordered there in this period, so no single customer can be picked out.}}",
+  "@heatmapNotEnoughMessage": {
+    "description": "The privacy floor: how many different customers an area needs before it is shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapCouldNotLoad": "Couldn't load demand right now",
+  "heatmapNoShopMessage": "Demand around your shop shows here once your shop is set up.",
+  "heatmapEntryBlurb": "See which neighbourhoods around your shop are ordering",
+  "heatmapZoneCentreLatitude": "Centre latitude (optional)",
+  "heatmapZoneCentreLongitude": "Centre longitude (optional)",
+  "heatmapZoneCentreHelp": "Roughly the middle of the area. It places the area on merchants' demand map; pricing never uses it.",
+  "heatmapZoneCentreBoth": "Enter both, or leave both empty",
+  "heatmapZoneCentreLatRange": "A latitude between -90 and 90",
+  "heatmapZoneCentreLngRange": "A longitude between -180 and 180",
+  "heatmapZoneOnMap": "On the demand map",
+  "heatmapZoneNotOnMap": "Not on the demand map"
 }

@@ -1,0 +1,188 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:delivery_core/delivery_core.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// The merchant Demand Radar's read, and the delivery-area centres that let it draw anything.
+///
+/// Two things are protected. The request: it names one shop and one window and nothing else — no
+/// coordinates, no customer, nothing a log line or a proxy could turn into somebody's whereabouts.
+/// And the parsing: a level this build does not know must not take the whole map down, and half a
+/// centre must never be drawn as a point on the equator.
+class _Recorder implements HttpClientAdapter {
+  _Recorder(this.body);
+
+  final Object body;
+  final List<RequestOptions> calls = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
+      Future<void>? cancelFuture) async {
+    calls.add(options);
+    return ResponseBody.fromString(jsonEncode(body), 200, headers: <String, List<String>>{
+      Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+    });
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+const Map<String, dynamic> _density = <String, dynamic>{
+  'storeId': 'store-1',
+  'region': 'Beirut',
+  'windowMinutes': 60,
+  'generatedAt': '2026-09-13T10:00:00Z',
+  'minimumCustomers': 5,
+  'areasAround': 3,
+  'zones': <dynamic>[
+    <String, dynamic>{
+      'zoneId': 'z-hamra',
+      'name': 'Hamra',
+      'region': 'Beirut',
+      'centerLat': 33.8959,
+      'centerLng': 35.4787,
+      'level': 'HIGH',
+    },
+    <String, dynamic>{
+      'zoneId': 'z-verdun',
+      'name': 'Verdun',
+      'region': 'Beirut',
+      'centerLat': null,
+      'centerLng': null,
+      'level': 'LOW',
+    },
+  ],
+};
+
+(DemandApi, _Recorder) _api(Object body) {
+  final _Recorder adapter = _Recorder(body);
+  final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
+  return (DemandApi(dio), adapter);
+}
+
+void main() {
+  group('DemandApi.density', () {
+    test('asks Order Manager about one shop over one window, and nothing else', () async {
+      final (DemandApi api, _Recorder adapter) = _api(_density);
+
+      await api.density(storeId: 'store-1', windowMinutes: DemandApi.lastDay);
+
+      final RequestOptions sent = adapter.calls.single;
+      expect(sent.method, 'GET');
+      expect(sent.path, '/api/orders/demand/density');
+      expect(sent.queryParameters, <String, dynamic>{'storeId': 'store-1', 'windowMinutes': 1440});
+    });
+
+    test('the last hour is the window unless another is asked for', () async {
+      final (DemandApi api, _Recorder adapter) = _api(_density);
+
+      await api.density(storeId: 'store-1');
+
+      expect(adapter.calls.single.queryParameters['windowMinutes'], 60);
+      expect(DemandApi.lastWeek, 10080);
+    });
+
+    test('reads levels, centres, the city label and the privacy floor', () async {
+      final (DemandApi api, _) = _api(_density);
+
+      final DemandDensity density = await api.density(storeId: 'store-1');
+
+      expect(density.region, 'Beirut');
+      expect(density.minimumCustomers, 5);
+      expect(density.areasAround, 3);
+      expect(density.hasNeighbourhood, isTrue);
+      expect(density.zones.map((DemandZone z) => z.level),
+          <DemandLevel>[DemandLevel.high, DemandLevel.low]);
+      expect(density.zones.first.isPlaced, isTrue);
+      expect(density.zones.first.centerLat, 33.8959);
+      // Listed, but there is nowhere to draw it.
+      expect(density.zones.last.isPlaced, isFalse);
+      expect(density.placed.map((DemandZone z) => z.name), <String>['Hamra']);
+    });
+
+    test('an unknown level is kept as unknown rather than failing the map', () {
+      final DemandZone zone = DemandZone.fromJson(<String, dynamic>{
+        'zoneId': 'z-1',
+        'name': 'Badaro',
+        'level': 'SCORCHING',
+      });
+
+      expect(zone.level, DemandLevel.unknown);
+    });
+
+    test('half a centre is no centre', () {
+      final DemandZone zone = DemandZone.fromJson(<String, dynamic>{
+        'zoneId': 'z-1',
+        'name': 'Badaro',
+        'centerLat': 33.87,
+        'level': 'MEDIUM',
+      });
+
+      expect(zone.isPlaced, isFalse);
+      expect(zone.centerLat, isNull);
+    });
+
+    test('a shop the platform cannot place yet parses to an honest empty answer', () {
+      final DemandDensity density = DemandDensity.fromJson(<String, dynamic>{
+        'storeId': 'store-1',
+        'region': null,
+        'windowMinutes': 60,
+        'minimumCustomers': 5,
+        'areasAround': 0,
+        'zones': <dynamic>[],
+      });
+
+      expect(density.hasNeighbourhood, isFalse);
+      expect(density.zones, isEmpty);
+      expect(density.region, isNull);
+    });
+  });
+
+  group('delivery area centres', () {
+    test('an area reads its centre when it has one, and none otherwise', () {
+      final DeliveryZone placed = DeliveryZone.fromJson(<String, dynamic>{
+        'id': 'z-1',
+        'name': 'Hamra',
+        'sortOrder': 10,
+        'active': true,
+        'centerLat': 33.8959,
+        'centerLng': 35.4787,
+      });
+      final DeliveryZone unplaced = DeliveryZone.fromJson(<String, dynamic>{
+        'id': 'z-2',
+        'name': 'Verdun',
+        'sortOrder': 20,
+        'active': true,
+      });
+
+      expect(placed.isPlaced, isTrue);
+      expect(placed.centerLng, 35.4787);
+      expect(unplaced.isPlaced, isFalse);
+    });
+
+    test('creating and editing an area send its centre, and an empty one clears it', () async {
+      final _Recorder adapter = _Recorder(<String, dynamic>{
+        'id': 'z-1',
+        'name': 'Hamra',
+        'sortOrder': 10,
+        'active': true,
+      });
+      final DeliveryZoneApi api =
+          DeliveryZoneApi(Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
+
+      await api.create(name: 'Hamra', region: 'Beirut', centerLat: 33.8959, centerLng: 35.4787);
+      await api.rename('z-1', name: 'Hamra', region: 'Beirut');
+
+      final Map<String, dynamic> created = adapter.calls.first.data as Map<String, dynamic>;
+      expect(created['centerLat'], 33.8959);
+      expect(created['centerLng'], 35.4787);
+      final Map<String, dynamic> edited = adapter.calls.last.data as Map<String, dynamic>;
+      expect(edited.containsKey('centerLat'), isTrue);
+      expect(edited['centerLat'], isNull);
+      expect(edited['centerLng'], isNull);
+    });
+  });
+}

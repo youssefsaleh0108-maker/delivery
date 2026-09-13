@@ -7279,4 +7279,115 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get heatmapTitle => 'رادار الطلب';
+
+  @override
+  String get heatmapSubtitle => 'نبض الأحياء لحظة بلحظة';
+
+  @override
+  String get heatmapActiveOrderDensities => 'كثافة الطلبات النشطة';
+
+  @override
+  String get heatmapLiveSyncing => 'مزامنة مباشرة';
+
+  @override
+  String get heatmapCantRefresh => 'تعذّر التحديث الآن';
+
+  @override
+  String get heatmapLevelHigh => 'مرتفع';
+
+  @override
+  String get heatmapLevelMedium => 'متوسط';
+
+  @override
+  String get heatmapLevelLow => 'منخفض';
+
+  @override
+  String heatmapZoneWithLevel(String zone, String level) {
+    return '$zone ($level)';
+  }
+
+  @override
+  String get heatmapWindowHour => 'آخر ساعة';
+
+  @override
+  String get heatmapWindowDay => 'آخر 24 ساعة';
+
+  @override
+  String get heatmapWindowWeek => 'آخر 7 أيام';
+
+  @override
+  String get heatmapAreasTitle => 'المناطق المحيطة بمتجرك';
+
+  @override
+  String get heatmapNotOnMap => 'غير محددة على الخريطة بعد';
+
+  @override
+  String get heatmapNoneOnMap => 'هذه المناطق غير محددة على الخريطة بعد';
+
+  @override
+  String get heatmapMapUnavailable => 'تعذّر تحميل الخريطة الآن';
+
+  @override
+  String get heatmapNoAreaTitle => 'لا نعرف حيّك بعد';
+
+  @override
+  String get heatmapNoAreaMessage =>
+      'أضف المناطق التي توصل إليها أو حدّد موقع متجرك على الخريطة، وسيظهر هنا الطلب من حول متجرك.';
+
+  @override
+  String get heatmapNotEnoughTitle => 'لا توجد طلبات كافية بالقرب منك بعد';
+
+  @override
+  String heatmapNotEnoughMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'تظهر المنطقة عندما يطلب منها $count عميل مختلف خلال هذه الفترة، فلا يمكن تمييز أي عميل بعينه.',
+      many:
+          'تظهر المنطقة عندما يطلب منها $count عميلاً مختلفاً خلال هذه الفترة، فلا يمكن تمييز أي عميل بعينه.',
+      few:
+          'تظهر المنطقة عندما يطلب منها $count عملاء مختلفين خلال هذه الفترة، فلا يمكن تمييز أي عميل بعينه.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapCouldNotLoad => 'تعذّر تحميل الطلب الآن';
+
+  @override
+  String get heatmapNoShopMessage =>
+      'سيظهر هنا الطلب من حول متجرك بعد إعداد متجرك.';
+
+  @override
+  String get heatmapEntryBlurb => 'اعرف أي الأحياء حول متجرك تطلب الآن';
+
+  @override
+  String get heatmapZoneCentreLatitude => 'خط العرض لمركز المنطقة (اختياري)';
+
+  @override
+  String get heatmapZoneCentreLongitude => 'خط الطول لمركز المنطقة (اختياري)';
+
+  @override
+  String get heatmapZoneCentreHelp =>
+      'منتصف المنطقة تقريباً. يُظهر المنطقة على خريطة الطلب لدى التجار، ولا يدخل في التسعير.';
+
+  @override
+  String get heatmapZoneCentreBoth =>
+      'أدخل القيمتين معاً أو اترك كلتيهما فارغتين';
+
+  @override
+  String get heatmapZoneCentreLatRange => 'خط عرض بين -90 و 90';
+
+  @override
+  String get heatmapZoneCentreLngRange => 'خط طول بين -180 و 180';
+
+  @override
+  String get heatmapZoneOnMap => 'على خريطة الطلب';
+
+  @override
+  String get heatmapZoneNotOnMap => 'ليست على خريطة الطلب';
 }
