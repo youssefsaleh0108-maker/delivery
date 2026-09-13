@@ -36,13 +36,16 @@ const List<Size> _windows = <Size>[
 class _RouteAdapter implements HttpClientAdapter {
   _RouteAdapter(this.routes);
 
-  /// Path → body. Exact paths, so `/api/orders` and `/api/orders/stats` cannot be confused.
+  /// Path → body. Exact paths, so `/api/orders` and `/api/orders/stats` cannot be confused. A body
+  /// may also be a function of the request, for a path whose answer depends on its query; one that
+  /// answers null is a 404.
   final Map<String, Object> routes;
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream,
       Future<void>? cancelFuture) async {
-    final Object? body = routes[options.path];
+    final Object? route = routes[options.path];
+    final Object? body = route is Object? Function(RequestOptions) ? route(options) : route;
     final Map<String, List<String>> headers = <String, List<String>>{
       Headers.contentTypeHeader: <String>[Headers.jsonContentType]
     };
@@ -162,8 +165,9 @@ void main() {
           placedAt: minutesAgo(2),
         ),
       ]),
-      // 482 storefronts, one page of none of them — the screen only reads the count.
-      '/api/stores': _page(<Map<String, dynamic>>[], totalElements: 482),
+      // 482 live storefronts, one page of none of them — the screen only reads the counts: 470
+      // goods shops from the storefront read and 12 service shops from the Services read.
+      '/api/stores': _storefrontCounts(goods: 470, services: 12),
     });
 
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'))
@@ -401,4 +405,35 @@ void main() {
 
     await close(tester);
   });
+
+  testWidgets('counts service shops among the live storefronts', (WidgetTester tester) async {
+    adapter.routes['/api/stores'] = _storefrontCounts(goods: 471, services: 36);
+    await pump(tester);
+
+    // The storefront read that names no vertical never lists a provider, so alone it would say 471.
+    expect(find.text('507'), findsOneWidget);
+    expect(find.text('471'), findsNothing);
+
+    await close(tester);
+  });
+
+  testWidgets('shows no storefront figure rather than the half that answered',
+      (WidgetTester tester) async {
+    adapter.routes['/api/stores'] = _storefrontCounts(goods: 471);
+    await pump(tester);
+
+    expect(find.text('471'), findsNothing);
+    expect(find.text('Unavailable'), findsOneWidget);
+    expect(find.text('12,847'), findsOneWidget);
+
+    await close(tester);
+  });
 }
+
+/// `/api/stores` answering with a count per read: the goods storefront when the request names no
+/// vertical, the Services list when it names SERVICES. A null count is that read failing, as a 404.
+Object? Function(RequestOptions) _storefrontCounts({int? goods, int? services}) =>
+    (RequestOptions request) {
+      final int? count = request.queryParameters['vertical'] == 'SERVICES' ? services : goods;
+      return count == null ? null : _page(<Map<String, dynamic>>[], totalElements: count);
+    };
