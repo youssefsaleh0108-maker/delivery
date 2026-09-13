@@ -20,6 +20,8 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import com.delivery.appnotification.service.RoomSubscriptionGuard;
+
 /**
  * STOMP over WebSocket for live in-app notifications (Section 9).
  *
@@ -56,11 +58,14 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
     static final String USER_SUBSCRIBE_PREFIX = "/user/";
 
     private final JwtDecoder jwtDecoder;
+    private final RoomSubscriptionGuard roomGuard;
     private final List<String> allowedOrigins;
 
     public WebSocketConfiguration(JwtDecoder jwtDecoder,
+                                  RoomSubscriptionGuard roomGuard,
                                   @Value("${delivery.websocket.allowed-origins:*}") String origins) {
         this.jwtDecoder = jwtDecoder;
+        this.roomGuard = roomGuard;
         this.allowedOrigins = List.of(origins.split(","));
     }
 
@@ -150,6 +155,11 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
                     throw new IllegalArgumentException(
                             "Subscriptions are only allowed under " + USER_SUBSCRIBE_PREFIX);
                 }
+                // A neighbourhood room's feed carries many people's words rather than the caller's
+                // own, so being under /user/ is not enough for it: the caller must currently be in
+                // that room, checked exactly as the history and post endpoints check it.
+                Principal user = accessor.getUser();
+                roomGuard.requireMember(destination, user == null ? null : user.getName());
             }
         });
     }

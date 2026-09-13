@@ -155,6 +155,23 @@ delivery:
     # same read happening through a psql prompt with no record.
     backoffice-transcript-access: ${CHAT_BACKOFFICE_READ:true}
     order-events-queue: app-notification.order-events
+    # Neighbourhood rooms, one per delivery zone. Policy, not tuning - see RoomChatProperties for the
+    # reasoning behind each number.
+    rooms:
+      # How long a neighbour stays in a room before their address may move them to another.
+      move-cooldown: ${CHAT_ROOM_MOVE_COOLDOWN:7d}
+      history-page-size: 50
+      # The send rate limit: at most this many messages per window, per person, across all rooms.
+      send-window: 1m
+      max-messages-per-window: ${CHAT_ROOM_MAX_MESSAGES_PER_WINDOW:8}
+
+  # Product Service answers what chat cannot know alone: whether a delivery area is real, whether a
+  # shop exists, which shops a merchant owns. Always asked with the caller's own token.
+  clients:
+    product-service:
+      base-url: ${PRODUCT_SERVICE_URL:http://localhost:8103}
+      connect-timeout: 2s
+      read-timeout: 5s
 
 management:
   endpoints:
