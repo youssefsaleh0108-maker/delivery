@@ -32,9 +32,10 @@ import static org.mockito.Mockito.when;
  *
  * <p>"Around" matters more than it looks. Order Manager counts demand in exactly the areas this
  * answers and nowhere else, so this is the rule that keeps a merchant looking at their own
- * neighbourhood rather than at the platform. The coordinates are real Beirut ones, so the distances
- * the assertions depend on can be checked against a map: Mar Mikhael and Badaro are each about four
- * kilometres from Hamra, Jounieh about sixteen.
+ * neighbourhood rather than at the platform. Two of its inputs are the merchant's to set — the areas
+ * the shop prices and the width of its delivery circle — so neither may widen it past the cap. The
+ * coordinates are real ones, so the distances the assertions depend on can be checked against a map:
+ * Badaro, Mar Mikhael and Ghobeiry are each four to five kilometres from Hamra, Jounieh about sixteen.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -44,7 +45,11 @@ class DeliveryZoneNeighbourhoodTest {
     private static final GeoPoint HAMRA_CENTRE = GeoPoint.of(33.8959, 35.4787);
     private static final GeoPoint MAR_MIKHAEL_CENTRE = GeoPoint.of(33.8981, 35.5244);
     private static final GeoPoint BADARO_CENTRE = GeoPoint.of(33.8745, 35.5147);
+    private static final GeoPoint GHOBEIRY_CENTRE = GeoPoint.of(33.8600, 35.5050);
     private static final GeoPoint JOUNIEH_CENTRE = GeoPoint.of(33.9808, 35.6178);
+
+    /** The cap the platform runs with when nothing configures another. */
+    private static final int CAP = 5_000;
 
     @Mock
     private DeliveryZoneRepository zones;
@@ -61,7 +66,7 @@ class DeliveryZoneNeighbourhoodTest {
 
     @BeforeEach
     void setUp() {
-        service = new DeliveryZoneService(zones, storeZones);
+        service = new DeliveryZoneService(zones, storeZones, CAP);
         shop = new Store("merchant-1", "Hamra Sushi", Store.Vertical.RESTAURANT);
 
         hamra = placed("Hamra", "Beirut", 10, HAMRA_CENTRE);
@@ -91,6 +96,12 @@ class DeliveryZoneNeighbourhoodTest {
     @DisplayName("an area's centre")
     class Centre {
 
+        @BeforeEach
+        void hamraCanBeEdited() {
+            when(zones.findById(hamra.getId())).thenReturn(Optional.of(hamra));
+            when(zones.findByNameIgnoreCase("Hamra")).thenReturn(Optional.of(hamra));
+        }
+
         @Test
         void a_new_area_can_be_placed_as_it_is_created() {
             when(zones.existsByNameIgnoreCase("Gemmayze")).thenReturn(false);
@@ -104,18 +115,31 @@ class DeliveryZoneNeighbourhoodTest {
         }
 
         @Test
-        void editing_an_area_without_a_centre_takes_it_off_the_map_and_leaves_the_rest() {
-            // The back office's edit replaces the whole area. An area left unplaced is listed
-            // rather than drawn; nothing about pricing reads the centre.
-            when(zones.findById(hamra.getId())).thenReturn(Optional.of(hamra));
-            when(zones.findByNameIgnoreCase("Hamra")).thenReturn(Optional.of(hamra));
+        void editing_an_area_without_a_word_about_its_centre_keeps_the_centre() {
+            // What every client written before centres existed sends: name, region and rank alone.
+            // A rename or a reorder from one of them must not take the area off every shop's map.
+            service.rename(hamra.getId(), "Hamra", "Beirut", 5, null, false);
 
-            service.rename(hamra.getId(), "Hamra", "Beirut", 5, null);
+            assertThat(hamra.centre()).isEqualTo(HAMRA_CENTRE);
+            assertThat(hamra.getSortOrder()).isEqualTo(5);
+        }
+
+        @Test
+        void clearing_the_centre_takes_the_area_off_the_map_and_leaves_the_rest() {
+            service.rename(hamra.getId(), "Hamra", "Beirut", 5, null, true);
 
             assertThat(hamra.centre()).isNull();
             assertThat(hamra.getCenterLat()).isNull();
             assertThat(hamra.getCenterLng()).isNull();
             assertThat(hamra.getSortOrder()).isEqualTo(5);
+        }
+
+        @Test
+        void a_new_centre_moves_the_area() {
+            service.rename(hamra.getId(), "Hamra", "Beirut", 10, GeoPoint.of(33.8970, 35.4800),
+                    false);
+
+            assertThat(hamra.centre()).isEqualTo(GeoPoint.of(33.8970, 35.4800));
         }
 
         @Test
@@ -154,42 +178,82 @@ class DeliveryZoneNeighbourhoodTest {
         }
 
         @Test
-        void the_areas_a_shop_delivers_to_count_however_far_they_are() {
+        void a_nearby_area_the_shop_prices_counts_even_past_its_own_circle() {
             shop.pinAt(HAMRA_CENTRE);
-            shopDeliversTo(jounieh);
+            shop.setDeliveryRadiusMetres(1_000);
+            shopDeliversTo(badaro);
 
-            assertThat(service.around(shop).zones()).containsExactly(hamra, marMikhael, badaro,
-                    jounieh);
+            assertThat(service.around(shop).zones()).containsExactly(hamra, badaro);
         }
 
         @Test
-        void a_shop_with_no_pin_is_around_its_own_coverage_and_nothing_else() {
-            shopDeliversTo(badaro);
+        void a_far_area_the_shop_prices_is_not_around_it() {
+            // Any merchant may price any area on the platform. Were a coverage row enough, a Hamra
+            // shop pricing Jounieh would put Jounieh's demand on its map — and a shop pricing every
+            // area would read the whole platform.
+            shop.pinAt(HAMRA_CENTRE);
+            shopDeliversTo(jounieh);
+
+            assertThat(service.around(shop).zones()).containsExactly(hamra, marMikhael, badaro);
+        }
+
+        @Test
+        void a_fifty_kilometre_delivery_circle_is_held_to_the_cap() {
+            shop.pinAt(HAMRA_CENTRE);
+            shop.setDeliveryRadiusMetres(50_000);
 
             DeliveryZoneService.Neighbourhood around = service.around(shop);
 
-            assertThat(around.zones()).containsExactly(badaro);
+            assertThat(around.zones()).containsExactly(hamra, marMikhael, badaro);
+            assertThat(around.radiusMetres()).isEqualTo(CAP);
+        }
+
+        @Test
+        void the_cap_is_the_platforms_setting() {
+            DeliveryZoneService narrow = new DeliveryZoneService(zones, storeZones, 3_000);
+            shop.pinAt(HAMRA_CENTRE);
+            shopDeliversTo(badaro);
+
+            DeliveryZoneService.Neighbourhood around = narrow.around(shop);
+
+            assertThat(around.zones()).containsExactly(hamra);
+            assertThat(around.radiusMetres()).isEqualTo(3_000);
+        }
+
+        @Test
+        void a_cap_outside_sane_bounds_stops_the_service_from_starting() {
+            assertThatThrownBy(() -> new DeliveryZoneService(zones, storeZones, 0))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> new DeliveryZoneService(zones, storeZones, 50_000))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void a_shop_with_no_pin_has_no_neighbourhood_even_where_it_delivers() {
+            shopDeliversTo(badaro, jounieh);
+
+            DeliveryZoneService.Neighbourhood around = service.around(shop);
+
+            assertThat(around.zones()).isEmpty();
             assertThat(around.radiusMetres()).isNull();
         }
 
         @Test
-        void an_unplaced_area_is_found_only_through_coverage() {
+        void an_unplaced_area_is_around_nobody_even_where_the_shop_delivers() {
             DeliveryZone verdun = new DeliveryZone("Verdun", "Beirut", 50);
             when(zones.findByActiveTrueOrderBySortOrderAscNameAsc())
                     .thenReturn(List.of(hamra, verdun));
             shop.pinAt(HAMRA_CENTRE);
-
-            assertThat(service.around(shop).zones()).containsExactly(hamra);
-
             shopDeliversTo(verdun);
 
-            assertThat(service.around(shop).zones()).containsExactly(hamra, verdun);
+            assertThat(service.around(shop).zones()).containsExactly(hamra);
         }
 
         @Test
         void a_retired_area_is_around_nobody_even_where_a_shop_still_prices_it() {
             DeliveryZone retired = placed("Old Souk", "Beirut", 60, HAMRA_CENTRE);
             retired.retire();
+            shop.pinAt(HAMRA_CENTRE);
             // The active list is what the repository hands back; the coverage row outlives the
             // area it names.
             shopDeliversTo(retired);
@@ -208,9 +272,16 @@ class DeliveryZoneNeighbourhoodTest {
 
         @Test
         void the_city_label_is_the_region_most_of_the_areas_share() {
-            shopDeliversTo(jounieh, hamra, marMikhael);
+            DeliveryZone ghobeiry = placed("Ghobeiry", "Mount Lebanon", 5, GHOBEIRY_CENTRE);
+            when(zones.findByActiveTrueOrderBySortOrderAscNameAsc())
+                    .thenReturn(List.of(ghobeiry, hamra, marMikhael, badaro, jounieh));
+            shop.pinAt(HAMRA_CENTRE);
 
-            assertThat(service.around(shop).region()).isEqualTo("Beirut");
+            DeliveryZoneService.Neighbourhood around = service.around(shop);
+
+            // Ghobeiry comes first in the picker, but three of the four areas are in Beirut.
+            assertThat(around.zones()).containsExactly(ghobeiry, hamra, marMikhael, badaro);
+            assertThat(around.region()).isEqualTo("Beirut");
         }
     }
 }

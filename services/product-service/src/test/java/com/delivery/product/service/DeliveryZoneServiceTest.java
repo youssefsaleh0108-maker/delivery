@@ -51,7 +51,7 @@ class DeliveryZoneServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DeliveryZoneService(zones, storeZones);
+        service = new DeliveryZoneService(zones, storeZones, 5_000);
         store = new Store("merchant-1", "Smoke Test Kitchen", Store.Vertical.RESTAURANT);
         store.updateCommercials(new BigDecimal("3.00"), new BigDecimal("10.00"), 20, 40);
     }
@@ -194,7 +194,7 @@ class DeliveryZoneServiceTest {
             when(zones.findById(any())).thenReturn(Optional.of(hamra));
             when(zones.findByNameIgnoreCase("Hamra")).thenReturn(Optional.of(hamra));
 
-            service.rename(hamra.getId(), "Hamra", "Beirut", 5, null);
+            service.rename(hamra.getId(), "Hamra", "Beirut", 5, null, false);
 
             assertThat(hamra.getSortOrder()).isEqualTo(5);
         }

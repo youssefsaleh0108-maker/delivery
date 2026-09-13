@@ -79,11 +79,17 @@ public class DeliveryZoneController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ZoneResponse.of(created));
     }
 
+    /**
+     * Edits an area's name, region and rank, and its centre when the request says something about
+     * it: a request with no centre keeps the one the area has, and {@code "clearCentre": true} takes
+     * it off the demand map. {@link DeliveryZoneService#rename} says why the centre is not replaced
+     * wholesale like the rest.
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('BACKOFFICE')")
     public ZoneResponse rename(@PathVariable UUID id, @Valid @RequestBody ZoneRequest request) {
         return ZoneResponse.of(zones.rename(id, request.name(), request.region(),
-                request.sortOrder(), request.centre()));
+                request.sortOrder(), request.centre(), request.clearsCentre()));
     }
 
     /** Takes an area out of the picker. Saved addresses that name it keep working. */
@@ -150,23 +156,27 @@ public class DeliveryZoneController {
      * and then counts demand in exactly these areas and no others. The neighbourhood is decided
      * HERE, where shops and areas live, and never taken from a client: a list of area ids sent by
      * the app would let any merchant read demand anywhere on the platform. What counts as "around"
-     * is {@link DeliveryZoneService#around}.
+     * — placed areas within a fixed distance of the shop's pin — is {@link DeliveryZoneService#around}.
      *
      * <p>MERCHANT for their own shop, BACKOFFICE for any. Another merchant's shop answers 404, the
      * same as a shop that does not exist, so the endpoint confirms nothing about the ids it is
      * handed. Staff accounts (MERCHANT_STAFF) are refused by the role rule: the density this feeds
      * is owner-only, like every order-backed number a shop sees.
      *
-     * <p>Unlike the coverage calls above, the caller is passed to {@code read} as the viewer. A shop
-     * that has not published yet is exactly a shop deciding where to open for business, and
-     * {@code read} hides an unpublished shop from everyone but its owner.
+     * <p>Live shops only, for the owner and the back office alike: a shop that is not ACTIVE answers
+     * 404 too. A draft costs nothing to create and nobody orders from it, so serving one would let a
+     * test shop — pinned anywhere, pricing any area — read the demand around other people's shops
+     * before it has traded at all. The shop is read as nobody in particular, which already refuses a
+     * shop that is not live; the status is checked here as well, where the rule can be seen.
      */
     @GetMapping("/around/{storeId}")
     @PreAuthorize("hasAnyRole('MERCHANT','BACKOFFICE')")
     public NeighbourhoodResponse around(@PathVariable UUID storeId) {
-        Store store = stores.read(storeId.toString(), CurrentUser.id().orElse(null));
-        if (!CurrentUser.hasRole("BACKOFFICE")
-                && !CurrentUser.requireId().equals(store.getMerchantId())) {
+        Store store = stores.read(storeId.toString(), null);
+        boolean live = store.getStatus() == Store.Status.ACTIVE;
+        boolean mayLook = CurrentUser.hasRole("BACKOFFICE")
+                || CurrentUser.requireId().equals(store.getMerchantId());
+        if (!live || !mayLook) {
             throw new StoreService.StoreNotFoundException(storeId.toString());
         }
         DeliveryZoneService.Neighbourhood around = zones.around(store);
@@ -227,12 +237,17 @@ public class DeliveryZoneController {
             /**
              * Roughly the middle of the area, for the merchant demand map. Both or neither.
              *
-             * <p>This request replaces everything the back office edits, so leaving both out takes
-             * the area off the map. A client written before centres existed sends neither, and the
-             * worst it can do is un-place an area; nothing about pricing reads these.
+             * <p>Leaving both out, or sending both as null, keeps the centre an edited area already
+             * has: every client written before centres existed sends neither, and a rename from one
+             * of them must not take the area off the map. {@code clearCentre} removes a centre.
              */
             BigDecimal centerLat,
-            BigDecimal centerLng) {
+            BigDecimal centerLng,
+            /**
+             * True takes the area off the demand map; absent or false says nothing about the centre.
+             * Refused alongside a centre, which contradicts it.
+             */
+            Boolean clearCentre) {
 
         /**
          * The centre as a checked point, or null. Half a centre, a value out of range and the
@@ -240,6 +255,21 @@ public class DeliveryZoneController {
          */
         GeoPoint centre() {
             return GeoPoint.ofNullable(centerLat, centerLng);
+        }
+
+        /**
+         * Whether the request takes the centre off. A centre sent with it is refused with a 400, like
+         * any other coordinate that cannot be used, rather than resolved by guessing which was meant.
+         */
+        boolean clearsCentre() {
+            if (!Boolean.TRUE.equals(clearCentre)) {
+                return false;
+            }
+            if (centerLat != null || centerLng != null) {
+                throw new GeoPoint.InvalidCoordinateException(
+                        "Send a centre or clearCentre, not both");
+            }
+            return true;
         }
     }
 
@@ -255,12 +285,14 @@ public class DeliveryZoneController {
      * A shop's neighbourhood.
      *
      * @param merchantId   the shop's owner, so Order Manager can check on its own side that the
-     *                     merchant asking for density owns the shop they named
+     *                     merchant asking for density owns the shop they named, and leave that
+     *                     owner's own trade out of the count
      * @param region       the region most of these areas belong to — the city label on the map;
      *                     null when none of them names one
-     * @param radiusMetres how far from the shop's pin an area still counted as near; null for a
-     *                     shop with no pin, whose neighbourhood is its coverage alone
-     * @param zones        active areas only, in the picker's order
+     * @param radiusMetres how far from the shop's pin an area counts as near without a coverage row,
+     *                     never more than the neighbourhood cap; null for a shop with no pin, whose
+     *                     neighbourhood is empty
+     * @param zones        active, placed areas within the cap of the pin, in the picker's order
      */
     public record NeighbourhoodResponse(UUID storeId, String merchantId, String region,
                                         Integer radiusMetres, List<ZoneResponse> zones) {

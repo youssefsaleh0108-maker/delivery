@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,10 +41,24 @@ public class DeliveryZoneService {
     private final DeliveryZoneRepository zones;
     private final StoreDeliveryZoneRepository storeZones;
 
+    /** The farthest an area's centre may lie from a shop's pin and still be around it — see {@link #around}. */
+    private final int neighbourhoodCapMetres;
+
     public DeliveryZoneService(DeliveryZoneRepository zones,
-                               StoreDeliveryZoneRepository storeZones) {
+                               StoreDeliveryZoneRepository storeZones,
+                               @Value("${delivery.demand.neighbourhood-cap-metres:5000}")
+                               int neighbourhoodCapMetres) {
+        if (neighbourhoodCapMetres < MIN_NEIGHBOURHOOD_CAP_METRES
+                || neighbourhoodCapMetres > MAX_NEIGHBOURHOOD_CAP_METRES) {
+            // Refused at start-up rather than clamped: a typo in a values file should stop the
+            // deploy, not quietly widen every merchant's demand map to the next town.
+            throw new IllegalArgumentException("delivery.demand.neighbourhood-cap-metres must be "
+                    + "between " + MIN_NEIGHBOURHOOD_CAP_METRES + " and "
+                    + MAX_NEIGHBOURHOOD_CAP_METRES + ", not " + neighbourhoodCapMetres);
+        }
         this.zones = zones;
         this.storeZones = storeZones;
+        this.neighbourhoodCapMetres = neighbourhoodCapMetres;
     }
 
     // ---------------------------------------------------------------- the zone register
@@ -62,7 +77,7 @@ public class DeliveryZoneService {
      * Adds an area to the register.
      *
      * @param centre roughly the middle of the area, for the merchant demand map; null leaves it
-     *               unplaced, which costs it nothing but a circle on that map
+     *               unplaced, which keeps it off that map and out of every shop's neighbourhood
      */
     @Transactional
     public DeliveryZone create(String name, String region, int sortOrder, GeoPoint centre) {
@@ -75,14 +90,23 @@ public class DeliveryZoneService {
     }
 
     /**
-     * Replaces everything the back office edits about an area: name, region, rank and centre.
+     * Edits what the back office edits about an area: its name, region and rank, and its centre when
+     * the request says something about it.
      *
-     * <p>A full replacement, so a null centre takes the area off the demand map. Pricing never reads
-     * the centre, so moving or clearing it changes no shop's terms.
+     * <p>The centre is the one part not replaced wholesale. A new centre moves the area, an explicit
+     * {@code clearCentre} takes it off the demand map, and saying neither keeps the centre it has.
+     * Every client written before centres existed — an older portal build, a cached web bundle, a
+     * back-office tab left open — sends name, region and rank alone, and a rename or a reorder from
+     * one of them must not silently drop the area off every merchant's map. Pricing never reads the
+     * centre, so moving or clearing it changes no shop's terms.
+     *
+     * @param centre      the new centre, or null to say nothing about it
+     * @param clearCentre true to take the area off the map. The controller refuses it alongside a
+     *                    centre; were both to arrive here, the centre would win
      */
     @Transactional
     public DeliveryZone rename(UUID id, String name, String region, int sortOrder,
-                               GeoPoint centre) {
+                               GeoPoint centre, boolean clearCentre) {
         DeliveryZone zone = require(id);
         // Allowed to keep its own name, refused if it would take somebody else's.
         zones.findByNameIgnoreCase(name)
@@ -91,7 +115,11 @@ public class DeliveryZoneService {
                     throw new ZoneConflictException("An area called '" + name + "' already exists");
                 });
         zone.rename(name, region, sortOrder);
-        zone.placeAt(centre);
+        if (centre != null) {
+            zone.placeAt(centre);
+        } else if (clearCentre) {
+            zone.placeAt(null);
+        }
         return zone;
     }
 
@@ -157,45 +185,72 @@ public class DeliveryZoneService {
      *
      * <p>Five kilometres: from Hamra that reaches Mar Mikhael and Badaro, the distance a city shop's
      * riders routinely carry, and stops well short of the next town (Jounieh is sixteen). A shop that
-     * HAS drawn a circle is held to its own instead.
+     * HAS drawn a circle is held to its own instead, up to the neighbourhood cap.
      */
     static final int DEFAULT_NEIGHBOURHOOD_METRES = 5_000;
+
+    /** The narrowest cap configuration may set. Under half a kilometre is a street, not a neighbourhood. */
+    static final int MIN_NEIGHBOURHOOD_CAP_METRES = 500;
+
+    /**
+     * The widest cap configuration may set: the widest delivery circle the pin picker lets a merchant
+     * draw. Past that, "around the shop" is a district of districts.
+     */
+    static final int MAX_NEIGHBOURHOOD_CAP_METRES = 15_000;
 
     /**
      * The areas around a shop — the only areas its Demand Radar may show.
      *
-     * <p>An active area is around a shop when either:
+     * <p>An active area is around a shop only when all of these hold:
      * <ul>
-     *   <li>the shop delivers there (it has a coverage row), however far away that is — the shop has
-     *       said it serves the area; or
-     *   <li>the shop has a pin, the area has a centre, and the centre lies within the shop's own
-     *       delivery radius, or within {@link #DEFAULT_NEIGHBOURHOOD_METRES} when it has none.
+     *   <li>the shop has a pin and the area has a centre. Nothing can be measured from a shop whose
+     *       place is unknown, or to an area the back office has not placed;
+     *   <li>the centre lies within the neighbourhood cap of the pin: five kilometres unless
+     *       {@code delivery.demand.neighbourhood-cap-metres} says otherwise; and
+     *   <li>the shop delivers there (a coverage row), or the centre lies within the shop's own
+     *       delivery radius — {@link #DEFAULT_NEIGHBOURHOOD_METRES} when it has drawn none.
      * </ul>
      *
-     * <p>A shop with no pin and no areas has no neighbourhood and gets an empty one. The honest
-     * answer is "we don't know where you are yet", not a guess and not the whole city. A retired area
-     * is around nobody, even where a shop still holds a price for it.
+     * <p>The cap is what keeps "around" the platform's decision rather than the merchant's. Both other
+     * inputs are the merchant's to set: a coverage row can be added for any area on the platform, and
+     * a delivery radius can be drawn fifty kilometres wide. Without the cap, a shop pricing every area
+     * would read demand platform-wide.
+     *
+     * <p>A shop with no pin, or no placed area near its pin, gets an empty neighbourhood. The honest
+     * answer is "we don't know what is around you yet", not a guess and not the whole city. A retired
+     * area is around nobody, even where a shop still holds a price for it. Whether the shop is live is
+     * the endpoint's rule, not this one's.
      *
      * <p>The region is the one most of these areas name, for the map's city label. A tie goes to the
      * region that appears first in the picker's order, so the label cannot flicker between polls.
      */
     @Transactional(readOnly = true)
     public Neighbourhood around(Store store) {
+        GeoPoint pin = store.location();
+        if (pin == null) {
+            return new Neighbourhood(null, null, List.of());
+        }
         Set<UUID> covered = storeZones.findByStoreId(store.getId()).stream()
                 .map(StoreDeliveryZone::getZoneId)
                 .collect(Collectors.toSet());
-        GeoPoint pin = store.location();
-        int radius = store.getDeliveryRadiusMetres() != null
-                ? store.getDeliveryRadiusMetres()
-                : DEFAULT_NEIGHBOURHOOD_METRES;
+        int reach = Math.min(store.getDeliveryRadiusMetres() != null
+                        ? store.getDeliveryRadiusMetres()
+                        : DEFAULT_NEIGHBOURHOOD_METRES,
+                neighbourhoodCapMetres);
 
         List<DeliveryZone> near = zones.findByActiveTrueOrderBySortOrderAscNameAsc().stream()
-                .filter(zone -> covered.contains(zone.getId())
-                        || (pin != null && zone.centre() != null
-                                && pin.distanceMetresTo(zone.centre()) <= radius))
+                .filter(zone -> {
+                    GeoPoint centre = zone.centre();
+                    if (centre == null) {
+                        return false;
+                    }
+                    double metres = pin.distanceMetresTo(centre);
+                    return metres <= neighbourhoodCapMetres
+                            && (metres <= reach || covered.contains(zone.getId()));
+                })
                 .toList();
 
-        return new Neighbourhood(regionOf(near), pin == null ? null : radius, near);
+        return new Neighbourhood(regionOf(near), reach, near);
     }
 
     private static String regionOf(List<DeliveryZone> areas) {
@@ -221,8 +276,10 @@ public class DeliveryZoneService {
      * A shop's neighbourhood.
      *
      * @param region       the region most of the areas name, or null when none names one
-     * @param radiusMetres how far from the pin an area counted as near; null for a shop with no pin
-     * @param zones        active areas only, in the picker's order
+     * @param radiusMetres how far from the pin an area counts as near without a coverage row: the
+     *                     shop's own radius or the default, never more than the cap. Null for a shop
+     *                     with no pin, which has no neighbourhood
+     * @param zones        active, placed areas within the cap of the pin, in the picker's order
      */
     public record Neighbourhood(String region, Integer radiusMetres, List<DeliveryZone> zones) {
     }
