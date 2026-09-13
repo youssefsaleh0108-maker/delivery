@@ -261,9 +261,16 @@ public class ProductController {
 
     // ---------------------------------------------------------------- options
 
-    /** The questions to ask before this product can go in a basket. */
+    /**
+     * The questions to ask before this product can go in a basket.
+     *
+     * <p>Behind the rule reading the product follows ({@link CatalogService#read}): the choices and
+     * what each adds are part of the product, so a draft, a paused offer or an offer of a shop that is
+     * not listed keeps them to its owner, and anybody else is told the product is not found.
+     */
     @GetMapping("/{id}/options")
     public List<OptionGroupResponse> options(@PathVariable UUID id) {
+        catalog.read(id, CurrentUser.id().orElse(null));
         return optionService.forProduct(id).stream().map(ProductController::toGroup).toList();
     }
 
@@ -274,11 +281,18 @@ public class ProductController {
      * as options are ticked — and because it is a read that reveals nothing the menu does not.
      * Order Manager calls the same endpoint at checkout, so the price shown and the price charged
      * come from one implementation.
+     *
+     * <p>Which is why it follows reading the product ({@link CatalogService#read}). A product the
+     * caller may not read is "not found" here too: a draft, paused or archived product, or a live
+     * offer of a shop that is a draft, suspended or in a closed category, is quoted to its owner only.
+     * No quote is given for a line nobody could order, and Order Manager, which prices with the
+     * customer's token, is refused at the price as well as at the read.
      */
     @PostMapping("/{id}/price")
     public PriceResponse price(@PathVariable UUID id, @RequestBody(required = false) PriceRequest request) {
+        Product product = catalog.read(id, CurrentUser.id().orElse(null));
         PricedSelection priced = optionService.price(
-                id, request == null ? List.of() : request.optionIds());
+                product, request == null ? List.of() : request.optionIds());
         return new PriceResponse(
                 priced.basePrice(),
                 priced.unitPrice(),

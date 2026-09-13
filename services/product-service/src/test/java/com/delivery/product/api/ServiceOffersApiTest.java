@@ -1,6 +1,9 @@
 package com.delivery.product.api;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +18,7 @@ import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -38,11 +42,14 @@ import com.delivery.product.domain.ServiceTerms;
 import com.delivery.product.domain.ServiceTermsRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreDeliveryZoneRepository;
+import com.delivery.product.domain.StoreHours;
 import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductOptionService;
+import com.delivery.product.service.ProductOptionService.PricedSelection;
+import com.delivery.product.service.ServiceCategories;
 import com.delivery.product.service.ServiceOfferSearch;
 import com.delivery.product.service.ServiceOfferSearch.PopularOffer;
 import com.delivery.product.service.StoreService;
@@ -50,6 +57,7 @@ import com.delivery.product.service.StoreService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -77,7 +85,13 @@ class ServiceOffersApiTest {
 
     private ProductRepository products;
     private ServiceOfferSearch serviceOffers;
+    private ProductOptionService optionService;
+    private StoreService storeService;
+    private Store press;
     private Product offer;
+
+    /** The service's configuration, so a test can close the offer's category. */
+    private MockEnvironment environment;
 
     /** Refusals as the service's exception handler writes them. For callers who present a token. */
     private MockMvc mvc;
@@ -95,10 +109,18 @@ class ServiceOffersApiTest {
         StoreRepository stores = mock(StoreRepository.class);
         ServiceTermsRepository serviceTerms = mock(ServiceTermsRepository.class);
         serviceOffers = mock(ServiceOfferSearch.class);
+        optionService = mock(ProductOptionService.class);
+        storeService = mock(StoreService.class);
+        environment = new MockEnvironment();
 
-        Store press = new Store(PROVIDER, "Al Fakhry Press", Store.Vertical.SERVICES,
+        // Listed: open all week, published, and in a category the launch opens.
+        press = new Store(PROVIDER, "Al Fakhry Press", Store.Vertical.SERVICES,
                 Store.ServiceCategory.PRINTING);
         press.pinAt(GeoPoint.of(33.898200d, 35.482500d));
+        press.replaceHours(Arrays.stream(DayOfWeek.values())
+                .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
+                .toList());
+        press.publish(Instant.parse("2026-09-01T09:00:00Z"));
         offer = new Product(PROVIDER, press.getId(), "Business card printing", null,
                 new BigDecimal("15.00"), null);
         offer.addImage("products/cards.jpg");
@@ -107,19 +129,23 @@ class ServiceOffersApiTest {
                 500, 24, 48, ServiceTerms.Fulfilment.BOTH, ServiceTerms.AttachmentPolicy.NONE, null);
 
         when(stores.findById(press.getId())).thenReturn(Optional.of(press));
+        when(products.findById(offer.getId())).thenReturn(Optional.of(offer));
         when(products.findByIdAndMerchantId(any(UUID.class), anyString())).thenReturn(Optional.empty());
         when(products.findByIdAndMerchantId(offer.getId(), PROVIDER)).thenReturn(Optional.of(offer));
         when(products.existsById(offer.getId())).thenReturn(true);
         when(serviceTerms.findById(offer.getId())).thenReturn(Optional.of(terms));
         when(serviceTerms.findAllById(any())).thenReturn(List.of(terms));
+        when(optionService.price(any(Product.class), anyList())).thenReturn(new PricedSelection(
+                new BigDecimal("15.00"), new BigDecimal("15.00"), List.of()));
 
         CatalogService catalog = new CatalogService(products, mock(CategoryRepository.class),
-                mock(StoreService.class), mock(OutboxRecorder.class), stores, serviceTerms,
-                mock(StoreDeliveryZoneRepository.class), mock(ProductOptionGroupRepository.class));
+                storeService, mock(OutboxRecorder.class), stores, serviceTerms,
+                mock(StoreDeliveryZoneRepository.class), mock(ProductOptionGroupRepository.class),
+                new ServiceCategories(environment));
         ProductImageService images = mock(ProductImageService.class);
         when(images.resolveImages(any())).thenReturn(List.of());
 
-        Object controller = new ProductController(catalog, images, mock(ProductOptionService.class),
+        Object controller = new ProductController(catalog, images, optionService,
                 mock(CrossSellService.class), serviceOffers);
         mvc = secured(controller).setControllerAdvice(new ApiExceptionHandler()).build();
         noTokenMvc = secured(controller).build();
@@ -251,6 +277,83 @@ class ServiceOffersApiTest {
                     .andExpect(jsonPath("$.status").value("ACTIVE"));
 
             assertThat(offer.getStatus()).isEqualTo(Product.Status.ACTIVE);
+        }
+    }
+
+    @Nested
+    @DisplayName("reading, choosing options for and pricing one offer")
+    class OneOffer {
+
+        private static final String OPEN_CATEGORIES = "delivery.product.services.enabled-categories";
+
+        private String readPath() {
+            return "/api/products/" + offer.getId();
+        }
+
+        @Test
+        void a_customer_reads_and_prices_a_live_offer_of_a_listed_shop() throws Exception {
+            signedInAs("keycloak-sub-customer", "CUSTOMER");
+
+            mvc.perform(get(readPath()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.service.unitSize").value(500));
+            mvc.perform(post(readPath() + "/price"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.unitPrice").value(15.00));
+        }
+
+        /** Order Manager reads and prices with the customer's token, and knows no category. */
+        @Test
+        void an_offer_in_a_closed_category_is_a_404_to_read_to_choose_for_and_to_price() throws Exception {
+            environment.setProperty(OPEN_CATEGORIES, "TAILORING,REPAIRS");
+            signedInAs("keycloak-sub-customer", "CUSTOMER");
+
+            mvc.perform(get(readPath())).andExpect(status().isNotFound());
+            mvc.perform(get(readPath() + "/options")).andExpect(status().isNotFound());
+            mvc.perform(post(readPath() + "/price")).andExpect(status().isNotFound());
+
+            verify(optionService, never()).forProduct(any(UUID.class));
+            verify(optionService, never()).price(any(Product.class), anyList());
+        }
+
+        @Test
+        void an_offer_of_a_suspended_shop_is_a_404_to_read_and_to_price() throws Exception {
+            press.suspend();
+            signedInAs("keycloak-sub-customer", "CUSTOMER");
+
+            mvc.perform(get(readPath())).andExpect(status().isNotFound());
+            mvc.perform(post(readPath() + "/price")).andExpect(status().isNotFound());
+
+            verify(optionService, never()).price(any(Product.class), anyList());
+        }
+
+        @Test
+        void a_paused_offer_is_quoted_to_nobody_but_its_provider() throws Exception {
+            offer.pause();
+
+            signedInAs(RIVAL, "MERCHANT");
+            mvc.perform(post(readPath() + "/price")).andExpect(status().isNotFound());
+            signedInAs("keycloak-sub-customer", "CUSTOMER");
+            mvc.perform(post(readPath() + "/price")).andExpect(status().isNotFound());
+
+            verify(optionService, never()).price(any(Product.class), anyList());
+            verify(optionService, never()).price(any(UUID.class), anyList());
+        }
+
+        @Test
+        void its_provider_still_reads_and_prices_it_paused_in_a_suspended_shop_of_a_closed_category()
+                throws Exception {
+            offer.pause();
+            press.suspend();
+            environment.setProperty(OPEN_CATEGORIES, "TAILORING");
+            signedInAs(PROVIDER, "MERCHANT");
+
+            mvc.perform(get(readPath()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("PAUSED"));
+            mvc.perform(post(readPath() + "/price"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.unitPrice").value(15.00));
         }
     }
 

@@ -76,7 +76,22 @@ public class ProductOptionService {
     public PricedSelection price(UUID productId, List<UUID> optionIds) {
         Product product = products.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
+        return priced(productId, product, optionIds);
+    }
 
+    /**
+     * {@link #price(UUID, List)} for a product the caller has already read.
+     *
+     * <p>How the API prices. It reads the product through {@code CatalogService#read} first, so a
+     * product the caller may not see (a draft, a paused offer, an offer of a shop that is not listed)
+     * is "not found" rather than quoted, and the product is not read a second time here.
+     */
+    @Transactional(readOnly = true)
+    public PricedSelection price(Product product, List<UUID> optionIds) {
+        return priced(product.getId(), product, optionIds);
+    }
+
+    private PricedSelection priced(UUID productId, Product product, List<UUID> optionIds) {
         Collection<UUID> distinct = new LinkedHashSet<>(optionIds == null ? List.of() : optionIds);
 
         List<ProductOptionGroup> productGroups = groups.findByProductIdOrderByPositionAsc(productId);

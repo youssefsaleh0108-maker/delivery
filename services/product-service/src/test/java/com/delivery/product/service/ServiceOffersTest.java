@@ -1,6 +1,9 @@
 package com.delivery.product.service;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,9 +16,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.env.MockEnvironment;
 
 import com.delivery.platform.outbox.OutboxRecorder;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
@@ -34,12 +39,14 @@ import com.delivery.product.domain.ServiceTerms.PricingType;
 import com.delivery.product.domain.ServiceTermsRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreDeliveryZoneRepository;
+import com.delivery.product.domain.StoreHours;
 import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.event.CatalogEvents;
 import com.delivery.product.event.CatalogEvents.ProductSnapshot;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.StoreService.StoreNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -77,6 +84,9 @@ class ServiceOffersTest {
     private OutboxRecorder outbox;
     private CatalogService catalog;
 
+    /** The service's configuration, so a test can close a service category. */
+    private MockEnvironment environment;
+
     /** The terms "saved" for each offer, served back by the mocked repository. */
     private final Map<UUID, ServiceTerms> savedTerms = new HashMap<>();
 
@@ -93,8 +103,9 @@ class ServiceOffersTest {
         optionGroups = mock(ProductOptionGroupRepository.class);
         storeService = mock(StoreService.class);
         outbox = mock(OutboxRecorder.class);
+        environment = new MockEnvironment();
         catalog = new CatalogService(products, mock(CategoryRepository.class), storeService, outbox,
-                stores, serviceTerms, storeZones, optionGroups);
+                stores, serviceTerms, storeZones, optionGroups, new ServiceCategories(environment));
 
         press = shop(new Store(PROVIDER, "Al Fakhry Press", Store.Vertical.SERVICES,
                 Store.ServiceCategory.PRINTING));
@@ -572,6 +583,123 @@ class ServiceOffersTest {
             when(products.findByIdIn(any())).thenReturn(List.of(offer));
 
             assertThat(catalog.readAllActive(List.of(offer.getId()))).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("a live offer is shown only while its shop is listed")
+    class AnUnlistedShopsOffersAreInvisible {
+
+        private static final String OPEN_CATEGORIES = "delivery.product.services.enabled-categories";
+
+        /** Listed: open all week, published, and in a category the launch opens. */
+        private Store listedPress;
+
+        @BeforeEach
+        void aListedPrintShop() {
+            listedPress = listed(new Store(PROVIDER, "Listed Press", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING));
+        }
+
+        private Store listed(Store store) {
+            store.replaceHours(java.util.Arrays.stream(DayOfWeek.values())
+                    .map(day -> new StoreHours(day, LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)))
+                    .toList());
+            store.publish(Instant.parse("2026-09-01T09:00:00Z"));
+            return shop(store);
+        }
+
+        @Test
+        void a_customer_reads_a_live_offer_of_a_listed_shop() {
+            Product offer = offer(listedPress, Fulfilment.PICKUP, Product.Status.ACTIVE);
+
+            assertThat(catalog.read(offer.getId(), "customer-sub")).isSameAs(offer);
+        }
+
+        /**
+         * Order Manager reads and prices a line through here with the customer's token and knows no
+         * category, so this is what stops such an offer being ordered by its id.
+         */
+        @Test
+        void an_offer_in_a_category_the_platform_closed_is_not_found_by_anyone_but_its_provider() {
+            Product offer = offer(listedPress, Fulfilment.PICKUP, Product.Status.ACTIVE);
+            environment.setProperty(OPEN_CATEGORIES, "TAILORING,REPAIRS");
+
+            assertThatThrownBy(() -> catalog.read(offer.getId(), "customer-sub"))
+                    .isInstanceOf(ProductNotFoundException.class);
+            assertThatThrownBy(() -> catalog.read(offer.getId(), null))
+                    .isInstanceOf(ProductNotFoundException.class);
+            assertThatThrownBy(() -> catalog.read(offer.getId(), RIVAL))
+                    .isInstanceOf(ProductNotFoundException.class);
+            assertThat(catalog.read(offer.getId(), PROVIDER)).isSameAs(offer);
+        }
+
+        @Test
+        void an_offer_of_a_shop_in_a_category_that_never_opened_is_not_found() {
+            Store cleaners = listed(new Store(PROVIDER, "Spotless Cleaners", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.CLEANING));
+            Product offer = offer(cleaners, Fulfilment.PICKUP, Product.Status.ACTIVE);
+
+            assertThatThrownBy(() -> catalog.read(offer.getId(), "customer-sub"))
+                    .isInstanceOf(ProductNotFoundException.class);
+        }
+
+        @Test
+        void an_offer_of_a_suspended_shop_is_not_found_and_its_provider_still_reads_it() {
+            Product offer = offer(listedPress, Fulfilment.PICKUP, Product.Status.ACTIVE);
+            listedPress.suspend();
+
+            assertThatThrownBy(() -> catalog.read(offer.getId(), "customer-sub"))
+                    .isInstanceOf(ProductNotFoundException.class);
+            assertThat(catalog.read(offer.getId(), PROVIDER)).isSameAs(offer);
+        }
+
+        @Test
+        void an_offer_of_a_shop_never_listed_is_not_found() {
+            // The class's own fixture shops are drafts: created and never published.
+            Product offer = offer(press, Fulfilment.PICKUP, Product.Status.ACTIVE);
+
+            assertThatThrownBy(() -> catalog.read(offer.getId(), "customer-sub"))
+                    .isInstanceOf(ProductNotFoundException.class);
+        }
+
+        /**
+         * Goods are not judged by the services rules, and a broken category setting, which throws when
+         * it is read, cannot reach them.
+         */
+        @Test
+        void a_goods_product_reads_as_it_always_did() {
+            Product dish = offer(grill, null, Product.Status.ACTIVE);
+            environment.setProperty(OPEN_CATEGORIES, "PRINTNG");
+
+            assertThat(catalog.read(dish.getId(), "customer-sub")).isSameAs(dish);
+        }
+
+        @Test
+        void the_shelf_of_a_shop_that_is_not_listed_is_not_found_and_nothing_is_read_from_it() {
+            listedPress.suspend();
+
+            assertThatThrownBy(() -> catalog.browseStore(listedPress.getId(), "customer-sub", null, null,
+                    PageRequest.of(0, 20)))
+                    .isInstanceOf(StoreNotFoundException.class);
+            assertThatThrownBy(() -> catalog.browseStoreByIds(listedPress.getId(), null,
+                    List.of(UUID.randomUUID()), PageRequest.of(0, 20)))
+                    .isInstanceOf(StoreNotFoundException.class);
+            verify(products, never()).findActiveInStore(any(), any(), anyString(), any(Pageable.class));
+            verify(products, never()).findActiveInStoreByIds(any(), any(), any(Pageable.class));
+        }
+
+        @Test
+        void a_customer_sees_a_listed_shops_shelf_and_its_provider_sees_it_suspended() {
+            when(products.findActiveInStore(any(), any(), anyString(), any(Pageable.class)))
+                    .thenReturn(Page.empty());
+            catalog.browseStore(listedPress.getId(), "customer-sub", null, null, PageRequest.of(0, 20));
+
+            listedPress.suspend();
+            catalog.browseStore(listedPress.getId(), PROVIDER, null, null, PageRequest.of(0, 20));
+
+            verify(products, times(2)).findActiveInStore(eq(listedPress.getId()), any(), anyString(),
+                    any(Pageable.class));
         }
     }
 

@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -44,6 +45,11 @@ import com.delivery.product.event.CatalogEvents;
  * product can; and one that customers can have delivered is published only by a shop with delivery
  * areas or a pin. Each of those rules is decided here, from the shop the product sits in, never from
  * what the request claims.
+ *
+ * <p>A live offer is shown only while its shop is listed. While a service shop is a draft, is
+ * suspended or sits in a closed category, each offer, its options and price, and the shop's shelf are
+ * its provider's alone ({@link #read}, {@link #browseStore}), just as its offers are absent from the
+ * services search.
  */
 @Service
 public class CatalogService {
@@ -59,10 +65,17 @@ public class CatalogService {
     private final StoreDeliveryZoneRepository storeZones;
     private final ProductOptionGroupRepository optionGroups;
 
+    /**
+     * Which service categories are open. Consulted only about a service shop, so a mistake in that
+     * setting can never hide a goods product.
+     */
+    private final ServiceCategories serviceCategories;
+
     public CatalogService(ProductRepository products, CategoryRepository categories,
                           StoreService storeService, OutboxRecorder outbox, StoreRepository stores,
                           ServiceTermsRepository serviceTerms, StoreDeliveryZoneRepository storeZones,
-                          ProductOptionGroupRepository optionGroups) {
+                          ProductOptionGroupRepository optionGroups,
+                          ServiceCategories serviceCategories) {
         this.products = products;
         this.categories = categories;
         this.storeService = storeService;
@@ -71,6 +84,7 @@ public class CatalogService {
         this.serviceTerms = serviceTerms;
         this.storeZones = storeZones;
         this.optionGroups = optionGroups;
+        this.serviceCategories = serviceCategories;
     }
 
     /**
@@ -93,23 +107,33 @@ public class CatalogService {
         return products.findActiveCatalog(categoryId, SearchPatterns.like(search), pageable);
     }
 
-    /** A store's shelf. The store landing page's main query. */
+    /**
+     * A store's shelf, as {@code viewerId} may see it. The store landing page's main query.
+     *
+     * <p>A service shop that is not listed ({@link #hidesItsOffers}) shows its shelf to its provider
+     * only, and anybody else is told the shop is not found: each of its offers is not found either
+     * ({@link #read}), and a shelf that listed them would undo that. A goods shop's shelf is served as
+     * it always was.
+     */
     @Transactional(readOnly = true)
-    public Page<Product> browseStore(UUID storeId, UUID categoryId, String search,
+    public Page<Product> browseStore(UUID storeId, String viewerId, UUID categoryId, String search,
                                      Pageable pageable) {
+        requireShelfShownTo(storeId, viewerId);
         return products.findActiveInStore(storeId, categoryId, SearchPatterns.like(search), pageable);
     }
 
     /**
-     * A page of specific products from one store.
+     * A page of specific products from one store, as {@code viewerId} may see them.
      *
      * <p>Backs Buy Again: it knows the ids it wants from order history, and needs them re-read from
      * the live catalog so the price and description are today's. Store-scoped as well as id-scoped,
-     * so a caller cannot use it to read another shop's rows.
+     * so a caller cannot use it to read another shop's rows, and refused as {@link #browseStore}
+     * refuses the shelf.
      */
     @Transactional(readOnly = true)
-    public Page<Product> browseStoreByIds(UUID storeId, java.util.List<UUID> ids,
+    public Page<Product> browseStoreByIds(UUID storeId, String viewerId, java.util.List<UUID> ids,
                                           Pageable pageable) {
+        requireShelfShownTo(storeId, viewerId);
         return products.findActiveInStoreByIds(storeId, ids, pageable);
     }
 
@@ -151,14 +175,24 @@ public class CatalogService {
      * <p>A DRAFT, PAUSED or ARCHIVED product is visible only to the merchant that owns it — otherwise
      * a customer could enumerate ids and read unpublished pricing. Order Manager reads a product
      * through here before pricing a line, so a paused offer is also one nobody can order.
+     *
+     * <p>So is a live offer of a service shop that is not listed ({@link #hidesItsOffers}): a draft or
+     * suspended shop, or one in a closed category. The search leaves those offers out, but an id
+     * outlives a list (a bookmark, a shared link, a basket built last week), and nothing on Order
+     * Manager's side knows a category. This read is therefore where such an offer stops being
+     * readable, and with it priceable ({@code ProductController#price}) and orderable. Its provider
+     * still reads it. A goods product is read as it always was.
      */
     @Transactional(readOnly = true)
     public Product read(UUID id, String viewerId) {
         Product product = products.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
-
-        if (product.getStatus() != Product.Status.ACTIVE && !product.isOwnedBy(viewerId)) {
-            // Deliberately "not found" rather than "forbidden": a 403 would confirm the id exists.
+        if (product.isOwnedBy(viewerId)) {
+            return product;
+        }
+        // Deliberately "not found" rather than "forbidden": a 403 would confirm the id exists.
+        if (product.getStatus() != Product.Status.ACTIVE
+                || stores.findById(product.getStoreId()).filter(this::hidesItsOffers).isPresent()) {
             throw new ProductNotFoundException(id);
         }
         return product;
@@ -466,6 +500,32 @@ public class CatalogService {
         return stores.findById(product.getStoreId())
                 .orElseThrow(() -> new StoreService.StoreNotFoundException(
                         product.getStoreId().toString()));
+    }
+
+    /**
+     * Whether a shop's live offers are withheld from everyone but its provider: a service shop that is
+     * not listed, because it is a draft, is suspended, or sits in a category the platform has closed
+     * ({@link ServiceCategories}). The shops the services search leaves out
+     * ({@code ProductRepository#findListedServiceOffers}), judged here on the row.
+     *
+     * <p>Never a goods shop. The open categories are read only about a service shop, so a mistake in
+     * that setting cannot take a goods product off anybody's screen.
+     */
+    private boolean hidesItsOffers(Store store) {
+        return store.isServices()
+                && (store.getStatus() != Store.Status.ACTIVE
+                        || !serviceCategories.enabled().contains(store.getServiceCategory()));
+    }
+
+    /**
+     * Refuses, as "not found", a shelf its shop hides from this viewer ({@link #browseStore}). An id
+     * that names no shop still answers the empty shelf it always did.
+     */
+    private void requireShelfShownTo(UUID storeId, String viewerId) {
+        Optional<Store> store = stores.findById(storeId);
+        if (store.isPresent() && !store.get().isOwnedBy(viewerId) && hidesItsOffers(store.get())) {
+            throw new StoreService.StoreNotFoundException(storeId.toString());
+        }
     }
 
     /**

@@ -309,7 +309,13 @@ public class StoreController {
                 storeService.favoriteIdsOf(viewerId));
     }
 
-    /** A store's shelf. */
+    /**
+     * A store's shelf.
+     *
+     * <p>Read as the caller: a service shop that is a draft, suspended or in a closed category shows
+     * its shelf to its provider only, and anybody else is told the shop is not found
+     * ({@link CatalogService#browseStore}). A goods shop's shelf is served as it always was.
+     */
     @GetMapping("/{id}/products")
     public PageResponse<ProductResponse> products(
             @PathVariable UUID id,
@@ -324,9 +330,10 @@ public class StoreController {
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC)
             Pageable pageable) {
 
+        String viewerId = CurrentUser.id().orElse(null);
         Page<Product> page = ids == null || ids.isEmpty()
-                ? catalog.browseStore(id, categoryId, search, pageable)
-                : catalog.browseStoreByIds(id, ids, pageable);
+                ? catalog.browseStore(id, viewerId, categoryId, search, pageable)
+                : catalog.browseStoreByIds(id, viewerId, ids, pageable);
         return PageResponse.of(catalog.views(page).map(this::toProduct));
     }
 

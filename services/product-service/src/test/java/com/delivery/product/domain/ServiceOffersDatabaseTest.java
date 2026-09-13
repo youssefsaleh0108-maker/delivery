@@ -160,7 +160,8 @@ class ServiceOffersDatabaseTest {
                 Duration.ofHours(4));
         catalog = new CatalogService(products, categories, storeService, mock(OutboxRecorder.class),
                 stores, serviceTerms, repositories.getRepository(StoreDeliveryZoneRepository.class),
-                repositories.getRepository(ProductOptionGroupRepository.class));
+                repositories.getRepository(ProductOptionGroupRepository.class),
+                new ServiceCategories(new MockEnvironment()));
         search = searchWith(new MockEnvironment(), 3);
 
         transaction(() -> {
@@ -342,6 +343,29 @@ class ServiceOffersDatabaseTest {
         assertThat(names(search.search("poster", null, PAGE))).containsExactly("Poster printing");
 
         transaction(() -> catalog.archive(poster.getId(), press.getMerchantId()));
+        em.clear();
+    }
+
+    @Test
+    @DisplayName("an offer of a shop that is not listed, and that shop's shelf, are its provider's alone")
+    void offers_of_unlisted_shops_are_their_providers_alone() {
+        // Listed, in an open category: anybody reads it and its shelf.
+        assertThat(catalog.read(cards.getId(), "customer-sub").getName())
+                .isEqualTo("Business card printing");
+        assertThat(names(catalog.browseStore(press.getId(), "customer-sub", null, null, PAGE)))
+                .contains("Business card printing");
+
+        // Spotless Cleaners is listed in a category the launch keeps closed; Not Yet Press never listed.
+        assertThatThrownBy(() -> catalog.read(sofa.getId(), "customer-sub"))
+                .isInstanceOf(CatalogService.ProductNotFoundException.class);
+        assertThatThrownBy(() -> catalog.read(flyers.getId(), null))
+                .isInstanceOf(CatalogService.ProductNotFoundException.class);
+        assertThatThrownBy(() -> catalog.browseStore(sofa.getStoreId(), "customer-sub", null, null, PAGE))
+                .isInstanceOf(StoreService.StoreNotFoundException.class);
+
+        assertThat(catalog.read(sofa.getId(), "merchant-clean").getName()).isEqualTo("Sofa cleaning");
+        assertThat(names(catalog.browseStore(sofa.getStoreId(), "merchant-clean", null, null, PAGE)))
+                .containsExactly("Sofa cleaning");
         em.clear();
     }
 

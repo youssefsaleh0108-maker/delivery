@@ -1,6 +1,7 @@
 package com.delivery.product.api;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,11 +66,13 @@ class ServicesStoreApiTest {
     private static final String NEAR_HAMRA = "/api/stores/nearby?latitude=33.8977&longitude=35.4829";
 
     private StoreService storeService;
+    private CatalogService catalog;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         storeService = mock(StoreService.class);
+        catalog = mock(CatalogService.class);
         when(storeService.storefront(any(), any(), any(), any(), any(), any(), any(),
                 any(Pageable.class))).thenReturn(Page.empty());
         when(storeService.nearby(any(GeoPoint.class), anyDouble(), anyInt(),
@@ -77,7 +80,7 @@ class ServicesStoreApiTest {
                 .thenReturn(new NearbyResult(new PageImpl<>(List.of()), false));
 
         ProxyFactory factory = new ProxyFactory(new StoreController(storeService,
-                mock(CatalogService.class), mock(ProductImageService.class),
+                catalog, mock(ProductImageService.class),
                 mock(StoreImageService.class), mock(ReviewService.class)));
         factory.setProxyTargetClass(true);
         factory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
@@ -210,5 +213,22 @@ class ServicesStoreApiTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0]").value("PRINTING"))
                 .andExpect(jsonPath("$[1]").value("TAILORING"));
+    }
+
+    /**
+     * Read as the caller, so a service shop that is not listed can refuse everyone but its provider.
+     * Which shops refuse whom is pinned where it is decided, in {@code ServiceOffersTest}.
+     */
+    @Test
+    @DisplayName("a shop's shelf is read as the signed-in caller")
+    void the_shelf_is_read_as_the_caller() throws Exception {
+        signedInAs("CUSTOMER");
+        UUID shop = UUID.randomUUID();
+        when(catalog.browseStore(any(), any(), any(), any(), any(Pageable.class))).thenReturn(Page.empty());
+        when(catalog.views(any(Page.class))).thenReturn(Page.empty());
+
+        mvc.perform(get("/api/stores/" + shop + "/products")).andExpect(status().isOk());
+
+        verify(catalog).browseStore(eq(shop), eq("shopper"), isNull(), isNull(), any(Pageable.class));
     }
 }

@@ -21,10 +21,15 @@
 --   attachment_policy   whether the customer sends a file, such as a design to print.
 --   instructions_prompt the question put to the customer beside the order's instructions.
 --
--- No service category. An offer is filed under its shop's (stores.service_category, V33), so closing a
--- category hides its shops and their offers together, and no offer is listed under a category its shop
--- is not in. No price in any currency either: products.price is the price, in USD, and the LBP figure
--- the apps show is a conversion at the platform rate, never a second price somebody set.
+-- No service category. An offer is filed under its shop's (stores.service_category, V33), so no offer is
+-- listed under a category its shop is not in. Whether an offer may be shown is its shop's to say too, and
+-- code says it, not this table: while a shop is a draft, is suspended or sits in a closed category, the
+-- services search leaves its offers out, and CatalogService answers "not found" to everyone but the
+-- provider for each offer, its options and price, and the shop's shelf. Order-manager reads and prices a
+-- line through those same endpoints, with the customer's token, so such an offer cannot be ordered.
+--
+-- No price in any currency either: products.price is the price, in USD, and the LBP figure the apps show
+-- is a conversion at the platform rate, never a second price somebody set.
 --
 -- The CHECKs hold what no offer can ever be. Policy that may move (the longest turnaround worth
 -- promising, what a label must say) is in ServiceTerms, where changing it needs no migration.

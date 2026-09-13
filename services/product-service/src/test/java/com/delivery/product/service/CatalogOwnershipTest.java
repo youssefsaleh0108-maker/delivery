@@ -68,7 +68,8 @@ class CatalogOwnershipTest {
         StoreRepository stores = mock(StoreRepository.class);
         catalog = new CatalogService(products, categories, storeService, outbox, stores,
                 mock(ServiceTermsRepository.class), mock(StoreDeliveryZoneRepository.class),
-                mock(ProductOptionGroupRepository.class));
+                mock(ProductOptionGroupRepository.class),
+                new ServiceCategories(new org.springframework.mock.env.MockEnvironment()));
 
         // Every product here sits in a goods shop, which asks for no service terms.
         when(stores.findById(any(UUID.class)))
