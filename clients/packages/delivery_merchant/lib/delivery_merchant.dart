@@ -11,6 +11,7 @@
 library;
 
 export 'src/dashboard_screen.dart';
+export 'src/demand_radar_screen.dart';
 export 'src/delivery_screen.dart';
 // The merchant suite: the register, the shelves and the people who work them. Each of these is
 // mounted by both hosts like the screens above, and the POS trio is exported together because a

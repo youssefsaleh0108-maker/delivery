@@ -28,27 +28,56 @@ class DeliveryZoneApi {
         .toList();
   }
 
+  /// Adds an area. [centerLat] and [centerLng] place it on the merchant demand map: both or
+  /// neither, which the server enforces with a 400. Leaving both out adds an unplaced area.
   Future<DeliveryZone> create({
     required String name,
     String? region,
     int sortOrder = 100,
+    double? centerLat,
+    double? centerLng,
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '/api/delivery-zones',
-      data: <String, dynamic>{'name': name, 'region': region, 'sortOrder': sortOrder},
+      data: <String, dynamic>{
+        'name': name,
+        'region': region,
+        'sortOrder': sortOrder,
+        if (centerLat != null) 'centerLat': centerLat,
+        if (centerLng != null) 'centerLng': centerLng,
+      },
     );
     return DeliveryZone.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Edits an area's name, region and rank — and its centre only when asked to.
+  ///
+  /// A centre ([centerLat] and [centerLng], both or neither) moves the area on the merchant demand
+  /// map, and [clearCentre] takes it off. Sending neither keeps whatever centre the area has, which is
+  /// also all that a build written before centres existed ever sends: a rename from an older portal,
+  /// a cached bundle or a tab left open must never wipe an area off every shop's map. A centre sent
+  /// with [clearCentre] contradicts it, and the server refuses the pair. Nothing about pricing reads
+  /// the centre.
   Future<DeliveryZone> rename(
     String id, {
     required String name,
     String? region,
     int sortOrder = 100,
+    double? centerLat,
+    double? centerLng,
+    bool clearCentre = false,
   }) async {
     final Response<dynamic> response = await _dio.put<dynamic>(
       '/api/delivery-zones/$id',
-      data: <String, dynamic>{'name': name, 'region': region, 'sortOrder': sortOrder},
+      data: <String, dynamic>{
+        'name': name,
+        'region': region,
+        'sortOrder': sortOrder,
+        // Only what was asked for: an absent centre means "keep it", never "remove it".
+        if (centerLat != null) 'centerLat': centerLat,
+        if (centerLng != null) 'centerLng': centerLng,
+        if (clearCentre) 'clearCentre': true,
+      },
     );
     return DeliveryZone.fromJson(response.data as Map<String, dynamic>);
   }

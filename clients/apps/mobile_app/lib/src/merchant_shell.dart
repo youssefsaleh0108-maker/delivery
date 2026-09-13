@@ -43,6 +43,7 @@ class MerchantShell extends StatefulWidget {
     this.staffApi,
     this.reportsApi,
     this.catalogScanApi,
+    this.demandApi,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -86,6 +87,10 @@ class MerchantShell extends StatefulWidget {
   /// Merchant Blitz, behind the Inventory header and a Settings row. Null draws neither. Handed on
   /// only to an account carrying MERCHANT — see [_MerchantShellState._mayScan].
   final CatalogScanApi? catalogScanApi;
+
+  /// How busy the neighbourhoods around the shop are. Null leaves the Demand Radar's doors undrawn.
+  /// Opened for the owner only: the density is order-backed, and Order Manager refuses staff tokens.
+  final DemandApi? demandApi;
 
   final AuthSession session;
 
@@ -216,6 +221,26 @@ class _MerchantShellState extends State<MerchantShell> {
     if (tab == MerchantTab.orders) _refreshBadge();
   }
 
+  /// The Demand Radar's door, or null when this person gets none.
+  ///
+  /// The owner only: the density behind it is order-backed, and Order Manager answers MERCHANT and
+  /// refuses the MERCHANT_STAFF token an employee carries — the same reason Orders is owner-only.
+  /// And only when the host wired the client, so an unwired build draws no door rather than a dead
+  /// one.
+  VoidCallback? get _demandRadarDoor =>
+      _access.isOwner && widget.demandApi != null ? _openDemandRadar : null;
+
+  void _openDemandRadar() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => DemandRadarScreen(
+        api: widget.demandApi!,
+        storeId: _storeId,
+        onBack: navigator.pop,
+      ),
+    ));
+  }
+
   Widget _tabAt(MerchantTab tab) {
     if (!_visited.contains(tab)) return const SizedBox.shrink();
     switch (tab) {
@@ -226,6 +251,7 @@ class _MerchantShellState extends State<MerchantShell> {
           aggregates: widget.aggregatesApi,
           pendingApproval: widget.pendingApproval,
           onShowOrders: () => _open(MerchantTab.orders),
+          onDemandRadar: _demandRadarDoor,
         );
       case MerchantTab.pos:
         return PosTerminalScreen(
@@ -266,6 +292,7 @@ class _MerchantShellState extends State<MerchantShell> {
           aggregates: _access.isOwner ? widget.aggregatesApi : null,
           documents: _access.isOwner ? widget.documentsApi : null,
           statements: _access.isOwner ? widget.statementsApi : null,
+          onDemandRadar: _demandRadarDoor,
           // The suite's three management pages hang off Settings rather than taking a tab each:
           // a shop reorganises its shelves and its roster a few times a year, not a few times a
           // day, and the nav is for the few-times-a-day things.

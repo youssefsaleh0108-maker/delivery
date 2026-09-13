@@ -1,7 +1,11 @@
 /// An area a customer picks from a list.
 ///
-/// Not a coordinate. Addresses in this market are landmarks and floor numbers, so the reliable way
-/// to know where an order is going is to ask — which is what every local delivery app does.
+/// Not an address coordinate. Addresses in this market are landmarks and floor numbers, so the
+/// reliable way to know where an order is going is to ask — which is what every local delivery app
+/// does.
+///
+/// An area may carry a centre: roughly the middle of the neighbourhood, placed by the back office so
+/// the merchant demand map can draw it. It is never a boundary and never prices anything.
 class DeliveryZone {
   const DeliveryZone({
     required this.id,
@@ -9,6 +13,8 @@ class DeliveryZone {
     required this.sortOrder,
     required this.active,
     this.region,
+    this.centerLat,
+    this.centerLng,
   });
 
   final String id;
@@ -22,13 +28,28 @@ class DeliveryZone {
   /// Retired areas stay resolvable for the addresses that name them, but leave the picker.
   final bool active;
 
-  factory DeliveryZone.fromJson(Map<String, dynamic> json) => DeliveryZone(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        region: json['region'] as String?,
-        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 100,
-        active: json['active'] as bool? ?? true,
-      );
+  /// The area's centre, both or neither. Null until the back office places the area.
+  final double? centerLat;
+  final double? centerLng;
+
+  /// Whether the demand map can draw this area.
+  bool get isPlaced => centerLat != null && centerLng != null;
+
+  factory DeliveryZone.fromJson(Map<String, dynamic> json) {
+    final double? lat = (json['centerLat'] as num?)?.toDouble();
+    final double? lng = (json['centerLng'] as num?)?.toDouble();
+    // Half a centre is no centre: drawing it would put the area on the equator or the meridian.
+    final bool whole = lat != null && lng != null;
+    return DeliveryZone(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      region: json['region'] as String?,
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 100,
+      active: json['active'] as bool? ?? true,
+      centerLat: whole ? lat : null,
+      centerLng: whole ? lng : null,
+    );
+  }
 }
 
 /// What one shop charges to reach one area.

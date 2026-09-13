@@ -16291,6 +16291,234 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'A gift — who it\'s for shows once it\'s yours to carry'**
   String get giftUnnamed;
+
+  /// No description provided for @heatmapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand Radar'**
+  String get heatmapTitle;
+
+  /// No description provided for @heatmapSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time neighborhood pulses'**
+  String get heatmapSubtitle;
+
+  /// No description provided for @heatmapActiveOrderDensities.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Order Densities'**
+  String get heatmapActiveOrderDensities;
+
+  /// No description provided for @heatmapLiveSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Syncing'**
+  String get heatmapLiveSyncing;
+
+  /// No description provided for @heatmapCantRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t refresh right now'**
+  String get heatmapCantRefresh;
+
+  /// No description provided for @heatmapLevelHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get heatmapLevelHigh;
+
+  /// No description provided for @heatmapLevelMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Med'**
+  String get heatmapLevelMedium;
+
+  /// No description provided for @heatmapLevelLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get heatmapLevelLow;
+
+  /// A map label: an area name and how busy it is, e.g. "Hamra (High)".
+  ///
+  /// In en, this message translates to:
+  /// **'{zone} ({level})'**
+  String heatmapZoneWithLevel(String zone, String level);
+
+  /// No description provided for @heatmapWindowHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Last hour'**
+  String get heatmapWindowHour;
+
+  /// No description provided for @heatmapWindowDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 24 hours'**
+  String get heatmapWindowDay;
+
+  /// No description provided for @heatmapWindowWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get heatmapWindowWeek;
+
+  /// No description provided for @heatmapAreasTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas around your shop'**
+  String get heatmapAreasTitle;
+
+  /// No description provided for @heatmapNotOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on the map yet'**
+  String get heatmapNotOnMap;
+
+  /// No description provided for @heatmapNoneOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'These areas aren\'t on the map yet'**
+  String get heatmapNoneOnMap;
+
+  /// No description provided for @heatmapMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The map can\'t load right now'**
+  String get heatmapMapUnavailable;
+
+  /// No description provided for @heatmapNoAreaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t know your neighbourhood yet'**
+  String get heatmapNoAreaTitle;
+
+  /// No description provided for @heatmapNoAreaMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand shows for the mapped areas near your shop\'s pin. Drop your pin if you haven\'t yet, and nearby areas will appear here once they\'re on the map.'**
+  String get heatmapNoAreaMessage;
+
+  /// No description provided for @heatmapNotEnoughTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough orders nearby yet'**
+  String get heatmapNotEnoughTitle;
+
+  /// The privacy floor: how many different customers an area needs before it is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{An area appears once {count} different customers have ordered there in this period, so no single customer can be picked out.}}'**
+  String heatmapNotEnoughMessage(int count);
+
+  /// No description provided for @heatmapCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load demand right now'**
+  String get heatmapCouldNotLoad;
+
+  /// No description provided for @heatmapNoShopMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand around your shop shows here once your shop is set up.'**
+  String get heatmapNoShopMessage;
+
+  /// No description provided for @heatmapEntryBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'See which neighbourhoods around your shop are ordering'**
+  String get heatmapEntryBlurb;
+
+  /// No description provided for @heatmapZoneCentreLatitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Centre latitude (optional)'**
+  String get heatmapZoneCentreLatitude;
+
+  /// No description provided for @heatmapZoneCentreLongitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Centre longitude (optional)'**
+  String get heatmapZoneCentreLongitude;
+
+  /// No description provided for @heatmapZoneCentreHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Roughly the middle of the area. It places the area on merchants\' demand map; pricing never uses it.'**
+  String get heatmapZoneCentreHelp;
+
+  /// No description provided for @heatmapZoneCentreBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter both, or leave both empty'**
+  String get heatmapZoneCentreBoth;
+
+  /// No description provided for @heatmapZoneCentreLatRange.
+  ///
+  /// In en, this message translates to:
+  /// **'A latitude between -90 and 90'**
+  String get heatmapZoneCentreLatRange;
+
+  /// No description provided for @heatmapZoneCentreLngRange.
+  ///
+  /// In en, this message translates to:
+  /// **'A longitude between -180 and 180'**
+  String get heatmapZoneCentreLngRange;
+
+  /// No description provided for @heatmapZoneOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'On the demand map'**
+  String get heatmapZoneOnMap;
+
+  /// No description provided for @heatmapZoneNotOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on the demand map'**
+  String get heatmapZoneNotOnMap;
+
+  /// No description provided for @heatmapSubtitleDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood pulses over the last 24 hours'**
+  String get heatmapSubtitleDay;
+
+  /// No description provided for @heatmapSubtitleWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood pulses over the last 7 days'**
+  String get heatmapSubtitleWeek;
+
+  /// No description provided for @heatmapUpdatedHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated every hour'**
+  String get heatmapUpdatedHourly;
+
+  /// No description provided for @heatmapUpdatedDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated once a day'**
+  String get heatmapUpdatedDaily;
+
+  /// No description provided for @heatmapLegendRelative.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with the busiest area around you'**
+  String get heatmapLegendRelative;
+
+  /// No description provided for @heatmapNotLiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop isn\'t live yet'**
+  String get heatmapNotLiveTitle;
+
+  /// No description provided for @heatmapNotLiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand around your shop shows here once your shop is published.'**
+  String get heatmapNotLiveMessage;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

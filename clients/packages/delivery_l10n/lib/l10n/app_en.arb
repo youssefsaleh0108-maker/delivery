@@ -4674,5 +4674,62 @@
   "giftDeliveredToday": "Today, while the shop is open",
   "giftNoteLength": "{used}/{max}",
   "@giftNoteLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}},
-  "giftUnnamed": "A gift — who it's for shows once it's yours to carry"
+  "giftUnnamed": "A gift — who it's for shows once it's yours to carry",
+  "heatmapTitle": "Demand Radar",
+  "heatmapSubtitle": "Real-time neighborhood pulses",
+  "heatmapActiveOrderDensities": "Active Order Densities",
+  "heatmapLiveSyncing": "Live Syncing",
+  "heatmapCantRefresh": "Can't refresh right now",
+  "heatmapLevelHigh": "High",
+  "heatmapLevelMedium": "Med",
+  "heatmapLevelLow": "Low",
+  "heatmapZoneWithLevel": "{zone} ({level})",
+  "@heatmapZoneWithLevel": {
+    "description": "A map label: an area name and how busy it is, e.g. \"Hamra (High)\".",
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "heatmapWindowHour": "Last hour",
+  "heatmapWindowDay": "Last 24 hours",
+  "heatmapWindowWeek": "Last 7 days",
+  "heatmapAreasTitle": "Areas around your shop",
+  "heatmapNotOnMap": "Not on the map yet",
+  "heatmapNoneOnMap": "These areas aren't on the map yet",
+  "heatmapMapUnavailable": "The map can't load right now",
+  "heatmapNoAreaTitle": "We don't know your neighbourhood yet",
+  "heatmapNoAreaMessage": "Demand shows for the mapped areas near your shop's pin. Drop your pin if you haven't yet, and nearby areas will appear here once they're on the map.",
+  "heatmapNotEnoughTitle": "Not enough orders nearby yet",
+  "heatmapNotEnoughMessage": "{count, plural, other{An area appears once {count} different customers have ordered there in this period, so no single customer can be picked out.}}",
+  "@heatmapNotEnoughMessage": {
+    "description": "The privacy floor: how many different customers an area needs before it is shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapCouldNotLoad": "Couldn't load demand right now",
+  "heatmapNoShopMessage": "Demand around your shop shows here once your shop is set up.",
+  "heatmapEntryBlurb": "See which neighbourhoods around your shop are ordering",
+  "heatmapZoneCentreLatitude": "Centre latitude (optional)",
+  "heatmapZoneCentreLongitude": "Centre longitude (optional)",
+  "heatmapZoneCentreHelp": "Roughly the middle of the area. It places the area on merchants' demand map; pricing never uses it.",
+  "heatmapZoneCentreBoth": "Enter both, or leave both empty",
+  "heatmapZoneCentreLatRange": "A latitude between -90 and 90",
+  "heatmapZoneCentreLngRange": "A longitude between -180 and 180",
+  "heatmapZoneOnMap": "On the demand map",
+  "heatmapZoneNotOnMap": "Not on the demand map",
+  "heatmapSubtitleDay": "Neighborhood pulses over the last 24 hours",
+  "heatmapSubtitleWeek": "Neighborhood pulses over the last 7 days",
+  "heatmapUpdatedHourly": "Updated every hour",
+  "heatmapUpdatedDaily": "Updated once a day",
+  "heatmapLegendRelative": "Compared with the busiest area around you",
+  "heatmapNotLiveTitle": "Your shop isn't live yet",
+  "heatmapNotLiveMessage": "Demand around your shop shows here once your shop is published."
 }
