@@ -3303,5 +3303,13 @@
   "multiCartPriceChangedBody": "أصبح مجموع سلتك {total} بدلًا من {agreed} الذي رأيته. هل تريد إتمام طلباتها بالمجموع الجديد؟",
   "@multiCartPriceChangedBody": {"placeholders":{"total":{"type":"String"},"agreed":{"type":"String"}}},
   "multiCartEarlierCheckoutPlaced": "{count, plural, =2{نجحت محاولتك السابقة بالفعل: الطلبان كلاهما في «الطلبات».} few{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».} many{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».} other{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».}}",
-  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}}
+  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}},
+  "svcVerticalServices": "خدمات",
+  "svcCategoryPrinting": "طباعة",
+  "svcCategoryTailoring": "خياطة وتعديل ملابس",
+  "svcCategoryRepairs": "تصليحات",
+  "svcCategoryPhotography": "تصوير",
+  "svcCategoryCleaning": "تنظيف",
+  "svcCategoryBeauty": "تجميل",
+  "svcCategoryTutoring": "دروس خصوصية"
 }

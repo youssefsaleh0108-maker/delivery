@@ -16,8 +16,13 @@ class StoreApi {
   // ---------------------------------------------------------------- browsing
 
   /// The home screen. Every filter is optional; omitted ones are simply not sent.
+  ///
+  /// No [vertical] and no [serviceCategory] is every goods shop and no service shop — what Home asks
+  /// for. [StoreVertical.services], or a [serviceCategory] on its own, lists service shops in the
+  /// categories the server has open; a closed category answers an empty page even when named.
   Future<Paged<StoreCard>> browse({
     StoreVertical? vertical,
+    ServiceCategory? serviceCategory,
     String? search,
     double? maxDeliveryFee,
     int? maxEtaMinutes,
@@ -30,6 +35,7 @@ class StoreApi {
       '/api/stores',
       queryParameters: <String, dynamic>{
         if (vertical != null) 'vertical': vertical.wireValue,
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
         if (search != null && search.isNotEmpty) 'search': search,
         if (maxDeliveryFee != null) 'maxDeliveryFee': maxDeliveryFee,
         if (maxEtaMinutes != null) 'maxEtaMinutes': maxEtaMinutes,
@@ -46,6 +52,7 @@ class StoreApi {
   Future<Paged<StoreCard>> browseWith(StoreFilters filters, {int page = 0, int size = 20}) {
     return browse(
       vertical: filters.vertical,
+      serviceCategory: filters.serviceCategory,
       search: filters.search,
       maxDeliveryFee: filters.maxDeliveryFee,
       maxEtaMinutes: filters.maxEtaMinutes,
@@ -61,6 +68,21 @@ class StoreApi {
     final Response<dynamic> response =
         await _dio.get<dynamic>('/api/stores/neighborhoods');
     return (response.data as List<dynamic>).cast<String>();
+  }
+
+  /// The service categories the server has open, in taxonomy order —
+  /// `GET /api/stores/service-categories`.
+  ///
+  /// What a provider may file a shop under and what the Services tab may show; a closed category is
+  /// in neither. A name this app does not know, such as a category a newer server added, is left
+  /// out, because there is nothing to label it with.
+  Future<List<ServiceCategory>> serviceCategories() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/stores/service-categories');
+    return (response.data as List<dynamic>)
+        .map((dynamic name) => ServiceCategory.maybeFromWire(name as String?))
+        .whereType<ServiceCategory>()
+        .toList();
   }
 
   /// Live shops near a point, nearest first.
@@ -87,6 +109,8 @@ class StoreApi {
   /// * [newSinceDays] keeps shops that first listed on the platform within that many days (clamped
   ///   to 1..365 server-side) — counted from the listing, not from when the draft was created.
   /// * [verifiedLocal] keeps only shops Backoffice granted the trust badge.
+  /// * [vertical] and [serviceCategory] follow [browse]: neither is every goods shop and no service
+  ///   shop; [StoreVertical.services] or a category on its own is service shops in open categories.
   Future<NearbyPage> nearby(
     double lat,
     double lng, {
@@ -96,6 +120,8 @@ class StoreApi {
     String? neighborhood,
     int? newSinceDays,
     bool verifiedLocal = false,
+    StoreVertical? vertical,
+    ServiceCategory? serviceCategory,
     int page = 0,
     int size = 20,
   }) async {
@@ -110,6 +136,8 @@ class StoreApi {
         if (neighborhood != null && neighborhood.trim().isNotEmpty) 'neighborhood': neighborhood,
         if (newSinceDays != null) 'newSinceDays': newSinceDays,
         if (verifiedLocal) 'verifiedLocal': true,
+        if (vertical != null) 'vertical': vertical.wireValue,
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
         'page': page,
         'size': size,
       },
@@ -287,6 +315,7 @@ class StoreApi {
     String? timezone,
     String? address,
     String? neighborhood,
+    ServiceCategory? serviceCategory,
   }) async {
     final Response<dynamic> response = await _dio.put<dynamic>(
       '/api/stores/$storeId',
@@ -299,6 +328,9 @@ class StoreApi {
         'timezone': timezone,
         'address': address,
         if (neighborhood != null) 'neighborhood': neighborhood,
+        // Like the district, absent keeps what the shop has: a save that does not mention the
+        // category cannot clear it. Only a service shop has one; the server refuses it for goods.
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
       },
     );
     return Store.fromJson(response.data as Map<String, dynamic>);

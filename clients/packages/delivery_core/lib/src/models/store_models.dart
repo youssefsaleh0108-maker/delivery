@@ -9,13 +9,32 @@ enum StoreVertical {
   convenience('CONVENIENCE', 'Convenience'),
   pharmacy('PHARMACY', 'Pharmacy'),
   electronics('ELECTRONICS', 'Electronics'),
-  flowersGifts('FLOWERS_GIFTS', 'Flowers & Gifts');
+  flowersGifts('FLOWERS_GIFTS', 'Flowers & Gifts'),
+
+  /// A shop that makes something to order — a print shop, a tailor, a repairer — rather than selling
+  /// stock. It has a [ServiceCategory] and is listed on the Services tab, never among the goods
+  /// verticals: the server leaves it out of every storefront read that does not ask for it, and no
+  /// goods picker offers it ([pickerVerticals]). A shop never moves into or out of it.
+  services('SERVICES', 'Services');
 
   const StoreVertical(this.wireValue, this.label);
 
   final String wireValue;
   final String label;
 
+  /// The verticals a goods picker may offer: every vertical but [services].
+  ///
+  /// What the Home strip, the shop lists, the category counts, the merchant's shop form and the back
+  /// office's chip editor iterate. They iterated [values], which would have put a Services chip on
+  /// Home the moment this enum learned the word — a chip filtering a storefront that never lists a
+  /// service shop — and offered a goods merchant a vertical the server refuses to move them into.
+  /// Derived from [values], so a new goods vertical joins it without anyone remembering to add it.
+  static final List<StoreVertical> pickerVerticals = List<StoreVertical>.unmodifiable(
+      values.where((StoreVertical vertical) => vertical != services));
+
+  /// An unknown value reads as [restaurant]. That fallback is why the server never lists a service
+  /// shop to a read that did not ask for one: an app built before [services] existed reads SERVICES
+  /// as a restaurant.
   static StoreVertical fromWire(String? value) {
     return maybeFromWire(value) ?? StoreVertical.restaurant;
   }
@@ -26,6 +45,41 @@ enum StoreVertical {
     for (final StoreVertical vertical in StoreVertical.values) {
       if (vertical.wireValue == value) {
         return vertical;
+      }
+    }
+    return null;
+  }
+}
+
+/// What a [StoreVertical.services] shop does. The wire values mirror product-service's
+/// `Store.ServiceCategory`.
+///
+/// The whole taxonomy is here, including categories the server has not opened. Which ones are open is
+/// the server's setting, read with `StoreApi.serviceCategories`: a closed category is never offered
+/// to a provider and never shown to a customer, so a screen asks the server rather than iterating
+/// [values].
+enum ServiceCategory {
+  printing('PRINTING'),
+
+  /// Tailoring and alterations.
+  tailoring('TAILORING'),
+  repairs('REPAIRS'),
+  photography('PHOTOGRAPHY'),
+  cleaning('CLEANING'),
+  beauty('BEAUTY'),
+  tutoring('TUTORING');
+
+  const ServiceCategory(this.wireValue);
+
+  final String wireValue;
+
+  /// Null for a value this app does not know, such as a category a newer server added. There is no
+  /// safe stand-in — filing an unknown service under Printing would repeat the mistake that reads an
+  /// unknown vertical as a restaurant — so a screen hides what it cannot name.
+  static ServiceCategory? maybeFromWire(String? value) {
+    for (final ServiceCategory category in ServiceCategory.values) {
+      if (category.wireValue == value) {
+        return category;
       }
     }
     return null;
@@ -185,12 +239,17 @@ class StoreCard {
     this.latitude,
     this.longitude,
     this.deliveryRadiusMetres,
+    this.serviceCategory,
   });
 
   final String id;
   final String slug;
   final String name;
   final StoreVertical vertical;
+
+  /// What a [StoreVertical.services] shop does, for the Services tab's "Printing • 0.5 km" line.
+  /// Null on every goods card, and on a service card whose category this app does not know.
+  final ServiceCategory? serviceCategory;
   final String? tagline;
   final List<String> tags;
   final double? rating;
@@ -284,6 +343,7 @@ class StoreCard {
         latitude: latitude,
         longitude: longitude,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        serviceCategory: serviceCategory,
       );
 
   factory StoreCard.fromJson(Map<String, dynamic> json) => StoreCard(
@@ -319,6 +379,7 @@ class StoreCard {
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
+        serviceCategory: ServiceCategory.maybeFromWire(json['serviceCategory'] as String?),
       );
 }
 
@@ -377,12 +438,17 @@ class Store {
     this.powerUpdatedAt,
     this.powerCurrent = false,
     this.deliveryRadiusMetres,
+    this.serviceCategory,
   });
 
   final String id;
   final String slug;
   final String name;
   final StoreVertical vertical;
+
+  /// What a [StoreVertical.services] shop does; null for a goods shop. See
+  /// [StoreCard.serviceCategory].
+  final ServiceCategory? serviceCategory;
 
   /// Listed, delisted, or not yet published. What the merchant dashboard's Active switch reflects.
   /// Defaults to active because the customer storefront only ever returns listed shops — a customer
@@ -495,6 +561,7 @@ class Store {
         latitude: latitude,
         longitude: longitude,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        serviceCategory: serviceCategory,
       );
 
   Store copyWith({bool? favorite}) => Store(
@@ -531,6 +598,7 @@ class Store {
         powerUpdatedAt: powerUpdatedAt,
         powerCurrent: powerCurrent,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        serviceCategory: serviceCategory,
       );
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -570,6 +638,7 @@ class Store {
             : DateTime.parse(json['powerUpdatedAt'] as String),
         powerCurrent: json['powerCurrent'] as bool? ?? false,
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
+        serviceCategory: ServiceCategory.maybeFromWire(json['serviceCategory'] as String?),
       );
 }
 
@@ -646,6 +715,7 @@ class Aisle {
 class StoreFilters {
   const StoreFilters({
     this.vertical,
+    this.serviceCategory,
     this.search,
     this.maxDeliveryFee,
     this.maxEtaMinutes,
@@ -655,6 +725,10 @@ class StoreFilters {
   });
 
   final StoreVertical? vertical;
+
+  /// Service shops in one open category; asking for a category is asking for service shops. Null on
+  /// every goods screen — with it and [vertical] both null the server lists goods shops only.
+  final ServiceCategory? serviceCategory;
   final String? search;
   final double? maxDeliveryFee;
   final int? maxEtaMinutes;
@@ -679,6 +753,7 @@ class StoreFilters {
 
   StoreFilters copyWith({
     StoreVertical? vertical,
+    ServiceCategory? serviceCategory,
     String? search,
     double? maxDeliveryFee,
     int? maxEtaMinutes,
@@ -686,6 +761,7 @@ class StoreFilters {
     String? neighborhood,
     bool? offersOnly,
     bool clearVertical = false,
+    bool clearServiceCategory = false,
     bool clearSearch = false,
     bool clearFee = false,
     bool clearEta = false,
@@ -694,6 +770,8 @@ class StoreFilters {
   }) =>
       StoreFilters(
         vertical: clearVertical ? null : (vertical ?? this.vertical),
+        serviceCategory:
+            clearServiceCategory ? null : (serviceCategory ?? this.serviceCategory),
         search: clearSearch ? null : (search ?? this.search),
         maxDeliveryFee: clearFee ? null : (maxDeliveryFee ?? this.maxDeliveryFee),
         maxEtaMinutes: clearEta ? null : (maxEtaMinutes ?? this.maxEtaMinutes),
@@ -702,8 +780,14 @@ class StoreFilters {
         offersOnly: offersOnly ?? this.offersOnly,
       );
 
-  StoreFilters cleared() =>
-      StoreFilters(vertical: vertical, search: search, neighborhood: neighborhood);
+  /// Drops the refinements and keeps what the screen is ABOUT: the vertical or service category,
+  /// the search and the district.
+  StoreFilters cleared() => StoreFilters(
+        vertical: vertical,
+        serviceCategory: serviceCategory,
+        search: search,
+        neighborhood: neighborhood,
+      );
 }
 
 // ---------------------------------------------------------------------------- product options

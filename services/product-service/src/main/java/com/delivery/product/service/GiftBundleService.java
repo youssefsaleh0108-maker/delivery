@@ -81,7 +81,11 @@ public class GiftBundleService {
         List<GiftBundle> bundles = new ArrayList<>();
         for (Product product : picked) {
             Store shop = shops.get(product.getStoreId());
-            if (shop == null || shop.getStatus() != Store.Status.ACTIVE || !product.isInStock()) {
+            // Never a service shop's offer: services are not giftable (owner default 13) and the hub
+            // is a goods window. setFeatured refuses to feature one; this half keeps the hub right
+            // whatever the flag on the row says.
+            if (shop == null || shop.getStatus() != Store.Status.ACTIVE || !product.isInStock()
+                    || shop.getVertical() == Store.Vertical.SERVICES) {
                 continue;
             }
             bundles.add(new GiftBundle(product, shop, shop.availabilityAt(now),
@@ -94,7 +98,9 @@ public class GiftBundleService {
      * Puts a product on the gift hub or takes it off. BACKOFFICE only — the controller says so.
      *
      * <p>Featuring is refused for a product that is not live (422): a draft or archived product on
-     * the hub would be a card nobody can buy. Taking one off always works, whatever its state.
+     * the hub would be a card nobody can buy. A service shop's offer is refused too (422): services
+     * are not giftable, so its card would lead to a checkout that has to say no. Taking one off
+     * always works, whatever its state.
      *
      * @param actor the back-office user, recorded in the log so "who put this on the hub" has an
      *              answer beside the {@code gift_featured_at} the row keeps
@@ -104,6 +110,13 @@ public class GiftBundleService {
         Product product = products.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
         if (featured) {
+            boolean serviceOffer = stores.findById(product.getStoreId())
+                    .map(shop -> shop.getVertical() == Store.Vertical.SERVICES)
+                    .orElse(false);
+            if (serviceOffer) {
+                throw new CatalogRuleViolationException(
+                        "A service offer cannot be featured on the gift hub: services are not giftable.");
+            }
             try {
                 product.featureAsGift(now);
             } catch (IllegalStateException e) {

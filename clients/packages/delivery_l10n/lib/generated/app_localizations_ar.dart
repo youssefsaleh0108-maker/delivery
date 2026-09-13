@@ -10814,4 +10814,28 @@ class DeliveryStringsAr extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get svcVerticalServices => 'خدمات';
+
+  @override
+  String get svcCategoryPrinting => 'طباعة';
+
+  @override
+  String get svcCategoryTailoring => 'خياطة وتعديل ملابس';
+
+  @override
+  String get svcCategoryRepairs => 'تصليحات';
+
+  @override
+  String get svcCategoryPhotography => 'تصوير';
+
+  @override
+  String get svcCategoryCleaning => 'تنظيف';
+
+  @override
+  String get svcCategoryBeauty => 'تجميل';
+
+  @override
+  String get svcCategoryTutoring => 'دروس خصوصية';
 }

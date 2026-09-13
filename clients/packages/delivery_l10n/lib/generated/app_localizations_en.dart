@@ -10667,4 +10667,28 @@ class DeliveryStringsEn extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get svcVerticalServices => 'Services';
+
+  @override
+  String get svcCategoryPrinting => 'Printing';
+
+  @override
+  String get svcCategoryTailoring => 'Tailoring & alterations';
+
+  @override
+  String get svcCategoryRepairs => 'Repairs';
+
+  @override
+  String get svcCategoryPhotography => 'Photography';
+
+  @override
+  String get svcCategoryCleaning => 'Cleaning';
+
+  @override
+  String get svcCategoryBeauty => 'Beauty';
+
+  @override
+  String get svcCategoryTutoring => 'Tutoring';
 }

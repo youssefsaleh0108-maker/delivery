@@ -28,7 +28,73 @@ on:
       - 'pom.xml'
 
 jobs:
+  # The SQL that keeps service shops off the goods storefront, run against the database it is written
+  # for.
+  #
+  # The rest of this module's suite runs without a database, so ServicesVerticalDatabaseTest skips
+  # itself unless PRODUCT_TEST_DB_URL names one. Nothing set it, so deleting an exclusion predicate
+  # from a query still passed CI. This job gives the test a throwaway PostGIS on the image every
+  # environment runs, and fails if the test skipped anyway: a skipped proof is exactly the green build
+  # this job is here to stop.
+  #
+  # A job of this caller's own rather than a service container in reusable-service-ci.yml, which the
+  # other services share and none of them needs. `ci` waits for it, so an image whose exclusions no
+  # longer hold is never built, pushed or rolled out.
+  database-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          # Throwaway, and reachable only from this job. The test's user and password default to
+          # postgres, so only the URL has to be passed below.
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Checked over TCP, so the steps start once the server the test connects to is up, not while
+        # the image's init scripts are still running against a socket-only one.
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # -am builds the platform libraries this module depends on, as the build job does. The test
+      # filter matches nothing in them, which failIfNoSpecifiedTests=false allows.
+      - name: Storefront isolation against PostGIS
+        env:
+          PRODUCT_TEST_DB_URL: jdbc:postgresql://localhost:5432/postgres
+        run: >-
+          mvn -B -U -pl services/product-service -am test
+          -Dtest=ServicesVerticalDatabaseTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+
+      - name: Fail if the database tests did not run
+        run: |
+          report=services/product-service/target/surefire-reports/TEST-com.delivery.product.domain.ServicesVerticalDatabaseTest.xml
+          if [ ! -f "$report" ]; then
+            echo "::error::No report at $report, so the database tests did not run."
+            exit 1
+          fi
+          if ! grep -q 'tests="[1-9]' "$report" || grep -q 'skipped="[1-9]' "$report"; then
+            echo "::error::The database tests were skipped. Is PRODUCT_TEST_DB_URL set?"
+            exit 1
+          fi
+
   ci:
+    needs: database-tests
     uses: ./.github/workflows/reusable-service-ci.yml
     with:
       service-name: product-service

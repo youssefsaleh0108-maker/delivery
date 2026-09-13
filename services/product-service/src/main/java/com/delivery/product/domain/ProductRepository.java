@@ -28,12 +28,21 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
      *
      * <p>{@code categoryId} stays null-tolerant: it is only ever compared to a typed column, so
      * Postgres infers uuid from the other side of the equality.
+     *
+     * <p><strong>Never an offer of a service shop.</strong> A service offer is a product row, and this
+     * list is every live product of every shop, so without the store filter a print shop's "500
+     * business cards" would be listed among the groceries. Pinned in the query rather than left to
+     * callers, for the reason {@link StoreRepository#findStorefront} gives about ACTIVE. Service offers
+     * are found through their own read, which asks for them by name.
      */
     @Query("""
             SELECT p FROM Product p
             WHERE p.status = com.delivery.product.domain.Product$Status.ACTIVE
               AND (:categoryId IS NULL OR p.categoryId = :categoryId)
               AND LOWER(p.name) LIKE :namePattern ESCAPE '\\'
+              AND p.storeId NOT IN (
+                    SELECT s.id FROM Store s
+                    WHERE s.vertical = com.delivery.product.domain.Store$Vertical.SERVICES)
             """)
     Page<Product> findActiveCatalog(@Param("categoryId") UUID categoryId,
                                     @Param("namePattern") String namePattern,

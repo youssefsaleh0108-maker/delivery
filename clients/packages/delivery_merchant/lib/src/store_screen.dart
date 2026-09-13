@@ -640,19 +640,26 @@ class _StoreScreenState extends State<StoreScreen> {
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           _CardField(
             label: t.categoryLabel,
+            // A goods shop chooses among the goods verticals only. A service shop's vertical is shown
+            // but cannot be changed: the server refuses any move into or out of Services (422), so an
+            // open dropdown would be a control that cannot work.
             child: DropdownButtonFormField<StoreVertical>(
               initialValue: _vertical,
               isExpanded: true,
               style: _cardValueStyle,
               icon: const Icon(Icons.expand_more, size: 16, color: DeliveryColors.ink),
               decoration: _cardBoxDecoration(),
-              items: StoreVertical.values
+              items: (_vertical == StoreVertical.services
+                      ? const <StoreVertical>[StoreVertical.services]
+                      : StoreVertical.pickerVerticals)
                   .map((StoreVertical v) => DropdownMenuItem<StoreVertical>(
                         value: v,
                         child: Text(v.labelIn(t), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ))
                   .toList(),
-              onChanged: (StoreVertical? v) => setState(() => _vertical = v ?? _vertical),
+              onChanged: _vertical == StoreVertical.services
+                  ? null
+                  : (StoreVertical? v) => setState(() => _vertical = v ?? _vertical),
             ),
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),

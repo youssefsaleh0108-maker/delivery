@@ -74,6 +74,7 @@ class StoreAdministrationTest {
     @BeforeEach
     void setUp() {
         service = new StoreService(stores, offers, favorites, products, categories,
+                new ServiceCategories(new org.springframework.mock.env.MockEnvironment()),
                 Clock.fixed(Instant.parse("2026-09-09T09:00:00Z"), ZoneOffset.UTC),
                 Duration.ofHours(4));
 
@@ -145,7 +146,7 @@ class StoreAdministrationTest {
 
         private StoreRequest profile(String neighborhood) {
             return new StoreRequest("Beirut Grill", Store.Vertical.RESTAURANT, "Grills since 1985",
-                    null, List.of("grill"), null, "Hamra Street", neighborhood);
+                    null, List.of("grill"), null, "Hamra Street", neighborhood, null);
         }
 
         /**

@@ -137,9 +137,14 @@ public class BannerService {
             }
             return;
         }
-        if (!stores.existsById(target)) {
-            throw new CatalogRuleViolationException(
-                    "Nothing found for " + banner.getLinkKind() + " " + target);
+        Store store = stores.findById(target).orElseThrow(() -> new CatalogRuleViolationException(
+                "Nothing found for " + banner.getLinkKind() + " " + target));
+        if (store.getVertical() == Store.Vertical.SERVICES) {
+            // The rail is Home's, and service shops are never on Home: an app built before services
+            // existed would open a print shop from its own front page as though it were a restaurant.
+            throw new CatalogRuleViolationException("\"" + store.getName() + "\" is a services "
+                    + "shop. Banners run on Home, where service shops are never shown; point this one "
+                    + "at a goods shop.");
         }
     }
 
@@ -193,6 +198,13 @@ public class BannerService {
     @Transactional
     public Category setVertical(UUID categoryId, Store.Vertical vertical) {
         Category category = requireCategory(categoryId);
+        if (vertical == Store.Vertical.SERVICES) {
+            // Refused with a sentence rather than left to chk_category_vertical, which V33 kept
+            // without SERVICES: the editor needs to know why, not which constraint said no.
+            throw new CatalogRuleViolationException(
+                    "Service shops are never on the Home strip, so no category can stand for "
+                            + "Services. Customers find service shops on the Services tab.");
+        }
         if (vertical != null) {
             categories.findFirstByVertical(vertical)
                     // Re-tagging a category with the vertical it already has is a no-op, not a clash.
@@ -212,6 +224,10 @@ public class BannerService {
         // here would scan the whole merchant-authored tail for nothing.
         return categories.findByStoreIdIsNull().stream()
                 .filter(c -> c.getVertical() != null)
+                // Never a Services chip: service shops are not on Home. setVertical refuses one and
+                // V33 left chk_category_vertical without SERVICES, so no such row can be written today.
+                // This keeps the strip right if either of those is ever loosened.
+                .filter(c -> c.getVertical() != Store.Vertical.SERVICES)
                 .sorted(java.util.Comparator.comparing(Category::getName))
                 .toList();
     }

@@ -86,6 +86,19 @@ extension StoreVerticalLabel on StoreVertical {
         StoreVertical.pharmacy => t.verticalPharmacy,
         StoreVertical.electronics => t.verticalElectronics,
         StoreVertical.flowersGifts => t.verticalFlowersGifts,
+        StoreVertical.services => t.svcVerticalServices,
+      };
+}
+
+extension ServiceCategoryLabel on ServiceCategory {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        ServiceCategory.printing => t.svcCategoryPrinting,
+        ServiceCategory.tailoring => t.svcCategoryTailoring,
+        ServiceCategory.repairs => t.svcCategoryRepairs,
+        ServiceCategory.photography => t.svcCategoryPhotography,
+        ServiceCategory.cleaning => t.svcCategoryCleaning,
+        ServiceCategory.beauty => t.svcCategoryBeauty,
+        ServiceCategory.tutoring => t.svcCategoryTutoring,
       };
 }
 

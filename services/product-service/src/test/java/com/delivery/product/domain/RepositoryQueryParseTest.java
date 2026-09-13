@@ -190,6 +190,7 @@ class RepositoryQueryParseTest {
                 JOIN StoreFavorite f ON f.id.storeId = s.id
                 WHERE f.id.userId = :userId
                   AND s.status = :status
+                  AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
                 ORDER BY f.createdAt DESC
                 """);
     }

@@ -18091,6 +18091,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}'**
   String multiCartEarlierCheckoutPlaced(int count);
+
+  /// No description provided for @svcVerticalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get svcVerticalServices;
+
+  /// No description provided for @svcCategoryPrinting.
+  ///
+  /// In en, this message translates to:
+  /// **'Printing'**
+  String get svcCategoryPrinting;
+
+  /// No description provided for @svcCategoryTailoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Tailoring & alterations'**
+  String get svcCategoryTailoring;
+
+  /// No description provided for @svcCategoryRepairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairs'**
+  String get svcCategoryRepairs;
+
+  /// No description provided for @svcCategoryPhotography.
+  ///
+  /// In en, this message translates to:
+  /// **'Photography'**
+  String get svcCategoryPhotography;
+
+  /// No description provided for @svcCategoryCleaning.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaning'**
+  String get svcCategoryCleaning;
+
+  /// No description provided for @svcCategoryBeauty.
+  ///
+  /// In en, this message translates to:
+  /// **'Beauty'**
+  String get svcCategoryBeauty;
+
+  /// No description provided for @svcCategoryTutoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Tutoring'**
+  String get svcCategoryTutoring;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
