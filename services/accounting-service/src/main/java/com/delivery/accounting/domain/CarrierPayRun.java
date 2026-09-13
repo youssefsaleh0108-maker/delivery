@@ -76,6 +76,10 @@ public class CarrierPayRun {
     @Column(name = "attendance_note", length = 200)
     private String attendanceNote;
 
+    /** When the run's hours were read, or their read was tried. Null when none were needed. */
+    @Column(name = "attendance_at")
+    private Instant attendanceAt;
+
     @Column(name = "revision", nullable = false)
     private int revision;
 
@@ -120,12 +124,17 @@ public class CarrierPayRun {
         return run;
     }
 
-    /** The draft's figures were computed again, under {@code policyId}. */
-    public void recomputed(UUID policyId, Attendance attendance, String attendanceNote, Instant at) {
+    /**
+     * The draft's figures were computed again, under {@code policyId}, with hours read at
+     * {@code attendanceAt}.
+     */
+    public void recomputed(UUID policyId, Attendance attendance, String attendanceNote,
+                           Instant attendanceAt, Instant at) {
         requireDraft();
         this.policyId = policyId;
         this.attendance = attendance;
         this.attendanceNote = attendanceNote;
+        this.attendanceAt = attendanceAt;
         this.revision++;
         this.computedAt = at;
     }
@@ -190,6 +199,10 @@ public class CarrierPayRun {
 
     public String getAttendanceNote() {
         return attendanceNote;
+    }
+
+    public Instant getAttendanceAt() {
+        return attendanceAt;
     }
 
     public int getRevision() {

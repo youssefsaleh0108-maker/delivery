@@ -15,9 +15,6 @@ public interface CarrierPayslipRepository extends JpaRepository<CarrierPayslip, 
     /** Every payslip of several runs, for the period list's counts — a few hundred rows at most. */
     List<CarrierPayslip> findByRunIdIn(Collection<UUID> runIds);
 
-    /** A payslip only through its own run: an id from another run finds nothing. */
-    Optional<CarrierPayslip> findByIdAndRunId(UUID id, UUID runId);
-
     /** A draft's payslips, replaced when it is recomputed. Never called for an approved run. */
     void deleteByRunId(UUID runId);
 }

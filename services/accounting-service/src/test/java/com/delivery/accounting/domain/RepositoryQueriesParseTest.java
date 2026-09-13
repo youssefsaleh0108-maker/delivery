@@ -57,6 +57,7 @@ class RepositoryQueriesParseTest {
                 .addAnnotatedClass(CarrierPayLine.class)
                 .addAnnotatedClass(CarrierPayAdjustment.class)
                 .addAnnotatedClass(CarrierPayrollEvent.class)
+                .addAnnotatedClass(CarrierPayAttendance.class)
                 .buildMetadata()
                 .buildSessionFactory();
     }
@@ -75,7 +76,8 @@ class RepositoryQueriesParseTest {
                 new Class<?>[] {CarrierPayslipRepository.class, CarrierPayslip.class},
                 new Class<?>[] {CarrierPayLineRepository.class, CarrierPayLine.class},
                 new Class<?>[] {CarrierPayAdjustmentRepository.class, CarrierPayAdjustment.class},
-                new Class<?>[] {CarrierPayrollEventRepository.class, CarrierPayrollEvent.class})) {
+                new Class<?>[] {CarrierPayrollEventRepository.class, CarrierPayrollEvent.class},
+                new Class<?>[] {CarrierPayAttendanceRepository.class, CarrierPayAttendance.class})) {
             for (Method method : pair[0].getDeclaredMethods()) {
                 if (method.getAnnotation(Query.class) == null && !method.isDefault()) {
                     out.add(Arguments.of(pair[0].getSimpleName() + "." + method.getName(),
@@ -103,7 +105,8 @@ class RepositoryQueriesParseTest {
     static Stream<Arguments> queries() {
         List<Arguments> out = new ArrayList<>();
         for (Class<?> repository : List.of(CashFloatRepository.class,
-                RiderLedgerRepository.class, CarrierPayRunRepository.class)) {
+                RiderLedgerRepository.class, CarrierPayRunRepository.class,
+                CarrierPayAdjustmentRepository.class)) {
             for (Method method : repository.getDeclaredMethods()) {
                 Query query = method.getAnnotation(Query.class);
                 if (query != null && !query.nativeQuery()) {
@@ -159,7 +162,8 @@ class RepositoryQueriesParseTest {
                 "RiderLedgerRepository.countJobsForCarrierRecordedAfter",
                 "CarrierPayRunRepository.lockOwned",
                 "CarrierPayRunRepository.overlapping",
-                "CarrierPayRunRepository.endingOnOrAfter");
+                "CarrierPayRunRepository.endingOnOrAfter",
+                "CarrierPayAdjustmentRepository.lockAll");
     }
 
     /**

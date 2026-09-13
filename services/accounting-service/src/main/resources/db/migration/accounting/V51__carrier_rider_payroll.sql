@@ -106,6 +106,9 @@ CREATE TABLE carrier_pay_run (
     -- for and unavailable — in which case the run says so and approving it has to acknowledge it.
     attendance       varchar(16)  NOT NULL,
     attendance_note  varchar(200),
+    -- When the hours in carrier_pay_attendance were read, or their read was tried. Attendance for a
+    -- period keeps changing after it ends, so the page says which moment the hours are from.
+    attendance_at    timestamptz,
     -- Bumped each time a draft is recomputed. Approval names the revision the approver looked at.
     revision         integer      NOT NULL,
     computed_at      timestamptz  NOT NULL,
@@ -123,7 +126,8 @@ CREATE TABLE carrier_pay_run (
     CONSTRAINT chk_pay_run_status
         CHECK (status IN ('DRAFT', 'APPROVED', 'PAID')),
     CONSTRAINT chk_pay_run_attendance
-        CHECK (attendance IN ('NOT_NEEDED', 'INCLUDED', 'UNAVAILABLE')),
+        CHECK (attendance IN ('NOT_NEEDED', 'INCLUDED', 'UNAVAILABLE')
+            AND (attendance <> 'INCLUDED' OR attendance_at IS NOT NULL)),
     CONSTRAINT chk_pay_run_approved
         CHECK (status = 'DRAFT' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)),
     CONSTRAINT chk_pay_run_paid
@@ -206,7 +210,33 @@ CREATE TABLE carrier_payslip (
 CREATE INDEX idx_payslip_rider ON carrier_payslip (rider_ref);
 
 -- --------------------------------------------------------------------------------------------
--- 5. Corrections to an approved run.
+-- 5. The hours a run was computed with.
+--
+-- Attendance for a period is not final when the period ends: a night shift's 00:10 arrival, a
+-- session still open, or an office entry made weeks later all change it. So a draft copies the
+-- totals it used for every rider order-tracking listed — riders with no pay yet among them, because
+-- a late delivery can put them on a payslip — and only an explicit recompute of a draft reads them
+-- again. Editing a draft's lines and approving it use this copy, never a live read, so an approved
+-- run's hours are the hours its approver saw.
+
+CREATE TABLE carrier_pay_attendance (
+    id                uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id            uuid         NOT NULL REFERENCES carrier_pay_run (id),
+    rider_ref         varchar(64)  NOT NULL,
+    worked_seconds    bigint       NOT NULL,
+    manual_seconds    bigint       NOT NULL,
+    overtime_seconds  bigint       NOT NULL,
+    lates             integer      NOT NULL,
+    absences          integer      NOT NULL,
+
+    CONSTRAINT uq_pay_attendance_rider UNIQUE (run_id, rider_ref),
+    CONSTRAINT chk_pay_attendance_facts
+        CHECK (worked_seconds >= 0 AND manual_seconds >= 0 AND overtime_seconds >= 0
+            AND lates >= 0 AND absences >= 0)
+);
+
+-- --------------------------------------------------------------------------------------------
+-- 6. Corrections to an approved run.
 --
 -- An approved run is never edited. A correction is recorded against it and paid in the rider's
 -- next run, where it appears as its own line; applied_run_id is set once, when that run is approved.
@@ -236,7 +266,7 @@ CREATE INDEX idx_pay_adjustment_pending
     WHERE applied_run_id IS NULL;
 
 -- --------------------------------------------------------------------------------------------
--- 6. Payslip lines: how each payslip's figures break down.
+-- 7. Payslip lines: how each payslip's figures break down.
 --
 -- COMPUTED lines are regenerated whenever a draft is recomputed. MANUAL lines are the company's named
 -- bonuses and deductions on a draft; taking one off marks it removed rather than deleting it.
@@ -279,7 +309,7 @@ CREATE TABLE carrier_pay_line (
 CREATE INDEX idx_pay_line_run ON carrier_pay_line (run_id, rider_ref);
 
 -- --------------------------------------------------------------------------------------------
--- 7. The audit trail: who did what to a company's payroll, and when.
+-- 8. The audit trail: who did what to a company's payroll, and when.
 --
 -- run_id is deliberately not a foreign key: a discarded draft is deleted, and what was done to it
 -- before it went stays answerable.

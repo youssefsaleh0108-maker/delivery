@@ -64,9 +64,9 @@ public interface CarrierPayRunRepository extends JpaRepository<CarrierPayRun, UU
                                         @Param("since") LocalDate since);
 
     /**
-     * Whether a run past its draft starts on or after a day. A new pay policy may not start before
-     * such a run: it would claim to govern a period whose figures are already frozen under another.
+     * The company's latest-starting run past its draft. New pay rules may not start on or before its
+     * first day: they would claim to govern a period whose figures are already frozen under others.
      */
-    boolean existsByCarrierRefAndStatusNotAndPeriodFromGreaterThanEqual(
-            String carrierRef, CarrierPayRun.Status status, LocalDate day);
+    Optional<CarrierPayRun> findFirstByCarrierRefAndStatusNotOrderByPeriodFromDesc(
+            String carrierRef, CarrierPayRun.Status status);
 }

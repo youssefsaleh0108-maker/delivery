@@ -82,6 +82,21 @@ class CarrierPayrollMigrationTest {
                 .contains("CONSTRAINT uq_pay_run_to UNIQUE (carrier_ref, period_to)");
     }
 
+    /**
+     * Attendance keeps changing after a period ends, so a run keeps the hours it was computed with
+     * and says when they were read.
+     */
+    @Test
+    @DisplayName("keeps a copy of the hours each run used, and when they were read")
+    void hoursAreASnapshot() {
+        assertThat(the("CREATE TABLE carrier_pay_attendance"))
+                .contains("run_id uuid NOT NULL REFERENCES carrier_pay_run (id)")
+                .contains("UNIQUE (run_id, rider_ref)");
+        assertThat(the("CREATE TABLE carrier_pay_run"))
+                .contains("attendance_at timestamptz")
+                .contains("attendance <> 'INCLUDED' OR attendance_at IS NOT NULL");
+    }
+
     @Test
     @DisplayName("a correction is paid in a later run, never in the run it corrects")
     void correctionsGoForward() {
