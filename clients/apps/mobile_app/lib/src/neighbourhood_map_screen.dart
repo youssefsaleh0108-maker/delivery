@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'address_sheet.dart' show OsmBasemap;
+import 'store_power_chip.dart' show dekkaneDimmed;
 
 /// The neighbourhood browse's map, full screen (the frame's "Expand interactive map", 112:1941):
 /// the customer's pinned address and a pin for each shop the browse has loaded, every pin opening
@@ -96,8 +97,8 @@ class NeighbourhoodMapScreen extends StatelessWidget {
 }
 
 /// A shop on the neighbourhood map: a brand disc with the storefront glyph, named for a screen
-/// reader, and dimmed when the shop has declared itself dark — the same honest-not-hidden rule the
-/// list's cards follow.
+/// reader, and dimmed when the shop is closed or currently declared dark ([dekkaneDimmed]) — the
+/// same honest-not-hidden rule the list's cards follow.
 class NeighbourhoodShopPin extends StatelessWidget {
   const NeighbourhoodShopPin({super.key, required this.store, this.onTap});
 
@@ -123,9 +124,72 @@ class NeighbourhoodShopPin extends StatelessWidget {
       label: store.name,
       child: GestureDetector(
         onTap: onTap,
-        child: store.powerStatus == StorePowerStatus.dark
-            ? Opacity(opacity: 0.55, child: disc)
-            : disc,
+        child: dekkaneDimmed(store) ? Opacity(opacity: 0.55, child: disc) : disc,
+      ),
+    );
+  }
+}
+
+/// The map preview's one control, "Expand interactive map" (112:1941).
+///
+/// Drawn as the frame draws it — a white pill about 26px tall — inside a 48px-tall target: the band
+/// above and below the pill answers the tap as well, because a pill that small over a map is missed
+/// about as often as it is hit. Only the pill carries the ink and the button semantics.
+class NeighbourhoodMapExpandButton extends StatelessWidget {
+  const NeighbourhoodMapExpandButton({super.key, required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  /// The target's height: the smallest the platform guidelines allow.
+  static const double hitHeight = 48;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTap: onPressed,
+      child: SizedBox(
+        height: hitHeight,
+        child: Center(
+          widthFactor: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: DeliveryColors.ink.withValues(alpha: 0.10),
+                  blurRadius: 3,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Semantics(
+              button: true,
+              child: Material(
+                color: DeliveryColors.white,
+                shape: const StadiumBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onPressed,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(horizontal: 12, vertical: 6),
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.brand,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

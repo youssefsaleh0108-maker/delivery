@@ -13079,7 +13079,7 @@ abstract class DeliveryStrings {
   /// No description provided for @dekkaneMerchNeighborhoodHelp.
   ///
   /// In en, this message translates to:
-  /// **'Customers browsing their neighborhood find your shop under this name.'**
+  /// **'Shown under your shop\'s name when customers open your shop from their neighborhood list.'**
   String get dekkaneMerchNeighborhoodHelp;
 
   /// No description provided for @dekkaneMerchNeighborhoodTooLong.
@@ -13093,6 +13093,42 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Could not load this shop\'s shelves'**
   String get dekkaneCouldNotLoadShelf;
+
+  /// No description provided for @dekkaneBrowseTitleAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops on YouDrop'**
+  String get dekkaneBrowseTitleAll;
+
+  /// No description provided for @dekkaneBrowseSubAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Every shop, best rated first'**
+  String get dekkaneBrowseSubAll;
+
+  /// No description provided for @dekkaneAllShops.
+  ///
+  /// In en, this message translates to:
+  /// **'All shops'**
+  String get dekkaneAllShops;
+
+  /// No description provided for @dekkanePowerUpdatedMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =0{Updated just now} =1{Updated 1 min ago} other{Updated {minutes} min ago}}'**
+  String dekkanePowerUpdatedMinutes(int minutes);
+
+  /// No description provided for @dekkanePowerUpdatedHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{Updated 1 hr ago} other{Updated {hours} hrs ago}}'**
+  String dekkanePowerUpdatedHours(int hours);
+
+  /// No description provided for @dekkaneSearchedNearest.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Only the nearest shop was searched} other{Only the nearest {count} shops were searched}}'**
+  String dekkaneSearchedNearest(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

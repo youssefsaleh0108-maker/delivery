@@ -629,13 +629,20 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
                       Expanded(
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
-                          child: _dekkaneStatePill(t, card),
+                          child: _dekkaneStatePill(card),
                         ),
                       ),
                       const SizedBox(width: DeliverySpacing.sm),
-                      DekkanePowerPill(status: card.powerStatus, solid: true),
+                      DekkanePowerPill(store: card, solid: true),
                     ],
                   ),
+                  if (DekkanePowerPill.shows(card) && card.powerUpdatedAt != null) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: DekkanePowerAge(store: card, onPhoto: true),
+                    ),
+                  ],
                   const SizedBox(height: DeliverySpacing.md - 4),
                   Text(
                     card.name,
@@ -666,42 +673,11 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   }
 
   /// "Open · Closes 10:00 PM" — the frame's green pill, from the card's availability and the
-  /// store's closing time, in the reader's own clock format.
-  ///
-  /// The fills are the accent tokens' dark stops, not the frame's bright emerald: under an 11px
-  /// white label the emerald measures about 2.5:1, which the token system rules out for words, and
-  /// its -700 stop clears 4.5:1. Busy and closing-soon share the amber's; closed is the muted grey,
-  /// because closed is an absence, not a warning.
-  Widget _dekkaneStatePill(DeliveryStrings t, StoreCard card) {
-    final String? closes = _closingTime();
-    final String label = card.availability == StoreAvailability.open && closes != null
-        ? t.dekkaneOpenClosesAt(closes)
-        : card.availability.labelIn(t);
-    final Color fill = switch (card.availability) {
-      StoreAvailability.open => DeliveryAccent.positive.onTint,
-      StoreAvailability.busy || StoreAvailability.closingSoon => DeliveryAccent.caution.onTint,
-      StoreAvailability.closed => DeliveryColors.muted,
-    };
-
-    return Container(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: DeliveryColors.white,
-          height: 1.2,
-        ),
-      ),
-    );
-  }
+  /// store's closing time in the reader's own clock format. [DekkanePowerPill]'s neighbour,
+  /// [DekkaneStatePill], is shared with the neighbourhood cards, which show it for a shop that is
+  /// not open.
+  Widget _dekkaneStatePill(StoreCard card) =>
+      DekkaneStatePill(availability: card.availability, closesAt: _closingTime());
 
   /// The store's closing time for the window it is in, formatted by the reader's locale — "10:00
   /// PM", or the 24-hour and Arabic forms — or null when the full store has not arrived yet or the
@@ -848,7 +824,10 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// never inferred. Mains and undeclared shops draw nothing.
   Widget _powerBanner() {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final StorePowerStatus status = _card.powerStatus;
+    // Only a declaration that still counts as now: the banner says what is happening, and an old
+    // one is history rather than the state of the shop (StoreCard.powerCurrent).
+    final StorePowerStatus status =
+        _card.powerCurrent ? _card.powerStatus : StorePowerStatus.unknown;
     final (String text, Color fg, Color bg) = switch (status) {
       StorePowerStatus.generator => (
           t.custGeneratorBanner,

@@ -54,13 +54,16 @@ String dekkaneDistanceLabel(DeliveryStrings t, int metres) {
 /// Without one there is no point to be near, so the list falls back to the storefront browse and
 /// says plainly what pinning the address would add; the chips, the map and the distances are not
 /// drawn, because each of them needs the point and would otherwise be a control that does nothing
-/// or a number the platform does not have.
+/// or a number the platform does not have. Nor is the fallback called the neighbourhood: it is every
+/// shop on the platform, best rated first, and its title, subtitle and heading say that instead.
 ///
 /// **Pushed over the shell**, like every shop list. The frame draws a bottom bar with a "Shops"
 /// tab the shipped customer bar does not have; that is the frame's, not a destination.
 ///
-/// **A dark shop is dimmed, not hidden.** A customer walking past can still see it is there, and a
-/// list that silently dropped it would make the neighbourhood look smaller than it is.
+/// **A closed shop is dimmed, not hidden, and so is one currently declared dark.** Under "All" the
+/// list holds shops that are shut right now. Each says so on its cover instead of letting a customer
+/// open it to a shelf with nothing to add, and a list that silently dropped them would make the
+/// neighbourhood look smaller than it is.
 class HyperlocalScreen extends StatefulWidget {
   const HyperlocalScreen({
     super.key,
@@ -100,7 +103,7 @@ class HyperlocalScreen extends StatefulWidget {
   /// bury it under every supermarket in range.
   static const int radiusMetres = 2000;
 
-  /// What "New on YouDrop" means: joined the platform in the last thirty days.
+  /// What "New on YouDrop" means: first listed on the platform in the last thirty days.
   static const int joinedWithinDays = 30;
 
   /// The frame's map preview height.
@@ -114,6 +117,13 @@ class HyperlocalScreen extends StatefulWidget {
 typedef _Shop = ({StoreCard store, int? distanceMetres});
 
 class _HyperlocalScreenState extends State<HyperlocalScreen> {
+  /// How far below the location bar its tap reaches.
+  ///
+  /// The bar is drawn at the frame's height, about 34px, under the 44px a thumb needs. This band is
+  /// the top padding of the row beneath it — the chips, or the pin prompt — moved up into the bar's
+  /// tap area, so the target is 46px and nothing on the screen moves.
+  static const double _locationBarSlop = DeliverySpacing.md - 4;
+
   DekkaneFilter _filter = DekkaneFilter.all;
 
   /// The point the nearby list was loaded around, or null while the browse fallback is showing.
@@ -127,11 +137,19 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
   String? _zoneId;
   String? _region;
 
+  /// How many of the nearest shops the list covers when the search reached its ceiling, or null
+  /// when it did not ([NearbyPage.truncated]). Only an answer to the question on screen may set it:
+  /// [_question] moves on with every new address and chip, so a ceiling reached under one chip
+  /// never labels the list of another.
+  int? _searchedNearest;
+  int _question = 0;
+
   late final PagedList<NearbyStore> _nearby = PagedList<NearbyStore>(
     pageSize: 20,
-    fetch: (int page, int size) {
+    fetch: (int page, int size) async {
       final LatLng point = _point!;
-      return widget.storeApi.nearby(
+      final int question = _question;
+      final NearbyPage answer = await widget.storeApi.nearby(
         point.latitude,
         point.longitude,
         radiusMetres: HyperlocalScreen.radiusMetres,
@@ -143,6 +161,10 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
         page: page,
         size: size,
       );
+      if (question == _question) {
+        _searchedNearest = answer.truncated ? answer.candidateLimit : null;
+      }
+      return answer;
     },
   );
 
@@ -198,11 +220,19 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
     final DeliveryAddress? address = widget.addresses.selected;
     _point = _pointOf(address);
     if (_near) {
-      _nearby.refresh();
+      _askNearby();
     } else {
       _browse.refresh();
     }
     _loadRegion(address?.zoneId);
+  }
+
+  /// Puts a new question to the nearby search. The ceiling note belonged to the last answer, so it
+  /// goes with it rather than labelling a list it was never about.
+  void _askNearby() {
+    _question++;
+    _searchedNearest = null;
+    _nearby.refresh();
   }
 
   /// A new address is a new neighbourhood. The same one re-selected — or the store merely
@@ -241,7 +271,7 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
   void _select(DekkaneFilter filter) {
     if (filter == _filter) return;
     setState(() => _filter = filter);
-    _nearby.refresh();
+    _askNearby();
   }
 
   void _open(StoreCard store) {
@@ -282,8 +312,13 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       appBar: YdScreenHeader(
-        title: t.dekkaneBrowseTitle,
-        subtitle: _region == null ? t.custHyperlocalSub : t.dekkaneBrowseSubRegion(_region!),
+        // Without a point the list is the whole storefront, and it is named as that.
+        title: _near ? t.dekkaneBrowseTitle : t.dekkaneBrowseTitleAll,
+        subtitle: !_near
+            ? t.dekkaneBrowseSubAll
+            : _region == null
+                ? t.custHyperlocalSub
+                : t.dekkaneBrowseSubRegion(_region!),
         onBack: () => Navigator.of(context).maybePop(),
         backSemanticLabel: t.back,
         trailing: YouDropPill(semanticLabel: t.appTitle),
@@ -307,7 +342,7 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
               SliverToBoxAdapter(child: _near ? _filterRow(t) : _pinPrompt(t)),
               if (_near && _nearby.items.isNotEmpty) SliverToBoxAdapter(child: _mapPreview(t)),
               SliverToBoxAdapter(
-                child: _sectionLabel(_near ? t.dekkaneNearbyShops : t.dekkaneLocalShops),
+                child: _sectionLabel(_near ? t.dekkaneNearbyShops : t.dekkaneAllShops),
               ),
               ..._listSlivers(t, list),
               const SliverToBoxAdapter(child: SizedBox(height: DeliverySpacing.xl)),
@@ -328,36 +363,50 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
             ? address.line
             : (_region == null ? area : t.dekkaneAreaInRegion(area, _region!));
 
-    return Material(
-      color: DeliveryColors.white,
-      child: InkWell(
-        onTap: _pickAddress,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: DeliverySpacing.md, vertical: DeliverySpacing.sm),
-          child: Semantics(
-            button: true,
-            child: Row(
-              children: <Widget>[
-                const Icon(Icons.location_on_outlined, size: 16, color: DeliveryColors.brand),
-                const SizedBox(width: DeliverySpacing.sm),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: DeliveryColors.ink,
-                      height: 1.25,
-                    ),
+    // The band under the bar answers its tap as well ([_locationBarSlop]). Left out of semantics:
+    // the bar itself is the button a screen reader is offered.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTap: _pickAddress,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Material(
+            color: DeliveryColors.white,
+            child: InkWell(
+              onTap: _pickAddress,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: DeliverySpacing.md, vertical: DeliverySpacing.sm),
+                child: Semantics(
+                  button: true,
+                  child: Row(
+                    children: <Widget>[
+                      const Icon(Icons.location_on_outlined, size: 16, color: DeliveryColors.brand),
+                      const SizedBox(width: DeliverySpacing.sm),
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: DeliveryColors.ink,
+                            height: 1.25,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: _locationBarSlop),
+        ],
       ),
     );
   }
@@ -371,11 +420,12 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
         );
 
     return SizedBox(
-      height: YdChip.minHeight + DeliverySpacing.lg,
+      // Its top padding is the location bar's tap band now; see [_locationBarSlop].
+      height: YdChip.minHeight + DeliverySpacing.lg - _locationBarSlop,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: DeliverySpacing.md, vertical: DeliverySpacing.md - 4),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md - 4),
         children: <Widget>[
           chip(DekkaneFilter.all, t.all),
           const SizedBox(width: DeliverySpacing.sm),
@@ -392,8 +442,9 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
   /// Without a pinned address: what pinning it would add, as the way to do it.
   Widget _pinPrompt(DeliveryStrings t) {
     return Padding(
+      // No top padding: that is the location bar's tap band; see [_locationBarSlop].
       padding: const EdgeInsetsDirectional.fromSTEB(
-          DeliverySpacing.md, DeliverySpacing.md - 4, DeliverySpacing.md, DeliverySpacing.md),
+          DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md),
       child: YdCard.bordered(
         onTap: _pickAddress,
         padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
@@ -415,7 +466,7 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
 
   /// The frame's 100px `map-preview`: a real map of the address and the loaded shops, still, with
   /// the one control that opens it full screen. When the tiles cannot be fetched the preview says
-  /// so and drops the pill — the full map would be the same dead surface, larger.
+  /// so and drops the control — the full map would be the same dead surface, larger.
   Widget _mapPreview(DeliveryStrings t) {
     final LatLng home = _point!;
     final List<NearbyStore> shops = _nearby.items;
@@ -468,46 +519,14 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
               ),
             ],
             fallback: const NeighbourhoodMapUnavailable(compact: true),
-            overlay: (bool tilesLive) =>
-                tilesLive ? Center(child: _expandPill(t)) : const SizedBox.shrink(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _expandPill(DeliveryStrings t) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DeliveryRadius.pill),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: DeliveryColors.ink.withValues(alpha: 0.10),
-            blurRadius: 3,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Semantics(
-        button: true,
-        child: Material(
-          color: DeliveryColors.white,
-          shape: const StadiumBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: _openMap,
-            child: Padding(
-              padding: const EdgeInsetsDirectional.symmetric(horizontal: 12, vertical: 6),
-              child: Text(
-                t.dekkaneExpandMap,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: DeliveryColors.brand,
-                  height: 1.2,
-                ),
-              ),
-            ),
+            overlay: (bool tilesLive) => tilesLive
+                ? Center(
+                    child: NeighbourhoodMapExpandButton(
+                      label: t.dekkaneExpandMap,
+                      onPressed: _openMap,
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
       ),
@@ -560,13 +579,18 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
     }
     if (list.isEmptyAfterLoad) {
       final bool filtered = _near && _filter != DekkaneFilter.all;
+      final int? nearest = _near ? _searchedNearest : null;
       return <Widget>[
         SliverFillRemaining(
           hasScrollBody: false,
           child: YdEmptyState(
             icon: Icons.storefront_outlined,
             title: filtered || !_near ? t.noShopsMatch : t.dekkaneNoShopsNearby,
-            message: filtered ? t.tryClearingAFilter : null,
+            // Past the search's ceiling, "none match" is only known of the nearest shops, so the
+            // message says which shops were looked at.
+            message: nearest != null
+                ? t.dekkaneSearchedNearest(nearest)
+                : (filtered ? t.tryClearingAFilter : null),
           ),
         ),
       ];
@@ -616,16 +640,34 @@ class _HyperlocalScreenState extends State<HyperlocalScreen> {
         ),
       );
     }
+    // Past the search's ceiling the list is the nearest shops only. Said at its end, so the last
+    // card is not taken for the edge of the neighbourhood.
+    final int? nearest = _near ? _searchedNearest : null;
+    if (nearest != null && !list.hasMore) {
+      return Padding(
+        padding: const EdgeInsets.all(DeliverySpacing.md),
+        child: Text(
+          t.dekkaneSearchedNearest(nearest),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35),
+        ),
+      );
+    }
     return const SizedBox.shrink();
   }
 }
 
 /// One dekkane on the browse (the frame's shop card): a 120px cover, the name against the trust
-/// badge, one line about the shop, and the rating, the distance and the power pill underneath.
+/// badge, one line about the shop, and the rating, the distance and the power badge underneath.
 ///
 /// The fact line is the shop's own tagline, then the merchant's power note, then the kind of shop —
 /// whichever exists first, so the line is never empty and never invented. The distance appears
 /// only when there was a point to measure from.
+///
+/// A shop that is not simply open says so on its cover — closing soon, busy, closed — in the pill
+/// the dekkane shop page's hero uses, and a closed one is dimmed like a dark one
+/// ([dekkaneDimmed]). The frame's list is headed "active nearby shops"; a shut shop that looked like
+/// the rest was opened only to show a shelf with nothing to add.
 class DekkaneShopCard extends StatelessWidget {
   const DekkaneShopCard({
     super.key,
@@ -659,12 +701,26 @@ class DekkaneShopCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          CustomerPhoto(
-            // A list surface: the derivative, falling back to the full-size cover by itself.
-            url: store.listCoverUrl,
-            width: double.infinity,
+          SizedBox(
             height: coverHeight,
-            icon: iconForVertical(store.vertical),
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                CustomerPhoto(
+                  // A list surface: the derivative, falling back to the full-size cover by itself.
+                  url: store.listCoverUrl,
+                  width: double.infinity,
+                  height: coverHeight,
+                  icon: iconForVertical(store.vertical),
+                ),
+                if (store.availability != StoreAvailability.open)
+                  PositionedDirectional(
+                    top: DeliverySpacing.sm,
+                    start: DeliverySpacing.sm,
+                    child: DekkaneStatePill(availability: store.availability),
+                  ),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
@@ -701,29 +757,51 @@ class DekkaneShopCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
                 ),
                 const SizedBox(height: DeliverySpacing.sm),
-                Row(
-                  children: <Widget>[
-                    _rating(t),
-                    if (distanceMetres != null) ...<Widget>[
-                      const Padding(
-                        padding: EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.sm),
-                        child: Text('•',
-                            style: TextStyle(fontSize: 12, color: DeliveryColors.faint)),
-                      ),
-                      Flexible(
-                        child: Text(
-                          dekkaneDistanceLabel(t, distanceMetres!),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: DeliveryColors.muted, height: 1.2),
+                LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints row) => Row(
+                    children: <Widget>[
+                      _rating(t),
+                      if (distanceMetres != null) ...<Widget>[
+                        const Padding(
+                          padding:
+                              EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.sm),
+                          child: Text('•',
+                              style: TextStyle(fontSize: 12, color: DeliveryColors.faint)),
                         ),
+                        // Expanded, with no Spacer beside it. A Flexible and a Spacer split what the
+                        // rating and the badge left evenly, so on a 360px phone "350 m away" lost
+                        // its last word while an empty stretch as wide sat next to it.
+                        Expanded(
+                          child: Text(
+                            dekkaneDistanceLabel(t, distanceMetres!),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12, color: DeliveryColors.muted, height: 1.2),
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+                      const SizedBox(width: DeliverySpacing.sm),
+                      // At most half the row. The badge is far narrower than that in practice;
+                      // past it — a long translation, a large system text size — its words
+                      // shorten rather than pushing the row off the card.
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: row.maxWidth / 2),
+                        child: DekkanePowerPill(store: store),
                       ),
                     ],
-                    const Spacer(),
-                    DekkanePowerPill(status: store.powerStatus),
-                  ],
+                  ),
                 ),
+                // How long ago the merchant said so, under the badge and on a line of its own, so
+                // the words never take room from the distance however long they run.
+                if (DekkanePowerPill.shows(store) && store.powerUpdatedAt != null) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: DekkanePowerAge(store: store),
+                  ),
+                ],
               ],
             ),
           ),
@@ -731,21 +809,20 @@ class DekkaneShopCard extends StatelessWidget {
       ),
     );
 
-    return store.powerStatus == StorePowerStatus.dark
-        ? Opacity(opacity: 0.55, child: card)
-        : card;
+    return dekkaneDimmed(store) ? Opacity(opacity: 0.55, child: card) : card;
   }
 
   /// The frame's amber "★ 4.6". The star is the amber glyph; the number is the same hue's darker
   /// stop, because the bright amber measures under 3:1 as 12px text on white — the token system's
-  /// own rule for accents on bare white.
+  /// own rule for accents on bare white. "New" is muted for the same reason: faint is for
+  /// decoration, and this is a word someone reads.
   Widget _rating(DeliveryStrings t) {
     final double? rating = store.rating;
     if (rating == null) {
       return Text(
         t.ratingNew,
         style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w600, color: DeliveryColors.faint, height: 1.2),
+            fontSize: 12, fontWeight: FontWeight.w600, color: DeliveryColors.muted, height: 1.2),
       );
     }
     return Row(

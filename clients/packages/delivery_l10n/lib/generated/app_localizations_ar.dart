@@ -7380,11 +7380,65 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get dekkaneMerchNeighborhoodHelp =>
-      'يجد الزبائن الذين يتصفّحون حيّهم محلّك تحت هذا الاسم.';
+      'يظهر تحت اسم محلّك عندما يفتحه الزبائن من قائمة حيّهم.';
 
   @override
   String get dekkaneMerchNeighborhoodTooLong => 'يجب ألّا يتجاوز 80 حرفاً';
 
   @override
   String get dekkaneCouldNotLoadShelf => 'تعذّر تحميل رفوف المحل';
+
+  @override
+  String get dekkaneBrowseTitleAll => 'المحلات على YouDrop';
+
+  @override
+  String get dekkaneBrowseSubAll => 'كل المحلات، الأعلى تقييماً أولاً';
+
+  @override
+  String get dekkaneAllShops => 'كل المحلات';
+
+  @override
+  String dekkanePowerUpdatedMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'آخر تحديث منذ $minutes دقيقة',
+      many: 'آخر تحديث منذ $minutes دقيقة',
+      few: 'آخر تحديث منذ $minutes دقائق',
+      two: 'آخر تحديث منذ دقيقتين',
+      one: 'آخر تحديث منذ دقيقة',
+      zero: 'حُدِّث للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkanePowerUpdatedHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'آخر تحديث منذ $hours ساعة',
+      many: 'آخر تحديث منذ $hours ساعة',
+      few: 'آخر تحديث منذ $hours ساعات',
+      two: 'آخر تحديث منذ ساعتين',
+      one: 'آخر تحديث منذ ساعة',
+      zero: 'حُدِّث للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkaneSearchedNearest(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم البحث في أقرب $count محل فقط',
+      many: 'تم البحث في أقرب $count محلاً فقط',
+      few: 'تم البحث في أقرب $count محلات فقط',
+      two: 'تم البحث في أقرب محلّين فقط',
+      one: 'تم البحث في أقرب محل فقط',
+      zero: 'لم يتم البحث في أي محل',
+    );
+    return '$_temp0';
+  }
 }

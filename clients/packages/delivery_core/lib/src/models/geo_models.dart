@@ -123,6 +123,42 @@ class NearbyStore {
       );
 }
 
+/// A page of the "near me" search, mirroring `GeoDtos.NearbyPageResponse`: the storefront's page,
+/// plus whether the search reached its ceiling.
+///
+/// [truncated] marks the one case in which [Paged.totalElements] is not "every shop in the radius
+/// that matches": more matched than one search reads, so the page and its total cover the nearest
+/// [candidateLimit] of them only. A screen about to say "no shops match" over a truncated answer
+/// should say it searched the nearest [candidateLimit] instead.
+class NearbyPage extends Paged<NearbyStore> {
+  const NearbyPage({
+    required super.content,
+    required super.page,
+    required super.totalElements,
+    required super.totalPages,
+    this.truncated = false,
+    this.candidateLimit,
+  });
+
+  final bool truncated;
+
+  /// How many of the nearest matching shops one search reads. Null from a server that does not
+  /// say, which is also a server that never reports [truncated].
+  final int? candidateLimit;
+
+  factory NearbyPage.fromJson(Map<String, dynamic> json) {
+    final Paged<NearbyStore> page = Paged<NearbyStore>.fromJson(json, NearbyStore.fromJson);
+    return NearbyPage(
+      content: page.content,
+      page: page.page,
+      totalElements: page.totalElements,
+      totalPages: page.totalPages,
+      truncated: json['truncated'] as bool? ?? false,
+      candidateLimit: (json['candidateLimit'] as num?)?.toInt(),
+    );
+  }
+}
+
 /// How a cross-sell suggestion was arrived at, mirroring `CrossSellService.Basis`.
 ///
 /// Not decoration, and a rail should not ignore it: [boughtTogether] was counted from delivered

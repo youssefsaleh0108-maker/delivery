@@ -7374,7 +7374,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get dekkaneMerchNeighborhoodHelp =>
-      'Customers browsing their neighborhood find your shop under this name.';
+      'Shown under your shop\'s name when customers open your shop from their neighborhood list.';
 
   @override
   String get dekkaneMerchNeighborhoodTooLong =>
@@ -7382,4 +7382,47 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get dekkaneCouldNotLoadShelf => 'Could not load this shop\'s shelves';
+
+  @override
+  String get dekkaneBrowseTitleAll => 'Shops on YouDrop';
+
+  @override
+  String get dekkaneBrowseSubAll => 'Every shop, best rated first';
+
+  @override
+  String get dekkaneAllShops => 'All shops';
+
+  @override
+  String dekkanePowerUpdatedMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Updated $minutes min ago',
+      one: 'Updated 1 min ago',
+      zero: 'Updated just now',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkanePowerUpdatedHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Updated $hours hrs ago',
+      one: 'Updated 1 hr ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkaneSearchedNearest(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Only the nearest $count shops were searched',
+      one: 'Only the nearest shop was searched',
+    );
+    return '$_temp0';
+  }
 }

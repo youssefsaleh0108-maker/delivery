@@ -294,10 +294,11 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
 
   /// One shop as the frame's tall card: the cover, then name against the rating, the vertical's
   /// own line, and the delivery time in positive green against the minimum order. A shop that
-  /// declared itself DARK dims — visible, honest, and not pretending to cook.
+  /// currently declares itself DARK dims — visible, honest, and not pretending to cook. A
+  /// declaration too old to count as now dims nothing and draws no chip (StoreCard.powerCurrent).
   Widget _shopCard(DeliveryStrings t, StoreCard store) {
     final Widget card = _shopCardBody(t, store);
-    return store.powerStatus == StorePowerStatus.dark
+    return store.powerCurrent && store.powerStatus == StorePowerStatus.dark
         ? Opacity(opacity: 0.55, child: card)
         : card;
   }
@@ -338,7 +339,8 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
                         ),
                       ),
                     ),
-                    if (store.powerStatus != StorePowerStatus.unknown) ...<Widget>[
+                    if (store.powerCurrent &&
+                        store.powerStatus != StorePowerStatus.unknown) ...<Widget>[
                       const SizedBox(width: DeliverySpacing.sm),
                       StorePowerChip(status: store.powerStatus, compact: true),
                     ],

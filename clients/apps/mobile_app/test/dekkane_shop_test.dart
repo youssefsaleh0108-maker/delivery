@@ -60,6 +60,11 @@ void main() {
       'closesAt': '22:00:00',
       'neighborhood': 'Mar Mikhael',
       'powerStatus': 'GENERATOR',
+      // Declared two hours ago and still current: long enough ago that the age reads in hours and
+      // cannot tick over while the test runs.
+      'powerUpdatedAt':
+          DateTime.now().toUtc().subtract(const Duration(hours: 2)).toIso8601String(),
+      'powerCurrent': true,
       'rating': 4.8,
       'ratingCount': 234,
       'tagline': 'Family-run since 1985',
@@ -202,6 +207,20 @@ void main() {
       shop['powerStatus'] = 'MAINS';
       await pumpShop(tester);
       expect(find.text(en.dekkaneGeneratorActive), findsNothing);
+    });
+
+    testWidgets('the pill says how long ago the merchant declared it', (WidgetTester tester) async {
+      await pumpShop(tester);
+      expect(find.text(en.dekkanePowerUpdatedHours(2)), findsOneWidget);
+    });
+
+    testWidgets('a declaration too old to count as now draws no pill, whatever it said',
+        (WidgetTester tester) async {
+      // "Generator active" is a claim about now; the server said this one no longer is.
+      shop['powerCurrent'] = false;
+      await pumpShop(tester);
+      expect(find.text(en.dekkaneGeneratorActive), findsNothing);
+      expect(find.text(en.dekkanePowerUpdatedHours(2)), findsNothing);
     });
   });
 

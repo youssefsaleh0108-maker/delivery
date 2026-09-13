@@ -2449,7 +2449,13 @@
   "dekkaneAddOneMore": "أضف واحداً آخر",
   "dekkaneMerchNeighborhood": "الحي",
   "dekkaneMerchNeighborhoodHint": "مثلاً: مار مخايل",
-  "dekkaneMerchNeighborhoodHelp": "يجد الزبائن الذين يتصفّحون حيّهم محلّك تحت هذا الاسم.",
+  "dekkaneMerchNeighborhoodHelp": "يظهر تحت اسم محلّك عندما يفتحه الزبائن من قائمة حيّهم.",
   "dekkaneMerchNeighborhoodTooLong": "يجب ألّا يتجاوز 80 حرفاً",
-  "dekkaneCouldNotLoadShelf": "تعذّر تحميل رفوف المحل"
+  "dekkaneCouldNotLoadShelf": "تعذّر تحميل رفوف المحل",
+  "dekkaneBrowseTitleAll": "المحلات على YouDrop",
+  "dekkaneBrowseSubAll": "كل المحلات، الأعلى تقييماً أولاً",
+  "dekkaneAllShops": "كل المحلات",
+  "dekkanePowerUpdatedMinutes": "{minutes, plural, zero{حُدِّث للتو} one{آخر تحديث منذ دقيقة} two{آخر تحديث منذ دقيقتين} few{آخر تحديث منذ {minutes} دقائق} many{آخر تحديث منذ {minutes} دقيقة} other{آخر تحديث منذ {minutes} دقيقة}}",
+  "dekkanePowerUpdatedHours": "{hours, plural, zero{حُدِّث للتو} one{آخر تحديث منذ ساعة} two{آخر تحديث منذ ساعتين} few{آخر تحديث منذ {hours} ساعات} many{آخر تحديث منذ {hours} ساعة} other{آخر تحديث منذ {hours} ساعة}}",
+  "dekkaneSearchedNearest": "{count, plural, zero{لم يتم البحث في أي محل} one{تم البحث في أقرب محل فقط} two{تم البحث في أقرب محلّين فقط} few{تم البحث في أقرب {count} محلات فقط} many{تم البحث في أقرب {count} محلاً فقط} other{تم البحث في أقرب {count} محل فقط}}"
 }

@@ -3536,7 +3536,34 @@
   "dekkaneAddOneMore": "Add one more",
   "dekkaneMerchNeighborhood": "Neighborhood",
   "dekkaneMerchNeighborhoodHint": "e.g. Mar Mikhael",
-  "dekkaneMerchNeighborhoodHelp": "Customers browsing their neighborhood find your shop under this name.",
+  "dekkaneMerchNeighborhoodHelp": "Shown under your shop's name when customers open your shop from their neighborhood list.",
   "dekkaneMerchNeighborhoodTooLong": "Keep it to 80 characters or fewer",
-  "dekkaneCouldNotLoadShelf": "Could not load this shop's shelves"
+  "dekkaneCouldNotLoadShelf": "Could not load this shop's shelves",
+  "dekkaneBrowseTitleAll": "Shops on YouDrop",
+  "dekkaneBrowseSubAll": "Every shop, best rated first",
+  "dekkaneAllShops": "All shops",
+  "dekkanePowerUpdatedMinutes": "{minutes, plural, =0{Updated just now} =1{Updated 1 min ago} other{Updated {minutes} min ago}}",
+  "@dekkanePowerUpdatedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "dekkanePowerUpdatedHours": "{hours, plural, =1{Updated 1 hr ago} other{Updated {hours} hrs ago}}",
+  "@dekkanePowerUpdatedHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "dekkaneSearchedNearest": "{count, plural, =1{Only the nearest shop was searched} other{Only the nearest {count} shops were searched}}",
+  "@dekkaneSearchedNearest": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

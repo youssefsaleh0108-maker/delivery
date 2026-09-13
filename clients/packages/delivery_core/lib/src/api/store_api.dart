@@ -72,18 +72,21 @@ class StoreApi {
   /// legitimate "everything around here".
   ///
   /// The filters are the neighbourhood browse's chips, applied by the server before the page is
-  /// cut, so pages stay full and [Paged.totalElements] counts what matches. Omitted ones are not
-  /// sent, and the plain search is what the home rail has always had.
+  /// cut, so pages stay full — within the nearest [NearbyPage.candidateLimit] shops that match. All
+  /// but [openNow] narrow the database's candidates themselves; [NearbyPage.truncated] says when more
+  /// shops matched than one search reads, and then [Paged.totalElements] counts only the nearest of
+  /// them. Omitted filters are not sent, and no filter is the plain search.
   ///
   /// * [openNow] drops a shop whose card would read closed; busy and closing-soon stay, because
   ///   both still take orders.
-  /// * [powerStatus] is what the merchant says the lights are doing NOW. `generator` means "running
-  ///   on the generator at the moment", not "owns one" — label it that way.
+  /// * [powerStatus] is what the merchant says the lights are doing NOW, and only while that
+  ///   declaration still counts as now ([StoreCard.powerCurrent]). `generator` means "running on the
+  ///   generator at the moment", not "owns one" — label it that way.
   /// * [neighborhood] is an exact match on the district a shop declared.
-  /// * [newSinceDays] keeps shops that joined the platform within that many days (clamped to
-  ///   1..365 server-side).
+  /// * [newSinceDays] keeps shops that first listed on the platform within that many days (clamped
+  ///   to 1..365 server-side) — counted from the listing, not from when the draft was created.
   /// * [verifiedLocal] keeps only shops Backoffice granted the trust badge.
-  Future<Paged<NearbyStore>> nearby(
+  Future<NearbyPage> nearby(
     double lat,
     double lng, {
     int radiusMetres = 5000,
@@ -110,8 +113,7 @@ class StoreApi {
         'size': size,
       },
     );
-    return Paged<NearbyStore>.fromJson(
-        response.data as Map<String, dynamic>, NearbyStore.fromJson);
+    return NearbyPage.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<Paged<StoreCard>> favorites({int page = 0, int size = 20}) async {
