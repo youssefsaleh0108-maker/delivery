@@ -38,6 +38,7 @@ class ProfileDrawer extends StatefulWidget {
     this.inbox,
     this.onOpenOrders,
     this.profileApi,
+    this.onOpenGiftHub,
   });
 
   final AuthSession session;
@@ -48,6 +49,9 @@ class ProfileDrawer extends StatefulWidget {
   final NotificationInbox? inbox;
   final VoidCallback? onOpenOrders;
   final ProfileApi? profileApi;
+
+  /// Opens the gift hub over the shell. Null hides the row.
+  final VoidCallback? onOpenGiftHub;
 
   @override
   State<ProfileDrawer> createState() => _ProfileDrawerState();
@@ -206,6 +210,15 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
                         ? null
                         : () => _go((NavigatorState _) => widget.onOpenOrders!()),
                   ),
+                  if (widget.onOpenGiftHub != null) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.sm),
+                    YdListRow(
+                      icon: Icons.card_giftcard_rounded,
+                      title: t.giftHubTitle,
+                      subtitle: t.giftHomeEntrySub,
+                      onTap: () => _go((NavigatorState _) => widget.onOpenGiftHub!()),
+                    ),
+                  ],
                   const SizedBox(height: DeliverySpacing.sm),
                   YdListRow(
                     icon: Icons.place_outlined,

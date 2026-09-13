@@ -13,6 +13,7 @@ import 'cart_screen.dart';
 import 'customer_nav_bar.dart';
 import 'delivery_address.dart';
 import 'delivery_terms_book.dart';
+import 'gift_hub_screen.dart';
 import 'my_orders_screen.dart';
 import 'notification_inbox.dart';
 import 'offline_banner.dart';
@@ -193,6 +194,25 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     _open(CustomerNavBar.basketIndex);
   }
 
+  /// Pushes the gift hub (Figma 112:1684) over the shell, from the Home card or the profile menu.
+  ///
+  /// Over the shell like every customer detail screen, so its shops reach the one basket through
+  /// [_openBasket], and "Select Items & Start Order" lands on Home to shop for the recipient.
+  void _openGiftHub() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => GiftHubScreen(
+        storeApi: widget.storeApi,
+        orderApi: widget.orderApi,
+        cart: _cart,
+        addresses: _addresses,
+        zoneApi: widget.zoneApi,
+        geocodingApi: widget.geocodingApi,
+        onOpenBasket: _openBasket,
+        onStartShopping: () => _open(CustomerNavBar.homeIndex),
+      ),
+    ));
+  }
+
   /// Re-asks the server what this basket qualifies for, when the basket has actually changed.
   ///
   /// Crossing an offer's minimum is exactly the moment the customer should see the fee disappear,
@@ -344,6 +364,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           transferApi: widget.transferApi,
           onSignOut: widget.onSignOut,
           onOpenBasket: _openBasket,
+          onOpenGiftHub: _openGiftHub,
         );
       case CustomerNavBar.ordersIndex:
         // The order list stays mounted under the catalog, so closing the catalog lands back on the
@@ -460,6 +481,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
               inbox: _inbox,
               profileApi: widget.profileApi,
               onOpenOrders: () => _open(CustomerNavBar.ordersIndex),
+              onOpenGiftHub: _openGiftHub,
             ),
             // IndexedStack, not a switch: it keeps each tab's scroll position and in-flight
             // requests alive, so switching to the basket and back does not refetch the catalog.

@@ -324,6 +324,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
+                        if (order.gift != null) ...<Widget>[
+                          _giftCard(t, order.gift!),
+                          const SizedBox(height: DeliverySpacing.md),
+                        ],
                         _receiptCard(t, order),
                         const SizedBox(height: DeliverySpacing.md),
                         YdPillButton(
@@ -803,6 +807,63 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   // ------------------------------------------------------------------ what it cost (kept)
 
+  /// The gift as the customer sent it. Before gifts had their own fields the sender could not see
+  /// their own card on the receipt at all; only the rider and the shop could.
+  Widget _giftCard(DeliveryStrings t, OrderGift gift) {
+    final String? message = gift.message?.trim();
+    return YdCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.card_giftcard_rounded, size: 18, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: Text(
+                  t.giftForName(gift.recipientName),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (gift.recipientPhone != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              gift.recipientPhone!,
+              textDirection: TextDirection.ltr,
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+            ),
+          ],
+          if (message != null && message.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              '“$message”',
+              style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.45),
+            ),
+          ],
+          if (gift.wrap) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              t.giftWrapRequested,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.brand,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _receiptCard(DeliveryStrings t, DeliveryOrder order) {
     return YdCard(
       child: Column(
@@ -828,6 +889,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 : t.setByStoreCharged(order.storeName ?? ''),
             override: order.deliveryFeeCharged == 0 ? t.free : null,
           ),
+          // The wrap, itemised like the express premium: inside the total, so shown for the total
+          // to add up.
+          if (order.gift != null && order.gift!.wrapFee > 0) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            _money(t.giftWrapLine, order.gift!.wrapFee),
+          ],
           // The promo code's line, only on orders that carried one — null means no code, which
           // is not the same receipt as a code worth zero.
           if (order.discountAmount != null) ...<Widget>[

@@ -653,11 +653,88 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
             name: order.deliveryAddress,
             detail: order.contactPhone,
           ),
+          if (order.gift != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md),
+            _giftPanel(t, order.gift!),
+          ],
           if (_eta != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md),
             const RiderHairline(),
             const SizedBox(height: DeliverySpacing.md),
             _etaPanel(t, _eta!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Who to hand a gift to. The rider carrying it is the one person besides the customer and
+  /// support the server gives the recipient's phone to, because they ring it at the door; the card
+  /// is shown so it goes over with the goods.
+  Widget _giftPanel(DeliveryStrings t, OrderGift gift) {
+    final String? message = gift.message?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.card_giftcard_rounded, size: 16, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: Text(
+                  t.giftForName(gift.recipientName),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (gift.recipientPhone != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              '${t.giftRecipientPhoneLabel}: ${gift.recipientPhone}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.ink,
+                height: 1.3,
+              ),
+            ),
+          ],
+          if (gift.wrap) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              t.giftWrapRequested,
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.brand, height: 1.3),
+            ),
+          ],
+          if (message != null && message.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              t.giftCardMessage.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.muted,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '“$message”',
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.45),
+            ),
           ],
         ],
       ),

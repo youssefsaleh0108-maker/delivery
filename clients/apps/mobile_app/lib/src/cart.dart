@@ -189,10 +189,39 @@ class Cart extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The diaspora gift note, set by the Send-to-Lebanon flow and carried until checkout folds it
-  /// into the order's notes. On the CART rather than an address: the note belongs to THIS order,
-  /// and writing it onto a saved address is exactly the leak checkout once had to fix.
+  /// The card for a gift, as typed at the gift checkout and kept while the customer goes back to the
+  /// basket and returns. On the CART rather than an address: the note belongs to THIS order, and
+  /// writing it onto a saved address is exactly the leak checkout once had to fix. It is sent as
+  /// the gift's own message ([GiftDetails.message]), never folded into the door notes.
   String? giftNote;
+
+  /// Whether this basket is a gift for somebody else. Started from the gift hub ([startGift]);
+  /// ended by placing it, emptying it ([clear]) or the customer saying it is not one ([stopGift]).
+  ///
+  /// It is what sends Proceed to Checkout to the gift checkout, so the basket says so while it is
+  /// on. Moving to another shop keeps it: a gift is about who receives it, not where it is bought.
+  bool get isGift => _isGift;
+  bool _isGift = false;
+
+  /// Whether the gift checkout's wrap switch is on, kept for the same round trip as [giftNote].
+  /// What wrapping costs is the server's to price.
+  bool giftWrap = false;
+
+  /// Marks this basket as a gift. Harmless when it already is one.
+  void startGift() {
+    if (_isGift) return;
+    _isGift = true;
+    notifyListeners();
+  }
+
+  /// Checks this basket out as an ordinary order after all, forgetting the card and the wrap only
+  /// a gift carries.
+  void stopGift() {
+    _isGift = false;
+    giftNote = null;
+    giftWrap = false;
+    notifyListeners();
+  }
 
   /// The group split plan behind this basket, set once the host's payment requests went out.
   /// Checkout attaches the placed order to it; same order-scoped lifetime as [giftNote].
@@ -206,6 +235,8 @@ class Cart extends ChangeNotifier {
     _lines.clear();
     _releaseStore();
     giftNote = null;
+    giftWrap = false;
+    _isGift = false;
     splitPlanId = null;
     notifyListeners();
   }

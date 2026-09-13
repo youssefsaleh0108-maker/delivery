@@ -618,6 +618,10 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
                         _flowCard(t),
                         const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
                         _customerCard(t),
+                        if (_order.gift != null) ...<Widget>[
+                          const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
+                          _giftCard(t, _order.gift!),
+                        ],
                         const SizedBox(height: DeliverySpacing.lg - DeliverySpacing.xs),
                         _receiptCard(t),
                         if (_order.availableActions.isNotEmpty) ...<Widget>[
@@ -801,6 +805,61 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
     );
   }
 
+  // ----------------------------------------------------------------- gift
+
+  /// What the shop needs to prepare a gift: who it is for (the name for the card), the card, and
+  /// whether to wrap it. Never the recipient's phone — the server does not give it to a shop; the
+  /// rider carrying the order is the one who rings it.
+  Widget _giftCard(DeliveryStrings t, OrderGift gift) {
+    final String? message = gift.message?.trim();
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _sectionLabel(t.giftForName(gift.recipientName)),
+          if (gift.wrap) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Row(
+              children: <Widget>[
+                const Icon(Icons.redeem_rounded, size: 15, color: DeliveryColors.brand),
+                const SizedBox(width: DeliverySpacing.xs),
+                Expanded(
+                  child: Text(
+                    t.giftWrapRequested,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: DeliveryColors.brand,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (message != null && message.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              t.giftCardMessage,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.faint,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              '“$message”',
+              style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.4),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ----------------------------------------------------------------- receipt
 
   Widget _receiptCard(DeliveryStrings t) {
@@ -874,6 +933,12 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
             t.deliveryFeeLabelMerchant,
             merchantMoney(_order.deliveryFeeCharged),
           ),
+          // Inside the grand total and outside the goods and the fee, so itemised for the receipt
+          // to add up.
+          if (_order.gift != null && _order.gift!.wrapFee > 0) ...<Widget>[
+            const SizedBox(height: 6),
+            _totalRow(t.giftWrapLine, merchantMoney(_order.gift!.wrapFee)),
+          ],
           const SizedBox(height: DeliverySpacing.sm + 2),
           Row(
             children: <Widget>[

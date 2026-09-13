@@ -104,11 +104,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
                               maxCrossAxisExtent: 340,
                               mainAxisSpacing: DeliverySpacing.md,
                               crossAxisSpacing: DeliverySpacing.md,
-                              mainAxisExtent: 296,
+                              mainAxisExtent: 340,
                             ),
                             itemCount: page.content.length,
                             itemBuilder: (BuildContext context, int index) =>
-                                _CatalogCard(product: page.content[index]),
+                                _CatalogCard(product: page.content[index], api: widget.api),
                           ),
                         ),
                       ],
@@ -135,17 +135,50 @@ const ProductPreviewWords _previewWords = ProductPreviewWords(
 
 String _photoPosition(int index, int count) => '$index of $count';
 
-/// One live product, as a customer would see it.
+/// One live product, as a customer would see it — with the Backoffice's one hand on it: whether
+/// it is featured on the customer gift hub.
 ///
-/// No actions: the Backoffice looks at the catalog, it does not edit it. A merchant's own portal is
-/// the only place a product changes, and putting an Edit button here would imply otherwise.
-class _CatalogCard extends StatelessWidget {
-  const _CatalogCard({required this.product});
+/// Still no Edit: a merchant's own portal is the only place a product changes. Featuring is the
+/// platform choosing what its own gift hub shows, which is the Backoffice's call and nobody
+/// else's — the server refuses it to any other role.
+class _CatalogCard extends StatefulWidget {
+  const _CatalogCard({required this.product, required this.api});
 
   final Product product;
+  final CatalogApi api;
 
   /// Keycloak subs are full UUIDs; the first segment is enough to tell merchants apart on screen.
   static String _short(String id) => id.length <= 8 ? id : id.substring(0, 8);
+
+  @override
+  State<_CatalogCard> createState() => _CatalogCardState();
+}
+
+class _CatalogCardState extends State<_CatalogCard> {
+  late bool _featured = widget.product.giftFeatured;
+  bool _saving = false;
+
+  Product get product => widget.product;
+
+  /// Flips the switch at once and puts it back if the server refuses — a product that stopped
+  /// being live since the page loaded is refused, and the reason is shown.
+  Future<void> _setFeatured(bool featured) async {
+    setState(() {
+      _featured = featured;
+      _saving = true;
+    });
+    try {
+      final bool now = await widget.api.setGiftFeatured(product.id, featured: featured);
+      if (mounted) setState(() => _featured = now);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _featured = !featured);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not update the gift hub: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -210,11 +243,20 @@ class _CatalogCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    'merchant ${_short(product.merchantId)}',
+                    'merchant ${_CatalogCard._short(product.merchantId)}',
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
                         ?.copyWith(color: DeliveryColors.muted),
+                  ),
+                  Row(
+                    children: <Widget>[
+                      const Expanded(
+                        child: Text('Featured on the gift hub',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      ),
+                      Switch(value: _featured, onChanged: _saving ? null : _setFeatured),
+                    ],
                   ),
                 ],
               ),

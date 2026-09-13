@@ -43,6 +43,7 @@ class StoreHomeScreen extends StatefulWidget {
     this.transferApi,
     required this.onSignOut,
     required this.onOpenBasket,
+    this.onOpenGiftHub,
   });
 
   final StoreApi storeApi;
@@ -79,6 +80,9 @@ class StoreHomeScreen extends StatefulWidget {
   /// The shell's way to its Basket tab, handed to every shop page opened from here — a card, a
   /// banner, or a shop reached through a category listing — for the basket bar's View basket.
   final VoidCallback onOpenBasket;
+
+  /// Opens the gift hub (Figma 112:1684) over the shell. Null draws no entry.
+  final VoidCallback? onOpenGiftHub;
 
   @override
   State<StoreHomeScreen> createState() => _StoreHomeScreenState();
@@ -398,6 +402,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 SliverToBoxAdapter(child: _splitRequestBanner(t)),
                 SliverToBoxAdapter(
                     child: KeyedSubtree(key: _stripKey, child: _categoryStrip(context))),
+                if (widget.onOpenGiftHub != null) SliverToBoxAdapter(child: _giftEntry(t)),
                 if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
                 if (_stores.isLoadingFirstPage || _loadingRails)
                   const SliverFillRemaining(
@@ -829,6 +834,60 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// The door to the gift hub, under the category cards. The hub is a route pushed over the shell,
+  /// like every customer detail screen; this card and the profile menu's row are how it is reached.
+  Widget _giftEntry(DeliveryStrings t) {
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(_gutter, DeliverySpacing.md, _gutter, 0),
+      child: YdCard.bordered(
+        onTap: widget.onOpenGiftHub,
+        padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              ),
+              child: const Icon(Icons.card_giftcard_rounded,
+                  size: 22, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    t.giftHomeEntryTitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.giftHomeEntrySub,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+            Icon(rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                size: 20, color: DeliveryColors.faint),
+          ],
+        ),
       ),
     );
   }
