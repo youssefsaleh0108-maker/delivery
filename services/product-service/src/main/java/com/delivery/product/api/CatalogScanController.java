@@ -139,19 +139,28 @@ public class CatalogScanController {
 
     @PostMapping("/{scanId}/items/{itemId}/reject")
     public ScanResponse rejectItem(@PathVariable UUID scanId, @PathVariable UUID itemId) {
-        return toResponse(scans.rejectItem(scanId, CurrentUser.requireId(), itemId));
+        String merchantId = CurrentUser.requireId();
+        scans.rejectItem(scanId, merchantId, itemId);
+        // After the decision has committed: skipping the last waiting line lets the photos go.
+        return toResponse(scans.discardPhotosOnceDecided(scanId, merchantId));
     }
 
     /**
      * The review, in one request: accepted lines become DRAFT products in the scan's store,
      * rejected lines are closed. All or nothing. Nothing is published.
+     *
+     * <p>Once the save has committed, a scan with no line left waiting has its shelf photos deleted
+     * — see {@link CatalogScanService#discardPhotosOnceDecided} — and the answer is the scan as it
+     * then stands, so the client is never handed a URL to a photo that is already gone.
      */
     @PostMapping("/{scanId}/commit")
     public ScanResponse commit(@PathVariable UUID scanId, @Valid @RequestBody CommitRequest request) {
         List<Acceptance> accept = request.accept() == null ? List.of() : request.accept().stream()
                 .map(a -> new Acceptance(a.itemId(), a.name(), a.price(), a.categoryId()))
                 .toList();
-        return toResponse(scans.commit(scanId, CurrentUser.requireId(), accept, request.reject()));
+        String merchantId = CurrentUser.requireId();
+        scans.commit(scanId, merchantId, accept, request.reject());
+        return toResponse(scans.discardPhotosOnceDecided(scanId, merchantId));
     }
 
     // ---------------------------------------------------------------- mapping

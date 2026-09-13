@@ -211,6 +211,30 @@ class CatalogScanAccessTest {
         verify(scans).current("intruder-sub", store);
     }
 
+    /**
+     * Shelf photos are let go only after the save has returned — an object delete cannot be rolled
+     * back with a save that failed — and a refused save lets nothing go.
+     */
+    @Test
+    void shelf_photos_are_let_go_only_after_the_save_has_committed() {
+        signInAs("merchant-sub", "ROLE_MERCHANT");
+        when(scans.discardPhotosOnceDecided(SCAN, "merchant-sub")).thenReturn(emptyScan());
+
+        controller.commit(SCAN, new CommitRequest(List.of(), List.of(ITEM)));
+
+        InOrder order = Mockito.inOrder(scans);
+        order.verify(scans).commit(SCAN, "merchant-sub", List.of(), List.of(ITEM));
+        order.verify(scans).discardPhotosOnceDecided(SCAN, "merchant-sub");
+
+        Mockito.reset(scans);
+        when(scans.commit(any(), any(), any(), any()))
+                .thenThrow(new CatalogScanService.ScanStateException("Line was already decided"));
+
+        assertThatThrownBy(() -> controller.commit(SCAN, new CommitRequest(List.of(), List.of(ITEM))))
+                .isInstanceOf(CatalogScanService.ScanStateException.class);
+        verify(scans, never()).discardPhotosOnceDecided(any(), any());
+    }
+
     /** The job is queued only after the transaction that marked the scan ANALYZING has returned. */
     @Test
     void analysis_is_queued_only_after_the_scan_has_been_marked() {

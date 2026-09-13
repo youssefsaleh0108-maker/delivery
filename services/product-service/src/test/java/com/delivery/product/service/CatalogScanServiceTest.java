@@ -697,6 +697,81 @@ class CatalogScanServiceTest {
         }
     }
 
+    /**
+     * Shelf photos are a picture of the merchant's stock room in a public-read bucket, so once no line
+     * waits on them they go. Best effort: a photo that will not delete never undoes a save that has
+     * already happened — the bucket's expiry rule takes it.
+     */
+    @Nested
+    @DisplayName("letting shelf photos go")
+    class Discarding {
+
+        private CatalogScanPhoto photo(CatalogScan scan, int position) {
+            CatalogScanPhoto photo = new CatalogScanPhoto(scan.getId(), UUID.randomUUID(),
+                    "scans/" + scan.getId() + "/" + position + ".jpg", position);
+            photo.markUploaded();
+            return photo;
+        }
+
+        @Test
+        void once_every_line_is_decided_every_photo_is_deleted_as_its_owner() {
+            CatalogScan scan = complete();
+            CatalogScanPhoto first = photo(scan, 0);
+            CatalogScanPhoto second = photo(scan, 1);
+            when(photos.findByScanIdOrderByPositionAsc(scan.getId())).thenReturn(List.of(first, second));
+
+            service.discardPhotosOnceDecided(scan.getId(), MERCHANT);
+
+            verify(storage).softDelete(first.getFileId(), MERCHANT);
+            verify(storage).softDelete(second.getFileId(), MERCHANT);
+        }
+
+        @Test
+        void while_a_line_still_waits_the_photos_stay() {
+            CatalogScan scan = complete();
+            when(photos.findByScanIdOrderByPositionAsc(scan.getId())).thenReturn(List.of(photo(scan, 0)));
+            when(items.existsByScanIdAndStatus(scan.getId(), CatalogScanItem.Status.PENDING)).thenReturn(true);
+
+            service.discardPhotosOnceDecided(scan.getId(), MERCHANT);
+
+            verifyNoInteractions(storage);
+        }
+
+        @Test
+        void a_scan_still_taking_photos_keeps_them() {
+            CatalogScan scan = uploading();
+            uploadedPhoto(scan);
+
+            service.discardPhotosOnceDecided(scan.getId(), MERCHANT);
+
+            verifyNoInteractions(storage);
+        }
+
+        @Test
+        void a_photo_that_will_not_delete_does_not_stop_the_rest_or_undo_the_save() {
+            CatalogScan scan = complete();
+            CatalogScanPhoto stuck = photo(scan, 0);
+            CatalogScanPhoto next = photo(scan, 1);
+            when(photos.findByScanIdOrderByPositionAsc(scan.getId())).thenReturn(List.of(stuck, next));
+            org.mockito.Mockito.doThrow(new IllegalStateException("storage is down"))
+                    .when(storage).softDelete(stuck.getFileId(), MERCHANT);
+
+            ScanDetails details = service.discardPhotosOnceDecided(scan.getId(), MERCHANT);
+
+            verify(storage).softDelete(next.getFileId(), MERCHANT);
+            assertThat(details.status()).isEqualTo(CatalogScan.Status.COMPLETE);
+        }
+
+        @Test
+        void another_merchants_scan_is_not_found_and_nothing_is_deleted() {
+            CatalogScan scan = complete();
+
+            assertThatThrownBy(() -> service.discardPhotosOnceDecided(scan.getId(), OTHER))
+                    .isInstanceOf(CatalogScanNotFoundException.class);
+            verifyNoInteractions(storage);
+        }
+    }
+
     /** A box ending on the photo's edge must not round a hair past it and fail the whole scan. */
     @Test
     void a_box_rounded_for_storage_still_fits_inside_its_photo() {

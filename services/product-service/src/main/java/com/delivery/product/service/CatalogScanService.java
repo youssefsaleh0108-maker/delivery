@@ -496,6 +496,39 @@ public class CatalogScanService {
         return details(scan);
     }
 
+    /**
+     * Deletes a scan's shelf photos once no line on it is waiting any more.
+     *
+     * <p>Shelf photos are a picture of the merchant's stock room, kept in the public-read
+     * product-images bucket, and nothing needs them once every line is kept or skipped: the drafts
+     * carry no photo from them. So they go, through the same {@code softDelete} a product photo's
+     * removal uses — the object, and its metadata marked deleted, so nothing resolves a URL to it.
+     *
+     * <p>Called by the controller after the save has committed, never inside it: an object delete
+     * cannot be rolled back, and a save that failed after its photos were gone would leave lines
+     * waiting on pictures that no longer exist. Not {@code @Transactional} for the same reason —
+     * each delete is its own, so one that fails cannot take the others, or the save's answer, down
+     * with it. Best effort per photo: the bucket's expiry rule for {@code scans/} (MinIO bootstrap)
+     * takes whatever this misses, along with every scan abandoned before it was finished.
+     *
+     * @return the scan as it now stands
+     */
+    public ScanDetails discardPhotosOnceDecided(UUID scanId, String merchantId) {
+        CatalogScan scan = requireOwned(scanId, merchantId);
+        if (scan.getStatus() == CatalogScan.Status.COMPLETE
+                && !items.existsByScanIdAndStatus(scanId, CatalogScanItem.Status.PENDING)) {
+            for (CatalogScanPhoto photo : photos.findByScanIdOrderByPositionAsc(scanId)) {
+                try {
+                    storage.softDelete(photo.getFileId(), merchantId);
+                } catch (RuntimeException e) {
+                    log.warn("Scan {}: shelf photo {} was not deleted after the save; the scans/ "
+                            + "expiry rule will take it: {}", scanId, photo.getFileId(), e.toString());
+                }
+            }
+        }
+        return details(scan);
+    }
+
     // ---------------------------------------------------------------- internals
 
     private ScanDetails details(CatalogScan scan) {
