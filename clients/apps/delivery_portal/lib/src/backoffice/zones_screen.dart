@@ -16,7 +16,8 @@ import 'package:flutter/material.dart';
 ///
 /// An area can also be given a centre — roughly the middle of the neighbourhood — which is what puts
 /// it on the merchant Demand Radar's map and lets a shop's pin find the areas around it. It is
-/// optional and never prices anything; each card says whether its area is on that map.
+/// optional and never prices anything; each card says whether its area is on that map. Emptying both
+/// centre boxes takes an area off the map; an edit that leaves them alone never does.
 class ZonesScreen extends StatefulWidget {
   const ZonesScreen({super.key, required this.api});
 
@@ -82,6 +83,7 @@ class _ZonesScreenState extends State<ZonesScreen> {
                   sortOrder: draft.sortOrder,
                   centerLat: draft.centerLat,
                   centerLng: draft.centerLng,
+                  clearCentre: draft.clearCentre,
                 ))
           .then((_) {}),
       existing == null ? 'Area added' : 'Area updated',
@@ -237,7 +239,14 @@ class _ZonesScreenState extends State<ZonesScreen> {
 }
 
 class _Draft {
-  const _Draft(this.name, this.region, this.sortOrder, this.centerLat, this.centerLng);
+  const _Draft(
+    this.name,
+    this.region,
+    this.sortOrder,
+    this.centerLat,
+    this.centerLng, {
+    this.clearCentre = false,
+  });
 
   final String name;
   final String? region;
@@ -246,6 +255,13 @@ class _Draft {
   /// Both or neither; the dialog refuses one without the other before it closes.
   final double? centerLat;
   final double? centerLng;
+
+  /// True only when the operator emptied both boxes of an area that had a centre.
+  ///
+  /// An edit that sends no centre keeps the one stored, so taking an area off the map has to be said
+  /// out loud — and it is said only when it was meant. Boxes that merely opened empty ask for
+  /// nothing: another tab may have placed the area since this dialog opened.
+  final bool clearCentre;
 }
 
 class _ZoneDialog extends StatefulWidget {
@@ -378,12 +394,16 @@ class _ZoneDialogState extends State<_ZoneDialog> {
           onPressed: () {
             if (!(_form.currentState?.validate() ?? false)) return;
             final String region = _region.text.trim();
+            // The validators have already made these both-or-neither.
+            final double? lat = double.tryParse(_lat.text.trim());
+            final double? lng = double.tryParse(_lng.text.trim());
             Navigator.of(context).pop(_Draft(
               _name.text.trim(),
               region.isEmpty ? null : region,
               int.parse(_sort.text.trim()),
-              double.tryParse(_lat.text.trim()),
-              double.tryParse(_lng.text.trim()),
+              lat,
+              lng,
+              clearCentre: (widget.existing?.isPlaced ?? false) && lat == null && lng == null,
             ));
           },
           style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),

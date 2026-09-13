@@ -163,26 +163,58 @@ void main() {
       expect(unplaced.isPlaced, isFalse);
     });
 
-    test('creating and editing an area send its centre, and an empty one clears it', () async {
+    (DeliveryZoneApi, _Recorder) zoneApi() {
       final _Recorder adapter = _Recorder(<String, dynamic>{
         'id': 'z-1',
         'name': 'Hamra',
         'sortOrder': 10,
         'active': true,
       });
-      final DeliveryZoneApi api =
-          DeliveryZoneApi(Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter);
+      return (
+        DeliveryZoneApi(Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter),
+        adapter,
+      );
+    }
+
+    test('creating an area sends its centre, and an unplaced one sends none', () async {
+      final (DeliveryZoneApi api, _Recorder adapter) = zoneApi();
 
       await api.create(name: 'Hamra', region: 'Beirut', centerLat: 33.8959, centerLng: 35.4787);
-      await api.rename('z-1', name: 'Hamra', region: 'Beirut');
+      await api.create(name: 'Verdun', region: 'Beirut');
 
-      final Map<String, dynamic> created = adapter.calls.first.data as Map<String, dynamic>;
-      expect(created['centerLat'], 33.8959);
-      expect(created['centerLng'], 35.4787);
-      final Map<String, dynamic> edited = adapter.calls.last.data as Map<String, dynamic>;
-      expect(edited.containsKey('centerLat'), isTrue);
-      expect(edited['centerLat'], isNull);
-      expect(edited['centerLng'], isNull);
+      final Map<String, dynamic> placed = adapter.calls.first.data as Map<String, dynamic>;
+      expect(placed['centerLat'], 33.8959);
+      expect(placed['centerLng'], 35.4787);
+      final Map<String, dynamic> unplaced = adapter.calls.last.data as Map<String, dynamic>;
+      expect(unplaced.containsKey('centerLat'), isFalse);
+      expect(unplaced.containsKey('centerLng'), isFalse);
+    });
+
+    test('an edit that says nothing about the centre sends nothing about it, so it is kept',
+        () async {
+      final (DeliveryZoneApi api, _Recorder adapter) = zoneApi();
+
+      await api.rename('z-1', name: 'Hamra', region: 'Beirut', sortOrder: 5);
+
+      // Exactly the body every build older than centres sends, which the server reads as "keep".
+      final Map<String, dynamic> edited = adapter.calls.single.data as Map<String, dynamic>;
+      expect(edited.keys, unorderedEquals(<String>['name', 'region', 'sortOrder']));
+    });
+
+    test('a new centre is sent whole, and taking one off is said out loud', () async {
+      final (DeliveryZoneApi api, _Recorder adapter) = zoneApi();
+
+      await api.rename('z-1', name: 'Hamra', centerLat: 33.897, centerLng: 35.48);
+      await api.rename('z-1', name: 'Hamra', clearCentre: true);
+
+      final Map<String, dynamic> moved = adapter.calls.first.data as Map<String, dynamic>;
+      expect(moved['centerLat'], 33.897);
+      expect(moved['centerLng'], 35.48);
+      expect(moved.containsKey('clearCentre'), isFalse);
+      final Map<String, dynamic> cleared = adapter.calls.last.data as Map<String, dynamic>;
+      expect(cleared['clearCentre'], isTrue);
+      expect(cleared.containsKey('centerLat'), isFalse);
+      expect(cleared.containsKey('centerLng'), isFalse);
     });
   });
 }
