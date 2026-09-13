@@ -7272,4 +7272,284 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get wizAccountRolesRetry =>
       'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get blitzTitle => 'Merchant Blitz';
+
+  @override
+  String get blitzSubtitle => 'Your catalogue from shelf photos';
+
+  @override
+  String get blitzFastSetup => 'Fast setup';
+
+  @override
+  String get blitzStepScan => 'Scan shop';
+
+  @override
+  String get blitzStepCheck => 'Check items';
+
+  @override
+  String get blitzStepSave => 'Save drafts';
+
+  @override
+  String blitzStepDone(String step) {
+    return '$step, done';
+  }
+
+  @override
+  String blitzStepCurrent(String step) {
+    return '$step, current step';
+  }
+
+  @override
+  String get blitzIntroTitle => 'Photograph your shelves, skip the typing';
+
+  @override
+  String get blitzIntroBody =>
+      'Take a photo of each shelf. We read the product names and sizes and suggest a section and a price, and you check every item before anything is saved.';
+
+  @override
+  String get blitzTakePhoto => 'Take photo';
+
+  @override
+  String get blitzChoosePhotos => 'Choose photos';
+
+  @override
+  String blitzPhotoCount(int count, int max) {
+    return 'Photos: $count of $max';
+  }
+
+  @override
+  String blitzPhotoLabel(int number) {
+    return 'Shelf photo $number';
+  }
+
+  @override
+  String blitzUploading(int current, int total) {
+    return 'Uploading photo $current of $total…';
+  }
+
+  @override
+  String blitzScanPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Scan $count photos',
+      one: 'Scan 1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzAnalyzing => 'Reading your shelves…';
+
+  @override
+  String get blitzAnalyzingHint =>
+      'This can take a minute or two. Keep this screen open.';
+
+  @override
+  String get blitzScanComplete => 'Scan complete';
+
+  @override
+  String blitzItemsFound(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+      zero: 'No items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSampleTitle => 'Sample items';
+
+  @override
+  String get blitzSampleBody =>
+      'The photo reader isn\'t switched on yet, so these are example items, not what\'s on your shelves. Skip any you don\'t sell.';
+
+  @override
+  String get blitzNoneFound =>
+      'We couldn\'t recognise any products in these photos.';
+
+  @override
+  String get blitzNoneFoundHint =>
+      'Try closer photos with the labels facing the camera.';
+
+  @override
+  String get blitzNewScan => 'Start a new scan';
+
+  @override
+  String get blitzReviewCta => 'Review and save as drafts';
+
+  @override
+  String get blitzFooter => 'Nothing reaches customers until you publish it.';
+
+  @override
+  String blitzScansLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count scans left today',
+      one: '1 scan left today',
+      zero: 'No scans left today',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String blitzQuotaReached(int limit) {
+    return 'You\'ve used today\'s $limit scans. Try again tomorrow.';
+  }
+
+  @override
+  String get blitzFailedRefused =>
+      'These photos couldn\'t be read. Try clear photos of your shop\'s shelves.';
+
+  @override
+  String get blitzFailedUnreadable =>
+      'One of the photos couldn\'t be opened. Try taking it again.';
+
+  @override
+  String get blitzFailedProvider => 'The photo reader didn\'t answer.';
+
+  @override
+  String get blitzFailedBusy =>
+      'Many shops are scanning right now. Try again in a minute.';
+
+  @override
+  String get blitzFailedInterrupted =>
+      'The scan was interrupted before it finished.';
+
+  @override
+  String get blitzFailedOther => 'The scan didn\'t finish.';
+
+  @override
+  String get blitzNoRetriesLeft =>
+      'This scan can\'t be tried again. Start a new one.';
+
+  @override
+  String get blitzCameraFailed =>
+      'The camera didn\'t open. Choose a photo instead.';
+
+  @override
+  String get blitzUploadFailed =>
+      'A photo didn\'t upload. Check your connection and try again.';
+
+  @override
+  String get blitzCouldNotStart => 'The scan couldn\'t start.';
+
+  @override
+  String get blitzConnectionLost =>
+      'We couldn\'t check on the scan. Check your connection.';
+
+  @override
+  String blitzTag(String name, String price) {
+    return '$name · about $price';
+  }
+
+  @override
+  String get blitzReviewTitle => 'Check items';
+
+  @override
+  String get blitzReviewSubtitle => 'What you keep is saved as a draft';
+
+  @override
+  String get blitzKeep => 'Keep';
+
+  @override
+  String blitzKeepItem(String name) {
+    return 'Keep $name';
+  }
+
+  @override
+  String get blitzName => 'Name';
+
+  @override
+  String get blitzPriceUsd => 'Price (USD)';
+
+  @override
+  String get blitzSection => 'Section';
+
+  @override
+  String get blitzNoSection => 'No section';
+
+  @override
+  String blitzGuess(String price) {
+    return 'Guess: $price';
+  }
+
+  @override
+  String get blitzUseGuess => 'Use this price';
+
+  @override
+  String get blitzCheckThis => 'Not sure of this one — check it';
+
+  @override
+  String get blitzNeedName => 'Enter a name';
+
+  @override
+  String get blitzNeedPrice => 'Enter a price above 0';
+
+  @override
+  String get blitzPriceDecimals => 'Use at most two decimals';
+
+  @override
+  String blitzSaveDrafts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Save $count drafts',
+      one: 'Save 1 draft',
+      zero: 'Nothing to save',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSkipAll => 'Skip all items';
+
+  @override
+  String get blitzFixItems => 'Fix the marked items first.';
+
+  @override
+  String get blitzSavedTitle => 'Saved as drafts';
+
+  @override
+  String blitzSavedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count products were added to your catalogue as drafts.',
+      one: '1 product was added to your catalogue as a draft.',
+      zero: 'No products were added.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSavedHint =>
+      'Drafts stay hidden from customers. Add a photo to each one, then publish it from Inventory.';
+
+  @override
+  String get blitzDone => 'Done';
+
+  @override
+  String get blitzAlreadySaved => 'Saved';
+
+  @override
+  String blitzTooManyPhotos(int max) {
+    return 'A scan takes $max photos at most, so the extra ones weren\'t added.';
+  }
+
+  @override
+  String get blitzSectionsUnavailable =>
+      'Sections couldn\'t load, so each item keeps the section we suggested.';
+
+  @override
+  String get blitzEntryAction => 'Scan shelves';
+
+  @override
+  String get blitzSettingsRow => 'Build catalogue from photos';
 }

@@ -12931,6 +12931,408 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Your application is in, but we couldn\'t finish setting up your account. Please try again.'**
   String get wizAccountRolesRetry;
+
+  /// No description provided for @blitzTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant Blitz'**
+  String get blitzTitle;
+
+  /// No description provided for @blitzSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your catalogue from shelf photos'**
+  String get blitzSubtitle;
+
+  /// No description provided for @blitzFastSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast setup'**
+  String get blitzFastSetup;
+
+  /// No description provided for @blitzStepScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan shop'**
+  String get blitzStepScan;
+
+  /// No description provided for @blitzStepCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check items'**
+  String get blitzStepCheck;
+
+  /// No description provided for @blitzStepSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save drafts'**
+  String get blitzStepSave;
+
+  /// No description provided for @blitzStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, done'**
+  String blitzStepDone(String step);
+
+  /// No description provided for @blitzStepCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, current step'**
+  String blitzStepCurrent(String step);
+
+  /// No description provided for @blitzIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph your shelves, skip the typing'**
+  String get blitzIntroTitle;
+
+  /// No description provided for @blitzIntroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo of each shelf. We read the product names and sizes and suggest a section and a price, and you check every item before anything is saved.'**
+  String get blitzIntroBody;
+
+  /// No description provided for @blitzTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get blitzTakePhoto;
+
+  /// No description provided for @blitzChoosePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose photos'**
+  String get blitzChoosePhotos;
+
+  /// No description provided for @blitzPhotoCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos: {count} of {max}'**
+  String blitzPhotoCount(int count, int max);
+
+  /// No description provided for @blitzPhotoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf photo {number}'**
+  String blitzPhotoLabel(int number);
+
+  /// No description provided for @blitzUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading photo {current} of {total}…'**
+  String blitzUploading(int current, int total);
+
+  /// No description provided for @blitzScanPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Scan 1 photo} other{Scan {count} photos}}'**
+  String blitzScanPhotos(int count);
+
+  /// No description provided for @blitzAnalyzing.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading your shelves…'**
+  String get blitzAnalyzing;
+
+  /// No description provided for @blitzAnalyzingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This can take a minute or two. Keep this screen open.'**
+  String get blitzAnalyzingHint;
+
+  /// No description provided for @blitzScanComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete'**
+  String get blitzScanComplete;
+
+  /// No description provided for @blitzItemsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No items} =1{1 item} other{{count} items}}'**
+  String blitzItemsFound(int count);
+
+  /// No description provided for @blitzSampleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample items'**
+  String get blitzSampleTitle;
+
+  /// No description provided for @blitzSampleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo reader isn\'t switched on yet, so these are example items, not what\'s on your shelves. Skip any you don\'t sell.'**
+  String get blitzSampleBody;
+
+  /// No description provided for @blitzNoneFound.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t recognise any products in these photos.'**
+  String get blitzNoneFound;
+
+  /// No description provided for @blitzNoneFoundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try closer photos with the labels facing the camera.'**
+  String get blitzNoneFoundHint;
+
+  /// No description provided for @blitzNewScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new scan'**
+  String get blitzNewScan;
+
+  /// No description provided for @blitzReviewCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and save as drafts'**
+  String get blitzReviewCta;
+
+  /// No description provided for @blitzFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing reaches customers until you publish it.'**
+  String get blitzFooter;
+
+  /// No description provided for @blitzScansLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No scans left today} =1{1 scan left today} other{{count} scans left today}}'**
+  String blitzScansLeft(int count);
+
+  /// No description provided for @blitzQuotaReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve used today\'s {limit} scans. Try again tomorrow.'**
+  String blitzQuotaReached(int limit);
+
+  /// No description provided for @blitzFailedRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'These photos couldn\'t be read. Try clear photos of your shop\'s shelves.'**
+  String get blitzFailedRefused;
+
+  /// No description provided for @blitzFailedUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the photos couldn\'t be opened. Try taking it again.'**
+  String get blitzFailedUnreadable;
+
+  /// No description provided for @blitzFailedProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo reader didn\'t answer.'**
+  String get blitzFailedProvider;
+
+  /// No description provided for @blitzFailedBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Many shops are scanning right now. Try again in a minute.'**
+  String get blitzFailedBusy;
+
+  /// No description provided for @blitzFailedInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'The scan was interrupted before it finished.'**
+  String get blitzFailedInterrupted;
+
+  /// No description provided for @blitzFailedOther.
+  ///
+  /// In en, this message translates to:
+  /// **'The scan didn\'t finish.'**
+  String get blitzFailedOther;
+
+  /// No description provided for @blitzNoRetriesLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'This scan can\'t be tried again. Start a new one.'**
+  String get blitzNoRetriesLeft;
+
+  /// No description provided for @blitzCameraFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera didn\'t open. Choose a photo instead.'**
+  String get blitzCameraFailed;
+
+  /// No description provided for @blitzUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'A photo didn\'t upload. Check your connection and try again.'**
+  String get blitzUploadFailed;
+
+  /// No description provided for @blitzCouldNotStart.
+  ///
+  /// In en, this message translates to:
+  /// **'The scan couldn\'t start.'**
+  String get blitzCouldNotStart;
+
+  /// No description provided for @blitzConnectionLost.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check on the scan. Check your connection.'**
+  String get blitzConnectionLost;
+
+  /// No description provided for @blitzTag.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · about {price}'**
+  String blitzTag(String name, String price);
+
+  /// No description provided for @blitzReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check items'**
+  String get blitzReviewTitle;
+
+  /// No description provided for @blitzReviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What you keep is saved as a draft'**
+  String get blitzReviewSubtitle;
+
+  /// No description provided for @blitzKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get blitzKeep;
+
+  /// No description provided for @blitzKeepItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep {name}'**
+  String blitzKeepItem(String name);
+
+  /// No description provided for @blitzName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get blitzName;
+
+  /// No description provided for @blitzPriceUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'Price (USD)'**
+  String get blitzPriceUsd;
+
+  /// No description provided for @blitzSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Section'**
+  String get blitzSection;
+
+  /// No description provided for @blitzNoSection.
+  ///
+  /// In en, this message translates to:
+  /// **'No section'**
+  String get blitzNoSection;
+
+  /// No description provided for @blitzGuess.
+  ///
+  /// In en, this message translates to:
+  /// **'Guess: {price}'**
+  String blitzGuess(String price);
+
+  /// No description provided for @blitzUseGuess.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this price'**
+  String get blitzUseGuess;
+
+  /// No description provided for @blitzCheckThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sure of this one — check it'**
+  String get blitzCheckThis;
+
+  /// No description provided for @blitzNeedName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name'**
+  String get blitzNeedName;
+
+  /// No description provided for @blitzNeedPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a price above 0'**
+  String get blitzNeedPrice;
+
+  /// No description provided for @blitzPriceDecimals.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at most two decimals'**
+  String get blitzPriceDecimals;
+
+  /// No description provided for @blitzSaveDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nothing to save} =1{Save 1 draft} other{Save {count} drafts}}'**
+  String blitzSaveDrafts(int count);
+
+  /// No description provided for @blitzSkipAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip all items'**
+  String get blitzSkipAll;
+
+  /// No description provided for @blitzFixItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the marked items first.'**
+  String get blitzFixItems;
+
+  /// No description provided for @blitzSavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved as drafts'**
+  String get blitzSavedTitle;
+
+  /// No description provided for @blitzSavedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No products were added.} =1{1 product was added to your catalogue as a draft.} other{{count} products were added to your catalogue as drafts.}}'**
+  String blitzSavedCount(int count);
+
+  /// No description provided for @blitzSavedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafts stay hidden from customers. Add a photo to each one, then publish it from Inventory.'**
+  String get blitzSavedHint;
+
+  /// No description provided for @blitzDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get blitzDone;
+
+  /// No description provided for @blitzAlreadySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get blitzAlreadySaved;
+
+  /// No description provided for @blitzTooManyPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'A scan takes {max} photos at most, so the extra ones weren\'t added.'**
+  String blitzTooManyPhotos(int max);
+
+  /// No description provided for @blitzSectionsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sections couldn\'t load, so each item keeps the section we suggested.'**
+  String get blitzSectionsUnavailable;
+
+  /// No description provided for @blitzEntryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan shelves'**
+  String get blitzEntryAction;
+
+  /// No description provided for @blitzSettingsRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Build catalogue from photos'**
+  String get blitzSettingsRow;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
