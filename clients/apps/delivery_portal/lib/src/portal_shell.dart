@@ -26,6 +26,8 @@ import 'backoffice/zones_screen.dart' as backoffice;
 import 'carrier/applicants_screen.dart';
 // carr-cash (feat/carrier-cash-custody): the Reconciliation destination below.
 import 'carrier/cash_reconciliation_screen.dart';
+// carrier-payroll (feat/carrier-payroll): the Payroll destination below.
+import 'carrier/payroll_screen.dart';
 import 'carrier/company_screen.dart';
 import 'carrier/dashboard_screen.dart';
 import 'carrier/earnings_screen.dart';
@@ -382,6 +384,23 @@ class PortalArea {
         ),
       ),
       // ---- end carr-cash ------------------------------------------------------------------------
+      // ---- carrier-payroll (feat/carrier-payroll) -----------------------------------------------
+      // Rider payroll, Figma 112:1162. The design files it under a "Riders HR" rail item, which the
+      // carrier sidebar restructure on feat/carrier-riders-directory introduces with its
+      // `carrierRidersHrPages` extension point — not on this branch. Until the two meet it sits right
+      // after Reconciliation, the riders' cash a pay run nets against their pay. AT INTEGRATION this
+      // destination moves into carrierRidersHrPages and this block goes. Nothing is inserted before
+      // Jobs, which the dashboard reaches with jump(1).
+      PortalDestination(
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments,
+        label: (DeliveryStrings t) => t.payrollNavLabel,
+        build: (PortalApis a, _, __, ___) => CarrierPayrollScreen(
+          api: a.accounting.carrierPayroll,
+          notificationApi: a.notification,
+        ),
+      ),
+      // ---- end carrier-payroll ------------------------------------------------------------------
       // The design's `users-round` glyph. This is the fleet page — the company's own record is on
       // Settings now, where the design puts it.
       PortalDestination(
