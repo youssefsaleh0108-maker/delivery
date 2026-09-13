@@ -7924,4 +7924,168 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get carrCashBoMethodLabel => 'طريقة الدفع (اختياري)';
+
+  @override
+  String get dekkaneBrowseTitle => 'حيّك';
+
+  @override
+  String dekkaneBrowseSubRegion(String region) {
+    return 'دكاكين $region المحلية';
+  }
+
+  @override
+  String dekkaneAreaInRegion(String area, String region) {
+    return '$area، $region';
+  }
+
+  @override
+  String get dekkaneEntrySub => 'الدكاكين والمحلات الصغيرة حول عنوانك';
+
+  @override
+  String get dekkaneFilterOpenNow => 'مفتوح الآن';
+
+  @override
+  String get dekkaneFilterOnGenerator => 'على المولّد الآن';
+
+  @override
+  String get dekkaneFilterNew => 'جديد على YouDrop';
+
+  @override
+  String get dekkaneExpandMap => 'توسيع الخريطة التفاعلية';
+
+  @override
+  String get dekkaneNearbyShops => 'محلات قريبة منك';
+
+  @override
+  String get dekkaneLocalShops => 'محلات الحي';
+
+  @override
+  String dekkaneDistanceMetres(int metres) {
+    final intl.NumberFormat metresNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String metresString = metresNumberFormat.format(metres);
+
+    return 'على بُعد $metresString م';
+  }
+
+  @override
+  String dekkaneDistanceKm(double km) {
+    final intl.NumberFormat kmNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+          locale: localeName,
+          decimalDigits: 1,
+        );
+    final String kmString = kmNumberFormat.format(km);
+
+    return 'على بُعد $kmString كم';
+  }
+
+  @override
+  String get dekkaneGeneratorActive => 'المولّد يعمل';
+
+  @override
+  String get dekkaneTrustedLocal => 'محلّي موثوق';
+
+  @override
+  String get dekkaneCouldNotLoadShops => 'تعذّر تحميل المحلات من حولك';
+
+  @override
+  String get dekkanePinAddressPrompt =>
+      'ثبّت عنوانك على الخريطة لترى أقرب المحلات إليك وكم يبعد كلّ منها.';
+
+  @override
+  String get dekkaneNoShopsNearby => 'لا توجد محلات قرب هذا العنوان بعد';
+
+  @override
+  String get dekkaneMapTitle => 'المحلات على الخريطة';
+
+  @override
+  String dekkaneOpenClosesAt(String time) {
+    return 'مفتوح · يغلق $time';
+  }
+
+  @override
+  String get dekkaneShopInventory => 'بضاعة المحل';
+
+  @override
+  String dekkaneLbpAmount(int amount) {
+    final intl.NumberFormat amountNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String amountString = amountNumberFormat.format(amount);
+
+    return '$amountString ل.ل.';
+  }
+
+  @override
+  String get dekkaneAddOneMore => 'أضف واحداً آخر';
+
+  @override
+  String get dekkaneMerchNeighborhood => 'الحي';
+
+  @override
+  String get dekkaneMerchNeighborhoodHint => 'مثلاً: مار مخايل';
+
+  @override
+  String get dekkaneMerchNeighborhoodHelp =>
+      'يظهر تحت اسم محلّك عندما يفتحه الزبائن من قائمة حيّهم.';
+
+  @override
+  String get dekkaneMerchNeighborhoodTooLong => 'يجب ألّا يتجاوز 80 حرفاً';
+
+  @override
+  String get dekkaneCouldNotLoadShelf => 'تعذّر تحميل رفوف المحل';
+
+  @override
+  String get dekkaneBrowseTitleAll => 'المحلات على YouDrop';
+
+  @override
+  String get dekkaneBrowseSubAll => 'كل المحلات، الأعلى تقييماً أولاً';
+
+  @override
+  String get dekkaneAllShops => 'كل المحلات';
+
+  @override
+  String dekkanePowerUpdatedMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'آخر تحديث منذ $minutes دقيقة',
+      many: 'آخر تحديث منذ $minutes دقيقة',
+      few: 'آخر تحديث منذ $minutes دقائق',
+      two: 'آخر تحديث منذ دقيقتين',
+      one: 'آخر تحديث منذ دقيقة',
+      zero: 'حُدِّث للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkanePowerUpdatedHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'آخر تحديث منذ $hours ساعة',
+      many: 'آخر تحديث منذ $hours ساعة',
+      few: 'آخر تحديث منذ $hours ساعات',
+      two: 'آخر تحديث منذ ساعتين',
+      one: 'آخر تحديث منذ ساعة',
+      zero: 'حُدِّث للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkaneSearchedNearest(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم البحث في أقرب $count محل فقط',
+      many: 'تم البحث في أقرب $count محلاً فقط',
+      few: 'تم البحث في أقرب $count محلات فقط',
+      two: 'تم البحث في أقرب محلّين فقط',
+      one: 'تم البحث في أقرب محل فقط',
+      zero: 'لم يتم البحث في أي محل',
+    );
+    return '$_temp0';
+  }
 }

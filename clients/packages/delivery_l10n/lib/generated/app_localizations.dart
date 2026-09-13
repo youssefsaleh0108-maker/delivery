@@ -13831,6 +13831,204 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'How it was paid (optional)'**
   String get carrCashBoMethodLabel;
+
+  /// No description provided for @dekkaneBrowseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Neighborhood'**
+  String get dekkaneBrowseTitle;
+
+  /// No description provided for @dekkaneBrowseSubRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Local {region} dekkanes'**
+  String dekkaneBrowseSubRegion(String region);
+
+  /// No description provided for @dekkaneAreaInRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'{area}, {region}'**
+  String dekkaneAreaInRegion(String area, String region);
+
+  /// No description provided for @dekkaneEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'The dekkanes and small shops around your address'**
+  String get dekkaneEntrySub;
+
+  /// No description provided for @dekkaneFilterOpenNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open now'**
+  String get dekkaneFilterOpenNow;
+
+  /// No description provided for @dekkaneFilterOnGenerator.
+  ///
+  /// In en, this message translates to:
+  /// **'On generator now'**
+  String get dekkaneFilterOnGenerator;
+
+  /// No description provided for @dekkaneFilterNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New on YouDrop'**
+  String get dekkaneFilterNew;
+
+  /// No description provided for @dekkaneExpandMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand interactive map'**
+  String get dekkaneExpandMap;
+
+  /// No description provided for @dekkaneNearbyShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops near you'**
+  String get dekkaneNearbyShops;
+
+  /// No description provided for @dekkaneLocalShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Local shops'**
+  String get dekkaneLocalShops;
+
+  /// No description provided for @dekkaneDistanceMetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{metres} m away'**
+  String dekkaneDistanceMetres(int metres);
+
+  /// No description provided for @dekkaneDistanceKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km away'**
+  String dekkaneDistanceKm(double km);
+
+  /// No description provided for @dekkaneGeneratorActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Generator active'**
+  String get dekkaneGeneratorActive;
+
+  /// No description provided for @dekkaneTrustedLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted local'**
+  String get dekkaneTrustedLocal;
+
+  /// No description provided for @dekkaneCouldNotLoadShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the shops around you'**
+  String get dekkaneCouldNotLoadShops;
+
+  /// No description provided for @dekkanePinAddressPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin your address on the map to see the shops nearest you, and how far each one is.'**
+  String get dekkanePinAddressPrompt;
+
+  /// No description provided for @dekkaneNoShopsNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'No shops near this address yet'**
+  String get dekkaneNoShopsNearby;
+
+  /// No description provided for @dekkaneMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops on the map'**
+  String get dekkaneMapTitle;
+
+  /// No description provided for @dekkaneOpenClosesAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Open · Closes {time}'**
+  String dekkaneOpenClosesAt(String time);
+
+  /// No description provided for @dekkaneShopInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop inventory'**
+  String get dekkaneShopInventory;
+
+  /// No description provided for @dekkaneLbpAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'LBP {amount}'**
+  String dekkaneLbpAmount(int amount);
+
+  /// No description provided for @dekkaneAddOneMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Add one more'**
+  String get dekkaneAddOneMore;
+
+  /// No description provided for @dekkaneMerchNeighborhood.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood'**
+  String get dekkaneMerchNeighborhood;
+
+  /// No description provided for @dekkaneMerchNeighborhoodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Mar Mikhael'**
+  String get dekkaneMerchNeighborhoodHint;
+
+  /// No description provided for @dekkaneMerchNeighborhoodHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown under your shop\'s name when customers open your shop from their neighborhood list.'**
+  String get dekkaneMerchNeighborhoodHelp;
+
+  /// No description provided for @dekkaneMerchNeighborhoodTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it to 80 characters or fewer'**
+  String get dekkaneMerchNeighborhoodTooLong;
+
+  /// No description provided for @dekkaneCouldNotLoadShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this shop\'s shelves'**
+  String get dekkaneCouldNotLoadShelf;
+
+  /// No description provided for @dekkaneBrowseTitleAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops on YouDrop'**
+  String get dekkaneBrowseTitleAll;
+
+  /// No description provided for @dekkaneBrowseSubAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Every shop, best rated first'**
+  String get dekkaneBrowseSubAll;
+
+  /// No description provided for @dekkaneAllShops.
+  ///
+  /// In en, this message translates to:
+  /// **'All shops'**
+  String get dekkaneAllShops;
+
+  /// No description provided for @dekkanePowerUpdatedMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =0{Updated just now} =1{Updated 1 min ago} other{Updated {minutes} min ago}}'**
+  String dekkanePowerUpdatedMinutes(int minutes);
+
+  /// No description provided for @dekkanePowerUpdatedHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{Updated 1 hr ago} other{Updated {hours} hrs ago}}'**
+  String dekkanePowerUpdatedHours(int hours);
+
+  /// No description provided for @dekkaneSearchedNearest.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Only the nearest shop was searched} other{Only the nearest {count} shops were searched}}'**
+  String dekkaneSearchedNearest(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

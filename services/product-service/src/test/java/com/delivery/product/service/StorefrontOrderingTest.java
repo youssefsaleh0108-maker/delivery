@@ -2,6 +2,7 @@ package com.delivery.product.service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -73,7 +74,8 @@ class StorefrontOrderingTest {
     @BeforeEach
     void setUp() {
         service = new StoreService(stores, offers, favorites, products, categories,
-                Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC),
+                Duration.ofHours(4));
     }
 
     /** Runs a storefront read and hands back the Pageable the repository was actually given. */

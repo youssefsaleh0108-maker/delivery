@@ -1,6 +1,7 @@
 package com.delivery.product.domain;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -136,6 +137,27 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
      * operator would need the {@code OPERATOR(public.<->)} spelling to resolve at all, and the
      * ordering here only exists to make {@code LIMIT} pick the right candidates — the index has
      * already done the narrowing in the {@code WHERE}, and Java does the ordering that ships.
+     *
+     * <p><strong>The neighbourhood browse's filters are in the {@code WHERE} too, ahead of the
+     * {@code LIMIT}.</strong> Applied only afterwards, in Java, they narrowed the nearest
+     * {@code maxCandidates} shops instead of the radius: a matching shop just past the ceiling went
+     * missing and the answer said nothing matched. Each predicate here mirrors
+     * {@code StoreService.NearbyFilters#admits}, which still judges the rows as read and decides.
+     * "Open now" is not here at all: availability is walked out of opening hours in Java, and a SQL
+     * twin of that walk would be a second answer to "is it open", free to disagree with the card.
+     *
+     * <p>No parameter is ever bound null. An untyped null in native SQL is one PostgreSQL cannot
+     * infer a type for, and how a driver binds it varies — so each optional filter arrives as a value
+     * with a switch ({@code ''} meaning "no status" or "no district", a boolean for the others), and
+     * every parameter is {@code CAST} to its column's type so the planner never has to guess.
+     *
+     * @param powerStatus        {@code ''} for no power filter, else a {@link Store.PowerStatus} name
+     * @param powerDeclaredSince the oldest declaration that still counts as now; used only with a
+     *                           power filter
+     * @param neighborhood       {@code ''} for no district filter, else the exact district
+     * @param newOnly            whether {@code listedSince} applies
+     * @param listedSince        the earliest first listing that counts as new
+     * @param maxCandidates      the {@code LIMIT}; the service asks for one more than it will use
      */
     @Query(value = """
             SELECT s.id
@@ -146,6 +168,14 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                        s.location,
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography,
                        :radiusMetres)
+               AND (CAST(:powerStatus AS varchar) = ''
+                    OR (s.power_status = CAST(:powerStatus AS varchar)
+                        AND s.power_updated_at >= CAST(:powerDeclaredSince AS timestamptz)))
+               AND (CAST(:neighborhood AS varchar) = ''
+                    OR s.neighborhood = CAST(:neighborhood AS varchar))
+               AND (NOT CAST(:verifiedLocalOnly AS boolean) OR s.verified_local)
+               AND (NOT CAST(:newOnly AS boolean)
+                    OR s.published_at >= CAST(:listedSince AS timestamptz))
              ORDER BY public.ST_Distance(
                        s.location,
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography)
@@ -154,6 +184,12 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     List<UUID> findActiveIdsNear(@Param("latitude") double latitude,
                                  @Param("longitude") double longitude,
                                  @Param("radiusMetres") double radiusMetres,
+                                 @Param("powerStatus") String powerStatus,
+                                 @Param("powerDeclaredSince") Instant powerDeclaredSince,
+                                 @Param("neighborhood") String neighborhood,
+                                 @Param("verifiedLocalOnly") boolean verifiedLocalOnly,
+                                 @Param("newOnly") boolean newOnly,
+                                 @Param("listedSince") Instant listedSince,
                                  @Param("maxCandidates") int maxCandidates);
 
     /**

@@ -33,6 +33,7 @@ import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
 import com.delivery.product.api.dto.GeoDtos.LocationRequest;
+import com.delivery.product.api.dto.GeoDtos.NearbyPageResponse;
 import com.delivery.product.api.dto.GeoDtos.NearbyStoreResponse;
 import com.delivery.product.api.dto.StoreDtos.AisleResponse;
 import com.delivery.product.api.dto.StoreDtos.BusyRequest;
@@ -48,6 +49,7 @@ import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
+import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.Store;
@@ -97,9 +99,18 @@ public class StoreController {
      *
      * <p>The radius alone is not a bound: in a dense city a 50 km circle is every shop on the
      * platform. This caps what a single request can pull into memory to sort, and a caller who hits
-     * it gets the nearest 500 — which is the right subset to lose the rest from.
+     * it gets the nearest 500 shops that match the search — the right subset to lose the rest from —
+     * with {@code truncated} set, so that answer is never passed off as the whole radius.
      */
     static final int MAX_NEARBY_CANDIDATES = 500;
+
+    /**
+     * The widest "new on the platform" window the nearby search will apply: a year.
+     *
+     * <p>Past that "new" has stopped meaning anything, and a client asking for more is asking for
+     * every shop, which a year's window already very nearly is.
+     */
+    static final int MAX_NEW_SINCE_DAYS = 365;
 
     private final StoreService storeService;
     private final CatalogService catalog;
@@ -173,12 +184,24 @@ public class StoreController {
      *                     widest circle this endpoint supports genuinely answers that. Nothing
      *                     returned is untrue either way — every shop in the response really is
      *                     within the radius it was measured against.
+     * @return the storefront's page shape plus {@code truncated}: true when more shops matched inside
+     *         the radius than one search reads ({@link #MAX_NEARBY_CANDIDATES}), so the page and its
+     *         total cover the nearest of them only. See {@link NearbyPageResponse}.
      */
     @GetMapping("/nearby")
-    public PageResponse<NearbyStoreResponse> nearby(
+    public NearbyPageResponse nearby(
             @RequestParam BigDecimal latitude,
             @RequestParam BigDecimal longitude,
             @RequestParam(defaultValue = "5000") int radiusMetres,
+            // The neighbourhood browse's chips. Each is documented where it is applied — see
+            // StoreService.NearbyFilters — because what a filter MEANS is a service rule, and the
+            // one worth reading is powerStatus: what the lights are doing now, not what the shop
+            // owns.
+            @RequestParam(defaultValue = "false") boolean openNow,
+            @RequestParam(required = false) Store.PowerStatus powerStatus,
+            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) Integer newSinceDays,
+            @RequestParam(defaultValue = "false") boolean verifiedLocal,
             @PageableDefault(size = 20) Pageable pageable) {
 
         // Built here rather than passed on as two loose numbers, so an out-of-range or (0, 0)
@@ -189,19 +212,31 @@ public class StoreController {
         int radius = Math.min(Math.max(radiusMetres, MIN_NEARBY_RADIUS_METRES),
                 MAX_NEARBY_RADIUS_METRES);
 
-        Page<StoreService.NearbyStoreView> page =
-                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, pageable);
+        StoreService.NearbyFilters filters = new StoreService.NearbyFilters(
+                openNow,
+                powerStatus,
+                neighborhood,
+                // Clamped like the radius, and for the same reason: zero or a negative number of
+                // days is a client bug with no sensible answer, and ten thousand days is a client
+                // asking for "every shop", which the widest window genuinely answers.
+                newSinceDays == null ? null
+                        : Math.min(Math.max(newSinceDays, 1), MAX_NEW_SINCE_DAYS),
+                verifiedLocal);
+
+        StoreService.NearbyResult result =
+                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, filters, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
 
-        return PageResponse.of(page.map(near -> new NearbyStoreResponse(
-                toCard(near.store(), starred, offersByStore),
-                near.store().store().getLatitude(),
-                near.store().store().getLongitude(),
-                // Whole metres. The pin this is measured from was dropped by hand on a map, so a
-                // decimal place would be precision the number does not have.
-                Math.round(near.distanceMetres()))));
+        return NearbyPageResponse.of(result.page().map(near -> new NearbyStoreResponse(
+                        toCard(near.store(), starred, offersByStore),
+                        near.store().store().getLatitude(),
+                        near.store().store().getLongitude(),
+                        // Whole metres. The pin this is measured from was dropped by hand on a map,
+                        // so a decimal place would be precision the number does not have.
+                        Math.round(near.distanceMetres()))),
+                result.truncated(), MAX_NEARBY_CANDIDATES);
     }
 
     /**
@@ -394,6 +429,25 @@ public class StoreController {
         return Map.of("canDeliver", storeService.deliversTo(id, latitude, longitude));
     }
 
+    /**
+     * Backoffice grants or withdraws the dekkane "Trusted Local" badge.
+     *
+     * <p>BACKOFFICE and nobody else — not even the shop's own merchant, and that is the point of the
+     * badge: it is a claim the platform makes to the shop's neighbours, and one the shop could award
+     * itself would certify nothing. V23 made the column deliberately not merchant-writable and this
+     * is the only road to it; it is not on {@link #update}'s form, so no profile save can touch it.
+     *
+     * <p>Any store, in any status. Vetting a shop before it is listed is exactly when Backoffice
+     * would do it, and granting a badge to a draft shows it to nobody until the shop publishes.
+     */
+    @PutMapping("/{id}/verified-local")
+    @PreAuthorize("hasRole('BACKOFFICE')")
+    public StoreResponse setVerifiedLocal(@PathVariable UUID id,
+                                          @Valid @RequestBody VerifiedLocalRequest request) {
+        return toResponse(storeService.setVerifiedLocal(
+                id, CurrentUser.requireId(), request.verified()), Set.of());
+    }
+
     /** The merchant declares what the lights are doing — the power chip's one source of truth. */
     @PostMapping("/{id}/power")
     @PreAuthorize("hasRole('MERCHANT')")
@@ -581,6 +635,8 @@ public class StoreController {
                 store.isVerifiedLocal(),
                 store.getPowerStatus(),
                 store.getPowerNote(),
+                store.getPowerUpdatedAt(),
+                v.powerCurrent(),
                 store.getLatitude(),
                 store.getLongitude(),
                 store.getDeliveryRadiusMetres());
@@ -623,6 +679,7 @@ public class StoreController {
                 store.getPowerStatus(),
                 store.getPowerNote(),
                 store.getPowerUpdatedAt(),
+                v.powerCurrent(),
                 store.getDeliveryRadiusMetres());
     }
 

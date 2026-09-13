@@ -180,6 +180,8 @@ class StoreCard {
     this.verifiedLocal = false,
     this.powerStatus = StorePowerStatus.unknown,
     this.powerNote,
+    this.powerUpdatedAt,
+    this.powerCurrent = false,
     this.latitude,
     this.longitude,
     this.deliveryRadiusMetres,
@@ -223,6 +225,19 @@ class StoreCard {
   /// The merchant's one-liner under the chip: "Ovens fully hot", "Cold storage active".
   final String? powerNote;
 
+  /// When the merchant declared [powerStatus], or null if they never have — for the "updated 20 min
+  /// ago" under a power badge.
+  final DateTime? powerUpdatedAt;
+
+  /// Whether that declaration is recent enough to present as what the lights are doing NOW.
+  ///
+  /// The server decides, with its configured window (`delivery.product.power-declaration-fresh-for`,
+  /// four hours by default), and its "on generator now" filter uses the same answer, so a card and
+  /// the filter cannot disagree about a shop. False draws no power badge and dims nothing: an old
+  /// declaration is history, not the state of the shop. A server that does not send it reads as
+  /// false for the same reason.
+  final bool powerCurrent;
+
   /// The pin, carried on the card so checkout can measure the door against the circle below.
   final double? latitude;
   final double? longitude;
@@ -264,6 +279,8 @@ class StoreCard {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        powerUpdatedAt: powerUpdatedAt,
+        powerCurrent: powerCurrent,
         latitude: latitude,
         longitude: longitude,
         deliveryRadiusMetres: deliveryRadiusMetres,
@@ -295,6 +312,10 @@ class StoreCard {
         verifiedLocal: json['verifiedLocal'] as bool? ?? false,
         powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
         powerNote: json['powerNote'] as String?,
+        powerUpdatedAt: json['powerUpdatedAt'] == null
+            ? null
+            : DateTime.parse(json['powerUpdatedAt'] as String),
+        powerCurrent: json['powerCurrent'] as bool? ?? false,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
@@ -353,6 +374,8 @@ class Store {
     this.verifiedLocal = false,
     this.powerStatus = StorePowerStatus.unknown,
     this.powerNote,
+    this.powerUpdatedAt,
+    this.powerCurrent = false,
     this.deliveryRadiusMetres,
   });
 
@@ -413,6 +436,13 @@ class Store {
   /// The one-liner the storefront prints under the power chip.
   final String? powerNote;
 
+  /// When the merchant last declared. See [StoreCard.powerUpdatedAt].
+  final DateTime? powerUpdatedAt;
+
+  /// Whether the declaration still counts as now. See [StoreCard.powerCurrent] — customer surfaces
+  /// draw nothing from a declaration that does not. The merchant's own screens show it regardless.
+  final bool powerCurrent;
+
   /// The merchant's delivery circle in metres, or null for zones-only.
   final int? deliveryRadiusMetres;
 
@@ -460,6 +490,8 @@ class Store {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        powerUpdatedAt: powerUpdatedAt,
+        powerCurrent: powerCurrent,
         latitude: latitude,
         longitude: longitude,
         deliveryRadiusMetres: deliveryRadiusMetres,
@@ -496,6 +528,8 @@ class Store {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        powerUpdatedAt: powerUpdatedAt,
+        powerCurrent: powerCurrent,
         deliveryRadiusMetres: deliveryRadiusMetres,
       );
 
@@ -531,6 +565,10 @@ class Store {
         verifiedLocal: json['verifiedLocal'] as bool? ?? false,
         powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
         powerNote: json['powerNote'] as String?,
+        powerUpdatedAt: json['powerUpdatedAt'] == null
+            ? null
+            : DateTime.parse(json['powerUpdatedAt'] as String),
+        powerCurrent: json['powerCurrent'] as bool? ?? false,
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
       );
 }

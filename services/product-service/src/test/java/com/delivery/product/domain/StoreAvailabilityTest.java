@@ -35,7 +35,7 @@ class StoreAvailabilityTest {
     private static Store storeOpen(LocalTime from, LocalTime to) {
         Store store = new Store("merchant-1", "Beirut Grill", Store.Vertical.RESTAURANT);
         store.replaceHours(everyDay(from, to));
-        store.publish();
+        store.publish(utc(0, 0));
         return store;
     }
 
@@ -163,7 +163,7 @@ class StoreAvailabilityTest {
         void publishing_without_hours_is_refused() {
             Store store = new Store("merchant-1", "No hours", Store.Vertical.COFFEE);
 
-            assertThatThrownBy(store::publish)
+            assertThatThrownBy(() -> store.publish(utc(0, 0)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("opening hours");
         }
@@ -177,7 +177,7 @@ class StoreAvailabilityTest {
         void an_auto_provisioned_store_is_open_during_the_day() {
             Store store = new Store("merchant-1", "My Store", Store.Vertical.RESTAURANT);
             store.replaceHours(everyDay(LocalTime.of(9, 0), LocalTime.of(22, 0)));
-            store.publish();
+            store.publish(utc(0, 0));
 
             assertThat(store.availabilityAt(utc(12, 0))).isEqualTo(Store.Availability.OPEN);
             assertThat(store.isOrderable(utc(12, 0))).isTrue();
@@ -195,7 +195,7 @@ class StoreAvailabilityTest {
                             new StoreHours(day, LocalTime.of(6, 30), LocalTime.of(11, 30)),
                             new StoreHours(day, LocalTime.of(14, 0), LocalTime.of(19, 0))))
                     .toList());
-            store.publish();
+            store.publish(utc(0, 0));
             return store;
         }
 
@@ -230,7 +230,7 @@ class StoreAvailabilityTest {
             store.replaceHours(List.of(
                     new StoreHours(DayOfWeek.WEDNESDAY, LocalTime.of(8, 0), LocalTime.of(14, 0)),
                     new StoreHours(DayOfWeek.WEDNESDAY, LocalTime.of(12, 0), LocalTime.of(20, 0))));
-            store.publish();
+            store.publish(utc(0, 0));
 
             assertThat(store.closingTimeAt(utc(13, 0))).isEqualTo(LocalTime.of(20, 0));
             // Would read as CLOSING_SOON if the earlier window won.
@@ -242,7 +242,7 @@ class StoreAvailabilityTest {
             Store store = new Store("merchant-1", "Wednesdays only", Store.Vertical.RESTAURANT);
             store.replaceHours(List.of(
                     new StoreHours(DayOfWeek.WEDNESDAY, LocalTime.of(8, 0), LocalTime.of(23, 0))));
-            store.publish();
+            store.publish(utc(0, 0));
 
             assertThat(store.availabilityAt(utc(12, 0))).isEqualTo(Store.Availability.OPEN);
             // Thursday, same time of day.
@@ -276,7 +276,7 @@ class StoreAvailabilityTest {
             store.updateProfile("Beirut Grill", null, null, Store.Vertical.RESTAURANT,
                     List.of(), "Asia/Beirut", null);
             store.replaceHours(everyDay(LocalTime.of(8, 0), LocalTime.of(23, 0)));
-            store.publish();
+            store.publish(utc(0, 0));
 
             // 22:00 UTC on the Wednesday is 01:00 Thursday in Beirut (UTC+3 in August): shut.
             assertThat(store.availabilityAt(utc(22, 0))).isEqualTo(Store.Availability.CLOSED);
@@ -295,7 +295,7 @@ class StoreAvailabilityTest {
             store.updateProfile("Typo", null, null, Store.Vertical.ELECTRONICS,
                     List.of(), "Not/A_Real_Zone", null);
             store.replaceHours(everyDay(LocalTime.of(8, 0), LocalTime.of(23, 0)));
-            store.publish();
+            store.publish(utc(0, 0));
 
             assertThat(store.availabilityAt(utc(12, 0))).isEqualTo(Store.Availability.OPEN);
             assertThat(store.availabilityAt(utc(3, 0))).isEqualTo(Store.Availability.CLOSED);

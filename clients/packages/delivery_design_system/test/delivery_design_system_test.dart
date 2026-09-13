@@ -460,4 +460,151 @@ void main() {
       expect(first.height, closeTo(second.height, 0.5));
     });
   });
+
+  group('ShelfGridTile', () {
+    // The dekkane shop's two-column grid (Figma 112:2041). Words arrive localised; the tile only
+    // lays them out.
+    Future<void> pumpTile(WidgetTester tester, ShelfGridTile tile) {
+      return tester.pumpWidget(MaterialApp(
+        theme: DeliveryTheme.light(),
+        home: Scaffold(
+          body: Align(
+            alignment: AlignmentDirectional.topStart,
+            child: SizedBox(width: 180, child: tile),
+          ),
+        ),
+      ));
+    }
+
+    testWidgets('draws no add button where nothing can be added, and keeps the room one takes',
+        (WidgetTester tester) async {
+      // A closed shop's shelf still browses. A button that cannot add is not drawn — but the tile
+      // keeps its height, or the grid would jump as the shop opens and shuts under the customer.
+      await pumpTile(
+          tester, ShelfGridTile(name: 'Halloumi', price: r'$3.50', addLabel: 'أضف', onAdd: () {}));
+      final double withButton = tester.getSize(find.byType(ShelfGridTile)).height;
+      expect(find.text('أضف'), findsOneWidget);
+
+      await pumpTile(tester, const ShelfGridTile(name: 'Halloumi', price: r'$3.50', addLabel: 'أضف'));
+      expect(find.text('أضف'), findsNothing);
+      expect(tester.getSize(find.byType(ShelfGridTile)).height, withButton);
+    });
+
+    testWidgets('becomes a stepper once the product is in the basket, each glyph named',
+        (WidgetTester tester) async {
+      int added = 0;
+      int removed = 0;
+      await pumpTile(
+        tester,
+        ShelfGridTile(
+          name: 'Halloumi',
+          price: r'$3.50',
+          addLabel: 'Add to basket',
+          quantityInBasket: 2,
+          onAdd: () => added++,
+          onRemove: () => removed++,
+          removeSemanticLabel: 'Remove one',
+          addMoreSemanticLabel: 'Add one more',
+        ),
+      );
+
+      expect(find.text('Add to basket'), findsNothing);
+      expect(find.text('2'), findsOneWidget);
+      expect(tester.getSemantics(find.byIcon(Icons.remove_rounded)).label, 'Remove one');
+      expect(tester.getSemantics(find.byIcon(Icons.add_rounded)).label, 'Add one more');
+
+      await tester.tap(find.byIcon(Icons.remove_rounded));
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      expect(removed, 1);
+      expect(added, 1);
+    });
+
+    testWidgets('prints a second price only when it is handed one', (WidgetTester tester) async {
+      // No rate, no conversion: an invented LBP figure is worse than none.
+      await pumpTile(
+          tester, ShelfGridTile(name: 'Halloumi', price: r'$3.50', addLabel: 'Add', onAdd: () {}));
+      expect(find.textContaining('LBP'), findsNothing);
+
+      await pumpTile(
+        tester,
+        ShelfGridTile(
+          name: 'Halloumi',
+          price: r'$3.50',
+          secondaryPrice: 'LBP 313,000',
+          addLabel: 'Add',
+          onAdd: () {},
+        ),
+      );
+      expect(find.text('LBP 313,000'), findsOneWidget);
+    });
+
+    testWidgets('the add button and the stepper glyphs answer a thumb-sized target, drawn as before',
+        (WidgetTester tester) async {
+      int added = 0;
+      await pumpTile(tester,
+          ShelfGridTile(name: 'Halloumi', price: r'$3.50', addLabel: 'Add', onAdd: () => added++));
+
+      // Drawn at the frame's 32px...
+      final Rect button = tester
+          .getRect(find.ancestor(of: find.text('Add'), matching: find.byType(Material)).first);
+      expect(button.height, ShelfGridTile.controlHeight);
+      // ...but a thumb landing just above or below it still adds, rather than opening the product
+      // behind it.
+      await tester.tapAt(button.topCenter - const Offset(0, 6));
+      await tester.tapAt(button.bottomCenter + const Offset(0, 6));
+      expect(added, 2);
+
+      await pumpTile(
+        tester,
+        ShelfGridTile(
+          name: 'Halloumi',
+          price: r'$3.50',
+          addLabel: 'Add',
+          quantityInBasket: 1,
+          onAdd: () => added++,
+          onRemove: () {},
+        ),
+      );
+      for (final IconData glyph in <IconData>[Icons.remove_rounded, Icons.add_rounded]) {
+        final Size target = tester.getSize(
+            find.ancestor(of: find.byIcon(glyph), matching: find.byType(GestureDetector)).first);
+        expect(target.width, greaterThanOrEqualTo(48));
+        expect(target.height, greaterThanOrEqualTo(48));
+        // The glyph itself sits in the same 36 × 32 cell it always did.
+        expect(
+            tester.getSize(
+                find.ancestor(of: find.byIcon(glyph), matching: find.byType(SizedBox)).first),
+            const Size(36, ShelfGridTile.controlHeight));
+      }
+    });
+  });
+
+  group('YouDropPill', () {
+    // The brand pill in the redesign's screen headers (Figma 112:1961). A wordmark, not a
+    // sentence: it must not mirror in Arabic, and what a screen reader says is the caller's.
+    testWidgets('keeps the dot before the name in right-to-left, announced by the label handed in',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(body: Center(child: YouDropPill(semanticLabel: 'يو دروب'))),
+        ),
+      ));
+
+      final Rect dot = tester.getRect(find.byWidgetPredicate((Widget w) =>
+          w is Container && w.constraints == const BoxConstraints.tightFor(width: 8, height: 8)));
+      final Rect name = tester.getRect(find.text('YouDrop'));
+      expect(dot.right, lessThanOrEqualTo(name.left));
+      expect(find.bySemanticsLabel('يو دروب'), findsOneWidget);
+    });
+
+    testWidgets('says nothing without a label', (WidgetTester tester) async {
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: YouDropPill())));
+
+      expect(
+        find.descendant(of: find.byType(YouDropPill), matching: find.byType(ExcludeSemantics)),
+        findsOneWidget,
+      );
+    });
+  });
 }

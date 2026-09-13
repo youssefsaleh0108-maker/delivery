@@ -70,10 +70,31 @@ class StoreApi {
   ///
   /// [radiusMetres] is clamped into range server-side rather than refused — a million metres is a
   /// legitimate "everything around here".
-  Future<Paged<NearbyStore>> nearby(
+  ///
+  /// The filters are the neighbourhood browse's chips, applied by the server before the page is
+  /// cut, so pages stay full — within the nearest [NearbyPage.candidateLimit] shops that match. All
+  /// but [openNow] narrow the database's candidates themselves; [NearbyPage.truncated] says when more
+  /// shops matched than one search reads, and then [Paged.totalElements] counts only the nearest of
+  /// them. Omitted filters are not sent, and no filter is the plain search.
+  ///
+  /// * [openNow] drops a shop whose card would read closed; busy and closing-soon stay, because
+  ///   both still take orders.
+  /// * [powerStatus] is what the merchant says the lights are doing NOW, and only while that
+  ///   declaration still counts as now ([StoreCard.powerCurrent]). `generator` means "running on the
+  ///   generator at the moment", not "owns one" — label it that way.
+  /// * [neighborhood] is an exact match on the district a shop declared.
+  /// * [newSinceDays] keeps shops that first listed on the platform within that many days (clamped
+  ///   to 1..365 server-side) — counted from the listing, not from when the draft was created.
+  /// * [verifiedLocal] keeps only shops Backoffice granted the trust badge.
+  Future<NearbyPage> nearby(
     double lat,
     double lng, {
     int radiusMetres = 5000,
+    bool openNow = false,
+    StorePowerStatus? powerStatus,
+    String? neighborhood,
+    int? newSinceDays,
+    bool verifiedLocal = false,
     int page = 0,
     int size = 20,
   }) async {
@@ -83,12 +104,16 @@ class StoreApi {
         'latitude': lat,
         'longitude': lng,
         'radiusMetres': radiusMetres,
+        if (openNow) 'openNow': true,
+        if (powerStatus != null) 'powerStatus': powerStatus.wire,
+        if (neighborhood != null && neighborhood.trim().isNotEmpty) 'neighborhood': neighborhood,
+        if (newSinceDays != null) 'newSinceDays': newSinceDays,
+        if (verifiedLocal) 'verifiedLocal': true,
         'page': page,
         'size': size,
       },
     );
-    return Paged<NearbyStore>.fromJson(
-        response.data as Map<String, dynamic>, NearbyStore.fromJson);
+    return NearbyPage.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<Paged<StoreCard>> favorites({int page = 0, int size = 20}) async {
@@ -234,6 +259,12 @@ class StoreApi {
     return Paged<Store>.fromJson(response.data as Map<String, dynamic>, Store.fromJson);
   }
 
+  /// Saves the profile form.
+  ///
+  /// [neighborhood] follows the server's three-way rule: null leaves the shop's district as it is
+  /// (and is not sent at all), an empty string clears it, anything else sets it. The field used to
+  /// be missing here entirely while the server wrote whatever arrived — so every profile save
+  /// cleared the district, and the neighbourhood browse had nothing to browse.
   Future<Store> updateProfile(
     String storeId, {
     required String name,
@@ -243,6 +274,7 @@ class StoreApi {
     List<String> tags = const <String>[],
     String? timezone,
     String? address,
+    String? neighborhood,
   }) async {
     final Response<dynamic> response = await _dio.put<dynamic>(
       '/api/stores/$storeId',
@@ -254,6 +286,7 @@ class StoreApi {
         'tags': tags,
         'timezone': timezone,
         'address': address,
+        if (neighborhood != null) 'neighborhood': neighborhood,
       },
     );
     return Store.fromJson(response.data as Map<String, dynamic>);

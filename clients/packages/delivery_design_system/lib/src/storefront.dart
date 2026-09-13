@@ -1026,6 +1026,266 @@ class StickyBasketBar extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------- product grid tile
+
+/// A product as the dekkane shop's two-column grid draws it (Figma `customer-dekkane-shop`
+/// 112:2041): a 100px picture, the name on one line, the dollar price over its LBP conversion, and
+/// a full-width add button.
+///
+/// The frame draws only the empty state. Once the product is in the basket the button becomes a
+/// stepper — the count, and the way back out — because a shelf you can only add to is a shelf you
+/// have to leave to correct; [ShelfProductTile] made the same call.
+///
+/// Laid out top-and-bottom with the button pinned to the foot, so two tiles side by side in a
+/// stretched row keep their buttons on one line whatever the names wrap to. In an unbounded column
+/// it simply packs.
+class ShelfGridTile extends StatelessWidget {
+  const ShelfGridTile({
+    super.key,
+    required this.name,
+    required this.price,
+    required this.addLabel,
+    this.secondaryPrice,
+    this.imageUrl,
+    this.quantityInBasket = 0,
+    this.onAdd,
+    this.onRemove,
+    this.onTap,
+    this.removeSemanticLabel,
+    this.addMoreSemanticLabel,
+  });
+
+  final String name;
+
+  /// The price as it should read, already formatted.
+  final String price;
+
+  /// The second figure under the price — the LBP conversion — or null to draw none. Null is the
+  /// honest state when there is no rate: a price with an invented conversion is worse than one
+  /// without.
+  final String? secondaryPrice;
+
+  final String? imageUrl;
+
+  /// The add button's word, already localised.
+  final String addLabel;
+
+  final int quantityInBasket;
+
+  /// Null draws no add control at all — a closed shop's shelf still browses, and a button that
+  /// cannot add anything is not drawn. The space is kept so the grid does not jump.
+  final VoidCallback? onAdd;
+  final VoidCallback? onRemove;
+  final VoidCallback? onTap;
+
+  /// Screen-reader labels for the stepper's two glyphs, localised by the caller.
+  final String? removeSemanticLabel;
+  final String? addMoreSemanticLabel;
+
+  static const double imageHeight = 100;
+
+  /// How tall the add button and the stepper are drawn: the frame's 32px.
+  static const double controlHeight = 32;
+
+  /// How tall a target they answer. A 32px control is under the 44–48px a thumb needs, so the 8px
+  /// above and below the drawn control answer its tap too. That room is spacing the tile already
+  /// had — the gap over the control and part of the bottom padding — moved inside the control's
+  /// box, so the tile keeps its shape and nothing it draws moves.
+  static const double hitHeight = 48;
+
+  @override
+  Widget build(BuildContext context) {
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.lg);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: DeliveryColors.white,
+        borderRadius: corners,
+        border: Border.all(color: DeliveryColors.border),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: corners,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            // Short at the bottom by the part of [hitHeight] the control's box spans below it.
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                DeliverySpacing.md - 4,
+                DeliverySpacing.md - 4,
+                DeliverySpacing.md - 4,
+                DeliverySpacing.md - 4 - (hitHeight - controlHeight) / 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                      child: SizedBox(
+                        height: imageHeight,
+                        width: double.infinity,
+                        child: DeliveryProductImage(url: imageUrl),
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.sm),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: DeliverySpacing.sm),
+                    Text(
+                      price,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: DeliveryColors.brand,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (secondaryPrice != null) ...<Widget>[
+                      const SizedBox(height: 1),
+                      Text(
+                        secondaryPrice!,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          // Muted, not faint: faint is for decoration, and this is a price.
+                          color: DeliveryColors.muted,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                // No gap here: the 8px the tile used to leave above the control is the top of the
+                // control's own tap area now ([hitHeight]).
+                _control(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _control() {
+    if (onAdd == null) {
+      return const SizedBox(height: hitHeight);
+    }
+    final BorderRadius corners = BorderRadius.circular(DeliveryRadius.sm);
+    if (quantityInBasket == 0) {
+      // Drawn [controlHeight] tall, centred in a [hitHeight] box. A tap on the band above or below
+      // reaches [onAdd] through the outer detector; one on the button itself through the InkWell,
+      // whose ink stays inside the drawn button. Only the button is announced.
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onAdd,
+        child: SizedBox(
+          height: hitHeight,
+          child: Center(
+            child: Semantics(
+              button: true,
+              child: Material(
+                color: DeliveryColors.brand,
+                borderRadius: corners,
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onAdd,
+                  child: SizedBox(
+                    height: controlHeight,
+                    width: double.infinity,
+                    child: Center(
+                      child: Text(
+                        addLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      height: hitHeight,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          Center(
+            child: SizedBox(
+              height: controlHeight,
+              width: double.infinity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: DeliveryColors.brand, borderRadius: corners),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              _step(Icons.remove_rounded, onRemove, removeSemanticLabel,
+                  AlignmentDirectional.centerStart),
+              Text(
+                '$quantityInBasket',
+                style: const TextStyle(
+                    color: DeliveryColors.white, fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              _step(Icons.add_rounded, onAdd, addMoreSemanticLabel, AlignmentDirectional.centerEnd),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One stepper glyph, drawn where the frame draws it — a 36px cell at the pill's end — but
+  /// answering a [hitHeight]-square target that reaches over the band above and below the pill and
+  /// 12px in towards the count. A GestureDetector rather than an InkWell: the old InkWell's ink was
+  /// painted beneath the pill's own fill and never seen, and over the band it would be.
+  Widget _step(IconData icon, VoidCallback? onTap, String? label, AlignmentGeometry end) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: hitHeight,
+          height: hitHeight,
+          child: Align(
+            alignment: end,
+            child: SizedBox(
+              width: 36,
+              height: controlHeight,
+              child: Icon(icon, size: 17, color: DeliveryColors.white),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------- product row
 
 /// A product as it appears on a store's shelf: text on the left, picture on the right, an add

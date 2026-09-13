@@ -3880,5 +3880,110 @@
   },
   "carrCashBoOverdueNote": "Some cash has been out longer than the platform's limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.",
   "carrCashBoLoadFailed": "What delivery companies hold could not be loaded just now. The rest of this page is unaffected.",
-  "carrCashBoMethodLabel": "How it was paid (optional)"
+  "carrCashBoMethodLabel": "How it was paid (optional)",
+  "dekkaneBrowseTitle": "Your Neighborhood",
+  "dekkaneBrowseSubRegion": "Local {region} dekkanes",
+  "@dekkaneBrowseSubRegion": {
+    "placeholders": {
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneAreaInRegion": "{area}, {region}",
+  "@dekkaneAreaInRegion": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      },
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneEntrySub": "The dekkanes and small shops around your address",
+  "dekkaneFilterOpenNow": "Open now",
+  "dekkaneFilterOnGenerator": "On generator now",
+  "dekkaneFilterNew": "New on YouDrop",
+  "dekkaneExpandMap": "Expand interactive map",
+  "dekkaneNearbyShops": "Shops near you",
+  "dekkaneLocalShops": "Local shops",
+  "dekkaneDistanceMetres": "{metres} m away",
+  "@dekkaneDistanceMetres": {
+    "placeholders": {
+      "metres": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "dekkaneDistanceKm": "{km} km away",
+  "@dekkaneDistanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "double",
+        "format": "decimalPatternDigits",
+        "optionalParameters": {
+          "decimalDigits": 1
+        }
+      }
+    }
+  },
+  "dekkaneGeneratorActive": "Generator active",
+  "dekkaneTrustedLocal": "Trusted local",
+  "dekkaneCouldNotLoadShops": "Could not load the shops around you",
+  "dekkanePinAddressPrompt": "Pin your address on the map to see the shops nearest you, and how far each one is.",
+  "dekkaneNoShopsNearby": "No shops near this address yet",
+  "dekkaneMapTitle": "Shops on the map",
+  "dekkaneOpenClosesAt": "Open · Closes {time}",
+  "@dekkaneOpenClosesAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneShopInventory": "Shop inventory",
+  "dekkaneLbpAmount": "LBP {amount}",
+  "@dekkaneLbpAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "dekkaneAddOneMore": "Add one more",
+  "dekkaneMerchNeighborhood": "Neighborhood",
+  "dekkaneMerchNeighborhoodHint": "e.g. Mar Mikhael",
+  "dekkaneMerchNeighborhoodHelp": "Shown under your shop's name when customers open your shop from their neighborhood list.",
+  "dekkaneMerchNeighborhoodTooLong": "Keep it to 80 characters or fewer",
+  "dekkaneCouldNotLoadShelf": "Could not load this shop's shelves",
+  "dekkaneBrowseTitleAll": "Shops on YouDrop",
+  "dekkaneBrowseSubAll": "Every shop, best rated first",
+  "dekkaneAllShops": "All shops",
+  "dekkanePowerUpdatedMinutes": "{minutes, plural, =0{Updated just now} =1{Updated 1 min ago} other{Updated {minutes} min ago}}",
+  "@dekkanePowerUpdatedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "dekkanePowerUpdatedHours": "{hours, plural, =1{Updated 1 hr ago} other{Updated {hours} hrs ago}}",
+  "@dekkanePowerUpdatedHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "dekkaneSearchedNearest": "{count, plural, =1{Only the nearest shop was searched} other{Only the nearest {count} shops were searched}}",
+  "@dekkaneSearchedNearest": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

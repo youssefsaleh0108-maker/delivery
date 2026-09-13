@@ -7,6 +7,8 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 
+import org.springframework.data.domain.Page;
+
 import com.delivery.product.api.dto.StoreDtos.StoreCardResponse;
 import com.delivery.product.service.CrossSellService;
 
@@ -96,6 +98,35 @@ public final class GeoDtos {
             BigDecimal latitude,
             BigDecimal longitude,
             long distanceMetres) {
+    }
+
+    /**
+     * A page of the "near me" search.
+     *
+     * <p>The storefront's page shape field for field, so a client that reads one reads this unchanged
+     * — plus the two fields that keep its total honest.
+     *
+     * @param truncated      true when more shops matched inside the radius than one search reads.
+     *                       The page and {@code totalElements} then cover the nearest
+     *                       {@code candidateLimit} matching shops, not every one in the radius, so a
+     *                       client should say "among the nearest" rather than "none match". Unlikely
+     *                       inside a neighbourhood; possible at the widest radius in a dense city.
+     * @param candidateLimit how many of the nearest matching shops one search reads
+     */
+    public record NearbyPageResponse(
+            List<NearbyStoreResponse> content,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages,
+            boolean truncated,
+            int candidateLimit) {
+
+        public static NearbyPageResponse of(Page<NearbyStoreResponse> page, boolean truncated,
+                                            int candidateLimit) {
+            return new NearbyPageResponse(page.getContent(), page.getNumber(), page.getSize(),
+                    page.getTotalElements(), page.getTotalPages(), truncated, candidateLimit);
+        }
     }
 
     /**

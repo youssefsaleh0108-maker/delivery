@@ -52,6 +52,9 @@ class _StoreScreenState extends State<StoreScreen> {
   final TextEditingController _description = TextEditingController();
   final TextEditingController _tags = TextEditingController();
   final TextEditingController _address = TextEditingController();
+
+  /// The district customers browsing their neighbourhood find the shop under.
+  final TextEditingController _neighborhood = TextEditingController();
   final TextEditingController _fee = TextEditingController();
   final TextEditingController _minOrder = TextEditingController();
   final TextEditingController _etaMin = TextEditingController();
@@ -79,7 +82,8 @@ class _StoreScreenState extends State<StoreScreen> {
   @override
   void dispose() {
     for (final TextEditingController c in <TextEditingController>[
-      _name, _tagline, _description, _tags, _address, _fee, _minOrder, _etaMin, _etaMax
+      _name, _tagline, _description, _tags, _address, _neighborhood, _fee, _minOrder, _etaMin,
+      _etaMax
     ]) {
       c.dispose();
     }
@@ -135,6 +139,7 @@ class _StoreScreenState extends State<StoreScreen> {
     _description.text = store.description ?? '';
     _tags.text = store.tags.join(', ');
     _address.text = store.address ?? '';
+    _neighborhood.text = store.neighborhood ?? '';
     _fee.text = store.deliveryFee.toStringAsFixed(2);
     _minOrder.text = store.minOrder.toStringAsFixed(2);
     _etaMin.text = '${store.etaMinMinutes}';
@@ -188,6 +193,10 @@ class _StoreScreenState extends State<StoreScreen> {
             .where((String t) => t.isNotEmpty)
             .toList(),
         address: _address.text.trim().isEmpty ? null : _address.text.trim(),
+        // Always sent, and sent as an empty string when the box is empty — never null. Null means
+        // "this client does not know the field" and leaves the district alone; this form does know
+        // it, so an emptied box is the merchant clearing it and must say so.
+        neighborhood: _neighborhood.text.trim(),
       );
       await widget.api.updateCommercials(
         store.id,
@@ -655,6 +664,27 @@ class _StoreScreenState extends State<StoreScreen> {
               cursorColor: DeliveryColors.brand,
               decoration: _cardBoxDecoration(hint: t.tagsHint),
             ),
+          ),
+          const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+          // The neighbourhood browse lists shops by this. It had no field anywhere, and the server
+          // wrote whatever the profile save sent — nothing — so no shop ever had a district.
+          _CardField(
+            label: t.dekkaneMerchNeighborhood,
+            child: TextFormField(
+              controller: _neighborhood,
+              style: _cardValueStyle,
+              cursorColor: DeliveryColors.brand,
+              textCapitalization: TextCapitalization.words,
+              decoration: _cardBoxDecoration(hint: t.dekkaneMerchNeighborhoodHint),
+              // The column's own limit, refused here in words rather than as a 400 on save.
+              validator: (String? v) =>
+                  (v ?? '').trim().length > 80 ? t.dekkaneMerchNeighborhoodTooLong : null,
+            ),
+          ),
+          const SizedBox(height: DeliverySpacing.xs),
+          Text(
+            t.dekkaneMerchNeighborhoodHelp,
+            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.35),
           ),
           const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
           _CardField(
