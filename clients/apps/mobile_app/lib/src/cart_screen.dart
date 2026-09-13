@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import 'cart.dart';
 import 'checkout_screen.dart';
+import 'delivery_terms_book.dart';
 import 'order_outbox.dart';
 import 'split_add_friend_sheet.dart';
 import 'split_status_screen.dart';
@@ -42,6 +43,7 @@ class CartScreen extends StatefulWidget {
     this.geocodingApi,
     this.outbox,
     this.connectivity,
+    this.deliveryTerms,
   });
 
   final Cart cart;
@@ -78,6 +80,10 @@ class CartScreen extends StatefulWidget {
 
   /// Handed to checkout, so it knows the platform is unreachable before it tries.
   final ValueListenable<bool>? connectivity;
+
+  /// Handed to checkout, which prices delivery to an address's area from it. Optional for the same
+  /// reason as [promoApi]; without it checkout shows the shop's flat fee.
+  final DeliveryTermsBook? deliveryTerms;
 
   /// After a placement AND after a checkout is queued: either way the customer's next question is
   /// "where is it?", and the Orders tab is where both answers live.
@@ -231,6 +237,7 @@ class _CartScreenState extends State<CartScreen> {
           promo: quote != null && quote.valid ? quote : null,
           outbox: widget.outbox,
           connectivity: widget.connectivity,
+          deliveryTerms: widget.deliveryTerms,
         ),
       ),
     );

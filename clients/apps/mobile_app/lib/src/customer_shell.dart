@@ -12,6 +12,7 @@ import 'cart.dart';
 import 'cart_screen.dart';
 import 'customer_nav_bar.dart';
 import 'delivery_address.dart';
+import 'delivery_terms_book.dart';
 import 'my_orders_screen.dart';
 import 'notification_inbox.dart';
 import 'offline_banner.dart';
@@ -145,6 +146,11 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
   late final OfflineCatalog _catalog =
       OfflineCatalog(store: _offlineStore, ownerId: widget.session.subject);
 
+  /// What each shop charges to reach each saved area, learned while the platform answers, so a
+  /// checkout that finds itself offline can still assert the fee Order Manager will charge.
+  late final DeliveryTermsBook _deliveryTerms = DeliveryTermsBook(
+      api: widget.zoneApi, store: _offlineStore, ownerId: widget.session.subject);
+
   StreamSubscription<OutboxPlaced>? _placedFromOutbox;
 
   int _index = CustomerNavBar.homeIndex;
@@ -186,6 +192,33 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     }
     _quotedFor = signature;
     _cart.refreshWaiver(widget.offerApi);
+    _learnDeliveryTerms();
+  }
+
+  /// Asks, while the platform answers, what the shops the customer can check out from — the
+  /// basket's, and the offline shelf's — charge to reach each of their saved areas.
+  ///
+  /// Ahead of time on purpose. Checkout asks too, but a checkout opened after the connection
+  /// dropped can only use what was learned before, and without it an address priced by area cannot
+  /// be queued at all. The book asks each pair at most once per ten minutes, however often this
+  /// runs.
+  void _learnDeliveryTerms() {
+    if (!mounted || !_online.value) return;
+    final Set<String> shops = <String>{
+      if (_cart.storeId != null) _cart.storeId!,
+      if (_catalog.store != null) _catalog.store!.id,
+    };
+    final DeliveryAddress? selected = _addresses.selected;
+    final Set<String> areas = <String>{
+      if (selected?.zoneId != null) selected!.zoneId!,
+      for (final DeliveryAddress address in _addresses.recents)
+        if (address.zoneId != null) address.zoneId!,
+    };
+    for (final String shop in shops) {
+      for (final String area in areas) {
+        unawaited(_deliveryTerms.learn(shop, area));
+      }
+    }
   }
 
   /// Re-saves the offline shelf. Silent and best effort; throttled inside unless [force]d.
@@ -193,9 +226,12 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     unawaited(_catalog.refresh(orders: widget.orderApi, stores: widget.storeApi, force: force));
   }
 
-  /// Back online is the moment the shelf can catch up with anything bought meanwhile.
+  /// Back online is the moment the shelf, and the delivery fees behind it, can catch up with
+  /// anything bought or saved meanwhile.
   void _onConnectivity() {
-    if (_online.value) _refreshCatalog();
+    if (!_online.value) return;
+    _refreshCatalog();
+    _learnDeliveryTerms();
   }
 
   /// A queued checkout became an order: say so, whichever tab the customer is on.
@@ -243,6 +279,10 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     _placedFromOutbox = _outbox.placed.listen(_onQueuedOrderPlaced);
     _catalog.load().then((_) => _refreshCatalog());
     _online.addListener(_onConnectivity);
+    // The fees follow what they are fees for: the shelf's shop, and the saved areas.
+    _deliveryTerms.load().then((_) => _learnDeliveryTerms());
+    _catalog.addListener(_learnDeliveryTerms);
+    _addresses.addListener(_learnDeliveryTerms);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -261,6 +301,8 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _online.removeListener(_onConnectivity);
+    _catalog.removeListener(_learnDeliveryTerms);
+    _addresses.removeListener(_learnDeliveryTerms);
     _placedFromOutbox?.cancel();
     _outbox.dispose();
     _catalog.dispose();
@@ -334,6 +376,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
           geocodingApi: widget.geocodingApi,
           outbox: _outbox,
           connectivity: _online,
+          deliveryTerms: _deliveryTerms,
           onOrderPlaced: () {
             _open(CustomerNavBar.ordersIndex);
             // The purchase just made belongs on the offline shelf.

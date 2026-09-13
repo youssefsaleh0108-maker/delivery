@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/cart.dart';
 import 'package:mobile_app/src/checkout_screen.dart';
 import 'package:mobile_app/src/delivery_address.dart';
+import 'package:mobile_app/src/delivery_terms_book.dart';
 import 'package:mobile_app/src/offline_store.dart';
 import 'package:mobile_app/src/order_outbox.dart';
 
@@ -39,15 +40,29 @@ void main() {
   final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
 
   /// Order Manager for these tests: each POST /api/orders gets the next reply, or a new order once
-  /// the replies run out; a GET gets [gets] or a 404.
+  /// the replies run out; a GET gets [gets] or a 404. Product Service's delivery terms answer with
+  /// the fee [areaFees] names for the area asked about, and a 404 for any other.
   ({Dio dio, List<RequestOptions> placed}) server(
     List<void Function(RequestOptions o, RequestInterceptorHandler h)> replies, {
     Map<String, Object> gets = const <String, Object>{},
+    Map<String, double> areaFees = const <String, double>{'zone-home': 0},
   }) {
     final List<RequestOptions> placed = <RequestOptions>[];
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (RequestOptions o, RequestInterceptorHandler h) {
+        final double? areaFee = areaFees[o.queryParameters['zoneId']];
+        if (o.path.startsWith('/api/delivery-zones/terms/') && areaFee != null) {
+          h.resolve(Response<dynamic>(requestOptions: o, statusCode: 200, data: <String, dynamic>{
+            'storeId': o.path.substring('/api/delivery-zones/terms/'.length),
+            'served': true,
+            'deliveryFee': areaFee,
+            'minOrder': 0,
+            'etaMinMinutes': 20,
+            'etaMaxMinutes': 35,
+          }));
+          return;
+        }
         if (o.method == 'POST' && o.path == '/api/orders') {
           final int n = placed.length;
           placed.add(o);
@@ -107,6 +122,8 @@ void main() {
     required Cart cart,
     required OrderOutbox outbox,
     ValueListenable<bool>? connectivity,
+    DeliveryTermsBook? terms,
+    PromoQuote? promo,
   }) async {
     tester.view.physicalSize = const Size(1000, 2400);
     tester.view.devicePixelRatio = 1.0;
@@ -115,6 +132,10 @@ void main() {
     final DeliveryAddressStore addresses = DeliveryAddressStore(ownerId: 'user-1');
     await addresses.select(const DeliveryAddress(
         line: '12 Rose Street', label: 'Home', zoneId: 'zone-home', zoneName: 'Riverside'));
+
+    // Asks this test's server, unless the test brings a book of its own.
+    final DeliveryTermsBook book = terms ??
+        DeliveryTermsBook(api: DeliveryZoneApi(dio), store: _MemoryStore(), ownerId: 'user-1');
 
     Object? result;
     bool returned = false;
@@ -139,6 +160,8 @@ void main() {
                     addresses: addresses,
                     outbox: outbox,
                     connectivity: connectivity,
+                    deliveryTerms: book,
+                    promo: promo,
                   ),
                 ));
                 returned = true;
@@ -331,6 +354,124 @@ void main() {
     expect(outbox.items, isEmpty);
     expect(cart.isNotEmpty, isTrue);
     expect(checkout.returned(), isFalse);
+  });
+
+  group('the total a queued checkout asserts is the one Order Manager will charge', () {
+    /// The shop's flat fee is 2.00; to the test address's area it charges 3.50.
+    Cart areaPricedBasket() =>
+        Cart()..add(product('a', 's1', 9.75), from: storeCard('s1', deliveryFee: 2));
+
+    testWidgets('an address priced by its area queues at that area\'s fee, which is also the total '
+        'on the button', (WidgetTester tester) async {
+      final Cart cart = areaPricedBasket();
+      final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[neverConnected],
+          areaFees: const <String, double>{'zone-home': 3.5});
+      final OrderOutbox outbox = outboxOver(s.dio, _MemoryStore());
+      await openCheckout(tester, dio: s.dio, cart: cart, outbox: outbox);
+
+      // Not the shop's flat 2.00: 9.75 + 3.50, what Order Manager will charge to this address.
+      expect(find.text(en.custPlaceOrderAmount('\$13.25')), findsOneWidget);
+
+      await tapPlace(tester);
+      await tester.tap(find.text(en.offlineQueueAction));
+      await tester.pumpAndSettle();
+
+      expect(outbox.items.single.expectedTotal, 13.25);
+    });
+
+    testWidgets('an Express checkout cannot wait, and says why', (WidgetTester tester) async {
+      final Cart cart = basket();
+      final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[neverConnected]);
+      final OrderOutbox outbox = outboxOver(s.dio, _MemoryStore());
+      await openCheckout(tester, dio: s.dio, cart: cart, outbox: outbox);
+
+      await tester.tap(find.text(en.deliveryTierExpress));
+      await tester.pumpAndSettle();
+      await tapPlace(tester);
+
+      // Its surcharge is priced only when the order is placed, so no total can be promised for it.
+      expect(find.text(en.offlineQueueStandardOnly), findsOneWidget);
+      expect(find.text(en.offlineQueueAction), findsNothing);
+      await tester.tap(find.text(en.close));
+      await tester.pumpAndSettle();
+      expect(outbox.items, isEmpty);
+      expect(cart.isNotEmpty, isTrue);
+    });
+
+    testWidgets('an address whose area fee this phone never learned cannot wait',
+        (WidgetTester tester) async {
+      final Cart cart = basket();
+      final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[neverConnected],
+          areaFees: const <String, double>{});
+      final OrderOutbox outbox = outboxOver(s.dio, _MemoryStore());
+      await openCheckout(tester, dio: s.dio, cart: cart, outbox: outbox);
+
+      await tapPlace(tester);
+
+      expect(find.text(en.offlineQueueTotalUnknown), findsOneWidget);
+      expect(find.text(en.offlineQueueAction), findsNothing);
+      expect(outbox.items, isEmpty);
+    });
+
+    testWidgets('a fee learned while online is the one a checkout opened offline queues at, even '
+        'after the app restarted', (WidgetTester tester) async {
+      final _MemoryStore phone = _MemoryStore();
+      final online = server(<void Function(RequestOptions, RequestInterceptorHandler)>[],
+          areaFees: const <String, double>{'zone-home': 3.5});
+      // Learned earlier, while the platform answered…
+      await tester.runAsync(() =>
+          DeliveryTermsBook(api: DeliveryZoneApi(online.dio), store: phone, ownerId: 'user-1')
+              .learn('s1', 'zone-home'));
+      // …and read back by the next run of the app, which can reach nothing.
+      final offline = server(<void Function(RequestOptions, RequestInterceptorHandler)>[],
+          areaFees: const <String, double>{});
+      final DeliveryTermsBook afterRestart =
+          DeliveryTermsBook(api: DeliveryZoneApi(offline.dio), store: phone, ownerId: 'user-1');
+      await tester.runAsync(afterRestart.load);
+
+      final Cart cart = areaPricedBasket();
+      final OrderOutbox outbox = outboxOver(offline.dio, _MemoryStore());
+      await openCheckout(tester,
+          dio: offline.dio,
+          cart: cart,
+          outbox: outbox,
+          connectivity: ValueNotifier<bool>(false),
+          terms: afterRestart);
+
+      await tapPlace(tester);
+      await tester.tap(find.text(en.offlineQueueAction));
+      await tester.pumpAndSettle();
+
+      expect(offline.placed, isEmpty);
+      expect(outbox.items.single.expectedTotal, 13.25);
+    });
+
+    testWidgets('a promo quoted at the shop\'s flat fee is not asserted at a different area fee',
+        (WidgetTester tester) async {
+      final Cart cart = areaPricedBasket();
+      final s = server(<void Function(RequestOptions, RequestInterceptorHandler)>[neverConnected],
+          areaFees: const <String, double>{'zone-home': 3.5});
+      final OrderOutbox outbox = outboxOver(s.dio, _MemoryStore());
+      await openCheckout(
+        tester,
+        dio: s.dio,
+        cart: cart,
+        outbox: outbox,
+        // Free delivery: worth the 2.00 the basket knew, and 3.50 to this address.
+        promo: const PromoQuote(
+          valid: true,
+          reason: PromoQuoteReason.ok,
+          discount: 2,
+          code: 'FREEDEL',
+          kind: PromoKind.freeDelivery,
+        ),
+      );
+
+      await tapPlace(tester);
+
+      expect(find.text(en.offlineQueueTotalUnknown), findsOneWidget);
+      expect(outbox.items, isEmpty);
+    });
   });
 }
 

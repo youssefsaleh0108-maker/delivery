@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -10,6 +12,8 @@ import 'package:mobile_app/src/cached_catalog_screen.dart';
 import 'package:mobile_app/src/cart.dart';
 import 'package:mobile_app/src/customer_nav_bar.dart';
 import 'package:mobile_app/src/customer_shell.dart';
+import 'package:mobile_app/src/delivery_address.dart';
+import 'package:mobile_app/src/delivery_terms_book.dart';
 import 'package:mobile_app/src/my_orders_screen.dart';
 import 'package:mobile_app/src/offline_banner.dart';
 import 'package:mobile_app/src/offline_catalog.dart';
@@ -543,6 +547,78 @@ void main() {
 
       expect(find.text(en.offlineNothingSaved), findsOneWidget);
       expect(find.text(en.offlineQuickAdd), findsNothing);
+    });
+
+    testWidgets('while the platform answers, the shell learns what the shelf\'s shop charges to '
+        'reach each saved area, and keeps it for a checkout opened offline later',
+        (WidgetTester tester) async {
+      tallView(tester);
+      // The saved address, as the last session left it on the phone: in an area.
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(storageChannel, (MethodCall call) async {
+        final Map<Object?, Object?> args =
+            (call.arguments as Map<Object?, Object?>?) ?? const <Object?, Object?>{};
+        if (call.method == 'read' && args['key'] == 'delivery.addresses.user-1') {
+          const DeliveryAddress home = DeliveryAddress(line: '12 Rose Street', zoneId: 'zone-hamra');
+          return jsonEncode(<String, dynamic>{
+            'selected': home.toJson(),
+            'recents': <Object>[home.toJson()],
+          });
+        }
+        return null;
+      });
+      final List<RequestOptions> asked = <RequestOptions>[];
+      final Dio dio = serve(<String, Object>{
+        ...platform(),
+        '/api/stores': page(const <Map<String, dynamic>>[]),
+        '/api/stores/favorites': page(const <Map<String, dynamic>>[]),
+        '/api/banners': const <dynamic>[],
+        '/api/categories/chips': const <dynamic>[],
+        '/api/notifications/unread-count': const <String, dynamic>{'unread': 0},
+        '/api/butler/mine': page(const <Map<String, dynamic>>[]),
+      });
+      // Product Service's terms: shop s1 charges 3.50 to reach the area (its flat fee is 2).
+      dio.interceptors.insert(0, InterceptorsWrapper(
+        onRequest: (RequestOptions o, RequestInterceptorHandler h) {
+          if (!o.path.startsWith('/api/delivery-zones/terms/')) {
+            h.next(o);
+            return;
+          }
+          asked.add(o);
+          h.resolve(Response<dynamic>(requestOptions: o, statusCode: 200, data: <String, dynamic>{
+            'storeId': 's1',
+            'served': true,
+            'deliveryFee': 3.5,
+            'minOrder': 0,
+            'etaMinMinutes': 20,
+            'etaMaxMinutes': 35,
+          }));
+        },
+      ));
+      final _MemoryStore phone = _MemoryStore();
+
+      await tester.pumpWidget(app(CustomerShell(
+        storeApi: StoreApi(dio),
+        orderApi: OrderApi(dio),
+        notificationApi: NotificationApi(dio),
+        butlerApi: ButlerApi(dio),
+        zoneApi: DeliveryZoneApi(dio),
+        offerApi: OfferApi(dio),
+        offlineStore: phone,
+        session: sessionWith(<DeliveryRole>{DeliveryRole.customer}),
+        locale: LocaleController(read: () async => 'en', write: (String _) async {}),
+        onSignOut: () async {},
+      )));
+      await tester.pumpAndSettle();
+
+      // Once, for the shelf's shop and the saved address's area — however many things changed.
+      expect(asked, hasLength(1));
+      expect(asked.single.path, '/api/delivery-zones/terms/s1');
+      expect(asked.single.queryParameters['zoneId'], 'zone-hamra');
+      // On the phone, for the next run of the app, which may have no connection at all.
+      final DeliveryTermsBook nextRun = DeliveryTermsBook(api: null, store: phone, ownerId: 'user-1');
+      await tester.runAsync(nextRun.load);
+      expect(nextRun.known('s1', 'zone-hamra')?.deliveryFee, 3.5);
     });
   });
 }
