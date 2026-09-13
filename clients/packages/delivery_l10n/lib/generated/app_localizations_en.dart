@@ -7602,4 +7602,126 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get giftUnnamed =>
       'A gift — who it\'s for shows once it\'s yours to carry';
+
+  @override
+  String get multiCartTitle => 'Smart Basket';
+
+  @override
+  String get multiCartSubtitle => 'One checkout, every shop';
+
+  @override
+  String multiCartShopCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shops',
+      one: '1 shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartFromShop(int count, String store) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'From $store ($count items)',
+      one: 'From $store (1 item)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopDelivery => 'Delivery from this shop';
+
+  @override
+  String multiCartDeliveryFromShops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delivery from $count shops',
+      one: 'Delivery from 1 shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartCheckoutAmount(String amount) {
+    return 'Checkout — $amount';
+  }
+
+  @override
+  String multiCartBelowMinimum(String amount, String store) {
+    return 'Add $amount more from $store to reach its minimum order';
+  }
+
+  @override
+  String multiCartShopClosed(String store) {
+    return '$store is closed right now. Remove its items to check out.';
+  }
+
+  @override
+  String multiCartShopNotServing(String store) {
+    return '$store doesn\'t deliver to your address. Remove its items to check out.';
+  }
+
+  @override
+  String multiCartShopUnavailable(String store) {
+    return '$store can\'t take this order right now.';
+  }
+
+  @override
+  String multiCartRemoveShop(String store) {
+    return 'Remove $store';
+  }
+
+  @override
+  String multiCartShopLimitTitle(int max) {
+    String _temp0 = intl.Intl.pluralLogic(
+      max,
+      locale: localeName,
+      other: 'Up to $max shops per basket',
+      one: 'One shop per basket',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopLimitBody =>
+      'Check out, or remove a shop from your basket, before adding items from another.';
+
+  @override
+  String multiCartPartOfOrder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Part of a $count-shop order',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartCannotWait =>
+      'A basket from several shops can\'t wait for the connection: its shops\' orders are placed together, while you\'re online. Check out once you\'re back.';
+
+  @override
+  String get multiCartGiftOneShop =>
+      'A gift is sent from one shop at a time. Remove the other shops\' items, or send this basket as an ordinary order.';
+
+  @override
+  String multiCartPlaced(int count, String amount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count orders placed · $amount',
+      one: '1 order placed · $amount',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartPricesUpdating => 'Updating prices…';
+
+  @override
+  String get multiCartPricesFailed => 'We couldn\'t confirm the latest prices.';
 }

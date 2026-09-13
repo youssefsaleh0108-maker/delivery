@@ -202,6 +202,8 @@ class DeliveryOrder {
     required this.contactPhone,
     required this.notes,
     this.gift,
+    this.checkoutId,
+    this.checkoutSize,
     required this.items,
     required this.availableActions,
     required this.placedAt,
@@ -280,6 +282,17 @@ class DeliveryOrder {
   /// Who receives it and what goes with it, when the order is a gift; null on an ordinary order.
   /// Its recipient phone is present only for the viewers the server allows — see [OrderGift].
   final OrderGift? gift;
+
+  /// The checkout this order was placed in with other shops' orders; null when it was placed alone.
+  /// Every order of one checkout carries the same id, which is how the Orders list shows them as one
+  /// purchase.
+  final String? checkoutId;
+
+  /// How many shops' orders that checkout placed; null when the order was placed alone.
+  final int? checkoutSize;
+
+  /// Whether this order was one of several shops' orders placed together.
+  bool get isPartOfCheckout => checkoutId != null && (checkoutSize ?? 0) > 1;
   final List<OrderLine> items;
   final List<OrderAction> availableActions;
   final DateTime? placedAt;
@@ -333,6 +346,8 @@ class DeliveryOrder {
         deliveryAddress: json['deliveryAddress'] as String? ?? '',
         contactPhone: json['contactPhone'] as String?,
         notes: json['notes'] as String?,
+        checkoutId: json['checkoutId'] as String?,
+        checkoutSize: (json['checkoutSize'] as num?)?.toInt(),
         gift: json['gift'] is Map<String, dynamic>
             ? OrderGift.fromJson(json['gift'] as Map<String, dynamic>)
             : null,
