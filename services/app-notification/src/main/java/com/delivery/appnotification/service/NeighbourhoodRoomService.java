@@ -162,14 +162,15 @@ public class NeighbourhoodRoomService {
         int size = properties.getHistoryPageSize();
         PageRequest onePastAPage = PageRequest.of(0, size + 1);
 
+        // The caller's id goes into both queries: authors they blocked are excluded by the database.
         if (afterSequence != null) {
-            List<ChatRoomMessage> newer = messages.oldestAfter(roomId, afterSequence, onePastAPage);
+            List<ChatRoomMessage> newer = messages.oldestAfter(roomId, afterSequence, userId, onePastAPage);
             boolean more = newer.size() > size;
             return new HistoryPage(more ? newer.subList(0, size) : newer, more);
         }
 
         long before = beforeSequence == null ? Long.MAX_VALUE : beforeSequence;
-        List<ChatRoomMessage> older = messages.newestBefore(roomId, before, onePastAPage);
+        List<ChatRoomMessage> older = messages.newestBefore(roomId, before, userId, onePastAPage);
         boolean more = older.size() > size;
         List<ChatRoomMessage> page = new ArrayList<>(more ? older.subList(0, size) : older);
         Collections.reverse(page);

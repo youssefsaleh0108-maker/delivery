@@ -16,17 +16,25 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
 
+import com.delivery.appnotification.domain.ChatBlock;
 import com.delivery.appnotification.domain.ChatRoom;
 import com.delivery.appnotification.domain.ChatRoomMember;
 import com.delivery.appnotification.domain.ChatRoomMessage;
+import com.delivery.appnotification.domain.ChatRoomReport;
 import com.delivery.appnotification.service.NeighbourhoodRoomService;
+import com.delivery.appnotification.service.RoomModerationService;
 import com.delivery.appnotification.service.RoomExceptions.MemberMutedException;
 import com.delivery.appnotification.service.RoomExceptions.NoNeighbourhoodException;
 import com.delivery.appnotification.service.RoomExceptions.NoRoomReason;
 import com.delivery.appnotification.service.RoomExceptions.RoomNotFoundException;
 import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedException;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -54,6 +62,7 @@ class NeighbourhoodChatAccessTest {
     private static final UUID ZONE = UUID.randomUUID();
 
     private NeighbourhoodRoomService rooms;
+    private RoomModerationService moderation;
     private MockMvc mvc;
     private ChatRoom room;
     private ChatRoomMember member;
@@ -61,7 +70,8 @@ class NeighbourhoodChatAccessTest {
     @BeforeEach
     void setUp() {
         rooms = mock(NeighbourhoodRoomService.class);
-        mvc = SecuredMvc.of(new NeighbourhoodChatController(rooms));
+        moderation = mock(RoomModerationService.class);
+        mvc = SecuredMvc.of(new NeighbourhoodChatController(rooms, moderation));
         room = new ChatRoom(ZONE, "Mar Mikhael");
         member = new ChatRoomMember(room.getId(), CUSTOMER, "Tania K.", Instant.now());
     }
@@ -79,7 +89,12 @@ class NeighbourhoodChatAccessTest {
         return List.of(
                 get("/api/chat/rooms/mine").param("zoneId", ZONE.toString()),
                 get(messagesPath()),
-                post(messagesPath()).contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"hello\"}"));
+                post(messagesPath()).contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"hello\"}"),
+                post("/api/chat/rooms/messages/" + UUID.randomUUID() + "/report")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"SPAM\"}"),
+                post("/api/chat/rooms/messages/" + UUID.randomUUID() + "/block-author"),
+                get("/api/chat/rooms/blocks"),
+                delete("/api/chat/rooms/blocks/" + UUID.randomUUID()));
     }
 
     @Nested
@@ -92,7 +107,7 @@ class NeighbourhoodChatAccessTest {
             for (RequestBuilder request : everyEndpoint()) {
                 mvc.perform(request).andExpect(status().isUnauthorized());
             }
-            verifyNoInteractions(rooms);
+            verifyNoInteractions(rooms, moderation);
         }
 
         @Test
@@ -104,7 +119,7 @@ class NeighbourhoodChatAccessTest {
                     mvc.perform(request).andExpect(status().isForbidden());
                 }
             }
-            verifyNoInteractions(rooms);
+            verifyNoInteractions(rooms, moderation);
         }
     }
 
@@ -228,6 +243,77 @@ class NeighbourhoodChatAccessTest {
             mvc.perform(post(messagesPath()).contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"\"}"))
                     .andExpect(status().isBadRequest());
             verifyNoInteractions(rooms);
+        }
+
+        @Test
+        @DisplayName("reports a message as themselves and gets 204")
+        void reports() throws Exception {
+            UUID message = UUID.randomUUID();
+
+            mvc.perform(post("/api/chat/rooms/messages/" + message + "/report")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"PERSONAL_INFO\"}"))
+                    .andExpect(status().isNoContent());
+            verify(moderation).report(message, CUSTOMER, ChatRoomReport.Reason.PERSONAL_INFO);
+        }
+
+        @Test
+        @DisplayName("a report with a reason the app does not offer is a 400")
+        void an_unknown_reason_is_a_400() throws Exception {
+            mvc.perform(post("/api/chat/rooms/messages/" + UUID.randomUUID() + "/report")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"BECAUSE\"}"))
+                    .andExpect(status().isBadRequest());
+            verifyNoInteractions(moderation);
+        }
+
+        @Test
+        @DisplayName("reporting a message from another neighbourhood is a 404")
+        void reporting_elsewhere_is_a_404() throws Exception {
+            UUID message = UUID.randomUUID();
+            doThrow(new RoomNotFoundException(message))
+                    .when(moderation).report(message, CUSTOMER, ChatRoomReport.Reason.ABUSE);
+
+            mvc.perform(post("/api/chat/rooms/messages/" + message + "/report")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"ABUSE\"}"))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("blocks an author through their message and learns a name, never an account id")
+        void blocks_an_author() throws Exception {
+            UUID message = UUID.randomUUID();
+            ChatBlock block = new ChatBlock(CUSTOMER, "author-sub", "Hadi S.", Instant.now());
+            when(moderation.blockAuthor(message, CUSTOMER)).thenReturn(block);
+
+            mvc.perform(post("/api/chat/rooms/messages/" + message + "/block-author"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.id").value(block.getId().toString()))
+                    .andExpect(jsonPath("$.name").value("Hadi S."))
+                    .andExpect(content().string(not(containsString("author-sub"))));
+        }
+
+        @Test
+        @DisplayName("lists and lifts their own blocks")
+        void lists_and_lifts_blocks() throws Exception {
+            ChatBlock block = new ChatBlock(CUSTOMER, "author-sub", "Hadi S.", Instant.now());
+            when(moderation.blocksOf(CUSTOMER)).thenReturn(List.of(block));
+
+            mvc.perform(get("/api/chat/rooms/blocks"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].name").value("Hadi S."))
+                    .andExpect(content().string(not(containsString("author-sub"))));
+            mvc.perform(delete("/api/chat/rooms/blocks/" + block.getId()))
+                    .andExpect(status().isNoContent());
+            verify(moderation).unblock(block.getId(), CUSTOMER);
+        }
+
+        @Test
+        @DisplayName("lifting somebody else's block is a 404")
+        void lifting_another_persons_block_is_a_404() throws Exception {
+            UUID theirs = UUID.randomUUID();
+            doThrow(new RoomNotFoundException(theirs)).when(moderation).unblock(theirs, CUSTOMER);
+
+            mvc.perform(delete("/api/chat/rooms/blocks/" + theirs))
+                    .andExpect(status().isNotFound());
         }
     }
 }

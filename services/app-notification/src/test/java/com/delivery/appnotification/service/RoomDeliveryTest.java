@@ -19,6 +19,7 @@ import org.springframework.messaging.simp.user.SimpSubscriptionMatcher;
 import org.springframework.messaging.simp.user.SimpUser;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
 
+import com.delivery.appnotification.domain.ChatBlockRepository;
 import com.delivery.appnotification.domain.ChatRoomMember;
 import com.delivery.appnotification.domain.ChatRoomMemberRepository;
 import com.delivery.appnotification.domain.ChatRoomMessage;
@@ -46,6 +47,7 @@ class RoomDeliveryTest {
     private SimpMessagingTemplate websocket;
     private SimpUserRegistry registry;
     private ChatRoomMemberRepository members;
+    private ChatBlockRepository blocks;
     private RoomDelivery delivery;
 
     private final List<SimpSubscription> subscriptions = new ArrayList<>();
@@ -56,7 +58,8 @@ class RoomDeliveryTest {
         websocket = mock(SimpMessagingTemplate.class);
         registry = mock(SimpUserRegistry.class);
         members = mock(ChatRoomMemberRepository.class);
-        delivery = new RoomDelivery(websocket, registry, members);
+        blocks = mock(ChatBlockRepository.class);
+        delivery = new RoomDelivery(websocket, registry, members, blocks);
 
         when(registry.findSubscriptions(any())).thenAnswer(call -> {
             SimpSubscriptionMatcher matcher = call.getArgument(0);
@@ -104,6 +107,21 @@ class RoomDeliveryTest {
         assertThat(toAuthor.getValue().mine()).isTrue();
         assertThat(toNeighbour.getValue().mine()).isFalse();
         assertThat(toNeighbour.getValue().text()).isEqualTo("Hallab is open late tonight");
+    }
+
+    /** A block that only the history endpoint honoured would still put the frame on the blocker's screen. */
+    @Test
+    @DisplayName("leaves out neighbours who blocked the author, on the wire and not only in history")
+    void blockers_are_left_out() {
+        listening("author-sub", "/user" + DESTINATION);
+        listening("blocker-sub", "/user" + DESTINATION);
+        when(members.currentAmong(eq(ROOM), anyCollection())).thenReturn(List.of("author-sub", "blocker-sub"));
+        when(blocks.blockersAmong(eq("author-sub"), anyCollection())).thenReturn(List.of("blocker-sub"));
+
+        delivery.broadcast(message);
+
+        verify(websocket).convertAndSendToUser(eq("author-sub"), eq(DESTINATION), any());
+        verify(websocket, never()).convertAndSendToUser(eq("blocker-sub"), any(), any());
     }
 
     @Test

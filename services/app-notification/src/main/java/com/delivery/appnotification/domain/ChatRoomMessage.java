@@ -47,8 +47,43 @@ public class ChatRoomMessage {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "hidden_at")
+    private Instant hiddenAt;
+
+    @Column(name = "hidden_by", length = 64)
+    private String hiddenBy;
+
     protected ChatRoomMessage() {
         // for JPA
+    }
+
+    /**
+     * Removes the message from every neighbour's view, keeping the row.
+     *
+     * <p>A tombstone rather than a delete: the words stay for the audit trail and for an appeal, and
+     * the thread keeps its numbering, so a client holding sequence 41 does not find a hole.
+     *
+     * @return whether this call hid it — false if a moderator already had
+     */
+    public boolean hide(String actorId, Instant at) {
+        if (hiddenAt != null) {
+            return false;
+        }
+        hiddenAt = at;
+        hiddenBy = actorId;
+        return true;
+    }
+
+    public boolean isHidden() {
+        return hiddenAt != null;
+    }
+
+    public Instant getHiddenAt() {
+        return hiddenAt;
+    }
+
+    public String getHiddenBy() {
+        return hiddenBy;
     }
 
     public ChatRoomMessage(UUID roomId, long sequenceNo, ChatRoomMember sender, String body,

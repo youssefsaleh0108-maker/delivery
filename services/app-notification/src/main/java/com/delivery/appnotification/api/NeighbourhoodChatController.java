@@ -7,12 +7,14 @@ import java.util.UUID;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,10 +23,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.delivery.appnotification.domain.ChatBlock;
 import com.delivery.appnotification.domain.ChatRoomMember;
+import com.delivery.appnotification.domain.ChatRoomReport;
 import com.delivery.appnotification.service.ChatDisplayName;
 import com.delivery.appnotification.service.NeighbourhoodRoomService;
 import com.delivery.appnotification.service.RoomMessageView;
+import com.delivery.appnotification.service.RoomModerationService;
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.platform.security.CurrentUser;
 
@@ -48,9 +53,53 @@ import com.delivery.platform.security.CurrentUser;
 public class NeighbourhoodChatController {
 
     private final NeighbourhoodRoomService rooms;
+    private final RoomModerationService moderation;
 
-    public NeighbourhoodChatController(NeighbourhoodRoomService rooms) {
+    public NeighbourhoodChatController(NeighbourhoodRoomService rooms, RoomModerationService moderation) {
         this.rooms = rooms;
+        this.moderation = moderation;
+    }
+
+    /**
+     * Flags a message for a moderator. 204 whether this is the first report or a repeat; 404 for a
+     * message outside the caller's room; 422 for the caller's own message.
+     */
+    @PostMapping("/messages/{messageId}/report")
+    public ResponseEntity<Void> report(@PathVariable UUID messageId,
+                                       @Valid @RequestBody ReportRequest request) {
+        moderation.report(messageId, CurrentUser.requireId(), request.reason());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Blocks the author of a message. The answer names the author and never identifies them. */
+    @PostMapping("/messages/{messageId}/block-author")
+    public ResponseEntity<BlockView> blockAuthor(@PathVariable UUID messageId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(BlockView.of(moderation.blockAuthor(messageId, CurrentUser.requireId())));
+    }
+
+    /** The people the caller blocked, newest first, so a block can be lifted. */
+    @GetMapping("/blocks")
+    public List<BlockView> blocks() {
+        return moderation.blocksOf(CurrentUser.requireId()).stream().map(BlockView::of).toList();
+    }
+
+    @DeleteMapping("/blocks/{blockId}")
+    public ResponseEntity<Void> unblock(@PathVariable UUID blockId) {
+        moderation.unblock(blockId, CurrentUser.requireId());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** One of the reasons the app offers; anything else is a 400 before the service is asked. */
+    public record ReportRequest(@NotNull ChatRoomReport.Reason reason) {
+    }
+
+    /** @param name the name the blocked person went by, which may be null like any display name */
+    public record BlockView(UUID id, String name, Instant blockedAt) {
+
+        static BlockView of(ChatBlock block) {
+            return new BlockView(block.getId(), block.getBlockedName(), block.getCreatedAt());
+        }
     }
 
     /**

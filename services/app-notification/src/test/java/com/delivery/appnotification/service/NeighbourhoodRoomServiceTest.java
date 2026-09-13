@@ -255,7 +255,8 @@ class NeighbourhoodRoomServiceTest {
             ChatRoomMessage m1 = said(member, 1);
             ChatRoomMessage m2 = said(member, 2);
             ChatRoomMessage m3 = said(member, 3);
-            when(messages.newestBefore(room.getId(), Long.MAX_VALUE, PageRequest.of(0, 3)))
+            // Asked AS the viewer: that is what lets the query itself leave out authors they blocked.
+            when(messages.newestBefore(room.getId(), Long.MAX_VALUE, CUSTOMER, PageRequest.of(0, 3)))
                     .thenReturn(List.of(m3, m2, m1));
 
             NeighbourhoodRoomService.HistoryPage page = service.history(room.getId(), CUSTOMER, null, null);
@@ -269,13 +270,13 @@ class NeighbourhoodRoomServiceTest {
         void reconnect_returns_what_was_missed() {
             ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now());
             ChatRoomMessage m4 = said(member, 4);
-            when(messages.oldestAfter(eq(room.getId()), eq(3L), any())).thenReturn(List.of(m4));
+            when(messages.oldestAfter(eq(room.getId()), eq(3L), eq(CUSTOMER), any())).thenReturn(List.of(m4));
 
             NeighbourhoodRoomService.HistoryPage page = service.history(room.getId(), CUSTOMER, 2L, 3L);
 
             assertThat(page.messages()).containsExactly(m4);
             assertThat(page.more()).isFalse();
-            verify(messages, never()).newestBefore(any(), anyLong(), any());
+            verify(messages, never()).newestBefore(any(), anyLong(), any(), any());
         }
     }
 

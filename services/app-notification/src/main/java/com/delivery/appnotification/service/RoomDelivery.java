@@ -1,5 +1,6 @@
 package com.delivery.appnotification.service;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.delivery.appnotification.domain.ChatBlockRepository;
 import com.delivery.appnotification.domain.ChatRoomMemberRepository;
 import com.delivery.appnotification.domain.ChatRoomMessage;
 
@@ -47,13 +49,16 @@ public class RoomDelivery {
     private final SimpMessagingTemplate websocket;
     private final SimpUserRegistry connectedUsers;
     private final ChatRoomMemberRepository members;
+    private final ChatBlockRepository blocks;
 
     public RoomDelivery(SimpMessagingTemplate websocket,
                         SimpUserRegistry connectedUsers,
-                        ChatRoomMemberRepository members) {
+                        ChatRoomMemberRepository members,
+                        ChatBlockRepository blocks) {
         this.websocket = websocket;
         this.connectedUsers = connectedUsers;
         this.members = members;
+        this.blocks = blocks;
     }
 
     /**
@@ -91,8 +96,14 @@ public class RoomDelivery {
         }
     }
 
-    /** Listening is not enough; they must still be in the room. */
+    /** Listening is not enough: they must still be in the room, and must not have blocked the author. */
     Set<String> recipientsAmong(ChatRoomMessage message, Set<String> listening) {
-        return Set.copyOf(members.currentAmong(message.getRoomId(), listening));
+        Set<String> recipients = new HashSet<>(members.currentAmong(message.getRoomId(), listening));
+        if (!recipients.isEmpty()) {
+            // The block is honoured on the wire, not only in history: a blocker's socket is simply
+            // never sent the frame, whatever the client would have done with it.
+            blocks.blockersAmong(message.getSenderId(), recipients).forEach(recipients::remove);
+        }
+        return recipients;
     }
 }

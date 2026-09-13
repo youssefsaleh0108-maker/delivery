@@ -30,7 +30,7 @@ import com.delivery.platform.observability.CorrelationIdFilter;
  * ends up rendered somewhere it should not be.
  */
 @RestControllerAdvice(assignableTypes = {ChatController.class, ChatBackofficeController.class,
-        NeighbourhoodChatController.class})
+        NeighbourhoodChatController.class, ChatModerationController.class})
 public class ChatExceptionHandler {
 
     @ExceptionHandler(ConversationNotFoundException.class)

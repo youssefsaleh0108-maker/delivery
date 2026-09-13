@@ -35,15 +35,18 @@ public record RoomMessageView(
     public static final String HIDDEN = "HIDDEN";
 
     public static RoomMessageView of(ChatRoomMessage message, String viewerId) {
+        boolean hidden = message.isHidden();
         return new RoomMessageView(
                 message.getId(),
                 message.getRoomId(),
                 message.getSequenceNo(),
                 message.getSenderHandle(),
-                message.getSenderName(),
+                // A removed message keeps its place in the thread and loses its words and its
+                // author's name: the tombstone says something was removed, not whom to look at.
+                hidden ? null : message.getSenderName(),
                 message.getSenderId().equals(viewerId),
-                TEXT,
-                message.getBody(),
+                hidden ? HIDDEN : TEXT,
+                hidden ? null : message.getBody(),
                 message.getCreatedAt());
     }
 }

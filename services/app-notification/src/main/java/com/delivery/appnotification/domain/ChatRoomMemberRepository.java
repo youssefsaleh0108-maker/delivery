@@ -24,6 +24,9 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
 
     long countByRoomIdAndLeftAtIsNull(UUID roomId);
 
+    /** Authors' memberships for the moderation queue, in one query rather than one per line. */
+    List<ChatRoomMember> findByRoomIdInAndUserIdIn(Collection<UUID> roomIds, Collection<String> userIds);
+
     /**
      * Which of these connected people are still in the room.
      *
