@@ -11,8 +11,8 @@ import com.delivery.appnotification.domain.ChatRoomMemberRepository;
 /**
  * Decides whether a socket may subscribe to a neighbourhood room's live feed.
  *
- * <p>Called by {@code WebSocketConfiguration}'s inbound interceptor on every SUBSCRIBE. The rule is
- * the same one the history and post endpoints apply — a current membership row for this room and this
+ * <p>Asked by {@code WebSocketConfiguration}'s inbound interceptor on every SUBSCRIBE. The rule is
+ * the one the history and post endpoints apply — a current membership row for this room and this
  * principal — so the socket is not a side door into a room the REST API would refuse.
  *
  * <p>The check is repeated at send time by {@link RoomDelivery}, because a subscription outlives the
@@ -40,25 +40,23 @@ public class RoomSubscriptionGuard {
     }
 
     /**
-     * Refuses a room subscription by anyone who is not currently in that room. Destinations outside
-     * the room family are not this guard's business and pass untouched.
+     * Whether this principal may listen to this destination.
      *
-     * @throws IllegalArgumentException which the STOMP layer turns into an ERROR frame
+     * <p>Destinations outside the room family are not this guard's business and answer true. Inside
+     * it, the destination must name exactly one room, in canonical form, and the principal must
+     * currently be in that room.
      */
     @Transactional(readOnly = true)
-    public void requireMember(String destination, String userId) {
+    public boolean mayListen(String destination, String userId) {
         if (destination == null || !destination.startsWith(ROOM_FAMILY)) {
-            return;
+            return true;
         }
         String roomId = destination.startsWith(RoomDelivery.ROOM_SUBSCRIPTION_PREFIX)
                 ? destination.substring(RoomDelivery.ROOM_SUBSCRIPTION_PREFIX.length())
                 : "";
-        if (!CANONICAL_UUID.matcher(roomId).matches()) {
-            throw new IllegalArgumentException("A room subscription must name exactly one room");
+        if (userId == null || !CANONICAL_UUID.matcher(roomId).matches()) {
+            return false;
         }
-        if (userId == null
-                || !members.existsByRoomIdAndUserIdAndLeftAtIsNull(UUID.fromString(roomId), userId)) {
-            throw new IllegalArgumentException("Only members of a room may listen to it");
-        }
+        return members.existsByRoomIdAndUserIdAndLeftAtIsNull(UUID.fromString(roomId), userId);
     }
 }

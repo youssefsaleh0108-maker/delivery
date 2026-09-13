@@ -92,24 +92,27 @@ class WebSocketConfigurationTest {
         void a_member_may_listen() {
             when(roomMembers.existsByRoomIdAndUserIdAndLeftAtIsNull(room, "neighbour-sub")).thenReturn(true);
 
-            assertThatCode(() -> send(subscribeAs("neighbour-sub", "/user/queue/chat.rooms." + room)))
-                    .doesNotThrowAnyException();
+            assertThat(interceptor.preSend(subscribeAs("neighbour-sub", "/user/queue/chat.rooms." + room), channel))
+                    .as("passed on to the broker")
+                    .isNotNull();
         }
 
         @Test
-        @DisplayName("is refused for a customer of another neighbourhood")
+        @DisplayName("is dropped for a customer of another neighbourhood, so no subscription ever exists")
         void a_stranger_is_refused() {
             when(roomMembers.existsByRoomIdAndUserIdAndLeftAtIsNull(room, "other-zone-sub")).thenReturn(false);
 
-            assertThatThrownBy(() -> send(subscribeAs("other-zone-sub", "/user/queue/chat.rooms." + room)))
-                    .isInstanceOf(IllegalArgumentException.class);
+            // Null is the interceptor's "do not deliver this frame": the broker never sees the
+            // SUBSCRIBE, and no ERROR frame tears down the session's other subscriptions.
+            assertThat(interceptor.preSend(subscribeAs("other-zone-sub", "/user/queue/chat.rooms." + room), channel))
+                    .isNull();
         }
 
         @Test
-        @DisplayName("is refused without a principal, rather than checked against nobody")
+        @DisplayName("is dropped without a principal, rather than checked against nobody")
         void no_principal_is_refused() {
-            assertThatThrownBy(() -> send(subscribeAs(null, "/user/queue/chat.rooms." + room)))
-                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(interceptor.preSend(subscribeAs(null, "/user/queue/chat.rooms." + room), channel))
+                    .isNull();
         }
 
         /**
@@ -118,7 +121,7 @@ class WebSocketConfigurationTest {
          * a guard with a gap in it.
          */
         @Test
-        @DisplayName("is refused when the destination does not name exactly one room")
+        @DisplayName("is dropped when the destination does not name exactly one room")
         void malformed_room_destinations_are_refused() {
             when(roomMembers.existsByRoomIdAndUserIdAndLeftAtIsNull(org.mockito.ArgumentMatchers.any(),
                     org.mockito.ArgumentMatchers.any())).thenReturn(true);
@@ -130,19 +133,17 @@ class WebSocketConfigurationTest {
                     "/user/queue/chat.rooms." + room.toString().toUpperCase(java.util.Locale.ROOT),
                     "/user/queue/chat.rooms." + room + ".extra",
                     "/user/queue/chat.roomsX" + room)) {
-                assertThatThrownBy(() -> send(subscribeAs("neighbour-sub", destination)))
+                assertThat(interceptor.preSend(subscribeAs("neighbour-sub", destination), channel))
                         .as(destination)
-                        .isInstanceOf(IllegalArgumentException.class);
+                        .isNull();
             }
         }
 
         @Test
         @DisplayName("leaves the order chat and notification queues to their own rule")
         void other_destinations_are_untouched() {
-            assertThatCode(() -> send(subscribeAs("rider-sub", "/user/queue/chat")))
-                    .doesNotThrowAnyException();
-            assertThatCode(() -> send(subscribeAs("rider-sub", "/user/queue/chat.shops")))
-                    .doesNotThrowAnyException();
+            assertThat(interceptor.preSend(subscribeAs("rider-sub", "/user/queue/chat"), channel)).isNotNull();
+            assertThat(interceptor.preSend(subscribeAs("rider-sub", "/user/queue/chat.shops"), channel)).isNotNull();
         }
     }
 
