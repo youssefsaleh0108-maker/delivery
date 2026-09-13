@@ -13289,7 +13289,7 @@ abstract class DeliveryStrings {
   /// No description provided for @attendanceNotOnFleet.
   ///
   /// In en, this message translates to:
-  /// **'This rider is not on your fleet in tracking yet. They appear here once they have carried an order for your company.'**
+  /// **'This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.'**
   String get attendanceNotOnFleet;
 
   /// No description provided for @attendanceLoadFailed.
@@ -13526,16 +13526,10 @@ abstract class DeliveryStrings {
   /// **'{name} from {date}'**
   String attendanceUpcomingShift(String name, String date);
 
-  /// No description provided for @attendanceUnlinkedRiders.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 rider has not carried an order for your company yet, so their attendance cannot be read until they do.} other{{count} riders have not carried an order for your company yet, so their attendance cannot be read until they do.}}'**
-  String attendanceUnlinkedRiders(int count);
-
   /// No description provided for @attendanceNoRiders.
   ///
   /// In en, this message translates to:
-  /// **'No riders on your fleet in tracking yet.'**
+  /// **'No riders on your fleet yet.'**
   String get attendanceNoRiders;
 
   /// No description provided for @attendanceNewShiftTitle.

@@ -85,7 +85,8 @@ import com.delivery.tracking.service.DutySessionService.SessionView;
  * neither schedule nor manual entry. A rider who moved companies inside a period appears under each
  * only for their own part, and a company that let a rider go keeps their hours up to the departure
  * in its pay-run read. A read or a write about one rider also needs the rider on the caller's fleet
- * now, by Order Manager's account ({@link DutySessionService#requireOwnFleet}).
+ * now, by Order Manager's account ({@link DutySessionService#requireOwnFleet} for a read,
+ * {@link DutySessionService#requireWritable} for a write).
  *
  * <p>Every date and wall-clock time is in the platform day zone
  * ({@code delivery.tracking.duty-session.day-zone}), and every conversion to an instant goes through
@@ -550,6 +551,10 @@ public class AttendanceService {
      * or of the shift they are moving to, has begun, a change asked for today starts tomorrow —
      * so a row that covered a window that has begun is always ended, never deleted.
      *
+     * <p>A rider can be scheduled the day they are hired: Order Manager's word that they are on the
+     * fleet is enough ({@link DutySessionService#requireWritable}), with no wait for tracking to link
+     * them.
+     *
      * <p>Idempotent: putting a rider on the shift they are already on changes nothing.
      */
     @Transactional
@@ -561,7 +566,7 @@ public class AttendanceService {
     /** The whole of {@link #assign}. Package-private with an explicit clock for the tests. */
     List<AssignmentView> assign(String riderId, String callerId, UUID shiftId,
                                 String effectiveFrom, Instant now) {
-        UUID carrier = dutySessions.requireOwnFleet(riderId, callerId);
+        UUID carrier = dutySessions.requireWritable(riderId, callerId);
         LocalDate today = today(now);
         LocalDate requested = effectiveFrom == null || effectiveFrom.isBlank()
                 ? today
@@ -666,7 +671,7 @@ public class AttendanceService {
     @Transactional
     public ManualEntry recordEntry(String riderId, String callerId, String date, String status,
                                    String clockIn, String clockOut, String note) {
-        UUID carrier = dutySessions.requireOwnFleet(riderId, callerId);
+        UUID carrier = dutySessions.requireWritable(riderId, callerId);
         Instant now = Instant.now();
         ZoneId zone = zone();
         LocalDate today = LocalDate.ofInstant(now, zone);
@@ -712,7 +717,7 @@ public class AttendanceService {
     /** Withdraws the office's entry for a day. The day goes back to what the evidence says. */
     @Transactional
     public void withdrawEntry(String riderId, String callerId, String date) {
-        UUID carrier = dutySessions.requireOwnFleet(riderId, callerId);
+        UUID carrier = dutySessions.requireWritable(riderId, callerId);
         LocalDate day = AttendancePeriod.date(date, "date");
         AttendanceEntry live = entries
                 .findByRiderIdAndCarrierIdAndWorkDateAndRevokedAtIsNull(riderId, carrier, day)

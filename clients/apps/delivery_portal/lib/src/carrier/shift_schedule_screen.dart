@@ -18,10 +18,11 @@ import 'rider_attendance_screen.dart';
 /// they are on today and any change already set to start, and two actions: change the shift, or
 /// open the rider's monthly attendance, which replaces this page in place so the rail stays.
 ///
-/// The rider list is the tracking roster — exactly the riders the attendance endpoints will answer
-/// for. A rider the company employs but that tracking has not yet linked to the fleet (they have
-/// not carried an order for it) cannot be scheduled or read, and a sentence says how many, rather
-/// than listing rows whose every action would come back "not found".
+/// The rider list is the company's riders as Order Manager has them — the list the Riders HR
+/// directory reads, and the one order-tracking checks every schedule change against — so a rider can
+/// be put on a shift the day they are hired, before tracking has linked them to the fleet. Their
+/// attendance opens once it has (tracking hears of the hire, or they carry an order for the
+/// company); until then that page says so.
 ///
 /// A rider with no shift is a freelancer: never late, never absent. That is the default, and
 /// taking a rider off their schedule returns them to it.
@@ -33,10 +34,10 @@ class ShiftScheduleScreen extends StatefulWidget {
     this.onboardingApi,
   });
 
-  /// Shifts, assignments, the roster, and each rider's attendance.
+  /// Shifts, assignments, and each rider's attendance.
   final TrackingApi api;
 
-  /// The company, and its rider list — to count riders tracking cannot see yet.
+  /// The company, and its riders: the people this page schedules.
   final DeliveryProviderApi providerApi;
 
   /// The riders' own applications, for their names. Without it riders show by reference.
@@ -62,40 +63,34 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   Future<_Schedule> _load() => _fetch()..ignore();
 
   Future<_Schedule> _fetch() async {
-    // These three are the page; if any fails, the page says so.
+    // These three are the page; if any fails, the page says so. The riders are the company's own
+    // list, not the tracking roster: the roster leaves out a rider tracking has not linked yet, and
+    // so kept a new hire off every shift until they had carried an order.
     final List<Object> core = await Future.wait(<Future<Object>>[
       widget.api.shifts(),
       widget.api.shiftAssignments(),
-      widget.api.roster(onDutyOnly: false),
+      widget.providerApi.myRiders(),
     ]);
 
-    // Everything below only names and counts riders; a failure leaves references and no count.
+    // Everything below only names riders; a failure leaves their references.
     final DeliveryProviderInfo? company = await _tryLoad(widget.providerApi.myCompany);
-    final List<String>? employed = await _tryLoad(widget.providerApi.myRiders);
     final OnboardingApi? onboarding = widget.onboardingApi;
     final List<OnboardingApplication>? applications = onboarding == null || company == null
         ? null
         : await _tryLoad(() => onboarding.forCompany(company.id, all: true));
 
-    final List<String> roster = (core[2] as List<RiderPresence>)
-        .map((RiderPresence p) => p.riderId)
-        .toSet()
-        .toList();
     final List<ShiftTemplate> shifts = core[0] as List<ShiftTemplate>;
     return _Schedule(
       shifts: shifts.where((ShiftTemplate s) => !s.archived).toList(),
       retired: shifts.where((ShiftTemplate s) => s.archived).toList(),
       assignments: core[1] as List<ShiftAssignment>,
-      riders: roster,
+      riders: (core[2] as List<String>).toSet().toList(),
       names: <String, String>{
         if (applications != null)
           for (final OnboardingApplication a in applications)
             if (a.kind == OnboardingKind.rider && a.provisionedUserRef != null)
               a.provisionedUserRef!: a.contactName,
       },
-      unlinked: employed == null
-          ? 0
-          : employed.where((String r) => !roster.contains(r)).length,
     );
   }
 
@@ -339,10 +334,6 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
               ),
           ],
         ),
-        if (data.unlinked > 0) ...<Widget>[
-          const SizedBox(height: DeliverySpacing.sm),
-          Text(t.attendanceUnlinkedRiders(data.unlinked), style: ConsoleText.meta),
-        ],
       ],
     );
   }
@@ -549,7 +540,6 @@ class _Schedule {
     required this.assignments,
     required this.riders,
     required this.names,
-    required this.unlinked,
   });
 
   /// Current shifts only; retired ones are history and are not offered.
@@ -559,12 +549,9 @@ class _Schedule {
   final List<ShiftTemplate> retired;
   final List<ShiftAssignment> assignments;
 
-  /// The tracking roster: the riders the attendance endpoints answer for.
+  /// The company's riders, as Order Manager lists them: who can be scheduled.
   final List<String> riders;
   final Map<String, String> names;
-
-  /// Riders the company employs that tracking has not linked to the fleet yet.
-  final int unlinked;
 
   /// The rider's own name from their application, or their reference when there is none.
   String nameOf(String rider) =>

@@ -187,7 +187,7 @@ _Backend _backend({int trackingStatus = 200}) {
         if (path.endsWith('/my-company/riders')) {
           return const _Reply(<String, dynamic>{
             'providerId': 'p1',
-            // One more than tracking knows: hired, but not yet linked to the fleet there.
+            // One more than the tracking roster: hired, and not linked to the fleet there yet.
             'riders': <String>['rider-aaaaaaaa', 'rider-bbbbbbbb', 'rider-cccccccc', 'rider-dddd'],
           });
         }
@@ -270,7 +270,7 @@ void main() {
 
   testWidgets('lists the current shifts, and each rider by name with their shift today',
       (WidgetTester tester) async {
-    await _pump(tester);
+    final _Backend backend = await _pump(tester);
 
     expect(find.text(en.attendanceShiftsTitle), findsOneWidget);
     // Once as the shift, once as Nadia's shift today.
@@ -288,10 +288,13 @@ void main() {
     expect(find.text('Karim Aoun'), findsOneWidget);
     // No application behind this one: shown by reference rather than not at all.
     expect(find.text('rider-cc'), findsOneWidget);
+    // The company's riders, not the tracking roster: a hire tracking has not linked yet is here, to
+    // be put on a shift like anybody else.
+    expect(find.text('rider-dd'), findsOneWidget);
+    expect(backend.sent('GET', '/tracking/riders/roster'), isEmpty);
     // Karim's night shift has not started, so today he is a freelancer — with the change shown.
-    expect(find.text(en.attendanceFreelancer), findsNWidgets(2));
+    expect(find.text(en.attendanceFreelancer), findsNWidgets(3));
     expect(find.textContaining('Night from'), findsOneWidget);
-    expect(find.text(en.attendanceUnlinkedRiders(1)), findsOneWidget);
 
     // Past days are still judged against a retired shift, so it can still be found.
     await tester.tap(find.text(en.attendanceRetiredShifts(1)));
@@ -398,7 +401,7 @@ void main() {
       (WidgetTester tester) async {
     final _Backend api = await _pump(tester);
 
-    // Karim, Nadia, rider-cc: Nadia is the second row.
+    // Karim, Nadia, rider-cc, rider-dd: Nadia is the second row.
     await tester.tap(find.byTooltip(en.attendanceOpenAttendance).at(1));
     await tester.pumpAndSettle();
 

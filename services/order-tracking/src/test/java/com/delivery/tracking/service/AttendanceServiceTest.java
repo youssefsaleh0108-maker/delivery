@@ -48,9 +48,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -188,6 +190,12 @@ class AttendanceServiceTest {
         riderRow = row;
         when(presenceRows.findById(RIDER)).thenReturn(Optional.of(row));
         when(presenceRows.existsById(RIDER)).thenReturn(true);
+    }
+
+    /** Order Manager does not put the rider on the dispatcher's fleet: a rival's rider, or a leaver. */
+    private void orderManagerRefuses() {
+        doThrow(new PresenceService.PresenceNotFoundException(RIDER))
+                .when(guard).requireOnCallersFleet(DISPATCHER, RIDER);
     }
 
     private ShiftTemplate shift(String name, String start, String end, DayOfWeek... days) {
@@ -801,9 +809,11 @@ class AttendanceServiceTest {
                     .isInstanceOf(InvalidRequestException.class);
         }
 
+        /** A rival's rider, whom Order Manager does not put on the caller's fleet. */
         @Test
         void a_carrier_cannot_write_for_another_fleets_rider() {
             riderSeenAt(NOW, OTHER_CARRIER);
+            orderManagerRefuses();
 
             assertThatThrownBy(() -> service.recordEntry(RIDER, DISPATCHER,
                     LocalDate.now(BEIRUT).toString(), "SICK", null, null, null))
@@ -898,14 +908,37 @@ class AttendanceServiceTest {
             verify(assignments, never()).save(any());
         }
 
+        /** A rival's rider, whom Order Manager does not put on the caller's fleet. */
         @Test
         void a_carrier_cannot_schedule_another_fleets_rider() {
             ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
             riderSeenAt(NOW, OTHER_CARRIER);
+            orderManagerRefuses();
 
             assertThatThrownBy(() -> service.assign(RIDER, DISPATCHER, day.getId(), null))
                     .isInstanceOf(PresenceService.PresenceNotFoundException.class);
             verify(assignments, never()).save(any());
+        }
+
+        /**
+         * Hired in Order Manager this morning, and not linked here yet — no hire event through, no
+         * order carried: the company can still put its new rider on a shift and write their register,
+         * on Order Manager's word alone.
+         */
+        @Test
+        void a_new_hire_tracking_has_not_linked_yet_can_be_scheduled_and_logged() {
+            ShiftTemplate day = shift("Day", "08:00", "18:00", WEEKDAYS);
+            when(presenceRows.findById(RIDER)).thenReturn(Optional.empty());
+            keepWrites();
+
+            service.assign(RIDER, DISPATCHER, day.getId(), monday.plusDays(1).toString(), NOW);
+            service.recordEntry(RIDER, DISPATCHER, today.plusDays(3).toString(), "LEAVE", null, null,
+                    null);
+
+            assertThat(assignmentRows).extracting(RiderShiftAssignment::getEffectiveFrom)
+                    .containsExactly(monday.plusDays(1));
+            verify(entries).save(argThat((AttendanceEntry e) -> e.getCarrierId().equals(CARRIER)));
+            verify(guard, times(2)).requireOnCallersFleet(DISPATCHER, RIDER);
         }
 
         @Test

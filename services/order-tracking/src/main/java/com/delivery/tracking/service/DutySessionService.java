@@ -150,8 +150,8 @@ public class DutySessionService {
 
     /**
      * The caller's fleet, provided this rider rides for it now — the gate on every carrier read about
-     * one rider (hours, sessions, the attendance month) and every write about one (their shift, a
-     * manual attendance entry).
+     * one rider: hours, sessions, the attendance month. A write needs less; see
+     * {@link #requireWritable}.
      *
      * <p>Two checks. First the linkage, resolved as the roster resolves it: the caller's fleet comes
      * from their token — or from Order Manager when this service has not learned it yet — never from
@@ -171,6 +171,24 @@ public class DutySessionService {
         if (!owned) {
             throw new PresenceNotFoundException(riderId);
         }
+        fleetGuard.requireOnCallersFleet(callerId, riderId);
+        return scope;
+    }
+
+    /**
+     * The caller's fleet, provided Order Manager puts this rider on it now — the gate on every
+     * carrier write about one rider: their shift, a manual attendance entry.
+     *
+     * <p>Unlike {@link #requireOwnFleet} it does not also need this service's linkage. A company hires
+     * a rider in Order Manager, and the linkage only follows by event — the hire's, or an order's — so
+     * demanding it kept a new hire off every shift until they had carried an order for the company,
+     * and would still keep them off for as long as the hire's event takes. Order Manager, asked with
+     * the caller's own token, is the authority on who is on the fleet now: a stranger, a rival's rider
+     * and one the company let go all get the same not-found as on every read, and an Order Manager
+     * that cannot be reached refuses (503).
+     */
+    public UUID requireWritable(String riderId, String callerId) {
+        UUID scope = carrierScope.requireScopeFor(callerId);
         fleetGuard.requireOnCallersFleet(callerId, riderId);
         return scope;
     }

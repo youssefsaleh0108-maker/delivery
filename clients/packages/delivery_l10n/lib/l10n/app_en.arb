@@ -3582,7 +3582,7 @@
       }
     }
   },
-  "attendanceNotOnFleet": "This rider is not on your fleet in tracking yet. They appear here once they have carried an order for your company.",
+  "attendanceNotOnFleet": "This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.",
   "attendanceLoadFailed": "Attendance could not be loaded just now.",
   "attendanceLogTitle": "Log attendance for {name}",
   "@attendanceLogTitle": {
@@ -3653,15 +3653,7 @@
       }
     }
   },
-  "attendanceUnlinkedRiders": "{count, plural, =1{1 rider has not carried an order for your company yet, so their attendance cannot be read until they do.} other{{count} riders have not carried an order for your company yet, so their attendance cannot be read until they do.}}",
-  "@attendanceUnlinkedRiders": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "attendanceNoRiders": "No riders on your fleet in tracking yet.",
+  "attendanceNoRiders": "No riders on your fleet yet.",
   "attendanceNewShiftTitle": "New shift",
   "attendanceShiftName": "Name",
   "attendanceShiftStart": "Starts (HH:mm)",

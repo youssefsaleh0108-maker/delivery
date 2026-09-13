@@ -7488,7 +7488,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get attendanceNotOnFleet =>
-      'هذا السائق غير مرتبط بأسطولك في نظام التتبّع بعد. سيظهر هنا بعد أن ينقل طلبًا لشركتك.';
+      'هذا السائق غير مرتبط بأسطولك في نظام التتبّع بعد، لذا لا يمكن عرض حضوره. يُربط عندما يصل خبر تعيينه إلى نظام التتبّع، أو عندما ينقل طلبًا لشركتك.';
 
   @override
   String get attendanceLoadFailed => 'تعذّر تحميل الحضور حاليًا.';
@@ -7633,27 +7633,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String attendanceUnlinkedRiders(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count سائق لم ينقلوا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهم حتى يفعلوا.',
-      many:
-          '$count سائقًا لم ينقلوا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهم حتى يفعلوا.',
-      few:
-          '$count سائقين لم ينقلوا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهم حتى يفعلوا.',
-      two:
-          'سائقان لم ينقلا أي طلب لشركتك بعد، لذا لا يمكن عرض حضورهما حتى يفعلا.',
-      one:
-          'سائق واحد لم ينقل أي طلب لشركتك بعد، لذا لا يمكن عرض حضوره حتى يفعل.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get attendanceNoRiders =>
-      'لا يوجد سائقون في أسطولك ضمن نظام التتبّع بعد.';
+  String get attendanceNoRiders => 'لا يوجد سائقون في أسطولك بعد.';
 
   @override
   String get attendanceNewShiftTitle => 'وردية جديدة';

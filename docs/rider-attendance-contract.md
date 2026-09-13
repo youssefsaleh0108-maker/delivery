@@ -267,9 +267,10 @@ run — re-reading the paid period and comparing it with the snapshot is how tha
 
 ## Known limits a pay run must allow for
 
-- **Fleet linkage.** A carrier reads or writes about a rider only while `rider_presence.carrier_id`
-  names its fleet — set when Order Manager announces the hire, or earlier when the rider carries an
-  order for it — and Order Manager still lists the rider on it.
+- **Fleet linkage.** A carrier reads a rider only while `rider_presence.carrier_id` names its fleet —
+  set when Order Manager announces the hire, or earlier when the rider carries an order for it — and
+  Order Manager still lists the rider on it. Writes (a shift, a manual entry) need only Order
+  Manager's word, so a company can schedule a rider the day it hires them, before either happens.
 - **Membership comes from events.** The windows are kept from Order Manager's membership events, so
   they trail a change by the time its event takes to arrive, and a rider whose hire was never
   announced has no history a company can see: their month reads empty and they are absent from the

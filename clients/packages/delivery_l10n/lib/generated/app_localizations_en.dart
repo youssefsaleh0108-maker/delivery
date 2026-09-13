@@ -7477,7 +7477,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get attendanceNotOnFleet =>
-      'This rider is not on your fleet in tracking yet. They appear here once they have carried an order for your company.';
+      'This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.';
 
   @override
   String get attendanceLoadFailed => 'Attendance could not be loaded just now.';
@@ -7619,20 +7619,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String attendanceUnlinkedRiders(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count riders have not carried an order for your company yet, so their attendance cannot be read until they do.',
-      one:
-          '1 rider has not carried an order for your company yet, so their attendance cannot be read until they do.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get attendanceNoRiders => 'No riders on your fleet in tracking yet.';
+  String get attendanceNoRiders => 'No riders on your fleet yet.';
 
   @override
   String get attendanceNewShiftTitle => 'New shift';
