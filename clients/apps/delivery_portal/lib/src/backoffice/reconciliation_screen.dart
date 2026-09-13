@@ -304,10 +304,12 @@ class _ReconciliationData {
 
 /// Past this, cash has been out longer than a shift and somebody should be asked about it.
 ///
-/// <strong>A fallback only.</strong> The server now decides with its configured limit
-/// (`delivery.accounting.float.overdue-after-hours`) and flags every holder, so this screen and a
-/// delivery company's own reconciliation page cannot disagree about what "late" means. This day is
-/// used only against a server that predates the flag.
+/// <strong>A fallback only.</strong> The server decides with its own configured limits and flags
+/// every holder: a day for a rider of the platform's own fleet — the rule this screen always applied
+/// (`delivery.accounting.float.platform-overdue-after-hours`) — and the carrier-custody limit for a
+/// delivery company's cash (`carrier-overdue-after-hours`), the same one the company's own
+/// reconciliation page states, so the two cannot disagree about what "late" means. This day is used
+/// only against a server that predates the flag.
 const Duration _bankItWithin = Duration(hours: 24);
 
 /// Whether a holder's cash is late: the server's call, or the fallback above when it made none.

@@ -265,12 +265,27 @@ void main() {
 
     testWidgets('the server\'s own limit decides what is overdue, not the screen\'s',
         (WidgetTester tester) async {
-      // The platform's limit is 48 hours: the 30-hour bag is on time, whatever a day would say.
+      // A company's rider carrying its cash is held to the carrier limit, two days by default: the
+      // server calls the 30-hour bag on time, and the screen takes its word over its own day.
       floatJson = _floatJson(flags: <bool?>[false, false]);
       await pump(tester);
 
       expect(find.text('Overdue'), findsNothing);
       expect(find.textContaining('longer than the platform\'s limit'), findsNothing);
+    });
+
+    testWidgets('a holder the server calls overdue is flagged, however fresh it looks here',
+        (WidgetTester tester) async {
+      // The other direction: the server's line is the one drawn even where the screen's own day
+      // would have let the bag pass, so its flag is shown rather than second-guessed.
+      floatJson = _floatJson(flags: <bool?>[true, false]);
+      await pump(tester);
+
+      final Finder freshRow =
+          find.ancestor(of: find.text('DDDDDDDD'), matching: find.byType(Row)).first;
+      expect(find.descendant(of: freshRow, matching: find.text('Overdue')), findsOneWidget);
+      expect(find.text('Overdue'), findsOneWidget);
+      expect(find.textContaining('longer than the platform\'s limit'), findsOneWidget);
     });
 
     testWidgets('fits a half-width window', (WidgetTester tester) async {
