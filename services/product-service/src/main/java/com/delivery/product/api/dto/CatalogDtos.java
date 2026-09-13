@@ -5,13 +5,17 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import com.delivery.product.domain.Product;
+import com.delivery.product.domain.ServiceTerms;
 import com.delivery.product.domain.Store;
 
 /**
@@ -44,7 +48,31 @@ public final class CatalogDtos {
              */
             @Size(max = 64) String sku,
             /** Scanned at the till. Not unique — the same EAN legitimately appears in two stores. */
-            @Size(max = 32) String barcode) {
+            @Size(max = 32) String barcode,
+            /**
+             * What a service offer promises: how it is priced, the pack, the turnaround, how the
+             * customer gets the work, and whether they send a file. Replaced whole on an update.
+             *
+             * <p>Required for a product in a service shop and refused for any other (422). A goods
+             * form that has never heard of it keeps working unchanged, and a service offer can never
+             * be saved without the terms an order for it will need.
+             */
+            @Valid ServiceTermsRequest service) {
+    }
+
+    /** See {@link ServiceTerms} for what each term may be, and why. */
+    public record ServiceTermsRequest(
+            @NotNull ServiceTerms.PricingType pricingType,
+            /** What one unit is called: "cards", "sqm". Needed for a pack of more, and per unit. */
+            @Size(max = ServiceTerms.MAX_UNIT_LABEL_LENGTH) String unitLabel,
+            /** Units in one step of the quantity stepper; one when absent, and always one per unit. */
+            @Min(1) @Max(ServiceTerms.MAX_UNIT_SIZE) Integer unitSize,
+            @NotNull @Min(0) @Max(ServiceTerms.MAX_TURNAROUND_HOURS) Integer turnaroundMinHours,
+            @NotNull @Min(1) @Max(ServiceTerms.MAX_TURNAROUND_HOURS) Integer turnaroundMaxHours,
+            @NotNull ServiceTerms.Fulfilment fulfilmentModes,
+            /** NONE when absent. */
+            ServiceTerms.AttachmentPolicy attachmentPolicy,
+            @Size(max = ServiceTerms.MAX_INSTRUCTIONS_PROMPT_LENGTH) String instructionsPrompt) {
     }
 
     public record ProductResponse(
@@ -93,7 +121,56 @@ public final class CatalogDtos {
              * Whether the back office has put this product on the customer gift hub. Public
              * curation rather than a secret: the hub itself shows every featured product.
              */
-            boolean giftFeatured) {
+            boolean giftFeatured,
+            /**
+             * What a service offer promises; null for a goods product. On every read of the offer (a
+             * shop's shelf, the services search, the merchant's list, a single read), so no screen
+             * has to fetch the terms of the card it is drawing.
+             */
+            ServiceTermsResponse service,
+            /**
+             * The least a customer can pay for one pack of a service offer: the price plus the
+             * cheapest selection each option group allows
+             * ({@link com.delivery.product.domain.ProductOptionGroup#minimumDelta}), never below zero.
+             * What "From $15.00" shows. A client says "From" for FROM pricing, or when this is not the
+             * price; for a fixed price with no required extras the two are equal.
+             *
+             * <p>Null for a goods product. Goods screens never draw it, and the goods shelf is not made
+             * to read every product's options for a figure nobody shows.
+             */
+            BigDecimal fromPrice) {
+    }
+
+    public record ServiceTermsResponse(
+            ServiceTerms.PricingType pricingType,
+            String unitLabel,
+            int unitSize,
+            int turnaroundMinHours,
+            int turnaroundMaxHours,
+            ServiceTerms.Fulfilment fulfilmentModes,
+            ServiceTerms.AttachmentPolicy attachmentPolicy,
+            String instructionsPrompt) {
+
+        /** The terms as a response, or null for a goods product, which has none. */
+        public static ServiceTermsResponse of(ServiceTerms terms) {
+            if (terms == null) {
+                return null;
+            }
+            return new ServiceTermsResponse(terms.getPricingType(), terms.getUnitLabel(),
+                    terms.getUnitSize(), terms.getTurnaroundMinHours(), terms.getTurnaroundMaxHours(),
+                    terms.getFulfilmentModes(), terms.getAttachmentPolicy(),
+                    terms.getInstructionsPrompt());
+        }
+    }
+
+    /**
+     * A row of the Services tab's "Popular" list: a live offer, and how many delivered orders it was in.
+     *
+     * <p>{@code deliveredOrders} counts real orders projected from {@code order.delivered}, and it is
+     * the only figure the row has. There is no estimate to fall back to: an offer without enough
+     * delivered orders is not in the list, and an empty list means "show Services near you instead".
+     */
+    public record PopularServiceResponse(ProductResponse offer, long deliveredOrders) {
     }
 
     public record CategoryResponse(

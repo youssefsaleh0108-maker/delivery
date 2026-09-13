@@ -56,6 +56,7 @@ import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.CatalogService.ProductView;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ReviewService;
@@ -326,7 +327,7 @@ public class StoreController {
         Page<Product> page = ids == null || ids.isEmpty()
                 ? catalog.browseStore(id, categoryId, search, pageable)
                 : catalog.browseStoreByIds(id, ids, pageable);
-        return PageResponse.of(page.map(this::toProduct));
+        return PageResponse.of(catalog.views(page).map(this::toProduct));
     }
 
     /** The Aisles tab: only the categories this store actually stocks. */
@@ -723,27 +724,11 @@ public class StoreController {
                 offer.getEndsAt());
     }
 
-    private ProductResponse toProduct(Product product) {
-        List<String> refs = product.getImageRefs();
-        // This is the shop page's product list — the screen the whole derivative exists for.
-        List<ImageUrl> resolved = images.resolveImages(refs);
-        return new ProductResponse(
-                product.getId(),
-                product.getMerchantId(),
-                product.getStoreId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getCategoryId(),
-                refs,
-                resolved.stream().map(ImageUrl::full).toList(),
-                resolved.stream().map(ImageUrl::thumb).toList(),
-                product.getStatus(),
-                product.getSku(),
-                product.getBarcode(),
-                product.isInStock(),
-                product.getCreatedAt(),
-                product.getUpdatedAt(),
-                product.isGiftFeatured());
+    /**
+     * The shop page's product list, the screen the list-sized derivative exists for, and a service
+     * shop's offer cards with their terms and "From" price. Mapped where every product endpoint maps.
+     */
+    private ProductResponse toProduct(ProductView view) {
+        return ProductResponses.of(view, images);
     }
 }

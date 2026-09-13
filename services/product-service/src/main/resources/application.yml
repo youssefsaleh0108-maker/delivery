@@ -125,6 +125,13 @@ delivery:
       # volume — the rail falls back to same-shelf suggestions, clearly labelled as such, either way.
       min-orders-together: 2
 
+    services:
+      # How many delivered orders an offer must have been in before the Services tab's "Popular" row
+      # lists it (ServiceOfferSearch). Counted only from delivered_order_lines, the projection of
+      # order.delivered, and never topped up from anything else: one order is an anecdote. Until an
+      # offer reaches the floor the row is simply empty, and the app shows "Services near you".
+      popular-min-delivered-orders: 3
+
     # Merchant Blitz: shelf photos in, a draft catalogue out (CatalogScanService).
     scan:
       # FAKE is deterministic sample data that never leaves the pod; CLAUDE sends the photos to the

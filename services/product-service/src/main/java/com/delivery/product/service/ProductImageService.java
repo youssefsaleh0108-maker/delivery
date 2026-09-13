@@ -18,6 +18,7 @@ import com.delivery.platform.storage.PresignedUpload;
 import com.delivery.platform.storage.StorageService;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.ProductRepository;
+import com.delivery.product.domain.ServiceTermsRepository;
 import com.delivery.product.event.CatalogEvents;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
@@ -63,6 +64,9 @@ public class ProductImageService {
     private final FileMetadataRepository files;
     private final OutboxRecorder outbox;
     private final ThumbnailService thumbnails;
+
+    /** Read for the events this service records: a service offer's snapshot carries its terms. */
+    private final ServiceTermsRepository serviceTerms;
     private final int maxImagesPerProduct;
 
     public ProductImageService(
@@ -71,6 +75,7 @@ public class ProductImageService {
             FileMetadataRepository files,
             OutboxRecorder outbox,
             ThumbnailService thumbnails,
+            ServiceTermsRepository serviceTerms,
             @org.springframework.beans.factory.annotation.Value(
                     "${delivery.catalog.max-images-per-product:8}") int maxImagesPerProduct) {
         this.products = products;
@@ -78,7 +83,19 @@ public class ProductImageService {
         this.files = files;
         this.outbox = outbox;
         this.thumbnails = thumbnails;
+        this.serviceTerms = serviceTerms;
         this.maxImagesPerProduct = maxImagesPerProduct;
+    }
+
+    /**
+     * The snapshot an event about this product carries, with a service offer's terms.
+     *
+     * <p>Image changes record {@code product.updated} too, and a consumer takes every snapshot as the
+     * whole product: one without the terms would read as an offer whose terms were removed.
+     */
+    private CatalogEvents.ProductSnapshot snapshotOf(Product product) {
+        return CatalogEvents.ProductSnapshot.of(product,
+                serviceTerms.findById(product.getId()).orElse(null));
     }
 
     @Transactional
@@ -117,7 +134,7 @@ public class ProductImageService {
 
         product.addImage(metadata.getObjectKey());
         outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
-                CatalogEvents.PRODUCT_UPDATED, CatalogEvents.ProductSnapshot.of(product));
+                CatalogEvents.PRODUCT_UPDATED, snapshotOf(product));
         return product;
     }
 
@@ -141,7 +158,7 @@ public class ProductImageService {
                 .ifPresent(metadata -> storage.softDelete(metadata.getId(), merchantId));
 
         outbox.record(CatalogEvents.AGGREGATE_TYPE, product.getId().toString(),
-                CatalogEvents.PRODUCT_UPDATED, CatalogEvents.ProductSnapshot.of(product));
+                CatalogEvents.PRODUCT_UPDATED, snapshotOf(product));
         return product;
     }
 

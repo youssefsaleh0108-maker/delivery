@@ -479,7 +479,7 @@ public class CatalogScanService {
             }
 
             Product product = catalog.create(merchantId, new ProductRequest(
-                    name, null, a.price(), a.categoryId(), scan.getStoreId(), null, null));
+                    name, null, a.price(), a.categoryId(), scan.getStoreId(), null, null, null));
             item.accept(product.getId(), name, a.price(), a.categoryId(), now);
         }
         for (UUID id : rejecting) {

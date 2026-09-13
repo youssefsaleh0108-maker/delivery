@@ -1,7 +1,10 @@
 package com.delivery.product.api;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import jakarta.validation.Valid;
 
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.security.CurrentUser;
 import com.delivery.product.api.dto.CatalogDtos.PageResponse;
+import com.delivery.product.api.dto.CatalogDtos.PopularServiceResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
 import com.delivery.product.api.dto.GeoDtos.CrossSellResponse;
@@ -34,13 +38,16 @@ import com.delivery.product.api.dto.OptionDtos.OptionResponse;
 import com.delivery.product.api.dto.OptionDtos.PriceRequest;
 import com.delivery.product.api.dto.OptionDtos.PriceResponse;
 import com.delivery.product.domain.ProductOptionGroup;
+import com.delivery.product.domain.Store;
 import com.delivery.product.service.ProductOptionService;
 import com.delivery.product.service.ProductOptionService.PricedSelection;
 import com.delivery.product.domain.Product;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.CatalogService.ProductView;
 import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
-import com.delivery.product.service.ProductImageService.ImageUrl;
+import com.delivery.product.service.ServiceOfferSearch;
+import com.delivery.product.service.ServiceOfferSearch.PopularOffer;
 
 /**
  * The catalog API.
@@ -66,13 +73,16 @@ public class ProductController {
     private final ProductImageService images;
     private final ProductOptionService optionService;
     private final CrossSellService crossSell;
+    private final ServiceOfferSearch serviceOffers;
 
     public ProductController(CatalogService catalog, ProductImageService images,
-                             ProductOptionService optionService, CrossSellService crossSell) {
+                             ProductOptionService optionService, CrossSellService crossSell,
+                             ServiceOfferSearch serviceOffers) {
         this.catalog = catalog;
         this.images = images;
         this.optionService = optionService;
         this.crossSell = crossSell;
+        this.serviceOffers = serviceOffers;
     }
 
     /** Customer-facing browse. ACTIVE products only, from every merchant. */
@@ -84,11 +94,15 @@ public class ProductController {
             Pageable pageable) {
 
         Page<Product> page = catalog.browseCatalog(categoryId, search, pageable);
-        return PageResponse.of(page.map(this::toResponse));
+        return PageResponse.of(catalog.views(page).map(this::toResponse));
     }
 
     /**
-     * The Merchant Portal's list: everything the caller owns, in any status.
+     * The Merchant Portal's list: everything the caller owns, in any status, or in the one asked for.
+     *
+     * <p>{@code status} is how the provider dashboard counts "Active offers": {@code ?status=ACTIVE}
+     * with {@code size=1}, then the page's {@code totalElements}. A status this service does not have
+     * is a 400 rather than an unfiltered list.
      *
      * <p>Declared before {@code /{id}} would otherwise be ambiguous — Spring resolves the literal
      * path first, but keeping them adjacent makes the intent obvious to the next reader.
@@ -96,18 +110,62 @@ public class ProductController {
     @GetMapping("/mine")
     @PreAuthorize("hasRole('MERCHANT')")
     public PageResponse<ProductResponse> mine(
+            @RequestParam(required = false) Product.Status status,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        Page<Product> page = catalog.listOwnedBy(CurrentUser.requireId(), pageable);
-        return PageResponse.of(page.map(this::toResponse));
+        Page<Product> page = catalog.listOwnedBy(CurrentUser.requireId(), status, pageable);
+        return PageResponse.of(catalog.views(page).map(this::toResponse));
+    }
+
+    /**
+     * The Services tab's offer search: live offers of listed service shops in open categories, by name.
+     *
+     * <p>Never a goods product, a paused offer, or an offer of a draft, suspended or closed-category
+     * shop ({@link ServiceOfferSearch}). A category the platform does not have is a 400; one it has
+     * but has closed answers an empty page, as a category with no offers does.
+     *
+     * <p>For signed-in customers: the tab it serves is the customer app's. A literal path, resolved
+     * before {@code /{id}}.
+     */
+    @GetMapping("/services")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public PageResponse<ProductResponse> services(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+
+        Page<Product> page = serviceOffers.search(search, serviceCategory, pageable);
+        return PageResponse.of(catalog.views(page).map(this::toResponse));
+    }
+
+    /**
+     * The Services tab's "Popular" row: offers ranked by the delivered orders they were in, each with
+     * its count.
+     *
+     * <p>Empty until enough real orders have been delivered, and the app shows "Services near you"
+     * then. It never falls back to another ranking dressed up as popularity.
+     */
+    @GetMapping("/services/popular")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public List<PopularServiceResponse> popularServices(
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        List<PopularOffer> popular = serviceOffers.popular(serviceCategory, limit);
+        Map<UUID, ProductView> views = viewsById(popular.stream().map(PopularOffer::product).toList());
+        return popular.stream()
+                .map(p -> new PopularServiceResponse(
+                        toResponse(views.get(p.product().getId())), p.deliveredOrders()))
+                .toList();
     }
 
     @GetMapping("/{id}")
     public ProductResponse read(@PathVariable UUID id) {
         // The viewer id is passed in so the service can decide whether a DRAFT is visible; an
         // anonymous-but-authenticated customer simply won't match the owner.
-        return toResponse(catalog.read(id, CurrentUser.id().orElse(null)));
+        return toResponse(catalog.view(catalog.read(id, CurrentUser.id().orElse(null))));
     }
 
     /**
@@ -136,10 +194,13 @@ public class ProductController {
         // for a customer rather than quietly seeding a rail from a shelf they may not see.
         Product product = catalog.read(id, CurrentUser.id().orElse(null));
 
-        return crossSell.boughtTogetherWith(product, Math.min(Math.max(limit, 1), MAX_CROSS_SELL))
-                .stream()
+        var suggestions = crossSell.boughtTogetherWith(
+                product, Math.min(Math.max(limit, 1), MAX_CROSS_SELL));
+        // The whole rail's views at once, rather than one read per tile.
+        Map<UUID, ProductView> views = viewsById(suggestions.stream().map(s -> s.product()).toList());
+        return suggestions.stream()
                 .map(s -> new CrossSellResponse(
-                        toResponse(s.product()), s.basis(), s.ordersTogether()))
+                        toResponse(views.get(s.product().getId())), s.basis(), s.ordersTogether()))
                 .toList();
     }
 
@@ -147,13 +208,13 @@ public class ProductController {
     @PreAuthorize("hasRole('MERCHANT')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         Product product = catalog.create(CurrentUser.requireId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(product));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(catalog.view(product)));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('MERCHANT')")
     public ProductResponse update(@PathVariable UUID id, @Valid @RequestBody ProductRequest request) {
-        return toResponse(catalog.update(id, CurrentUser.requireId(), request));
+        return toResponse(catalog.view(catalog.update(id, CurrentUser.requireId(), request)));
     }
 
     @PostMapping("/{id}/publish")
@@ -162,14 +223,40 @@ public class ProductController {
     // thing gated is the act that puts goods in front of customers.
     @PreAuthorize("hasRole('MERCHANT') and !hasRole('APPLICANT')")
     public ProductResponse publish(@PathVariable UUID id) {
-        return toResponse(catalog.publish(id, CurrentUser.requireId()));
+        return toResponse(catalog.view(catalog.publish(id, CurrentUser.requireId())));
+    }
+
+    /**
+     * Takes a live service offer off sale for now (ACTIVE to PAUSED).
+     *
+     * <p>The provider's own offers only: anybody else's is a 404, like an id that was never issued. A
+     * goods product is a 422, because goods are taken off sale by archiving. Never gated on approval:
+     * stopping sales must always be possible.
+     */
+    @PostMapping("/{id}/pause")
+    @PreAuthorize("hasRole('MERCHANT')")
+    public ProductResponse pause(@PathVariable UUID id) {
+        return toResponse(catalog.view(catalog.pause(id, CurrentUser.requireId())));
+    }
+
+    /**
+     * Puts a paused service offer back on sale (PAUSED to ACTIVE), under publishing's rules: a photo,
+     * and delivery areas or a pin for an offer that can be delivered (422).
+     *
+     * <p>Gated exactly like publish, because it is the same act: putting an offer in front of
+     * customers.
+     */
+    @PostMapping("/{id}/resume")
+    @PreAuthorize("hasRole('MERCHANT') and !hasRole('APPLICANT')")
+    public ProductResponse resume(@PathVariable UUID id) {
+        return toResponse(catalog.view(catalog.resume(id, CurrentUser.requireId())));
     }
 
     /** Archive, not delete — past orders still reference this product. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MERCHANT')")
     public ProductResponse archive(@PathVariable UUID id) {
-        return toResponse(catalog.archive(id, CurrentUser.requireId()));
+        return toResponse(catalog.view(catalog.archive(id, CurrentUser.requireId())));
     }
 
     // ---------------------------------------------------------------- options
@@ -226,28 +313,14 @@ public class ProductController {
                         .toList());
     }
 
-    private ProductResponse toResponse(Product product) {
-        List<String> refs = product.getImageRefs();
-        // One resolve, two lists: full-size for the hero, list-sized for the rows. Splitting this
-        // into two calls would double the metadata lookups on the browse path for nothing.
-        List<ImageUrl> resolved = images.resolveImages(refs);
-        return new ProductResponse(
-                product.getId(),
-                product.getMerchantId(),
-                product.getStoreId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getCategoryId(),
-                refs,
-                resolved.stream().map(ImageUrl::full).toList(),
-                resolved.stream().map(ImageUrl::thumb).toList(),
-                product.getStatus(),
-                product.getSku(),
-                product.getBarcode(),
-                product.isInStock(),
-                product.getCreatedAt(),
-                product.getUpdatedAt(),
-                product.isGiftFeatured());
+    /** Views for a list of products, by id, read in one go. */
+    private Map<UUID, ProductView> viewsById(List<Product> products) {
+        return catalog.views(products).stream()
+                .collect(Collectors.toMap(view -> view.product().getId(), Function.identity(),
+                        (first, repeated) -> first));
+    }
+
+    private ProductResponse toResponse(ProductView view) {
+        return ProductResponses.of(view, images);
     }
 }
