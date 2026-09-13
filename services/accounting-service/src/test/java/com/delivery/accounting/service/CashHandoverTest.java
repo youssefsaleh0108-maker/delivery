@@ -2,8 +2,10 @@ package com.delivery.accounting.service;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
@@ -77,6 +80,12 @@ class CashHandoverTest {
     private static CashFloatEntry collectedForCompany(String amount) {
         return CashFloatEntry.collected(RIDER, HolderKind.RIDER, UUID.randomUUID(),
                 new BigDecimal(amount), "USD", COMPANY);
+    }
+
+    /** The database stamps a row when it is written; a row read back carries that time. */
+    private static CashFloatEntry at(CashFloatEntry row, String createdAt) {
+        ReflectionTestUtils.setField(row, "createdAt", Instant.parse(createdAt));
+        return row;
     }
 
     private List<CashFloatEntry> riderHolds(String... amounts) {
@@ -276,6 +285,93 @@ class CashHandoverTest {
             verify(floatEntries, never()).save(any());
         }
 
+        /**
+         * A pay run nets the cash its period produced. What the rider collected after the period
+         * ended is not on the payslip, so the deduction leaves it in their bag — and the expected
+         * amount is checked against what is cleared, never against the whole bag.
+         */
+        @Test
+        @DisplayName("a pay run's deduction clears only what was collected before its cut-off, and checks that")
+        void aDeductionStopsAtItsCutOff() {
+            Instant periodEnd = Instant.parse("2026-10-15T21:00:00Z");
+            CashFloatEntry early = at(collectedForCompany("145.00"), "2026-10-03T10:00:00Z");
+            CashFloatEntry lastSecond = at(collectedForCompany("120.00"), "2026-10-15T20:59:59Z");
+            CashFloatEntry later = at(collectedForCompany("30.00"), "2026-10-15T21:00:00Z");
+            when(floatEntries.lockHeldForCarrier(RIDER, COMPANY))
+                    .thenReturn(List.of(early, lastSecond, later));
+            Recorded payroll = new Recorded(STAFF, CashFloatEntry.Method.PAYROLL_DEDUCTION,
+                    "2026-10-01 to 2026-10-15",
+                    CarrierPayrollService.payrollKey(UUID.randomUUID(), RIDER));
+
+            // The whole bag is not what the payslip nets: refused with the period's figure.
+            assertThatThrownBy(() -> service.handOver(COMPANY, RIDER, new BigDecimal("295.00"),
+                    payroll, periodEnd))
+                    .isInstanceOfSatisfying(CashFloatService.AmountChangedException.class,
+                            e -> assertThat(e.current()).isEqualByComparingTo("265.00"));
+
+            CashFloatService.Handover handover = service.handOver(COMPANY, RIDER,
+                    new BigDecimal("265.00"), payroll, periodEnd);
+
+            assertThat(handover.amount()).isEqualByComparingTo("265.00");
+            assertThat(handover.collections()).isEqualTo(2);
+            assertThat(early.getClearedBy()).isEqualTo(handover.id());
+            assertThat(lastSecond.getClearedBy()).isEqualTo(handover.id());
+            assertThat(later.isOutstanding()).isTrue();
+            assertThat(custodyWritten()).extracting(CashFloatEntry::getOrderId)
+                    .containsExactly(early.getOrderId(), lastSecond.getOrderId());
+        }
+
+        /**
+         * A pay run's deduction is replayed by its key, and the key can be worked out from the run
+         * and the rider. A counter hand-over that took the key first must not be answered as the
+         * deduction: the rider would hand the notes over and lose them from their pay as well.
+         */
+        @Test
+        @DisplayName("a counter hand-over under a pay run's key is never replayed as that run's deduction")
+        void aReplayRepeatsTheMethod() {
+            String payrollKey = CarrierPayrollService.payrollKey(UUID.randomUUID(), RIDER);
+            // Recorded before counters were refused the prefix, or by a path that forgot to be.
+            CashFloatEntry counter = CashFloatEntry.transferred(RIDER, COMPANY,
+                    new BigDecimal("485.00"), "USD",
+                    new Recorded(STAFF, CashFloatEntry.Method.CASH, null, payrollKey));
+            when(floatEntries.findByRequestKey(payrollKey)).thenReturn(Optional.of(counter));
+
+            assertThatThrownBy(() -> service.handOver(COMPANY, RIDER, new BigDecimal("485.00"),
+                    new Recorded(STAFF, CashFloatEntry.Method.PAYROLL_DEDUCTION,
+                            "2026-10-01 to 2026-10-15", payrollKey)))
+                    .isInstanceOf(CashFloatService.RequestKeyReusedException.class);
+
+            // And any other change of method under a repeated key is a different request too.
+            CashFloatEntry first = CashFloatEntry.transferred(RIDER, COMPANY,
+                    new BigDecimal("485.00"), "USD", byStaff(KEY));
+            when(floatEntries.findByRequestKey(KEY)).thenReturn(Optional.of(first));
+            assertThatThrownBy(() -> service.handOver(COMPANY, RIDER, new BigDecimal("485.00"),
+                    new Recorded(STAFF, CashFloatEntry.Method.WALLET, null, KEY)))
+                    .isInstanceOf(CashFloatService.RequestKeyReusedException.class);
+
+            verify(floatEntries, never()).lockHeldForCarrier(anyString(), anyString());
+            verify(floatEntries, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("a pay run's key records nothing but a payroll deduction, and a deduction needs its key")
+        void payrollKeysBelongToPayroll() {
+            String payrollKey = CarrierPayrollService.payrollKey(UUID.randomUUID(), RIDER);
+            for (Recorded wrong : List.of(
+                    new Recorded(STAFF, CashFloatEntry.Method.CASH, null, payrollKey),
+                    new Recorded(STAFF, CashFloatEntry.Method.CASH, null,
+                            payrollKey.toUpperCase(Locale.ROOT)),
+                    new Recorded(STAFF, CashFloatEntry.Method.PAYROLL_DEDUCTION, null, KEY),
+                    new Recorded(STAFF, CashFloatEntry.Method.PAYROLL_DEDUCTION, null, null))) {
+                assertThatThrownBy(() -> service.handOver(COMPANY, RIDER,
+                        new BigDecimal("485.00"), wrong))
+                        .as(String.valueOf(wrong))
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(floatEntries, never()).findByRequestKey(anyString());
+            verify(floatEntries, never()).lockHeldForCarrier(anyString(), anyString());
+        }
+
         @Test
         @DisplayName("accepts a whole-cent amount written with extra zeros")
         void paddedAmountIsWholeCents() {
@@ -362,6 +458,27 @@ class CashHandoverTest {
                     Recorded.nobody()))
                     .isInstanceOf(CashFloatService.AmountChangedException.class);
 
+            verify(floatEntries, never()).save(any());
+            verifyNoInteractions(transactions, postings);
+        }
+
+        @Test
+        @DisplayName("a pay run's key never records a payment, and a repeated key must repeat the method")
+        void remittanceKeys() {
+            assertThatThrownBy(() -> service.remit(COMPANY, "corr-1", new BigDecimal("485.00"),
+                    new Recorded("op-1", CashFloatEntry.Method.BANK_DEPOSIT, null,
+                            CarrierPayrollService.payrollKey(UUID.randomUUID(), RIDER))))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            CashFloatEntry first = CashFloatEntry.remitted(COMPANY, HolderKind.PROVIDER,
+                    new BigDecimal("485.00"), "USD",
+                    new Recorded("op-1", CashFloatEntry.Method.BANK_DEPOSIT, null, KEY));
+            when(floatEntries.findByRequestKey(KEY)).thenReturn(Optional.of(first));
+            assertThatThrownBy(() -> service.remit(COMPANY, "corr-1", new BigDecimal("485.00"),
+                    new Recorded("op-1", CashFloatEntry.Method.CASH, null, KEY)))
+                    .isInstanceOf(CashFloatService.RequestKeyReusedException.class);
+
+            verify(floatEntries, never()).outstandingFor(anyString());
             verify(floatEntries, never()).save(any());
             verifyNoInteractions(transactions, postings);
         }

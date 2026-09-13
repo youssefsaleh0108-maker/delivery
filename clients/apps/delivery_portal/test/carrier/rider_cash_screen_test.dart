@@ -291,6 +291,35 @@ void main() {
     expect(tester.getTopLeft(newer).dy, lessThan(tester.getTopLeft(older).dy));
   });
 
+  testWidgets('cash a pay run kept from pay reads as such in the history, and is never a method to pick',
+      (WidgetTester tester) async {
+    server.respond = (RequestOptions o) =>
+        o.method == 'GET' && o.path == '/api/accounting/carrier/cash/riders/rider-youssef'
+            ? _json(_settlement(handovers: <dynamic>[
+                <String, dynamic>{
+                  'id': 'h-3',
+                  'riderRef': 'rider-youssef',
+                  'riderName': 'Youssef Kanaan',
+                  'amount': '60.00',
+                  'collections': 2,
+                  'method': 'PAYROLL_DEDUCTION',
+                  'note': '2026-10-01 to 2026-10-15',
+                  'recordedByName': 'Kamal M.',
+                  'at': '2026-10-20T09:00:00Z',
+                },
+              ]))
+            : _happy(o);
+    await pump(tester);
+
+    // Not passed off as notes handed over at a counter.
+    expect(find.textContaining('Kept from pay'), findsOneWidget);
+
+    await tester.tap(find.text('Cash hand-over'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bank deposit'), findsWidgets);
+    expect(find.text('Kept from pay'), findsNothing);
+  });
+
   testWidgets('a rider who never worked for the company is not found, not an empty bag',
       (WidgetTester tester) async {
     server.respond = (RequestOptions o) => o.path.contains('/rating')

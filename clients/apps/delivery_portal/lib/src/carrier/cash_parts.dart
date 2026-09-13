@@ -76,6 +76,7 @@ String methodLabel(DeliveryStrings t, CashMethod method) => switch (method) {
       CashMethod.cash => t.carrCashMethodCash,
       CashMethod.bankDeposit => t.carrCashMethodBank,
       CashMethod.wallet => t.carrCashMethodWallet,
+      CashMethod.payrollDeduction => t.payrollCashMethodKeptFromPay,
     };
 
 /// How the money moved. Recorded with the hand-over; nothing moves money because of it.
@@ -92,7 +93,8 @@ class CashMethodSelect extends StatelessWidget {
       label: methodLabel(t, value),
       icon: Icons.payments_outlined,
       options: <ConsoleOption>[
-        for (final CashMethod m in CashMethod.values)
+        // Only what a person may record: cash kept from pay is read in a history, never picked.
+        for (final CashMethod m in CashMethod.recordable)
           ConsoleOption(label: methodLabel(t, m), value: m.wire),
       ],
       onSelected: (String? wire) {
@@ -267,7 +269,7 @@ Money? sumMoney(Iterable<Money?> amounts) {
 /// wrote them.
 ///
 /// Every cell is written either as text or as a figure, and the difference matters: text goes
-/// through [_csvText], which is what makes the file safe to open, while a figure the ledger wrote
+/// through [csvText], which is what makes the file safe to open, while a figure the ledger wrote
 /// stays a number the spreadsheet can add up.
 String carrierCashCsv(DeliveryStrings t, CarrierCashOverview overview) {
   String standing(RiderCashLine l) => switch (l.standing) {
@@ -290,25 +292,25 @@ String carrierCashCsv(DeliveryStrings t, CarrierCashOverview overview) {
         t.carrCashColLastHandover,
         t.carrCashColStatus,
       ])
-        _csvText(heading),
+        csvText(heading),
     ],
     for (final RiderCashLine l in overview.riders)
       <String>[
-        _csvText(l.name ?? ''),
-        _csvText(l.riderRef),
-        _csvMoney(l.collected),
-        _csvMoney(l.earned),
-        _csvMoney(l.holding),
+        csvText(l.name ?? ''),
+        csvText(l.riderRef),
+        csvMoney(l.collected),
+        csvMoney(l.earned),
+        csvMoney(l.holding),
         '${l.orders}',
         l.oldest == null ? '' : l.oldest!.toUtc().toIso8601String(),
         l.lastHandoverAt == null ? '' : l.lastHandoverAt!.toUtc().toIso8601String(),
-        _csvText(standing(l)),
+        csvText(standing(l)),
       ],
   ];
   return '${rows.map((List<String> r) => r.join(',')).join('\r\n')}\r\n';
 }
 
-/// What a spreadsheet reads as the start of a formula. See [_csvText].
+/// What a spreadsheet reads as the start of a formula. See [csvText].
 const List<String> _formulaLeads = <String>['=', '+', '-', '@', '\t', '\r'];
 
 /// A cell of text, made safe to open in a spreadsheet and then quoted the way [_csvField] quotes.
@@ -322,7 +324,7 @@ const List<String> _formulaLeads = <String>['=', '+', '-', '@', '\t', '\r'];
 ///
 /// Applied to every text cell, headings and labels included — not only to the name a stranger
 /// types today, because the next column somebody adds is the one nobody thinks to check.
-String _csvText(String value) {
+String csvText(String value) {
   if (_formulaLeads.any(value.startsWith)) {
     return '"\'${value.replaceAll('"', '""')}"';
   }
@@ -332,9 +334,9 @@ String _csvText(String value) {
 /// A figure exactly as the ledger wrote it, left a number the sheet can add — a leading minus and
 /// all. Only a figure this client can read as one ([Money.isReadable]) is written bare: anything
 /// else the server sent is text, and gets the text treatment.
-String _csvMoney(Money? money) {
+String csvMoney(Money? money) {
   if (money == null) return '';
-  return money.isReadable ? money.amount : _csvText(money.amount);
+  return money.isReadable ? money.amount : csvText(money.amount);
 }
 
 /// Quoted when it has to be, with quotes doubled — RFC 4180, which every spreadsheet reads.

@@ -28,6 +28,7 @@ import 'carrier/cash_reconciliation_screen.dart';
 import 'carrier/dashboard_screen.dart';
 import 'carrier/earnings_screen.dart';
 import 'carrier/jobs_screen.dart';
+import 'carrier/payroll_screen.dart';
 import 'carrier/rider_attendance_screen.dart';
 import 'carrier/rider_profile_screen.dart';
 import 'carrier/riders_directory_screen.dart';
@@ -532,6 +533,16 @@ class PortalArea {
         api: a.tracking,
         providerApi: a.provider,
         onboardingApi: a.onboarding,
+      ),
+    ),
+    // Last, after the shifts it pays for: rider payroll and its pay runs (Figma 112:1162), which
+    // the design files under this heading. A pay run is built from the hours attendance records,
+    // and nets off the cash each rider still holds for the company, from Reconciliation above.
+    PortalPage(
+      label: (DeliveryStrings t) => t.payrollNavLabel,
+      build: (PortalApis a, _, __, ___) => CarrierPayrollScreen(
+        api: a.accounting.carrierPayroll,
+        notificationApi: a.notification,
       ),
     ),
   ];

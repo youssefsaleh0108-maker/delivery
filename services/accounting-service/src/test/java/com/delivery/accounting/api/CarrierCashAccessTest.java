@@ -366,13 +366,21 @@ class CarrierCashAccessTest {
         }
 
         @Test
-        @DisplayName("refuses a body with no amount, an unknown method or a malformed key")
+        @DisplayName("refuses a body with no amount, an unknown method, a malformed key or a pay run's key")
         void badBodies() throws Exception {
             asCompanyStaff();
             for (String body : List.of(
                     "{}",
                     "{\"expectedAmount\":\"10.00\",\"method\":\"CHEQUE\"}",
-                    "{\"expectedAmount\":\"10.00\",\"requestKey\":\"a b\"}")) {
+                    // Only an approved pay run writes this. A counter claiming it would mark cash
+                    // taken against a rider's pay that nobody took.
+                    "{\"expectedAmount\":\"10.00\",\"method\":\"PAYROLL_DEDUCTION\"}",
+                    "{\"expectedAmount\":\"10.00\",\"requestKey\":\"a b\"}",
+                    // A pay run's key, worked out from the run and the rider. Recorded here first, it
+                    // would be replayed as that run's deduction and the rider would pay twice.
+                    "{\"expectedAmount\":\"10.00\","
+                            + "\"requestKey\":\"payroll-0123456789abcdef0123456789abcdef\"}",
+                    "{\"expectedAmount\":\"10.00\",\"requestKey\":\"PAYROLL-0123456789abcdef\"}")) {
                 mvc.perform(post("/api/accounting/carrier/cash/riders/" + RIDER + "/handovers")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))

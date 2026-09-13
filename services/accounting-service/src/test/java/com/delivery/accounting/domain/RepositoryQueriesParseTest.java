@@ -51,8 +51,50 @@ class RepositoryQueriesParseTest {
                 .addAnnotatedClass(CashFloatEntry.class)
                 .addAnnotatedClass(RiderLedgerEntry.class)
                 .addAnnotatedClass(AccountingTransaction.class)
+                .addAnnotatedClass(CarrierPayPolicy.class)
+                .addAnnotatedClass(CarrierPayRun.class)
+                .addAnnotatedClass(CarrierPayslip.class)
+                .addAnnotatedClass(CarrierPayLine.class)
+                .addAnnotatedClass(CarrierPayAdjustment.class)
+                .addAnnotatedClass(CarrierPayrollEvent.class)
+                .addAnnotatedClass(CarrierPayAttendance.class)
+                .addAnnotatedClass(CarrierPayDelivered.class)
                 .buildMetadata()
                 .buildSessionFactory();
+    }
+
+    /**
+     * Payroll's repositories are mostly derived queries — a method name Spring Data turns into a
+     * query when the context starts, and nothing earlier. A property spelt wrong in one of those
+     * names compiles, passes every mocked test and stops the service at deploy, so each name is
+     * parsed here against its entity the way Spring Data will parse it.
+     */
+    static Stream<Arguments> derivedQueries() {
+        List<Arguments> out = new ArrayList<>();
+        for (Class<?>[] pair : List.of(
+                new Class<?>[] {CarrierPayPolicyRepository.class, CarrierPayPolicy.class},
+                new Class<?>[] {CarrierPayRunRepository.class, CarrierPayRun.class},
+                new Class<?>[] {CarrierPayslipRepository.class, CarrierPayslip.class},
+                new Class<?>[] {CarrierPayLineRepository.class, CarrierPayLine.class},
+                new Class<?>[] {CarrierPayAdjustmentRepository.class, CarrierPayAdjustment.class},
+                new Class<?>[] {CarrierPayrollEventRepository.class, CarrierPayrollEvent.class},
+                new Class<?>[] {CarrierPayAttendanceRepository.class, CarrierPayAttendance.class},
+                new Class<?>[] {CarrierPayDeliveredRepository.class, CarrierPayDelivered.class})) {
+            for (Method method : pair[0].getDeclaredMethods()) {
+                if (method.getAnnotation(Query.class) == null && !method.isDefault()) {
+                    out.add(Arguments.of(pair[0].getSimpleName() + "." + method.getName(),
+                            method.getName(), pair[1]));
+                }
+            }
+        }
+        return out.stream();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("derivedQueries")
+    void derivedNamesResolve(String name, String methodName, Class<?> entity) {
+        // Throws PropertyReferenceException naming the property that does not exist.
+        new org.springframework.data.repository.query.parser.PartTree(methodName, entity);
     }
 
     @AfterAll
@@ -65,7 +107,8 @@ class RepositoryQueriesParseTest {
     static Stream<Arguments> queries() {
         List<Arguments> out = new ArrayList<>();
         for (Class<?> repository : List.of(CashFloatRepository.class,
-                RiderLedgerRepository.class)) {
+                RiderLedgerRepository.class, CarrierPayRunRepository.class,
+                CarrierPayAdjustmentRepository.class)) {
             for (Method method : repository.getDeclaredMethods()) {
                 Query query = method.getAnnotation(Query.class);
                 if (query != null && !query.nativeQuery()) {
@@ -116,6 +159,31 @@ class RepositoryQueriesParseTest {
                 "CashFloatRepository.withRidersByCarrier",
                 "CashFloatRepository.oldestHeldByRider",
                 "CashFloatRepository.totalBetween",
-                "RiderLedgerRepository.jobsForCarrierBetween");
+                "RiderLedgerRepository.jobsForCarrierBetween",
+                "RiderLedgerRepository.tipsForCarrierBetween",
+                "RiderLedgerRepository.countJobsForCarrierRecordedAfter",
+                "CarrierPayRunRepository.lockOwned",
+                "CarrierPayRunRepository.overlapping",
+                "CarrierPayRunRepository.endingOnOrAfter",
+                "CarrierPayAdjustmentRepository.lockAll");
+    }
+
+    /**
+     * Payroll reads tips for information only. The query must stay on TIP rows of the company's
+     * fleet: widened to every row it would put job earnings into the tips column, and a later change
+     * that added "tips" to pay would then pay the company's own jobs twice.
+     */
+    @Test
+    @DisplayName("payroll's tip read stays on the company's TIP rows")
+    void payrollTipsAreTipsOnly() throws Exception {
+        Query query = RiderLedgerRepository.class
+                .getMethod("tipsForCarrierBetween", String.class, java.time.Instant.class,
+                        java.time.Instant.class)
+                .getAnnotation(Query.class);
+
+        assertThat(query.value())
+                .contains("RiderLedgerEntry$EntryType.TIP")
+                .contains("RiderLedgerEntry$Fleet.CARRIER")
+                .contains("e.carrierRef = :carrier");
     }
 }

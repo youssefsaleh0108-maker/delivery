@@ -688,7 +688,8 @@ class _CarrierPaymentDialogState extends State<_CarrierPaymentDialog> {
               spacing: DeliverySpacing.sm,
               runSpacing: DeliverySpacing.xs,
               children: <Widget>[
-                for (final CashMethod m in CashMethod.values)
+                // Only what an operator may record; a pay run's deduction is never a payment.
+                for (final CashMethod m in CashMethod.recordable)
                   ChoiceChip(
                     label: Text(_methodLabel(t, m)),
                     selected: _method == m,
@@ -717,6 +718,7 @@ String _methodLabel(DeliveryStrings t, CashMethod method) => switch (method) {
       CashMethod.cash => t.carrCashMethodCash,
       CashMethod.bankDeposit => t.carrCashMethodBank,
       CashMethod.wallet => t.carrCashMethodWallet,
+      CashMethod.payrollDeduction => t.payrollCashMethodKeptFromPay,
     };
 
 class _Filters extends StatelessWidget {

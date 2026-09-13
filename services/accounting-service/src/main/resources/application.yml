@@ -138,7 +138,8 @@ delivery:
     # delivery log; a second sending path here would be a class of message nobody can answer
     # "did it arrive" about.
     notifications-manager: ${NOTIFICATIONS_MANAGER_URL:http://localhost:8104}
-    # Asked one question only: which delivery company is the caller staff of.
+    # Asked which delivery company the caller is staff of — and, for a pay run, how many orders each
+    # of its riders delivered in the period (see OrderManagerDeliveriesClient for that endpoint).
     #
     # A carrier's legs are attributed with Order Manager's provider id while their token carries a
     # Keycloak subject, and this service cannot bridge the two without the membership table that
@@ -146,6 +147,10 @@ delivery:
     # fleet, so it is asked for instead — with the caller's own token, so the answer is Order
     # Manager's to give and a provider id can never arrive from a request parameter.
     order-manager: ${ORDER_MANAGER_URL:http://localhost:8101}
+    # Asked one thing: a delivery company's attendance, for its pay run — with the carrier's own
+    # token, so order-tracking scopes the read to the caller's fleet itself. Down, slow or not
+    # deployed, a pay run computes without hours and says so; it never fails for it.
+    order-tracking: ${ORDER_TRACKING_URL:http://localhost:8102}
 
   accounting:
     statements:
@@ -172,6 +177,17 @@ delivery:
       # reconciliation page and to the Back Office's list alike, so both sides of a hand-over agree
       # on what "late" means.
       carrier-overdue-after-hours: 48
+
+    payroll:
+      # The calendar a delivery company's pay periods are in. It must be the zone order-tracking
+      # judges attendance in (delivery.tracking.duty-session.day-zone): an attendance answer in any
+      # other zone is refused, because its days would not be the days the deliveries were counted in.
+      zone: Asia/Beirut
+      # How long a pay run waits for attendance before computing without it.
+      attendance-timeout: 10s
+      # How long a pay run waits for Order Manager's count of delivered orders before counting the
+      # ledger's paid jobs instead, and saying so.
+      deliveries-timeout: 10s
 
     order-events-queue: accounting.order-events
     results-queue: accounting.posting-results

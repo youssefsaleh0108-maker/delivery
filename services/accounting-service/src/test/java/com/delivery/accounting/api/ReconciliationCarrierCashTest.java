@@ -154,6 +154,21 @@ class ReconciliationCarrierCashTest {
     }
 
     @Test
+    @DisplayName("refuses a pay run's request key: only payroll records under one")
+    void aPayrollKeyIsRefused() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+
+        for (String key : List.of("payroll-0123456789abcdef0123456789abcdef", "Payroll-12345678")) {
+            mvc.perform(post("/api/accounting/float/" + COMPANY + "/remit")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"expectedAmount\":\"485.00\",\"requestKey\":\"" + key
+                                    + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(cashFloat, never()).remit(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("a payment the database already holds is a 409 that says so, not a 500")
     void alreadyRecorded() throws Exception {
         signedInAs("op-1", "BACKOFFICE");

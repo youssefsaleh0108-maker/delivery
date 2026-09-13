@@ -101,9 +101,10 @@ public class ReconciliationController {
         // The shape the carrier's hand-over route accepts too. Refused here, before anything is
         // written: the column holds 64 characters, and a longer key used to fail only at commit — a
         // 500 for a payment that was simply not recorded.
-        if (key != null && !Callers.REQUEST_KEY.matcher(key).matches()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "requestKey must be 8 to 64 letters, digits, - or _"));
+        // A pay run's key is refused here too: see Callers#requestKeyProblem.
+        String keyProblem = Callers.requestKeyProblem(key);
+        if (keyProblem != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", keyProblem));
         }
 
         try {

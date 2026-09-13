@@ -38,11 +38,22 @@ enum RiderCashStanding {
 enum CashMethod {
   cash('CASH'),
   bankDeposit('BANK_DEPOSIT'),
-  wallet('WALLET');
+  wallet('WALLET'),
+
+  /// Kept from the rider's pay by the company's approved pay run. Shown, so a rider's history does not
+  /// pass it off as notes handed over at a counter — and never offered: only a pay run records it, and
+  /// the server refuses it from anyone else.
+  payrollDeduction('PAYROLL_DEDUCTION');
 
   const CashMethod(this.wire);
 
   final String wire;
+
+  /// The methods a person may pick when recording a hand-over or a payment.
+  static const List<CashMethod> recordable = <CashMethod>[cash, bankDeposit, wallet];
+
+  /// Whether a person may record it, rather than only read it.
+  bool get isRecordable => this != payrollDeduction;
 
   /// Null for a method this build does not know, rather than a guess.
   static CashMethod? fromWire(Object? value) {

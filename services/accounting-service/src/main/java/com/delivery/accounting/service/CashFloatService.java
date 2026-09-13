@@ -65,6 +65,25 @@ public class CashFloatService {
         this.currency = currency;
     }
 
+    /**
+     * The start of every request key a pay run records a deduction under — {@code payroll-} and a
+     * hash of the run and the rider ({@code CarrierPayrollService.payrollKey}) — and of no other key.
+     *
+     * <p>Reserved because a repeated key is answered with whatever it recorded first. The run's id
+     * and the rider are both on the company's own pages, so the key can be worked out; a counter
+     * hand-over sent under it that committed just before the run was approved would otherwise be
+     * replayed as the run's deduction, and the rider would lose the same notes twice — once at the
+     * counter and once from their pay. So no route a person calls accepts the prefix, this service
+     * refuses it on anything but a payroll deduction, and a replay must repeat the method too.
+     */
+    public static final String PAYROLL_KEY_PREFIX = "payroll-";
+
+    /** Whether a request key is one only payroll records under. Case aside: "PAYROLL-" is one. */
+    public static boolean isPayrollKey(String requestKey) {
+        return requestKey != null && requestKey.regionMatches(true, 0, PAYROLL_KEY_PREFIX, 0,
+                PAYROLL_KEY_PREFIX.length());
+    }
+
     /** What one holder is still carrying. */
     @Transactional(readOnly = true)
     public BigDecimal outstandingFor(String holderRef) {
@@ -109,8 +128,11 @@ public class CashFloatService {
     public Optional<Remittance> remit(String holderRef, String correlationId, BigDecimal expected,
                                       Recorded recorded) {
         Recorded who = recorded == null ? Recorded.nobody() : recorded;
+        if (isPayrollKey(who.requestKey())) {
+            throw new IllegalArgumentException("That request key is kept for pay runs");
+        }
 
-        Optional<Remittance> replay = replayRemittance(holderRef, who.requestKey());
+        Optional<Remittance> replay = replayRemittance(holderRef, who);
         if (replay.isPresent()) {
             return replay;
         }
@@ -119,7 +141,7 @@ public class CashFloatService {
 
         // Asked again now the rows are locked: a twin of this request holding the same key may have
         // committed while this one waited on its locks, and it recorded the payment already.
-        replay = replayRemittance(holderRef, who.requestKey());
+        replay = replayRemittance(holderRef, who);
         if (replay.isPresent()) {
             return replay;
         }
@@ -179,14 +201,41 @@ public class CashFloatService {
      * {@code requestKey} answers with the first hand-over, and a second press with no key finds the
      * rows already cleared and is refused rather than recorded.
      *
-     * @throws IllegalArgumentException  a missing party, or an amount that is not a positive sum
+     * @throws IllegalArgumentException  a missing party, an amount that is not a positive sum, or a
+     *                                   pay run's key without a pay run's method (or the reverse)
      * @throws AmountChangedException    the rider does not hold exactly {@code expected} for this
      *                                   company; nothing was recorded
-     * @throws RequestKeyReusedException the key already recorded something else
+     * @throws RequestKeyReusedException the key already recorded something else — another rider,
+     *                                   another company or another method
      */
     @Transactional
     public Handover handOver(String carrierRef, String riderRef, BigDecimal expected,
                              Recorded recorded) {
+        return handOver(carrierRef, riderRef, expected, recorded, null);
+    }
+
+    /**
+     * {@link #handOver(String, String, BigDecimal, Recorded)}, clearing only the cash the rider
+     * collected before {@code collectedBefore}: a pay run's deduction.
+     *
+     * <p><strong>Why a cut-off.</strong> A pay run nets the cash its period produced, and riders keep
+     * working after a period ends. Against everything a rider holds right now, the payslip's figure
+     * went stale with every cash delivery made while the approver was looking, and approval kept
+     * refusing through the working day. What a rider collected up to the period's end and still holds
+     * stops growing when the period closes: it can only fall, when the rider hands it over at the hub,
+     * and that is a real change the approver has to see. Cash collected later is not on the payslip,
+     * so it stays in the rider's bag, for the hub or the next run.
+     *
+     * <p><strong>Otherwise the same door.</strong> Every row the rider holds for the company is locked,
+     * in the same order as a counter hand-over locks them, so the two wait on each other exactly as
+     * two counters do; {@code expected} is checked against what is cleared; a repeated key replays.
+     * Whole rows only, by when each was written, so no collection is ever split.
+     *
+     * @param collectedBefore exclusive; null clears everything the rider holds for the company
+     */
+    @Transactional
+    public Handover handOver(String carrierRef, String riderRef, BigDecimal expected,
+                             Recorded recorded, Instant collectedBefore) {
         if (carrierRef == null || carrierRef.isBlank() || riderRef == null || riderRef.isBlank()) {
             throw new IllegalArgumentException("A hand-over needs a company and a rider");
         }
@@ -198,20 +247,30 @@ public class CashFloatService {
                     "The amount handed over must be more than nothing, to the cent");
         }
         Recorded who = recorded == null ? Recorded.nobody() : recorded;
+        // A pay run's key and a pay run's method go together or not at all: see PAYROLL_KEY_PREFIX.
+        boolean payroll = who.method() == CashFloatEntry.Method.PAYROLL_DEDUCTION;
+        if (payroll != isPayrollKey(who.requestKey())) {
+            throw new IllegalArgumentException(payroll
+                    ? "A payroll deduction is recorded under its pay run's key"
+                    : "That request key is kept for pay runs");
+        }
 
-        Optional<Handover> replay = replayHandover(carrierRef, riderRef, who.requestKey());
+        Optional<Handover> replay = replayHandover(carrierRef, riderRef, who);
         if (replay.isPresent()) {
             return replay.get();
         }
 
-        List<CashFloatEntry> held = floatEntries.lockHeldForCarrier(riderRef, carrierRef);
+        List<CashFloatEntry> locked = floatEntries.lockHeldForCarrier(riderRef, carrierRef);
 
         // See remit(): the twin of this request may have committed while this one waited.
-        replay = replayHandover(carrierRef, riderRef, who.requestKey());
+        replay = replayHandover(carrierRef, riderRef, who);
         if (replay.isPresent()) {
             return replay.get();
         }
 
+        List<CashFloatEntry> held = collectedBefore == null
+                ? locked
+                : locked.stream().filter(row -> writtenBefore(row, collectedBefore)).toList();
         BigDecimal total = sum(held);
         if (held.isEmpty() || total.compareTo(money(expected)) != 0) {
             throw new AmountChangedException(total);
@@ -292,13 +351,15 @@ public class CashFloatService {
         }
     }
 
-    private Optional<Remittance> replayRemittance(String holderRef, String requestKey) {
-        if (requestKey == null) {
+    private Optional<Remittance> replayRemittance(String holderRef, Recorded who) {
+        if (who.requestKey() == null) {
             return Optional.empty();
         }
-        return floatEntries.findByRequestKey(requestKey).map(previous -> {
+        return floatEntries.findByRequestKey(who.requestKey()).map(previous -> {
+            // A double press repeats everything it sent; a different method is a different request.
             if (previous.getEntryKind() != CashFloatEntry.Kind.REMITTED
-                    || !holderRef.equals(previous.getHolderRef())) {
+                    || !holderRef.equals(previous.getHolderRef())
+                    || previous.getMethod() != who.method()) {
                 throw new RequestKeyReusedException();
             }
             return new Remittance(previous.getId(), holderRef, previous.getAmount(),
@@ -306,15 +367,17 @@ public class CashFloatService {
         });
     }
 
-    private Optional<Handover> replayHandover(String carrierRef, String riderRef,
-                                              String requestKey) {
-        if (requestKey == null) {
+    private Optional<Handover> replayHandover(String carrierRef, String riderRef, Recorded who) {
+        if (who.requestKey() == null) {
             return Optional.empty();
         }
-        return floatEntries.findByRequestKey(requestKey).map(previous -> {
+        return floatEntries.findByRequestKey(who.requestKey()).map(previous -> {
+            // The method as well as the parties: a counter hand-over is never a pay run's deduction,
+            // whatever key it was sent under (see PAYROLL_KEY_PREFIX).
             if (previous.getEntryKind() != CashFloatEntry.Kind.TRANSFERRED
                     || !riderRef.equals(previous.getHolderRef())
-                    || !carrierRef.equals(previous.getCarrierRef())) {
+                    || !carrierRef.equals(previous.getCarrierRef())
+                    || previous.getMethod() != who.method()) {
                 throw new RequestKeyReusedException();
             }
             return new Handover(previous.getId(), riderRef, carrierRef, previous.getAmount(),
@@ -331,6 +394,14 @@ public class CashFloatService {
             }
         }
         return 0;
+    }
+
+    /**
+     * Whether a row was written before the cut-off. A row with no time yet has not been read back
+     * from the database — it was written in this transaction, so now — and is never before one.
+     */
+    static boolean writtenBefore(CashFloatEntry row, Instant cutOff) {
+        return row.getCreatedAt() != null && row.getCreatedAt().isBefore(cutOff);
     }
 
     private static BigDecimal sum(List<CashFloatEntry> rows) {
