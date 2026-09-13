@@ -70,6 +70,30 @@ class OrderApi {
     }
   }
 
+  /// Whether a [place] that threw may nonetheless have placed the order.
+  ///
+  /// **True for every failure with no answer but one.** Dio raises a connect timeout before a byte
+  /// of the request has left, so that one proves nothing was placed. Everything else without a
+  /// response can follow a request the server received: a receive timeout plainly does, and a
+  /// "connection error" is what Dio calls both a refused socket and a connection that closed
+  /// while the answer was awaited — which the phone cannot tell apart.
+  ///
+  /// **True for a server or gateway error (5xx).** A gateway gives up on a placement that goes on
+  /// to commit (504), and a proxy answers for an upstream it lost mid-request (502).
+  ///
+  /// **False for any other answer.** The platform refused the request, and the refusal left nothing
+  /// behind.
+  ///
+  /// What follows from true, for every checkout built on [place] (live, queued, gift, multi-shop):
+  /// the attempt keeps its key; trying again resends the SAME [OrderSubmission], which the server
+  /// answers with the order if there is one; and nothing tells the customer the order "did not go
+  /// through".
+  static bool mayHavePlaced(DioException e) {
+    final int? status = e.response?.statusCode;
+    if (status != null) return status >= 500;
+    return e.type != DioExceptionType.connectionTimeout;
+  }
+
   Future<Paged<DeliveryOrder>> mine({int page = 0, int size = 20}) =>
       _page('/api/orders/mine', page, size);
 

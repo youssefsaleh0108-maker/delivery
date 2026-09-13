@@ -54,8 +54,15 @@ class OutboxSection extends StatelessWidget {
 /// * waited too long — whether they still want it;
 /// * refused — the server's reason, retry and discard.
 ///
-/// The reference is the queued attempt's own, taken from its idempotency key — the order has no
-/// server number until it exists.
+/// **Named by its shop and when it was queued, not by a number.** The frame's "#4521" is an order
+/// number, and a queued checkout has none until the platform places it; a number made up here
+/// would be one the placed order never shows. So the title is the shop, and the line under it
+/// says when it was queued and for how much.
+///
+/// **A checkout that may already have been placed** ([PendingOrder.maybePlaced]) is never called
+/// unsent. Waiting, it says the outcome is still being checked; gone stale, it offers "Send again",
+/// which the server answers with the order if it exists; and its Discard warns that only the
+/// phone's copy goes.
 class OutboxCard extends StatelessWidget {
   const OutboxCard({super.key, required this.pending, required this.outbox});
 
@@ -63,6 +70,18 @@ class OutboxCard extends StatelessWidget {
   final OrderOutbox outbox;
 
   static String _money(double amount) => '\$${amount.toStringAsFixed(2)}';
+
+  /// When it was queued: the time alone on the day it was queued, and the date as well after that —
+  /// a checkout can wait on the phone for days, and "18:05" would then point at the wrong one.
+  static String queuedAt(BuildContext context, DateTime at, {DateTime? now}) {
+    final MaterialLocalizations dates = MaterialLocalizations.of(context);
+    final DateTime local = at.toLocal();
+    final DateTime today = (now ?? DateTime.now()).toLocal();
+    final String time = dates.formatTimeOfDay(TimeOfDay.fromDateTime(local));
+    final bool sameDay =
+        local.year == today.year && local.month == today.month && local.day == today.day;
+    return sameDay ? time : '${dates.formatShortDate(local)} $time';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +116,10 @@ class OutboxCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  t.offlineQueuedTitle(pending.reference),
+                  t.offlineQueuedTitle(
+                      pending.storeName.isEmpty ? t.tabShop : pending.storeName),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -107,8 +129,8 @@ class OutboxCard extends StatelessWidget {
                 ),
                 const SizedBox(height: DeliverySpacing.xs),
                 Text(
-                  t.offlineQueuedStoreAmount(
-                    pending.storeName.isEmpty ? t.tabShop : pending.storeName,
+                  t.offlineQueuedWhenAmount(
+                    queuedAt(context, pending.createdAt),
                     _money(pending.expectedTotal),
                   ),
                   maxLines: 1,
@@ -144,20 +166,29 @@ class OutboxCard extends StatelessWidget {
 
     switch (pending.status) {
       case PendingOrderStatus.queued:
-        return <Widget>[Text(t.offlineWillSend, style: line(accent.onTint))];
+        // No button beside the promise: the outbox re-sends by itself with the same key, which is
+        // also how an unconfirmed one is checked.
+        return <Widget>[
+          Text(pending.maybePlaced ? t.offlineMaybePlaced : t.offlineWillSend,
+              style: line(accent.onTint)),
+        ];
       case PendingOrderStatus.sending:
         return <Widget>[Text(t.offlineSending, style: line(accent.onTint))];
       case PendingOrderStatus.needsReview:
         final bool priced = pending.review == PendingReview.priceChanged && pending.newTotal != null;
         return <Widget>[
           Text(
-            priced ? t.offlinePriceChanged(_money(pending.newTotal!)) : t.offlineStale,
+            priced
+                ? t.offlinePriceChanged(_money(pending.newTotal!))
+                : (pending.maybePlaced ? t.offlineStaleMaybePlaced : t.offlineStale),
             style: line(DeliveryColors.ink),
           ),
           const SizedBox(height: DeliverySpacing.sm),
           _actions(
             context,
-            primary: priced ? t.offlineSendAt(_money(pending.newTotal!)) : t.offlineSendNow,
+            primary: priced
+                ? t.offlineSendAt(_money(pending.newTotal!))
+                : (pending.maybePlaced ? t.offlineSendAgain : t.offlineSendNow),
             onPrimary: () => outbox.confirm(pending.key),
           ),
         ];
@@ -197,7 +228,11 @@ class OutboxCard extends StatelessWidget {
   }
 }
 
-/// Asks before dropping a queued checkout. It is the only copy of that order anywhere.
+/// Asks before dropping a queued checkout from the phone.
+///
+/// Two different questions, depending on what is known. Not sent: this is the only copy of that
+/// order anywhere, and discarding means it is never placed. Maybe placed: the order may already
+/// exist, discarding cancels nothing, and the customer is pointed at Orders to find out.
 Future<void> confirmDiscard(BuildContext context, OrderOutbox outbox, PendingOrder pending) async {
   final DeliveryStrings t = DeliveryStrings.of(context);
   final bool? discard = await showDialog<bool>(
@@ -208,7 +243,7 @@ Future<void> confirmDiscard(BuildContext context, OrderOutbox outbox, PendingOrd
       title: Text(t.offlineDiscardTitle,
           style: const TextStyle(
               fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
-      content: Text(t.offlineDiscardBody,
+      content: Text(pending.maybePlaced ? t.offlineDiscardMaybePlacedBody : t.offlineDiscardBody,
           style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4)),
       actions: <Widget>[
         TextButton(

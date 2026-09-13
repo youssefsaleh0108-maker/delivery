@@ -337,6 +337,129 @@ void main() {
     });
   });
 
+  group('never called unsent when it may not be', () {
+    /// The request left and no answer came back: the order may or may not exist.
+    void unanswered(RequestOptions o, RequestInterceptorHandler h) =>
+        h.reject(DioException(requestOptions: o, type: DioExceptionType.receiveTimeout));
+
+    OrderOutbox outboxOver(_Server server, {_MemoryStore? store, bool online = true}) {
+      final OrderOutbox outbox = OrderOutbox(
+        api: server.api,
+        store: store ?? _MemoryStore(),
+        ownerId: owner,
+        connectivity: ValueNotifier<bool>(online),
+        retryDelay: const Duration(milliseconds: 10),
+      );
+      addTearDown(outbox.dispose);
+      return outbox;
+    }
+
+    test('a send whose answer never came is marked as maybe placed, and stays marked across a '
+        'restart', () async {
+      final _MemoryStore store = _MemoryStore();
+      final _Server server = _Server()..replies.add(unanswered);
+      final OrderOutbox firstRun = OrderOutbox(
+        api: server.api,
+        store: store,
+        ownerId: owner,
+        connectivity: ValueNotifier<bool>(true),
+        // Not retried during the test: what is on the phone after the silence is the point.
+        retryDelay: const Duration(hours: 1),
+      );
+      final PendingOrder queued = pending();
+
+      await firstRun.enqueue(queued);
+      await settle();
+
+      expect(firstRun.items.single.status, PendingOrderStatus.queued);
+      expect(firstRun.items.single.maybePlaced, isTrue);
+      firstRun.dispose();
+
+      final OrderOutbox secondRun = outboxOver(_Server(), store: store, online: false);
+      await secondRun.load();
+
+      expect(secondRun.items.single.key, queued.key);
+      expect(secondRun.items.single.maybePlaced, isTrue);
+    });
+
+    test('so is a checkout the app stopped in the middle of sending', () async {
+      final _MemoryStore store = _MemoryStore();
+      final PendingOrder inFlight = pending();
+      store.values[storageKey] = jsonEncode(<String, dynamic>{
+        'items': <Object>[
+          <String, dynamic>{...inFlight.toJson(), 'status': 'sending'},
+        ],
+      });
+      final OrderOutbox outbox = outboxOver(_Server(), store: store, online: false);
+
+      await outbox.load();
+
+      expect(outbox.items.single.status, PendingOrderStatus.queued);
+      expect(outbox.items.single.maybePlaced, isTrue);
+    });
+
+    test('a connection that was never made proves nothing left, and marks nothing', () async {
+      final _Server server = _Server()
+        ..replies.add((RequestOptions o, RequestInterceptorHandler h) =>
+            h.reject(DioException(requestOptions: o, type: DioExceptionType.connectionTimeout)));
+      final OrderOutbox outbox = outboxOver(server);
+
+      await outbox.enqueue(pending());
+      await settle();
+
+      expect(server.placements, hasLength(1));
+      expect(outbox.items.single.maybePlaced, isFalse);
+    });
+
+    test('a changed price clears the mark: Order Manager prices only what no key has placed',
+        () async {
+      final _Server server = _Server()
+        ..replies.add(unanswered)
+        ..replies.add(_Server.refused(409, <String, dynamic>{
+          'code': 'PRICE_CHANGED',
+          'total': 13.90,
+          'expectedTotal': 12.40,
+        }));
+      final OrderOutbox outbox = outboxOver(server);
+
+      await outbox.enqueue(pending());
+      await settle();
+      expect(outbox.items.single.maybePlaced, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await settle();
+
+      expect(server.placements, hasLength(2));
+      expect(outbox.items.single.review, PendingReview.priceChanged);
+      expect(outbox.items.single.maybePlaced, isFalse);
+    });
+
+    test('a business-rule refusal clears it too; a refusal from before the key is read does not',
+        () async {
+      Future<PendingOrder> refusedAfterSilence(int status) async {
+        final _Server server = _Server()
+          ..replies.add(unanswered)
+          ..replies.add(_Server.refused(status, <String, dynamic>{'detail': 'refused'}));
+        final OrderOutbox outbox = outboxOver(server);
+        await outbox.enqueue(pending());
+        await settle();
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        await settle();
+        return outbox.items.single;
+      }
+
+      final PendingOrder ruleRefusal = await refusedAfterSilence(422);
+      expect(ruleRefusal.status, PendingOrderStatus.failed);
+      expect(ruleRefusal.maybePlaced, isFalse);
+
+      // A malformed request is turned away before Order Manager looks the key up, so the earlier
+      // silent send may still have placed it.
+      final PendingOrder malformed = await refusedAfterSilence(400);
+      expect(malformed.status, PendingOrderStatus.failed);
+      expect(malformed.maybePlaced, isTrue);
+    });
+  });
+
   group('what may be queued, and by whom', () {
     test('only cash: a card hold cannot be decided offline, and its token is never written down',
         () async {

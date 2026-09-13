@@ -7317,13 +7317,8 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get offlineOutboxTitle => 'Waiting to send';
 
   @override
-  String offlineQueuedTitle(String ref) {
-    return 'Order $ref — Queued';
-  }
-
-  @override
-  String offlineQueuedStoreAmount(String store, String amount) {
-    return '$store • $amount';
+  String offlineQueuedTitle(String store) {
+    return '$store — Queued';
   }
 
   @override
@@ -7361,7 +7356,8 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get offlineDiscardTitle => 'Discard this order?';
 
   @override
-  String get offlineDiscardBody => 'It hasn\'t been sent, and it won\'t be.';
+  String get offlineDiscardBody =>
+      'It hasn\'t been placed, and it won\'t be sent.';
 
   @override
   String get offlineQueueTitle => 'Couldn\'t reach YouDrop';
@@ -7390,11 +7386,54 @@ class DeliveryStringsEn extends DeliveryStrings {
       'Your earlier try already went through, so that\'s the order we placed.';
 
   @override
-  String offlineSent(String ref) {
-    return 'Your queued order $ref was placed.';
+  String offlineSent(String store) {
+    return 'Your queued order from $store was placed.';
   }
 
   @override
   String get offlineQueueUnavailable =>
-      'This order can\'t wait for the connection. Try again when you\'re back online.';
+      'Orders split with friends can\'t wait for the connection: each friend\'s share is linked to the order the moment it\'s placed. Try again when you\'re back online.';
+
+  @override
+  String offlineQueuedWhenAmount(String when, String amount) {
+    return 'Queued $when • $amount';
+  }
+
+  @override
+  String get offlineMaybePlaced =>
+      'We couldn\'t confirm this went through. We\'ll check again automatically — it won\'t be placed twice.';
+
+  @override
+  String get offlineStaleMaybePlaced =>
+      'We couldn\'t confirm this went through, and it has been waiting a while. Send it again to find out: if it already went through, you\'ll get that order, not a second one.';
+
+  @override
+  String get offlineSendAgain => 'Send again';
+
+  @override
+  String get offlineDiscardMaybePlacedBody =>
+      'It may already have been placed — we couldn\'t confirm it. Discarding only removes it from this phone, so check Orders to see whether it went through.';
+
+  @override
+  String get offlineUnconfirmedTitle => 'We couldn\'t confirm your order';
+
+  @override
+  String get offlineUnconfirmedLead =>
+      'It may have gone through before the connection dropped — check Orders once you\'re back online.';
+
+  @override
+  String get offlineQueueResendBody =>
+      'We can keep it on this phone and send it again when you\'re back online. If it already went through, you\'ll get that order, not a second one — and if the price changes, we\'ll ask you first.';
+
+  @override
+  String get offlineUnconfirmedRetry =>
+      'We couldn\'t confirm your order — it may have gone through. Trying again is safe: it won\'t be placed twice.';
+
+  @override
+  String get offlineQueueStandardOnly =>
+      'Express orders can\'t wait for the connection: the express price is only set when the order is placed. Choose Standard, or try again when you\'re back online.';
+
+  @override
+  String get offlineQueueTotalUnknown =>
+      'We couldn\'t confirm this order\'s total for this address, so it can\'t wait for the connection. Try again when you\'re back online.';
 }

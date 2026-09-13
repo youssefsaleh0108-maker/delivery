@@ -191,4 +191,45 @@ void main() {
       await expectLater(s.api.place(aCheckout()), throwsA(isA<DioException>()));
     });
   });
+
+  group('whether a placement that threw may have placed the order anyway', () {
+    DioException failure(DioExceptionType type, {int? status}) {
+      final RequestOptions request = RequestOptions(path: '/api/orders');
+      return DioException(
+        requestOptions: request,
+        type: type,
+        response:
+            status == null ? null : Response<dynamic>(requestOptions: request, statusCode: status),
+      );
+    }
+
+    test('it may, whenever the request can have arrived and the answer did not come back', () {
+      // A receive timeout follows a request that left; Dio's "connection error" covers a
+      // connection closed while the answer was awaited; the rest cannot rule arrival out.
+      for (final DioExceptionType type in <DioExceptionType>[
+        DioExceptionType.receiveTimeout,
+        DioExceptionType.connectionError,
+        DioExceptionType.sendTimeout,
+        DioExceptionType.unknown,
+        DioExceptionType.cancel,
+      ]) {
+        expect(OrderApi.mayHavePlaced(failure(type)), isTrue, reason: type.name);
+      }
+      // A gateway that gave up, or a server that failed, may have done so after the commit.
+      for (final int status in <int>[500, 502, 503, 504]) {
+        expect(OrderApi.mayHavePlaced(failure(DioExceptionType.badResponse, status: status)),
+            isTrue,
+            reason: '$status');
+      }
+    });
+
+    test('it may not, when no connection was ever made or the platform refused the request', () {
+      expect(OrderApi.mayHavePlaced(failure(DioExceptionType.connectionTimeout)), isFalse);
+      for (final int status in <int>[400, 401, 402, 403, 409, 422, 429]) {
+        expect(OrderApi.mayHavePlaced(failure(DioExceptionType.badResponse, status: status)),
+            isFalse,
+            reason: '$status');
+      }
+    });
+  });
 }

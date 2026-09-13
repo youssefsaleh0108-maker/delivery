@@ -199,7 +199,10 @@ void main() {
   });
 
   group('queued checkouts on the Orders tab', () {
-    PendingOrder queuedCheckout(String key) => PendingOrder(
+    /// Named by its shop, which is how its card is named — so each card in a test gets its own.
+    PendingOrder queuedCheckout(String key, String shop,
+            {DateTime? queuedAt, bool maybePlaced = false}) =>
+        PendingOrder(
           submission: OrderSubmission(
             idempotencyKey: key,
             items: <OrderLineSubmission>[(productId: 'p1', qty: 1, optionIds: const <String>[])],
@@ -207,8 +210,9 @@ void main() {
           ),
           expectedTotal: 12.40,
           storeId: 's1',
-          storeName: 'Dekkane Abou Selim',
-          createdAt: DateTime.now(),
+          storeName: shop,
+          createdAt: queuedAt ?? DateTime.now(),
+          maybePlaced: maybePlaced,
         );
 
     void refuse(RequestOptions o, RequestInterceptorHandler h, int code,
@@ -245,10 +249,14 @@ void main() {
       final OrderOutbox outbox = OrderOutbox(
           api: OrderApi(dio), store: _MemoryStore(), ownerId: 'user-1', connectivity: online);
       addTearDown(outbox.dispose);
-      final PendingOrder repriced = queuedCheckout('aaaaaaaa-0000-4000-8000-000000000001');
-      final PendingOrder refused = queuedCheckout('bbbbbbbb-0000-4000-8000-000000000002');
-      final PendingOrder onTheWire = queuedCheckout('cccccccc-0000-4000-8000-000000000003');
-      final PendingOrder waiting = queuedCheckout('dddddddd-0000-4000-8000-000000000004');
+      final PendingOrder repriced =
+          queuedCheckout('aaaaaaaa-0000-4000-8000-000000000001', 'Dekkane Abou Selim');
+      final PendingOrder refused =
+          queuedCheckout('bbbbbbbb-0000-4000-8000-000000000002', 'Furn Al Hara');
+      final PendingOrder onTheWire =
+          queuedCheckout('cccccccc-0000-4000-8000-000000000003', 'Kaak Beirut');
+      final PendingOrder waiting =
+          queuedCheckout('dddddddd-0000-4000-8000-000000000004', 'Abou Joseph Grocery');
       for (final PendingOrder p in <PendingOrder>[repriced, refused, onTheWire, waiting]) {
         await outbox.enqueue(p);
       }
@@ -269,7 +277,7 @@ void main() {
       }
 
       Finder card(PendingOrder p) => find.ancestor(
-          of: find.text(en.offlineQueuedTitle(p.reference)), matching: find.byType(OutboxCard));
+          of: find.text(en.offlineQueuedTitle(p.storeName)), matching: find.byType(OutboxCard));
       Finder inCard(PendingOrder p, Finder f) => find.descendant(of: card(p), matching: f);
 
       expect(find.text(en.offlineOutboxTitle), findsOneWidget);
@@ -291,11 +299,17 @@ void main() {
       expect(inCard(onTheWire, find.byType(IconButton)), findsNothing);
       expect(inCard(onTheWire, find.text(en.offlineDiscard)), findsNothing);
 
-      // Waiting: the frame's own card — shop, amount, and the promise.
+      // Waiting: the frame's own card — named by its shop, then when it was queued and for how
+      // much, then the promise. No "#1234" anywhere: a queued checkout has no order number yet,
+      // and one made up here would be a number the placed order never shows.
+      final MaterialLocalizations dates = MaterialLocalizations.of(tester.element(card(waiting)));
+      final String queuedAt =
+          dates.formatTimeOfDay(TimeOfDay.fromDateTime(waiting.createdAt.toLocal()));
       expect(inCard(waiting, find.text(en.offlineWillSend)), findsOneWidget);
-      expect(
-          inCard(waiting, find.text(en.offlineQueuedStoreAmount('Dekkane Abou Selim', '\$12.40'))),
+      expect(inCard(waiting, find.text(en.offlineQueuedWhenAmount(queuedAt, '\$12.40'))),
           findsOneWidget);
+      expect(find.descendant(of: find.byType(OutboxCard), matching: find.textContaining('#')),
+          findsNothing);
 
       // Discarding asks first, then removes it from the phone.
       await tester.tap(inCard(refused, find.text(en.offlineDiscard)));
@@ -310,6 +324,91 @@ void main() {
       expect(card(refused), findsNothing);
       expect(outbox.items.map((PendingOrder p) => p.key),
           <String>[repriced.key, onTheWire.key, waiting.key]);
+    });
+
+    testWidgets('one that may already have been placed is never called unsent: it says the outcome '
+        'is being checked, its Discard warns that only the phone\'s copy goes, and once stale it '
+        'offers to send again under the same key', (WidgetTester tester) async {
+      tallView(tester);
+      final List<RequestOptions> sends = <RequestOptions>[];
+      final Dio dio = serve(
+        const <String, Object>{},
+        onPlace: (RequestOptions o, RequestInterceptorHandler h) {
+          sends.add(o);
+          // It had gone through: the key is answered with the order it placed back then.
+          h.resolve(Response<dynamic>(requestOptions: o, statusCode: 200, data: <String, dynamic>{
+            'id': 'order-earlier',
+            'customerId': 'user-1',
+            'merchantId': 'm1',
+            'riderId': null,
+            'status': 'PLACED',
+            'totalAmount': 12.40,
+            'deliveryAddress': '12 Rose Street',
+            'paymentMethod': 'CASH',
+            'paymentStatus': 'DUE',
+            'items': <dynamic>[],
+            'availableActions': <dynamic>[],
+          }));
+        },
+      );
+      final ValueNotifier<bool> online = ValueNotifier<bool>(false);
+      final OrderOutbox outbox = OrderOutbox(
+          api: OrderApi(dio), store: _MemoryStore(), ownerId: 'user-1', connectivity: online);
+      addTearDown(outbox.dispose);
+      // Queued yesterday, after a try whose answer never came back.
+      final DateTime yesterday = DateTime.now().subtract(const Duration(days: 1));
+      final PendingOrder unconfirmed = queuedCheckout(
+          'eeeeeeee-0000-4000-8000-000000000005', 'Furn Al Hara',
+          queuedAt: yesterday, maybePlaced: true);
+      await outbox.enqueue(unconfirmed);
+
+      await tester.pumpWidget(app(Scaffold(
+        body: MyOrdersScreen(
+          api: OrderApi(dio),
+          storeApi: StoreApi(dio),
+          cart: Cart(),
+          onOpenBasket: () {},
+          outbox: outbox,
+        ),
+      )));
+      await tester.pumpAndSettle();
+
+      Finder inCard(Finder f) => find.descendant(of: find.byType(OutboxCard), matching: f);
+
+      // Waiting: never "will send", which would say it has not been sent.
+      expect(inCard(find.text(en.offlineQueuedTitle('Furn Al Hara'))), findsOneWidget);
+      expect(inCard(find.text(en.offlineMaybePlaced)), findsOneWidget);
+      expect(inCard(find.text(en.offlineWillSend)), findsNothing);
+      // Queued on another day, so the day is part of "when".
+      final MaterialLocalizations dates =
+          MaterialLocalizations.of(tester.element(find.byType(OutboxCard)));
+      final DateTime local = yesterday.toLocal();
+      final String when =
+          '${dates.formatShortDate(local)} ${dates.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+      expect(inCard(find.text(en.offlineQueuedWhenAmount(when, '\$12.40'))), findsOneWidget);
+
+      // Its Discard does not promise that nothing was sent.
+      await tester.tap(inCard(find.byType(IconButton)));
+      await tester.pumpAndSettle();
+      expect(find.text(en.offlineDiscardMaybePlacedBody), findsOneWidget);
+      expect(find.text(en.offlineDiscardBody), findsNothing);
+      await tester.tap(find.text(en.keepIt));
+      await tester.pumpAndSettle();
+      expect(outbox.items.single.key, unconfirmed.key);
+
+      // Back online, it has waited too long to go by itself: it asks, and says what sending does.
+      online.value = true;
+      await tester.pumpAndSettle();
+      expect(sends, isEmpty);
+      expect(inCard(find.text(en.offlineStaleMaybePlaced)), findsOneWidget);
+      expect(inCard(find.text(en.offlineStale)), findsNothing);
+
+      await tester.tap(inCard(find.text(en.offlineSendAgain)));
+      await tester.pumpAndSettle();
+
+      // The same key, answered with the order it had already placed — not a second order.
+      expect(sends.single.headers[OrderApi.idempotencyKeyHeader], unconfirmed.key);
+      expect(outbox.items, isEmpty);
     });
   });
 

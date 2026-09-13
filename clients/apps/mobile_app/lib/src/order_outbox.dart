@@ -38,6 +38,9 @@ enum PendingReview {
 /// Wraps the exact [OrderSubmission] the checkout built — its idempotency key included — so every
 /// send, after any number of reconnects and app restarts, is the same attempt the server
 /// recognises. See [OrderOutbox] for the rules that keep it from being placed twice or lost.
+///
+/// It has no order number, because there is no order until the platform places it. It is named by
+/// its shop and the time it was queued — never by a number the placed order would not carry.
 @immutable
 class PendingOrder {
   const PendingOrder({
@@ -52,6 +55,7 @@ class PendingOrder {
     this.review,
     this.newTotal,
     this.error,
+    this.maybePlaced = false,
   });
 
   final OrderSubmission submission;
@@ -59,6 +63,10 @@ class PendingOrder {
   /// The total the customer agreed to — what the checkout button said when they queued it, or the
   /// new total they confirmed after a price change. Sent as `expectedTotal`, so the server refuses
   /// to place at any other.
+  ///
+  /// Only ever a total the app can show is the server's own: checkout refuses to queue what it
+  /// cannot price exactly as Order Manager will (an Express tier, an area whose fee it never
+  /// learned), so a PRICE_CHANGED here means something really changed.
   final double expectedTotal;
 
   final String? storeId;
@@ -69,6 +77,7 @@ class PendingOrder {
   /// The USD half of a cash split, recorded in the transfer ledger once the order exists.
   final double? splitUsd;
 
+  /// When it was queued. The card shows it; staleness is measured from it until [confirmedAt].
   final DateTime createdAt;
 
   /// When the customer last said "yes, send it" — at a new price, or after it went stale. Staleness
@@ -85,13 +94,21 @@ class PendingOrder {
   /// caller shows its generic fallback.
   final String? error;
 
-  String get key => submission.idempotencyKey;
-
-  /// The short handle the card shows.
+  /// True when a send of this checkout may have reached the platform with its answer lost — so the
+  /// order may already exist ([OrderApi.mayHavePlaced]). Set when checkout's own try went
+  /// unanswered before the customer queued it, when a send from here timed out, was cut off or
+  /// hit a server error, and when the app stopped mid-send.
   ///
-  /// A queued order has no server id — it does not exist yet — so this is taken from its own
-  /// idempotency key rather than dressed up as an order number the platform never issued.
-  String get reference => '#${key.replaceAll('-', '').substring(0, 4).toUpperCase()}';
+  /// Sending does not change: every send carries the one key, and a copy that already placed is
+  /// answered with that order. What changes is what the customer may be told. Never "it hasn't
+  /// been sent"; and discarding it removes only the phone's copy of what may be a real order on the
+  /// Orders list, which the confirmation says.
+  ///
+  /// Cleared only by an answer proving nothing exists under the key: PRICE_CHANGED, or a
+  /// business-rule refusal (422). Order Manager looks the key up before it decides either.
+  final bool maybePlaced;
+
+  String get key => submission.idempotencyKey;
 
   PendingOrder _with({
     PendingOrderStatus? status,
@@ -100,6 +117,7 @@ class PendingOrder {
     PendingReview? review,
     double? newTotal,
     String? error,
+    bool? maybePlaced,
     bool clearReview = false,
     bool clearError = false,
   }) =>
@@ -115,6 +133,7 @@ class PendingOrder {
         review: clearReview ? null : (review ?? this.review),
         newTotal: clearReview ? null : (newTotal ?? this.newTotal),
         error: clearError ? null : (error ?? this.error),
+        maybePlaced: maybePlaced ?? this.maybePlaced,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -129,6 +148,7 @@ class PendingOrder {
         'review': review?.name,
         'newTotal': newTotal,
         'error': error,
+        'maybePlaced': maybePlaced,
       };
 
   factory PendingOrder.fromJson(Map<String, dynamic> json) => PendingOrder(
@@ -149,6 +169,7 @@ class PendingOrder {
             .firstOrNull,
         newTotal: (json['newTotal'] as num?)?.toDouble(),
         error: json['error'] as String?,
+        maybePlaced: json['maybePlaced'] as bool? ?? false,
       );
 }
 
@@ -191,6 +212,11 @@ class OutboxWriteException implements Exception {
 /// connection dropped, the answer never came) leaves it queued, not failed. An item found
 /// mid-send after a restart goes back to queued — and its resend is safe for the same reason.
 ///
+/// **Never called unsent when it may not be.** A send that may have reached the platform with its
+/// answer lost marks the item [PendingOrder.maybePlaced], and from then on nothing says it was
+/// never sent: the card says the outcome is being checked, and discarding it is confirmed as
+/// removing only the phone's copy.
+///
 /// **Never at a price nobody saw.** Every send carries [PendingOrder.expectedTotal]. A different
 /// server total comes back as PRICE_CHANGED, nothing is placed, and the item waits in
 /// [PendingOrderStatus.needsReview] until the customer confirms the new total ([confirm]). The
@@ -204,6 +230,10 @@ class OutboxWriteException implements Exception {
 /// Sends oldest first. Stops at the first send that cannot reach the platform, and starts again
 /// when [connectivity] says it is back; a server error or a slow answer is retried after
 /// [retryDelay].
+///
+/// For flows built after this one (gifting, the multi-shop basket): queue one [PendingOrder] per
+/// order, each wrapping the [OrderSubmission] that order's checkout sent and the total that order
+/// will cost. Everything above then holds per order.
 class OrderOutbox extends ChangeNotifier {
   OrderOutbox({
     required OrderApi api,
@@ -275,10 +305,11 @@ class OrderOutbox extends ChangeNotifier {
       final Map<String, dynamic> json = jsonDecode(raw) as Map<String, dynamic>;
       _items = (json['items'] as List<dynamic>)
           .map((dynamic e) => PendingOrder.fromJson(e as Map<String, dynamic>))
-          // Found mid-send: the app stopped with the answer unknown. Sending it again is safe —
-          // the key makes the server answer with the order if the first copy placed it.
+          // Found mid-send: the app stopped with the answer unknown, so the order may exist. Sending
+          // it again is safe — the key makes the server answer with the order if the first copy
+          // placed it — but nothing may call it unsent any more.
           .map((PendingOrder p) => p.status == PendingOrderStatus.sending
-              ? p._with(status: PendingOrderStatus.queued)
+              ? p._with(status: PendingOrderStatus.queued, maybePlaced: true)
               : p)
           .toList();
     } catch (_) {
@@ -292,6 +323,9 @@ class OrderOutbox extends ChangeNotifier {
 
   /// Queues a checkout. Returns once it is written to the phone; throws [OutboxWriteException]
   /// when it cannot be, in which case nothing is queued and the caller must keep the basket.
+  ///
+  /// A checkout whose own try went unanswered is queued with [PendingOrder.maybePlaced] already
+  /// set — checkout knows, and the card must not say otherwise from the first moment.
   ///
   /// Cash only. A card or wallet hold needs the provider, and an instrument token is never written
   /// to disk ([OrderSubmission.toJson]) — so a queued card order could only ever fail later.
@@ -318,6 +352,9 @@ class OrderOutbox extends ChangeNotifier {
   }
 
   /// The customer confirmed the new total, or said a stale order should still go. Sends it.
+  ///
+  /// For a stale item that may already have been placed this is the safe way to find out: the
+  /// same key is answered with the order if it exists, and places it only if it does not.
   Future<void> confirm(String key) async {
     final PendingOrder? item = _find(key);
     if (item == null || item.status != PendingOrderStatus.needsReview) return;
@@ -338,8 +375,11 @@ class OrderOutbox extends ChangeNotifier {
     await drain();
   }
 
-  /// Removes it for good. Refused while it is on the wire: its outcome is not known yet, and
-  /// dropping it then could leave an order the customer believes they cancelled.
+  /// Removes it from the phone for good. Refused while it is on the wire: its outcome is not known
+  /// yet, and dropping it then could leave an order the customer believes they cancelled.
+  ///
+  /// It cancels nothing on the platform. For an item that [PendingOrder.maybePlaced], the order may
+  /// already exist and stays on the Orders list — the card's confirmation says exactly that.
   Future<void> discard(String key) async {
     final PendingOrder? item = _find(key);
     if (item == null || item.status == PendingOrderStatus.sending) return;
@@ -361,10 +401,9 @@ class OrderOutbox extends ChangeNotifier {
           if (_disposed || !_online) return;
           final PendingOrder? current = _find(item.key);
           if (current == null || current.status != PendingOrderStatus.queued) continue;
-          // Waited too long to go without asking. One honest gap: an item the app died sending may
-          // already have been placed, and is still asked about here. Asking stays safe — "Send
-          // now" is answered with the order that exists — but "Discard" then removes only the
-          // phone's copy, and the order itself is on the Orders list.
+          // Waited too long to go without asking — including an item that may already have been
+          // placed. Its card says so, its "Send again" is answered with the order if it exists,
+          // and its Discard is confirmed as removing only the phone's copy.
           if (_now().difference(current.confirmedAt ?? current.createdAt) > staleAfter) {
             await _update(current._with(
                 status: PendingOrderStatus.needsReview, review: PendingReview.stale));
@@ -395,10 +434,12 @@ class OrderOutbox extends ChangeNotifier {
           // the key prevents — so the item ends here, as that order.
           await _placedAs(item, await _api.read(orderId), earlierAttempt: true);
         case OrderPriceChanged(total: final double total):
+          // Nothing exists under this key: Order Manager looks a key up before it prices anything.
           await _update(item._with(
               status: PendingOrderStatus.needsReview,
               review: PendingReview.priceChanged,
-              newTotal: total));
+              newTotal: total,
+              maybePlaced: false));
       }
       return true;
     } on DioException catch (e) {
@@ -410,8 +451,12 @@ class OrderOutbox extends ChangeNotifier {
           code == 408 ||
           code == 429;
       if (tryLater) {
-        // Unknown or temporary. Back to queued with the same key; resending is safe.
-        await _update(item._with(status: PendingOrderStatus.queued));
+        // Unknown or temporary. Back to queued with the same key; resending is safe. An answer
+        // that never came, or a server error, may have followed a placement — and once that is
+        // possible the item says so until an answer proves otherwise.
+        await _update(item._with(
+            status: PendingOrderStatus.queued,
+            maybePlaced: item.maybePlaced || OrderApi.mayHavePlaced(e)));
         if (!ConnectivityService.isUnreachable(e)) _scheduleRetry();
         return false;
       }
@@ -419,12 +464,16 @@ class OrderOutbox extends ChangeNotifier {
       await _update(item._with(
         status: PendingOrderStatus.failed,
         error: body is Map<String, dynamic> ? body['detail'] as String? : null,
+        // A business-rule refusal is decided after the key is looked up, so it proves nothing was
+        // placed under it. Any other refusal (a request the gateway rejected before Order Manager
+        // saw it, say) says nothing about an earlier send, and leaves the flag as it was.
+        maybePlaced: code == 422 ? false : null,
       ));
       return true;
     } catch (_) {
       // Something unexpected after the request left — a response that would not parse, say. The
-      // order may exist; the key makes finding out safe, so it goes back to queued.
-      await _update(item._with(status: PendingOrderStatus.queued));
+      // order may well exist; the key makes finding out safe, so it goes back to queued.
+      await _update(item._with(status: PendingOrderStatus.queued, maybePlaced: true));
       _scheduleRetry();
       return false;
     }

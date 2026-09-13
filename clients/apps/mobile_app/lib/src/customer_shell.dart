@@ -206,10 +206,13 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
   void _onQueuedOrderPlaced(OutboxPlaced placed) {
     if (!mounted) return;
     final DeliveryStrings t = DeliveryStrings.of(context);
+    // Named by its shop, as its card was: the order's own number is on the Orders list now, and a
+    // queued checkout never had one to repeat here.
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(placed.earlierAttempt
             ? t.offlineAlreadyPlaced
-            : t.offlineSent(placed.pending.reference))));
+            : t.offlineSent(
+                placed.pending.storeName.isEmpty ? t.tabShop : placed.pending.storeName))));
     _refreshCatalog(force: true);
   }
 
