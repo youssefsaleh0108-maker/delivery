@@ -13,9 +13,12 @@
 #   - The demo logins (customer/rider/merchant/backoffice/carrier) live in the realm file too and
 #     are untouched here.
 #
-# Two slots are created EMPTY, for the owner to fill: SMTP_PASSWORD (the mail relay) and
-# ANTHROPIC_API_KEY (Merchant Blitz's photo reader). An existing Secret predates the second one;
-# see deploy/k3s/README.md for adding it by hand.
+# One slot is created EMPTY, for the owner to fill: SMTP_PASSWORD (the mail relay).
+#
+# The Claude API key (Merchant Blitz's photo reader) is deliberately NOT a slot here. Every service
+# Deployment imports platform-secrets whole, so a key in it would reach every pod on the platform;
+# it lives in its own Secret, anthropic-api, which only product-service references and which the
+# owner creates by hand — see deploy/k3s/README.md.
 set -eu
 
 NS="${1:?usage: gen-secrets.sh <namespace> [realm.json]}"
@@ -54,7 +57,6 @@ kubectl -n "$NS" create secret generic platform-secrets \
   --from-literal=VAULT_ROLE_ID="$(rand)" \
   --from-literal=VAULT_SECRET_ID="$(rand)" \
   --from-literal=SMTP_PASSWORD="" \
-  --from-literal=ANTHROPIC_API_KEY="" \
   --from-literal=ONBOARDING_CLIENT_SECRET="$ONBOARDING_CLIENT_SECRET"
 
 echo "platform-secrets created in $NS."

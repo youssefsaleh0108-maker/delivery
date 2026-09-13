@@ -63,8 +63,9 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
  * <p><strong>The key.</strong> The client is built with {@code fromEnv()}, and the SDK reads the key
  * from exactly two places, in this order: the JVM property {@value #API_KEY_PROPERTY}, then the
  * process environment variable {@value #API_KEY_VARIABLE}. On the cluster that variable comes from
- * the {@code platform-secrets} Secret (an optional key on the product-service Deployment; the owner
- * sets its value). It is never in this repository or in config-repo, and this class never holds,
+ * its own {@code anthropic-api} Secret — an optional key that only the product-service Deployment
+ * references, never {@code platform-secrets}, which every service imports whole; the owner sets its
+ * value. It is never in this repository or in config-repo, and this class never holds,
  * logs or forwards it: {@link #isReady()} asks only whether the SDK will find a non-blank value, in
  * the SDK's own two places — not in Spring's {@code Environment}, which also sees Config Server and
  * {@code application.yml} properties the SDK never reads. Asking there would let a key set in the

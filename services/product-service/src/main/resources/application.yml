@@ -134,8 +134,9 @@ delivery:
       # as samples, so a missing key can never pass for a working one.
       #
       # The key is NOT a property here and must not become one: the Anthropic SDK reads only the
-      # process environment (or the anthropic.apiKey JVM property). On the cluster it comes from the
-      # platform-secrets Secret — see deploy/k3s/README.md.
+      # process environment (or the anthropic.apiKey JVM property). On the cluster it comes from its
+      # own anthropic-api Secret, which only this service's Deployment references — never
+      # platform-secrets, which every service imports whole. See deploy/k3s/README.md.
       vision-provider: ${CATALOG_SCAN_VISION_PROVIDER:FAKE}
 
       # The cost and abuse guards. Every analysis is a paid call once CLAUDE is on.
