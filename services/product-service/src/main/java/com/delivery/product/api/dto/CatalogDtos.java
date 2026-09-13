@@ -88,7 +88,12 @@ public final class CatalogDtos {
              */
             boolean inStock,
             Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt,
+            /**
+             * Whether the back office has put this product on the customer gift hub. Public
+             * curation rather than a secret: the hub itself shows every featured product.
+             */
+            boolean giftFeatured) {
     }
 
     public record CategoryResponse(

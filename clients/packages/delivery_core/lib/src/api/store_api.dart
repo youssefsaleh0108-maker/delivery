@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
 import '../models/geo_models.dart';
+import '../models/gift_models.dart';
 import '../models/store_models.dart';
 
 /// Typed client for the storefront half of the Product Service.
@@ -196,6 +197,17 @@ class StoreApi {
     final Response<dynamic> response = await _dio.get<dynamic>('/api/categories/chips');
     return (response.data as List<dynamic>)
         .map((dynamic j) => CategoryChip.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// The gift hub's featured care bundles, newest pick first — `GET /api/gift-bundles`.
+  ///
+  /// Live products of listed shops that the back office picked, each saying whether it could still
+  /// arrive today. An empty list is an ordinary answer: the hub hides the section.
+  Future<List<GiftBundle>> giftBundles() async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/gift-bundles');
+    return (response.data as List<dynamic>)
+        .map((dynamic j) => GiftBundle.fromJson(j as Map<String, dynamic>))
         .toList();
   }
 

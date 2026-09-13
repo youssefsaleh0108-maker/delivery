@@ -247,6 +247,7 @@ public class ProductController {
                 product.getBarcode(),
                 product.isInStock(),
                 product.getCreatedAt(),
-                product.getUpdatedAt());
+                product.getUpdatedAt(),
+                product.isGiftFeatured());
     }
 }

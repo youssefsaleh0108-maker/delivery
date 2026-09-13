@@ -85,6 +85,9 @@ public class BankPostingPublisher {
             case CASH_COLLECTED -> "Cash taken for order #" + shortOrder;
             case CASH_REMITTANCE -> "Takings banked, ref #" + shortOrder;
             case MERCHANT_CREDIT -> "Payout for order #" + shortOrder;
+            // Its own words, never "commission": the shop is being paid for wrapping a gift, and a
+            // statement months later should say so rather than hide it inside the goods payout.
+            case GIFT_WRAP_CREDIT -> "Gift wrapping for order #" + shortOrder;
             // Named as an errand rather than a payout: on a BUY most of this is the rider's own
             // money coming back, and a statement line reading "payout" would make a reimbursement
             // look like earnings at tax time.

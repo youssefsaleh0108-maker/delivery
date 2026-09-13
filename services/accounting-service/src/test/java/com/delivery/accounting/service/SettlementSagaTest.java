@@ -393,6 +393,32 @@ class SettlementSagaTest {
     }
 
     @Nested
+    @DisplayName("a refused gift-wrap credit does NOT refund either")
+    class GiftWrapCreditRefused {
+
+        @Test
+        void the_customer_is_not_refunded_because_the_shop_was_already_paid_for_the_goods() {
+            // The rider case's reasoning: the wrap is only released once the goods credit has
+            // posted, so the order worked for the customer and the shop. Refunding all 48.00 to
+            // make up 3.00 of wrapping would leave the shop's goods paid out of nothing.
+            List<AccountingTransaction> legs = new ArrayList<>(List.of(
+                    leg(Leg.CUSTOMER_DEBIT, CUSTOMER_ACCOUNT, "48.00", Direction.DEBIT),
+                    leg(Leg.MERCHANT_CREDIT, MERCHANT_ACCOUNT, "39.37", Direction.CREDIT),
+                    leg(Leg.GIFT_WRAP_CREDIT, MERCHANT_ACCOUNT, "3.00", Direction.CREDIT),
+                    leg(Leg.PLATFORM_COMMISSION, PLATFORM_ACCOUNT, "5.63", Direction.CREDIT)));
+            legs.get(0).markPosted("debit-ref");
+            legs.get(1).markPosted("merchant-ref");
+            given(legs);
+
+            failPermanently(legs.get(2), "ACCOUNT_FROZEN");
+
+            assertThat(refundRaised()).isNull();
+            // FAILED, for an operator to re-post: the platform's debt to the shop.
+            assertThat(legs.get(2).getStatus()).isEqualTo(Status.FAILED);
+        }
+    }
+
+    @Nested
     @DisplayName("a retryable failure is not a failure")
     class Retryable {
 

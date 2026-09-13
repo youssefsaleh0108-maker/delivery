@@ -194,6 +194,12 @@ public class OrderEventListener {
                         event.path("carrierFeeWaived").asBoolean(false),
                         discount.isNumber() ? discount.decimalValue() : null);
 
+                // What wrapping a gift added, paid in full to the shop that wrapped it. Read because
+                // the total already includes it: unread, it fell into the platform's residue and was
+                // reported as commission. Absent on events published before gifting and zero on
+                // every other order, which then settle exactly as they always did.
+                JsonNode wrap = event.path("giftWrapFee");
+
                 // WHO, alongside WHERE THE MONEY GOES. Both identifiers were already parsed a few
                 // lines above and then used only to look up an account — which is how the ledger
                 // ended up unable to name a shop: `accounts.forUser` answers a different question,
@@ -208,7 +214,8 @@ public class OrderEventListener {
                         carrierAccount,
                         holder, correlationId, waivers, rider, deliveredAt,
                         new SettlementService.Parties(
-                                merchantId, event.path("deliveryProviderId").asText(null)));
+                                merchantId, event.path("deliveryProviderId").asText(null)),
+                        wrap.isNumber() ? wrap.decimalValue() : null);
             }
 
             // Points, which is what the merchant and the carrier can actually convert into money.

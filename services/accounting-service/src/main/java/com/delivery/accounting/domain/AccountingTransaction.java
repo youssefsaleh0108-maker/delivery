@@ -37,6 +37,15 @@ public class AccountingTransaction {
         /** The merchant receives the total less commission. */
         MERCHANT_CREDIT,
         /**
+         * What wrapping a gift added to the order, paid to the shop that wrapped it.
+         *
+         * <p>Its own leg rather than more {@link #MERCHANT_CREDIT}: commission is taken on the goods
+         * and never on the wrap, and a statement has to be able to say which is which. Never left in
+         * the platform's residue either, where it was posted as {@link #PLATFORM_COMMISSION} —
+         * commission reported as earned on work the shop did.
+         */
+        GIFT_WRAP_CREDIT,
+        /**
          * The rider is paid for an errand.
          *
          * <p>On a Butler BUY this is a reimbursement for goods they bought with their own money

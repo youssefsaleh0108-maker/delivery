@@ -147,24 +147,30 @@ public class StatementService {
     // ------------------------------------------------------------------------------- merchant
 
     /**
-     * Goods sold, less the platform's commission, equals what the platform owes the shop.
+     * Goods sold, less the platform's commission, plus any gift wrapping, equals what the platform
+     * owes the shop.
      *
-     * <p>The net is the {@code MERCHANT_CREDIT} legs and nothing else, so it is exact whatever else
-     * happened on the order. The two gross lines are derived FROM it — goods sold is the net plus
-     * the commission, never computed independently — which is what makes the column add up by
+     * <p>The goods net is the {@code MERCHANT_CREDIT} legs and nothing else, so it is exact whatever
+     * else happened on the order. The two gross lines are derived FROM it — goods sold is the net
+     * plus the commission, never computed independently — which is what makes the column add up by
      * construction rather than by luck.
+     *
+     * <p>Gift wrapping is a line of its own, read off the {@code GIFT_WRAP_CREDIT} legs. No
+     * commission is taken on it, so it is never grossed up with the goods.
      */
     private Statement merchantStatement(String ref, String name, StatementRange range,
                                         Ledger ledger) {
-        BigDecimal owed = ledger.sumOf(Leg.MERCHANT_CREDIT);
+        BigDecimal goods = ledger.sumOf(Leg.MERCHANT_CREDIT);
+        BigDecimal wrapping = ledger.sumOf(Leg.GIFT_WRAP_CREDIT);
         Attribution take = ledger.platformTake(CounterpartyKind.MERCHANT, ref);
 
-        List<Statement.Line> lines = grossUp("Goods sold", owed, take,
-                ledger.orderCount() + " orders");
+        List<Statement.Line> lines = new ArrayList<>(grossUp("Goods sold", goods, take,
+                ledger.orderCount() + " orders"));
+        addIfAny(lines, Statement.Line.credit("Gift wrapping", wrapping, null));
 
         List<Statement.Entry> entries = ledger.entriesFor(Leg.MERCHANT_CREDIT, take);
         return Statement.of(CounterpartyKind.MERCHANT, ref, name, range, currency,
-                lines, owed, entries, ledger.orderCount(),
+                lines, goods.add(wrapping), entries, ledger.orderCount(),
                 note(range, ledger, take, "goods"));
     }
 
@@ -842,6 +848,17 @@ public class StatementService {
             return foundSelf;
         }
 
+        /** The gift wrapping paid on one order to whoever {@code credit} paid. Zero on most. */
+        private static BigDecimal wrappingOn(List<AccountingTransaction> legs,
+                                             AccountingTransaction credit) {
+            return legs.stream()
+                    .filter(l -> l.getLeg() == Leg.GIFT_WRAP_CREDIT)
+                    .filter(l -> java.util.Objects.equals(
+                            l.getCounterpartyRef(), credit.getCounterpartyRef()))
+                    .map(AccountingTransaction::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
         /** Commission less subsidy: what the platform actually kept on one order, signed. */
         private static BigDecimal keptOn(List<AccountingTransaction> legs) {
             BigDecimal kept = BigDecimal.ZERO;
@@ -901,11 +918,16 @@ public class StatementService {
                 }
                 List<AccountingTransaction> legs = byOrder.getOrDefault(t.getOrderId(), List.of());
                 BigDecimal kept = provable ? keptOn(legs) : BigDecimal.ZERO;
+                // The shop's gift wrapping on the same order is owed beside its goods and carries no
+                // commission, so it adds to the row's gross and net alike.
+                BigDecimal net = leg == Leg.MERCHANT_CREDIT
+                        ? t.getAmount().add(wrappingOn(legs, t))
+                        : t.getAmount();
                 entries.add(new Statement.Entry(
                         t.getOrderId(), t.getCreatedAt(),
-                        Statement.money(t.getAmount().add(kept)),
+                        Statement.money(net.add(kept)),
                         Statement.money(kept),
-                        Statement.money(t.getAmount()),
+                        Statement.money(net),
                         paymentMethodOn(t.getOrderId())));
             }
             return entries;

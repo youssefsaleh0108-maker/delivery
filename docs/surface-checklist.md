@@ -1747,7 +1747,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
   - [ ] t.custPctUsd = "{pct}% USD" / t.custPctLbp = "{pct}% LBP" + progress bar — Read-only mirror of the split.  `Text + LinearProgressIndicator`
   - [ ] t.custRiderChange(amount) = "Rider carries change for up to {amount} LBP and cash USD." — Read-only.  `brandSoft note, only when rate.riderChangeLimitLbp > 0`
   - [ ] t.paymentTestModeNote = "Test payment — no real money moves in this build" — Read-only honesty note for the wallet rails.  `Row with Icons.science_outlined, only when payment.needsProvider`
-  - [ ] t.custOrderNotes = "Order Notes" / hint t.custOrderNotesHint — Travels with the order. A diaspora gift note (cart.giftNote) would be prefixed with a gift emoji — but nothing in the shipped build can set giftNote (see DiasporaScreen).  `TextFormField minLines 2, maxLines 3`
+  - [ ] t.custOrderNotes = "Order Notes" / hint t.custOrderNotesHint — Travels with the order as the door instructions and nothing else. A gift basket never reaches this screen: it checks out on GiftCheckoutScreen, where the card is the gift's own message.  `TextFormField minLines 2, maxLines 3`
   - [ ] t.contactPhoneOptional = "Contact phone (optional)" — Sent as contactPhone. Not drawn in the design; no validator.  `TextFormField(keyboardType: phone) inside the Form`
   - [ ] t.custTotalPrice = "Total Price" + amount — Advisory total (cached prices minus the promo quote). The server recomputes; the toast shows the SERVER's total.  `Text column in the sticky bar`
   - [ ] **[destructive]** t.custPlaceOrderAmount(amount) = "Place Order ({amount})" — FINANCIAL. Validates the form, checks the shop's delivery radius by haversine, places the order, records the transfer intent, closes any split plan, clears the basket and pops the order. Disabled while placing or when the basket is empty.  `YdPillButton(busy: _placing)`
@@ -2076,18 +2076,39 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
   - [ ] Map preview (100px, still) → "Expand interactive map" (NeighbourhoodMapExpandButton: a ~26px pill answering a 48px band) → NeighbourhoodMapScreen, pins open the shop and dim like the cards. Hidden without a point or without shops; says "map unavailable" and drops the pill when tiles fail.  `OsmBasemap`
   - [ ] Shop cards: cover, Trusted local (verified_local, Backoffice-granted via PUT /api/stores/{id}/verified-local), fact line, rating or "New", distance, generator / dark pill with its age underneath (t.dekkanePowerUpdatedMinutes / t.dekkanePowerUpdatedHours; drawn only while powerCurrent), a DekkaneStatePill on the cover when the shop is not open → StorePageScreen in StorePageLayout.dekkane (Figma 112:2041).  `DekkaneShopCard`
 
-### DiasporaScreen (Send to Lebanon)  — UNREACHABLE, no driving test
-*Pick a recipient (a saved address labelled with their name), attach a gift note, and start shopping with THEIR address active.*
+### GiftHubScreen (Send a Gift, Figma 112:1684)
+*Where somebody abroad starts a gift for family in Lebanon: how it works, gift categories, recent recipients and featured care bundles. Anything started here marks the basket as a gift.*
 
-- file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/diaspora_screen.dart`
-- reached by: Nothing. Zero call sites. Its onStartOrder callback has no caller to supply it.
-- **unreachable:** Dead code, and it takes a checkout code path with it (the gift-note prefix). Also carries a visible string bug that would ship the moment anyone wires it up.
-- states: Never mounted
+- file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/gift_hub_screen.dart`
+- reached by: Home's gift card (StoreHomeScreen) and the profile menu's gift row (ProfileDrawer) — both drawn only when GET /api/orders/gift-terms, asked once by CustomerShell, names at least one payment method. While Order Manager accepts CASH alone (application.yml delivery.ordering.payment-methods) neither door is drawn.
+- covered by: test/gift_hub_test.dart (categories, recipients, bundles, the cannot-send notice, Arabic) and test/gift_hub_wiring_test.dart (both doors open it from the real shell, and neither is drawn while no method can pay).
+- states: Bundles loading: a skeleton row · Bundles failed or empty: the section is hidden · No method can pay for a gift: t.giftNoPaymentMethods first, above everything that starts a gift · Terms unknown: nothing said · A recipient chosen: t.custStartOrder at the bottom
 
-  - [ ] t.custDiasporaTitle = "Send to Lebanon" / t.custDiasporaBanner = "Remittance made real" — Unreachable.  `YdScreenHeader + banner`
-  - [ ] t.edit = "Edit" on the t.custFamilyRecipient = "Family recipient" card — Opens the address sheet to choose the recipient. Unreachable.  `InkWell`
-  - [ ] t.custPersonalNote = "Attach a personal note (delivered with the order)" — Sets cart.giftNote. Unreachable — which means cart.giftNote is ALWAYS null, so checkout's gift-note prefix branch (checkout_screen.dart ~line 250) is unreachable code too.  `TextField`
-  - [ ] t.custStartOrder — Selects the recipient's address, stores the note, pops and calls onStartOrder. Unreachable. SEPARATE BUG: the English string is "Select Items 0026 Start Order" — an unescaped ampersand survived as the literal digits 0026 in app_en.arb:1865.  `YdPillButton`
+  - [ ] Back, t.giftHubTitle = "Send a Gift" / t.custDiasporaSub, the YouDrop chip — maybePop.  `YdScreenHeader`
+  - [ ] t.giftHubBannerTitle / t.giftHubBannerBody — Brand gradient hero; the frame's photo is not shipped.  `Container`
+  - [ ] t.giftStep1Title … t.giftStep3Title — Read-only steps.  `YdCard.bordered`
+  - [ ] Categories t.giftCatCarePackage (flowers & gifts), t.giftCatGroceries (grocery), t.giftCatMedicine (pharmacy) — Marks the basket a gift and opens ShopsListingScreen on that vertical. Only categories a store vertical backs are drawn; Sweets & Pastries and Baby & Kids return when a vertical or tag backs them.  `horizontal YdCard rail`
+  - [ ] Recipient cards — The saved addresses that name a person; a tap marks the basket a gift and selects that address. t.giftAddRecipient opens the address sheet.  `horizontal rail`
+  - [ ] Featured bundles (GET /api/gift-bundles) — Price and shop; t.giftSameDayDeliverable only where the server says the shop can still make it today. A tap marks the basket a gift and opens the shop.  `YdCard.bordered rows`
+  - [ ] t.custStartOrder = "Select Items & Start Order" — Pops the hub and lands on Home. Only with a recipient chosen.  `YdPillButton`
+
+### GiftCheckoutScreen (Gift Details, Figma 112:1830)
+*The checkout for a gift basket: who receives it, the card, the wrap, a payment that is never cash, and the total.*
+
+- file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/gift_checkout_screen.dart`
+- reached by: Basket tab -> "Proceed to Checkout" while the basket is a gift (t.giftBasketBanner); t.giftBasketNotGift sends the basket to CheckoutScreen instead. A gift basket offers no Split Order.
+- covered by: test/gift_checkout_test.dart — the placement body (the gift block, CARD, STANDARD, notes = the address's door notes), no cash row, the no-method state, validation, offline, an unanswered send, the one delivery-day line, a 240-unit card of emoji, the Arabic phone row and its error's direction, and no split on a gift basket.
+- states: Terms loading: a spinner in the payment card · Terms failed: t.giftTermsFailed + t.tryAgain · No method: t.giftNoPaymentMethods and a disabled button · Offline: t.giftOfflineCannotWait, nothing sent or queued · Delivery fee unknown: a dash, never a guess · Promo quoted at another fee: t.giftTotalConfirmed · Already placed: t.offlineAlreadyPlaced and that order · Unanswered: t.offlineUnconfirmedRetry, the basket's key kept · Refused: the server's own reason
+
+  - [ ] t.giftRecipientName — Required; at most 80 UTF-16 units, the server's own count.  `TextFormField`
+  - [ ] t.giftRecipientPhone after the +961 prefix — A Lebanese number, sent as +961…. The prefix and the number read left to right; the error reads in the customer's language.  `Row(textDirection: ltr) + TextFormField`
+  - [ ] t.deliveryAddress — Opens the address sheet; the recipient is remembered with the address.  `InkWell`
+  - [ ] t.giftDeliveryDate: t.giftDeliveredToday = "Today, while the shop is open" — One plain line; there is no scheduling to offer.  `Text`
+  - [ ] t.giftNoteTitle — The card: at most 240 UTF-16 units (an emoji counts twice), with a t.giftNoteLength counter.  `TextField + length formatter`
+  - [ ] t.giftWrapTitle / t.giftWrapSubtitle(price) — The wrap at the server's price, paid to the shop that wraps it.  `Switch`
+  - [ ] Payment rows — Only the methods gift-terms returns, never cash; t.paymentTestModeNote; t.giftCashNotAllowed.  `_methodRow`
+  - [ ] Summary — Lines, t.giftWrapLine, t.giftDeliveryFee, the promo, t.giftTotalUsd; t.giftApproxLbp only with a rate.  `YdCard.bordered`
+  - [ ] **[destructive]** t.giftSendAndPay = "Send Gift & Pay" — FINANCIAL. Validates, checks the shop's delivery radius, refuses offline, places the gift under the basket's key, remembers the recipient with the address, settles the basket and pops the order. Disabled with no method, an empty basket, or while placing.  `YdPillButton(busy)`
 
 ## MERCHANT — mobile_app MerchantShell + the delivery_merchant package (dashboard, POS terminal/checkout/receipt, inventory, product form, categories, stock alerts, stock count, orders + order detail, staff, settings, payout, statement, analytics, shop profile, WhatsApp draft panel, reports)
 

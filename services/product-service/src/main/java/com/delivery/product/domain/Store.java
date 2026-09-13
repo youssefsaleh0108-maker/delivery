@@ -339,6 +339,30 @@ public class Store {
         return availabilityAt(now) != Availability.CLOSED;
     }
 
+    /**
+     * Whether an order placed now could still arrive before the shop shuts: it is taking orders,
+     * and the slow end of its delivery estimate fits inside the opening window it is in.
+     *
+     * <p>What the gift hub's "Same-day Deliverable" means. Derived from the clock on every read,
+     * like {@link #availabilityAt}, and never stored: a flag that was true in the morning is a lie
+     * by the evening, and the promise is made to somebody paying from abroad for a family's dinner.
+     */
+    public boolean deliversBeforeClosing(Instant now) {
+        if (!isOrderable(now)) {
+            return false;
+        }
+        LocalTime closesAt = closingTimeAt(now);
+        if (closesAt == null) {
+            return false;
+        }
+        long minutesLeft = Duration.between(now.atZone(zone()).toLocalTime(), closesAt).toMinutes();
+        if (minutesLeft < 0) {
+            // A window running past midnight closes earlier on the clock face than it is now.
+            minutesLeft += Duration.ofDays(1).toMinutes();
+        }
+        return minutesLeft >= etaMaxMinutes;
+    }
+
     // ---------------------------------------------------------------- behaviour
 
     public boolean isOwnedBy(String candidateMerchantId) {

@@ -40,6 +40,7 @@ class Product {
     this.sku,
     this.barcode,
     this.inStock = true,
+    this.giftFeatured = false,
   });
 
   final String id;
@@ -97,6 +98,10 @@ class Product {
   /// fallback repeated here catches the other case — the field absent from the response
   /// altogether, which is what an older service returns — so an app built against this model
   /// cannot end up with a row that has no picture at all.
+  /// Whether the back office has put this product on the customer gift hub. Public curation: the
+  /// hub itself shows every featured product.
+  final bool giftFeatured;
+
   String? get listImageUrl {
     if (imageThumbUrls.isNotEmpty) {
       return imageThumbUrls.first;
@@ -123,6 +128,7 @@ class Product {
         sku: json['sku'] as String?,
         barcode: json['barcode'] as String?,
         inStock: json['inStock'] as bool? ?? true,
+        giftFeatured: json['giftFeatured'] as bool? ?? false,
       );
 
   /// Note the absence of `merchantId` and `status`: the service derives the first from the token

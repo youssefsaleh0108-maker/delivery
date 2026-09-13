@@ -3950,24 +3950,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custAllDistricts => 'All districts';
 
   @override
-  String get custDiasporaTitle => 'Send to Lebanon';
-
-  @override
   String get custDiasporaSub => 'Diaspora Gifting Portal';
-
-  @override
-  String get custDiasporaBanner => 'Remittance made real';
-
-  @override
-  String get custDiasporaBlurb =>
-      'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.';
-
-  @override
-  String get custFamilyRecipient => 'Family recipient';
-
-  @override
-  String get custPersonalNote =>
-      'Attach a personal note (delivered with the order)';
 
   @override
   String get custPersonalNoteHint =>
@@ -3982,7 +3965,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String get custStartOrder => 'Select Items 0026 Start Order';
+  String get custStartOrder => 'Select Items & Start Order';
 
   @override
   String get custPickRecipient => 'Choose who receives it';
@@ -9276,4 +9259,187 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get blitzListChanged =>
       'Some items were already decided elsewhere, so they\'ve left the list. Check the rest and save again.';
+
+  @override
+  String get giftHubTitle => 'Send a Gift';
+
+  @override
+  String get giftHubBannerTitle => 'Remittance Made Real';
+
+  @override
+  String get giftHubBannerBody =>
+      'Support your loved ones in Lebanon. Choose real essentials, groceries or hot meals, delivered to their door — often the same day.';
+
+  @override
+  String get giftHowItWorks => 'How it works';
+
+  @override
+  String get giftStep1Title => 'Choose from local shops';
+
+  @override
+  String get giftStep1Body =>
+      'Pick groceries, sweets, pharmacy items or a ready-made care bundle.';
+
+  @override
+  String get giftStep2Title => 'Enter their address in Lebanon';
+
+  @override
+  String get giftStep2Body =>
+      'We deliver wherever the shop you choose delivers.';
+
+  @override
+  String get giftStep3Title => 'Same-day delivery';
+
+  @override
+  String get giftStep3Body =>
+      'A rider hands it over with your personal note — the same day, while the shop is open.';
+
+  @override
+  String get giftCategories => 'Gift categories';
+
+  @override
+  String get giftCatCarePackage => 'Care Package';
+
+  @override
+  String get giftCatGroceries => 'Groceries';
+
+  @override
+  String get giftCatMedicine => 'Medicine & Health';
+
+  @override
+  String get giftRecentRecipients => 'Recent recipients';
+
+  @override
+  String get giftAddRecipient => 'Add a recipient';
+
+  @override
+  String get giftFeaturedBundles => 'Featured care bundles';
+
+  @override
+  String get giftSameDayDeliverable => 'Same-day deliverable';
+
+  @override
+  String get giftHomeEntryTitle => 'Send a gift to Lebanon';
+
+  @override
+  String get giftHomeEntrySub =>
+      'Groceries, sweets and care bundles for family, delivered to their door';
+
+  @override
+  String get giftDetailsTitle => 'Gift Details';
+
+  @override
+  String get giftCheckoutSub => 'Diaspora Checkout';
+
+  @override
+  String get giftRecipientInfo => 'Recipient information';
+
+  @override
+  String get giftRecipientName => 'Recipient name';
+
+  @override
+  String get giftRecipientNameRequired => 'Who is receiving it?';
+
+  @override
+  String get giftRecipientPhone => 'Phone number (Lebanon)';
+
+  @override
+  String get giftPhoneInvalid => 'Enter a Lebanese number, e.g. 71 234 567';
+
+  @override
+  String get giftDeliveryDate => 'Delivery date';
+
+  @override
+  String get giftNoteTitle => 'Attach a personal note';
+
+  @override
+  String get giftNoteHelper => 'The shop sends your note with the gift.';
+
+  @override
+  String get giftWrapTitle => 'Premium gift wrapping';
+
+  @override
+  String giftWrapSubtitle(String amount) {
+    return 'Festive wrapping, with your note on a card (+$amount)';
+  }
+
+  @override
+  String get giftPaymentTitle => 'Payment';
+
+  @override
+  String get giftCashNotAllowed =>
+      'Gifts are paid online — the person receiving it is never asked to pay.';
+
+  @override
+  String get giftNoPaymentMethods =>
+      'Gifts are paid online, and online payment isn\'t switched on yet — so a gift can\'t be sent right now.';
+
+  @override
+  String get giftTermsFailed =>
+      'We couldn\'t load the gift\'s payment options.';
+
+  @override
+  String get giftOfflineCannotWait =>
+      'A gift can\'t wait for the connection the way a cash order can — it\'s paid online. Send it once you\'re back online.';
+
+  @override
+  String get giftOrderSummary => 'Order summary';
+
+  @override
+  String giftLineQty(int qty, String name) {
+    return '$qty× $name';
+  }
+
+  @override
+  String get giftWrapLine => 'Gift wrapping';
+
+  @override
+  String get giftDeliveryFee => 'Delivery fee';
+
+  @override
+  String get giftTotalUsd => 'Total USD';
+
+  @override
+  String giftApproxLbp(String amount) {
+    return '≈ $amount';
+  }
+
+  @override
+  String get giftTotalConfirmed =>
+      'The final total is confirmed when your gift is placed.';
+
+  @override
+  String get giftSendAndPay => 'Send Gift & Pay';
+
+  @override
+  String giftForName(String name) {
+    return 'Gift for $name';
+  }
+
+  @override
+  String get giftWrapRequested => 'Gift wrapping requested';
+
+  @override
+  String get giftCardMessage => 'Card message';
+
+  @override
+  String get giftRecipientPhoneLabel => 'Recipient\'s phone';
+
+  @override
+  String get giftBasketBanner => 'Sending this basket as a gift';
+
+  @override
+  String get giftBasketNotGift => 'Not a gift';
+
+  @override
+  String get giftDeliveredToday => 'Today, while the shop is open';
+
+  @override
+  String giftNoteLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get giftUnnamed =>
+      'A gift — who it\'s for shows once it\'s yours to carry';
 }

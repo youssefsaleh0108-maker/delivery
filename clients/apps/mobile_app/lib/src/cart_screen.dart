@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'cart.dart';
 import 'checkout_screen.dart';
 import 'delivery_terms_book.dart';
+import 'gift_checkout_screen.dart';
 import 'order_outbox.dart';
 import 'split_add_friend_sheet.dart';
 import 'split_status_screen.dart';
@@ -224,7 +225,19 @@ class _CartScreenState extends State<CartScreen> {
     // A placed order, a checkout queued for when the connection returns, or nothing (backed out).
     final Object? outcome = await Navigator.of(context).push<Object>(
       MaterialPageRoute<Object>(
-        builder: (_) => CheckoutScreen(
+        // A gift has its own checkout: who receives it, never cash, never queued for later.
+        builder: (_) => widget.cart.isGift
+            ? GiftCheckoutScreen(
+                api: widget.orderApi,
+                cart: widget.cart,
+                addresses: widget.addresses,
+                zoneApi: widget.zoneApi,
+                geocodingApi: widget.geocodingApi,
+                promo: quote != null && quote.valid ? quote : null,
+                connectivity: widget.connectivity,
+                deliveryTerms: widget.deliveryTerms,
+              )
+            : CheckoutScreen(
           api: widget.orderApi,
           cart: widget.cart,
           addresses: widget.addresses,
@@ -297,7 +310,7 @@ class _CartScreenState extends State<CartScreen> {
               children: <Widget>[
                 _storeStrip(context),
                 if (_splitAvailable) _modeToggle(context),
-                if (_splitMode) _participantsRow(context),
+                if (_splitting) _participantsRow(context),
                 Padding(
                   padding: const EdgeInsetsDirectional.all(_gutter),
                   child: Column(
@@ -305,12 +318,12 @@ class _CartScreenState extends State<CartScreen> {
                       for (int i = 0; i < lines.length; i++) ...<Widget>[
                         if (i > 0) const SizedBox(height: DeliverySpacing.md - 4),
                         _basketRow(context, lines[i]),
-                        if (_splitMode) _assignChip(context, lines[i]),
+                        if (_splitting) _assignChip(context, lines[i]),
                       ],
                     ],
                   ),
                 ),
-                if (_splitMode) _splitSummary(context),
+                if (_splitting) _splitSummary(context),
                 _promoSection(context),
                 const SizedBox(height: DeliverySpacing.lg),
                 _summary(context),
@@ -321,8 +334,18 @@ class _CartScreenState extends State<CartScreen> {
 
   // ---------------------------------------------------------- group split (Figma 83:7)
 
+  /// Whether this basket may be split with friends. Never a gift: the gift checkout attaches no
+  /// split plan, and placing the gift settles the basket — which clears the plan and would orphan
+  /// the payment requests the friends were sent.
   bool get _splitAvailable =>
-      widget.splitApi != null && widget.profileApi != null && widget.session != null;
+      widget.splitApi != null &&
+      widget.profileApi != null &&
+      widget.session != null &&
+      !widget.cart.isGift;
+
+  /// Split mode as drawn: chosen, and still available — a basket made a gift after Split was chosen
+  /// shows none of it.
+  bool get _splitting => _splitMode && _splitAvailable;
 
   /// Split mode on this basket. Participants[0] is always the host.
   bool _splitMode = false;
@@ -1212,6 +1235,10 @@ class _CartScreenState extends State<CartScreen> {
                 ],
               ),
             ],
+            if (widget.cart.isGift) ...<Widget>[
+              const SizedBox(height: DeliverySpacing.md),
+              _giftBanner(t),
+            ],
             const SizedBox(height: DeliverySpacing.md),
             YdPillButton(
               // Disabled rather than hidden: a customer needs to see that checkout exists and why
@@ -1221,6 +1248,37 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Says this basket is going to somebody else, and lets the customer say it is not — which is
+  /// what decides the checkout Proceed opens.
+  Widget _giftBanner(DeliveryStrings t) {
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(DeliverySpacing.md - DeliverySpacing.xs,
+          DeliverySpacing.xs, DeliverySpacing.xs, DeliverySpacing.xs),
+      decoration: BoxDecoration(
+        color: DeliveryColors.brandSoft,
+        borderRadius: BorderRadius.circular(DeliveryRadius.md),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.card_giftcard_rounded, size: 18, color: DeliveryColors.brand),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Text(
+              t.giftBasketBanner,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: DeliveryColors.ink),
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(widget.cart.stopGift),
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+            child: Text(t.giftBasketNotGift),
+          ),
+        ],
       ),
     );
   }

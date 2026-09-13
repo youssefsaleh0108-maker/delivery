@@ -190,6 +190,22 @@ public class SettlementSaga {
             return;
         }
 
+        // A shop's gift wrapping, which is only released once its goods credit has posted.
+        //
+        // The rider case's reasoning exactly: reaching here means the customer was debited and the
+        // shop was paid for the goods, so the order worked for both of them. Refunding the whole
+        // order to make up a wrap fee would claw back money from an order that succeeded and leave
+        // the shop's goods paid out of nothing. The leg sits FAILED in the reconciliation view — the
+        // platform's debt to the shop, to re-post.
+        boolean wrapAfterGoods = failed.getLeg() == Leg.GIFT_WRAP_CREDIT
+                && all.stream().anyMatch(t -> t.getLeg() == Leg.MERCHANT_CREDIT);
+        if (wrapAfterGoods) {
+            log.error("Gift wrapping not paid for order {}: {}. Customer and merchant goods are "
+                    + "settled correctly; this is the platform's debt to the shop to re-post.",
+                    failed.getOrderId(), failed.getFailureReason());
+            return;
+        }
+
         // The payee credit failed after the debit posted — the merchant on a basket, the rider on
         // an errand. Either way the platform is holding money it cannot pass on, so refund the
         // customer for whatever was actually collected.

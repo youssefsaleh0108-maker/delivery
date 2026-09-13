@@ -42,6 +42,21 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     long countByCategoryId(UUID categoryId);
 
     /**
+     * The gift hub's featured bundles: live products the back office picked, newest pick first.
+     *
+     * <p>Only the product's own state is decided here. Whether its shop is listed, and whether the
+     * stock projection says it can be sold, is decided in {@code GiftBundleService} against the
+     * rows it reads, where it can be tested. Bounded by the caller's page.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.giftFeatured = true
+              AND p.status = com.delivery.product.domain.Product$Status.ACTIVE
+            ORDER BY p.giftFeaturedAt DESC, p.id ASC
+            """)
+    java.util.List<Product> findFeaturedGifts(Pageable pageable);
+
+    /**
      * Products in a section that a customer could still be shown.
      *
      * <p>Products are archived, never deleted, so an unfiltered count keeps a section pinned open

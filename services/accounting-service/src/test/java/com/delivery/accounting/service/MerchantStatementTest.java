@@ -241,6 +241,65 @@ class MerchantStatementTest {
         }
     }
 
+    @Nested
+    @DisplayName("on a wrapped gift")
+    class WrappedGift {
+
+        private final UUID gift = UUID.randomUUID();
+
+        @BeforeEach
+        void aWrappedGift() {
+            // 45.00 of goods at 12.5% and 3.00 of wrapping, paid by card: 39.37 for the goods and
+            // 3.00 for the wrapping to the shop, 5.63 of commission to the platform.
+            List<AccountingTransaction> own = List.of(
+                    Legs.merchantCredit(gift, "39.37", SHOP),
+                    Legs.giftWrapCredit(gift, "3.00", SHOP));
+            List<AccountingTransaction> all = List.of(
+                    Legs.of(gift, AccountingTransaction.Leg.CUSTOMER_DEBIT, "48.00",
+                            AccountingTransaction.Direction.DEBIT, null, null),
+                    Legs.merchantCredit(gift, "39.37", SHOP),
+                    Legs.giftWrapCredit(gift, "3.00", SHOP),
+                    Legs.commission(gift, "5.63"));
+            ledgerHolds(own, all);
+        }
+
+        @Test
+        @DisplayName("owes the shop its goods and its wrapping")
+        void netCountsTheWrapping() {
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.net().amount()).isEqualByComparingTo("42.37");
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.WE_OWE);
+        }
+
+        @Test
+        @DisplayName("shows the wrapping on a line of its own, never grossed up with the goods")
+        void wrappingIsItsOwnLine() {
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.lines()).extracting(Statement.Line::label).containsExactly(
+                    "Goods sold", "Platform commission (12.5%)", "Gift wrapping");
+            // Commission on the 45.00 of goods, and none on the 3.00 of wrapping.
+            assertThat(statement.lines().get(0).amount()).isEqualByComparingTo("45.00");
+            assertThat(statement.lines().get(1).amount()).isEqualByComparingTo("5.63");
+            assertThat(statement.lines().get(2).amount()).isEqualByComparingTo("3.00");
+            assertThat(statement.lines().get(2).direction()).isEqualTo(Statement.Sign.CREDIT);
+        }
+
+        @Test
+        @DisplayName("counts the wrapping in the gift's own row, which stays one row")
+        void theRowCountsTheWrapping() {
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.entries()).hasSize(1);
+            Statement.Entry entry = statement.entries().get(0);
+            assertThat(entry.orderId()).isEqualTo(gift);
+            assertThat(entry.gross()).isEqualByComparingTo("48.00");
+            assertThat(entry.commission()).isEqualByComparingTo("5.63");
+            assertThat(entry.net()).isEqualByComparingTo("42.37");
+        }
+    }
+
     @Test
     @DisplayName("a shop with no orders in the range is settled, not broken")
     void emptyRangeIsSettled() {

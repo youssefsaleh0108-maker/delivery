@@ -23,6 +23,8 @@ class DeliveryAddress {
     this.zoneName,
     this.latitude,
     this.longitude,
+    this.recipientName,
+    this.recipientPhone,
   });
 
   /// The address itself, as the customer typed it.
@@ -54,6 +56,16 @@ class DeliveryAddress {
   final double? longitude;
 
   /// Whether the picker pinned this address to a point on the map.
+  /// Who receives gifts at this address, as the last gift checkout to it was told: the name the
+  /// rider asks for. Null for an address nobody has sent a gift to.
+  ///
+  /// Device-local like the rest of the address book (v1): it lives on this phone, for this account,
+  /// and is gone with a reinstall.
+  final String? recipientName;
+
+  /// Their phone in international form (`+96171234567`), so the next gift to them is prefilled.
+  final String? recipientPhone;
+
   bool get hasPoint => latitude != null && longitude != null;
 
   String get display => label == null || label!.isEmpty ? line : '$label · $line';
@@ -65,7 +77,39 @@ class DeliveryAddress {
       zoneId: id,
       zoneName: name,
       latitude: latitude,
-      longitude: longitude);
+      longitude: longitude,
+      recipientName: recipientName,
+      recipientPhone: recipientPhone);
+
+  /// This address with who receives gifts here, as a gift checkout was just told.
+  DeliveryAddress withRecipient(String name, String phone) => DeliveryAddress(
+      line: line,
+      label: label,
+      notes: notes,
+      zoneId: zoneId,
+      zoneName: zoneName,
+      latitude: latitude,
+      longitude: longitude,
+      recipientName: name,
+      recipientPhone: phone);
+
+  /// The person this address is for, when it names one: the recipient a gift checkout saved, or a
+  /// label that is not a place. "Home" and "Work" — the address sheet's own chips, in the current
+  /// language or in English — name places, not people.
+  String? personName(DeliveryStrings t) {
+    final String? saved = recipientName?.trim();
+    if (saved != null && saved.isNotEmpty) return saved;
+    final String? named = label?.trim();
+    if (named == null || named.isEmpty) return null;
+    final String lower = named.toLowerCase();
+    const Set<String> places = <String>{'home', 'work'};
+    if (places.contains(lower) ||
+        lower == t.custLabelHome.toLowerCase() ||
+        lower == t.custLabelWork.toLowerCase()) {
+      return null;
+    }
+    return named;
+  }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'line': line,
@@ -75,6 +119,8 @@ class DeliveryAddress {
         'zoneName': zoneName,
         'latitude': latitude,
         'longitude': longitude,
+        'recipientName': recipientName,
+        'recipientPhone': recipientPhone,
       };
 
   factory DeliveryAddress.fromJson(Map<String, dynamic> json) => DeliveryAddress(
@@ -85,6 +131,8 @@ class DeliveryAddress {
         zoneName: json['zoneName'] as String?,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
+        recipientName: json['recipientName'] as String?,
+        recipientPhone: json['recipientPhone'] as String?,
       );
 
   @override

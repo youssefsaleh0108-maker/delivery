@@ -1,6 +1,8 @@
 /// Order models mirroring the Order Manager API (Phase 2).
 library;
 
+import 'gift_models.dart';
+
 /// The lifecycle, mirroring `com.delivery.order.domain.OrderStatus`.
 enum OrderStatus {
   placed('PLACED', 'Placed'),
@@ -199,6 +201,7 @@ class DeliveryOrder {
     this.paidAt,
     required this.contactPhone,
     required this.notes,
+    this.gift,
     required this.items,
     required this.availableActions,
     required this.placedAt,
@@ -273,6 +276,10 @@ class DeliveryOrder {
   final String deliveryAddress;
   final String? contactPhone;
   final String? notes;
+
+  /// Who receives it and what goes with it, when the order is a gift; null on an ordinary order.
+  /// Its recipient phone is present only for the viewers the server allows — see [OrderGift].
+  final OrderGift? gift;
   final List<OrderLine> items;
   final List<OrderAction> availableActions;
   final DateTime? placedAt;
@@ -326,6 +333,9 @@ class DeliveryOrder {
         deliveryAddress: json['deliveryAddress'] as String? ?? '',
         contactPhone: json['contactPhone'] as String?,
         notes: json['notes'] as String?,
+        gift: json['gift'] is Map<String, dynamic>
+            ? OrderGift.fromJson(json['gift'] as Map<String, dynamic>)
+            : null,
         items: (json['items'] as List<dynamic>? ?? <dynamic>[])
             .map((dynamic e) => OrderLine.fromJson(e as Map<String, dynamic>))
             .toList(),

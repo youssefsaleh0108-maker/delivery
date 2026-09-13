@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'gift_models.dart';
 import 'order_models.dart';
 
 /// One basket line as Order Manager takes it: ids and a quantity, never a price.
@@ -54,6 +55,7 @@ class OrderSubmission {
     this.deliveryTier = DeliveryTier.standard,
     this.deliveryLatitude,
     this.deliveryLongitude,
+    this.gift,
     String? idempotencyKey,
   })  : items = List<OrderLineSubmission>.unmodifiable(items),
         idempotencyKey = idempotencyKey ?? newIdempotencyKey();
@@ -89,6 +91,14 @@ class OrderSubmission {
   final double? deliveryLatitude;
   final double? deliveryLongitude;
 
+  /// Who receives it and what goes with it, when this checkout is a gift; null otherwise.
+  ///
+  /// Sent in the body and so fingerprinted with everything else: a retry that changes the
+  /// recipient, the card or the wrap is a different order, refused rather than answered with the
+  /// first. A gift is never cash, so it is never queued by the offline outbox — which is also why
+  /// the recipient's phone never reaches the phone's own storage through [toJson].
+  final GiftDetails? gift;
+
   /// The request body.
   ///
   /// [expectedTotal] is the total the customer agreed to, when the caller wants the server to
@@ -116,6 +126,7 @@ class OrderSubmission {
           'deliveryLatitude': deliveryLatitude,
           'deliveryLongitude': deliveryLongitude,
         },
+        if (gift != null) 'gift': gift!.toJson(),
         if (expectedTotal != null) 'expectedTotal': num.parse(expectedTotal.toStringAsFixed(2)),
       };
 
@@ -138,6 +149,7 @@ class OrderSubmission {
         'deliveryTier': deliveryTier.wire,
         'deliveryLatitude': deliveryLatitude,
         'deliveryLongitude': deliveryLongitude,
+        'gift': gift?.toJson(),
       };
 
   factory OrderSubmission.fromJson(Map<String, dynamic> json) => OrderSubmission(
@@ -162,6 +174,9 @@ class OrderSubmission {
         deliveryTier: DeliveryTier.fromWire(json['deliveryTier'] as String?),
         deliveryLatitude: (json['deliveryLatitude'] as num?)?.toDouble(),
         deliveryLongitude: (json['deliveryLongitude'] as num?)?.toDouble(),
+        gift: json['gift'] is Map<String, dynamic>
+            ? GiftDetails.fromJson(json['gift'] as Map<String, dynamic>)
+            : null,
       );
 }
 

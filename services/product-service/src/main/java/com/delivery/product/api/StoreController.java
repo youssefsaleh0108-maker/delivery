@@ -715,6 +715,7 @@ public class StoreController {
                 product.getBarcode(),
                 product.isInStock(),
                 product.getCreatedAt(),
-                product.getUpdatedAt());
+                product.getUpdatedAt(),
+                product.isGiftFeatured());
     }
 }

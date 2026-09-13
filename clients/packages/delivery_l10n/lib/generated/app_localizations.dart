@@ -7106,41 +7106,11 @@ abstract class DeliveryStrings {
   /// **'All districts'**
   String get custAllDistricts;
 
-  /// No description provided for @custDiasporaTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Send to Lebanon'**
-  String get custDiasporaTitle;
-
   /// No description provided for @custDiasporaSub.
   ///
   /// In en, this message translates to:
   /// **'Diaspora Gifting Portal'**
   String get custDiasporaSub;
-
-  /// No description provided for @custDiasporaBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Remittance made real'**
-  String get custDiasporaBanner;
-
-  /// No description provided for @custDiasporaBlurb.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.'**
-  String get custDiasporaBlurb;
-
-  /// No description provided for @custFamilyRecipient.
-  ///
-  /// In en, this message translates to:
-  /// **'Family recipient'**
-  String get custFamilyRecipient;
-
-  /// No description provided for @custPersonalNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Attach a personal note (delivered with the order)'**
-  String get custPersonalNote;
 
   /// No description provided for @custPersonalNoteHint.
   ///
@@ -7163,7 +7133,7 @@ abstract class DeliveryStrings {
   /// No description provided for @custStartOrder.
   ///
   /// In en, this message translates to:
-  /// **'Select Items 0026 Start Order'**
+  /// **'Select Items & Start Order'**
   String get custStartOrder;
 
   /// No description provided for @custPickRecipient.
@@ -15997,6 +15967,330 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Some items were already decided elsewhere, so they\'ve left the list. Check the rest and save again.'**
   String get blitzListChanged;
+
+  /// No description provided for @giftHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a Gift'**
+  String get giftHubTitle;
+
+  /// No description provided for @giftHubBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remittance Made Real'**
+  String get giftHubBannerTitle;
+
+  /// No description provided for @giftHubBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Support your loved ones in Lebanon. Choose real essentials, groceries or hot meals, delivered to their door — often the same day.'**
+  String get giftHubBannerBody;
+
+  /// No description provided for @giftHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get giftHowItWorks;
+
+  /// No description provided for @giftStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from local shops'**
+  String get giftStep1Title;
+
+  /// No description provided for @giftStep1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick groceries, sweets, pharmacy items or a ready-made care bundle.'**
+  String get giftStep1Body;
+
+  /// No description provided for @giftStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter their address in Lebanon'**
+  String get giftStep2Title;
+
+  /// No description provided for @giftStep2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'We deliver wherever the shop you choose delivers.'**
+  String get giftStep2Body;
+
+  /// No description provided for @giftStep3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Same-day delivery'**
+  String get giftStep3Title;
+
+  /// No description provided for @giftStep3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider hands it over with your personal note — the same day, while the shop is open.'**
+  String get giftStep3Body;
+
+  /// No description provided for @giftCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift categories'**
+  String get giftCategories;
+
+  /// No description provided for @giftCatCarePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Care Package'**
+  String get giftCatCarePackage;
+
+  /// No description provided for @giftCatGroceries.
+  ///
+  /// In en, this message translates to:
+  /// **'Groceries'**
+  String get giftCatGroceries;
+
+  /// No description provided for @giftCatMedicine.
+  ///
+  /// In en, this message translates to:
+  /// **'Medicine & Health'**
+  String get giftCatMedicine;
+
+  /// No description provided for @giftRecentRecipients.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent recipients'**
+  String get giftRecentRecipients;
+
+  /// No description provided for @giftAddRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a recipient'**
+  String get giftAddRecipient;
+
+  /// No description provided for @giftFeaturedBundles.
+  ///
+  /// In en, this message translates to:
+  /// **'Featured care bundles'**
+  String get giftFeaturedBundles;
+
+  /// No description provided for @giftSameDayDeliverable.
+  ///
+  /// In en, this message translates to:
+  /// **'Same-day deliverable'**
+  String get giftSameDayDeliverable;
+
+  /// No description provided for @giftHomeEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a gift to Lebanon'**
+  String get giftHomeEntryTitle;
+
+  /// No description provided for @giftHomeEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Groceries, sweets and care bundles for family, delivered to their door'**
+  String get giftHomeEntrySub;
+
+  /// No description provided for @giftDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift Details'**
+  String get giftDetailsTitle;
+
+  /// No description provided for @giftCheckoutSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Diaspora Checkout'**
+  String get giftCheckoutSub;
+
+  /// No description provided for @giftRecipientInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient information'**
+  String get giftRecipientInfo;
+
+  /// No description provided for @giftRecipientName.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient name'**
+  String get giftRecipientName;
+
+  /// No description provided for @giftRecipientNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Who is receiving it?'**
+  String get giftRecipientNameRequired;
+
+  /// No description provided for @giftRecipientPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number (Lebanon)'**
+  String get giftRecipientPhone;
+
+  /// No description provided for @giftPhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a Lebanese number, e.g. 71 234 567'**
+  String get giftPhoneInvalid;
+
+  /// No description provided for @giftDeliveryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery date'**
+  String get giftDeliveryDate;
+
+  /// No description provided for @giftNoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach a personal note'**
+  String get giftNoteTitle;
+
+  /// No description provided for @giftNoteHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'The shop sends your note with the gift.'**
+  String get giftNoteHelper;
+
+  /// No description provided for @giftWrapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium gift wrapping'**
+  String get giftWrapTitle;
+
+  /// No description provided for @giftWrapSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Festive wrapping, with your note on a card (+{amount})'**
+  String giftWrapSubtitle(String amount);
+
+  /// No description provided for @giftPaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get giftPaymentTitle;
+
+  /// No description provided for @giftCashNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Gifts are paid online — the person receiving it is never asked to pay.'**
+  String get giftCashNotAllowed;
+
+  /// No description provided for @giftNoPaymentMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Gifts are paid online, and online payment isn\'t switched on yet — so a gift can\'t be sent right now.'**
+  String get giftNoPaymentMethods;
+
+  /// No description provided for @giftTermsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load the gift\'s payment options.'**
+  String get giftTermsFailed;
+
+  /// No description provided for @giftOfflineCannotWait.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift can\'t wait for the connection the way a cash order can — it\'s paid online. Send it once you\'re back online.'**
+  String get giftOfflineCannotWait;
+
+  /// No description provided for @giftOrderSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Order summary'**
+  String get giftOrderSummary;
+
+  /// No description provided for @giftLineQty.
+  ///
+  /// In en, this message translates to:
+  /// **'{qty}× {name}'**
+  String giftLineQty(int qty, String name);
+
+  /// No description provided for @giftWrapLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift wrapping'**
+  String get giftWrapLine;
+
+  /// No description provided for @giftDeliveryFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery fee'**
+  String get giftDeliveryFee;
+
+  /// No description provided for @giftTotalUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'Total USD'**
+  String get giftTotalUsd;
+
+  /// No description provided for @giftApproxLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {amount}'**
+  String giftApproxLbp(String amount);
+
+  /// No description provided for @giftTotalConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'The final total is confirmed when your gift is placed.'**
+  String get giftTotalConfirmed;
+
+  /// No description provided for @giftSendAndPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Gift & Pay'**
+  String get giftSendAndPay;
+
+  /// No description provided for @giftForName.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift for {name}'**
+  String giftForName(String name);
+
+  /// No description provided for @giftWrapRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift wrapping requested'**
+  String get giftWrapRequested;
+
+  /// No description provided for @giftCardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Card message'**
+  String get giftCardMessage;
+
+  /// No description provided for @giftRecipientPhoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient\'s phone'**
+  String get giftRecipientPhoneLabel;
+
+  /// No description provided for @giftBasketBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending this basket as a gift'**
+  String get giftBasketBanner;
+
+  /// No description provided for @giftBasketNotGift.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a gift'**
+  String get giftBasketNotGift;
+
+  /// No description provided for @giftDeliveredToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today, while the shop is open'**
+  String get giftDeliveredToday;
+
+  /// No description provided for @giftNoteLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String giftNoteLength(int used, int max);
+
+  /// No description provided for @giftUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift — who it\'s for shows once it\'s yours to carry'**
+  String get giftUnnamed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

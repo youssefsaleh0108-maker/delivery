@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
@@ -13,6 +11,7 @@ import 'cart.dart';
 import 'delivery_address.dart';
 import 'delivery_terms_book.dart';
 import 'order_outbox.dart';
+import 'order_placement.dart';
 
 /// Review the basket and place the order.
 ///
@@ -302,36 +301,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     if (!_form.currentState!.validate()) return;
 
-    // The merchant's delivery circle, honoured before promising: when the shop declared a radius
-    // and both pins exist, the spheroid decides. An address with no pin passes — the zones still
-    // gate it, and refusing over information nobody has would block real orders.
+    // The merchant's delivery circle, honoured before promising — the rule every checkout shares
+    // (isOutsideDeliveryRadius): an address with no pin passes, because the zones still gate it.
     final StoreCard? shop = widget.cart.store;
-    if (shop != null &&
-        shop.deliveryRadiusMetres != null &&
-        shop.latitude != null &&
-        shop.longitude != null &&
-        address.latitude != null &&
-        address.longitude != null) {
-      final double metres = _distanceMetres(shop.latitude!, shop.longitude!,
-          address.latitude!, address.longitude!);
-      if (metres > shop.deliveryRadiusMetres!) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(t.custOutsideDeliveryArea(shop.name,
-                (shop.deliveryRadiusMetres! / 1000).toStringAsFixed(1)))));
-        return;
-      }
+    if (isOutsideDeliveryRadius(shop, address)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t.custOutsideDeliveryArea(shop!.name,
+              (shop.deliveryRadiusMetres! / 1000).toStringAsFixed(1)))));
+      return;
     }
 
     // Read before the await below: re-selecting the address notifies the store, which re-seeds this
     // field, and reading it afterwards would send the address's saved note instead of what the
-    // customer actually typed. The diaspora gift note, when one was written, rides in front — the
-    // order's notes are the only thing that reaches the door.
-    final String typed = _notes.text.trim();
-    final String? gift = widget.cart.giftNote?.trim();
-    final String notes = <String>[
-      if (gift != null && gift.isNotEmpty) '🎁 $gift',
-      if (typed.isNotEmpty) typed,
-    ].join('\n');
+    // customer actually typed. Door instructions and nothing else: a gift basket never checks out
+    // here, and its card travels from the gift checkout as the gift's own message.
+    final String notes = _notes.text.trim();
 
     // One attempt per basket. Its key lives on the cart rather than on this screen, so backing out
     // after a try whose answer was lost and checking out again is recognised as the same attempt:
@@ -482,25 +466,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      // 422 is the interesting case: an item went out of stock, was archived, or the basket somehow
-      // spans two merchants. The server's message is specific, so show it rather than a generic one.
-      final String message = switch (e.response?.statusCode) {
-        // The server's own detail wins where it has one — it names the actual item — and only the
-        // fallback is translated. A specific English sentence beats a vague Arabic one here.
-        422 => (e.response?.data is Map<String, dynamic>
-                ? (e.response!.data as Map<String, dynamic>)['detail'] as String?
-                : null) ??
-            t.itemNoLongerAvailable,
-        // 402: the payment provider said no and the placement rolled back — there is no order.
-        // The provider's own sentence names the reason when it sent one.
-        402 => (e.response?.data is Map<String, dynamic>
-                ? (e.response!.data as Map<String, dynamic>)['detail'] as String?
-                : null) ??
-            t.custPaymentDeclined,
-        400 => t.checkDeliveryDetails,
-        _ => t.couldNotPlaceOrder,
-      };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      // A refusal: 422 (an item went, the shop closed), 402 (the payment was declined), 400. The
+      // sentence every checkout shares — the server's own detail where it sent one.
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(placementRefusalMessage(e, t))));
     }
   }
 
@@ -1523,16 +1492,3 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 }
-
-/// Great-circle distance in metres — the haversine, enough precision for a delivery circle.
-double _distanceMetres(double lat1, double lng1, double lat2, double lng2) {
-  const double earthRadius = 6371000;
-  final double dLat = _rad(lat2 - lat1);
-  final double dLng = _rad(lng2 - lng1);
-  final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-      math.cos(_rad(lat1)) * math.cos(_rad(lat2)) *
-          math.sin(dLng / 2) * math.sin(dLng / 2);
-  return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-}
-
-double _rad(double deg) => deg * math.pi / 180;
