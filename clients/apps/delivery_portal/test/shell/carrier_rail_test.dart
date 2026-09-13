@@ -61,6 +61,7 @@ PortalApis _apis({HttpClientAdapter? adapter}) {
     inventory: InventoryApi(dio),
     staff: StoreStaffApi(dio),
     reports: ReportsApi(dio),
+    catalogScan: CatalogScanApi(dio),
   );
 }
 
