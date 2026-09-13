@@ -1065,6 +1065,20 @@ class AttendanceServiceTest {
             verify(presenceRows, never()).findByCarrierIdOrderByLastSeenAtDesc(OTHER_CARRIER);
         }
 
+        /** Figures are never final, so every read says when it was computed — one instant a fleet. */
+        @Test
+        void every_read_says_the_instant_its_figures_were_computed() {
+            when(presenceRows.findByCarrierIdOrderByLastSeenAtDesc(CARRIER))
+                    .thenReturn(List.of(riderRow));
+            Instant before = Instant.now();
+
+            AttendanceService.FleetAttendance fleet = service.fleetAttendance(DISPATCHER, false,
+                    null, OCTOBER);
+
+            assertThat(fleet.asOf()).isBetween(before, Instant.now());
+            assertThat(october().asOf()).isEqualTo(NOW);
+        }
+
         @Test
         void backoffice_must_name_the_fleet() {
             assertThatThrownBy(() -> service.fleetAttendance("op-1", true, null, OCTOBER))

@@ -58,11 +58,14 @@ Query: the period, plus `carrierId` (UUID) — required for BACKOFFICE, ignored 
 
 ```json
 { "carrierId": "uuid", "zone": "Asia/Beirut", "from": "2026-10-01", "to": "2026-10-31",
+  "asOf": "2026-11-03T07:00:00Z",
   "riders": [ { "riderId": "kc-sub", "hasSchedule": true, "totals": { …AttendanceTotals… } } ] }
 ```
 
 `riders` is every rider **currently** linked to the fleet (`rider_presence.carrier_id`), sorted by
-id, each computed exactly as the per-rider read below — the two always agree.
+id, each computed exactly as the per-rider read below — the two always agree. `asOf` is the one
+instant every rider's figures were computed at; the figures are not final, so keep it with what you
+pay (see *When a period's figures are final*).
 
 ### AttendanceTotals
 
@@ -89,7 +92,8 @@ their current fleet's schedule (a rider on no fleet has none).
 
 ```json
 { "riderId": "kc-sub", "carrierId": "uuid|null", "zone": "Asia/Beirut",
-  "from": "2026-10-01", "to": "2026-10-31", "today": "2026-10-12", "hasSchedule": true,
+  "from": "2026-10-01", "to": "2026-10-31", "today": "2026-10-12",
+  "asOf": "2026-10-12T17:00:00Z", "hasSchedule": true,
   "days": [ …one AttendanceDay per date, in order… ], "totals": { …AttendanceTotals… } }
 ```
 
@@ -204,6 +208,26 @@ A past day — and today, once under way — is always judged against the assign
 
 Entries are append-only (`revoked_at`/`revoked_by`), so who changed a day, and from what, stays
 answerable. Duty sessions are never edited by anything here.
+
+## When a period's figures are final
+
+Never, on their own. Every read is computed from the duty evidence and the Manual Attendance Log as
+they stand at that moment, echoed as `asOf` (an ISO-8601 instant) on the fleet read and the rider
+read, and a period's figures can still change after the period is over:
+
+- **A night shift runs past the period's end.** A rider who arrives at 00:10 on 1 November for a
+  31 October 22:00 shift is attributed to 31 October, so October's `workedSeconds`, `lates` and
+  `absences` move after October ends (until that window closes, 31 October reads `PENDING`).
+- **Open sessions keep counting** until the rider closes them or the platform expires them, so a
+  day's `workedSeconds` and `overtimeSeconds` can grow after the period ends.
+- **The Manual Attendance Log reaches back.** Entries can be recorded, replaced or withdrawn for any
+  day inside the duty history (`duty-event-retention-days`, 400 days), which changes that day's
+  `status`, `daysWorked`, `manualSeconds`, and the late, absence, excused, sick and leave counts.
+
+Schedules are the one input that cannot move a past day (see the shift-assignment rules). So a pay
+run must **snapshot** what it pays: store the totals it used together with the read's `asOf`, never
+recompute a period it has already paid, and settle a later difference as an adjustment in a later
+run — re-reading the paid period and comparing it with the snapshot is how that difference is found.
 
 ## Known limits a pay run must allow for
 

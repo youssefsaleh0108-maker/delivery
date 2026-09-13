@@ -165,7 +165,7 @@ public class AttendanceService {
                     return new RiderTotals(riderId, month.hasSchedule(), month.totals());
                 })
                 .toList();
-        return new FleetAttendance(carrier, zone().getId(), period.from(), period.to(), riders);
+        return new FleetAttendance(carrier, zone().getId(), period.from(), period.to(), now, riders);
     }
 
     /** The whole derivation. Package-private with an explicit clock for the tests. */
@@ -199,7 +199,7 @@ public class AttendanceService {
                     zone, today, now));
         }
         return new RiderAttendance(riderId, carrierId, zone.getId(), period.from(), period.to(),
-                today, schedule.touches(period), days, AttendanceTotals.of(days));
+                today, now, schedule.touches(period), days, AttendanceTotals.of(days));
     }
 
     /**
@@ -740,6 +740,10 @@ public class AttendanceService {
      *
      * @param carrierId   the fleet whose schedule applied — null for a platform rider
      * @param today       today in {@code zone}; days after it are {@link Status#UPCOMING}
+     * @param asOf        the instant these figures were computed. They are never final — a night
+     *                    shift running past the period's end, an open session, or a manual entry
+     *                    up to the retention back can still change them — so a pay run keeps this
+     *                    beside the figures it paid, and settles later differences as adjustments.
      * @param hasSchedule whether any shift assignment touches the period. False means a freelancer
      *                    for the whole period: the client should show time on duty only, with no
      *                    late or absent legend at all.
@@ -751,6 +755,7 @@ public class AttendanceService {
             LocalDate from,
             LocalDate to,
             LocalDate today,
+            Instant asOf,
             boolean hasSchedule,
             List<AttendanceDay> days,
             AttendanceTotals totals) {
@@ -928,12 +933,18 @@ public class AttendanceService {
     public record RiderTotals(String riderId, boolean hasSchedule, AttendanceTotals totals) {
     }
 
-    /** A fleet over one period. */
+    /**
+     * A fleet over one period.
+     *
+     * @param asOf the one instant every rider's figures were computed at; see
+     *             {@link RiderAttendance#asOf()} for why a pay run keeps it
+     */
     public record FleetAttendance(
             UUID carrierId,
             String zone,
             LocalDate from,
             LocalDate to,
+            Instant asOf,
             List<RiderTotals> riders) {
     }
 

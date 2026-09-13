@@ -1,6 +1,7 @@
 package com.delivery.tracking.api;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -94,7 +95,7 @@ class AttendanceControllerAccessTest {
 
     private static RiderAttendance emptyMonth() {
         return new RiderAttendance("r1", CARRIER, "Asia/Beirut", OCTOBER.from(), OCTOBER.to(),
-                LocalDate.of(2026, 10, 12), false, List.of(),
+                LocalDate.of(2026, 10, 12), Instant.parse("2026-10-12T17:00:00Z"), false, List.of(),
                 new AttendanceTotals(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, BigDecimal.ZERO,
                         BigDecimal.ZERO));
     }
@@ -136,7 +137,11 @@ class AttendanceControllerAccessTest {
 
             mvc.perform(get("/api/tracking/riders/r1/attendance").param("month", "2026-10"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.zone").value("Asia/Beirut"));
+                    .andExpect(jsonPath("$.zone").value("Asia/Beirut"))
+                    // When the figures were computed, which a pay run stores beside them. Present
+                    // only: standalone MockMvc lacks Spring Boot's Jackson defaults, so it prints
+                    // instants as numbers where the running service writes ISO-8601.
+                    .andExpect(jsonPath("$.asOf").exists());
 
             verify(attendance).riderAttendance("r1", DISPATCHER, false, OCTOBER);
         }
