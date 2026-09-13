@@ -1,5 +1,6 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -12,6 +13,10 @@ import 'package:flutter/material.dart';
 /// Until an area exists, every shop charges one delivery fee and delivers anywhere. Adding the
 /// first area does not change that on its own: a shop only starts pricing by area once it sets its
 /// own coverage.
+///
+/// An area can also be given a centre — roughly the middle of the neighbourhood — which is what puts
+/// it on the merchant Demand Radar's map and lets a shop's pin find the areas around it. It is
+/// optional and never prices anything; each card says whether its area is on that map.
 class ZonesScreen extends StatefulWidget {
   const ZonesScreen({super.key, required this.api});
 
@@ -64,9 +69,20 @@ class _ZonesScreenState extends State<ZonesScreen> {
     await _run(
       () => (existing == null
               ? widget.api.create(
-                  name: draft.name, region: draft.region, sortOrder: draft.sortOrder)
-              : widget.api.rename(existing.id,
-                  name: draft.name, region: draft.region, sortOrder: draft.sortOrder))
+                  name: draft.name,
+                  region: draft.region,
+                  sortOrder: draft.sortOrder,
+                  centerLat: draft.centerLat,
+                  centerLng: draft.centerLng,
+                )
+              : widget.api.rename(
+                  existing.id,
+                  name: draft.name,
+                  region: draft.region,
+                  sortOrder: draft.sortOrder,
+                  centerLat: draft.centerLat,
+                  centerLng: draft.centerLng,
+                ))
           .then((_) {}),
       existing == null ? 'Area added' : 'Area updated',
     );
@@ -164,6 +180,7 @@ class _ZonesScreenState extends State<ZonesScreen> {
   }
 
   Widget _card(DeliveryZone zone) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: DeliverySpacing.sm),
       child: SoftCard(
@@ -184,6 +201,9 @@ class _ZonesScreenState extends State<ZonesScreen> {
                     <String>[
                       if (zone.region != null && zone.region!.isNotEmpty) zone.region!,
                       'order ${zone.sortOrder}',
+                      // Whether the merchant demand map can draw this area. Worth seeing on the
+                      // list, because an unplaced area is silently missing from every shop's map.
+                      zone.isPlaced ? t.heatmapZoneOnMap : t.heatmapZoneNotOnMap,
                     ].join('  ·  '),
                     style: const TextStyle(fontSize: 12.5, color: DeliveryColors.muted),
                   ),
@@ -217,11 +237,15 @@ class _ZonesScreenState extends State<ZonesScreen> {
 }
 
 class _Draft {
-  const _Draft(this.name, this.region, this.sortOrder);
+  const _Draft(this.name, this.region, this.sortOrder, this.centerLat, this.centerLng);
 
   final String name;
   final String? region;
   final int sortOrder;
+
+  /// Both or neither; the dialog refuses one without the other before it closes.
+  final double? centerLat;
+  final double? centerLng;
 }
 
 class _ZoneDialog extends StatefulWidget {
@@ -241,56 +265,108 @@ class _ZoneDialogState extends State<_ZoneDialog> {
       TextEditingController(text: widget.existing?.region ?? '');
   late final TextEditingController _sort =
       TextEditingController(text: '${widget.existing?.sortOrder ?? 100}');
+  late final TextEditingController _lat =
+      TextEditingController(text: widget.existing?.centerLat?.toString() ?? '');
+  late final TextEditingController _lng =
+      TextEditingController(text: widget.existing?.centerLng?.toString() ?? '');
 
   @override
   void dispose() {
     _name.dispose();
     _region.dispose();
     _sort.dispose();
+    _lat.dispose();
+    _lng.dispose();
     super.dispose();
+  }
+
+  /// One axis of the centre. Empty is fine only while the other axis is empty too: half a centre
+  /// would draw the area on the equator or the meridian, and the server refuses it anyway.
+  static String? _axisError(
+    String? value,
+    TextEditingController other, {
+    required double limit,
+    required String rangeMessage,
+    required String pairMessage,
+  }) {
+    final String text = (value ?? '').trim();
+    final bool otherEmpty = other.text.trim().isEmpty;
+    if (text.isEmpty) return otherEmpty ? null : pairMessage;
+    final double? parsed = double.tryParse(text);
+    if (parsed == null || parsed < -limit || parsed > limit) return rangeMessage;
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return AlertDialog(
       title: Text(widget.existing == null ? 'New area' : widget.existing!.name),
       content: Form(
         key: _form,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            TextFormField(
-              controller: _name,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Area name',
-                // The name a customer picks from a list, so it has to read like the place they
-                // would say out loud rather than an administrative district.
-                helperText: 'What a customer would call it — "Hamra", not "District 4"',
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextFormField(
+                controller: _name,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Area name',
+                  // The name a customer picks from a list, so it has to read like the place they
+                  // would say out loud rather than an administrative district.
+                  helperText: 'What a customer would call it — "Hamra", not "District 4"',
+                ),
+                validator: (String? v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
-              validator: (String? v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: DeliverySpacing.sm),
-            TextFormField(
-              controller: _region,
-              decoration: const InputDecoration(
-                labelText: 'Region (optional)',
-                helperText: 'Groups areas in the picker — "Beirut", "Mount Lebanon"',
+              const SizedBox(height: DeliverySpacing.sm),
+              TextFormField(
+                controller: _region,
+                decoration: const InputDecoration(
+                  labelText: 'Region (optional)',
+                  helperText: 'Groups areas in the picker — "Beirut", "Mount Lebanon"',
+                ),
               ),
-            ),
-            const SizedBox(height: DeliverySpacing.sm),
-            TextFormField(
-              controller: _sort,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Order in the list',
-                helperText: 'Lower comes first; ties fall back to the name',
+              const SizedBox(height: DeliverySpacing.sm),
+              TextFormField(
+                controller: _sort,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Order in the list',
+                  helperText: 'Lower comes first; ties fall back to the name',
+                ),
+                validator: (String? v) =>
+                    int.tryParse((v ?? '').trim()) == null ? 'A number' : null,
               ),
-              validator: (String? v) =>
-                  int.tryParse((v ?? '').trim()) == null ? 'A number' : null,
-            ),
-          ],
+              const SizedBox(height: DeliverySpacing.sm),
+              TextFormField(
+                controller: _lat,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true, signed: true),
+                decoration: InputDecoration(
+                  labelText: t.heatmapZoneCentreLatitude,
+                  helperText: t.heatmapZoneCentreHelp,
+                  helperMaxLines: 3,
+                ),
+                validator: (String? v) => _axisError(v, _lng,
+                    limit: 90,
+                    rangeMessage: t.heatmapZoneCentreLatRange,
+                    pairMessage: t.heatmapZoneCentreBoth),
+              ),
+              const SizedBox(height: DeliverySpacing.sm),
+              TextFormField(
+                controller: _lng,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true, signed: true),
+                decoration: InputDecoration(labelText: t.heatmapZoneCentreLongitude),
+                validator: (String? v) => _axisError(v, _lat,
+                    limit: 180,
+                    rangeMessage: t.heatmapZoneCentreLngRange,
+                    pairMessage: t.heatmapZoneCentreBoth),
+              ),
+            ],
+          ),
         ),
       ),
       actions: <Widget>[
@@ -306,6 +382,8 @@ class _ZoneDialogState extends State<_ZoneDialog> {
               _name.text.trim(),
               region.isEmpty ? null : region,
               int.parse(_sort.text.trim()),
+              double.tryParse(_lat.text.trim()),
+              double.tryParse(_lng.text.trim()),
             ));
           },
           style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),

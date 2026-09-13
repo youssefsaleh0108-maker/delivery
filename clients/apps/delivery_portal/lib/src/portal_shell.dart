@@ -68,6 +68,7 @@ class PortalApis {
     required this.inventory,
     required this.staff,
     required this.reports,
+    required this.demand,
   });
 
   final CatalogApi catalog;
@@ -114,6 +115,9 @@ class PortalApis {
   final InventoryApi inventory;
   final StoreStaffApi staff;
   final ReportsApi reports;
+
+  /// How busy the neighbourhoods around a shop are — the merchant Demand Radar.
+  final DemandApi demand;
 }
 
 /// One destination in a rail.
@@ -289,6 +293,16 @@ class PortalArea {
           storeId: storeId,
           access: const MerchantAccess.owner(),
         )),
+      ),
+      // The Demand Radar (Figma 121:8): which neighbourhoods around the shop are ordering. Appended
+      // like the suite above, never inserted — `jump(2)` must keep meaning Orders. The portal is
+      // owner-only (MERCHANT), which is exactly who the density endpoint answers.
+      PortalDestination(
+        icon: Icons.radar,
+        selectedIcon: Icons.radar,
+        label: (DeliveryStrings t) => t.heatmapTitle,
+        build: (PortalApis a, _, __, ___) => _withStore(
+            a, (String? storeId) => DemandRadarScreen(api: a.demand, storeId: storeId)),
       ),
     ],
   );
