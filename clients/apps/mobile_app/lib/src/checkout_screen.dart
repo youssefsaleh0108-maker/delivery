@@ -313,14 +313,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Read before the await below: re-selecting the address notifies the store, which re-seeds this
     // field, and reading it afterwards would send the address's saved note instead of what the
-    // customer actually typed. The diaspora gift note, when one was written, rides in front — the
-    // order's notes are the only thing that reaches the door.
-    final String typed = _notes.text.trim();
-    final String? gift = widget.cart.giftNote?.trim();
-    final String notes = <String>[
-      if (gift != null && gift.isNotEmpty) '🎁 $gift',
-      if (typed.isNotEmpty) typed,
-    ].join('\n');
+    // customer actually typed. Door instructions and nothing else: a gift basket never checks out
+    // here, and its card travels from the gift checkout as the gift's own message.
+    final String notes = _notes.text.trim();
 
     // One attempt per basket. Its key lives on the cart rather than on this screen, so backing out
     // after a try whose answer was lost and checking out again is recognised as the same attempt:

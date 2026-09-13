@@ -3950,24 +3950,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custAllDistricts => 'All districts';
 
   @override
-  String get custDiasporaTitle => 'Send to Lebanon';
-
-  @override
   String get custDiasporaSub => 'Diaspora Gifting Portal';
-
-  @override
-  String get custDiasporaBanner => 'Remittance made real';
-
-  @override
-  String get custDiasporaBlurb =>
-      'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.';
-
-  @override
-  String get custFamilyRecipient => 'Family recipient';
-
-  @override
-  String get custPersonalNote =>
-      'Attach a personal note (delivered with the order)';
 
   @override
   String get custPersonalNoteHint =>
@@ -7481,12 +7464,6 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get giftCatGroceries => 'Groceries';
 
   @override
-  String get giftCatSweets => 'Sweets & Pastries';
-
-  @override
-  String get giftCatBabyKids => 'Baby & Kids';
-
-  @override
   String get giftCatMedicine => 'Medicine & Health';
 
   @override
@@ -7531,15 +7508,6 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get giftDeliveryDate => 'Delivery date';
-
-  @override
-  String get giftToday => 'Today (same day)';
-
-  @override
-  String get giftTomorrow => 'Tomorrow';
-
-  @override
-  String get giftSchedule => 'Schedule';
 
   @override
   String get giftNoteTitle => 'Attach a personal note';
@@ -7622,4 +7590,16 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get giftBasketNotGift => 'Not a gift';
+
+  @override
+  String get giftDeliveredToday => 'Today, while the shop is open';
+
+  @override
+  String giftNoteLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get giftUnnamed =>
+      'A gift — who it\'s for shows once it\'s yours to carry';
 }

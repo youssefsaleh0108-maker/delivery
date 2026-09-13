@@ -112,6 +112,25 @@ void main() {
       expect(order.gift?.wrapFee, 3.0);
     });
 
+    test('reads a name and card the server withheld as nothing, and keeps the wrap', () {
+      // What a rider browsing the job board, or a delivery company's staff, are sent.
+      final DeliveryOrder order = DeliveryOrder.fromJson(<String, dynamic>{
+        ...orderJson(),
+        'gift': <String, dynamic>{
+          'recipientName': null,
+          'recipientPhone': null,
+          'message': null,
+          'wrap': true,
+          'wrapFee': 3.0,
+        },
+      });
+
+      expect(order.gift, isNotNull);
+      expect(order.gift?.recipientName, isNull);
+      expect(order.gift?.message, isNull);
+      expect(order.gift?.wrap, isTrue);
+    });
+
     test('an ordinary order has none', () {
       expect(DeliveryOrder.fromJson(orderJson()).gift, isNull);
     });

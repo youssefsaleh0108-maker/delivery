@@ -3926,23 +3926,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custAllDistricts => 'كل المناطق';
 
   @override
-  String get custDiasporaTitle => 'أرسل إلى لبنان';
-
-  @override
   String get custDiasporaSub => 'بوابة هدايا المغتربين';
-
-  @override
-  String get custDiasporaBanner => 'الحوالة الحقيقية';
-
-  @override
-  String get custDiasporaBlurb =>
-      'ادفع بالدولار من الخارج — ونوصل البقالة الطازجة والدواء والطعام الساخن إلى بابهم في لبنان.';
-
-  @override
-  String get custFamilyRecipient => 'المستلم من العائلة';
-
-  @override
-  String get custPersonalNote => 'أرفق رسالة شخصية (تُسلَّم مع الطلب)';
 
   @override
   String get custPersonalNoteHint =>
@@ -7485,12 +7469,6 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get giftCatGroceries => 'بقالة';
 
   @override
-  String get giftCatSweets => 'حلويات ومعجنات';
-
-  @override
-  String get giftCatBabyKids => 'الرضّع والأطفال';
-
-  @override
   String get giftCatMedicine => 'الدواء والصحة';
 
   @override
@@ -7535,15 +7513,6 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get giftDeliveryDate => 'تاريخ التوصيل';
-
-  @override
-  String get giftToday => 'اليوم';
-
-  @override
-  String get giftTomorrow => 'غداً';
-
-  @override
-  String get giftSchedule => 'جدولة';
 
   @override
   String get giftNoteTitle => 'أرفق رسالة شخصية';
@@ -7624,4 +7593,15 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get giftBasketNotGift => 'ليست هدية';
+
+  @override
+  String get giftDeliveredToday => 'اليوم، خلال ساعات عمل المتجر';
+
+  @override
+  String giftNoteLength(int used, int max) {
+    return '$used من $max';
+  }
+
+  @override
+  String get giftUnnamed => 'هدية — يظهر اسم المستلم عندما تتولى توصيلها';
 }

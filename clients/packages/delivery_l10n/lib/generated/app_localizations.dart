@@ -7106,41 +7106,11 @@ abstract class DeliveryStrings {
   /// **'All districts'**
   String get custAllDistricts;
 
-  /// No description provided for @custDiasporaTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Send to Lebanon'**
-  String get custDiasporaTitle;
-
   /// No description provided for @custDiasporaSub.
   ///
   /// In en, this message translates to:
   /// **'Diaspora Gifting Portal'**
   String get custDiasporaSub;
-
-  /// No description provided for @custDiasporaBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Remittance made real'**
-  String get custDiasporaBanner;
-
-  /// No description provided for @custDiasporaBlurb.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.'**
-  String get custDiasporaBlurb;
-
-  /// No description provided for @custFamilyRecipient.
-  ///
-  /// In en, this message translates to:
-  /// **'Family recipient'**
-  String get custFamilyRecipient;
-
-  /// No description provided for @custPersonalNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Attach a personal note (delivered with the order)'**
-  String get custPersonalNote;
 
   /// No description provided for @custPersonalNoteHint.
   ///
@@ -13274,18 +13244,6 @@ abstract class DeliveryStrings {
   /// **'Groceries'**
   String get giftCatGroceries;
 
-  /// No description provided for @giftCatSweets.
-  ///
-  /// In en, this message translates to:
-  /// **'Sweets & Pastries'**
-  String get giftCatSweets;
-
-  /// No description provided for @giftCatBabyKids.
-  ///
-  /// In en, this message translates to:
-  /// **'Baby & Kids'**
-  String get giftCatBabyKids;
-
   /// No description provided for @giftCatMedicine.
   ///
   /// In en, this message translates to:
@@ -13375,24 +13333,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Delivery date'**
   String get giftDeliveryDate;
-
-  /// No description provided for @giftToday.
-  ///
-  /// In en, this message translates to:
-  /// **'Today (same day)'**
-  String get giftToday;
-
-  /// No description provided for @giftTomorrow.
-  ///
-  /// In en, this message translates to:
-  /// **'Tomorrow'**
-  String get giftTomorrow;
-
-  /// No description provided for @giftSchedule.
-  ///
-  /// In en, this message translates to:
-  /// **'Schedule'**
-  String get giftSchedule;
 
   /// No description provided for @giftNoteTitle.
   ///
@@ -13531,6 +13471,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Not a gift'**
   String get giftBasketNotGift;
+
+  /// No description provided for @giftDeliveredToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today, while the shop is open'**
+  String get giftDeliveredToday;
+
+  /// No description provided for @giftNoteLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String giftNoteLength(int used, int max);
+
+  /// No description provided for @giftUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift — who it\'s for shows once it\'s yours to carry'**
+  String get giftUnnamed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

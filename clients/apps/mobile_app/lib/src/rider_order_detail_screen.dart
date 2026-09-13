@@ -670,7 +670,8 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
 
   /// Who to hand a gift to. The rider carrying it is the one person besides the customer and
   /// support the server gives the recipient's phone to, because they ring it at the door; the card
-  /// is shown so it goes over with the goods.
+  /// is shown so it goes over with the goods. On the job board the server withholds the name and the
+  /// card — the rider is browsing work, not carrying it — so the panel says only that it is a gift.
   Widget _giftPanel(DeliveryStrings t, OrderGift gift) {
     final String? message = gift.message?.trim();
     return Container(
@@ -689,7 +690,9 @@ class _RiderOrderDetailScreenState extends State<RiderOrderDetailScreen> {
               const SizedBox(width: DeliverySpacing.sm),
               Expanded(
                 child: Text(
-                  t.giftForName(gift.recipientName),
+                  gift.recipientName == null
+                      ? t.giftUnnamed
+                      : t.giftForName(gift.recipientName!),
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,

@@ -817,7 +817,10 @@ class _MerchantOrderDetailScreenState extends State<MerchantOrderDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          _sectionLabel(t.giftForName(gift.recipientName)),
+          // The shop is always told the name; the fallback is the model's rule, not a case here.
+          _sectionLabel(gift.recipientName == null
+              ? t.giftUnnamed
+              : t.giftForName(gift.recipientName!)),
           if (gift.wrap) ...<Widget>[
             const SizedBox(height: DeliverySpacing.sm),
             Row(

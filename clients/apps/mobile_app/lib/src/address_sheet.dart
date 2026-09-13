@@ -378,8 +378,16 @@ class _AddressSheetState extends State<_AddressSheet> {
     final DeliveryZone? zone = _zoneId == null
         ? null
         : _zones.where((DeliveryZone z) => z.id == _zoneId).firstOrNull;
+    final String line = _line.text.trim();
+    // Who receives gifts here belongs to the place. Addresses are matched by their line, so saving
+    // one whose line is unchanged — a new note, label, area or pin — replaces the saved address and
+    // must carry its recipient over. A different line is a different door, and starts with none.
+    final DeliveryAddress? saved = <DeliveryAddress>[
+      if (widget.store.selected != null) widget.store.selected!,
+      ...widget.store.recents,
+    ].where((DeliveryAddress a) => a.line.trim().toLowerCase() == line.toLowerCase()).firstOrNull;
     await widget.store.select(DeliveryAddress(
-      line: _line.text.trim(),
+      line: line,
       label: _label.text.trim().isEmpty ? null : _label.text.trim(),
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
       zoneId: zone?.id,
@@ -389,6 +397,8 @@ class _AddressSheetState extends State<_AddressSheet> {
       // tracking service has a point to measure the rider's ETA against.
       latitude: _lat,
       longitude: _lng,
+      recipientName: saved?.recipientName,
+      recipientPhone: saved?.recipientPhone,
     ));
     if (mounted) Navigator.of(context).pop();
   }

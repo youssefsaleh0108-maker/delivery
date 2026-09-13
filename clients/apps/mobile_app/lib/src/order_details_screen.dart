@@ -821,7 +821,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               const SizedBox(width: DeliverySpacing.sm),
               Expanded(
                 child: Text(
-                  t.giftForName(gift.recipientName),
+                  // Always named for the customer who sent it; the fallback is the model's rule.
+                  gift.recipientName == null
+                      ? t.giftUnnamed
+                      : t.giftForName(gift.recipientName!),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

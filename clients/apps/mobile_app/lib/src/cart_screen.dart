@@ -310,7 +310,7 @@ class _CartScreenState extends State<CartScreen> {
               children: <Widget>[
                 _storeStrip(context),
                 if (_splitAvailable) _modeToggle(context),
-                if (_splitMode) _participantsRow(context),
+                if (_splitting) _participantsRow(context),
                 Padding(
                   padding: const EdgeInsetsDirectional.all(_gutter),
                   child: Column(
@@ -318,12 +318,12 @@ class _CartScreenState extends State<CartScreen> {
                       for (int i = 0; i < lines.length; i++) ...<Widget>[
                         if (i > 0) const SizedBox(height: DeliverySpacing.md - 4),
                         _basketRow(context, lines[i]),
-                        if (_splitMode) _assignChip(context, lines[i]),
+                        if (_splitting) _assignChip(context, lines[i]),
                       ],
                     ],
                   ),
                 ),
-                if (_splitMode) _splitSummary(context),
+                if (_splitting) _splitSummary(context),
                 _promoSection(context),
                 const SizedBox(height: DeliverySpacing.lg),
                 _summary(context),
@@ -334,8 +334,18 @@ class _CartScreenState extends State<CartScreen> {
 
   // ---------------------------------------------------------- group split (Figma 83:7)
 
+  /// Whether this basket may be split with friends. Never a gift: the gift checkout attaches no
+  /// split plan, and placing the gift settles the basket — which clears the plan and would orphan
+  /// the payment requests the friends were sent.
   bool get _splitAvailable =>
-      widget.splitApi != null && widget.profileApi != null && widget.session != null;
+      widget.splitApi != null &&
+      widget.profileApi != null &&
+      widget.session != null &&
+      !widget.cart.isGift;
+
+  /// Split mode as drawn: chosen, and still available — a basket made a gift after Split was chosen
+  /// shows none of it.
+  bool get _splitting => _splitMode && _splitAvailable;
 
   /// Split mode on this basket. Participants[0] is always the host.
   bool _splitMode = false;

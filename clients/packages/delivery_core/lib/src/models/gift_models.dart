@@ -148,7 +148,7 @@ class GiftDetails {
 /// The gift on a placed order, as the signed-in person may see it — [DeliveryOrder.gift].
 class OrderGift {
   const OrderGift({
-    required this.recipientName,
+    this.recipientName,
     this.recipientPhone,
     this.message,
     this.wrap = false,
@@ -156,21 +156,24 @@ class OrderGift {
   });
 
   factory OrderGift.fromJson(Map<String, dynamic> json) => OrderGift(
-        recipientName: json['recipientName'] as String? ?? '',
+        recipientName: json['recipientName'] as String?,
         recipientPhone: json['recipientPhone'] as String?,
         message: json['message'] as String?,
         wrap: json['wrap'] as bool? ?? false,
         wrapFee: (json['wrapFee'] as num?)?.toDouble() ?? 0,
       );
 
-  final String recipientName;
+  /// Who it is for. Null unless this viewer handles the order — the shop, the rider carrying it, the
+  /// customer, or support. A rider browsing the job board and the delivery company's staff are told
+  /// only that it is a gift and whether it is wrapped: say that, never an empty name.
+  final String? recipientName;
 
   /// Null unless this viewer needs it: the rider carrying the order, the customer who typed it, or
   /// support. The shop, the job board and the delivery company's staff never receive it — render
   /// null as nothing at all.
   final String? recipientPhone;
 
-  /// The card; null when the customer wrote none.
+  /// The card; null when the customer wrote none, or when [recipientName] is withheld too.
   final String? message;
   final bool wrap;
 

@@ -31,8 +31,11 @@ import 'order_placement.dart';
 /// * **Never queued for later.** The offline outbox takes cash orders only — a card or wallet hold
 ///   needs the provider while the customer waits — so a gift that cannot reach the platform is not
 ///   sent and not queued, and the screen says why ([DeliveryStrings.giftOfflineCannotWait]).
-/// * **Today only.** Order Manager has no scheduling; Tomorrow and Schedule are drawn as coming soon
-///   and cannot be chosen, and the order goes STANDARD.
+/// * **Today only.** Order Manager has no scheduling, so the screen says in one plain line that the
+///   gift goes today while the shop is open — offering no day it cannot keep — and the order goes
+///   STANDARD.
+/// * **The card and the name are held to the server's own limits**, counted in UTF-16 units as Java
+///   counts them, so a card full of emoji is stopped in the field rather than refused at placement.
 ///
 /// **The total is honest or absent.** Goods; the delivery fee Order Manager will charge to the
 /// chosen address when this phone knows it ([DeliveryTermsBook]) and a dash when it does not; the
@@ -96,6 +99,10 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
   /// The development provider never reads the instrument token; a fixed marker is the honest value,
   /// exactly as the regular checkout sends.
   static const String _devInstrumentToken = 'dev-test-instrument';
+
+  /// Order Manager's `@Size` limits on the recipient's name and on the card, in UTF-16 code units.
+  static const int _nameLimit = 80;
+  static const int _cardLimit = 240;
 
   @override
   void initState() {
@@ -485,7 +492,7 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
           _fieldLabel(t.giftRecipientName),
           TextFormField(
             controller: _name,
-            maxLength: 80,
+            inputFormatters: const <TextInputFormatter>[_Utf16LengthLimit(_nameLimit)],
             textCapitalization: TextCapitalization.words,
             style: const TextStyle(fontSize: 14, color: DeliveryColors.ink),
             decoration: _filled(),
@@ -494,37 +501,40 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
           ),
           gap,
           _fieldLabel(t.giftRecipientPhone),
-          // A phone number reads left to right in Arabic too, prefix first.
-          Directionality(
+          // A phone number reads left to right in Arabic too, prefix first: the row is laid out left
+          // to right, and the prefix and the number are written left to right. Only those — the
+          // field's error is a sentence in the customer's language and keeps the ambient direction.
+          Row(
             textDirection: TextDirection.ltr,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  alignment: Alignment.center,
-                  decoration: _filledBox,
-                  child: const Text(LebanesePhone.countryCode,
-                      style: TextStyle(fontSize: 14, color: DeliveryColors.ink)),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.center,
+                decoration: _filledBox,
+                child: const Text(LebanesePhone.countryCode,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(fontSize: 14, color: DeliveryColors.ink)),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: TextFormField(
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  textDirection: TextDirection.ltr,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9 +\-]')),
+                    LengthLimitingTextInputFormatter(20),
+                  ],
+                  style: const TextStyle(fontSize: 14, color: DeliveryColors.ink),
+                  decoration: _filled(hint: '71 234 567')
+                      .copyWith(hintTextDirection: TextDirection.ltr),
+                  validator: (String? value) =>
+                      LebanesePhone.nationalNumber(value ?? '') == null ? t.giftPhoneInvalid : null,
                 ),
-                const SizedBox(width: DeliverySpacing.sm),
-                Expanded(
-                  child: TextFormField(
-                    controller: _phone,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: <TextInputFormatter>[
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9 +\-]')),
-                      LengthLimitingTextInputFormatter(20),
-                    ],
-                    style: const TextStyle(fontSize: 14, color: DeliveryColors.ink),
-                    decoration: _filled(hint: '71 234 567'),
-                    validator: (String? value) =>
-                        LebanesePhone.nationalNumber(value ?? '') == null ? t.giftPhoneInvalid : null,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           gap,
           _fieldLabel(t.deliveryAddress),
@@ -558,46 +568,14 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
           ),
           gap,
           _fieldLabel(t.giftDeliveryDate),
-          Row(
-            children: <Widget>[
-              Expanded(child: Semantics(selected: true, child: _datePill(t.giftToday, true))),
-              const SizedBox(width: DeliverySpacing.sm),
-              // Order Manager has no scheduling: drawn, and not choosable, until it does.
-              Expanded(
-                child: YdComingSoon.wrap(
-                    label: t.authComingSoon, child: _datePill(t.giftTomorrow, false)),
-              ),
-              const SizedBox(width: DeliverySpacing.sm),
-              Expanded(
-                child: YdComingSoon.wrap(
-                    label: t.authComingSoon, child: _datePill(t.giftSchedule, false)),
-              ),
-            ],
+          // A line, not a choice. Order Manager has no scheduling and a closed shop refuses the
+          // order, so a placed gift goes today while the shop is open — and no control offers a day
+          // it cannot keep.
+          Text(
+            t.giftDeliveredToday,
+            style: const TextStyle(fontSize: 13, color: DeliveryColors.ink, height: 1.35),
           ),
         ],
-      ),
-    );
-  }
-
-  static Widget _datePill(String label, bool selected) {
-    return Container(
-      height: 36,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: DeliverySpacing.xs),
-      decoration: BoxDecoration(
-        color: selected ? DeliveryColors.brandSoft : DeliveryColors.background,
-        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-        border: Border.all(color: selected ? DeliveryColors.brand : DeliveryColors.background),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? DeliveryColors.brand : DeliveryColors.muted,
-        ),
       ),
     );
   }
@@ -621,18 +599,34 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
             controller: _note,
             minLines: 3,
             maxLines: 5,
-            // The server's limit for the card. The field refuses the 241st character rather than
-            // letting a placement fail on it.
-            maxLength: 240,
+            // The server's limit for the card, counted as the server counts it: the field stops at
+            // the limit rather than letting a placement fail on it.
+            inputFormatters: const <TextInputFormatter>[_Utf16LengthLimit(_cardLimit)],
             style: const TextStyle(fontSize: 13, color: DeliveryColors.ink, height: 18 / 13),
             decoration: _filled(hint: t.custPersonalNoteHint),
             onChanged: (String value) =>
                 widget.cart.giftNote = value.trim().isEmpty ? null : value.trim(),
           ),
           const SizedBox(height: DeliverySpacing.xs),
-          Text(
-            t.giftNoteHelper,
-            style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.3),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t.giftNoteHelper,
+                  style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.3),
+                ),
+              ),
+              const SizedBox(width: DeliverySpacing.sm),
+              // The count the limit uses, so the figure reaches its end exactly when the card does.
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _note,
+                builder: (BuildContext context, TextEditingValue value, Widget? _) => Text(
+                  t.giftNoteLength(value.text.length, _cardLimit),
+                  style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.3),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -896,6 +890,39 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Holds a field to [max] UTF-16 code units — what Java's `String.length()`, and so Order Manager's
+/// `@Size`, counts — and cuts only between whole characters.
+///
+/// Not Flutter's `maxLength`, which counts characters as a person sees them: an emoji is one there
+/// and two here, so a card that field accepted could come back from placement as a 400 the customer
+/// would read as "check delivery details".
+class _Utf16LengthLimit extends TextInputFormatter {
+  const _Utf16LengthLimit(this.max);
+
+  final int max;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.length <= max) return newValue;
+    // Already full and typed at a caret: the keystroke is refused, not the end of the card trimmed.
+    if (oldValue.text.length == max && oldValue.selection.isCollapsed) return oldValue;
+    final StringBuffer kept = StringBuffer();
+    for (final String character in newValue.text.characters) {
+      if (kept.length + character.length > max) break;
+      kept.write(character);
+    }
+    final String text = kept.toString();
+    int within(int offset) => offset > text.length ? text.length : offset;
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection(
+        baseOffset: within(newValue.selection.baseOffset),
+        extentOffset: within(newValue.selection.extentOffset),
       ),
     );
   }

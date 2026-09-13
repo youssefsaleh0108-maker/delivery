@@ -15,7 +15,7 @@ import 'package:mobile_app/src/checkout_screen.dart';
 import 'package:mobile_app/src/delivery_address.dart';
 import 'package:mobile_app/src/gift_checkout_screen.dart';
 
-import 'widget_test.dart' show product, storeCard;
+import 'widget_test.dart' show product, sessionWith, storeCard;
 
 /// What the gift checkout sends, what it refuses to send, and what it tells the customer.
 ///
@@ -254,18 +254,15 @@ void main() {
     expect(find.text('\$50.50'), findsOneWidget);
   });
 
-  testWidgets('only today can be chosen: tomorrow and schedule are coming soon',
+  testWidgets('says plainly the gift goes today, and offers no day it cannot keep',
       (WidgetTester tester) async {
     await pumpGiftCheckout(tester,
         dio: server().dio, addresses: await recipientStore(), cart: giftBasket());
 
-    expect(find.text(en.giftToday), findsOneWidget);
-    // The coming-soon badge prints its label in capitals.
-    expect(find.text(en.authComingSoon.toUpperCase()), findsNWidgets(2));
-    expect(
-      find.ancestor(of: find.text(en.giftTomorrow), matching: find.byType(IgnorePointer)),
-      findsWidgets,
-    );
+    expect(find.text(en.giftDeliveryDate), findsOneWidget);
+    expect(find.text(en.giftDeliveredToday), findsOneWidget);
+    expect(find.byType(YdComingSoon), findsNothing);
+    expect(find.text(en.authComingSoon.toUpperCase()), findsNothing);
   });
 
   testWidgets('a refusal shows the server\'s own reason', (WidgetTester tester) async {
@@ -403,5 +400,106 @@ void main() {
     final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
     expect(find.text(ar.giftDetailsTitle), findsOneWidget);
     expect(tester.getCenter(find.text('+961')).dx, lessThan(tester.getCenter(phoneField()).dx));
+  });
+
+  testWidgets('in Arabic, the number is typed left to right but its error reads right to left',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) gateway = server();
+    await pumpGiftCheckout(tester,
+        dio: gateway.dio,
+        addresses: await recipientStore(),
+        cart: giftBasket(),
+        locale: const Locale('ar'));
+    final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
+
+    await tester.enterText(phoneField(), '12');
+    await tester.tap(find.text(ar.giftSendAndPay));
+    await tester.pumpAndSettle();
+
+    final Finder error = find.text(ar.giftPhoneInvalid);
+    expect(error, findsOneWidget);
+    expect(Directionality.of(tester.element(error)), TextDirection.rtl);
+    // Only the input stays left to right: the prefix first, then the number.
+    final EditableText input = tester.widget<EditableText>(
+        find.descendant(of: phoneField(), matching: find.byType(EditableText)));
+    expect(input.textDirection, TextDirection.ltr);
+    expect(tester.getCenter(find.text('+961')).dx, lessThan(tester.getCenter(phoneField()).dx));
+    expect(placements(gateway.sent), isEmpty);
+  });
+
+  testWidgets('holds the card to the 240 units the server counts, where an emoji counts twice',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) gateway = server();
+    await pumpGiftCheckout(tester,
+        dio: gateway.dio, addresses: await recipientStore(), cart: giftBasket());
+
+    // 121 emoji: 121 characters, which Flutter's own maxLength of 240 would have let through — and
+    // 242 UTF-16 units, which the server's @Size(max = 240) refuses.
+    final Finder card = find.byType(TextField).last;
+    await tester.enterText(card, '😍' * 121);
+    await tester.pump();
+
+    final String kept = tester.widget<TextField>(card).controller!.text;
+    expect(kept, '😍' * 120);
+    expect(kept.length, 240);
+    expect(find.text(en.giftNoteLength(240, 240)), findsOneWidget);
+
+    await tester.enterText(phoneField(), '71 234 567');
+    await tester.tap(find.text(en.giftSendAndPay));
+    await tester.pumpAndSettle();
+
+    final Map<String, dynamic> gift =
+        bodyOf(placements(gateway.sent).single)['gift'] as Map<String, dynamic>;
+    expect(gift['message'], '😍' * 120);
+  });
+
+  testWidgets('a gift basket offers no split, and one made a gift after Split was chosen shows none',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1000, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final Dio dio = server().dio;
+    final Cart cart = Cart()..add(product('bundle', 's1', 45.0), from: storeCard('s1', deliveryFee: 2.5));
+    final DeliveryAddressStore addresses = await recipientStore();
+
+    await tester.pumpWidget(MaterialApp(
+      theme: DeliveryTheme.light(),
+      localizationsDelegates: const <LocalizationsDelegate<Object>>[
+        DeliveryStrings.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: LocaleController.supported,
+      home: Scaffold(
+        // Rebuilt on every cart change, as CustomerShell rebuilds its tabs.
+        body: AnimatedBuilder(
+          animation: cart,
+          builder: (BuildContext context, Widget? _) => CartScreen(
+            cart: cart,
+            addresses: addresses,
+            orderApi: OrderApi(dio),
+            offerApi: OfferApi(dio),
+            splitApi: SplitApi(dio),
+            profileApi: ProfileApi(dio),
+            session: sessionWith(<DeliveryRole>{DeliveryRole.customer}),
+            onOrderPlaced: () {},
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // An ordinary basket can be split with friends.
+    await tester.tap(find.text(en.custSplitOrder));
+    await tester.pumpAndSettle();
+    expect(find.text(en.custSendPaymentRequests), findsOneWidget);
+
+    // As a gift none of it is offered: the gift checkout could never attach the plan, and placing
+    // the gift would clear it from under the friends' payment requests.
+    cart.startGift();
+    await tester.pumpAndSettle();
+    expect(find.text(en.custSplitOrder), findsNothing);
+    expect(find.text(en.custSendPaymentRequests), findsNothing);
   });
 }
