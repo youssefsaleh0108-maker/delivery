@@ -26,6 +26,8 @@ import com.delivery.appnotification.service.RoomModerationService;
 import com.delivery.appnotification.service.RoomExceptions.MemberMutedException;
 import com.delivery.appnotification.service.RoomExceptions.NoNeighbourhoodException;
 import com.delivery.appnotification.service.RoomExceptions.NoRoomReason;
+import com.delivery.appnotification.service.RoomExceptions.PostingLockedException;
+import com.delivery.appnotification.service.RoomExceptions.ProofUnavailableException;
 import com.delivery.appnotification.service.RoomExceptions.RoomNotFoundException;
 import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedException;
 
@@ -139,12 +141,14 @@ class NeighbourhoodChatAccessTest {
         @DisplayName("is placed by the token's subject and name, and gets the room without anybody's account id")
         void placed_as_themselves() throws Exception {
             when(rooms.place(CUSTOMER, ZONE, "Tania K."))
-                    .thenReturn(new NeighbourhoodRoomService.Placement(room, member, 12L, null, null));
+                    .thenReturn(new NeighbourhoodRoomService.Placement(room, member, 12L, null, null,
+                            NeighbourhoodRoomService.PostingStatus.OPEN));
 
             mvc.perform(get("/api/chat/rooms/mine").param("zoneId", ZONE.toString()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.name").value("Mar Mikhael"))
                     .andExpect(jsonPath("$.memberCount").value(12))
+                    .andExpect(jsonPath("$.posting").value("OPEN"))
                     .andExpect(jsonPath("$.yourHandle").value(member.getHandle().toString()))
                     .andExpect(jsonPath("$.userId").doesNotExist())
                     .andExpect(jsonPath("$.mutedUntil").doesNotExist());
@@ -224,6 +228,40 @@ class NeighbourhoodChatAccessTest {
             mvc.perform(post(messagesPath()).contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"hello\"}"))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.mutedUntil").exists());
+        }
+
+        @Test
+        @DisplayName("reads a room they cannot speak in yet, and is told what would open it")
+        void read_only_until_a_delivery() throws Exception {
+            when(rooms.place(CUSTOMER, ZONE, "Tania K.")).thenReturn(new NeighbourhoodRoomService.Placement(
+                    room, member, 3L, null, null, NeighbourhoodRoomService.PostingStatus.NEEDS_DELIVERY));
+
+            mvc.perform(get("/api/chat/rooms/mine").param("zoneId", ZONE.toString()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.name").value("Mar Mikhael"))
+                    .andExpect(jsonPath("$.posting").value("NEEDS_DELIVERY"));
+        }
+
+        @Test
+        @DisplayName("posting with no delivery in the area is a 403 that says why — and is not a mute")
+        void posting_without_proof_is_a_403_with_a_reason() throws Exception {
+            when(rooms.post(any(), eq(CUSTOMER), anyString(), any(), any()))
+                    .thenThrow(new PostingLockedException());
+
+            mvc.perform(post(messagesPath()).contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"hello\"}"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.reason").value("NEEDS_DELIVERY"))
+                    .andExpect(jsonPath("$.mutedUntil").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("posting while deliveries cannot be checked is a 503 worth retrying, not a guess")
+        void posting_while_proof_is_unavailable_is_a_503() throws Exception {
+            when(rooms.post(any(), eq(CUSTOMER), anyString(), any(), any()))
+                    .thenThrow(new ProofUnavailableException("down", null));
+
+            mvc.perform(post(messagesPath()).contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"hello\"}"))
+                    .andExpect(status().isServiceUnavailable());
         }
 
         @Test

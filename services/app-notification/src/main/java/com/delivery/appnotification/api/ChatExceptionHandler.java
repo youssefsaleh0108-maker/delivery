@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.delivery.appnotification.service.ConversationClosedException;
 import com.delivery.appnotification.service.ConversationNotFoundException;
 import com.delivery.appnotification.service.MessageRejectedException;
+import com.delivery.appnotification.service.NeighbourhoodRoomService;
 import com.delivery.appnotification.service.RoomExceptions;
 import com.delivery.platform.observability.CorrelationIdFilter;
 
@@ -84,6 +85,26 @@ public class ChatExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
         problem.setTitle("Muted");
         problem.setProperty("mutedUntil", e.getMutedUntil());
+        return withCorrelation(problem);
+    }
+
+    /**
+     * 403 with a reason, like the mute's but without an end: the room stays readable, and what would
+     * open the composer is a delivery in the area, not the passing of time.
+     */
+    @ExceptionHandler(RoomExceptions.PostingLockedException.class)
+    public ProblemDetail onPostingLocked(RoomExceptions.PostingLockedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        problem.setTitle("Posting locked");
+        problem.setProperty("reason", NeighbourhoodRoomService.PostingStatus.NEEDS_DELIVERY.name());
+        return withCorrelation(problem);
+    }
+
+    /** 503: whether the caller may post could not be checked, and nobody posts on a guess. */
+    @ExceptionHandler(RoomExceptions.ProofUnavailableException.class)
+    public ProblemDetail onProofUnavailable(RoomExceptions.ProofUnavailableException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+        problem.setTitle("Temporarily unavailable");
         return withCorrelation(problem);
     }
 

@@ -65,6 +65,28 @@ public final class RoomExceptions {
         }
     }
 
+    /**
+     * 403 with a reason. The caller may read this room but not speak in it: no order of theirs has
+     * been delivered in its area recently enough. The app draws the composer read-only and says what
+     * would open it, instead of failing each send.
+     */
+    public static class PostingLockedException extends RuntimeException {
+        public PostingLockedException() {
+            super("You can post in this room after an order of yours is delivered in its area");
+        }
+    }
+
+    /**
+     * 503. Order Manager could not say where the caller's orders were delivered. Posting waits rather
+     * than guessing: "yes" would let any account speak in any room, and "no" would tell a neighbour of
+     * years that they have never had a delivery.
+     */
+    public static class ProofUnavailableException extends RuntimeException {
+        public ProofUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
     /** 429 with Retry-After. */
     public static class SendRateLimitedException extends RuntimeException {
         private final Duration retryAfter;

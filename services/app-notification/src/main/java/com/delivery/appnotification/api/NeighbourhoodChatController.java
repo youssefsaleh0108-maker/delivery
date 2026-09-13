@@ -107,6 +107,8 @@ public class NeighbourhoodChatController {
      *
      * <p>404 with {@code reason} NO_ZONE when the address names no area and the caller is in no room
      * yet, UNKNOWN_ZONE when the area is not one the picker offers; 503 if that cannot be checked.
+     * Whether the caller may post is {@code posting} in the answer, never a failure: a customer with
+     * no delivery in the area, or whose deliveries cannot be checked right now, still reads the room.
      */
     @GetMapping("/mine")
     public RoomView mine(@RequestParam(required = false) UUID zoneId) {
@@ -130,7 +132,9 @@ public class NeighbourhoodChatController {
 
     /**
      * Says something. 201 with the stored message; 422 for refused text, 403 with {@code mutedUntil}
-     * when a moderator has muted the caller here, 429 with Retry-After when they are sending too fast.
+     * when a moderator has muted the caller, 403 with {@code reason} NEEDS_DELIVERY when no order of
+     * theirs was delivered in the room's area recently enough, 503 when that cannot be checked, and
+     * 429 with Retry-After when they are sending too fast.
      */
     @PostMapping("/{roomId}/messages")
     public ResponseEntity<RoomMessageView> post(@PathVariable UUID roomId,
@@ -158,6 +162,8 @@ public class NeighbourhoodChatController {
      * @param mutedUntil       present only while a mute is in force
      * @param moveBlockedUntil present only when the caller's address is in another area they cannot
      *                         move to yet
+     * @param posting          OPEN, NEEDS_DELIVERY (read-only until an order of theirs is delivered in
+     *                         the area) or UNVERIFIED (read-only until Order Manager answers again)
      */
     public record RoomView(
             UUID id,
@@ -168,7 +174,8 @@ public class NeighbourhoodChatController {
             UUID yourHandle,
             String yourName,
             Instant mutedUntil,
-            Instant moveBlockedUntil) {
+            Instant moveBlockedUntil,
+            NeighbourhoodRoomService.PostingStatus posting) {
 
         static RoomView of(NeighbourhoodRoomService.Placement placement) {
             ChatRoomMember member = placement.member();
@@ -181,7 +188,8 @@ public class NeighbourhoodChatController {
                     member.getHandle(),
                     member.getDisplayName(),
                     placement.mutedUntil(),
-                    placement.moveBlockedUntil());
+                    placement.moveBlockedUntil(),
+                    placement.posting());
         }
     }
 

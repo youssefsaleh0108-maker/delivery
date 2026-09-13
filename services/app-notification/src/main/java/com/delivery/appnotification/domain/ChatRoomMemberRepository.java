@@ -23,7 +23,13 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
 
     boolean existsByRoomIdAndUserIdAndLeftAtIsNull(UUID roomId, String userId);
 
-    long countByRoomIdAndLeftAtIsNull(UUID roomId);
+    /**
+     * The room's member count: people in the room now who may speak there. Somebody reading without a
+     * delivery in the area is not counted, so the number means neighbours rather than visitors.
+     */
+    @Query("select count(m) from ChatRoomMember m "
+            + "where m.roomId = :roomId and m.leftAt is null and m.deliveryProvenUntil > :now")
+    long countProvenMembers(@Param("roomId") UUID roomId, @Param("now") Instant now);
 
     /** Every room this person has been in — one row per room, so a handful at most. */
     List<ChatRoomMember> findByUserId(String userId);

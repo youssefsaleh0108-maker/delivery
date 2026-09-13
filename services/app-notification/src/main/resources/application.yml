@@ -160,6 +160,9 @@ delivery:
     rooms:
       # How long a neighbour stays in a room before their address may move them to another.
       move-cooldown: ${CHAT_ROOM_MOVE_COOLDOWN:7d}
+      # How recent an order delivered in the area must be for its customer to post in the area's room
+      # and count in its member count. Reading needs no proof.
+      delivery-proof-window: ${CHAT_ROOM_DELIVERY_PROOF_WINDOW:365d}
       history-page-size: 50
       # The send rate limit: at most this many messages per window, per person, across all rooms.
       send-window: 1m
@@ -182,6 +185,15 @@ delivery:
       base-url: ${PRODUCT_SERVICE_URL:http://localhost:8103}
       connect-timeout: 2s
       read-timeout: 5s
+    # Order Manager answers where the caller's own orders were delivered, which is what lets a
+    # customer post in a neighbourhood room. Always asked with the caller's own token; when it cannot
+    # be reached, rooms stay readable and nobody posts.
+    order-manager:
+      base-url: ${ORDER_MANAGER_URL:http://localhost:8101}
+      connect-timeout: 2s
+      read-timeout: 5s
+      # How long one customer's answer is reused before Order Manager is asked again.
+      proof-cache-ttl: 2m
 
 management:
   endpoints:

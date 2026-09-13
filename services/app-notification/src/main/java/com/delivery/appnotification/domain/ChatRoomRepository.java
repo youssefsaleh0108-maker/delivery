@@ -37,4 +37,15 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from ChatRoom r where r.id = :id")
     Optional<ChatRoom> lockById(@Param("id") UUID id);
+
+    /**
+     * The room's delivery area as a bare value, not a loaded room.
+     *
+     * <p>Posting needs the area before it takes the lock above (the proof of living there may be a
+     * network call, which must not happen under a lock). Loading the room entity for it would let
+     * {@link #lockById} hand back that same already-read instance, carrying a sequence number a
+     * neighbour's post may have moved on since.
+     */
+    @Query("select r.zoneId from ChatRoom r where r.id = :id")
+    Optional<UUID> zoneOf(@Param("id") UUID id);
 }

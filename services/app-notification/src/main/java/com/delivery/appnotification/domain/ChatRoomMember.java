@@ -58,6 +58,14 @@ public class ChatRoomMember {
     @Column(name = "muted_until")
     private Instant mutedUntil;
 
+    /**
+     * Until when this member may speak in the room: their latest delivered order in its area plus the
+     * proof window, as Order Manager last reported for their own token (V25). Null when there was no
+     * such delivery, or nobody has asked yet.
+     */
+    @Column(name = "delivery_proven_until")
+    private Instant deliveryProvenUntil;
+
     protected ChatRoomMember() {
         // for JPA
     }
@@ -106,6 +114,19 @@ public class ChatRoomMember {
 
     public void unmute() {
         this.mutedUntil = null;
+    }
+
+    public boolean isProvenAt(Instant now) {
+        return deliveryProvenUntil != null && now.isBefore(deliveryProvenUntil);
+    }
+
+    /** Order Manager's latest answer replaces what was known — including "no delivery any more". */
+    public void recordDeliveryProof(Instant provenUntil) {
+        this.deliveryProvenUntil = provenUntil;
+    }
+
+    public Instant getDeliveryProvenUntil() {
+        return deliveryProvenUntil;
     }
 
     public UUID getId() {

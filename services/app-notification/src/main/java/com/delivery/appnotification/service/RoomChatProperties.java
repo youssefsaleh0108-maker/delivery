@@ -28,6 +28,18 @@ public class RoomChatProperties {
      */
     private Duration moveCooldown = Duration.ofDays(7);
 
+    /**
+     * How recent an order delivered in an area must be for its customer to speak in the area's room,
+     * and to count in its member count. Reading needs no proof.
+     *
+     * <p>The area on an address is the customer's say-so; a delivered order is the platform's own
+     * evidence that they receive things there. A year: somebody who orders a few times a year stays a
+     * neighbour, while somebody who moved away stops speaking for a street they left, and touring the
+     * city now takes a delivered order in every area rather than an afternoon. Order Manager recorded
+     * no delivery area before its V34, so older orders count for nothing until the next delivery.
+     */
+    private Duration deliveryProofWindow = Duration.ofDays(365);
+
     /** Messages per history page. A screen and a half on a phone. */
     private int historyPageSize = 50;
 
@@ -50,6 +62,14 @@ public class RoomChatProperties {
 
     public void setMoveCooldown(Duration moveCooldown) {
         this.moveCooldown = moveCooldown;
+    }
+
+    public Duration getDeliveryProofWindow() {
+        return deliveryProofWindow;
+    }
+
+    public void setDeliveryProofWindow(Duration deliveryProofWindow) {
+        this.deliveryProofWindow = deliveryProofWindow;
     }
 
     public int getHistoryPageSize() {

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.data.domain.PageRequest;
 
+import com.delivery.appnotification.client.DeliveredAreas;
 import com.delivery.appnotification.client.ProductDirectory;
 import com.delivery.appnotification.domain.ChatRoom;
 import com.delivery.appnotification.domain.ChatRoomMember;
@@ -20,9 +21,12 @@ import com.delivery.appnotification.domain.ChatRoomMemberRepository;
 import com.delivery.appnotification.domain.ChatRoomMessage;
 import com.delivery.appnotification.domain.ChatRoomMessageRepository;
 import com.delivery.appnotification.domain.ChatRoomRepository;
+import com.delivery.appnotification.service.NeighbourhoodRoomService.PostingStatus;
 import com.delivery.appnotification.service.RoomExceptions.MemberMutedException;
 import com.delivery.appnotification.service.RoomExceptions.NoNeighbourhoodException;
 import com.delivery.appnotification.service.RoomExceptions.NoRoomReason;
+import com.delivery.appnotification.service.RoomExceptions.PostingLockedException;
+import com.delivery.appnotification.service.RoomExceptions.ProofUnavailableException;
 import com.delivery.appnotification.service.RoomExceptions.RoomNotFoundException;
 import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +39,7 @@ import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -58,6 +63,7 @@ class NeighbourhoodRoomServiceTest {
     private ChatRoomMemberRepository members;
     private ChatRoomMessageRepository messages;
     private ProductDirectory directory;
+    private DeliveredAreas deliveredAreas;
     private RoomDelivery delivery;
     private RoomChatProperties properties;
     private NeighbourhoodRoomService service;
@@ -70,15 +76,22 @@ class NeighbourhoodRoomServiceTest {
         members = mock(ChatRoomMemberRepository.class);
         messages = mock(ChatRoomMessageRepository.class);
         directory = mock(ProductDirectory.class);
+        deliveredAreas = mock(DeliveredAreas.class);
         delivery = mock(RoomDelivery.class);
         properties = new RoomChatProperties();
-        service = new NeighbourhoodRoomService(rooms, members, messages, directory, delivery,
+        service = new NeighbourhoodRoomService(rooms, members, messages, directory, deliveredAreas, delivery,
                 properties, new ChatProperties());
 
         room = new ChatRoom(ZONE, "Mar Mikhael");
         when(rooms.findById(room.getId())).thenReturn(Optional.of(room));
         when(rooms.findByZoneId(ZONE)).thenReturn(Optional.of(room));
         when(rooms.lockById(room.getId())).thenReturn(Optional.of(room));
+        when(rooms.zoneOf(room.getId())).thenReturn(Optional.of(ZONE));
+        // Unless a test says otherwise: a delivery a month ago in the customer's own area, none elsewhere.
+        when(deliveredAreas.lastDeliveryIn(anyString(), eq(ZONE), any(Instant.class)))
+                .thenReturn(Optional.of(Instant.now().minus(Duration.ofDays(30))));
+        when(deliveredAreas.lastDeliveryIn(anyString(), eq(OTHER_ZONE), any(Instant.class)))
+                .thenReturn(Optional.empty());
         when(members.findByUserIdAndLeftAtIsNull(anyString())).thenReturn(Optional.empty());
         when(members.findByRoomIdAndUserId(any(UUID.class), anyString())).thenReturn(Optional.empty());
         when(members.save(any(ChatRoomMember.class))).thenAnswer(call -> call.getArgument(0));
@@ -117,7 +130,7 @@ class NeighbourhoodRoomServiceTest {
         @DisplayName("puts them in their area's room, opening it on the first arrival")
         void places_them_in_their_areas_room() {
             zoneIsOffered(ZONE, "Mar Mikhael");
-            when(members.countByRoomIdAndLeftAtIsNull(room.getId())).thenReturn(1L);
+            when(members.countProvenMembers(eq(room.getId()), any(Instant.class))).thenReturn(1L);
 
             NeighbourhoodRoomService.Placement placement = service.place(CUSTOMER, ZONE, "Tania K.");
 
@@ -126,6 +139,7 @@ class NeighbourhoodRoomServiceTest {
             assertThat(placement.member().isCurrent()).isTrue();
             assertThat(placement.memberCount()).isEqualTo(1L);
             assertThat(placement.moveBlockedUntil()).isNull();
+            assertThat(placement.posting()).isEqualTo(PostingStatus.OPEN);
             // Named from Product Service's zone, never from anything the client sent.
             verify(rooms).insertIfAbsent(any(UUID.class), eq(ZONE), eq("Mar Mikhael"));
         }
@@ -419,6 +433,139 @@ class NeighbourhoodRoomServiceTest {
                     .contains("Tania K.");
             assertThat(RoomMessageView.of(message, STRANGER).mine()).isFalse();
             assertThat(RoomMessageView.of(message, CUSTOMER).mine()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("speaking, which needs a delivery in the area")
+    class Speaking {
+
+        @Test
+        @DisplayName("opens the composer for a recent delivery in the area, and keeps them counted until the window closes")
+        void a_delivery_in_the_area_opens_the_room() {
+            Instant delivered = Instant.now().minus(Duration.ofDays(30));
+            when(deliveredAreas.lastDeliveryIn(eq(CUSTOMER), eq(ZONE), any(Instant.class)))
+                    .thenReturn(Optional.of(delivered));
+            ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now().minus(Duration.ofDays(3)));
+
+            NeighbourhoodRoomService.Placement placement = service.place(CUSTOMER, ZONE, "Tania K.");
+
+            assertThat(placement.posting()).isEqualTo(PostingStatus.OPEN);
+            assertThat(member.getDeliveryProvenUntil()).isEqualTo(delivered.plus(Duration.ofDays(365)));
+            // The window is this service's policy and travels with the question.
+            Instant yearAgo = Instant.now().minus(Duration.ofDays(365));
+            verify(deliveredAreas).lastDeliveryIn(eq(CUSTOMER), eq(ZONE),
+                    argThat(since -> Duration.between(since, yearAgo).abs().getSeconds() < 5));
+        }
+
+        /** Reading is the customer's choice; the platform cannot tell a new resident from a visitor. */
+        @Test
+        @DisplayName("lets a customer with no delivery in the area read its room, and refuses their post before any lock")
+        void without_a_delivery_they_read_but_do_not_speak() {
+            when(deliveredAreas.lastDeliveryIn(eq(CUSTOMER), eq(ZONE), any(Instant.class)))
+                    .thenReturn(Optional.empty());
+            zoneIsOffered(ZONE, "Mar Mikhael");
+
+            NeighbourhoodRoomService.Placement placement = service.place(CUSTOMER, ZONE, "Tania K.");
+
+            assertThat(placement.room()).isSameAs(room);
+            assertThat(placement.member().isCurrent()).isTrue();
+            assertThat(placement.posting()).isEqualTo(PostingStatus.NEEDS_DELIVERY);
+            assertThat(placement.member().getDeliveryProvenUntil()).isNull();
+
+            memberOf(room, CUSTOMER, Instant.now());
+            assertThatThrownBy(() -> service.post(room.getId(), CUSTOMER, "Hello neighbours", null, null))
+                    .isInstanceOf(PostingLockedException.class);
+            verify(rooms, never()).lockById(any());
+            verify(messages, never()).save(any());
+            verifyNoInteractions(delivery);
+        }
+
+        /** The proof is per area: a delivery at home does not open the room of another area. */
+        @Test
+        @DisplayName("moving to another area's room brings the right to speak only with a delivery there")
+        void a_move_needs_its_own_proof() {
+            memberOf(room, CUSTOMER, Instant.now().minus(Duration.ofDays(8)));
+            ChatRoom elsewhere = new ChatRoom(OTHER_ZONE, "Hamra");
+            zoneIsOffered(OTHER_ZONE, "Hamra");
+            when(rooms.findByZoneId(OTHER_ZONE)).thenReturn(Optional.of(elsewhere));
+
+            NeighbourhoodRoomService.Placement placement = service.place(CUSTOMER, OTHER_ZONE, "Tania K.");
+
+            assertThat(placement.room()).isSameAs(elsewhere);
+            assertThat(placement.posting()).isEqualTo(PostingStatus.NEEDS_DELIVERY);
+            verify(deliveredAreas).lastDeliveryIn(eq(CUSTOMER), eq(OTHER_ZONE), any(Instant.class));
+        }
+
+        @Test
+        @DisplayName("forgets a proof once Order Manager no longer reports a delivery in the window")
+        void a_lapsed_proof_is_cleared() {
+            ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now().minus(Duration.ofDays(400)));
+            member.recordDeliveryProof(Instant.now().plus(Duration.ofDays(1)));
+            when(deliveredAreas.lastDeliveryIn(eq(CUSTOMER), eq(ZONE), any(Instant.class)))
+                    .thenReturn(Optional.empty());
+
+            assertThat(service.place(CUSTOMER, null, "Tania K.").posting())
+                    .isEqualTo(PostingStatus.NEEDS_DELIVERY);
+            assertThat(member.getDeliveryProvenUntil()).isNull();
+        }
+
+        /** Neither yes nor no is safe to guess: see ProofUnavailableException. */
+        @Test
+        @DisplayName("when Order Manager cannot be asked, the room still opens read-only and a post is refused")
+        void nobody_speaks_on_a_guess() {
+            ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now().minus(Duration.ofDays(30)));
+            Instant known = Instant.now().plus(Duration.ofDays(200));
+            member.recordDeliveryProof(known);
+            when(deliveredAreas.lastDeliveryIn(eq(CUSTOMER), eq(ZONE), any(Instant.class)))
+                    .thenThrow(new ProofUnavailableException("down", null));
+
+            NeighbourhoodRoomService.Placement placement = service.place(CUSTOMER, ZONE, "Tania K.");
+
+            assertThat(placement.room()).isSameAs(room);
+            assertThat(placement.posting()).isEqualTo(PostingStatus.UNVERIFIED);
+            assertThat(member.getDeliveryProvenUntil())
+                    .as("What was last known stays, so the member count does not lurch")
+                    .isEqualTo(known);
+            assertThatThrownBy(() -> service.post(room.getId(), CUSTOMER, "hello", null, null))
+                    .isInstanceOf(ProofUnavailableException.class);
+            verify(rooms, never()).lockById(any());
+            verify(messages, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("answers the retry of an accepted message without asking for proof again")
+        void a_retry_needs_no_proof() {
+            ChatRoomMember member = memberOf(room, CUSTOMER, Instant.now());
+            ChatRoomMessage accepted = said(member, 1);
+            when(messages.findByRoomIdAndSenderIdAndClientMessageId(room.getId(), CUSTOMER, "client-1"))
+                    .thenReturn(Optional.of(accepted));
+            when(deliveredAreas.lastDeliveryIn(eq(CUSTOMER), eq(ZONE), any(Instant.class)))
+                    .thenThrow(new ProofUnavailableException("down", null));
+
+            assertThat(service.post(room.getId(), CUSTOMER, "hello", "client-1", null)).isSameAs(accepted);
+            verifyNoInteractions(deliveredAreas);
+        }
+
+        @Test
+        @DisplayName("asks for the proof before taking the room's lock, never while holding it")
+        void the_proof_is_asked_outside_the_lock() {
+            memberOf(room, CUSTOMER, Instant.now());
+
+            service.post(room.getId(), CUSTOMER, "Is the bakery open on Sunday?", null, null);
+
+            InOrder order = inOrder(deliveredAreas, rooms);
+            order.verify(deliveredAreas).lastDeliveryIn(eq(CUSTOMER), eq(ZONE), any(Instant.class));
+            order.verify(rooms).lockById(room.getId());
+        }
+
+        @Test
+        @DisplayName("counts the neighbours who may speak, not everybody reading")
+        void the_member_count_is_of_neighbours() {
+            memberOf(room, CUSTOMER, Instant.now());
+            when(members.countProvenMembers(eq(room.getId()), any(Instant.class))).thenReturn(7L);
+
+            assertThat(service.place(CUSTOMER, ZONE, "Tania K.").memberCount()).isEqualTo(7L);
         }
     }
 
