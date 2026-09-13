@@ -45,14 +45,15 @@ import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ServiceTermsRequest;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ServiceCategories;
 import com.delivery.product.service.ServiceOfferSearch;
-import com.delivery.product.service.ServiceOfferSearch.PopularOffer;
 import com.delivery.product.service.StoreService;
+import com.delivery.product.service.StoreService.NearbyStoreView;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -101,10 +102,9 @@ class ServiceOffersDatabaseTest {
     private EntityManager em;
     private ProductRepository products;
     private ServiceTermsRepository serviceTerms;
-    private DeliveredOrderLineRepository deliveredLines;
     private CatalogService catalog;
 
-    /** With the launch categories open and a "Popular" floor of three delivered orders. */
+    /** With the launch categories open. */
     private ServiceOfferSearch search;
 
     private UUID grill;
@@ -151,7 +151,6 @@ class ServiceOffersDatabaseTest {
         CategoryRepository categories = repositories.getRepository(CategoryRepository.class);
         products = repositories.getRepository(ProductRepository.class);
         serviceTerms = repositories.getRepository(ServiceTermsRepository.class);
-        deliveredLines = repositories.getRepository(DeliveredOrderLineRepository.class);
 
         StoreService storeService = new StoreService(stores,
                 repositories.getRepository(StoreOfferRepository.class),
@@ -162,7 +161,7 @@ class ServiceOffersDatabaseTest {
                 stores, serviceTerms, repositories.getRepository(StoreDeliveryZoneRepository.class),
                 repositories.getRepository(ProductOptionGroupRepository.class),
                 new ServiceCategories(new MockEnvironment()));
-        search = searchWith(new MockEnvironment(), 3);
+        search = searchWith(new MockEnvironment());
 
         transaction(() -> {
             press = listed(new Store("merchant-press", "Al Fakhry Press", Store.Vertical.SERVICES,
@@ -317,7 +316,7 @@ class ServiceOffersDatabaseTest {
         assertThat(search.search(null, Store.ServiceCategory.CLEANING, PAGE).getContent()).isEmpty();
 
         ServiceOfferSearch cleaningOpen =
-                searchWith(new MockEnvironment().withProperty(OPEN_CATEGORIES, "PRINTING,CLEANING"), 3);
+                searchWith(new MockEnvironment().withProperty(OPEN_CATEGORIES, "PRINTING,CLEANING"));
         assertThat(names(cleaningOpen.search(null, Store.ServiceCategory.CLEANING, PAGE)))
                 .containsExactly("Sofa cleaning");
         em.clear();
@@ -420,27 +419,128 @@ class ServiceOffersDatabaseTest {
     }
 
     @Test
-    @DisplayName("Popular counts delivered orders of listed offers only, and below the floor it is nothing")
-    void popular_counts_only_real_orders_of_listed_offers() {
-        assertThat(search.popular(null, 10))
-                .extracting(p -> p.product().getName(), PopularOffer::deliveredOrders)
-                .containsExactly(tuple("Business card printing", 3L));
-        assertThat(searchWith(new MockEnvironment(), 4).popular(null, 10)).isEmpty();
+    @DisplayName("Popular near you ranks nearby listed service shops by the orders they delivered in 30 days")
+    void popular_near_you_ranks_nearby_listed_service_shops_by_recent_orders() throws SQLException {
+        // Jounieh: about twelve kilometres from the Beirut shops set up above, so outside any circle
+        // drawn around it. Every shop here is due north of it by the kilometres given.
+        double jounieh = 33.980800d;
+        Store photos = transaction(() -> shopNorthOf(jounieh, 3.0, "Kaslik Photo Lab",
+                Store.Vertical.SERVICES, Store.ServiceCategory.PHOTOGRAPHY));
+        Store printer = transaction(() -> shopNorthOf(jounieh, 1.0, "Jounieh Print House",
+                Store.Vertical.SERVICES, Store.ServiceCategory.PRINTING));
+        Store tailor = transaction(() -> shopNorthOf(jounieh, 1.0, "Bay Tailors",
+                Store.Vertical.SERVICES, Store.ServiceCategory.TAILORING));
+        Store repairs = transaction(() -> shopNorthOf(jounieh, 2.0, "Fix It Jounieh",
+                Store.Vertical.SERVICES, Store.ServiceCategory.REPAIRS));
+        Store farRepairs = transaction(() -> shopNorthOf(jounieh, 8.0, "Byblos Repairs",
+                Store.Vertical.SERVICES, Store.ServiceCategory.REPAIRS));
+        Store quiet = transaction(() -> shopNorthOf(jounieh, 1.5, "Quiet Frames",
+                Store.Vertical.SERVICES, Store.ServiceCategory.PHOTOGRAPHY));
+        Store stale = transaction(() -> shopNorthOf(jounieh, 1.5, "Last Year's Tailor",
+                Store.Vertical.SERVICES, Store.ServiceCategory.TAILORING));
+        Store beauty = transaction(() -> shopNorthOf(jounieh, 0.5, "Glow Salon",
+                Store.Vertical.SERVICES, Store.ServiceCategory.BEAUTY));
+        Store suspended = transaction(() -> {
+            Store shop = shopNorthOf(jounieh, 0.5, "Shut Press", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING);
+            shop.suspend();
+            return shop;
+        });
+        Store bakery = transaction(() -> shopNorthOf(jounieh, 0.5, "Jounieh Bakery",
+                Store.Vertical.RESTAURANT, null));
+        em.clear();
 
-        // The count on its own, with every category: where a goods product, a paused offer or a draft
-        // shop's offer would have got in, however many orders each has.
-        assertThat(deliveredLines.countDeliveredOrdersOfListedServiceOffers(
-                List.of(Store.ServiceCategory.values()), 1, PageRequest.of(0, 20)))
-                .extracting(row -> row[0], row -> ((Number) row[1]).longValue())
-                .containsExactly(tuple(sofa.getId(), 6L), tuple(cards.getId(), 3L));
+        Instant recently = NOW.minus(Duration.ofDays(2));
+        deliveredOrders(photos.getId(), 7, 1, recently);
+        // Four recent orders and one on the window's edge, 29 days ago, which still counts.
+        deliveredOrders(printer.getId(), 4, 1, recently);
+        deliveredOrders(printer.getId(), 1, 1, NOW.minus(Duration.ofDays(29)));
+        // Five orders of three lines each: five orders, not the fifteen that would lead the row.
+        deliveredOrders(tailor.getId(), 5, 3, recently);
+        deliveredOrders(repairs.getId(), 5, 1, recently);
+        execute("UPDATE stores SET rating = 4.9, rating_count = 20 WHERE id = '" + printer.getId() + "'");
+        execute("UPDATE stores SET rating = 4.2, rating_count = 12 WHERE id = '" + tailor.getId() + "'");
+        // Each of these would lead the row if it counted: too far, a closed category, suspended, goods.
+        deliveredOrders(farRepairs.getId(), 9, 1, recently);
+        deliveredOrders(beauty.getId(), 9, 1, recently);
+        deliveredOrders(suspended.getId(), 9, 1, recently);
+        deliveredOrders(bakery.getId(), 9, 1, recently);
+        // Below the floor: two orders in all, and one recent order after ten delivered 31 days ago.
+        deliveredOrders(quiet.getId(), 2, 1, recently);
+        deliveredOrders(stale.getId(), 1, 1, recently);
+        deliveredOrders(stale.getId(), 10, 1, NOW.minus(Duration.ofDays(31)));
+
+        GeoPoint centre = GeoPoint.of(jounieh, 35.617800d);
+        PopularServiceShops popular = popularShops(new MockEnvironment());
+
+        List<NearbyStoreView> row = popular.near(centre, null, 10);
+        // Most delivered first; the three-way tie at five goes to the better rated, the unrated last.
+        assertThat(row).extracting(near -> near.store().store().getName())
+                .containsExactly("Kaslik Photo Lab", "Jounieh Print House", "Bay Tailors", "Fix It Jounieh");
+        assertThat(row.get(0).distanceMetres()).isCloseTo(3000d, within(10d));
+
+        assertThat(popular.near(centre, null, 2)).extracting(near -> near.store().store().getName())
+                .containsExactly("Kaslik Photo Lab", "Jounieh Print House");
+        assertThat(popular.near(centre, Store.ServiceCategory.PRINTING, 10))
+                .extracting(near -> near.store().store().getName())
+                .containsExactly("Jounieh Print House");
+        assertThat(popular.near(centre, Store.ServiceCategory.BEAUTY, 10)).isEmpty();
+        // Around Beirut, only the listed print shop set up above: the cleaners' category is closed, the
+        // draft press is not listed, and the grill sells goods.
+        assertThat(popular.near(GeoPoint.of(33.898200d, 35.482500d), null, 10))
+                .extracting(near -> near.store().store().getName())
+                .containsExactly("Al Fakhry Press");
         em.clear();
     }
 
     // ------------------------------------------------------------------------------------ helpers
 
-    private ServiceOfferSearch searchWith(MockEnvironment environment, long popularFloor) {
-        return new ServiceOfferSearch(products, deliveredLines, new ServiceCategories(environment),
-                popularFloor);
+    private ServiceOfferSearch searchWith(MockEnvironment environment) {
+        return new ServiceOfferSearch(products, new ServiceCategories(environment));
+    }
+
+    /** The popular row with the service's default settings: five kilometres, thirty days, three orders. */
+    private PopularServiceShops popularShops(MockEnvironment environment) {
+        JpaRepositoryFactory repositories = new JpaRepositoryFactory(em);
+        StoreRepository stores = repositories.getRepository(StoreRepository.class);
+        StoreService storeService = new StoreService(stores,
+                repositories.getRepository(StoreOfferRepository.class),
+                repositories.getRepository(StoreFavoriteRepository.class), products,
+                repositories.getRepository(CategoryRepository.class), new ServiceCategories(environment),
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+        return new PopularServiceShops(stores, storeService, new ServiceCategories(environment),
+                Clock.fixed(NOW, ZoneOffset.UTC), 5000, 30, 3);
+    }
+
+    /** A listed shop, persisted, {@code kilometres} due north of a point on Jounieh's meridian. */
+    private Store shopNorthOf(double latitude, double kilometres, String name, Store.Vertical vertical,
+                              Store.ServiceCategory category) {
+        Store shop = category == null
+                ? new Store("merchant-" + UUID.randomUUID(), name, vertical)
+                : new Store("merchant-" + UUID.randomUUID(), name, vertical, category);
+        listed(shop);
+        shop.pinAt(GeoPoint.of(latitude + kilometres / 111.195d, 35.617800d));
+        em.persist(shop);
+        return shop;
+    }
+
+    /** {@code orders} delivered orders of one shop, each of {@code lines} lines, delivered {@code at}. */
+    private void deliveredOrders(UUID storeId, int orders, int lines, Instant at) throws SQLException {
+        try (Connection connection = connection();
+             PreparedStatement insert = connection.prepareStatement(
+                     "INSERT INTO delivered_order_lines (order_id, product_id, store_id, qty, "
+                             + "delivered_at) VALUES (?, ?, ?, 1, ?)")) {
+            for (int order = 0; order < orders; order++) {
+                UUID orderId = UUID.randomUUID();
+                for (int line = 0; line < lines; line++) {
+                    insert.setObject(1, orderId);
+                    insert.setObject(2, UUID.randomUUID());
+                    insert.setObject(3, storeId);
+                    insert.setObject(4, java.time.OffsetDateTime.ofInstant(at, ZoneOffset.UTC));
+                    insert.executeUpdate();
+                }
+            }
+        }
     }
 
     private <T> T transaction(Supplier<T> work) {

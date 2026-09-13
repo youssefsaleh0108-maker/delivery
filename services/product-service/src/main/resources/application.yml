@@ -126,10 +126,14 @@ delivery:
       min-orders-together: 2
 
     services:
-      # How many delivered orders an offer must have been in before the Services tab's "Popular" row
-      # lists it (ServiceOfferSearch). Counted only from delivered_order_lines, the projection of
-      # order.delivered, and never topped up from anything else: one order is an anecdote. Until an
-      # offer reaches the floor the row is simply empty, and the app shows "Services near you".
+      # The Services tab's "Popular near you" row (PopularServiceShops): service shops pinned within
+      # popular-radius-metres of the customer, ranked by the distinct orders they delivered over the
+      # last popular-window-days. Counted only from delivered_order_lines, the projection of
+      # order.delivered, and never topped up from anything else. A shop needs
+      # popular-min-delivered-orders of them to be listed at all, since one order is an anecdote; until
+      # one does the row is empty and the app shows "Services near you". No count reaches a client.
+      popular-radius-metres: 5000
+      popular-window-days: 30
       popular-min-delivered-orders: 3
 
     # Merchant Blitz: shelf photos in, a draft catalogue out (CatalogScanService).

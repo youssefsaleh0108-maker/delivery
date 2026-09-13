@@ -57,11 +57,13 @@ import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
 import com.delivery.product.service.StoreService;
+import com.delivery.product.service.StoreService.NearbyStoreView;
 import com.delivery.product.service.StoreService.StoreView;
 
 /**
@@ -118,15 +120,17 @@ public class StoreController {
     private final ProductImageService images;
     private final StoreImageService storeImages;
     private final ReviewService reviewService;
+    private final PopularServiceShops popularServiceShops;
 
     public StoreController(StoreService storeService, CatalogService catalog,
                            ProductImageService images, StoreImageService storeImages,
-                           ReviewService reviewService) {
+                           ReviewService reviewService, PopularServiceShops popularServiceShops) {
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
         this.storeImages = storeImages;
         this.reviewService = reviewService;
+        this.popularServiceShops = popularServiceShops;
     }
 
     // ---------------------------------------------------------------- storefront
@@ -264,6 +268,54 @@ public class StoreController {
                         // so a decimal place would be precision the number does not have.
                         Math.round(near.distanceMetres()))),
                 result.truncated(), MAX_NEARBY_CANDIDATES);
+    }
+
+    /**
+     * The Services tab's "Popular near you" row: service shops near a point, ranked by the orders they
+     * delivered in the last 30 days, most first ({@link PopularServiceShops}).
+     *
+     * <p>The answer is the cards in rank order, each with its pin and distance exactly as
+     * {@link #nearby} draws them, and nothing more: no count, and no bucket standing in for one. The
+     * counts rank the row on the server and stop there, because a competitor's order volume is not a
+     * customer's to read. An empty list means no shop nearby has enough delivered orders yet, and the
+     * app shows "Services near you" instead ({@code /nearby?vertical=SERVICES}).
+     *
+     * <p>The radius, the window and the floor are the server's settings
+     * ({@code delivery.catalog.services.popular-*}), not parameters: a client that could widen the
+     * circle could turn "near you" back into a nationwide ranking.
+     *
+     * <p>Any signed-in caller, like {@link #nearby} and for its reason: a point is where somebody is
+     * standing, so no signed-out caller gets a proximity oracle, while a customer, a provider and back
+     * office all read the same public cards. A literal path, never taken for {@code /{idOrSlug}}.
+     *
+     * @param serviceCategory one open category, or none for every open one; a closed one answers empty
+     * @param limit           the most cards wanted, held to {@code PopularServiceShops.MAX_SHOPS}
+     */
+    @GetMapping("/services/popular")
+    @PreAuthorize("isAuthenticated()")
+    public List<NearbyStoreResponse> popularServices(
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        // Refused before the database, with the message "near me" gives: see nearby.
+        GeoPoint centre = new GeoPoint(latitude, longitude);
+        List<NearbyStoreView> popular = popularServiceShops.near(centre, serviceCategory, limit);
+        if (popular.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
+        Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
+
+        return popular.stream()
+                .map(near -> new NearbyStoreResponse(
+                        toCard(near.store(), starred, offersByStore),
+                        near.store().store().getLatitude(),
+                        near.store().store().getLongitude(),
+                        Math.round(near.distanceMetres())))
+                .toList();
     }
 
     /**

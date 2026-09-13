@@ -167,18 +167,16 @@ class RepositoryQueryParseTest {
 
     /**
      * The services marketplace's reads, straight off the repositories' annotations so they cannot
-     * drift: the customer's offer search with its shop subquery, and the "Popular" count two subqueries
-     * deep. Plus what the derived status count generates, and the terms' columns as ServiceTerms maps
-     * them, which {@code ddl-auto: validate} would otherwise be the first to check.
+     * drift: the customer's offer search with its shop subquery. Plus what the derived counts by status
+     * and by shop generate, and the terms' columns as ServiceTerms maps them, which
+     * {@code ddl-auto: validate} would otherwise be the first to check. The "Popular near you" ranking
+     * is native PostGIS SQL, out of this test's reach, and runs against a database in
+     * {@code ServiceOffersDatabaseTest}.
      */
     @Test
     void the_service_offer_queries_parse() throws NoSuchMethodException {
         parses(ProductRepository.class.getMethod("findListedServiceOffers", java.util.Collection.class,
                         String.class, org.springframework.data.domain.Pageable.class)
-                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
-        parses(DeliveredOrderLineRepository.class.getMethod("countDeliveredOrdersOfListedServiceOffers",
-                        java.util.Collection.class, long.class,
-                        org.springframework.data.domain.Pageable.class)
                 .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
 
         parses("SELECT p FROM Product p WHERE p.merchantId = :merchantId AND p.status = :status");

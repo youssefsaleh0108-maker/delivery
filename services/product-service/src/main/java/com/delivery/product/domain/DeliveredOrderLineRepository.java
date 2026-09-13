@@ -51,39 +51,4 @@ public interface DeliveredOrderLineRepository
     List<Object[]> findBoughtWith(@Param("productId") UUID productId,
                                   @Param("minOrdersTogether") long minOrdersTogether,
                                   Pageable limit);
-
-    /**
-     * How many delivered orders each live service offer was in: the Services tab's "Popular" row.
-     *
-     * <p>Only offers a customer may be shown are counted: ACTIVE offers of ACTIVE service shops in the
-     * given open categories, the scope of {@link ProductRepository#findListedServiceOffers}. A goods
-     * product is never counted, however well it sells, and neither is a paused offer.
-     *
-     * <p>{@code COUNT(DISTINCT line.orderId)} counts orders, not units, so one order of 5,000 flyers is
-     * one order. The {@code HAVING} floor keeps a single order from being called popular; the caller
-     * supplies it ({@code delivery.catalog.services.popular-min-delivered-orders}). Ties go to the id,
-     * so the row does not reshuffle on every refresh.
-     *
-     * @param categories never empty; see {@code ServiceOfferSearch}
-     * @return rows of {@code [productId (UUID), deliveredOrders (Long)]}, most delivered first
-     */
-    @Query("""
-            SELECT line.productId, COUNT(DISTINCT line.orderId)
-            FROM DeliveredOrderLine line
-            WHERE line.productId IN (
-                    SELECT p.id FROM Product p
-                    WHERE p.status = com.delivery.product.domain.Product$Status.ACTIVE
-                      AND p.storeId IN (
-                            SELECT s.id FROM Store s
-                            WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
-                              AND s.vertical = com.delivery.product.domain.Store$Vertical.SERVICES
-                              AND s.serviceCategory IN :categories))
-            GROUP BY line.productId
-            HAVING COUNT(DISTINCT line.orderId) >= :minDeliveredOrders
-            ORDER BY COUNT(DISTINCT line.orderId) DESC, line.productId ASC
-            """)
-    List<Object[]> countDeliveredOrdersOfListedServiceOffers(
-            @Param("categories") java.util.Collection<Store.ServiceCategory> categories,
-            @Param("minDeliveredOrders") long minDeliveredOrders,
-            Pageable limit);
 }

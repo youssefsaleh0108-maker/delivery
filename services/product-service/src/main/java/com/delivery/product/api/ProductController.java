@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.delivery.platform.security.CurrentUser;
 import com.delivery.product.api.dto.CatalogDtos.PageResponse;
-import com.delivery.product.api.dto.CatalogDtos.PopularServiceResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
 import com.delivery.product.api.dto.GeoDtos.CrossSellResponse;
@@ -47,7 +46,6 @@ import com.delivery.product.service.CatalogService.ProductView;
 import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ServiceOfferSearch;
-import com.delivery.product.service.ServiceOfferSearch.PopularOffer;
 
 /**
  * The catalog API.
@@ -144,27 +142,6 @@ public class ProductController {
 
         Page<Product> page = serviceOffers.search(search, serviceCategory, pageable);
         return PageResponse.of(catalog.views(page).map(this::toResponse));
-    }
-
-    /**
-     * The Services tab's "Popular" row: offers ranked by the delivered orders they were in, each with
-     * its count.
-     *
-     * <p>Empty until enough real orders have been delivered, and the app shows "Services near you"
-     * then. It never falls back to another ranking dressed up as popularity.
-     */
-    @GetMapping("/services/popular")
-    @PreAuthorize("hasRole('CUSTOMER')")
-    public List<PopularServiceResponse> popularServices(
-            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
-            @RequestParam(defaultValue = "10") int limit) {
-
-        List<PopularOffer> popular = serviceOffers.popular(serviceCategory, limit);
-        Map<UUID, ProductView> views = viewsById(popular.stream().map(PopularOffer::product).toList());
-        return popular.stream()
-                .map(p -> new PopularServiceResponse(
-                        toResponse(views.get(p.product().getId())), p.deliveredOrders()))
-                .toList();
     }
 
     @GetMapping("/{id}")

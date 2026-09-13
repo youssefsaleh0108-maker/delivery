@@ -252,6 +252,63 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                  @Param("maxCandidates") int maxCandidates);
 
     /**
+     * The Services tab's "Popular near you" row: live service shops pinned inside a radius, in open
+     * categories, ranked by the distinct orders they delivered since a moment, most first.
+     *
+     * <p>Only ids leave the database, in rank order, and no count. The counts rank the row and stay
+     * here: a competitor's order volume is not something a customer's app should be handed, so
+     * {@code PopularServiceShops} is given nothing it could pass on.
+     *
+     * <p>Each clause, and why:
+     * <ul>
+     *   <li>{@code COUNT(DISTINCT l.order_id)}: orders, not lines or units, so one order of three
+     *       offers, or of 5,000 flyers, is one order.
+     *   <li>{@code l.delivered_at >= :deliveredSince}: recent orders only. The table is the projection
+     *       of {@code order.delivered}, so an order placed and then cancelled never counts at all.
+     *   <li>{@code HAVING}: below the floor a shop is left out, never padded.
+     *   <li>ACTIVE, SERVICES, an open category and a pin inside the radius: the scope and circle "near
+     *       me" uses ({@link #findActiveIdsNear}), ahead of the {@code LIMIT}, so a busy shop across the
+     *       country cannot take a place a nearby one should have had.
+     *   <li>A tie goes to the better rated shop, unrated last, then to the id, so the row does not
+     *       reshuffle on every refresh.
+     * </ul>
+     *
+     * <p>Native for {@code ST_DWithin}, with {@link #findActiveIdsNear}'s {@code public.}
+     * qualification, typed casts and never-null parameters, and its slack: the caller widens the radius
+     * a little and judges every row again on the sphere, as the card measures it.
+     *
+     * @param serviceCategories the open categories the row may show, comma-separated; never empty
+     * @param deliveredSince    the oldest delivery that still counts
+     * @param maxShops          the {@code LIMIT}
+     */
+    @Query(value = """
+            SELECT s.id
+              FROM stores s
+              JOIN delivered_order_lines l ON l.store_id = s.id
+             WHERE s.status = 'ACTIVE'
+               AND s.vertical = 'SERVICES'
+               AND s.service_category = ANY (
+                       string_to_array(CAST(:serviceCategories AS varchar), ','))
+               AND s.location IS NOT NULL
+               AND public.ST_DWithin(
+                       s.location,
+                       public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography,
+                       :radiusMetres)
+               AND l.delivered_at >= CAST(:deliveredSince AS timestamptz)
+             GROUP BY s.id, s.rating
+            HAVING COUNT(DISTINCT l.order_id) >= :minDeliveredOrders
+             ORDER BY COUNT(DISTINCT l.order_id) DESC, s.rating DESC NULLS LAST, s.id
+             LIMIT :maxShops
+            """, nativeQuery = true)
+    List<UUID> findPopularServiceShopIdsNear(@Param("latitude") double latitude,
+                                             @Param("longitude") double longitude,
+                                             @Param("radiusMetres") double radiusMetres,
+                                             @Param("serviceCategories") String serviceCategories,
+                                             @Param("deliveredSince") Instant deliveredSince,
+                                             @Param("minDeliveredOrders") long minDeliveredOrders,
+                                             @Param("maxShops") int maxShops);
+
+    /**
      * Whether this shop's delivery circle covers the point. Three honest answers folded into
      * one: no radius set → yes (zones alone decide, the old behaviour); a radius but no pin →
      * yes (a circle without a centre binds nothing — the service refuses to create that state,

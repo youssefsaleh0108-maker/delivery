@@ -163,16 +163,6 @@ public final class CatalogDtos {
         }
     }
 
-    /**
-     * A row of the Services tab's "Popular" list: a live offer, and how many delivered orders it was in.
-     *
-     * <p>{@code deliveredOrders} counts real orders projected from {@code order.delivered}, and it is
-     * the only figure the row has. There is no estimate to fall back to: an offer without enough
-     * delivered orders is not in the list, and an empty list means "show Services near you instead".
-     */
-    public record PopularServiceResponse(ProductResponse offer, long deliveredOrders) {
-    }
-
     public record CategoryResponse(
             UUID id,
             String name,

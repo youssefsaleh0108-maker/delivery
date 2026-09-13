@@ -51,12 +51,10 @@ import com.delivery.product.service.ProductOptionService;
 import com.delivery.product.service.ProductOptionService.PricedSelection;
 import com.delivery.product.service.ServiceCategories;
 import com.delivery.product.service.ServiceOfferSearch;
-import com.delivery.product.service.ServiceOfferSearch.PopularOffer;
 import com.delivery.product.service.StoreService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -505,23 +503,5 @@ class ServiceOffersApiTest {
             verify(serviceOffers, never()).search(any(), any(), any(Pageable.class));
         }
 
-        @Test
-        void popular_without_a_token_is_a_401() throws Exception {
-            noTokenMvc.perform(get("/api/products/services/popular"))
-                    .andExpect(status().isUnauthorized());
-
-            verify(serviceOffers, never()).popular(any(), anyInt());
-        }
-
-        @Test
-        void popular_for_a_customer_carries_each_offers_delivered_orders() throws Exception {
-            signedInAs("keycloak-sub-customer", "CUSTOMER");
-            when(serviceOffers.popular(any(), anyInt())).thenReturn(List.of(new PopularOffer(offer, 7)));
-
-            mvc.perform(get("/api/products/services/popular").param("serviceCategory", "PRINTING"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].offer.name").value("Business card printing"))
-                    .andExpect(jsonPath("$[0].deliveredOrders").value(7));
-        }
     }
 }
