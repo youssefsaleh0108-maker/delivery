@@ -427,6 +427,86 @@ class AttendanceServiceTest {
             assertThat(day(month, "2026-10-08").scheduled().name()).isEqualTo("Late");
             assertThat(day(month, "2026-10-08").status()).isEqualTo(Status.PRESENT);
         }
+
+        /** Two hours at dawn that end before an 08:00 start are not an arrival: the shift was missed. */
+        @Test
+        void a_stint_that_ends_before_the_shift_starts_is_not_an_arrival() {
+            onDayShiftAllMonth();
+            worked("2026-10-05T05:00", "2026-10-05T07:00");
+
+            RiderAttendance month = october();
+
+            AttendanceDay monday = day(month, "2026-10-05");
+            assertThat(monday.status()).isEqualTo(Status.ABSENT);
+            assertThat(monday.lateBySeconds()).isNull();
+            // Still evidence, still printed, and every second of it beyond the schedule.
+            assertThat(monday.workedSeconds()).isEqualTo(2 * 3600L);
+            assertThat(monday.overtimeSeconds()).isEqualTo(2 * 3600L);
+            assertThat(monday.clockInLocal()).isEqualTo("2026-10-05T05:00");
+            // 1, 2, 5, 6, 7, 8, 9 and 12 October.
+            assertThat(month.totals().absences()).isEqualTo(8);
+        }
+
+        /** The same dawn stint, read before the shift is over, is not a verdict of any kind yet. */
+        @Test
+        void a_stint_before_todays_shift_leaves_the_day_pending() {
+            onDayShiftAllMonth();
+            worked("2026-10-12T05:00", "2026-10-12T07:00");
+
+            AttendanceDay today = day(service.compute(RIDER, CARRIER, OCTOBER,
+                    local("2026-10-12T07:30")), "2026-10-12");
+
+            assertThat(today.status()).isEqualTo(Status.PENDING);
+            assertThat(today.lateBySeconds()).isNull();
+        }
+
+        /** A day's work before a 23:00 night shift says nothing about the night shift. */
+        @Test
+        void daytime_duty_does_not_make_a_night_shift_present() {
+            ShiftTemplate night = shift("Late night", "23:00", "07:00", DayOfWeek.values());
+            onShift(night, LocalDate.of(2026, 10, 1), null);
+            worked("2026-10-05T10:00", "2026-10-05T14:00");
+
+            AttendanceDay thatAfternoon = day(service.compute(RIDER, CARRIER, OCTOBER,
+                    local("2026-10-05T15:00")), "2026-10-05");
+            AttendanceDay aWeekLater = day(october(), "2026-10-05");
+
+            assertThat(thatAfternoon.status()).isEqualTo(Status.PENDING);
+            assertThat(aWeekLater.status()).isEqualTo(Status.ABSENT);
+            assertThat(aWeekLater.lateBySeconds()).isNull();
+            assertThat(aWeekLater.overtimeSeconds()).isEqualTo(4 * 3600L);
+        }
+
+        /** Going on duty at 19:00 after an 08:00-18:00 shift is a missed shift, not 660 min late. */
+        @Test
+        void duty_after_the_shift_ended_is_an_absence_not_a_late() {
+            onDayShiftAllMonth();
+            worked("2026-10-05T19:00", "2026-10-05T21:00");
+
+            RiderAttendance month = october();
+
+            AttendanceDay monday = day(month, "2026-10-05");
+            assertThat(monday.status()).isEqualTo(Status.ABSENT);
+            assertThat(monday.lateBySeconds()).isNull();
+            assertThat(monday.overtimeSeconds()).isEqualTo(2 * 3600L);
+            assertThat(month.totals().lates()).isZero();
+        }
+
+        /** Judged to the minute the log prints: 08:10:40 against ten minutes' grace is 08:10. */
+        @Test
+        void lateness_is_judged_to_the_minute_the_log_prints() {
+            onDayShiftAllMonth();
+            worked("2026-10-05T08:10:40", "2026-10-05T18:00");
+            worked("2026-10-06T08:11:05", "2026-10-06T18:00");
+
+            RiderAttendance month = october();
+
+            assertThat(day(month, "2026-10-05").clockInLocal()).isEqualTo("2026-10-05T08:10");
+            assertThat(day(month, "2026-10-05").status()).isEqualTo(Status.PRESENT);
+            assertThat(day(month, "2026-10-05").lateBySeconds()).isEqualTo(10 * 60L);
+            assertThat(day(month, "2026-10-06").status()).isEqualTo(Status.LATE);
+            assertThat(day(month, "2026-10-06").lateBySeconds()).isEqualTo(11 * 60L);
+        }
     }
 
     // ------------------------------------------------------------------------------- time zones

@@ -79,7 +79,7 @@ id, each computed exactly as the per-rider read below — the two always agree.
 | `workedSeconds` | long | evidence: credited duty-session time of every session attributed to the period |
 | `manualSeconds` | long | claims: hours typed on manual `PRESENT` entries for days with no evidence |
 | `scheduledSeconds` | long | the real length of every scheduled shift in the period (an hour more or less on the nights the clocks change) |
-| `overtimeSeconds` | long | evidence only: per scheduled day, credited time beyond that day's shift length; all credited time on a scheduled day off; never anything for a freelancer day |
+| `overtimeSeconds` | long | evidence only: per scheduled day, credited time beyond that day's shift length — or all of it when no credited session touched the shift; all credited time on a scheduled day off; never anything for a freelancer day |
 | `workedHours`, `overtimeHours` | decimal | display only |
 
 ## GET /api/tracking/riders/{riderId}/attendance
@@ -111,7 +111,7 @@ no late or absent legend.
 | `worked` | counts toward `daysWorked` |
 | `workedSeconds`, `workedHours` | evidence for the day |
 | `manualSeconds` | typed hours, only on a day with no evidence |
-| `lateBySeconds` | seconds from shift start to arrival, 0 when early; null when unscheduled or nobody came |
+| `lateBySeconds` | seconds from shift start to arrival, in whole minutes, 0 when early; null when unscheduled or no credited session touched the shift |
 | `overtimeSeconds` | as in the totals |
 | `sessions` | the duty sessions attributed to the day (the `SessionView` shape below), including zero-credit ones |
 | `entry` | the live manual entry `{id, date, status, clockIn, clockOut, manualSeconds, note, recordedBy, recordedAt}`, or null |
@@ -120,16 +120,25 @@ no late or absent legend.
 
 | Status | When |
 |---|---|
-| `PRESENT` | scheduled; credited time; arrived no more than `lateGraceMinutes` after the shift start (exactly at the grace is on time) |
-| `LATE` | scheduled; credited time; the first session touching the shift began later than start + grace |
-| `ABSENT` | scheduled; no credited time; the shift is over |
-| `PENDING` | scheduled today; no credited time yet; the shift is not over — not an absence |
+| `PRESENT` | scheduled; a credited session touches the shift window, and the first one began no more than `lateGraceMinutes` after the shift start (exactly at the grace is on time) |
+| `LATE` | scheduled; the first credited session touching the shift window began later than start + grace |
+| `ABSENT` | scheduled; no credited session touches the shift window; the shift is over |
+| `PENDING` | scheduled; no credited session has touched the shift window yet; the shift is not over — not an absence |
 | `DAY_OFF` | an assigned rider's non-shift day, not worked |
 | `EXTRA` | an assigned rider's non-shift day, worked (all of it is overtime) |
 | `WORKED` / `NO_DUTY` | no schedule that day (a freelancer): worked / did not |
 | `UPCOMING` | after `today` |
 | `LATE_EXCUSED` | a `LATE` day with a `LATE_EXCUSED` entry |
 | `EXCUSED`, `SICK`, `LEAVE` | an `ABSENT_EXCUSED`, `SICK` or `LEAVE` entry (they win whatever the evidence says; the evidence stays in `workedSeconds`) |
+
+**Arrival.** Only a credited session that overlaps the shift window is an arrival, and it is
+judged to the minute: arrival is truncated to the minute before it is compared (shifts are stored in
+whole minutes, and the log prints minutes), so 08:10:40 against ten minutes' grace is on time and
+`lateBySeconds` is always whole minutes. Duty that never touches the window — two hours at dawn
+before an 08:00 start, going on duty at 19:00 after an 18:00 end, a day's work before a 23:00 night
+shift — is not an arrival: the day is `PENDING` until the window ends and `ABSENT` after, all of
+that time is `overtimeSeconds`, and the day still has `worked` true because it has credited time
+(so such a day counts in both `daysWorked` and `absences`).
 
 A manual `PRESENT` entry turns `ABSENT`/`PENDING` into `PRESENT`, `DAY_OFF` into `EXTRA` and
 `NO_DUTY` into `WORKED`; it does not excuse a `LATE`. Treat an unknown status as neutral.

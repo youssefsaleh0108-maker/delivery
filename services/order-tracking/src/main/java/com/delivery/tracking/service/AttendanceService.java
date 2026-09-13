@@ -7,7 +7,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -52,10 +54,12 @@ import com.delivery.tracking.service.DutySessionService.SessionView;
  *       freelancer on it: they worked ({@link Status#WORKED}) or they did not
  *       ({@link Status#NO_DUTY}). Nothing here may call a freelancer late or absent — they were
  *       never expected.</li>
- *   <li><strong>A scheduled day</strong> with credited duty time is {@link Status#PRESENT}, or
- *       {@link Status#LATE} when the first session that touches the shift began more than the
- *       shift's grace after its start. With none it is {@link Status#ABSENT} once the shift is
- *       over and {@link Status#PENDING} until then — a rider is not absent at 08:01.</li>
+ *   <li><strong>A scheduled day</strong> with a credited session that touches the shift window is
+ *       {@link Status#PRESENT}, or {@link Status#LATE} when the first such session began — to the
+ *       minute — more than the shift's grace after its start. With none it is
+ *       {@link Status#ABSENT} once the shift is over and {@link Status#PENDING} until then — a
+ *       rider is not absent at 08:01. Duty at other hours that day is never an arrival: it is all
+ *       overtime, as on a day off.</li>
  *   <li><strong>A day off</strong> in an assigned rider's week is {@link Status#DAY_OFF}, or
  *       {@link Status#EXTRA} if they worked it anyway, all of which is overtime.</li>
  *   <li><strong>A manual entry</strong> overrides the verdict (sick, leave, excused, present) but
@@ -243,15 +247,26 @@ public class AttendanceService {
         if (day.isAfter(today)) {
             derived = Status.UPCOMING;
         } else if (shift != null) {
-            if (!evidence.isEmpty()) {
-                // Arrival is the first session that touches the shift; an earlier, separate stint
-                // (on for an hour at dawn, off, back at nine) does not make a late rider on time.
-                Instant arrived = evidence.stream()
-                        .filter(s -> window.overlaps(s.startedAt(), s.countedUntil()))
-                        .map(SessionView::startedAt)
-                        .findFirst()
-                        .orElse(clockIn);
-                long secondsAfterStart = Duration.between(window.start(), arrived).getSeconds();
+            // Arrival is the first credited session that touches the shift window; an earlier,
+            // separate stint (on for an hour at dawn, off, back at nine) does not make a late rider
+            // on time. And a day with no such session has no arrival at all, whatever else was
+            // worked: two hours at dawn before an 08:00 start are not "on time", a day's errands
+            // before a 23:00 night shift are not "present", and going on duty at 19:00 after an
+            // 08:00-18:00 shift is not eleven hours late — the shift was missed.
+            Instant arrived = evidence.stream()
+                    .filter(s -> window.overlaps(s.startedAt(), s.countedUntil()))
+                    .map(SessionView::startedAt)
+                    .findFirst()
+                    .orElse(null);
+            if (arrived != null) {
+                // To the minute, which is how the shift is stored and how the log prints the
+                // clock-in: 08:10:40 against ten minutes' grace is 08:10 and on time, never "Late"
+                // beside "08:10". Truncated on the zone's own clock, so an arrival in the repeated
+                // hour of an autumn night keeps its offset.
+                Instant minute = ZonedDateTime.ofInstant(arrived, zone)
+                        .truncatedTo(ChronoUnit.MINUTES)
+                        .toInstant();
+                long secondsAfterStart = Duration.between(window.start(), minute).getSeconds();
                 lateBy = Math.max(0, secondsAfterStart);
                 derived = secondsAfterStart > shift.getLateGraceMinutes() * 60L
                         ? Status.LATE
@@ -259,6 +274,9 @@ public class AttendanceService {
                 overtime = Math.max(0, worked - window.lengthSeconds());
             } else {
                 derived = now.isBefore(window.end()) ? Status.PENDING : Status.ABSENT;
+                // Nothing touched the shift, so every credited second that day was beyond the
+                // schedule — the same rule as a day off.
+                overtime = worked;
             }
         } else if (schedule.assignedOn(day)) {
             derived = evidence.isEmpty() ? Status.DAY_OFF : Status.EXTRA;
@@ -649,13 +667,16 @@ public class AttendanceService {
 
     /** What a day comes to. */
     public enum Status {
-        /** Scheduled, and on time. */
+        /** Scheduled, and a credited session touching the shift began within the grace. */
         PRESENT,
         /** Scheduled, and the first session touching the shift began after start plus grace. */
         LATE,
-        /** Scheduled, the shift is over, and there is no credited duty time and no entry. */
+        /**
+         * Scheduled, the shift is over, and no credited session touched it. Duty at other hours
+         * that day may exist; it is all overtime.
+         */
         ABSENT,
-        /** Scheduled today, not yet in, and the shift is not over — not absent yet. */
+        /** Scheduled, nothing credited has touched the shift yet, and it is not over. */
         PENDING,
         /** An assigned rider's scheduled day off. */
         DAY_OFF,
@@ -715,10 +736,12 @@ public class AttendanceService {
      * @param worked          counts as a day worked (credited time, or a manual PRESENT)
      * @param workedSeconds   credited duty time of the sessions attributed to this day — evidence
      * @param manualSeconds   hours the office typed, only on a day with no evidence
-     * @param lateBySeconds   seconds between the shift start and arrival (0 when early); null when
-     *                        the day was not scheduled or nobody arrived
-     * @param overtimeSeconds credited time beyond the scheduled length; all of it on a day off;
-     *                        never anything for a freelancer
+     * @param lateBySeconds   seconds between the shift start and arrival, in whole minutes (0 when
+     *                        early); null when the day was not scheduled or nothing credited
+     *                        touched the shift
+     * @param overtimeSeconds credited time beyond the scheduled length; all of it on a day off, or
+     *                        on a scheduled day where nothing touched the shift; never anything
+     *                        for a freelancer
      */
     public record AttendanceDay(
             LocalDate date,
@@ -801,7 +824,8 @@ public class AttendanceService {
      * @param lates            unexcused lates only
      * @param scheduledSeconds the real length of every scheduled shift in the period
      * @param overtimeSeconds  credited time beyond each scheduled day's length, plus every credited
-     *                         second on a scheduled day off; evidence only
+     *                         second on a scheduled day off or on a scheduled day whose shift
+     *                         nothing touched; evidence only
      */
     public record AttendanceTotals(
             int scheduledDays,
