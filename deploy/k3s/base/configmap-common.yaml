@@ -59,6 +59,7 @@ data:
   # Internal service-to-service addresses.
   PRODUCT_SERVICE_URL: http://product-service:8103
   ORDER_MANAGER_URL: http://order-manager:8101
+  ORDER_TRACKING_URL: http://order-tracking:8102
   NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
   CONNECTOR_SETTINGS_URL: http://connector-settings:8109
   MINIO_ENDPOINT: http://minio:9000
