@@ -34,6 +34,23 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8103"
+            # Merchant Blitz's photo reader (ClaudeVisionProvider). The Anthropic SDK reads the key
+            # from the process environment only, so it arrives as an env var rather than through
+            # Vault and the Config Server.
+            #
+            # From its OWN Secret, anthropic-api, and never platform-secrets: every Deployment in
+            # this file imports platform-secrets whole through envFrom, so a key put there would
+            # land in every pod on the platform (order-manager, the connectors, accounting...) when
+            # exactly one service calls Claude. This is the only reference to anthropic-api, and
+            # gen-secrets.sh does not create it — the owner does, per environment (README.md).
+            # OPTIONAL: until then the pod starts normally and scans answer with labelled sample
+            # data. The value is never in this repository.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: anthropic-api
+                  key: ANTHROPIC_API_KEY
+                  optional: true
           ports:
             - containerPort: 8103
           # Ask the application, not the socket.

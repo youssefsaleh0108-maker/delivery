@@ -97,3 +97,7 @@ export 'src/api/store_staff_api.dart';
 export 'src/models/staff_models.dart';
 export 'src/api/reports_api.dart';
 export 'src/models/report_models.dart';
+// Merchant Blitz: shelf photos in, a draft catalogue out. Listed for the reason above — the review
+// screens in delivery_merchant name every one of these types.
+export 'src/api/catalog_scan_api.dart';
+export 'src/models/catalog_scan_models.dart';

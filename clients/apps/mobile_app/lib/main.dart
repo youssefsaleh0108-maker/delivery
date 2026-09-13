@@ -158,6 +158,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final StoreStaffApi _storeStaffApi = StoreStaffApi(_dio);
   late final ReportsApi _reportsApi = ReportsApi(_dio);
 
+  /// Merchant Blitz: shelf photos in, draft products out. Live against product-service.
+  late final CatalogScanApi _catalogScanApi = CatalogScanApi(_dio);
+
   // The capability APIs. Every screen takes these as OPTIONAL parameters — null renders the
   // feature's honest inert state — which is what let the screens land in parallel without breaking
   // each other's compile. The cost of that pattern is that nothing fails when the wiring is
@@ -915,6 +918,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               inventoryApi: _inventoryApi,
               staffApi: _storeStaffApi,
               reportsApi: _reportsApi,
+              catalogScanApi: _catalogScanApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,

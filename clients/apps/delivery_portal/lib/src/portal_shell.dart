@@ -72,9 +72,17 @@ class PortalApis {
     required this.inventory,
     required this.staff,
     required this.reports,
+    required this.catalogScan,
   });
 
   final CatalogApi catalog;
+
+  /// Merchant Blitz, behind the Inventory page's "Scan shelves". Required like every client here, so
+  /// a host that forgets it does not compile: InventoryScreen draws no button for a null client, and
+  /// an optional field would ship the portal without the feature and without one failing test. The
+  /// merchant area is MERCHANT-only, which is exactly who the scan endpoints admit. On the web there
+  /// is no camera, so the scan offers "Choose photos" only.
+  final CatalogScanApi catalogScan;
   final OrderApi order;
   final StoreApi store;
   final DeliveryProviderApi provider;
@@ -302,6 +310,7 @@ class PortalArea {
           catalogApi: a.catalog,
           storeApi: a.store,
           storeId: storeId,
+          catalogScanApi: a.catalogScan,
         )),
       ),
       PortalDestination(

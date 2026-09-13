@@ -125,6 +125,64 @@ delivery:
       # volume — the rail falls back to same-shelf suggestions, clearly labelled as such, either way.
       min-orders-together: 2
 
+    # Merchant Blitz: shelf photos in, a draft catalogue out (CatalogScanService).
+    scan:
+      # FAKE is deterministic sample data that never leaves the pod; CLAUDE sends the photos to the
+      # Claude API. Read per call, like the geocoding provider, so a Config Server change plus
+      # /actuator/busrefresh switches it. CLAUDE with no ANTHROPIC_API_KEY in the pod's environment
+      # answers with FAKE and says so on every scan it produces — the client labels those results
+      # as samples, so a missing key can never pass for a working one.
+      #
+      # The key is NOT a property here and must not become one: the Anthropic SDK reads only the
+      # process environment (or the anthropic.apiKey JVM property). On the cluster it comes from its
+      # own anthropic-api Secret, which only this service's Deployment references — never
+      # platform-secrets, which every service imports whole. See deploy/k3s/README.md.
+      vision-provider: ${CATALOG_SCAN_VISION_PROVIDER:FAKE}
+
+      # The cost and abuse guards. Every analysis is a paid call once CLAUDE is on.
+      max-photos-per-scan: 6
+      # Scans CREATED per merchant over a rolling 24 hours. Rolling rather than per calendar day so
+      # the limit cannot be doubled by starting a burst at 23:59.
+      max-scans-per-day: 5
+      # A failed analysis can be retried, but not forever: a photo the provider refuses will be
+      # refused again, and each attempt is billed.
+      max-analysis-attempts: 2
+      # The most lines one scan may produce. A shelf photo with hundreds of detections is a photo of
+      # a warehouse, and the review screen is not the place to triage it.
+      max-items-per-scan: 120
+      # An analysis still marked ANALYZING after this long was lost with its pod; the merchant may
+      # start another rather than wait on a job that no longer exists.
+      stale-after: 10m
+
+      claude:
+        # Exact model id. Changing it is a deliberate act, reviewed like any other pricing change.
+        # Adaptive thinking, structured output and server-side fallbacks ("fallbacks": "default",
+        # beta server-side-fallback-2026-07-01) are always on — see ClaudeVisionProvider.
+        model: claude-opus-5
+        max-tokens: 16000
+        # A shelf of photos with adaptive thinking takes tens of seconds; the SDK's own default is
+        # tuned for chat. This runs on the scan executor, never on a request thread.
+        #
+        # Sized against stale-after above: the client makes at most two attempts (one retry), so
+        # the worst case is two full timeouts plus backoff, which must stay under stale-after or the
+        # merchant is told a scan was interrupted while it is still running. Raise one, check the
+        # other. It also keeps the call inside the SDK's own ten-minute non-streaming guard.
+        timeout: 240s
+        # The long edge each photo is shrunk to before it is sent: 2236 px, chosen against what the
+        # model reads. Claude Opus 5 reads images at high resolution — up to 2576 px on the long edge
+        # and about 3.75 MP, some 4,784 image tokens at one token per 28 x 28 px patch — and resizes
+        # anything larger itself. A phone's 4:3 photo reaches that area at 2236 x 1677, so this is the
+        # most of a camera photo the model can use: larger only adds upload and resize time for no
+        # more detail, smaller blurs the small print on packaging that tells a 1 L bottle from a
+        # 1.5 L one. The phone's camera is asked for 2400 px, so the server only ever shrinks.
+        #
+        # The cost, at Opus 5's $5 per million input tokens: about 4,780 tokens a photo, so a full
+        # six-photo scan sends about 28,700 image tokens — about $0.14 an attempt, against about
+        # 2,350 tokens a photo and $0.07 an attempt at the 1568 px this was before. At the caps above
+        # (five scans a day, two attempts each) that is at most about $1.44 a merchant a day in
+        # photos, before the prompt and the answer (up to max-tokens, at $25 per million).
+        max-long-edge-px: 2236
+
   product:
     # How long a merchant's power declaration (mains, generator, dark) is shown to customers as what
     # the lights are doing NOW: the "Generator active" badge and its age, the dimmed dark shop, and the

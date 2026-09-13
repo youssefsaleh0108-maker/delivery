@@ -48,6 +48,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onCategories,
     this.onStaff,
     this.onStockCount,
+    this.onCatalogScan,
     this.onNotificationSettings,
     this.aggregates,
     this.documents,
@@ -79,6 +80,10 @@ class MerchantSettingsScreen extends StatelessWidget {
   final VoidCallback? onCategories;
   final VoidCallback? onStaff;
   final VoidCallback? onStockCount;
+
+  /// Merchant Blitz: builds the catalogue from shelf photos. Absent, not disabled, when unwired —
+  /// the host leaves it null for anyone the server would refuse, which is everyone but the owner.
+  final VoidCallback? onCatalogScan;
 
   /// Opens the host's notification preferences. Null marks the row as not yet available rather
   /// than hiding it, because the frame draws it.
@@ -268,6 +273,14 @@ class MerchantSettingsScreen extends StatelessWidget {
               icon: Icons.fact_check_outlined,
               title: t.invCountTitle,
               onTap: onStockCount,
+            ),
+          ],
+          if (onCatalogScan != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.document_scanner_outlined,
+              title: t.blitzSettingsRow,
+              onTap: onCatalogScan,
             ),
           ],
           if (onStaff != null) ...<Widget>[

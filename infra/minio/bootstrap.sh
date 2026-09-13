@@ -16,6 +16,19 @@ done
 echo "==> Setting product-images public-read"
 mc anonymous set download local/product-images
 
+# Merchant Blitz's shelf photos (product-images, under scans/) are working copies, not catalogue
+# images. product-service deletes a scan's photos once every line on it is decided; this expires the
+# rest — scans abandoned half way, uploads never confirmed. Two days: past the 24 hours in which a
+# scan can still be picked up again, so nothing goes from under a scan its merchant can reopen, and
+# no longer, because this bucket is public-read and these are photos of somebody's shop. Checked
+# first, because `mc ilm rule add` would add the same rule again on every run.
+echo "==> Expiring Merchant Blitz shelf photos (scans/) after 2 days"
+if mc ilm rule export local/product-images 2>/dev/null | grep -q '"scans/"'; then
+  echo "    (expiry rule already present)"
+else
+  mc ilm rule add local/product-images --prefix "scans/" --expire-days 2
+fi
+
 # Everything else stays private. Clients reach these objects only through short-TTL presigned URLs
 # issued by the file service after it has checked the caller's role AND resource ownership - no
 # client ever holds MinIO credentials (Section 5).

@@ -57,6 +57,26 @@ invent is the onboarding client secret, which must match what the realm import c
 - **Mail goes to mailpit** (monitoring-<env>/mailpit, behind the ops basic-auth). Real SMTP means
   putting relay credentials in `platform-secrets` and pointing `SMTP_*` in `platform-common` at
   the relay — a deliberate act, since test data then reaches real inboxes.
+- **Merchant Blitz reads shelf photos with sample data** until two deliberate acts, both per
+  environment. (1) Give product-service the Claude API key in its own Secret, `anthropic-api` —
+  never `platform-secrets`: every service imports that one whole, so a key there would sit in every
+  pod on the platform. Only product-service references `anthropic-api` (an optional `secretKeyRef`
+  in `base/services.yaml`), and `gen-secrets.sh` deliberately does not create it. Type the key in on
+  the box rather than putting it in a manifest, a commit, a chat or your shell history:
+
+  ```sh
+  read -rs ANTHROPIC_API_KEY   # paste the key, press Enter; nothing is echoed
+  printf %s "$ANTHROPIC_API_KEY" | kubectl -n delivery-dev create secret generic anthropic-api \
+    --from-file=ANTHROPIC_API_KEY=/dev/stdin
+  unset ANTHROPIC_API_KEY
+  kubectl -n delivery-dev rollout restart deployment/product-service
+  ```
+
+  To rotate it, delete `anthropic-api` and repeat. (2) Select the provider: add
+  `CATALOG_SCAN_VISION_PROVIDER=CLAUDE` to that overlay's `platform-env` literals. Either one alone
+  changes nothing a merchant can see: CLAUDE without a key still answers with labelled samples, and
+  a key without CLAUDE is never used. Each scan is a paid call once both are done; the per-merchant
+  caps live under `delivery.catalog.scan` in product-service's `application.yml`.
 - **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.

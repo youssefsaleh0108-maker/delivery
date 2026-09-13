@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -7972,9 +7971,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String dekkaneDistanceKm(double km) {
     final intl.NumberFormat kmNumberFormat =
         intl.NumberFormat.decimalPatternDigits(
-          locale: localeName,
-          decimalDigits: 1,
-        );
+            locale: localeName, decimalDigits: 1);
     final String kmString = kmNumberFormat.format(km);
 
     return 'على بُعد $kmString كم';
@@ -8990,7 +8987,8 @@ class DeliveryStringsAr extends DeliveryStrings {
       many:
           'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
       few: 'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
-      two: 'يحمل مهمتين من مهامك الآن. يمكن إنهاء عقده بعد تسليمهما أو إلغائهما.',
+      two:
+          'يحمل مهمتين من مهامك الآن. يمكن إنهاء عقده بعد تسليمهما أو إلغائهما.',
       one: 'يحمل إحدى مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
       zero: 'لا يحمل أي مهمة لك الآن.',
     );
@@ -9052,4 +9050,305 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get attendanceBackToProfile => 'العودة إلى الملف الشخصي';
+
+  @override
+  String get blitzTitle => 'الكتالوج السريع';
+
+  @override
+  String get blitzSubtitle => 'كتالوجك من صور رفوفك';
+
+  @override
+  String get blitzFastSetup => 'إعداد سريع';
+
+  @override
+  String get blitzStepScan => 'صوّر المتجر';
+
+  @override
+  String get blitzStepCheck => 'راجع الأصناف';
+
+  @override
+  String get blitzStepSave => 'احفظ المسودات';
+
+  @override
+  String blitzStepDone(String step) {
+    return '$step، مكتمل';
+  }
+
+  @override
+  String blitzStepCurrent(String step) {
+    return '$step، الخطوة الحالية';
+  }
+
+  @override
+  String get blitzIntroTitle => 'صوّر رفوفك ووفّر على نفسك الكتابة';
+
+  @override
+  String get blitzIntroBody =>
+      'التقط صورة لكل رف. نقرأ أسماء المنتجات وأحجامها ونقترح لكل منها قسماً وسعراً تقريبياً، وأنت تراجع كل صنف قبل حفظ أي شيء.';
+
+  @override
+  String get blitzTakePhoto => 'التقط صورة';
+
+  @override
+  String get blitzChoosePhotos => 'اختر صوراً';
+
+  @override
+  String blitzPhotoCount(int count, int max) {
+    return 'الصور: $count من $max';
+  }
+
+  @override
+  String blitzPhotoLabel(int number) {
+    return 'صورة الرف $number';
+  }
+
+  @override
+  String blitzUploading(int current, int total) {
+    return 'جارٍ رفع الصورة $current من $total…';
+  }
+
+  @override
+  String blitzScanPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'حلّل $count صورة',
+      few: 'حلّل $count صور',
+      two: 'حلّل صورتين',
+      one: 'حلّل صورة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzAnalyzing => 'نقرأ رفوفك…';
+
+  @override
+  String get blitzAnalyzingHint =>
+      'قد يستغرق ذلك دقيقة أو دقيقتين. أبقِ هذه الشاشة مفتوحة.';
+
+  @override
+  String get blitzScanComplete => 'اكتمل التحليل';
+
+  @override
+  String blitzItemsFound(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صنف',
+      many: '$count صنفاً',
+      few: '$count أصناف',
+      two: 'صنفان',
+      one: 'صنف واحد',
+      zero: 'لا أصناف',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSampleTitle => 'أصناف تجريبية';
+
+  @override
+  String get blitzSampleBody =>
+      'قارئ الصور غير مفعّل بعد، لذا هذه أصناف على سبيل المثال وليست ما على رفوفك. تجاوز أي صنف لا تبيعه.';
+
+  @override
+  String get blitzNoneFound => 'لم نتعرّف على أي منتج في هذه الصور.';
+
+  @override
+  String get blitzNoneFoundHint =>
+      'جرّب صوراً أقرب تظهر فيها ملصقات المنتجات بوضوح.';
+
+  @override
+  String get blitzNewScan => 'ابدأ تحليلاً جديداً';
+
+  @override
+  String get blitzReviewCta => 'راجع واحفظ كمسودات';
+
+  @override
+  String get blitzFooter => 'لا يظهر شيء للزبائن قبل أن تنشره بنفسك.';
+
+  @override
+  String blitzScansLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تبقّى $count تحليل اليوم',
+      many: 'تبقّى $count تحليلاً اليوم',
+      few: 'تبقّت $count تحليلات اليوم',
+      two: 'تبقّى تحليلان اليوم',
+      one: 'تبقّى تحليل واحد اليوم',
+      zero: 'لم يتبقَّ لك أي تحليل اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String blitzQuotaReached(int limit) {
+    return 'استخدمت كل التحليلات المتاحة لك اليوم ($limit). حاول مجدداً غداً.';
+  }
+
+  @override
+  String get blitzFailedRefused =>
+      'تعذّرت قراءة هذه الصور. جرّب صوراً واضحة لرفوف متجرك.';
+
+  @override
+  String get blitzFailedUnreadable =>
+      'تعذّر فتح إحدى الصور. جرّب التقاطها من جديد.';
+
+  @override
+  String get blitzFailedProvider => 'لم يستجب قارئ الصور.';
+
+  @override
+  String get blitzFailedBusy =>
+      'متاجر كثيرة تحلّل صورها الآن. حاول مجدداً بعد دقيقة.';
+
+  @override
+  String get blitzFailedInterrupted => 'توقّف التحليل قبل أن يكتمل.';
+
+  @override
+  String get blitzFailedOther => 'لم يكتمل التحليل.';
+
+  @override
+  String get blitzNoRetriesLeft =>
+      'لا يمكن إعادة هذا التحليل. ابدأ تحليلاً جديداً.';
+
+  @override
+  String get blitzCameraFailed => 'لم تُفتح الكاميرا. اختر صورة بدلاً من ذلك.';
+
+  @override
+  String get blitzUploadFailed =>
+      'لم تُرفع إحدى الصور. تحقّق من اتصالك وحاول مجدداً.';
+
+  @override
+  String get blitzCouldNotStart => 'تعذّر بدء التحليل.';
+
+  @override
+  String get blitzConnectionLost =>
+      'تعذّر الاطلاع على حالة التحليل. تحقّق من اتصالك.';
+
+  @override
+  String blitzTag(String name, String price) {
+    return '$name · حوالي $price';
+  }
+
+  @override
+  String get blitzReviewTitle => 'راجع الأصناف';
+
+  @override
+  String get blitzReviewSubtitle => 'ما تبقيه يُحفظ كمسودة';
+
+  @override
+  String get blitzKeep => 'إبقاء';
+
+  @override
+  String blitzKeepItem(String name) {
+    return 'إبقاء $name';
+  }
+
+  @override
+  String get blitzName => 'الاسم';
+
+  @override
+  String get blitzPriceUsd => 'السعر (بالدولار)';
+
+  @override
+  String get blitzSection => 'القسم';
+
+  @override
+  String get blitzNoSection => 'بدون قسم';
+
+  @override
+  String blitzGuess(String price) {
+    return 'تقدير: $price';
+  }
+
+  @override
+  String get blitzUseGuess => 'استخدم هذا السعر';
+
+  @override
+  String get blitzCheckThis => 'لسنا متأكدين من هذا الصنف — تحقّق منه';
+
+  @override
+  String get blitzNeedName => 'أدخل اسماً';
+
+  @override
+  String get blitzNeedPrice => 'أدخل سعراً أكبر من صفر';
+
+  @override
+  String get blitzPriceDecimals => 'استخدم منزلتين عشريتين كحد أقصى';
+
+  @override
+  String blitzSaveDrafts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'احفظ $count مسودة',
+      many: 'احفظ $count مسودة',
+      few: 'احفظ $count مسودات',
+      two: 'احفظ مسودتين',
+      one: 'احفظ مسودة واحدة',
+      zero: 'لا شيء للحفظ',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSkipAll => 'تجاوز كل الأصناف';
+
+  @override
+  String get blitzFixItems => 'أصلح الأصناف المعلَّمة أولاً.';
+
+  @override
+  String get blitzSavedTitle => 'حُفظت كمسودات';
+
+  @override
+  String blitzSavedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'أُضيف $count منتج إلى كتالوجك كمسودات.',
+      many: 'أُضيف $count منتجاً إلى كتالوجك كمسودات.',
+      few: 'أُضيفت $count منتجات إلى كتالوجك كمسودات.',
+      two: 'أُضيف منتجان إلى كتالوجك كمسودتين.',
+      one: 'أُضيف منتج واحد إلى كتالوجك كمسودة.',
+      zero: 'لم تُضف أي منتجات.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSavedHint =>
+      'تبقى المسودات مخفية عن الزبائن. أضف صورة لكل منها ثم انشرها من المخزون.';
+
+  @override
+  String get blitzDone => 'تم';
+
+  @override
+  String get blitzAlreadySaved => 'محفوظ';
+
+  @override
+  String blitzTooManyPhotos(int max) {
+    return 'يتّسع التحليل الواحد لـ $max صور كحد أقصى، لذا لم تُضف الصور الزائدة.';
+  }
+
+  @override
+  String get blitzSectionsUnavailable =>
+      'تعذّر تحميل الأقسام، لذا يبقى لكل صنف القسم الذي اقترحناه.';
+
+  @override
+  String get blitzEntryAction => 'صوّر الرفوف';
+
+  @override
+  String get blitzSettingsRow => 'أنشئ الكتالوج من الصور';
+
+  @override
+  String get blitzSaveFailed => 'تعذّر الحفظ. تحقّق من اتصالك وحاول مرة أخرى.';
+
+  @override
+  String get blitzSavedEarlier => 'كانت هذه الأصناف قد حُفظت من قبل.';
+
+  @override
+  String get blitzListChanged =>
+      'حُسم أمر بعض الأصناف في مكان آخر فخرجت من القائمة. راجع الباقي ثم احفظ مرة أخرى.';
 }

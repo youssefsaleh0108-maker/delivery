@@ -42,6 +42,7 @@ class MerchantShell extends StatefulWidget {
     this.inventoryApi,
     this.staffApi,
     this.reportsApi,
+    this.catalogScanApi,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -81,6 +82,10 @@ class MerchantShell extends StatefulWidget {
 
   /// Sales reports. Wired now so the dashboard can take it the day the service lands.
   final ReportsApi? reportsApi;
+
+  /// Merchant Blitz, behind the Inventory header and a Settings row. Null draws neither. Handed on
+  /// only to an account carrying MERCHANT — see [_MerchantShellState._mayScan].
+  final CatalogScanApi? catalogScanApi;
 
   final AuthSession session;
 
@@ -245,6 +250,7 @@ class _MerchantShellState extends State<MerchantShell> {
           storeApi: widget.storeApi,
           storeId: _storeId,
           onOpenAlerts: _openStockAlerts,
+          catalogScanApi: _mayScan ? widget.catalogScanApi : null,
         );
       case MerchantTab.orders:
         return OrdersScreen(api: widget.orderApi);
@@ -270,6 +276,7 @@ class _MerchantShellState extends State<MerchantShell> {
           onStockCount: _access.can(StorePermission.modifyInventoryPricing) && _storeId != null
               ? _openStockCount
               : null,
+          onCatalogScan: _mayScan && widget.catalogScanApi != null ? _openBlitz : null,
           onSignOut: () => widget.onSignOut(),
         );
     }
@@ -317,6 +324,24 @@ class _MerchantShellState extends State<MerchantShell> {
         api: widget.inventoryApi,
         storeId: _storeId!,
         catalogApi: widget.catalogApi,
+      ),
+    ));
+  }
+
+  /// Whether this person may scan shelves into the catalogue.
+  ///
+  /// The token's role, not the staff record: the scan endpoints are gated on MERCHANT and refuse a
+  /// MERCHANT_STAFF token whatever permissions the store grants it, so an employee who may manage
+  /// stock would still only ever get a 403 behind the button. A pending applicant carries MERCHANT
+  /// and may scan — everything it keeps is a draft, and publishing stays behind approval.
+  bool get _mayScan => widget.session.hasRole(DeliveryRole.merchant);
+
+  void _openBlitz() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MerchantBlitzScreen(
+        api: widget.catalogScanApi!,
+        catalogApi: widget.catalogApi,
+        storeId: _storeId,
       ),
     ));
   }

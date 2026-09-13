@@ -1,0 +1,653 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:delivery_core/delivery_core.dart';
+import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:delivery_merchant/delivery_merchant.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter_test/flutter_test.dart';
+
+import 'fixtures/sideways_camera_jpeg.dart';
+
+/// Merchant Blitz, Figma 121:198, driven the way a shopkeeper drives it.
+///
+/// What is held down here:
+///  * opening the page spends nothing — no scan is started, and so no daily allowance used, until a
+///    photo is actually picked — but it does pick up a scan left waiting (a reading still running, a
+///    review not yet saved, a photo Android recovered), and nothing that would start a second scan
+///    can be tapped until it has asked;
+///  * "Take photo" exists only where a camera does, so the portal never draws a dead button;
+///  * photos go up one after another on a scan the first one started, and the review button waits,
+///    disabled, while the photos are read;
+///  * a camera photo's orientation tag is honoured, so tags lie over the upright photo the reader
+///    was sent;
+///  * sample results say they are samples before anything else and draw no tags on the merchant's
+///    own photo, a reading that found nothing says so, and a failure offers a retry only while the
+///    server says one is left;
+///  * closing the review reads the scan again, so lines already saved are not offered twice;
+///  * a spent daily allowance is worded with its own number;
+///  * the finished page in Arabic on a 320-wide phone does not overflow;
+///  * and the Inventory tab is where the door is, when — and only when — its host wires it.
+final Uint8List _png = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAMAASsJTYQAAAAASUVORK5CYII=');
+
+CatalogScan _scan({
+  CatalogScanStatus status = CatalogScanStatus.uploading,
+  List<ScanPhoto> photos = const <ScanPhoto>[],
+  List<ScanLine> lines = const <ScanLine>[],
+  bool sample = false,
+  ScanFailure? failure,
+  int attemptsLeft = 2,
+  int? scansLeftToday = 4,
+}) =>
+    CatalogScan(
+      id: 'scan-1',
+      storeId: 'store-1',
+      status: status,
+      photos: photos,
+      lines: lines,
+      sample: sample,
+      provider: sample ? 'FAKE' : 'CLAUDE',
+      failure: failure,
+      maxPhotos: 6,
+      attemptsLeft: attemptsLeft,
+      scansLeftToday: scansLeftToday,
+    );
+
+ScanLine _line(String id, String name, {double confidence = 0.9, double? guess}) => ScanLine(
+      id: id,
+      name: name,
+      confidence: confidence,
+      status: ScanLineStatus.pending,
+      photoFileId: 'file-1',
+      priceGuess: guess,
+      box: const ScanBox(left: 0.1, top: 0.1, width: 0.3, height: 0.3),
+    );
+
+/// The scan client, scripted. Records every call in order — all but the look for a scan to pick up
+/// again, which is counted apart so the flows below read as what the merchant did.
+class _FakeScanApi extends CatalogScanApi {
+  _FakeScanApi() : super(Dio());
+
+  final List<String> calls = <String>[];
+  Object? startError;
+
+  /// The scan as the server last answered it.
+  CatalogScan latest = _scan();
+
+  /// What the look for a scan to pick up again finds. Null: nothing is waiting.
+  CatalogScan? resumable;
+
+  /// When set, that look waits for it.
+  Completer<void>? resumeGate;
+  int looks = 0;
+  String? lookedInStore;
+
+  /// What "analyze" answers. Defaults to the scan moving to ANALYZING.
+  CatalogScan Function(CatalogScan current)? analyzeResult;
+
+  /// Answers to successive reads; the last one repeats.
+  final List<CatalogScan> reads = <CatalogScan>[];
+
+  @override
+  Future<CatalogScan?> current({String? storeId}) async {
+    looks++;
+    lookedInStore = storeId;
+    final Completer<void>? gate = resumeGate;
+    if (gate != null) await gate.future;
+    final CatalogScan? found = resumable;
+    if (found != null) latest = found;
+    return found;
+  }
+
+  @override
+  Future<CatalogScan> start({String? storeId}) async {
+    calls.add('start');
+    final Object? error = startError;
+    if (error != null) throw error;
+    return latest = _scan();
+  }
+
+  @override
+  Future<CatalogScan> addPhoto({
+    required String scanId,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    calls.add('addPhoto $contentType');
+    final int n = latest.photos.length + 1;
+    return latest = _scan(photos: <ScanPhoto>[
+      ...latest.photos,
+      ScanPhoto(fileId: 'file-$n', position: n - 1, uploaded: true),
+    ]);
+  }
+
+  @override
+  Future<CatalogScan> analyze(String scanId) async {
+    calls.add('analyze');
+    final CatalogScan Function(CatalogScan) answer = analyzeResult ??
+        (CatalogScan c) => _scan(status: CatalogScanStatus.analyzing, photos: c.photos);
+    return latest = answer(latest);
+  }
+
+  @override
+  Future<CatalogScan> read(String scanId) async {
+    calls.add('read');
+    if (reads.isNotEmpty) latest = reads.length == 1 ? reads.first : reads.removeAt(0);
+    return latest;
+  }
+}
+
+class _FakePhotos extends ShelfPhotoSource {
+  _FakePhotos({this.camera = true, this.picks = 1, this.cameraError, this.lost, this.photo});
+
+  final bool camera;
+  final int picks;
+
+  /// What the camera and the gallery hand over; a 1x1 PNG unless a test says otherwise.
+  final PickedShelfPhoto? photo;
+
+  /// What opening the camera throws — image_picker's answer to a refused camera permission, say.
+  final Object? cameraError;
+
+  /// A photo the camera took while Android had closed the app, for the next start to recover.
+  final PickedShelfPhoto? lost;
+
+  @override
+  bool get canUseCamera => camera;
+
+  @override
+  Future<PickedShelfPhoto?> retrieveLostPhoto() async => lost;
+
+  @override
+  Future<PickedShelfPhoto?> takePhoto() async {
+    final Object? error = cameraError;
+    if (error != null) throw error;
+    return photo ?? PickedShelfPhoto(bytes: _png, contentType: 'image/png');
+  }
+
+  @override
+  Future<List<PickedShelfPhoto>> choosePhotos({required String label}) async =>
+      List<PickedShelfPhoto>.generate(
+          picks, (_) => photo ?? PickedShelfPhoto(bytes: _png, contentType: 'image/png'));
+}
+
+class _FakeCatalog extends CatalogApi {
+  _FakeCatalog() : super(Dio());
+
+  @override
+  Future<List<Category>> categories() async =>
+      const <Category>[Category(id: 'cat-drinks', name: 'Drinks')];
+
+  @override
+  Future<List<Category>> storeCategories(String storeId) async =>
+      const <Category>[Category(id: 'cat-own', name: 'Cold Drinks', storeId: 'store-1')];
+}
+
+Future<DeliveryStrings> _pump(
+  WidgetTester tester,
+  Widget home, {
+  Locale locale = const Locale('en'),
+  Size size = const Size(400, 1600),
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(MaterialApp(
+    theme: DeliveryTheme.light(),
+    locale: locale,
+    localizationsDelegates: DeliveryStrings.localizationsDelegates,
+    supportedLocales: DeliveryStrings.supportedLocales,
+    home: home,
+  ));
+  await tester.pump();
+  return DeliveryStrings.of(tester.element(find.byType(Scaffold).first));
+}
+
+MerchantBlitzScreen _blitz(_FakeScanApi api, {_FakePhotos? photos}) => MerchantBlitzScreen(
+      api: api,
+      catalogApi: _FakeCatalog(),
+      storeId: 'store-1',
+      photoSource: photos ?? _FakePhotos(),
+    );
+
+/// Picks the source's photos through "Choose photos" and lets the uploads finish.
+Future<void> _choose(WidgetTester tester, DeliveryStrings t) async {
+  await tester.tap(find.text(t.blitzChoosePhotos));
+  await tester.pump();
+  await tester.pump();
+}
+
+ElevatedButton _buttonWith(WidgetTester tester, String label) => tester.widget<ElevatedButton>(
+    find.ancestor(of: find.text(label), matching: find.byType(ElevatedButton)));
+
+void main() {
+  testWidgets('opening the page spends nothing and explains itself', (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi();
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    expect(find.text(t.blitzTitle), findsOneWidget);
+    expect(find.text(t.blitzIntroTitle), findsOneWidget);
+    expect(find.text(t.blitzTakePhoto), findsOneWidget);
+    expect(find.text(t.blitzChoosePhotos), findsOneWidget);
+    // The honest footer, not the frame's "Your shop online in 24 hours".
+    expect(find.text(t.blitzFooter), findsOneWidget);
+    // No scan started, so none of the day's allowance used, by merely looking. The one thing opening
+    // does is ask whether a scan is waiting to be picked up again.
+    expect(api.calls, isEmpty);
+    expect(api.looks, 1);
+  });
+
+  testWidgets('where there is no camera there is no camera button', (WidgetTester tester) async {
+    final DeliveryStrings t =
+        await _pump(tester, _blitz(_FakeScanApi(), photos: _FakePhotos(camera: false)));
+
+    expect(find.text(t.blitzTakePhoto), findsNothing);
+    expect(find.text(t.blitzChoosePhotos), findsOneWidget);
+  });
+
+  testWidgets('a camera that will not open says so, points at the gallery, and starts nothing',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi();
+    final DeliveryStrings t = await _pump(
+      tester,
+      _blitz(api,
+          photos: _FakePhotos(
+              cameraError: PlatformException(code: 'camera_access_denied'))),
+    );
+
+    await tester.tap(find.text(t.blitzTakePhoto));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text(t.blitzCameraFailed), findsOneWidget);
+    // The gallery is still there, and no scan — no share of the day's allowance — was spent on a
+    // photo that never came.
+    expect(find.text(t.blitzChoosePhotos), findsOneWidget);
+    expect(api.calls, isEmpty);
+  });
+
+  testWidgets(
+      'photos go up one at a time on a scan the first starts, then the review waits for the reading',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi();
+    final DeliveryStrings t = await _pump(tester, _blitz(api, photos: _FakePhotos(picks: 2)));
+
+    await _choose(tester, t);
+
+    expect(api.calls, <String>['start', 'addPhoto image/png', 'addPhoto image/png']);
+    expect(find.text(t.blitzPhotoCount(2, 6)), findsOneWidget);
+    expect(find.text(t.blitzScansLeft(4)), findsOneWidget);
+
+    await tester.tap(find.text(t.blitzScanPhotos(2)));
+    await tester.pump();
+
+    expect(api.calls.last, 'analyze');
+    expect(find.text(t.blitzAnalyzing), findsOneWidget);
+    expect(_buttonWith(tester, t.blitzReviewCta).onPressed, isNull);
+
+    // The reading finishes between two polls.
+    api.reads.add(_scan(
+      status: CatalogScanStatus.complete,
+      photos: api.latest.photos,
+      sample: true,
+      lines: <ScanLine>[
+        _line('line-1', 'Pepsi 1L', guess: 1.2),
+        _line('line-2', "Lay's Classic", guess: 0.8),
+      ],
+    ));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    expect(api.calls.last, 'read');
+    expect(find.text(t.blitzScanComplete), findsOneWidget);
+    expect(find.text(t.blitzItemsFound(2)), findsOneWidget);
+    // Sample lines are said to be samples, not presented as a reading of this shelf.
+    expect(find.text(t.blitzSampleTitle), findsOneWidget);
+    expect(_buttonWith(tester, t.blitzReviewCta).onPressed, isNotNull);
+
+    // And the polling stopped with the reading.
+    final int reads = api.calls.where((String c) => c == 'read').length;
+    await tester.pump(const Duration(seconds: 10));
+    expect(api.calls.where((String c) => c == 'read').length, reads);
+  });
+
+  testWidgets('a reading that found nothing says so and offers a fresh scan, not an empty review',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..analyzeResult =
+          (CatalogScan c) => _scan(status: CatalogScanStatus.complete, photos: c.photos);
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    await _choose(tester, t);
+    await tester.tap(find.text(t.blitzScanPhotos(1)));
+    await tester.pump();
+
+    expect(find.text(t.blitzItemsFound(0)), findsOneWidget);
+    expect(find.text(t.blitzNoneFound), findsOneWidget);
+    expect(find.text(t.blitzReviewCta), findsNothing);
+
+    await tester.tap(find.text(t.blitzNewScan));
+    await tester.pump();
+    expect(find.text(t.blitzIntroTitle), findsOneWidget);
+  });
+
+  testWidgets('a failed reading offers a retry while one is left, and a new scan once none is',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..analyzeResult = (CatalogScan c) => _scan(
+            status: CatalogScanStatus.failed,
+            photos: c.photos,
+            failure: ScanFailure.providerError,
+            attemptsLeft: 1,
+          );
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    await _choose(tester, t);
+    await tester.tap(find.text(t.blitzScanPhotos(1)));
+    await tester.pump();
+
+    expect(find.text(t.blitzFailedProvider), findsOneWidget);
+    expect(find.text(t.blitzNoRetriesLeft), findsNothing);
+
+    api.analyzeResult = (CatalogScan c) => _scan(
+          status: CatalogScanStatus.failed,
+          photos: c.photos,
+          failure: ScanFailure.refused,
+          attemptsLeft: 0,
+        );
+    await tester.tap(find.text(t.tryAgain));
+    await tester.pump();
+
+    expect(api.calls.where((String c) => c == 'analyze').length, 2);
+    expect(find.text(t.blitzFailedRefused), findsOneWidget);
+    expect(find.text(t.blitzNoRetriesLeft), findsOneWidget);
+    expect(find.text(t.tryAgain), findsNothing);
+    expect(find.text(t.blitzNewScan), findsOneWidget);
+  });
+
+  testWidgets('a spent daily allowance is worded with its own number, and nothing is uploaded',
+      (WidgetTester tester) async {
+    final RequestOptions request = RequestOptions(path: '/api/products/scans');
+    final _FakeScanApi api = _FakeScanApi()
+      ..startError = DioException(
+        requestOptions: request,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(
+          requestOptions: request,
+          statusCode: 429,
+          data: <String, dynamic>{
+            'title': 'Scan limit reached',
+            'detail': 'You can start 5 scans a day; try again tomorrow',
+            'limit': 5,
+          },
+        ),
+      );
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    await _choose(tester, t);
+
+    expect(find.text(t.blitzQuotaReached(5)), findsOneWidget);
+    expect(api.calls, <String>['start']);
+  });
+
+  testWidgets('in Arabic on a 320-wide phone the finished scan lays out without overflowing',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..analyzeResult = (CatalogScan c) => _scan(
+            status: CatalogScanStatus.complete,
+            photos: c.photos,
+            sample: true,
+            scansLeftToday: 3,
+            lines: <ScanLine>[
+              _line('line-1', 'Tannourine Water 1.5L', guess: 0.6),
+              _line('line-2', 'Picon Cheese Portions', confidence: 0.4),
+            ],
+          );
+    final DeliveryStrings t = await _pump(
+      tester,
+      _blitz(api),
+      locale: const Locale('ar'),
+      size: const Size(320, 1600),
+    );
+
+    await _choose(tester, t);
+    await tester.tap(find.text(t.blitzScanPhotos(1)));
+    await tester.pump();
+
+    expect(find.text(t.blitzScanComplete), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a scan left waiting is picked up on opening, and its review opens and opens again',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..resumable = _scan(
+        status: CatalogScanStatus.complete,
+        photos: const <ScanPhoto>[ScanPhoto(fileId: 'file-1', position: 0, uploaded: true)],
+        lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+        scansLeftToday: 3,
+      );
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+    await tester.pump();
+
+    expect(api.looks, 1);
+    expect(api.lookedInStore, 'store-1');
+    expect(find.text(t.blitzScanComplete), findsOneWidget);
+    expect(find.text(t.blitzScansLeft(3)), findsOneWidget);
+    // Nothing started or uploaded: the scan, its photos and its reading are the ones already spent.
+    expect(api.calls, isEmpty);
+
+    for (int visit = 0; visit < 2; visit++) {
+      await tester.tap(find.text(t.blitzReviewCta));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(CatalogScanReviewScreen), findsOneWidget);
+
+      await tester.state<NavigatorState>(find.byType(Navigator)).maybePop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(CatalogScanReviewScreen), findsNothing);
+    }
+  });
+
+  testWidgets('a reading left running is watched again, and its result arrives',
+      (WidgetTester tester) async {
+    const List<ScanPhoto> photos = <ScanPhoto>[
+      ScanPhoto(fileId: 'file-1', position: 0, uploaded: true),
+    ];
+    final _FakeScanApi api = _FakeScanApi()
+      ..resumable = _scan(status: CatalogScanStatus.analyzing, photos: photos);
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+    await tester.pump();
+
+    expect(find.text(t.blitzAnalyzing), findsOneWidget);
+
+    api.reads.add(_scan(
+      status: CatalogScanStatus.complete,
+      photos: photos,
+      lines: <ScanLine>[_line('line-1', 'Pepsi 1L')],
+    ));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    expect(api.calls, <String>['read']);
+    expect(find.text(t.blitzScanComplete), findsOneWidget);
+  });
+
+  testWidgets('until the look for a waiting scan answers, nothing that would start one can be tapped',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()..resumeGate = Completer<void>();
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+
+    expect(_buttonWith(tester, t.blitzTakePhoto).onPressed, isNull);
+    await tester.tap(find.text(t.blitzChoosePhotos));
+    await tester.pump();
+    expect(api.calls, isEmpty);
+
+    api.resumeGate!.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(_buttonWith(tester, t.blitzTakePhoto).onPressed, isNotNull);
+  });
+
+  testWidgets('a photo the camera took while Android had closed the app is sent on the waiting scan',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()..resumable = _scan();
+    final DeliveryStrings t = await _pump(
+      tester,
+      _blitz(api,
+          photos: _FakePhotos(lost: PickedShelfPhoto(bytes: _png, contentType: 'image/jpeg'))),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // On the scan already started for it, not a new one that would spend another of the day's.
+    expect(api.calls, <String>['addPhoto image/jpeg']);
+    expect(find.text(t.blitzPhotoCount(1, 6)), findsOneWidget);
+  });
+
+  testWidgets('a camera photo tagged to be turned is drawn upright: the frame its tags are measured in',
+      (WidgetTester tester) async {
+    final _FakeScanApi api = _FakeScanApi()
+      ..analyzeResult = (CatalogScan c) => _scan(
+            status: CatalogScanStatus.complete,
+            photos: c.photos,
+            lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+          );
+    final DeliveryStrings t = await _pump(
+      tester,
+      _blitz(api,
+          photos: _FakePhotos(
+              photo: PickedShelfPhoto(bytes: sidewaysCameraJpeg, contentType: 'image/jpeg'))),
+    );
+
+    await _choose(tester, t);
+    await tester.tap(find.text(t.blitzScanPhotos(1)));
+    await tester.pump();
+    // The photo is decoded off the test's fake clock.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump();
+
+    // The server stands a photo upright by this tag before the reader sees it (ExifOrientationTest),
+    // so the boxes come back measured on the upright photo. The viewfinder lays its tags over the
+    // photo as decoded here, so that must be the same upright frame: 20 wide and 40 tall, not the
+    // 40 x 20 the pixels are stored in.
+    final Iterable<double> frames = tester
+        .widgetList<AspectRatio>(find.byType(AspectRatio))
+        .map((AspectRatio frame) => frame.aspectRatio);
+    expect(frames, anyElement(closeTo(0.5, 0.001)));
+    expect(frames, isNot(anyElement(closeTo(2.0, 0.001))));
+    expect(find.textContaining('Pepsi 1L'), findsOneWidget);
+  });
+
+  testWidgets('sample lines tag nothing on the shelf photo, and say they are samples before all else',
+      (WidgetTester tester) async {
+    // A photo that really decodes in a widget test — the camera JPEG, as the orientation test above
+    // shows. Tags are laid out on the decoded photo's own size, so one that never decoded would draw
+    // no tags either way and prove nothing.
+    final Uint8List shelf = Uint8List.fromList(sidewaysCameraJpeg);
+
+    Future<DeliveryStrings> finishReading({required bool sample}) async {
+      await tester.pumpWidget(const SizedBox());
+      final _FakeScanApi api = _FakeScanApi()
+        ..analyzeResult = (CatalogScan c) => _scan(
+              status: CatalogScanStatus.complete,
+              photos: c.photos,
+              sample: sample,
+              lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+            );
+      final DeliveryStrings t = await _pump(
+        tester,
+        _blitz(api,
+            photos: _FakePhotos(photo: PickedShelfPhoto(bytes: shelf, contentType: 'image/jpeg'))),
+      );
+      await _choose(tester, t);
+      await tester.tap(find.text(t.blitzScanPhotos(1)));
+      await tester.pump();
+      // The photo is decoded off the test's fake clock, and tags are laid out once it is.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      return t;
+    }
+
+    // A real reading tags its line where the reader found it...
+    await finishReading(sample: false);
+    expect(find.textContaining('Pepsi 1L'), findsOneWidget);
+
+    // ...a sample, whose boxes are made up, tags nothing on the merchant's own shelf.
+    final DeliveryStrings t = await finishReading(sample: true);
+    expect(find.textContaining('Pepsi 1L'), findsNothing);
+    final double notice = tester.getTopLeft(find.text(t.blitzSampleTitle)).dy;
+    final Finder photo =
+        find.byWidgetPredicate((Widget w) => w is Image && w.image is MemoryImage);
+    expect(notice, lessThan(tester.getTopLeft(photo.first).dy));
+    expect(notice, lessThan(tester.getTopLeft(find.text(t.blitzScanComplete)).dy));
+  });
+
+  testWidgets('closing the review reads the scan again, so lines already saved are not offered again',
+      (WidgetTester tester) async {
+    const List<ScanPhoto> photos = <ScanPhoto>[
+      ScanPhoto(fileId: 'file-1', position: 0, uploaded: true),
+    ];
+    final _FakeScanApi api = _FakeScanApi()
+      ..resumable = _scan(
+        status: CatalogScanStatus.complete,
+        photos: photos,
+        lines: <ScanLine>[_line('line-1', 'Pepsi 1L', guess: 1.2)],
+      );
+    final DeliveryStrings t = await _pump(tester, _blitz(api));
+    await tester.pump();
+
+    await tester.tap(find.text(t.blitzReviewCta));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Saved meanwhile (its answer lost, say), and the review left with the back button.
+    api.reads.add(_scan(
+      status: CatalogScanStatus.complete,
+      photos: photos,
+      lines: const <ScanLine>[
+        ScanLine(
+          id: 'line-1',
+          name: 'Pepsi 1L',
+          confidence: 0.9,
+          status: ScanLineStatus.accepted,
+          photoFileId: 'file-1',
+          productId: 'product-1',
+        ),
+      ],
+    ));
+    await tester.state<NavigatorState>(find.byType(Navigator)).maybePop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(api.calls, <String>['read']);
+    expect(find.text(t.blitzReviewCta), findsNothing);
+    expect(find.text(t.blitzSavedTitle), findsOneWidget);
+  });
+
+  testWidgets('Inventory opens the scan when its host hands it the client',
+      (WidgetTester tester) async {
+    final DeliveryStrings t = await _pump(
+      tester,
+      InventoryScreen(catalogApi: _FakeCatalog(), catalogScanApi: _FakeScanApi(), storeId: 'store-1'),
+    );
+
+    await tester.tap(find.text(t.blitzEntryAction).first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(MerchantBlitzScreen), findsOneWidget);
+  });
+
+  testWidgets('and shows no such door when it is not handed one', (WidgetTester tester) async {
+    final DeliveryStrings t = await _pump(tester, InventoryScreen(catalogApi: _FakeCatalog()));
+
+    expect(find.text(t.blitzEntryAction), findsNothing);
+  });
+}
