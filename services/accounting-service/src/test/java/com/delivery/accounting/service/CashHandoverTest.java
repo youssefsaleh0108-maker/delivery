@@ -2,6 +2,7 @@ package com.delivery.accounting.service;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
@@ -78,6 +80,12 @@ class CashHandoverTest {
     private static CashFloatEntry collectedForCompany(String amount) {
         return CashFloatEntry.collected(RIDER, HolderKind.RIDER, UUID.randomUUID(),
                 new BigDecimal(amount), "USD", COMPANY);
+    }
+
+    /** The database stamps a row when it is written; a row read back carries that time. */
+    private static CashFloatEntry at(CashFloatEntry row, String createdAt) {
+        ReflectionTestUtils.setField(row, "createdAt", Instant.parse(createdAt));
+        return row;
     }
 
     private List<CashFloatEntry> riderHolds(String... amounts) {
@@ -275,6 +283,42 @@ class CashHandoverTest {
                     byStaff(KEY)))
                     .isInstanceOf(CashFloatService.RequestKeyReusedException.class);
             verify(floatEntries, never()).save(any());
+        }
+
+        /**
+         * A pay run nets the cash its period produced. What the rider collected after the period
+         * ended is not on the payslip, so the deduction leaves it in their bag — and the expected
+         * amount is checked against what is cleared, never against the whole bag.
+         */
+        @Test
+        @DisplayName("a pay run's deduction clears only what was collected before its cut-off, and checks that")
+        void aDeductionStopsAtItsCutOff() {
+            Instant periodEnd = Instant.parse("2026-10-15T21:00:00Z");
+            CashFloatEntry early = at(collectedForCompany("145.00"), "2026-10-03T10:00:00Z");
+            CashFloatEntry lastSecond = at(collectedForCompany("120.00"), "2026-10-15T20:59:59Z");
+            CashFloatEntry later = at(collectedForCompany("30.00"), "2026-10-15T21:00:00Z");
+            when(floatEntries.lockHeldForCarrier(RIDER, COMPANY))
+                    .thenReturn(List.of(early, lastSecond, later));
+            Recorded payroll = new Recorded(STAFF, CashFloatEntry.Method.PAYROLL_DEDUCTION,
+                    "2026-10-01 to 2026-10-15",
+                    CarrierPayrollService.payrollKey(UUID.randomUUID(), RIDER));
+
+            // The whole bag is not what the payslip nets: refused with the period's figure.
+            assertThatThrownBy(() -> service.handOver(COMPANY, RIDER, new BigDecimal("295.00"),
+                    payroll, periodEnd))
+                    .isInstanceOfSatisfying(CashFloatService.AmountChangedException.class,
+                            e -> assertThat(e.current()).isEqualByComparingTo("265.00"));
+
+            CashFloatService.Handover handover = service.handOver(COMPANY, RIDER,
+                    new BigDecimal("265.00"), payroll, periodEnd);
+
+            assertThat(handover.amount()).isEqualByComparingTo("265.00");
+            assertThat(handover.collections()).isEqualTo(2);
+            assertThat(early.getClearedBy()).isEqualTo(handover.id());
+            assertThat(lastSecond.getClearedBy()).isEqualTo(handover.id());
+            assertThat(later.isOutstanding()).isTrue();
+            assertThat(custodyWritten()).extracting(CashFloatEntry::getOrderId)
+                    .containsExactly(early.getOrderId(), lastSecond.getOrderId());
         }
 
         /**

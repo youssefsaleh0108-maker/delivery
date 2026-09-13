@@ -104,6 +104,8 @@ class CarrierPayrollServiceTest {
     private static final LocalDate OCT_1 = LocalDate.parse("2026-10-01");
     private static final LocalDate OCT_15 = LocalDate.parse("2026-10-15");
     private static final LocalDate OCT_16 = LocalDate.parse("2026-10-16");
+    /** Midnight into the 16th in Beirut: where October's first half ends. */
+    private static final Instant FIRST_HALF_ENDS = Instant.parse("2026-10-15T21:00:00Z");
 
     @Mock
     private CarrierPayPolicyRepository policies;
@@ -144,7 +146,8 @@ class CarrierPayrollServiceTest {
     private final List<CarrierPayAttendance> snapshotRows = new ArrayList<>();
     private final List<CarrierPayrollEvent> eventRows = new ArrayList<>();
     private final List<RiderLedgerEntry> ledgerRows = new ArrayList<>();
-    private final Map<String, BigDecimal> cash = new HashMap<>();
+    /** Cash riders took at doors for the company and still hold, each with when they took it. */
+    private final List<Collected> collections = new ArrayList<>();
     private AttendanceRead read = AttendanceRead.unavailable("NOT_DEPLOYED");
 
     private static final Map<String, String> NAMES = Map.of(
@@ -296,10 +299,18 @@ class CarrierPayrollServiceTest {
         when(riderLedger.countJobsForCarrierRecordedAfter(anyString(), any(), any(), any()))
                 .thenReturn(0L);
 
-        when(carrierCash.heldByRider(COMPANY)).thenAnswer(i -> new LinkedHashMap<>(cash));
-        // A real hand-over clears the rider's bag; this one does too, so later reads agree.
-        when(cashFloat.handOver(anyString(), anyString(), any(), any())).thenAnswer(i -> {
-            cash.remove(i.<String>getArgument(1));
+        when(carrierCash.heldByRider(eq(COMPANY), any())).thenAnswer(i -> {
+            Map<String, BigDecimal> held = new LinkedHashMap<>();
+            collections.stream()
+                    .filter(c -> c.at().isBefore(i.<Instant>getArgument(1)))
+                    .forEach(c -> held.merge(c.rider(), c.amount(), BigDecimal::add));
+            return held;
+        });
+        // A real deduction clears what the rider took before its cut-off; this one does too, so
+        // later reads agree.
+        when(cashFloat.handOver(anyString(), anyString(), any(), any(), any())).thenAnswer(i -> {
+            collections.removeIf(c -> c.rider().equals(i.getArgument(1))
+                    && c.at().isBefore(i.<Instant>getArgument(4)));
             return new CashFloatService.Handover(UUID.randomUUID(), i.getArgument(1),
                     i.getArgument(0), i.getArgument(2), 2, Method.PAYROLL_DEDUCTION, null, STAFF,
                     Instant.now(), false);
@@ -343,6 +354,15 @@ class CarrierPayrollServiceTest {
     /** A job for the company, delivered at noon in Beirut on {@code day}. */
     private void delivered(String rider, String day) {
         deliveredAt(rider, LocalDate.parse(day).atTime(12, 0).atZone(BEIRUT).toInstant());
+    }
+
+    private record Collected(String rider, BigDecimal amount, Instant at) {
+    }
+
+    /** Cash {@code rider} took at a door for the company at noon in Beirut on {@code day}. */
+    private void holds(String rider, String amount, String day) {
+        collections.add(new Collected(rider, new BigDecimal(amount),
+                LocalDate.parse(day).atTime(12, 0).atZone(BEIRUT).toInstant()));
     }
 
     private void deliveredAt(String rider, Instant at) {
@@ -555,9 +575,9 @@ class CarrierPayrollServiceTest {
             delivered(YOUSSEF, "2026-10-05");
         }
         delivered(RANIA, "2026-10-06");
-        cash.put(YOUSSEF, new BigDecimal("60.00"));
+        holds(YOUSSEF, "60.00", "2026-10-05");
         // More than her pay: left in her bag for the hub to collect, not deducted in part.
-        cash.put(RANIA, new BigDecimal("30.00"));
+        holds(RANIA, "30.00", "2026-10-06");
         RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
         UUID id = run.run().getId();
 
@@ -568,8 +588,8 @@ class CarrierPayrollServiceTest {
                 ArgumentCaptor.forClass(CashFloatEntry.Recorded.class);
         verify(cashFloat).handOver(eq(COMPANY), eq(YOUSSEF),
                 argThat(amount -> amount.compareTo(new BigDecimal("60.00")) == 0),
-                recorded.capture());
-        verify(cashFloat, never()).handOver(anyString(), eq(RANIA), any(), any());
+                recorded.capture(), eq(FIRST_HALF_ENDS));
+        verify(cashFloat, never()).handOver(anyString(), eq(RANIA), any(), any(), any());
         assertThat(recorded.getValue().by()).isEqualTo(STAFF);
         assertThat(recorded.getValue().method()).isEqualTo(Method.PAYROLL_DEDUCTION);
         assertThat(recorded.getValue().requestKey())
@@ -589,7 +609,7 @@ class CarrierPayrollServiceTest {
         // Pressed again: already approved, and the cash is not taken a second time.
         assertThat(service.approve(COMPANY, id, 1, false, STAFF).outcome())
                 .isEqualTo(ApprovalOutcome.ALREADY_APPROVED);
-        verify(cashFloat, times(1)).handOver(anyString(), anyString(), any(), any());
+        verify(cashFloat, times(1)).handOver(anyString(), anyString(), any(), any(), any());
     }
 
     @Test
@@ -636,11 +656,11 @@ class CarrierPayrollServiceTest {
         for (int i = 0; i < 50; i++) {
             delivered(YOUSSEF, "2026-10-05");
         }
-        cash.put(YOUSSEF, new BigDecimal("60.00"));
+        holds(YOUSSEF, "60.00", "2026-10-05");
         RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
         UUID id = run.run().getId();
         doThrow(new CashFloatService.AmountChangedException(new BigDecimal("75.00")))
-                .when(cashFloat).handOver(anyString(), anyString(), any(), any());
+                .when(cashFloat).handOver(anyString(), anyString(), any(), any(), any());
 
         assertThatThrownBy(() -> service.approve(COMPANY, id, 1, false, STAFF))
                 .isInstanceOf(CashFloatService.AmountChangedException.class);
@@ -648,6 +668,63 @@ class CarrierPayrollServiceTest {
         assertThat(runRows.get(id).getStatus()).isEqualTo(Status.DRAFT);
         assertThat(slipRows).allSatisfy(p ->
                 assertThat(p.getStatus()).isEqualTo(CarrierPayslip.Status.DRAFT));
+    }
+
+    /**
+     * Riders keep working after a period ends, and every cash delivery grows what they hold. Only
+     * what they took by the period's end is the run's: later cash may not move a figure the approver
+     * is looking at, or approval would be refused all through the working day.
+     */
+    @Test
+    @DisplayName("cash riders take after the period ends moves nothing on it, and stays in their bags")
+    void cashCollectedAfterThePeriod() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", null);
+        for (int i = 0; i < 50; i++) {
+            delivered(YOUSSEF, "2026-10-05");
+        }
+        delivered(RANIA, "2026-10-06");
+        holds(YOUSSEF, "60.00", "2026-10-14");
+        RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+        UUID id = run.run().getId();
+
+        // While the approver reads the draft on the 20th, both riders take cash at doors.
+        holds(YOUSSEF, "35.00", "2026-10-20");
+        holds(RANIA, "12.00", "2026-10-20");
+
+        Approval approval = service.approve(COMPANY, id, 1, false, STAFF);
+
+        assertThat(approval.outcome()).isEqualTo(ApprovalOutcome.APPROVED);
+        verify(cashFloat).handOver(eq(COMPANY), eq(YOUSSEF),
+                argThat(amount -> amount.compareTo(new BigDecimal("60.00")) == 0), any(),
+                eq(FIRST_HALF_ENDS));
+        PayslipView youssef = slip(approval.run(), YOUSSEF);
+        assertThat(youssef.slip().figures().cashHeld()).isEqualByComparingTo("60.00");
+        assertThat(youssef.slip().getNet()).isEqualByComparingTo("40.00");
+        assertThat(slip(approval.run(), RANIA).slip().figures().cashHeld())
+                .isEqualByComparingTo("0.00");
+        // What they took on the 20th is still theirs to hand over, at the hub or in the next run.
+        assertThat(collections).extracting(Collected::amount)
+                .containsExactlyInAnyOrder(new BigDecimal("35.00"), new BigDecimal("12.00"));
+    }
+
+    @Test
+    @DisplayName("the period's cash handed over at the hub before approval is a change the approver sees")
+    void periodCashHandedOverAtTheHub() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", null);
+        for (int i = 0; i < 50; i++) {
+            delivered(YOUSSEF, "2026-10-05");
+        }
+        holds(YOUSSEF, "60.00", "2026-10-14");
+        RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+        assertThat(slip(run, YOUSSEF).slip().getNet()).isEqualByComparingTo("40.00");
+
+        // The hub takes Youssef's bag on the 20th, before anyone approves.
+        collections.clear();
+
+        Approval moved = service.approve(COMPANY, run.run().getId(), 1, false, STAFF);
+        assertThat(moved.outcome()).isEqualTo(ApprovalOutcome.FIGURES_CHANGED);
+        assertThat(slip(moved.run(), YOUSSEF).slip().getNet()).isEqualByComparingTo("100.00");
+        verifyNoInteractions(cashFloat);
     }
 
     @Test
@@ -888,7 +965,7 @@ class CarrierPayrollServiceTest {
     @Test
     @DisplayName("payroll never writes the platform's books: no ledger row, no posting, only a custody hand-over")
     void neverPlatformMoney() {
-        cash.put(YOUSSEF, new BigDecimal("1.00"));
+        holds(YOUSSEF, "1.00", "2026-10-05");
         RunView run = approvedFirstHalf();
         service.payAll(COMPANY, run.run().getId(), run.totals().outstanding(), Method.CASH, null,
                 STAFF);

@@ -8,9 +8,10 @@
 -- its rider, outside this system, the way ManualPayoutProvider records a platform cash-out.
 --
 -- The one place payroll touches the platform's books is deliberate and goes through the existing
--- door: cash a rider still holds for the company, kept out of their pay, is a hand-over of custody
--- (CashFloatService.handOver), recorded as a TRANSFERRED row with method PAYROLL_DEDUCTION. It moves
--- custody from the rider to the company and posts nothing, exactly like a hand-over at the hub.
+-- door: cash a rider collected for the company by the end of the period and still holds, kept out of
+-- their pay, is a hand-over of custody (CashFloatService.handOver, cut off at the period's end),
+-- recorded as a TRANSFERRED row with method PAYROLL_DEDUCTION under a payroll- key no other route
+-- accepts. It moves custody from the rider to the company and posts nothing, like a hub hand-over.
 --
 -- MONEY SHAPE. Every amount is numeric(12,2) and every rule that makes a payslip add up is a CHECK,
 -- so a payslip whose parts do not make its total cannot be stored however it was computed. A run is
@@ -163,9 +164,11 @@ CREATE TABLE carrier_payslip (
     -- Informational. A tip is the rider's own money (paid by the platform, or in hand), never the
     -- company's to pay, so it is in neither gross nor net.
     tips              numeric(12,2) NOT NULL,
-    -- What the rider held for the company when computed, and the part kept out of this pay. All of
-    -- it or none: a hand-over clears a rider's whole bag or nothing, so cash is only netted when the
-    -- pay can absorb all of it. Otherwise the rider keeps chasing it at the hub, where it still shows.
+    -- What the rider still held for the company when computed, of the cash they collected by the end
+    -- of the period, and the part kept out of this pay. Bounded by the period because riders keep
+    -- collecting after it: that cash is a later run's, stays in their bag, and cannot move a figure
+    -- being approved. All of it or none: cash is only netted when the pay can absorb all of it.
+    -- Otherwise the rider keeps chasing it at the hub, where it still shows.
     cash_held         numeric(12,2) NOT NULL,
     cash_netted       numeric(12,2) NOT NULL,
     -- The TRANSFERRED cash_float row that netted it, once approved.

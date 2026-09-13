@@ -450,8 +450,25 @@ public class CarrierCashService {
      */
     @Transactional(readOnly = true)
     public Map<String, BigDecimal> heldByRider(String carrierRef) {
+        return heldByRider(carrierRef, null);
+    }
+
+    /**
+     * {@link #heldByRider(String)}, counting only what each rider collected before
+     * {@code collectedBefore} — exactly what a hand-over with the same cut-off
+     * ({@link CashFloatService#handOver(String, String, BigDecimal, CashFloatEntry.Recorded, Instant)})
+     * would clear. A pay run passes the end of its period: riders keep collecting after it, and that
+     * cash is neither the run's to net nor allowed to move a figure its approver is looking at.
+     *
+     * @param collectedBefore exclusive; null for everything held
+     */
+    @Transactional(readOnly = true)
+    public Map<String, BigDecimal> heldByRider(String carrierRef, Instant collectedBefore) {
         Map<String, BigDecimal> out = new LinkedHashMap<>();
-        byHolder(floats.heldByRidersFor(carrierRef))
+        byHolder(floats.heldByRidersFor(carrierRef).stream()
+                .filter(row -> collectedBefore == null
+                        || CashFloatService.writtenBefore(row, collectedBefore))
+                .toList())
                 .forEach((rider, rows) -> out.put(rider, sum(rows)));
         return out;
     }

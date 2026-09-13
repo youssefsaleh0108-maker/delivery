@@ -504,6 +504,27 @@ class CarrierCashServiceTest {
         assertThat(held).doesNotContainKey(RANIA);
     }
 
+    /**
+     * A pay run nets the cash its period produced. Riders keep collecting after it ends, so the run's
+     * figure is cut off at the period's end — the same cut-off its deduction clears to.
+     */
+    @Test
+    @DisplayName("gives a pay run only the cash collected before its cut-off, which later deliveries never move")
+    void heldByRiderUpToACutOff() {
+        when(floats.heldByRidersFor(COMPANY)).thenReturn(List.of(
+                collected(YOUSSEF, "50.00", "2026-10-21T09:00:00Z"),
+                collected(MICHEL, "30.00", "2026-10-25T11:00:00Z"),
+                collected(YOUSSEF, "20.05", "2026-10-24T10:00:00Z")));
+
+        java.util.Map<String, BigDecimal> held =
+                service.heldByRider(COMPANY, Instant.parse("2026-10-24T10:00:00Z"));
+
+        // Exclusive: the 20.05 collected at that very instant belongs to the next period.
+        assertThat(held).containsOnlyKeys(YOUSSEF);
+        assertThat(held.get(YOUSSEF)).isEqualByComparingTo("50.00");
+        assertThat(held.get(YOUSSEF).scale()).isEqualTo(2);
+    }
+
     /** A projection row, as Spring Data would build one. */
     private record Balance(String holderRef, HolderKind holderKind, BigDecimal amount, long orders,
                            Instant oldest) implements CashFloatRepository.HolderBalance {

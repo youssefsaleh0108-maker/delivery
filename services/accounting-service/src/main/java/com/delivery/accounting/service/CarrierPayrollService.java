@@ -63,10 +63,12 @@ import com.delivery.accounting.service.RiderAttendanceSource.AttendanceRead;
  * <p>What a company pays its riders is its own employment contract ({@code PayableBy.CARRIER}).
  * Nothing here writes a ledger leg, a rider balance or a bank posting; a payslip marked paid records
  * that the company paid, outside this system. The one place payroll touches the platform's books is
- * cash a rider holds for the company, kept out of their pay — and that goes through the custody
- * model's own door, {@link CashFloatService#handOver}, exactly as {@link CarrierCashService}
- * documents: the payslip's figure as the expected amount, and a request key derived from the run and
- * the rider ({@link #payrollKey}), so the same run can never take the same cash twice.
+ * cash a rider collected for the company by the end of the period and still holds, kept out of their
+ * pay — and that goes through the custody model's own door, {@link CashFloatService#handOver},
+ * exactly as {@link CarrierCashService} documents: the payslip's figure as the expected amount, the
+ * period's end as the cut-off, and a request key derived from the run and the rider
+ * ({@link #payrollKey}), so the same run can never take the same cash twice. Cash collected after the
+ * period is not the run's: it neither moves the figures being approved nor leaves the rider's bag.
  *
  * <h2>Draft, approved, paid</h2>
  * <p>A draft is recomputed as often as the company likes. Approving it computes it once more and
@@ -752,15 +754,19 @@ public class CarrierPayrollService {
             // the draft exactly as it was. In rider order, so two approvals lock riders' cash in
             // the same order and cannot deadlock.
             Map<UUID, UUID> handovers = new HashMap<>();
+            Instant periodEnd = periodOf(run).endIn(zone);
             for (CarrierPayslip slip : stored) {
                 if (!slip.nettedCash()) {
                     continue;
                 }
+                // Only what was collected by the period's end: the cash on the payslip. Whatever the
+                // rider took since stays in their bag.
                 CashFloatService.Handover handover = cashFloat.handOver(company,
                         slip.getRiderRef(), slip.getCashNetted(),
                         new CashFloatEntry.Recorded(actor, CashFloatEntry.Method.PAYROLL_DEDUCTION,
                                 run.getPeriodFrom() + " to " + run.getPeriodTo(),
-                                payrollKey(run.getId(), slip.getRiderRef())));
+                                payrollKey(run.getId(), slip.getRiderRef())),
+                        periodEnd);
                 if (handover.amount().compareTo(slip.getCashNetted()) != 0) {
                     throw new IllegalStateException("The deduction recorded for "
                             + slip.getRiderRef() + " is " + handover.amount() + ", not the "
@@ -985,7 +991,9 @@ public class CarrierPayrollService {
 
         List<PayslipCalculator.Payslip> slips = PayslipCalculator.compute(
                 new PayslipCalculator.Inputs(policy.terms(), hours.status(), deliveries, tips,
-                        hours.riders(), carrierCash.heldByRider(company), named,
+                        // Cash of the period and before, still held: riders keep collecting after
+                        // the period ends, and none of that may move a figure being approved.
+                        hours.riders(), carrierCash.heldByRider(company, to), named,
                         pendingCorrections(company, runId, period)));
         return new Computation(policy, hours, slips);
     }

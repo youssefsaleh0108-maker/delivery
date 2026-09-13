@@ -56,7 +56,8 @@ public class CarrierPayslip {
      * @param deductions      lateness, absence, named deductions, deduction corrections and netted
      *                        cash
      * @param tips            informational only: the rider's own money, never in gross or net
-     * @param cashHeld        what the rider held for the company when computed
+     * @param cashHeld        what the rider still held for the company when computed, of the cash
+     *                        they collected by the end of the period
      * @param cashNetted      the part of it kept out of this pay: all of it, or nothing
      */
     public record Figures(int deliveries, Long workedSeconds, Long manualSeconds,

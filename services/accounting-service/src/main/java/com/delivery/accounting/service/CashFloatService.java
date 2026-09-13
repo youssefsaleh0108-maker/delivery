@@ -211,6 +211,31 @@ public class CashFloatService {
     @Transactional
     public Handover handOver(String carrierRef, String riderRef, BigDecimal expected,
                              Recorded recorded) {
+        return handOver(carrierRef, riderRef, expected, recorded, null);
+    }
+
+    /**
+     * {@link #handOver(String, String, BigDecimal, Recorded)}, clearing only the cash the rider
+     * collected before {@code collectedBefore}: a pay run's deduction.
+     *
+     * <p><strong>Why a cut-off.</strong> A pay run nets the cash its period produced, and riders keep
+     * working after a period ends. Against everything a rider holds right now, the payslip's figure
+     * went stale with every cash delivery made while the approver was looking, and approval kept
+     * refusing through the working day. What a rider collected up to the period's end and still holds
+     * stops growing when the period closes: it can only fall, when the rider hands it over at the hub,
+     * and that is a real change the approver has to see. Cash collected later is not on the payslip,
+     * so it stays in the rider's bag, for the hub or the next run.
+     *
+     * <p><strong>Otherwise the same door.</strong> Every row the rider holds for the company is locked,
+     * in the same order as a counter hand-over locks them, so the two wait on each other exactly as
+     * two counters do; {@code expected} is checked against what is cleared; a repeated key replays.
+     * Whole rows only, by when each was written, so no collection is ever split.
+     *
+     * @param collectedBefore exclusive; null clears everything the rider holds for the company
+     */
+    @Transactional
+    public Handover handOver(String carrierRef, String riderRef, BigDecimal expected,
+                             Recorded recorded, Instant collectedBefore) {
         if (carrierRef == null || carrierRef.isBlank() || riderRef == null || riderRef.isBlank()) {
             throw new IllegalArgumentException("A hand-over needs a company and a rider");
         }
@@ -235,7 +260,7 @@ public class CashFloatService {
             return replay.get();
         }
 
-        List<CashFloatEntry> held = floatEntries.lockHeldForCarrier(riderRef, carrierRef);
+        List<CashFloatEntry> locked = floatEntries.lockHeldForCarrier(riderRef, carrierRef);
 
         // See remit(): the twin of this request may have committed while this one waited.
         replay = replayHandover(carrierRef, riderRef, who);
@@ -243,6 +268,9 @@ public class CashFloatService {
             return replay.get();
         }
 
+        List<CashFloatEntry> held = collectedBefore == null
+                ? locked
+                : locked.stream().filter(row -> writtenBefore(row, collectedBefore)).toList();
         BigDecimal total = sum(held);
         if (held.isEmpty() || total.compareTo(money(expected)) != 0) {
             throw new AmountChangedException(total);
@@ -366,6 +394,14 @@ public class CashFloatService {
             }
         }
         return 0;
+    }
+
+    /**
+     * Whether a row was written before the cut-off. A row with no time yet has not been read back
+     * from the database — it was written in this transaction, so now — and is never before one.
+     */
+    static boolean writtenBefore(CashFloatEntry row, Instant cutOff) {
+        return row.getCreatedAt() != null && row.getCreatedAt().isBefore(cutOff);
     }
 
     private static BigDecimal sum(List<CashFloatEntry> rows) {

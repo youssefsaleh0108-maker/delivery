@@ -31,8 +31,9 @@ import com.delivery.accounting.domain.CarrierPayslip;
  *   <li>Lateness and absence deductions, per unexcused day as order-tracking judged it. A rider
  *       with no schedule is never late or absent there, so they never lose pay here.</li>
  *   <li>The company's named bonuses and deductions, and corrections carried in from earlier runs.</li>
- *   <li>Cash the rider holds for the company, kept out of their pay — <strong>all of it or none
- *       of it</strong>. A hand-over clears a rider's whole bag or nothing, so cash is only netted
+ *   <li>Cash the rider collected for the company by the end of the period and still holds, kept out
+ *       of their pay — <strong>all of it or none of it</strong>. Cash collected later belongs to a
+ *       later run, so a rider still working while the approver looks cannot move this figure. A hand-over clears a rider's whole bag or nothing, so cash is only netted
  *       when what is left of the pay covers it. Otherwise it stays in their bag, where the company's
  *       cash page keeps chasing it, rather than being deducted here while the float still shows the
  *       rider holding part of it.</li>
@@ -71,7 +72,8 @@ public final class PayslipCalculator {
      * @param deliveries rider to delivered jobs for the company in the period
      * @param tips       rider to tips in the period, informational
      * @param hours      rider to attendance totals; a rider absent from it has unknown hours
-     * @param cashHeld   rider to what they hold for the company right now
+     * @param cashHeld   rider to what they collected for the company by the end of the period and
+     *                   still hold
      * @param namedLines the company's live named bonuses and deductions on this draft
      * @param adjustments corrections to earlier runs not yet paid
      */
