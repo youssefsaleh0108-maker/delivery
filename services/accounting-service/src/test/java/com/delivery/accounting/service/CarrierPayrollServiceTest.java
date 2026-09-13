@@ -49,6 +49,8 @@ import com.delivery.accounting.domain.CarrierPayAdjustment;
 import com.delivery.accounting.domain.CarrierPayAdjustmentRepository;
 import com.delivery.accounting.domain.CarrierPayAttendance;
 import com.delivery.accounting.domain.CarrierPayAttendanceRepository;
+import com.delivery.accounting.domain.CarrierPayDelivered;
+import com.delivery.accounting.domain.CarrierPayDeliveredRepository;
 import com.delivery.accounting.domain.CarrierPayLine;
 import com.delivery.accounting.domain.CarrierPayLine.Kind;
 import com.delivery.accounting.domain.CarrierPayLine.Source;
@@ -58,6 +60,7 @@ import com.delivery.accounting.domain.CarrierPayPolicy.PayCycle;
 import com.delivery.accounting.domain.CarrierPayPolicyRepository;
 import com.delivery.accounting.domain.CarrierPayRun;
 import com.delivery.accounting.domain.CarrierPayRun.Attendance;
+import com.delivery.accounting.domain.CarrierPayRun.Deliveries;
 import com.delivery.accounting.domain.CarrierPayRun.Status;
 import com.delivery.accounting.domain.CarrierPayRunRepository;
 import com.delivery.accounting.domain.CarrierPayrollEvent;
@@ -78,6 +81,7 @@ import com.delivery.accounting.service.CarrierPayrollService.PayslipView;
 import com.delivery.accounting.service.CarrierPayrollService.RunView;
 import com.delivery.accounting.service.PayslipCalculator.RiderHours;
 import com.delivery.accounting.service.RiderAttendanceSource.AttendanceRead;
+import com.delivery.accounting.service.RiderDeliveriesSource.DeliveriesRead;
 
 /**
  * A delivery company's pay runs, from rules to recorded payment.
@@ -120,6 +124,8 @@ class CarrierPayrollServiceTest {
     @Mock
     private CarrierPayAttendanceRepository snapshots;
     @Mock
+    private CarrierPayDeliveredRepository deliveredCopies;
+    @Mock
     private CarrierPayrollEventRepository events;
     @Mock
     private RiderLedgerRepository riderLedger;
@@ -129,6 +135,8 @@ class CarrierPayrollServiceTest {
     private CashFloatService cashFloat;
     @Mock
     private RiderAttendanceSource attendance;
+    @Mock
+    private RiderDeliveriesSource deliveriesSource;
     @Mock
     private AccountDirectory accounts;
     @Mock
@@ -144,11 +152,16 @@ class CarrierPayrollServiceTest {
     private final List<CarrierPayLine> lineRows = new ArrayList<>();
     private final List<CarrierPayAdjustment> adjustmentRows = new ArrayList<>();
     private final List<CarrierPayAttendance> snapshotRows = new ArrayList<>();
+    private final List<CarrierPayDelivered> deliveredRows = new ArrayList<>();
     private final List<CarrierPayrollEvent> eventRows = new ArrayList<>();
     private final List<RiderLedgerEntry> ledgerRows = new ArrayList<>();
     /** Cash riders took at doors for the company and still hold, each with when they took it. */
     private final List<Collected> collections = new ArrayList<>();
     private AttendanceRead read = AttendanceRead.unavailable("NOT_DEPLOYED");
+    /** Every order the company's riders delivered, as Order Manager holds them: fee or none. */
+    private final List<Delivery> deliveredOrders = new ArrayList<>();
+    /** A reason, to make Order Manager's count unavailable; null while it answers. */
+    private String ordersUnavailable;
 
     private static final Map<String, String> NAMES = Map.of(
             YOUSSEF, "Youssef Kanaan", RANIA, "Rania Ghandour", STAFF, "Kamal M.");
@@ -156,8 +169,8 @@ class CarrierPayrollServiceTest {
     @BeforeEach
     void setUp() {
         service = new CarrierPayrollService(policies, runs, payslips, lines, adjustments, snapshots,
-                events, riderLedger, carrierCash, cashFloat, attendance, accounts,
-                transactionManager, "Asia/Beirut", "USD", clock);
+                deliveredCopies, events, riderLedger, carrierCash, cashFloat, attendance,
+                deliveriesSource, accounts, transactionManager, "Asia/Beirut", "USD", clock);
 
         when(policies.findByCarrierRefOrderByEffectiveFromDescCreatedAtDesc(COMPANY))
                 .thenAnswer(i -> policyRows.stream()
@@ -281,6 +294,18 @@ class CarrierPayrollServiceTest {
         doAnswer(i -> snapshotRows.removeIf(s -> s.getRunId().equals(i.getArgument(0))))
                 .when(snapshots).deleteByRunId(any());
 
+        when(deliveredCopies.findByRunId(any())).thenAnswer(i -> deliveredRows.stream()
+                .filter(r -> r.getRunId().equals(i.getArgument(0)))
+                .toList());
+        when(deliveredCopies.saveAll(anyIterable())).thenAnswer(i -> {
+            List<CarrierPayDelivered> in = new ArrayList<>();
+            i.<Iterable<CarrierPayDelivered>>getArgument(0).forEach(in::add);
+            deliveredRows.addAll(in);
+            return in;
+        });
+        doAnswer(i -> deliveredRows.removeIf(r -> r.getRunId().equals(i.getArgument(0))))
+                .when(deliveredCopies).deleteByRunId(any());
+
         when(events.save(any(CarrierPayrollEvent.class))).thenAnswer(i -> {
             eventRows.add(i.getArgument(0));
             return i.getArgument(0);
@@ -317,6 +342,20 @@ class CarrierPayrollServiceTest {
         });
         when(attendance.fleet(anyString(), anyString(), any(), any(), any()))
                 .thenAnswer(i -> read);
+        // Order Manager counts the orders delivered in the period's days that have happened so far.
+        when(deliveriesSource.fleet(anyString(), anyString(), any(), any(), any())).thenAnswer(i -> {
+            if (ordersUnavailable != null) {
+                return DeliveriesRead.unavailable(ordersUnavailable);
+            }
+            Instant from = i.<LocalDate>getArgument(3).atStartOfDay(BEIRUT).toInstant();
+            Instant to = i.<LocalDate>getArgument(4).plusDays(1).atStartOfDay(BEIRUT).toInstant();
+            Map<String, Integer> counts = new HashMap<>();
+            deliveredOrders.stream()
+                    .filter(d -> !d.at().isBefore(from) && d.at().isBefore(to)
+                            && !d.at().isAfter(clock.instant()))
+                    .forEach(d -> counts.merge(d.rider(), 1, Integer::sum));
+            return DeliveriesRead.of(counts);
+        });
         when(accounts.profileOf(anyString())).thenAnswer(i ->
                 new AccountDirectory.Profile("ACC-1", NAMES.get(i.<String>getArgument(0)), null));
     }
@@ -365,9 +404,23 @@ class CarrierPayrollServiceTest {
                 LocalDate.parse(day).atTime(12, 0).atZone(BEIRUT).toInstant()));
     }
 
+    /** A job that earned a fee: Order Manager has the order, and the ledger what it earned. */
     private void deliveredAt(String rider, Instant at) {
+        deliveredOrders.add(new Delivery(rider, at));
         ledgerRows.add(RiderLedgerEntry.jobEarning(rider, UUID.randomUUID(), new BigDecimal("1.50"),
                 "USD", RiderLedgerEntry.Fleet.CARRIER, COMPANY, "customer-1", at));
+    }
+
+    private record Delivery(String rider, Instant at) {
+    }
+
+    /**
+     * A free delivery at noon in Beirut on {@code day}: Order Manager has the order, and the ledger has
+     * nothing, because a job that earned no fee writes no JOB_EARNING row.
+     */
+    private void deliveredFree(String rider, String day) {
+        deliveredOrders.add(new Delivery(rider,
+                LocalDate.parse(day).atTime(12, 0).atZone(BEIRUT).toInstant()));
     }
 
     private static PayslipView slip(RunView run, String rider) {
@@ -626,25 +679,26 @@ class CarrierPayrollServiceTest {
     }
 
     @Test
-    @DisplayName("figures that moved since the approver looked are recomputed, not approved")
+    @DisplayName("counted from the ledger, figures that moved since the approver looked are recomputed, not approved")
     void figuresMoved() {
         rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", null);
+        ordersUnavailable = "UNREACHABLE";
         delivered(YOUSSEF, "2026-10-05");
         RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
         UUID id = run.run().getId();
         // A delivery from the 14th reaches the ledger late.
         delivered(YOUSSEF, "2026-10-14");
 
-        Approval moved = service.approve(COMPANY, id, 1, false, STAFF);
+        Approval moved = service.approve(COMPANY, id, 1, true, STAFF);
         assertThat(moved.outcome()).isEqualTo(ApprovalOutcome.FIGURES_CHANGED);
         assertThat(moved.run().run().getStatus()).isEqualTo(Status.DRAFT);
         assertThat(moved.run().run().getRevision()).isEqualTo(2);
         assertThat(slip(moved.run(), YOUSSEF).slip().getNet()).isEqualByComparingTo("4.00");
 
         // A page still showing revision 1 is told to look again; revision 2 is approved.
-        assertThat(service.approve(COMPANY, id, 1, false, STAFF).outcome())
+        assertThat(service.approve(COMPANY, id, 1, true, STAFF).outcome())
                 .isEqualTo(ApprovalOutcome.FIGURES_CHANGED);
-        assertThat(service.approve(COMPANY, id, 2, false, STAFF).outcome())
+        assertThat(service.approve(COMPANY, id, 2, true, STAFF).outcome())
                 .isEqualTo(ApprovalOutcome.APPROVED);
         verifyNoInteractions(cashFloat);
     }
@@ -756,6 +810,103 @@ class CarrierPayrollServiceTest {
         assertRefused(() -> service.addLine(COMPANY, id, YOUSSEF, Kind.BONUS, "Late bonus",
                 new BigDecimal("5.00"), STAFF), 409, "NOT_DRAFT");
         assertRefused(() -> service.discard(COMPANY, id, STAFF), 409, "NOT_DRAFT");
+    }
+
+    // --------------------------------------------------------------------------- deliveries
+
+    /**
+     * A rider paid per delivery is paid for every order they delivered. A free delivery earns the
+     * company no fee, so the ledger never wrote it a JOB_EARNING row: counting rows would skip it.
+     */
+    @Test
+    @DisplayName("a free delivery is a delivery: counted from the company's orders and paid like any other")
+    void freeDeliveriesArePaid() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", null);
+        delivered(YOUSSEF, "2026-10-05");
+        deliveredFree(YOUSSEF, "2026-10-06");
+        deliveredFree(RANIA, "2026-10-07");
+        // Late ledger rows say nothing about a count taken from orders.
+        when(riderLedger.countJobsForCarrierRecordedAfter(anyString(), any(), any(), any()))
+                .thenReturn(5L);
+
+        RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+
+        verify(deliveriesSource).fleet(TOKEN, COMPANY, BEIRUT, OCT_1, OCT_15);
+        assertThat(run.run().getDeliveries()).isEqualTo(Deliveries.ORDERS);
+        assertThat(run.run().getDeliveriesAt()).isEqualTo(Instant.parse("2026-10-20T09:00:00Z"));
+        assertThat(slip(run, YOUSSEF).slip().figures().deliveries()).isEqualTo(2);
+        assertThat(slip(run, YOUSSEF).slip().getNet()).isEqualByComparingTo("4.00");
+        // Rania delivered only free orders, and is paid for them.
+        assertThat(slip(run, RANIA).slip().getNet()).isEqualByComparingTo("2.00");
+        assertThat(run.needsAcknowledgement()).isFalse();
+        assertThat(run.jobsSinceComputed()).isZero();
+        assertThat(deliveredRows).extracting(CarrierPayDelivered::getRiderRef)
+                .containsExactlyInAnyOrder(YOUSSEF, RANIA);
+
+        // Approving reads the copy the approver saw, never Order Manager again.
+        assertThat(service.approve(COMPANY, run.run().getId(), 1, false, STAFF).outcome())
+                .isEqualTo(ApprovalOutcome.APPROVED);
+        verify(deliveriesSource, times(1)).fleet(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("when orders cannot be counted the ledger stands in, the run says so, and approving it is acknowledged")
+    void deliveriesFromTheLedger() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", null);
+        ordersUnavailable = "NOT_DEPLOYED";
+        delivered(YOUSSEF, "2026-10-05");
+        deliveredFree(YOUSSEF, "2026-10-06");
+        RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+        UUID id = run.run().getId();
+
+        assertThat(run.run().getDeliveries()).isEqualTo(Deliveries.LEDGER);
+        assertThat(run.run().getDeliveriesNote()).isEqualTo("NOT_DEPLOYED");
+        // The ledger knows only the job that earned a fee: a floor, not the count.
+        assertThat(slip(run, YOUSSEF).slip().getNet()).isEqualByComparingTo("2.00");
+        assertThat(run.needsAcknowledgement()).isTrue();
+        assertThat(deliveredRows).isEmpty();
+        assertThat(service.approve(COMPANY, id, 1, false, STAFF).outcome())
+                .isEqualTo(ApprovalOutcome.NEEDS_ACKNOWLEDGEMENT);
+
+        // Order Manager answers again: a recompute counts every delivery and leaves nothing to say.
+        ordersUnavailable = null;
+        RunView recomputed = service.recompute(COMPANY, id, STAFF, TOKEN);
+        assertThat(recomputed.run().getDeliveries()).isEqualTo(Deliveries.ORDERS);
+        assertThat(recomputed.run().getDeliveriesNote()).isNull();
+        assertThat(slip(recomputed, YOUSSEF).slip().getNet()).isEqualByComparingTo("4.00");
+        assertThat(recomputed.needsAcknowledgement()).isFalse();
+        assertThat(service.approve(COMPANY, id, 2, false, STAFF).outcome())
+                .isEqualTo(ApprovalOutcome.APPROVED);
+    }
+
+    /**
+     * A copy stops at the moment it is taken. A draft started while its period was running holds the
+     * deliveries up to then; approved as it stood, the rest of the period would go unpaid.
+     */
+    @Test
+    @DisplayName("a draft last read before its period ended is recomputed before it can be approved")
+    void readBeforeThePeriodEnded() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", null);
+        clock.set("2026-10-10T09:00:00Z");
+        delivered(YOUSSEF, "2026-10-05");
+        RunView early = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+        UUID id = early.run().getId();
+        assertThat(early.readBeforePeriodEnd()).isFalse();
+
+        // Youssef keeps delivering until the period ends; the draft's copy stops on the 10th.
+        delivered(YOUSSEF, "2026-10-13");
+        clock.set("2026-10-20T09:00:00Z");
+        RunView stale = service.run(COMPANY, id).orElseThrow();
+        assertThat(stale.readBeforePeriodEnd()).isTrue();
+        assertThat(slip(stale, YOUSSEF).slip().getNet()).isEqualByComparingTo("2.00");
+        assertRefused(() -> service.approve(COMPANY, id, 1, true, STAFF), 409, "RECOMPUTE_NEEDED");
+        assertThat(runRows.get(id).getStatus()).isEqualTo(Status.DRAFT);
+
+        RunView fresh = service.recompute(COMPANY, id, STAFF, TOKEN);
+        assertThat(fresh.readBeforePeriodEnd()).isFalse();
+        assertThat(slip(fresh, YOUSSEF).slip().getNet()).isEqualByComparingTo("4.00");
+        assertThat(service.approve(COMPANY, id, 2, false, STAFF).outcome())
+                .isEqualTo(ApprovalOutcome.APPROVED);
     }
 
     // ----------------------------------------------------------------------------- payments

@@ -138,7 +138,8 @@ delivery:
     # delivery log; a second sending path here would be a class of message nobody can answer
     # "did it arrive" about.
     notifications-manager: ${NOTIFICATIONS_MANAGER_URL:http://localhost:8104}
-    # Asked one question only: which delivery company is the caller staff of.
+    # Asked which delivery company the caller is staff of — and, for a pay run, how many orders each
+    # of its riders delivered in the period (see OrderManagerDeliveriesClient for that endpoint).
     #
     # A carrier's legs are attributed with Order Manager's provider id while their token carries a
     # Keycloak subject, and this service cannot bridge the two without the membership table that
@@ -184,6 +185,9 @@ delivery:
       zone: Asia/Beirut
       # How long a pay run waits for attendance before computing without it.
       attendance-timeout: 10s
+      # How long a pay run waits for Order Manager's count of delivered orders before counting the
+      # ledger's paid jobs instead, and saying so.
+      deliveries-timeout: 10s
 
     order-events-queue: accounting.order-events
     results-queue: accounting.posting-results

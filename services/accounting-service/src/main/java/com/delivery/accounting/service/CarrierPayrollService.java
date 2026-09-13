@@ -34,6 +34,8 @@ import com.delivery.accounting.domain.CarrierPayAdjustment;
 import com.delivery.accounting.domain.CarrierPayAdjustmentRepository;
 import com.delivery.accounting.domain.CarrierPayAttendance;
 import com.delivery.accounting.domain.CarrierPayAttendanceRepository;
+import com.delivery.accounting.domain.CarrierPayDelivered;
+import com.delivery.accounting.domain.CarrierPayDeliveredRepository;
 import com.delivery.accounting.domain.CarrierPayLine;
 import com.delivery.accounting.domain.CarrierPayLine.Source;
 import com.delivery.accounting.domain.CarrierPayLineRepository;
@@ -42,6 +44,7 @@ import com.delivery.accounting.domain.CarrierPayPolicy.PayCycle;
 import com.delivery.accounting.domain.CarrierPayPolicyRepository;
 import com.delivery.accounting.domain.CarrierPayRun;
 import com.delivery.accounting.domain.CarrierPayRun.Attendance;
+import com.delivery.accounting.domain.CarrierPayRun.Deliveries;
 import com.delivery.accounting.domain.CarrierPayRun.Status;
 import com.delivery.accounting.domain.CarrierPayRunRepository;
 import com.delivery.accounting.domain.CarrierPayrollEvent;
@@ -54,6 +57,7 @@ import com.delivery.accounting.domain.RiderLedgerEntry;
 import com.delivery.accounting.domain.RiderLedgerRepository;
 import com.delivery.accounting.service.PayslipCalculator.RiderHours;
 import com.delivery.accounting.service.RiderAttendanceSource.AttendanceRead;
+import com.delivery.accounting.service.RiderDeliveriesSource.DeliveriesRead;
 
 /**
  * A delivery company's payroll for the riders it employs: its pay rules, one run per pay period,
@@ -84,6 +88,14 @@ import com.delivery.accounting.service.RiderAttendanceSource.AttendanceRead;
  * into the run with the time they were read; editing its lines and approving it use that copy; and
  * only an explicit recompute reads them again. If attendance cannot be read the run computes
  * without hours, says so, and approving it has to acknowledge that.
+ *
+ * <h2>A delivery is an order, not a fee</h2>
+ * <p>Deliveries are counted from Order Manager ({@link RiderDeliveriesSource}): every order a rider
+ * delivered for the company in the period, whatever it earned. The ledger's JOB_EARNING rows are not
+ * that — a free delivery has none — so they only stand in when Order Manager cannot be asked, and a
+ * run counted from them says so and needs acknowledging. The count is a copy, like the hours, and a
+ * draft last read before its period ended is recomputed before it can be approved: a copy stops at
+ * the moment it was taken.
  *
  * <h2>No network inside a transaction</h2>
  * <p>The attendance read happens before a transaction opens, never while a pooled connection and a
@@ -116,11 +128,13 @@ public class CarrierPayrollService {
     private final CarrierPayLineRepository lines;
     private final CarrierPayAdjustmentRepository adjustments;
     private final CarrierPayAttendanceRepository snapshots;
+    private final CarrierPayDeliveredRepository deliveredCopies;
     private final CarrierPayrollEventRepository events;
     private final RiderLedgerRepository riderLedger;
     private final CarrierCashService carrierCash;
     private final CashFloatService cashFloat;
     private final RiderAttendanceSource attendance;
+    private final RiderDeliveriesSource deliveriesSource;
     private final AccountDirectory accounts;
     private final TransactionTemplate writeTx;
     private final TransactionTemplate readTx;
@@ -135,19 +149,21 @@ public class CarrierPayrollService {
                                  CarrierPayLineRepository lines,
                                  CarrierPayAdjustmentRepository adjustments,
                                  CarrierPayAttendanceRepository snapshots,
+                                 CarrierPayDeliveredRepository deliveredCopies,
                                  CarrierPayrollEventRepository events,
                                  RiderLedgerRepository riderLedger,
                                  CarrierCashService carrierCash,
                                  CashFloatService cashFloat,
                                  RiderAttendanceSource attendance,
+                                 RiderDeliveriesSource deliveriesSource,
                                  AccountDirectory accounts,
                                  PlatformTransactionManager transactionManager,
                                  // The calendar pay periods are in: order-tracking's day zone.
                                  @Value("${delivery.accounting.payroll.zone:Asia/Beirut}") String zone,
                                  @Value("${delivery.accounting.currency:USD}") String currency) {
-        this(policies, runs, payslips, lines, adjustments, snapshots, events, riderLedger,
-                carrierCash, cashFloat, attendance, accounts, transactionManager, zone, currency,
-                Clock.systemUTC());
+        this(policies, runs, payslips, lines, adjustments, snapshots, deliveredCopies, events,
+                riderLedger, carrierCash, cashFloat, attendance, deliveriesSource, accounts,
+                transactionManager, zone, currency, Clock.systemUTC());
     }
 
     /** For tests, which need "today" to hold still while periods open and close around it. */
@@ -155,9 +171,11 @@ public class CarrierPayrollService {
                           CarrierPayslipRepository payslips, CarrierPayLineRepository lines,
                           CarrierPayAdjustmentRepository adjustments,
                           CarrierPayAttendanceRepository snapshots,
+                          CarrierPayDeliveredRepository deliveredCopies,
                           CarrierPayrollEventRepository events, RiderLedgerRepository riderLedger,
                           CarrierCashService carrierCash, CashFloatService cashFloat,
-                          RiderAttendanceSource attendance, AccountDirectory accounts,
+                          RiderAttendanceSource attendance, RiderDeliveriesSource deliveriesSource,
+                          AccountDirectory accounts,
                           PlatformTransactionManager transactionManager, String zone,
                           String currency, Clock clock) {
         this.policies = policies;
@@ -166,11 +184,13 @@ public class CarrierPayrollService {
         this.lines = lines;
         this.adjustments = adjustments;
         this.snapshots = snapshots;
+        this.deliveredCopies = deliveredCopies;
         this.events = events;
         this.riderLedger = riderLedger;
         this.carrierCash = carrierCash;
         this.cashFloat = cashFloat;
         this.attendance = attendance;
+        this.deliveriesSource = deliveriesSource;
         this.accounts = accounts;
         this.writeTx = new TransactionTemplate(transactionManager);
         this.readTx = new TransactionTemplate(transactionManager);
@@ -305,15 +325,21 @@ public class CarrierPayrollService {
      * One run's page.
      *
      * @param jobsSinceComputed deliveries of the period that reached the ledger after the figures
-     *                          were computed: on a draft, "recompute"; on an approved run, "correct"
-     * @param needsAcknowledgement approving this draft means approving it without some hours
+     *                          were computed, when they were counted from the ledger: on a draft,
+     *                          "recompute"; on an approved run, "correct". Always zero when they
+     *                          were counted from orders, whose copy the ledger cannot make stale
+     * @param needsAcknowledgement approving this draft means approving it without some hours, or
+     *                          with deliveries counted from the ledger
      * @param periodChanged     the rules now cut this draft's days into a different period
+     * @param readBeforePeriodEnd this draft's figures were last read before its period ended: it is
+     *                          recomputed before it can be approved
      */
     public record RunView(CarrierPayRun run, PolicyView policy, String approvedByName,
                           List<PayslipView> payslips, Totals totals,
                           List<CorrectionView> corrections, List<EventView> history,
                           boolean periodOver, long jobsSinceComputed,
-                          boolean needsAcknowledgement, boolean periodChanged) {
+                          boolean needsAcknowledgement, boolean periodChanged,
+                          boolean readBeforePeriodEnd) {
     }
 
     public enum ApprovalOutcome {
@@ -322,7 +348,10 @@ public class CarrierPayrollService {
         ALREADY_APPROVED,
         /** What the approver looked at is no longer true. The run now shows what is. */
         FIGURES_CHANGED,
-        /** Hours are missing and the approver has not said to approve without them. */
+        /**
+         * Hours are missing, or deliveries were counted from the ledger, and the approver has not
+         * said to approve anyway.
+         */
         NEEDS_ACKNOWLEDGEMENT
     }
 
@@ -577,6 +606,7 @@ public class CarrierPayrollService {
         }
 
         Hours hours = readHours(policy.terms(), company, period, bearer);
+        Delivered delivered = readDelivered(company, period, bearer);
         UUID runId;
         try {
             runId = writeTx.execute(status -> {
@@ -584,7 +614,7 @@ public class CarrierPayrollService {
                 CarrierPayRun run = runs.save(CarrierPayRun.draft(company, period.from(),
                         period.to(), policy.getId(), currency, actor, now));
                 Computation computed = compute(company, run.getId(), policy, period, hours,
-                        List.of());
+                        delivered, List.of());
                 replaceFigures(run, computed, now);
                 record(run, null, Action.RUN_STARTED, actor, summary(run, computed));
                 return run.getId();
@@ -601,6 +631,7 @@ public class CarrierPayrollService {
         CarrierPayRun peek = draftOf(company, runId);
         CarrierPayPolicy policy = policyFor(company, peek);
         Hours hours = readHours(policy.terms(), company, periodOf(peek), bearer);
+        Delivered delivered = readDelivered(company, periodOf(peek), bearer);
 
         writeTx.executeWithoutResult(status -> {
             CarrierPayRun run = lockDraft(company, runId);
@@ -610,7 +641,7 @@ public class CarrierPayrollService {
                         "Your pay rules changed a moment ago. Recompute again.");
             }
             Computation computed = compute(company, run.getId(), current, periodOf(run), hours,
-                    liveNamedLines(run));
+                    delivered, liveNamedLines(run));
             replaceFigures(run, computed, now());
             record(run, null, Action.RUN_RECOMPUTED, actor, summary(run, computed));
         });
@@ -625,6 +656,7 @@ public class CarrierPayrollService {
             lines.deleteByRunId(id);
             payslips.deleteByRunId(id);
             snapshots.deleteByRunId(id);
+            deliveredCopies.deleteByRunId(id);
             payslips.flush();
             record(run, null, Action.RUN_DISCARDED, actor, run.getPeriodFrom() + " to "
                     + run.getPeriodTo() + ", revision " + run.getRevision());
@@ -685,12 +717,12 @@ public class CarrierPayrollService {
     /**
      * Freezes a draft, netting each rider's cash through the custody model.
      *
-     * @param revision                the revision the approver looked at
-     * @param acknowledgeMissingHours the approver has been told hours are missing and approves
-     *                                anyway
+     * @param revision           the revision the approver looked at
+     * @param acknowledgeMissing the approver has been told what is missing — some riders' hours, or
+     *                           deliveries counted from the ledger — and approves anyway
      */
     public Approval approve(String company, UUID runId, int revision,
-                            boolean acknowledgeMissingHours, String actor) {
+                            boolean acknowledgeMissing, String actor) {
         CarrierPayRun peek = runs.findByIdAndCarrierRef(runId, company)
                 .orElseThrow(CarrierPayrollService::notFound);
         if (!peek.isDraft()) {
@@ -710,13 +742,21 @@ public class CarrierPayrollService {
             if (run.getRevision() != revision) {
                 return ApprovalOutcome.FIGURES_CHANGED;
             }
+            // Counted and judged as they stood when read: the rest of the period is not in them, and
+            // no comparison below could notice. Nothing has been written yet.
+            if (readBeforeItEnded(run)) {
+                throw refusal(409, "RECOMPUTE_NEEDED", "These figures were read before the period "
+                        + "ended on " + run.getPeriodTo() + ". Recompute them, check them and "
+                        + "approve again.");
+            }
 
             CarrierPayPolicy policy = policyFor(company, run);
             List<CarrierPayslip> stored = payslips.findByRunIdOrderByRiderRefAsc(run.getId());
             List<CarrierPayLine> storedLines = lines.findByRunIdOrderByCreatedAtAsc(run.getId());
-            // The same computation once more — with the hours the draft holds, never a live read.
+            // The same computation once more — with the hours and deliveries the draft holds, never
+            // a live read.
             Computation fresh = compute(company, run.getId(), policy, periodOf(run),
-                    storedHours(run, policy.terms()), liveNamedLines(run));
+                    storedHours(run, policy.terms()), storedDelivered(run), liveNamedLines(run));
             if (!unchanged(run, stored, storedLines, fresh)) {
                 replaceFigures(run, fresh, now());
                 record(run, null, Action.RUN_RECOMPUTED, actor,
@@ -730,7 +770,8 @@ public class CarrierPayrollService {
             boolean hoursMissing = policy.terms().needsAttendance()
                     && (run.getAttendance() != Attendance.INCLUDED
                         || stored.stream().anyMatch(s -> s.figures().workedSeconds() == null));
-            if (hoursMissing && !acknowledgeMissingHours) {
+            boolean deliveriesUncounted = deliveriesUncounted(run, policy);
+            if ((hoursMissing || deliveriesUncounted) && !acknowledgeMissing) {
                 return ApprovalOutcome.NEEDS_ACKNOWLEDGEMENT;
             }
 
@@ -790,7 +831,9 @@ public class CarrierPayrollService {
             }
             run.approve(actor, now);
             record(run, null, Action.RUN_APPROVED, actor, "revision " + run.getRevision() + "; "
-                    + stored.size() + " payslips" + (hoursMissing ? "; approved without hours" : ""));
+                    + stored.size() + " payslips" + (hoursMissing ? "; approved without hours" : "")
+                    + (deliveriesUncounted ? "; deliveries counted from the ledger ("
+                            + run.getDeliveriesNote() + ")" : ""));
             settleIfDone(run, stored, actor, now);
             return ApprovalOutcome.APPROVED;
         });
@@ -966,23 +1009,79 @@ public class CarrierPayrollService {
         };
     }
 
-    private record Computation(CarrierPayPolicy policy, Hours hours,
+    /** The delivery counts a computation uses, and where they came from. */
+    private record Delivered(Deliveries source, String note, Instant readAt,
+                             Map<String, Integer> riders, boolean fresh) {
+    }
+
+    /**
+     * A live count of every order each rider delivered, or — when Order Manager cannot say — the
+     * note that the ledger stands in. Called before any transaction opens, and always stamped: it is
+     * the moment the run's figures were read.
+     */
+    private Delivered readDelivered(String company, PayPeriods.Period period, String bearer) {
+        Instant at = now();
+        DeliveriesRead read = deliveriesSource.fleet(bearer, company, zone, period.from(),
+                period.to());
+        return read.available()
+                ? new Delivered(Deliveries.ORDERS, null, at, read.riders(), true)
+                : new Delivered(Deliveries.LEDGER, read.reason(), at, Map.of(), true);
+    }
+
+    /** The count a draft already holds. Never a live read. */
+    private Delivered storedDelivered(CarrierPayRun run) {
+        if (run.getDeliveries() != Deliveries.ORDERS) {
+            return new Delivered(Deliveries.LEDGER, run.getDeliveriesNote(), run.getDeliveriesAt(),
+                    Map.of(), false);
+        }
+        Map<String, Integer> riders = new HashMap<>();
+        for (CarrierPayDelivered row : deliveredCopies.findByRunId(run.getId())) {
+            riders.put(row.getRiderRef(), row.getDelivered());
+        }
+        return new Delivered(Deliveries.ORDERS, null, run.getDeliveriesAt(), riders, false);
+    }
+
+    /**
+     * Whether a run's figures were last read before its period ended. Deliveries are counted, and
+     * hours judged, as they stood at the read, so whatever came after is missing from them.
+     */
+    private boolean readBeforeItEnded(CarrierPayRun run) {
+        Instant read = run.getDeliveriesAt();
+        return read == null || read.isBefore(periodOf(run).endIn(zone));
+    }
+
+    /**
+     * Pay per delivery, counted from the ledger: a delivery that earned no fee is missing from the
+     * count, so whoever approves has to say they approve without it.
+     */
+    private static boolean deliveriesUncounted(CarrierPayRun run, CarrierPayPolicy policy) {
+        return run.getDeliveries() != Deliveries.ORDERS
+                && policy.terms().perDeliveryRate().signum() > 0;
+    }
+
+    private record Computation(CarrierPayPolicy policy, Hours hours, Delivered delivered,
                                List<PayslipCalculator.Payslip> payslips) {
     }
 
     /**
-     * A period's payslips from the ledger's facts as they are now: the company's jobs and tips in
-     * the period, the cash its riders hold, its corrections still unpaid — and the hours given.
+     * A period's payslips: the deliveries and hours given, and the ledger's facts as they are now —
+     * the company's tips in the period, the cash its riders collected by its end and still hold, its
+     * corrections still unpaid.
      */
     private Computation compute(String company, UUID runId, CarrierPayPolicy policy,
-                                PayPeriods.Period period, Hours hours,
+                                PayPeriods.Period period, Hours hours, Delivered delivered,
                                 List<CarrierPayLine> named) {
         Instant from = period.startIn(zone);
         Instant to = period.endIn(zone);
 
         Map<String, Integer> deliveries = new HashMap<>();
-        for (RiderLedgerEntry job : riderLedger.jobsForCarrierBetween(company, from, to)) {
-            deliveries.merge(job.getRiderRef(), 1, Integer::sum);
+        if (delivered.source() == Deliveries.ORDERS) {
+            deliveries.putAll(delivered.riders());
+        } else {
+            // Standing in, counted afresh each time: every row is a delivery, not every delivery a row.
+            for (RiderLedgerEntry job : riderLedger.jobsForCarrierBetween(company, from, to)) {
+                deliveries.merge(job.getRiderRef(), 1, Integer::sum);
+            }
         }
         Map<String, BigDecimal> tips = new HashMap<>();
         for (RiderLedgerEntry tip : riderLedger.tipsForCarrierBetween(company, from, to)) {
@@ -995,7 +1094,7 @@ public class CarrierPayrollService {
                         // the period ends, and none of that may move a figure being approved.
                         hours.riders(), carrierCash.heldByRider(company, to), named,
                         pendingCorrections(company, runId, period)));
-        return new Computation(policy, hours, slips);
+        return new Computation(policy, hours, delivered, slips);
     }
 
     /** Corrections to runs of earlier periods, not yet paid in any run. */
@@ -1021,23 +1120,33 @@ public class CarrierPayrollService {
                 .toList();
     }
 
-    /** A draft recomputed after an edit: the ledger's facts now, and the hours it already holds. */
+    /**
+     * A draft recomputed after an edit: the ledger's facts now, and the hours and deliveries it
+     * already holds.
+     */
     private void refigure(String company, CarrierPayRun run, List<CarrierPayLine> named,
                           Instant now) {
         CarrierPayPolicy policy = policyFor(company, run);
         replaceFigures(run, compute(company, run.getId(), policy, periodOf(run),
-                storedHours(run, policy.terms()), named), now);
+                storedHours(run, policy.terms()), storedDelivered(run), named), now);
     }
 
-    /** Replaces a draft's payslips, computed lines and — from a fresh read — its hours. */
+    /**
+     * Replaces a draft's payslips, computed lines and — from a fresh read — its hours and
+     * deliveries.
+     */
     private void replaceFigures(CarrierPayRun run, Computation computed, Instant now) {
         UUID id = run.getId();
         Hours hours = computed.hours();
+        Delivered delivered = computed.delivered();
 
         payslips.deleteByRunId(id);
         lines.deleteByRunIdAndSourceIn(id, EnumSet.of(Source.COMPUTED, Source.ADJUSTMENT));
         if (hours.fresh() || hours.status() != Attendance.INCLUDED) {
             snapshots.deleteByRunId(id);
+        }
+        if (delivered.fresh()) {
+            deliveredCopies.deleteByRunId(id);
         }
         // Flushed before the inserts: a flush runs its inserts first, and the new rows take the old
         // ones' (run, rider) keys.
@@ -1049,6 +1158,12 @@ public class CarrierPayrollService {
                     .map(e -> CarrierPayAttendance.of(id, e.getKey(), e.getValue().workedSeconds(),
                             e.getValue().manualSeconds(), e.getValue().overtimeSeconds(),
                             e.getValue().lates(), e.getValue().absences()))
+                    .toList());
+        }
+        if (delivered.fresh() && delivered.source() == Deliveries.ORDERS) {
+            deliveredCopies.saveAll(delivered.riders().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(e -> CarrierPayDelivered.of(id, e.getKey(), e.getValue()))
                     .toList());
         }
         List<CarrierPayslip> slips = new ArrayList<>();
@@ -1065,7 +1180,7 @@ public class CarrierPayrollService {
         payslips.saveAll(slips);
         lines.saveAll(generated);
         run.recomputed(computed.policy().getId(), hours.status(), hours.note(), hours.readAt(),
-                now);
+                delivered.source(), delivered.note(), delivered.readAt(), now);
     }
 
     /** Whether a fresh computation says exactly what the draft already says. */
@@ -1073,6 +1188,7 @@ public class CarrierPayrollService {
                                      List<CarrierPayLine> storedLines, Computation fresh) {
         if (!run.getPolicyId().equals(fresh.policy().getId())
                 || run.getAttendance() != fresh.hours().status()
+                || run.getDeliveries() != fresh.delivered().source()
                 || stored.size() != fresh.payslips().size()) {
             return false;
         }
@@ -1112,9 +1228,12 @@ public class CarrierPayrollService {
 
     private static String summary(CarrierPayRun run, Computation computed) {
         Hours hours = computed.hours();
+        Delivered delivered = computed.delivered();
         return "revision " + run.getRevision() + "; " + computed.payslips().size()
                 + " payslips; hours " + hours.status()
-                + (hours.note() == null ? "" : " (" + hours.note() + ")");
+                + (hours.note() == null ? "" : " (" + hours.note() + ")")
+                + "; deliveries " + delivered.source()
+                + (delivered.note() == null ? "" : " (" + delivered.note() + ")");
     }
 
     // ------------------------------------------------------------------------------- plumbing
@@ -1214,8 +1333,11 @@ public class CarrierPayrollService {
                 lines.findByRunIdOrderByCreatedAtAsc(run.getId()),
                 adjustments.findByCorrectsRunIdOrderByCreatedAtAsc(run.getId()),
                 events.findByRunIdOrderByOccurredAtDesc(run.getId(), PageRequest.of(0, HISTORY)),
-                riderLedger.countJobsForCarrierRecordedAfter(run.getCarrierRef(),
-                        period.startIn(zone), period.endIn(zone), run.getComputedAt()));
+                // Only a count taken from the ledger can miss a job that reached the ledger late.
+                run.getDeliveries() == Deliveries.LEDGER
+                        ? riderLedger.countJobsForCarrierRecordedAfter(run.getCarrierRef(),
+                                period.startIn(zone), period.endIn(zone), run.getComputedAt())
+                        : 0L);
     }
 
     /** Names are resolved outside the read transaction: a Keycloak lookup holds no connection. */
@@ -1247,6 +1369,7 @@ public class CarrierPayrollService {
 
         boolean hoursMissing = needsHours && (run.getAttendance() != Attendance.INCLUDED
                 || slips.stream().anyMatch(PayslipView::hoursUnknown));
+        boolean periodOver = today().isAfter(run.getPeriodTo());
         return new RunView(run, policyView(d.policy()), nameOf(run.getApprovedBy()), slips,
                 totals(d.slips()),
                 d.corrections().stream()
@@ -1256,9 +1379,11 @@ public class CarrierPayrollService {
                 d.history().stream()
                         .map(e -> new EventView(e, nameOf(e.getActor()), nameOf(e.getRiderRef())))
                         .toList(),
-                today().isAfter(run.getPeriodTo()), d.jobsSinceComputed(),
-                run.isDraft() && hoursMissing && !slips.isEmpty(),
-                run.isDraft() && !d.aligned());
+                periodOver, d.jobsSinceComputed(),
+                run.isDraft() && (hoursMissing || deliveriesUncounted(run, d.policy()))
+                        && !slips.isEmpty(),
+                run.isDraft() && !d.aligned(),
+                run.isDraft() && periodOver && readBeforeItEnded(run));
     }
 
     static Totals totals(List<CarrierPayslip> slips) {

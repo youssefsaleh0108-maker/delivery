@@ -58,6 +58,7 @@ class RepositoryQueriesParseTest {
                 .addAnnotatedClass(CarrierPayAdjustment.class)
                 .addAnnotatedClass(CarrierPayrollEvent.class)
                 .addAnnotatedClass(CarrierPayAttendance.class)
+                .addAnnotatedClass(CarrierPayDelivered.class)
                 .buildMetadata()
                 .buildSessionFactory();
     }
@@ -77,7 +78,8 @@ class RepositoryQueriesParseTest {
                 new Class<?>[] {CarrierPayLineRepository.class, CarrierPayLine.class},
                 new Class<?>[] {CarrierPayAdjustmentRepository.class, CarrierPayAdjustment.class},
                 new Class<?>[] {CarrierPayrollEventRepository.class, CarrierPayrollEvent.class},
-                new Class<?>[] {CarrierPayAttendanceRepository.class, CarrierPayAttendance.class})) {
+                new Class<?>[] {CarrierPayAttendanceRepository.class, CarrierPayAttendance.class},
+                new Class<?>[] {CarrierPayDeliveredRepository.class, CarrierPayDelivered.class})) {
             for (Method method : pair[0].getDeclaredMethods()) {
                 if (method.getAnnotation(Query.class) == null && !method.isDefault()) {
                     out.add(Arguments.of(pair[0].getSimpleName() + "." + method.getName(),

@@ -46,6 +46,21 @@ public class CarrierPayRun {
         UNAVAILABLE
     }
 
+    /** Where this run's delivery counts came from. */
+    public enum Deliveries {
+        /**
+         * Order Manager's count of the orders each rider delivered for the company — every one,
+         * whatever it earned — copied into the run when read.
+         */
+        ORDERS,
+        /**
+         * Order Manager could not be asked, so the ledger's JOB_EARNING rows are counted instead, afresh
+         * at every computation. Each is a real delivery, but a delivery that earned no fee has no row:
+         * the run says so, and approving it has to acknowledge it.
+         */
+        LEDGER
+    }
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -79,6 +94,21 @@ public class CarrierPayRun {
     /** When the run's hours were read, or their read was tried. Null when none were needed. */
     @Column(name = "attendance_at")
     private Instant attendanceAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "deliveries", nullable = false, length = 16)
+    private Deliveries deliveries;
+
+    /** Why Order Manager's count could not be had, as a code; null when it was. */
+    @Column(name = "deliveries_note", length = 200)
+    private String deliveriesNote;
+
+    /**
+     * When the run's figures were last read afresh: its deliveries always, its hours too when the
+     * rules need them. A draft read before its period ended is recomputed before it is approved.
+     */
+    @Column(name = "deliveries_at")
+    private Instant deliveriesAt;
 
     @Column(name = "revision", nullable = false)
     private int revision;
@@ -117,6 +147,7 @@ public class CarrierPayRun {
         run.policyId = policyId;
         run.currency = currency;
         run.attendance = Attendance.NOT_NEEDED;
+        run.deliveries = Deliveries.LEDGER;
         run.revision = 0;
         run.computedAt = now;
         run.createdBy = createdBy;
@@ -126,15 +157,19 @@ public class CarrierPayRun {
 
     /**
      * The draft's figures were computed again, under {@code policyId}, with hours read at
-     * {@code attendanceAt}.
+     * {@code attendanceAt} and deliveries counted at {@code deliveriesAt}.
      */
     public void recomputed(UUID policyId, Attendance attendance, String attendanceNote,
-                           Instant attendanceAt, Instant at) {
+                           Instant attendanceAt, Deliveries deliveries, String deliveriesNote,
+                           Instant deliveriesAt, Instant at) {
         requireDraft();
         this.policyId = policyId;
         this.attendance = attendance;
         this.attendanceNote = attendanceNote;
         this.attendanceAt = attendanceAt;
+        this.deliveries = deliveries;
+        this.deliveriesNote = deliveriesNote;
+        this.deliveriesAt = deliveriesAt;
         this.revision++;
         this.computedAt = at;
     }
@@ -203,6 +238,18 @@ public class CarrierPayRun {
 
     public Instant getAttendanceAt() {
         return attendanceAt;
+    }
+
+    public Deliveries getDeliveries() {
+        return deliveries;
+    }
+
+    public String getDeliveriesNote() {
+        return deliveriesNote;
+    }
+
+    public Instant getDeliveriesAt() {
+        return deliveriesAt;
     }
 
     public int getRevision() {

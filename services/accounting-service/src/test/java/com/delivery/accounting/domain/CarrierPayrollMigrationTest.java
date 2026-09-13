@@ -97,6 +97,23 @@ class CarrierPayrollMigrationTest {
                 .contains("attendance <> 'INCLUDED' OR attendance_at IS NOT NULL");
     }
 
+    /**
+     * A delivery is an order, whatever it earned, so a run keeps the count Order Manager gave it — and
+     * says when the ledger's paid jobs stood in, which a free delivery is missing from.
+     */
+    @Test
+    @DisplayName("keeps a copy of the deliveries each run counted, and says when the ledger stood in")
+    void deliveriesAreASnapshot() {
+        assertThat(the("CREATE TABLE carrier_pay_delivered"))
+                .contains("run_id uuid NOT NULL REFERENCES carrier_pay_run (id)")
+                .contains("UNIQUE (run_id, rider_ref)")
+                .contains("CHECK (delivered >= 0)");
+        assertThat(the("CREATE TABLE carrier_pay_run"))
+                .contains("deliveries varchar(16) NOT NULL")
+                .contains("deliveries IN ('ORDERS', 'LEDGER')")
+                .contains("deliveries <> 'ORDERS' OR deliveries_at IS NOT NULL");
+    }
+
     @Test
     @DisplayName("a correction is paid in a later run, never in the run it corrects")
     void correctionsGoForward() {

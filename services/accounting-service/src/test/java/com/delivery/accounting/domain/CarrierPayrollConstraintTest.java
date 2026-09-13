@@ -62,6 +62,9 @@ class CarrierPayrollConstraintTest {
     private CarrierPayAttendanceRepository snapshots;
 
     @Autowired
+    private CarrierPayDeliveredRepository deliveredCopies;
+
+    @Autowired
     private EntityManager em;
 
     private CarrierPayRun run(String company, String from, String to) {
@@ -74,7 +77,7 @@ class CarrierPayrollConstraintTest {
         CarrierPayRun run = CarrierPayRun.draft(company, LocalDate.parse(from), LocalDate.parse(to),
                 policy.getId(), "USD", "staff", Instant.now());
         run.recomputed(policy.getId(), CarrierPayRun.Attendance.NOT_NEEDED, null, null,
-                Instant.now());
+                CarrierPayRun.Deliveries.ORDERS, null, Instant.now(), Instant.now());
         return runs.saveAndFlush(run);
     }
 
@@ -135,6 +138,16 @@ class CarrierPayrollConstraintTest {
 
         assertThatThrownBy(() -> snapshots.saveAndFlush(
                 CarrierPayAttendance.of(run.getId(), "rider-a", 7200, 0, 0, 0, 0)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void a_run_keeps_one_count_of_each_riders_deliveries() {
+        CarrierPayRun run = run("company-" + UUID.randomUUID(), "2026-10-01", "2026-10-15");
+        deliveredCopies.saveAndFlush(CarrierPayDelivered.of(run.getId(), "rider-a", 17));
+
+        assertThatThrownBy(() -> deliveredCopies.saveAndFlush(
+                CarrierPayDelivered.of(run.getId(), "rider-a", 18)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

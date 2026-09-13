@@ -110,6 +110,15 @@ CREATE TABLE carrier_pay_run (
     -- When the hours in carrier_pay_attendance were read, or their read was tried. Attendance for a
     -- period keeps changing after it ends, so the page says which moment the hours are from.
     attendance_at    timestamptz,
+    -- Where the delivery counts came from. ORDERS: Order Manager's count of the orders each rider
+    -- delivered for the company, whatever they earned, copied into carrier_pay_delivered. LEDGER:
+    -- Order Manager could not be asked, so JOB_EARNING rows were counted instead — a floor, because a
+    -- delivery that earned no fee has no row — which the run says and its approval acknowledges.
+    deliveries       varchar(16)  NOT NULL,
+    deliveries_note  varchar(200),
+    -- When the figures were last read afresh (deliveries always; hours when the rules need them). A
+    -- draft read before its period ended is recomputed before it can be approved.
+    deliveries_at    timestamptz,
     -- Bumped each time a draft is recomputed. Approval names the revision the approver looked at.
     revision         integer      NOT NULL,
     computed_at      timestamptz  NOT NULL,
@@ -129,6 +138,9 @@ CREATE TABLE carrier_pay_run (
     CONSTRAINT chk_pay_run_attendance
         CHECK (attendance IN ('NOT_NEEDED', 'INCLUDED', 'UNAVAILABLE')
             AND (attendance <> 'INCLUDED' OR attendance_at IS NOT NULL)),
+    CONSTRAINT chk_pay_run_deliveries
+        CHECK (deliveries IN ('ORDERS', 'LEDGER')
+            AND (deliveries <> 'ORDERS' OR deliveries_at IS NOT NULL)),
     CONSTRAINT chk_pay_run_approved
         CHECK (status = 'DRAFT' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)),
     CONSTRAINT chk_pay_run_paid
@@ -143,9 +155,10 @@ CREATE TABLE carrier_payslip (
     run_id            uuid          NOT NULL REFERENCES carrier_pay_run (id),
     rider_ref         varchar(64)   NOT NULL,
 
-    -- The facts the figures came from. Deliveries are the rider's JOB_EARNING rows for this company
-    -- in the period. The attendance facts are null when no attendance was read for this rider —
-    -- "we were not told" is not "zero hours".
+    -- The facts the figures came from. Deliveries are the orders the rider delivered for this company
+    -- in the period, whatever they earned (carrier_pay_run.deliveries says how they were counted).
+    -- The attendance facts are null when no attendance was read for this rider — "we were not told"
+    -- is not "zero hours".
     deliveries        integer       NOT NULL,
     worked_seconds    bigint,
     manual_seconds    bigint,
@@ -236,6 +249,23 @@ CREATE TABLE carrier_pay_attendance (
     CONSTRAINT chk_pay_attendance_facts
         CHECK (worked_seconds >= 0 AND manual_seconds >= 0 AND overtime_seconds >= 0
             AND lates >= 0 AND absences >= 0)
+);
+
+-- The deliveries a run was computed with, the same way.
+--
+-- A delivery is an order the rider delivered for the company in the period, whatever it earned: a
+-- JOB_EARNING row exists only for a job that earned a fee, so a free delivery counted from those
+-- would go unpaid by a company paying per delivery. Order Manager counts them; a draft copies the
+-- count for every rider it listed, and editing or approving the draft reads this copy.
+
+CREATE TABLE carrier_pay_delivered (
+    id          uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id      uuid         NOT NULL REFERENCES carrier_pay_run (id),
+    rider_ref   varchar(64)  NOT NULL,
+    delivered   integer      NOT NULL,
+
+    CONSTRAINT uq_pay_delivered_rider UNIQUE (run_id, rider_ref),
+    CONSTRAINT chk_pay_delivered_count CHECK (delivered >= 0)
 );
 
 -- --------------------------------------------------------------------------------------------

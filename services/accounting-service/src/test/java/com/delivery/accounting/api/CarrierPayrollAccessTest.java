@@ -147,7 +147,8 @@ class CarrierPayrollAccessTest {
                 "USD", STAFF, at);
         CarrierPayRun run = CarrierPayRun.draft(COMPANY, LocalDate.parse("2026-10-01"),
                 LocalDate.parse("2026-10-15"), policy.getId(), "USD", STAFF, at);
-        run.recomputed(policy.getId(), CarrierPayRun.Attendance.INCLUDED, null, at, at);
+        run.recomputed(policy.getId(), CarrierPayRun.Attendance.INCLUDED, null, at,
+                CarrierPayRun.Deliveries.ORDERS, null, at, at);
         CarrierPayslip slip = CarrierPayslip.draft(run.getId(), RIDER, new CarrierPayslip.Figures(
                 17, 28_800L, 0L, 0L, 0, 0,
                 new BigDecimal("32.00"), new BigDecimal("39.95"), new BigDecimal("25.00"),
@@ -169,7 +170,7 @@ class CarrierPayrollAccessTest {
                                 new CarrierPayrollService.LineView(hours, null),
                                 new CarrierPayrollService.LineView(bonus, "Kamal M.")),
                         false, null, null)),
-                totals, List.of(), List.of(), true, 2, false, false);
+                totals, List.of(), List.of(), true, 2, false, false, false);
     }
 
     // ----------------------------------------------------------------------------- the company
@@ -271,6 +272,10 @@ class CarrierPayrollAccessTest {
                 .andExpect(jsonPath("$.revision").value(1))
                 .andExpect(jsonPath("$.attendance").value("INCLUDED"))
                 .andExpect(jsonPath("$.attendanceAt").value("2026-10-20T09:00:00Z"))
+                .andExpect(jsonPath("$.deliveries").value("ORDERS"))
+                .andExpect(jsonPath("$.deliveriesReason").doesNotExist())
+                .andExpect(jsonPath("$.deliveriesAt").value("2026-10-20T09:00:00Z"))
+                .andExpect(jsonPath("$.readBeforePeriodEnd").value(false))
                 .andExpect(jsonPath("$.jobsSinceComputed").value(2))
                 .andExpect(jsonPath("$.policy.perDeliveryRate").value("2.35"))
                 .andExpect(jsonPath("$.policy.overtimeMultiplier").value("1.50"))
@@ -309,6 +314,8 @@ class CarrierPayrollAccessTest {
                 .thenReturn(new Approval(ApprovalOutcome.APPROVED, view));
         when(payroll.approve(COMPANY, RUN, 3, false, STAFF))
                 .thenThrow(new CashFloatService.AmountChangedException(new BigDecimal("75.00")));
+        when(payroll.approve(COMPANY, RUN, 4, false, STAFF))
+                .thenThrow(new PayrollRefusal(409, "RECOMPUTE_NEEDED", "read before it ended"));
 
         mvc.perform(json(post(approve), "{\"revision\":1}"))
                 .andExpect(status().isConflict())
@@ -317,11 +324,14 @@ class CarrierPayrollAccessTest {
         mvc.perform(json(post(approve), "{\"revision\":2}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("NEEDS_ACKNOWLEDGEMENT"));
-        mvc.perform(json(post(approve), "{\"revision\":2,\"acknowledgeMissingHours\":true}"))
+        mvc.perform(json(post(approve), "{\"revision\":2,\"acknowledgeMissing\":true}"))
                 .andExpect(status().isOk());
         mvc.perform(json(post(approve), "{\"revision\":3}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CASH_CHANGED"));
+        mvc.perform(json(post(approve), "{\"revision\":4}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RECOMPUTE_NEEDED"));
     }
 
     @Test

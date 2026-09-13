@@ -191,12 +191,14 @@ public class CarrierPayrollController {
     }
 
     /**
-     * {@code {"revision": 3, "acknowledgeMissingHours": false}}.
+     * {@code {"revision": 3, "acknowledgeMissing": false}}.
      *
      * <p>200 with the approved run. 409 {@code FIGURES_CHANGED} with the run as it now is, when what
      * the approver looked at is no longer true; 409 {@code NEEDS_ACKNOWLEDGEMENT} when hours are
-     * missing and the body did not say to go ahead without them; 409 {@code CASH_CHANGED} when a
-     * rider's cash moved at the last moment. Nothing is approved in any of the three.
+     * missing or deliveries were counted from the ledger, and the body did not say to go ahead
+     * anyway; 409 {@code RECOMPUTE_NEEDED} when the figures were read before the period ended; 409
+     * {@code CASH_CHANGED} when a rider's cash moved at the last moment. Nothing is approved in any
+     * of them.
      */
     @PostMapping("/runs/{runId}/approve")
     public ResponseEntity<?> approve(@PathVariable String runId,
@@ -207,7 +209,7 @@ public class CarrierPayrollController {
                         "Say which revision of the figures you are approving, as revision.");
             }
             CarrierPayrollService.Approval approval = payroll.approve(caller.company(), id,
-                    body.revision(), Boolean.TRUE.equals(body.acknowledgeMissingHours()),
+                    body.revision(), Boolean.TRUE.equals(body.acknowledgeMissing()),
                     caller.subject());
             return switch (approval.outcome()) {
                 case APPROVED, ALREADY_APPROVED -> ResponseEntity.ok(runPayload(approval.run()));
@@ -215,8 +217,8 @@ public class CarrierPayrollController {
                         "The figures changed since you looked. Check them and approve again.",
                         approval.run());
                 case NEEDS_ACKNOWLEDGEMENT -> conflictWithRun("NEEDS_ACKNOWLEDGEMENT",
-                        "Hours are missing from this pay run. Approve saying so to go ahead "
-                                + "without them.", approval.run());
+                        "Hours or deliveries are missing from this pay run. Approve saying so to "
+                                + "go ahead without them.", approval.run());
             };
         });
     }
@@ -299,7 +301,7 @@ public class CarrierPayrollController {
     public record LineRequest(String riderRef, String kind, String label, BigDecimal amount) {
     }
 
-    public record ApproveRequest(Integer revision, Boolean acknowledgeMissingHours) {
+    public record ApproveRequest(Integer revision, Boolean acknowledgeMissing) {
     }
 
     public record PaidRequest(String method, String reference) {
@@ -512,6 +514,10 @@ public class CarrierPayrollController {
         out.put("attendance", run.getAttendance().name());
         out.put("attendanceReason", run.getAttendanceNote());
         out.put("attendanceAt", iso(run.getAttendanceAt()));
+        out.put("deliveries", run.getDeliveries().name());
+        out.put("deliveriesReason", run.getDeliveriesNote());
+        out.put("deliveriesAt", iso(run.getDeliveriesAt()));
+        out.put("readBeforePeriodEnd", view.readBeforePeriodEnd());
         out.put("periodOver", view.periodOver());
         out.put("jobsSinceComputed", view.jobsSinceComputed());
         out.put("needsAcknowledgement", view.needsAcknowledgement());
