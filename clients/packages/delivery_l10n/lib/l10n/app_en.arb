@@ -3829,5 +3829,517 @@
   },
   "carrCashBoOverdueNote": "Some cash has been out longer than the platform's limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.",
   "carrCashBoLoadFailed": "What delivery companies hold could not be loaded just now. The rest of this page is unaffected.",
-  "carrCashBoMethodLabel": "How it was paid (optional)"
+  "carrCashBoMethodLabel": "How it was paid (optional)",
+  "payrollNavLabel": "Payroll",
+  "payrollTitle": "Rider Payroll & Earnings Management",
+  "payrollSubtitle": "Approve payouts, calculate bonuses, and track payouts history",
+  "payrollPeriodLabel": "Pay Period: {from} – {to}",
+  "@payrollPeriodLabel": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollPeriodTooltip": "Choose a pay period",
+  "payrollPeriodOption": "{from} – {to} · {state}",
+  "@payrollPeriodOption": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRulesButton": "Pay rules",
+  "payrollExport": "Export Payslips",
+  "payrollExported": "Saved {file}.",
+  "@payrollExported": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollStart": "Start pay run",
+  "payrollRecompute": "Recompute",
+  "payrollApprove": "Approve pay run",
+  "payrollPayAll": "Record All Payments",
+  "payrollDiscard": "Discard draft",
+  "payrollKpiPool": "Total Payroll Pool",
+  "payrollKpiPoolNote": "To pay for {from} – {to}",
+  "@payrollKpiPoolNote": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollKpiRiders": "Riders on Payroll",
+  "payrollKpiRidersValue": "{count, plural, =0{No riders} =1{1 Rider} other{{count} Riders}}",
+  "@payrollKpiRidersValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollKpiRidersNote": "With a payslip this period",
+  "payrollKpiAverage": "Average Rider Earnings",
+  "payrollKpiAverageNote": "Per {days}-day period",
+  "@payrollKpiAverageNote": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollKpiBonuses": "Bonuses",
+  "payrollKpiBonusesNote": "Named bonuses and corrections",
+  "payrollLedgerTitle": "Rider Payroll Ledger",
+  "payrollColRider": "Rider name",
+  "payrollColBase": "Base pay",
+  "payrollColDelivery": "Delivery pay",
+  "payrollColTips": "Tips",
+  "payrollColDeductions": "Deductions",
+  "payrollColGross": "Gross pay",
+  "payrollColNet": "Net pay",
+  "payrollColStatus": "Status",
+  "payrollColActions": "Actions",
+  "payrollPayslip": "Payslip",
+  "payrollTipsNote": "Tips are the rider's own money and never part of their pay.",
+  "payrollHoursUnknown": "Hours for this rider could not be read.",
+  "payrollNobody": "Nobody on your fleet has pay in this period.",
+  "payrollTableNote": "This is your company's payroll, worked out from your pay rules. YouDrop does not pay your riders.",
+  "payrollStatusDraft": "Draft",
+  "payrollStatusDue": "Awaiting payment",
+  "payrollStatusNothingDue": "Nothing to pay",
+  "payrollStatusPaid": "Paid ✓",
+  "payrollStatusFailed": "Failed",
+  "payrollRunApproved": "Approved",
+  "payrollRunPaid": "Paid",
+  "payrollNotStarted": "Not started",
+  "payrollRunMeta": "{state} · figures computed {time}",
+  "@payrollRunMeta": {
+    "placeholders": {
+      "state": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRunRevision": "Draft, revision {revision}",
+  "@payrollRunRevision": {
+    "placeholders": {
+      "revision": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollHoursAsOf": "Hours as read on {time}",
+  "@payrollHoursAsOf": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollNoRulesTitle": "Set your pay rules first",
+  "payrollNoRulesBody": "Payroll works out each rider's pay from your company's own rules: what a delivery pays, whether hours are paid, and any deductions. Nothing is assumed for you.",
+  "payrollNoRunTitle": "No pay run for this period yet",
+  "payrollNoRunBody": "Starting one computes a draft from the deliveries and hours on record. Nothing is final until you approve it.",
+  "payrollPeriodOpen": "This period runs until {date}. It can be approved once it is over.",
+  "@payrollPeriodOpen": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollHoursMissing": "Attendance hours could not be read, so these figures leave hours out.",
+  "payrollHoursNotDeployed": "Attendance hours are not available on this platform yet, so these figures leave hours out.",
+  "payrollHoursNotRead": "Your pay rules now use hours. Recompute to read them.",
+  "payrollJobsLateDraft": "{count, plural, =1{1 delivery reached the ledger after these figures were computed. Recompute to include it.} other{{count} deliveries reached the ledger after these figures were computed. Recompute to include them.}}",
+  "@payrollJobsLateDraft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollJobsLateApproved": "{count, plural, =1{1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.} other{{count} deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.}}",
+  "@payrollJobsLateApproved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollPeriodChanged": "Your pay rules now pay these days in a different period. Discard this draft and start that period.",
+  "payrollLoadFailed": "Payroll could not be loaded just now.",
+  "payrollTryAgain": "Try again",
+  "payrollPayslipSubtitle": "Payslip for {from} – {to}",
+  "@payrollPayslipSubtitle": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollSectionPay": "Pay",
+  "payrollSectionSummary": "Summary",
+  "payrollSectionAttendance": "Hours and attendance",
+  "payrollSectionPayment": "Payment",
+  "payrollLineDeliveries": "{count} deliveries × {rate}",
+  "@payrollLineDeliveries": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineHours": "{hours} h recorded × {rate}",
+  "@payrollLineHours": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineOvertime": "{hours} h overtime × {rate}",
+  "@payrollLineOvertime": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineTyped": "{hours} h typed by the office × {rate}",
+  "@payrollLineTyped": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineTypedUnpaid": "{hours} h typed by the office, not paid under your rules",
+  "@payrollLineTypedUnpaid": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineLate": "{days} late days × {rate}",
+  "@payrollLineLate": {
+    "placeholders": {
+      "days": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineAbsence": "{days} absences × {rate}",
+  "@payrollLineAbsence": {
+    "placeholders": {
+      "days": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineCash": "Company cash the rider held, kept from pay",
+  "payrollLineBonus": "Bonus: {label}",
+  "@payrollLineBonus": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineDeduction": "Deduction: {label}",
+  "@payrollLineDeduction": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineCorrection": "Correction: {label}",
+  "@payrollLineCorrection": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineOther": "Other",
+  "payrollOwes": "Owes the company {amount}. Nothing is paid.",
+  "@payrollOwes": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollTipsInfo": "Tips {amount}: the rider's own money, not part of this pay.",
+  "@payrollTipsInfo": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollCashKept": "Holds {amount} of the company's cash, more than this pay covers. It stays for the hub to collect.",
+  "@payrollCashKept": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollHoursFacts": "Recorded {recorded} h · typed {typed} h · overtime {overtime} h",
+  "@payrollHoursFacts": {
+    "placeholders": {
+      "recorded": {
+        "type": "String"
+      },
+      "typed": {
+        "type": "String"
+      },
+      "overtime": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollDaysFacts": "Late days {lates} · absences {absences}",
+  "@payrollDaysFacts": {
+    "placeholders": {
+      "lates": {
+        "type": "int"
+      },
+      "absences": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollAddBonus": "Add bonus",
+  "payrollAddDeduction": "Add deduction",
+  "payrollRemove": "Remove",
+  "payrollMarkPaid": "Mark paid",
+  "payrollMarkFailed": "Mark failed",
+  "payrollAddCorrection": "Add correction",
+  "payrollPaidOn": "Paid on {date} · {method}",
+  "@payrollPaidOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRecordedBy": "Recorded by {name}",
+  "@payrollRecordedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollFailedBecause": "Payment failed: {reason}",
+  "@payrollFailedBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollCorrections": "Corrections",
+  "payrollCorrectionWaiting": "Paid in the rider's next pay run",
+  "payrollCorrectionPaid": "Paid in a later pay run",
+  "payrollLineDialogBonus": "Add a bonus for {name}",
+  "@payrollLineDialogBonus": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineDialogDeduction": "Add a deduction for {name}",
+  "@payrollLineDialogDeduction": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLabelField": "What it is for",
+  "payrollAmountField": "Amount",
+  "payrollAmountInvalid": "An amount to the cent, like 25.00",
+  "payrollRequired": "Required",
+  "payrollReasonField": "Reason",
+  "payrollReferenceField": "Reference (optional)",
+  "payrollSave": "Save",
+  "payrollCorrectionTitle": "Correct {name}'s pay",
+  "@payrollCorrectionTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollCorrectionBody": "The approved payslip stays as it is. The correction is paid in the rider's next pay run.",
+  "payrollCorrectionMore": "Pay more",
+  "payrollCorrectionLess": "Take back",
+  "payrollFailedTitle": "Payment to {name} did not go through?",
+  "@payrollFailedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollFailedBody": "The pay stays owed and can be recorded as paid later.",
+  "payrollPaidTitle": "Record paying {name} {amount}?",
+  "@payrollPaidTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollPaidBody": "This records that your company paid the rider. YouDrop moves no money.",
+  "payrollApproveTitle": "Approve pay for {from} – {to}?",
+  "@payrollApproveTitle": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollApproveBody": "{count, plural, =1{1 rider, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.} other{{count} riders, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.}}",
+  "@payrollApproveBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollApproveCash": "{amount} of company cash your riders hold is kept from their pay and recorded as handed to your company.",
+  "@payrollApproveCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollApproveWithoutHours": "Approve without the missing hours",
+  "payrollApproveYes": "Approve",
+  "payrollPayAllTitle": "{count, plural, =1{Record 1 payment of {total}?} other{Record {count} payments totalling {total}?}}",
+  "@payrollPayAllTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollPayAllBody": "This records that your company paid these riders, and cannot be undone. Failed payments are left to record one by one.",
+  "payrollRecordYes": "Record",
+  "payrollDiscardTitle": "Discard this draft?",
+  "payrollDiscardBody": "Its figures are thrown away and its history is kept. You can start the period again.",
+  "payrollDiscardYes": "Discard",
+  "payrollDone": "Saved.",
+  "payrollApproved": "Pay run approved.",
+  "payrollErrFiguresChanged": "The figures changed since you looked. Check the new ones, then approve again.",
+  "payrollErrNeedsHours": "Hours are missing. Tick the box to approve without them.",
+  "payrollErrCashChanged": "A rider's cash changed a moment ago. Nothing was approved; approve again to see the new figures.",
+  "payrollErrTotalChanged": "The total waiting for payment is now {amount}. Nothing was recorded.",
+  "@payrollErrTotalChanged": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollErrRefused": "That could not be done: the pay run has changed or no longer allows it. Reload and try again.",
+  "payrollErrFailed": "That could not be done just now. Please try again.",
+  "payrollErrRulesStart": "New rules cannot start on that day. Pick one of the days offered.",
+  "payrollRulesNow": "In force since {from}",
+  "@payrollRulesNow": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRulesNone": "No pay rules yet.",
+  "payrollRulesNext": "New rules start on {date}",
+  "@payrollRulesNext": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRulesCycle": "Pay riders",
+  "payrollCycleSemiMonthly": "Twice a month (1st–15th, 16th–end)",
+  "payrollCycleMonthly": "Monthly",
+  "payrollRulesStart": "Starting on",
+  "payrollRulesPerDelivery": "Pay per delivery",
+  "payrollRulesHourly": "Hourly base (optional)",
+  "payrollRulesHourlyHint": "Empty for no hourly pay",
+  "payrollRulesTyped": "Pay hours the office typed",
+  "payrollRulesOvertime": "Overtime multiplier",
+  "payrollRulesLate": "Deduction per late day",
+  "payrollRulesAbsence": "Deduction per absence",
+  "payrollRulesSave": "Save rules",
+  "payrollRulesNote": "Rules take effect from the first day of a pay period and never change a pay run already approved.",
+  "payrollMultiplierInvalid": "Between 1.00 and 5.00",
+  "payrollRulesNoStart": "No day is open for new rules right now."
 }

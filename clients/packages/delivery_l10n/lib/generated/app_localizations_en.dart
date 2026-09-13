@@ -7727,4 +7727,601 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get carrCashBoMethodLabel => 'How it was paid (optional)';
+
+  @override
+  String get payrollNavLabel => 'Payroll';
+
+  @override
+  String get payrollTitle => 'Rider Payroll & Earnings Management';
+
+  @override
+  String get payrollSubtitle =>
+      'Approve payouts, calculate bonuses, and track payouts history';
+
+  @override
+  String payrollPeriodLabel(String from, String to) {
+    return 'Pay Period: $from – $to';
+  }
+
+  @override
+  String get payrollPeriodTooltip => 'Choose a pay period';
+
+  @override
+  String payrollPeriodOption(String from, String to, String state) {
+    return '$from – $to · $state';
+  }
+
+  @override
+  String get payrollRulesButton => 'Pay rules';
+
+  @override
+  String get payrollExport => 'Export Payslips';
+
+  @override
+  String payrollExported(String file) {
+    return 'Saved $file.';
+  }
+
+  @override
+  String get payrollStart => 'Start pay run';
+
+  @override
+  String get payrollRecompute => 'Recompute';
+
+  @override
+  String get payrollApprove => 'Approve pay run';
+
+  @override
+  String get payrollPayAll => 'Record All Payments';
+
+  @override
+  String get payrollDiscard => 'Discard draft';
+
+  @override
+  String get payrollKpiPool => 'Total Payroll Pool';
+
+  @override
+  String payrollKpiPoolNote(String from, String to) {
+    return 'To pay for $from – $to';
+  }
+
+  @override
+  String get payrollKpiRiders => 'Riders on Payroll';
+
+  @override
+  String payrollKpiRidersValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Riders',
+      one: '1 Rider',
+      zero: 'No riders',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollKpiRidersNote => 'With a payslip this period';
+
+  @override
+  String get payrollKpiAverage => 'Average Rider Earnings';
+
+  @override
+  String payrollKpiAverageNote(int days) {
+    return 'Per $days-day period';
+  }
+
+  @override
+  String get payrollKpiBonuses => 'Bonuses';
+
+  @override
+  String get payrollKpiBonusesNote => 'Named bonuses and corrections';
+
+  @override
+  String get payrollLedgerTitle => 'Rider Payroll Ledger';
+
+  @override
+  String get payrollColRider => 'Rider name';
+
+  @override
+  String get payrollColBase => 'Base pay';
+
+  @override
+  String get payrollColDelivery => 'Delivery pay';
+
+  @override
+  String get payrollColTips => 'Tips';
+
+  @override
+  String get payrollColDeductions => 'Deductions';
+
+  @override
+  String get payrollColGross => 'Gross pay';
+
+  @override
+  String get payrollColNet => 'Net pay';
+
+  @override
+  String get payrollColStatus => 'Status';
+
+  @override
+  String get payrollColActions => 'Actions';
+
+  @override
+  String get payrollPayslip => 'Payslip';
+
+  @override
+  String get payrollTipsNote =>
+      'Tips are the rider\'s own money and never part of their pay.';
+
+  @override
+  String get payrollHoursUnknown => 'Hours for this rider could not be read.';
+
+  @override
+  String get payrollNobody => 'Nobody on your fleet has pay in this period.';
+
+  @override
+  String get payrollTableNote =>
+      'This is your company\'s payroll, worked out from your pay rules. YouDrop does not pay your riders.';
+
+  @override
+  String get payrollStatusDraft => 'Draft';
+
+  @override
+  String get payrollStatusDue => 'Awaiting payment';
+
+  @override
+  String get payrollStatusNothingDue => 'Nothing to pay';
+
+  @override
+  String get payrollStatusPaid => 'Paid ✓';
+
+  @override
+  String get payrollStatusFailed => 'Failed';
+
+  @override
+  String get payrollRunApproved => 'Approved';
+
+  @override
+  String get payrollRunPaid => 'Paid';
+
+  @override
+  String get payrollNotStarted => 'Not started';
+
+  @override
+  String payrollRunMeta(String state, String time) {
+    return '$state · figures computed $time';
+  }
+
+  @override
+  String payrollRunRevision(int revision) {
+    return 'Draft, revision $revision';
+  }
+
+  @override
+  String payrollHoursAsOf(String time) {
+    return 'Hours as read on $time';
+  }
+
+  @override
+  String get payrollNoRulesTitle => 'Set your pay rules first';
+
+  @override
+  String get payrollNoRulesBody =>
+      'Payroll works out each rider\'s pay from your company\'s own rules: what a delivery pays, whether hours are paid, and any deductions. Nothing is assumed for you.';
+
+  @override
+  String get payrollNoRunTitle => 'No pay run for this period yet';
+
+  @override
+  String get payrollNoRunBody =>
+      'Starting one computes a draft from the deliveries and hours on record. Nothing is final until you approve it.';
+
+  @override
+  String payrollPeriodOpen(String date) {
+    return 'This period runs until $date. It can be approved once it is over.';
+  }
+
+  @override
+  String get payrollHoursMissing =>
+      'Attendance hours could not be read, so these figures leave hours out.';
+
+  @override
+  String get payrollHoursNotDeployed =>
+      'Attendance hours are not available on this platform yet, so these figures leave hours out.';
+
+  @override
+  String get payrollHoursNotRead =>
+      'Your pay rules now use hours. Recompute to read them.';
+
+  @override
+  String payrollJobsLateDraft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count deliveries reached the ledger after these figures were computed. Recompute to include them.',
+      one:
+          '1 delivery reached the ledger after these figures were computed. Recompute to include it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollJobsLateApproved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.',
+      one:
+          '1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollPeriodChanged =>
+      'Your pay rules now pay these days in a different period. Discard this draft and start that period.';
+
+  @override
+  String get payrollLoadFailed => 'Payroll could not be loaded just now.';
+
+  @override
+  String get payrollTryAgain => 'Try again';
+
+  @override
+  String payrollPayslipSubtitle(String from, String to) {
+    return 'Payslip for $from – $to';
+  }
+
+  @override
+  String get payrollSectionPay => 'Pay';
+
+  @override
+  String get payrollSectionSummary => 'Summary';
+
+  @override
+  String get payrollSectionAttendance => 'Hours and attendance';
+
+  @override
+  String get payrollSectionPayment => 'Payment';
+
+  @override
+  String payrollLineDeliveries(String count, String rate) {
+    return '$count deliveries × $rate';
+  }
+
+  @override
+  String payrollLineHours(String hours, String rate) {
+    return '$hours h recorded × $rate';
+  }
+
+  @override
+  String payrollLineOvertime(String hours, String rate) {
+    return '$hours h overtime × $rate';
+  }
+
+  @override
+  String payrollLineTyped(String hours, String rate) {
+    return '$hours h typed by the office × $rate';
+  }
+
+  @override
+  String payrollLineTypedUnpaid(String hours) {
+    return '$hours h typed by the office, not paid under your rules';
+  }
+
+  @override
+  String payrollLineLate(String days, String rate) {
+    return '$days late days × $rate';
+  }
+
+  @override
+  String payrollLineAbsence(String days, String rate) {
+    return '$days absences × $rate';
+  }
+
+  @override
+  String get payrollLineCash => 'Company cash the rider held, kept from pay';
+
+  @override
+  String payrollLineBonus(String label) {
+    return 'Bonus: $label';
+  }
+
+  @override
+  String payrollLineDeduction(String label) {
+    return 'Deduction: $label';
+  }
+
+  @override
+  String payrollLineCorrection(String label) {
+    return 'Correction: $label';
+  }
+
+  @override
+  String get payrollLineOther => 'Other';
+
+  @override
+  String payrollOwes(String amount) {
+    return 'Owes the company $amount. Nothing is paid.';
+  }
+
+  @override
+  String payrollTipsInfo(String amount) {
+    return 'Tips $amount: the rider\'s own money, not part of this pay.';
+  }
+
+  @override
+  String payrollCashKept(String amount) {
+    return 'Holds $amount of the company\'s cash, more than this pay covers. It stays for the hub to collect.';
+  }
+
+  @override
+  String payrollHoursFacts(String recorded, String typed, String overtime) {
+    return 'Recorded $recorded h · typed $typed h · overtime $overtime h';
+  }
+
+  @override
+  String payrollDaysFacts(int lates, int absences) {
+    return 'Late days $lates · absences $absences';
+  }
+
+  @override
+  String get payrollAddBonus => 'Add bonus';
+
+  @override
+  String get payrollAddDeduction => 'Add deduction';
+
+  @override
+  String get payrollRemove => 'Remove';
+
+  @override
+  String get payrollMarkPaid => 'Mark paid';
+
+  @override
+  String get payrollMarkFailed => 'Mark failed';
+
+  @override
+  String get payrollAddCorrection => 'Add correction';
+
+  @override
+  String payrollPaidOn(String date, String method) {
+    return 'Paid on $date · $method';
+  }
+
+  @override
+  String payrollRecordedBy(String name) {
+    return 'Recorded by $name';
+  }
+
+  @override
+  String payrollFailedBecause(String reason) {
+    return 'Payment failed: $reason';
+  }
+
+  @override
+  String get payrollCorrections => 'Corrections';
+
+  @override
+  String get payrollCorrectionWaiting => 'Paid in the rider\'s next pay run';
+
+  @override
+  String get payrollCorrectionPaid => 'Paid in a later pay run';
+
+  @override
+  String payrollLineDialogBonus(String name) {
+    return 'Add a bonus for $name';
+  }
+
+  @override
+  String payrollLineDialogDeduction(String name) {
+    return 'Add a deduction for $name';
+  }
+
+  @override
+  String get payrollLabelField => 'What it is for';
+
+  @override
+  String get payrollAmountField => 'Amount';
+
+  @override
+  String get payrollAmountInvalid => 'An amount to the cent, like 25.00';
+
+  @override
+  String get payrollRequired => 'Required';
+
+  @override
+  String get payrollReasonField => 'Reason';
+
+  @override
+  String get payrollReferenceField => 'Reference (optional)';
+
+  @override
+  String get payrollSave => 'Save';
+
+  @override
+  String payrollCorrectionTitle(String name) {
+    return 'Correct $name\'s pay';
+  }
+
+  @override
+  String get payrollCorrectionBody =>
+      'The approved payslip stays as it is. The correction is paid in the rider\'s next pay run.';
+
+  @override
+  String get payrollCorrectionMore => 'Pay more';
+
+  @override
+  String get payrollCorrectionLess => 'Take back';
+
+  @override
+  String payrollFailedTitle(String name) {
+    return 'Payment to $name did not go through?';
+  }
+
+  @override
+  String get payrollFailedBody =>
+      'The pay stays owed and can be recorded as paid later.';
+
+  @override
+  String payrollPaidTitle(String name, String amount) {
+    return 'Record paying $name $amount?';
+  }
+
+  @override
+  String get payrollPaidBody =>
+      'This records that your company paid the rider. YouDrop moves no money.';
+
+  @override
+  String payrollApproveTitle(String from, String to) {
+    return 'Approve pay for $from – $to?';
+  }
+
+  @override
+  String payrollApproveBody(int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count riders, $total to pay. Payslips are final once approved; a mistake is corrected in a later pay run.',
+      one:
+          '1 rider, $total to pay. Payslips are final once approved; a mistake is corrected in a later pay run.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollApproveCash(String amount) {
+    return '$amount of company cash your riders hold is kept from their pay and recorded as handed to your company.';
+  }
+
+  @override
+  String get payrollApproveWithoutHours => 'Approve without the missing hours';
+
+  @override
+  String get payrollApproveYes => 'Approve';
+
+  @override
+  String payrollPayAllTitle(int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Record $count payments totalling $total?',
+      one: 'Record 1 payment of $total?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollPayAllBody =>
+      'This records that your company paid these riders, and cannot be undone. Failed payments are left to record one by one.';
+
+  @override
+  String get payrollRecordYes => 'Record';
+
+  @override
+  String get payrollDiscardTitle => 'Discard this draft?';
+
+  @override
+  String get payrollDiscardBody =>
+      'Its figures are thrown away and its history is kept. You can start the period again.';
+
+  @override
+  String get payrollDiscardYes => 'Discard';
+
+  @override
+  String get payrollDone => 'Saved.';
+
+  @override
+  String get payrollApproved => 'Pay run approved.';
+
+  @override
+  String get payrollErrFiguresChanged =>
+      'The figures changed since you looked. Check the new ones, then approve again.';
+
+  @override
+  String get payrollErrNeedsHours =>
+      'Hours are missing. Tick the box to approve without them.';
+
+  @override
+  String get payrollErrCashChanged =>
+      'A rider\'s cash changed a moment ago. Nothing was approved; approve again to see the new figures.';
+
+  @override
+  String payrollErrTotalChanged(String amount) {
+    return 'The total waiting for payment is now $amount. Nothing was recorded.';
+  }
+
+  @override
+  String get payrollErrRefused =>
+      'That could not be done: the pay run has changed or no longer allows it. Reload and try again.';
+
+  @override
+  String get payrollErrFailed =>
+      'That could not be done just now. Please try again.';
+
+  @override
+  String get payrollErrRulesStart =>
+      'New rules cannot start on that day. Pick one of the days offered.';
+
+  @override
+  String payrollRulesNow(String from) {
+    return 'In force since $from';
+  }
+
+  @override
+  String get payrollRulesNone => 'No pay rules yet.';
+
+  @override
+  String payrollRulesNext(String date) {
+    return 'New rules start on $date';
+  }
+
+  @override
+  String get payrollRulesCycle => 'Pay riders';
+
+  @override
+  String get payrollCycleSemiMonthly => 'Twice a month (1st–15th, 16th–end)';
+
+  @override
+  String get payrollCycleMonthly => 'Monthly';
+
+  @override
+  String get payrollRulesStart => 'Starting on';
+
+  @override
+  String get payrollRulesPerDelivery => 'Pay per delivery';
+
+  @override
+  String get payrollRulesHourly => 'Hourly base (optional)';
+
+  @override
+  String get payrollRulesHourlyHint => 'Empty for no hourly pay';
+
+  @override
+  String get payrollRulesTyped => 'Pay hours the office typed';
+
+  @override
+  String get payrollRulesOvertime => 'Overtime multiplier';
+
+  @override
+  String get payrollRulesLate => 'Deduction per late day';
+
+  @override
+  String get payrollRulesAbsence => 'Deduction per absence';
+
+  @override
+  String get payrollRulesSave => 'Save rules';
+
+  @override
+  String get payrollRulesNote =>
+      'Rules take effect from the first day of a pay period and never change a pay run already approved.';
+
+  @override
+  String get payrollMultiplierInvalid => 'Between 1.00 and 5.00';
+
+  @override
+  String get payrollRulesNoStart => 'No day is open for new rules right now.';
 }

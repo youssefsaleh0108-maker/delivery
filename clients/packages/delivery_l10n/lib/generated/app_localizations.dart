@@ -13567,6 +13567,912 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'How it was paid (optional)'**
   String get carrCashBoMethodLabel;
+
+  /// No description provided for @payrollNavLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get payrollNavLabel;
+
+  /// No description provided for @payrollTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Payroll & Earnings Management'**
+  String get payrollTitle;
+
+  /// No description provided for @payrollSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve payouts, calculate bonuses, and track payouts history'**
+  String get payrollSubtitle;
+
+  /// No description provided for @payrollPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay Period: {from} – {to}'**
+  String payrollPeriodLabel(String from, String to);
+
+  /// No description provided for @payrollPeriodTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a pay period'**
+  String get payrollPeriodTooltip;
+
+  /// No description provided for @payrollPeriodOption.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} – {to} · {state}'**
+  String payrollPeriodOption(String from, String to, String state);
+
+  /// No description provided for @payrollRulesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay rules'**
+  String get payrollRulesButton;
+
+  /// No description provided for @payrollExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Payslips'**
+  String get payrollExport;
+
+  /// No description provided for @payrollExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {file}.'**
+  String payrollExported(String file);
+
+  /// No description provided for @payrollStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start pay run'**
+  String get payrollStart;
+
+  /// No description provided for @payrollRecompute.
+  ///
+  /// In en, this message translates to:
+  /// **'Recompute'**
+  String get payrollRecompute;
+
+  /// No description provided for @payrollApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve pay run'**
+  String get payrollApprove;
+
+  /// No description provided for @payrollPayAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Record All Payments'**
+  String get payrollPayAll;
+
+  /// No description provided for @payrollDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard draft'**
+  String get payrollDiscard;
+
+  /// No description provided for @payrollKpiPool.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Payroll Pool'**
+  String get payrollKpiPool;
+
+  /// No description provided for @payrollKpiPoolNote.
+  ///
+  /// In en, this message translates to:
+  /// **'To pay for {from} – {to}'**
+  String payrollKpiPoolNote(String from, String to);
+
+  /// No description provided for @payrollKpiRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders on Payroll'**
+  String get payrollKpiRiders;
+
+  /// No description provided for @payrollKpiRidersValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No riders} =1{1 Rider} other{{count} Riders}}'**
+  String payrollKpiRidersValue(int count);
+
+  /// No description provided for @payrollKpiRidersNote.
+  ///
+  /// In en, this message translates to:
+  /// **'With a payslip this period'**
+  String get payrollKpiRidersNote;
+
+  /// No description provided for @payrollKpiAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average Rider Earnings'**
+  String get payrollKpiAverage;
+
+  /// No description provided for @payrollKpiAverageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Per {days}-day period'**
+  String payrollKpiAverageNote(int days);
+
+  /// No description provided for @payrollKpiBonuses.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonuses'**
+  String get payrollKpiBonuses;
+
+  /// No description provided for @payrollKpiBonusesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Named bonuses and corrections'**
+  String get payrollKpiBonusesNote;
+
+  /// No description provided for @payrollLedgerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Payroll Ledger'**
+  String get payrollLedgerTitle;
+
+  /// No description provided for @payrollColRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider name'**
+  String get payrollColRider;
+
+  /// No description provided for @payrollColBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base pay'**
+  String get payrollColBase;
+
+  /// No description provided for @payrollColDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery pay'**
+  String get payrollColDelivery;
+
+  /// No description provided for @payrollColTips.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get payrollColTips;
+
+  /// No description provided for @payrollColDeductions.
+  ///
+  /// In en, this message translates to:
+  /// **'Deductions'**
+  String get payrollColDeductions;
+
+  /// No description provided for @payrollColGross.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross pay'**
+  String get payrollColGross;
+
+  /// No description provided for @payrollColNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net pay'**
+  String get payrollColNet;
+
+  /// No description provided for @payrollColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get payrollColStatus;
+
+  /// No description provided for @payrollColActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get payrollColActions;
+
+  /// No description provided for @payrollPayslip.
+  ///
+  /// In en, this message translates to:
+  /// **'Payslip'**
+  String get payrollPayslip;
+
+  /// No description provided for @payrollTipsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips are the rider\'s own money and never part of their pay.'**
+  String get payrollTipsNote;
+
+  /// No description provided for @payrollHoursUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours for this rider could not be read.'**
+  String get payrollHoursUnknown;
+
+  /// No description provided for @payrollNobody.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody on your fleet has pay in this period.'**
+  String get payrollNobody;
+
+  /// No description provided for @payrollTableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your company\'s payroll, worked out from your pay rules. YouDrop does not pay your riders.'**
+  String get payrollTableNote;
+
+  /// No description provided for @payrollStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get payrollStatusDraft;
+
+  /// No description provided for @payrollStatusDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting payment'**
+  String get payrollStatusDue;
+
+  /// No description provided for @payrollStatusNothingDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to pay'**
+  String get payrollStatusNothingDue;
+
+  /// No description provided for @payrollStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid ✓'**
+  String get payrollStatusPaid;
+
+  /// No description provided for @payrollStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get payrollStatusFailed;
+
+  /// No description provided for @payrollRunApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get payrollRunApproved;
+
+  /// No description provided for @payrollRunPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get payrollRunPaid;
+
+  /// No description provided for @payrollNotStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get payrollNotStarted;
+
+  /// No description provided for @payrollRunMeta.
+  ///
+  /// In en, this message translates to:
+  /// **'{state} · figures computed {time}'**
+  String payrollRunMeta(String state, String time);
+
+  /// No description provided for @payrollRunRevision.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft, revision {revision}'**
+  String payrollRunRevision(int revision);
+
+  /// No description provided for @payrollHoursAsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours as read on {time}'**
+  String payrollHoursAsOf(String time);
+
+  /// No description provided for @payrollNoRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your pay rules first'**
+  String get payrollNoRulesTitle;
+
+  /// No description provided for @payrollNoRulesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll works out each rider\'s pay from your company\'s own rules: what a delivery pays, whether hours are paid, and any deductions. Nothing is assumed for you.'**
+  String get payrollNoRulesBody;
+
+  /// No description provided for @payrollNoRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No pay run for this period yet'**
+  String get payrollNoRunTitle;
+
+  /// No description provided for @payrollNoRunBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting one computes a draft from the deliveries and hours on record. Nothing is final until you approve it.'**
+  String get payrollNoRunBody;
+
+  /// No description provided for @payrollPeriodOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This period runs until {date}. It can be approved once it is over.'**
+  String payrollPeriodOpen(String date);
+
+  /// No description provided for @payrollHoursMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance hours could not be read, so these figures leave hours out.'**
+  String get payrollHoursMissing;
+
+  /// No description provided for @payrollHoursNotDeployed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance hours are not available on this platform yet, so these figures leave hours out.'**
+  String get payrollHoursNotDeployed;
+
+  /// No description provided for @payrollHoursNotRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pay rules now use hours. Recompute to read them.'**
+  String get payrollHoursNotRead;
+
+  /// No description provided for @payrollJobsLateDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 delivery reached the ledger after these figures were computed. Recompute to include it.} other{{count} deliveries reached the ledger after these figures were computed. Recompute to include them.}}'**
+  String payrollJobsLateDraft(int count);
+
+  /// No description provided for @payrollJobsLateApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.} other{{count} deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.}}'**
+  String payrollJobsLateApproved(int count);
+
+  /// No description provided for @payrollPeriodChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pay rules now pay these days in a different period. Discard this draft and start that period.'**
+  String get payrollPeriodChanged;
+
+  /// No description provided for @payrollLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll could not be loaded just now.'**
+  String get payrollLoadFailed;
+
+  /// No description provided for @payrollTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get payrollTryAgain;
+
+  /// No description provided for @payrollPayslipSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payslip for {from} – {to}'**
+  String payrollPayslipSubtitle(String from, String to);
+
+  /// No description provided for @payrollSectionPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get payrollSectionPay;
+
+  /// No description provided for @payrollSectionSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get payrollSectionSummary;
+
+  /// No description provided for @payrollSectionAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours and attendance'**
+  String get payrollSectionAttendance;
+
+  /// No description provided for @payrollSectionPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get payrollSectionPayment;
+
+  /// No description provided for @payrollLineDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} deliveries × {rate}'**
+  String payrollLineDeliveries(String count, String rate);
+
+  /// No description provided for @payrollLineHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h recorded × {rate}'**
+  String payrollLineHours(String hours, String rate);
+
+  /// No description provided for @payrollLineOvertime.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h overtime × {rate}'**
+  String payrollLineOvertime(String hours, String rate);
+
+  /// No description provided for @payrollLineTyped.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h typed by the office × {rate}'**
+  String payrollLineTyped(String hours, String rate);
+
+  /// No description provided for @payrollLineTypedUnpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h typed by the office, not paid under your rules'**
+  String payrollLineTypedUnpaid(String hours);
+
+  /// No description provided for @payrollLineLate.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} late days × {rate}'**
+  String payrollLineLate(String days, String rate);
+
+  /// No description provided for @payrollLineAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} absences × {rate}'**
+  String payrollLineAbsence(String days, String rate);
+
+  /// No description provided for @payrollLineCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Company cash the rider held, kept from pay'**
+  String get payrollLineCash;
+
+  /// No description provided for @payrollLineBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus: {label}'**
+  String payrollLineBonus(String label);
+
+  /// No description provided for @payrollLineDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduction: {label}'**
+  String payrollLineDeduction(String label);
+
+  /// No description provided for @payrollLineCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction: {label}'**
+  String payrollLineCorrection(String label);
+
+  /// No description provided for @payrollLineOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get payrollLineOther;
+
+  /// No description provided for @payrollOwes.
+  ///
+  /// In en, this message translates to:
+  /// **'Owes the company {amount}. Nothing is paid.'**
+  String payrollOwes(String amount);
+
+  /// No description provided for @payrollTipsInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips {amount}: the rider\'s own money, not part of this pay.'**
+  String payrollTipsInfo(String amount);
+
+  /// No description provided for @payrollCashKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Holds {amount} of the company\'s cash, more than this pay covers. It stays for the hub to collect.'**
+  String payrollCashKept(String amount);
+
+  /// No description provided for @payrollHoursFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {recorded} h · typed {typed} h · overtime {overtime} h'**
+  String payrollHoursFacts(String recorded, String typed, String overtime);
+
+  /// No description provided for @payrollDaysFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Late days {lates} · absences {absences}'**
+  String payrollDaysFacts(int lates, int absences);
+
+  /// No description provided for @payrollAddBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bonus'**
+  String get payrollAddBonus;
+
+  /// No description provided for @payrollAddDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add deduction'**
+  String get payrollAddDeduction;
+
+  /// No description provided for @payrollRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get payrollRemove;
+
+  /// No description provided for @payrollMarkPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark paid'**
+  String get payrollMarkPaid;
+
+  /// No description provided for @payrollMarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark failed'**
+  String get payrollMarkFailed;
+
+  /// No description provided for @payrollAddCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Add correction'**
+  String get payrollAddCorrection;
+
+  /// No description provided for @payrollPaidOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid on {date} · {method}'**
+  String payrollPaidOn(String date, String method);
+
+  /// No description provided for @payrollRecordedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded by {name}'**
+  String payrollRecordedBy(String name);
+
+  /// No description provided for @payrollFailedBecause.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed: {reason}'**
+  String payrollFailedBecause(String reason);
+
+  /// No description provided for @payrollCorrections.
+  ///
+  /// In en, this message translates to:
+  /// **'Corrections'**
+  String get payrollCorrections;
+
+  /// No description provided for @payrollCorrectionWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid in the rider\'s next pay run'**
+  String get payrollCorrectionWaiting;
+
+  /// No description provided for @payrollCorrectionPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid in a later pay run'**
+  String get payrollCorrectionPaid;
+
+  /// No description provided for @payrollLineDialogBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a bonus for {name}'**
+  String payrollLineDialogBonus(String name);
+
+  /// No description provided for @payrollLineDialogDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a deduction for {name}'**
+  String payrollLineDialogDeduction(String name);
+
+  /// No description provided for @payrollLabelField.
+  ///
+  /// In en, this message translates to:
+  /// **'What it is for'**
+  String get payrollLabelField;
+
+  /// No description provided for @payrollAmountField.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get payrollAmountField;
+
+  /// No description provided for @payrollAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'An amount to the cent, like 25.00'**
+  String get payrollAmountInvalid;
+
+  /// No description provided for @payrollRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get payrollRequired;
+
+  /// No description provided for @payrollReasonField.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get payrollReasonField;
+
+  /// No description provided for @payrollReferenceField.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference (optional)'**
+  String get payrollReferenceField;
+
+  /// No description provided for @payrollSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get payrollSave;
+
+  /// No description provided for @payrollCorrectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct {name}\'s pay'**
+  String payrollCorrectionTitle(String name);
+
+  /// No description provided for @payrollCorrectionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The approved payslip stays as it is. The correction is paid in the rider\'s next pay run.'**
+  String get payrollCorrectionBody;
+
+  /// No description provided for @payrollCorrectionMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay more'**
+  String get payrollCorrectionMore;
+
+  /// No description provided for @payrollCorrectionLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Take back'**
+  String get payrollCorrectionLess;
+
+  /// No description provided for @payrollFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment to {name} did not go through?'**
+  String payrollFailedTitle(String name);
+
+  /// No description provided for @payrollFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The pay stays owed and can be recorded as paid later.'**
+  String get payrollFailedBody;
+
+  /// No description provided for @payrollPaidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record paying {name} {amount}?'**
+  String payrollPaidTitle(String name, String amount);
+
+  /// No description provided for @payrollPaidBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This records that your company paid the rider. YouDrop moves no money.'**
+  String get payrollPaidBody;
+
+  /// No description provided for @payrollApproveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve pay for {from} – {to}?'**
+  String payrollApproveTitle(String from, String to);
+
+  /// No description provided for @payrollApproveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 rider, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.} other{{count} riders, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.}}'**
+  String payrollApproveBody(int count, String total);
+
+  /// No description provided for @payrollApproveCash.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} of company cash your riders hold is kept from their pay and recorded as handed to your company.'**
+  String payrollApproveCash(String amount);
+
+  /// No description provided for @payrollApproveWithoutHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve without the missing hours'**
+  String get payrollApproveWithoutHours;
+
+  /// No description provided for @payrollApproveYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get payrollApproveYes;
+
+  /// No description provided for @payrollPayAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Record 1 payment of {total}?} other{Record {count} payments totalling {total}?}}'**
+  String payrollPayAllTitle(int count, String total);
+
+  /// No description provided for @payrollPayAllBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This records that your company paid these riders, and cannot be undone. Failed payments are left to record one by one.'**
+  String get payrollPayAllBody;
+
+  /// No description provided for @payrollRecordYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get payrollRecordYes;
+
+  /// No description provided for @payrollDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this draft?'**
+  String get payrollDiscardTitle;
+
+  /// No description provided for @payrollDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its figures are thrown away and its history is kept. You can start the period again.'**
+  String get payrollDiscardBody;
+
+  /// No description provided for @payrollDiscardYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get payrollDiscardYes;
+
+  /// No description provided for @payrollDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get payrollDone;
+
+  /// No description provided for @payrollApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay run approved.'**
+  String get payrollApproved;
+
+  /// No description provided for @payrollErrFiguresChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The figures changed since you looked. Check the new ones, then approve again.'**
+  String get payrollErrFiguresChanged;
+
+  /// No description provided for @payrollErrNeedsHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours are missing. Tick the box to approve without them.'**
+  String get payrollErrNeedsHours;
+
+  /// No description provided for @payrollErrCashChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider\'s cash changed a moment ago. Nothing was approved; approve again to see the new figures.'**
+  String get payrollErrCashChanged;
+
+  /// No description provided for @payrollErrTotalChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The total waiting for payment is now {amount}. Nothing was recorded.'**
+  String payrollErrTotalChanged(String amount);
+
+  /// No description provided for @payrollErrRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'That could not be done: the pay run has changed or no longer allows it. Reload and try again.'**
+  String get payrollErrRefused;
+
+  /// No description provided for @payrollErrFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That could not be done just now. Please try again.'**
+  String get payrollErrFailed;
+
+  /// No description provided for @payrollErrRulesStart.
+  ///
+  /// In en, this message translates to:
+  /// **'New rules cannot start on that day. Pick one of the days offered.'**
+  String get payrollErrRulesStart;
+
+  /// No description provided for @payrollRulesNow.
+  ///
+  /// In en, this message translates to:
+  /// **'In force since {from}'**
+  String payrollRulesNow(String from);
+
+  /// No description provided for @payrollRulesNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No pay rules yet.'**
+  String get payrollRulesNone;
+
+  /// No description provided for @payrollRulesNext.
+  ///
+  /// In en, this message translates to:
+  /// **'New rules start on {date}'**
+  String payrollRulesNext(String date);
+
+  /// No description provided for @payrollRulesCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay riders'**
+  String get payrollRulesCycle;
+
+  /// No description provided for @payrollCycleSemiMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Twice a month (1st–15th, 16th–end)'**
+  String get payrollCycleSemiMonthly;
+
+  /// No description provided for @payrollCycleMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get payrollCycleMonthly;
+
+  /// No description provided for @payrollRulesStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting on'**
+  String get payrollRulesStart;
+
+  /// No description provided for @payrollRulesPerDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay per delivery'**
+  String get payrollRulesPerDelivery;
+
+  /// No description provided for @payrollRulesHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Hourly base (optional)'**
+  String get payrollRulesHourly;
+
+  /// No description provided for @payrollRulesHourlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty for no hourly pay'**
+  String get payrollRulesHourlyHint;
+
+  /// No description provided for @payrollRulesTyped.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay hours the office typed'**
+  String get payrollRulesTyped;
+
+  /// No description provided for @payrollRulesOvertime.
+  ///
+  /// In en, this message translates to:
+  /// **'Overtime multiplier'**
+  String get payrollRulesOvertime;
+
+  /// No description provided for @payrollRulesLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduction per late day'**
+  String get payrollRulesLate;
+
+  /// No description provided for @payrollRulesAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduction per absence'**
+  String get payrollRulesAbsence;
+
+  /// No description provided for @payrollRulesSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save rules'**
+  String get payrollRulesSave;
+
+  /// No description provided for @payrollRulesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules take effect from the first day of a pay period and never change a pay run already approved.'**
+  String get payrollRulesNote;
+
+  /// No description provided for @payrollMultiplierInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Between 1.00 and 5.00'**
+  String get payrollMultiplierInvalid;
+
+  /// No description provided for @payrollRulesNoStart.
+  ///
+  /// In en, this message translates to:
+  /// **'No day is open for new rules right now.'**
+  String get payrollRulesNoStart;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
