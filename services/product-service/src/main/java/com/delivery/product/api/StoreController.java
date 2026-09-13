@@ -56,11 +56,14 @@ import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
 import com.delivery.product.service.StoreService;
+import com.delivery.product.service.StoreService.NearbyStoreView;
 import com.delivery.product.service.StoreService.StoreView;
 
 /**
@@ -117,15 +120,17 @@ public class StoreController {
     private final ProductImageService images;
     private final StoreImageService storeImages;
     private final ReviewService reviewService;
+    private final PopularServiceShops popularServiceShops;
 
     public StoreController(StoreService storeService, CatalogService catalog,
                            ProductImageService images, StoreImageService storeImages,
-                           ReviewService reviewService) {
+                           ReviewService reviewService, PopularServiceShops popularServiceShops) {
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
         this.storeImages = storeImages;
         this.reviewService = reviewService;
+        this.popularServiceShops = popularServiceShops;
     }
 
     // ---------------------------------------------------------------- storefront
@@ -266,6 +271,54 @@ public class StoreController {
     }
 
     /**
+     * The Services tab's "Popular near you" row: service shops near a point, ranked by the orders they
+     * delivered in the last 30 days, most first ({@link PopularServiceShops}).
+     *
+     * <p>The answer is the cards in rank order, each with its pin and distance exactly as
+     * {@link #nearby} draws them, and nothing more: no count, and no bucket standing in for one. The
+     * counts rank the row on the server and stop there, because a competitor's order volume is not a
+     * customer's to read. An empty list means no shop nearby has enough delivered orders yet, and the
+     * app shows "Services near you" instead ({@code /nearby?vertical=SERVICES}).
+     *
+     * <p>The radius, the window and the floor are the server's settings
+     * ({@code delivery.catalog.services.popular-*}), not parameters: a client that could widen the
+     * circle could turn "near you" back into a nationwide ranking.
+     *
+     * <p>Any signed-in caller, like {@link #nearby} and for its reason: a point is where somebody is
+     * standing, so no signed-out caller gets a proximity oracle, while a customer, a provider and back
+     * office all read the same public cards. A literal path, never taken for {@code /{idOrSlug}}.
+     *
+     * @param serviceCategory one open category, or none for every open one; a closed one answers empty
+     * @param limit           the most cards wanted, held to {@code PopularServiceShops.MAX_SHOPS}
+     */
+    @GetMapping("/services/popular")
+    @PreAuthorize("isAuthenticated()")
+    public List<NearbyStoreResponse> popularServices(
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        // Refused before the database, with the message "near me" gives: see nearby.
+        GeoPoint centre = new GeoPoint(latitude, longitude);
+        List<NearbyStoreView> popular = popularServiceShops.near(centre, serviceCategory, limit);
+        if (popular.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
+        Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
+
+        return popular.stream()
+                .map(near -> new NearbyStoreResponse(
+                        toCard(near.store(), starred, offersByStore),
+                        near.store().store().getLatitude(),
+                        near.store().store().getLongitude(),
+                        Math.round(near.distanceMetres())))
+                .toList();
+    }
+
+    /**
      * The starred row at the top of the home screen: goods shops only.
      *
      * <p>Paged like everything else. A customer who has starred two hundred shops should not send
@@ -314,7 +367,13 @@ public class StoreController {
                 storeService.favoriteIdsOf(viewerId));
     }
 
-    /** A store's shelf. */
+    /**
+     * A store's shelf.
+     *
+     * <p>Read as the caller: a service shop that is a draft, suspended or in a closed category shows
+     * its shelf to its provider only, and anybody else is told the shop is not found
+     * ({@link CatalogService#browseStore}). A goods shop's shelf is served as it always was.
+     */
     @GetMapping("/{id}/products")
     public PageResponse<ProductResponse> products(
             @PathVariable UUID id,
@@ -329,10 +388,11 @@ public class StoreController {
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC)
             Pageable pageable) {
 
+        String viewerId = CurrentUser.id().orElse(null);
         Page<Product> page = ids == null || ids.isEmpty()
-                ? catalog.browseStore(id, categoryId, search, pageable)
-                : catalog.browseStoreByIds(id, ids, pageable);
-        return PageResponse.of(page.map(this::toProduct));
+                ? catalog.browseStore(id, viewerId, categoryId, search, pageable)
+                : catalog.browseStoreByIds(id, viewerId, ids, pageable);
+        return PageResponse.of(catalog.views(page).map(this::toProduct));
     }
 
     /** The Aisles tab: only the categories this store actually stocks. */
@@ -729,27 +789,11 @@ public class StoreController {
                 offer.getEndsAt());
     }
 
-    private ProductResponse toProduct(Product product) {
-        List<String> refs = product.getImageRefs();
-        // This is the shop page's product list — the screen the whole derivative exists for.
-        List<ImageUrl> resolved = images.resolveImages(refs);
-        return new ProductResponse(
-                product.getId(),
-                product.getMerchantId(),
-                product.getStoreId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getCategoryId(),
-                refs,
-                resolved.stream().map(ImageUrl::full).toList(),
-                resolved.stream().map(ImageUrl::thumb).toList(),
-                product.getStatus(),
-                product.getSku(),
-                product.getBarcode(),
-                product.isInStock(),
-                product.getCreatedAt(),
-                product.getUpdatedAt(),
-                product.isGiftFeatured());
+    /**
+     * The shop page's product list, the screen the list-sized derivative exists for, and a service
+     * shop's offer cards with their terms and "From" price. Mapped where every product endpoint maps.
+     */
+    private ProductResponse toProduct(ProductView view) {
+        return ProductResponses.of(view, images);
     }
 }

@@ -145,6 +145,36 @@ class StoreApi {
     return NearbyPage.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// The Services tab's "Popular near you" row: service shops within a few kilometres of the point,
+  /// ranked by the orders they delivered in the last 30 days, most first.
+  ///
+  /// Cards in the server's order, each with its distance as [nearby] measures it, and never a count:
+  /// the ranking is the server's, and no shop's order volume is published. Live shops in open
+  /// categories only, or in the open [serviceCategory] named. Empty until enough nearby orders have
+  /// been delivered, and the tab then shows services near the customer instead ([nearby] with
+  /// [StoreVertical.services]). A row this build cannot read is dropped.
+  Future<List<NearbyStore>> popularServices(
+    double lat,
+    double lng, {
+    ServiceCategory? serviceCategory,
+    int limit = 10,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/stores/services/popular',
+      queryParameters: <String, dynamic>{
+        'latitude': lat,
+        'longitude': lng,
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
+        'limit': limit,
+      },
+    );
+    final Object? rows = response.data;
+    if (rows is! List) {
+      return const <NearbyStore>[];
+    }
+    return rows.map(NearbyStore.maybeFromJson).whereType<NearbyStore>().toList();
+  }
+
   Future<Paged<StoreCard>> favorites({int page = 0, int size = 20}) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '/api/stores/favorites',

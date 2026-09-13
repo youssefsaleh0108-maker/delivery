@@ -121,6 +121,24 @@ class NearbyStore {
         longitude: (json['longitude'] as num).toDouble(),
         distanceMetres: (json['distanceMetres'] as num?)?.toInt() ?? 0,
       );
+
+  /// The row, or null when [json] is not one this build can draw: no card with an id and a name, or no
+  /// pin. For a list the server sends bare, such as the Services tab's popular shops, where one row
+  /// this build cannot read is dropped rather than failing the whole list or being drawn with a guess.
+  static NearbyStore? maybeFromJson(Object? json) {
+    if (json is! Map<String, dynamic>) {
+      return null;
+    }
+    final Object? store = json['store'];
+    if (store is! Map<String, dynamic> ||
+        store['id'] is! String ||
+        store['name'] is! String ||
+        json['latitude'] is! num ||
+        json['longitude'] is! num) {
+      return null;
+    }
+    return NearbyStore.fromJson(json);
+  }
 }
 
 /// A page of the "near me" search, mirroring `GeoDtos.NearbyPageResponse`: the storefront's page,

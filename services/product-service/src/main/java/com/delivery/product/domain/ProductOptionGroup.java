@@ -132,16 +132,36 @@ public class ProductOptionGroup {
         this.options.addAll(replacement);
     }
 
-    /** The cheapest way to satisfy this group, used to show a product's "from" price. */
+    /**
+     * The least this group can add to a line that satisfies it: what an offer's "From" price counts.
+     *
+     * <p>The cheapest selection the group's rule allows, among options that can be chosen. That is the
+     * {@code minSelect} cheapest, because the customer must pick that many, plus any further discount
+     * up to {@code maxSelect}, because a customer can always take one. So an optional group of
+     * surcharges adds nothing, a required "Paper type" adds its cheapest paper, "choose two sides" adds
+     * the two cheapest sides, and a "No lamination -$1.00" lowers the figure exactly as it lowers what
+     * {@code POST /api/products/{id}/price} charges. A lower "From" than any order can reach would be a
+     * price the platform does not have.
+     *
+     * <p>A required group with too few available options cannot be satisfied, and an order for it is
+     * refused when placed ({@link #validateSelection}). The figure then counts what is available, and
+     * says nothing about whether the product can be ordered.
+     */
     public BigDecimal minimumDelta() {
-        if (!isRequired()) {
-            return BigDecimal.ZERO;
-        }
-        return options.stream()
+        List<BigDecimal> cheapestFirst = options.stream()
                 .filter(ProductOption::isAvailable)
                 .map(ProductOption::getPriceDelta)
-                .min(BigDecimal::compareTo)
-                .orElse(BigDecimal.ZERO);
+                .sorted()
+                .toList();
+        BigDecimal least = BigDecimal.ZERO;
+        for (int taken = 0; taken < cheapestFirst.size() && taken < maxSelect; taken++) {
+            BigDecimal delta = cheapestFirst.get(taken);
+            if (taken >= minSelect && delta.signum() >= 0) {
+                break;
+            }
+            least = least.add(delta);
+        }
+        return least;
     }
 
     public UUID getId() {

@@ -1,6 +1,7 @@
 package com.delivery.product.api;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,12 +28,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Store;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.service.StoreService.NearbyFilters;
 import com.delivery.product.service.StoreService.NearbyResult;
+import com.delivery.product.service.StoreService.NearbyStoreView;
 import com.delivery.product.service.StoreService.StoreView;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,20 +68,25 @@ class ServicesStoreApiTest {
     private static final String NEAR_HAMRA = "/api/stores/nearby?latitude=33.8977&longitude=35.4829";
 
     private StoreService storeService;
+    private CatalogService catalog;
+    private PopularServiceShops popular;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         storeService = mock(StoreService.class);
+        catalog = mock(CatalogService.class);
+        popular = mock(PopularServiceShops.class);
         when(storeService.storefront(any(), any(), any(), any(), any(), any(), any(),
                 any(Pageable.class))).thenReturn(Page.empty());
         when(storeService.nearby(any(GeoPoint.class), anyDouble(), anyInt(),
                 any(NearbyFilters.class), any(Pageable.class)))
                 .thenReturn(new NearbyResult(new PageImpl<>(List.of()), false));
+        when(popular.near(any(GeoPoint.class), any(), anyInt())).thenReturn(List.of());
 
         ProxyFactory factory = new ProxyFactory(new StoreController(storeService,
-                mock(CatalogService.class), mock(ProductImageService.class),
-                mock(StoreImageService.class), mock(ReviewService.class)));
+                catalog, mock(ProductImageService.class),
+                mock(StoreImageService.class), mock(ReviewService.class), popular));
         factory.setProxyTargetClass(true);
         factory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
 
@@ -210,5 +218,89 @@ class ServicesStoreApiTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0]").value("PRINTING"))
                 .andExpect(jsonPath("$[1]").value("TAILORING"));
+    }
+
+    /**
+     * Read as the caller, so a service shop that is not listed can refuse everyone but its provider.
+     * Which shops refuse whom is pinned where it is decided, in {@code ServiceOffersTest}.
+     */
+    @Test
+    @DisplayName("a shop's shelf is read as the signed-in caller")
+    void the_shelf_is_read_as_the_caller() throws Exception {
+        signedInAs("CUSTOMER");
+        UUID shop = UUID.randomUUID();
+        when(catalog.browseStore(any(), any(), any(), any(), any(Pageable.class))).thenReturn(Page.empty());
+        when(catalog.views(any(Page.class))).thenReturn(Page.empty());
+
+        mvc.perform(get("/api/stores/" + shop + "/products")).andExpect(status().isOk());
+
+        verify(catalog).browseStore(eq(shop), eq("shopper"), isNull(), isNull(), any(Pageable.class));
+    }
+
+    private static final String POPULAR_NEAR_HAMRA =
+            "/api/stores/services/popular?latitude=33.8977&longitude=35.4829";
+
+    @Test
+    @DisplayName("popular service shops: without a token it is a 401, and nothing is ranked")
+    void popular_refuses_a_caller_with_no_token() throws Exception {
+        mvc.perform(get(POPULAR_NEAR_HAMRA)).andExpect(status().isUnauthorized());
+
+        verify(popular, never()).near(any(), any(), anyInt());
+    }
+
+    /** Any signed-in caller: a customer, a merchant-only account and back office alike. */
+    @Test
+    @DisplayName("popular service shops: any signed-in caller reads them")
+    void popular_is_read_by_any_signed_in_caller() throws Exception {
+        for (String role : List.of("CUSTOMER", "MERCHANT", "BACKOFFICE")) {
+            signedInAs(role);
+            mvc.perform(get(POPULAR_NEAR_HAMRA)).andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    @DisplayName("popular service shops: the cards in rank order with their distance, and never a count")
+    void popular_is_cards_in_rank_order_and_never_a_count() throws Exception {
+        signedInAs("CUSTOMER");
+        Store tailor = new Store("merchant-tailor", "Hamra Tailor", Store.Vertical.SERVICES,
+                Store.ServiceCategory.TAILORING);
+        tailor.pinAt(GeoPoint.of(33.924000d, 35.482900d));
+        Store press = new Store("merchant-press", "Al Fakhry Press", Store.Vertical.SERVICES,
+                Store.ServiceCategory.PRINTING);
+        press.pinAt(GeoPoint.of(33.901500d, 35.482900d));
+        when(popular.near(any(GeoPoint.class), any(), anyInt())).thenReturn(List.of(
+                new NearbyStoreView(new StoreView(tailor, Store.Availability.OPEN, null, false), 2924.6),
+                new NearbyStoreView(new StoreView(press, Store.Availability.OPEN, null, false), 422.4)));
+
+        String body = mvc.perform(get(POPULAR_NEAR_HAMRA + "&serviceCategory=TAILORING&limit=5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].store.name").value("Hamra Tailor"))
+                .andExpect(jsonPath("$[0].store.serviceCategory").value("TAILORING"))
+                .andExpect(jsonPath("$[0].distanceMetres").value(2925))
+                .andExpect(jsonPath("$[1].store.name").value("Al Fakhry Press"))
+                .andExpect(jsonPath("$[1].distanceMetres").value(422))
+                .andReturn().getResponse().getContentAsString();
+
+        // A row is the card, its pin and its distance: no field that could carry an order count.
+        com.fasterxml.jackson.databind.JsonNode rows =
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+        assertThat(rows.get(0).fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("store", "latitude", "longitude", "distanceMetres");
+        assertThat(body).doesNotContain("deliveredOrders");
+
+        ArgumentCaptor<GeoPoint> centre = ArgumentCaptor.forClass(GeoPoint.class);
+        verify(popular).near(centre.capture(), eq(Store.ServiceCategory.TAILORING), eq(5));
+        assertThat(centre.getValue().latitude()).isEqualByComparingTo("33.8977");
+    }
+
+    @Test
+    @DisplayName("popular service shops: without a point it is a 400, never a nationwide ranking")
+    void popular_needs_a_point() throws Exception {
+        signedInAs("CUSTOMER");
+
+        mvc.perform(get("/api/stores/services/popular")).andExpect(status().isBadRequest());
+
+        verify(popular, never()).near(any(), any(), anyInt());
     }
 }

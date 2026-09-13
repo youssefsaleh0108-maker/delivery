@@ -30,6 +30,7 @@ import com.delivery.platform.storage.FilePurpose;
 import com.delivery.platform.storage.StorageService;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.ProductRepository;
+import com.delivery.product.domain.ServiceTermsRepository;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.service.ProductImageService.ImageUrl;
@@ -134,7 +135,8 @@ class ImageThumbnailFlowTest {
         ThumbnailService thumbnails =
                 new ThumbnailService(bucket, files, new Thumbnailer(40_000_000L));
         productImages = new ProductImageService(
-                products, storage, files, mock(OutboxRecorder.class), thumbnails, 8);
+                products, storage, files, mock(OutboxRecorder.class), thumbnails,
+                mock(ServiceTermsRepository.class), 8);
         storeImages = new StoreImageService(stores, storage, thumbnails);
     }
 
@@ -287,7 +289,8 @@ class ImageThumbnailFlowTest {
             Product product = product();
             ThumbnailService tiny = new ThumbnailService(bucket, files, new Thumbnailer(1_000L));
             ProductImageService images = new ProductImageService(
-                    products, storage, files, mock(OutboxRecorder.class), tiny, 8);
+                    products, storage, files, mock(OutboxRecorder.class), tiny,
+                    mock(ServiceTermsRepository.class), 8);
             String key = uploadedProductImage(photo(800, 600));
 
             images.confirmImage(PRODUCT, MERCHANT, UUID.randomUUID());

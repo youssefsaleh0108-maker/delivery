@@ -14,8 +14,12 @@ import com.delivery.platform.outbox.OutboxRecorder;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.domain.CategoryRepository;
 import com.delivery.product.domain.Product;
+import com.delivery.product.domain.ProductOptionGroupRepository;
 import com.delivery.product.domain.ProductRepository;
+import com.delivery.product.domain.ServiceTermsRepository;
 import com.delivery.product.domain.Store;
+import com.delivery.product.domain.StoreDeliveryZoneRepository;
+import com.delivery.product.domain.StoreRepository;
 import com.delivery.product.event.CatalogEvents;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.CategoryNotFoundException;
@@ -61,7 +65,15 @@ class CatalogOwnershipTest {
         categories = mock(CategoryRepository.class);
         storeService = mock(StoreService.class);
         outbox = mock(OutboxRecorder.class);
-        catalog = new CatalogService(products, categories, storeService, outbox);
+        StoreRepository stores = mock(StoreRepository.class);
+        catalog = new CatalogService(products, categories, storeService, outbox, stores,
+                mock(ServiceTermsRepository.class), mock(StoreDeliveryZoneRepository.class),
+                mock(ProductOptionGroupRepository.class),
+                new ServiceCategories(new org.springframework.mock.env.MockEnvironment()));
+
+        // Every product here sits in a goods shop, which asks for no service terms.
+        when(stores.findById(any(UUID.class)))
+                .thenReturn(Optional.of(new Store(MERCHANT, "My Store", Store.Vertical.RESTAURANT)));
 
         when(products.save(any(Product.class))).thenAnswer(call -> call.getArgument(0));
         when(categories.existsById(any(UUID.class))).thenReturn(true);
@@ -84,7 +96,7 @@ class CatalogOwnershipTest {
 
     private static ProductRequest request(UUID storeId) {
         return new ProductRequest("Falafel wrap", "With pickles", new BigDecimal("6.50"),
-                null, storeId, null, null);
+                null, storeId, null, null, null);
     }
 
     @Nested
@@ -266,7 +278,7 @@ class CatalogOwnershipTest {
                     .thenReturn(new Store(MERCHANT, "My Store", Store.Vertical.RESTAURANT));
 
             assertThatThrownBy(() -> catalog.create(MERCHANT,
-                    new ProductRequest("n", "d", BigDecimal.ONE, unknown, null, null, null)))
+                    new ProductRequest("n", "d", BigDecimal.ONE, unknown, null, null, null, null)))
                     .isInstanceOf(CategoryNotFoundException.class);
 
             verify(products, never()).save(any(Product.class));

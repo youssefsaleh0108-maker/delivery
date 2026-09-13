@@ -80,7 +80,7 @@ class StoreVerifiedLocalAccessTest {
 
         mvc = secured(new StoreController(storeService, mock(CatalogService.class),
                 mock(ProductImageService.class), mock(StoreImageService.class),
-                mock(ReviewService.class)));
+                mock(ReviewService.class), mock(com.delivery.product.service.PopularServiceShops.class)));
     }
 
     @AfterEach

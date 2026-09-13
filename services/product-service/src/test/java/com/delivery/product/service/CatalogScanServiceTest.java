@@ -169,6 +169,39 @@ class CatalogScanServiceTest {
         }
 
         /**
+         * A scan reads a shelf into goods lines, and a service shop's offers need terms no photo
+         * carries, so every line would be refused at commit. Refused at the start instead: no scan
+         * spent, nothing uploaded, nothing sent to a vision provider.
+         */
+        @Test
+        void a_service_shop_cannot_start_a_scan_and_spends_nothing() {
+            Store press = new Store(MERCHANT, "Al Fakhry Press", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING);
+            when(stores.ownedBy(MERCHANT)).thenReturn(List.of(store, press));
+
+            assertThatThrownBy(() -> service.create(MERCHANT, press.getId()))
+                    .isInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessageContaining("service shop");
+
+            verify(scans, never()).countByMerchantIdAndCreatedAtAfter(any(), any());
+            verify(scans, never()).save(any());
+            verifyNoInteractions(storage, catalog);
+        }
+
+        /** The same when the service shop is the merchant's own, and the start names none. */
+        @Test
+        void a_merchant_whose_own_shop_is_a_service_shop_is_refused_the_same_way() {
+            when(stores.requireStoreFor(MERCHANT)).thenReturn(new Store(MERCHANT, "Al Fakhry Press",
+                    Store.Vertical.SERVICES, Store.ServiceCategory.PRINTING));
+
+            assertThatThrownBy(() -> service.create(MERCHANT, null))
+                    .isInstanceOf(CatalogRuleViolationException.class);
+
+            verify(scans, never()).countByMerchantIdAndCreatedAtAfter(any(), any());
+            verify(scans, never()).save(any());
+        }
+
+        /**
          * Counted under the merchant's lock, so two starts racing each other cannot both see the last
          * free slot — and counted over a rolling day, so a burst cannot straddle midnight.
          */

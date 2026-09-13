@@ -14,6 +14,31 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     /** The Merchant Portal's list — everything the merchant owns, any status. */
     Page<Product> findByMerchantId(String merchantId, Pageable pageable);
 
+    /**
+     * The merchant's list narrowed to one status.
+     *
+     * <p>How the provider dashboard counts its "Active offers": {@code GET /api/products/mine?status=
+     * ACTIVE&size=1} and the page's {@code totalElements}, a count the database made rather than the
+     * length of whatever page a client happened to load.
+     */
+    Page<Product> findByMerchantIdAndStatus(String merchantId, Product.Status status, Pageable pageable);
+
+    /**
+     * The merchant's list in one of their shops, in any status.
+     *
+     * <p>Scoped by merchant as well as by shop, although the caller has already checked the shop is the
+     * merchant's: a row that disagreed about its owner is one this list must not show.
+     */
+    Page<Product> findByMerchantIdAndStoreId(String merchantId, UUID storeId, Pageable pageable);
+
+    /**
+     * One shop's products in one status: how the provider dashboard counts its service shop's "Active
+     * offers" when the account owns a goods shop too
+     * ({@code GET /api/products/mine?storeId=&status=ACTIVE&size=1}).
+     */
+    Page<Product> findByMerchantIdAndStoreIdAndStatus(String merchantId, UUID storeId,
+                                                     Product.Status status, Pageable pageable);
+
     Optional<Product> findByIdAndMerchantId(UUID id, String merchantId);
 
     /**
@@ -125,4 +150,37 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     Page<Product> findActiveInStoreByIds(@Param("storeId") UUID storeId,
                                          @Param("ids") java.util.Collection<UUID> ids,
                                          Pageable pageable);
+
+    /**
+     * The customer services search: live offers of listed service shops, in the given open categories.
+     *
+     * <p>Three filters, each for a reason:
+     * <ul>
+     *   <li>The offer is ACTIVE, so a paused offer, a draft or an archived product never reaches a
+     *       customer.
+     *   <li>Its shop is ACTIVE, so a draft or suspended shop's offers are not listed, as its shelf is
+     *       not.
+     *   <li>Its shop is a SERVICES shop in one of {@code categories}: never a goods product, whatever
+     *       its name says, and never an offer of a shop in a closed category. The category is the
+     *       shop's (V33); an offer has none of its own.
+     * </ul>
+     *
+     * <p>{@code categories} is never empty: {@code ServiceOfferSearch} answers an empty page itself
+     * when no category may be shown, for the reason {@link StoreRepository#findServicesStorefront}
+     * gives. The name pattern follows {@link #findActiveCatalog}'s non-null contract.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.status = com.delivery.product.domain.Product$Status.ACTIVE
+              AND LOWER(p.name) LIKE :namePattern ESCAPE '\\'
+              AND p.storeId IN (
+                    SELECT s.id FROM Store s
+                    WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+                      AND s.vertical = com.delivery.product.domain.Store$Vertical.SERVICES
+                      AND s.serviceCategory IN :categories)
+            """)
+    Page<Product> findListedServiceOffers(
+            @Param("categories") java.util.Collection<Store.ServiceCategory> categories,
+            @Param("namePattern") String namePattern,
+            Pageable pageable);
 }

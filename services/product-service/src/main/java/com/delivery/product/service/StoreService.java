@@ -122,6 +122,19 @@ public class StoreService {
                 store.powerDeclaredSince(powerDeclaredSince(now)));
     }
 
+    /**
+     * The rendering form of a shop another read found and judged, at the instant that read is about.
+     *
+     * <p>For {@link PopularServiceShops}, which ranks shops by what only its own query can count, so it
+     * cannot go through {@link #nearby}, and must still draw the card "near me" draws. Public, so the
+     * call goes through the proxy to this bean like every other read here, rather than running a
+     * package-private method against a proxy's empty fields.
+     */
+    @Transactional(readOnly = true)
+    public StoreView viewAt(Store store, Instant now) {
+        return view(store, now);
+    }
+
     /** The oldest declaration still presented as now. See {@link #powerDeclarationFreshFor}. */
     private Instant powerDeclaredSince(Instant now) {
         return now.minus(powerDeclarationFreshFor);
@@ -344,8 +357,9 @@ public class StoreService {
      * radius by haversine but a few metres outside it by the spheroid would be discarded before
      * Java ever saw it — a shop missing from a "near me" list for a reason no one could observe. One
      * percent comfortably covers the disagreement; the Java filter below is what actually decides.
+     * {@link PopularServiceShops} asks for its circle the same way, for the same reason.
      */
-    private static final double RADIUS_SLACK = 1.01d;
+    static final double RADIUS_SLACK = 1.01d;
 
     /**
      * Live stores near a point, nearest first.

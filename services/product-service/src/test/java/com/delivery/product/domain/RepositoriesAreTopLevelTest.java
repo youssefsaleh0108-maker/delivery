@@ -72,4 +72,13 @@ class RepositoriesAreTopLevelTest {
                 "com.delivery.product.domain.staff.StaffInviteRepository",
                 "com.delivery.product.domain.staff.StaffShiftRepository");
     }
+
+    @Test
+    @DisplayName("the scan actually sees the service offers' terms repository")
+    void serviceTermsRepositoryIsFound() {
+        // Saved beside a product rather than through it, so nothing else would notice it missing
+        // until a service offer was first created on a deployed pod.
+        assertThat(repositoriesUnder("com.delivery.product.domain"))
+                .contains("com.delivery.product.domain.ServiceTermsRepository");
+    }
 }
