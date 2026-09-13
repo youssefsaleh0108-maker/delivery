@@ -69,7 +69,8 @@ class OnboardingApplicationDetailsTest {
         mvc = MockMvcBuilders.standaloneSetup(new OnboardingController(
                         onboarding, mock(VerificationService.class),
                         mock(PlatformClient.class), mock(CustomerSignUpService.class),
-                        documents, payouts))
+                        documents, payouts,
+                        mock(com.delivery.onboarding.service.PartnerManagementService.class)))
                 .build();
     }
 

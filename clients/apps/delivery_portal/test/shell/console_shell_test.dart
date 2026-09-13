@@ -99,6 +99,58 @@ void main() {
 
       expect(picked, 1);
     });
+
+    testWidgets('files pages under a heading as rows, and says which one was tapped',
+        (WidgetTester tester) async {
+      // The carrier rail's shape: a plain destination, a heading with one page, and a heading with
+      // two. Every page the rail used to list is one of these rows now, so a row that drew but did
+      // not answer would hide a working page.
+      int? selected;
+      (int, int)? opened;
+      await _pump(
+        tester,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            ConsoleSidebar(
+              area: const ConsoleArea(wordmark: 'Carrier Hub', logoIcon: Icons.local_shipping),
+              entries: const <ConsoleNavEntry>[
+                ConsoleNavEntry(icon: Icons.grid_view_outlined, label: 'Dashboard'),
+                ConsoleNavEntry(
+                  icon: Icons.calculate_outlined,
+                  label: 'Reconciliation',
+                  children: <String>['Statement'],
+                ),
+                ConsoleNavEntry(
+                  icon: Icons.people_outline,
+                  label: 'Riders HR',
+                  children: <String>['Directory', 'Applicants'],
+                ),
+              ],
+              selectedIndex: 2,
+              selectedChild: 0,
+              onSelected: (int i) => selected = i,
+              onChildSelected: (int entry, int child) => opened = (entry, child),
+              userName: 'Sam Ali',
+              userRole: 'Carrier partner',
+            ),
+            const Expanded(child: SizedBox()),
+          ],
+        ),
+        const Size(1024, 720),
+      );
+
+      // One page under a heading is that heading's page, not a row of its own.
+      expect(find.text('Statement'), findsNothing);
+      expect(find.text('Directory'), findsOneWidget);
+      expect(find.text('Applicants'), findsOneWidget);
+
+      await tester.tap(find.text('Applicants'));
+      expect(opened, (2, 1));
+
+      await tester.tap(find.text('Reconciliation'));
+      expect(selected, 1);
+    });
   });
 
   group('ConsolePage', () {

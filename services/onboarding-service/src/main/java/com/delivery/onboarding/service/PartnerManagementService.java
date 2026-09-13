@@ -1,7 +1,10 @@
 package com.delivery.onboarding.service;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -184,6 +187,27 @@ public class PartnerManagementService {
     public Optional<PartnerStatusChange> standing(UUID applicationId) {
         require(applicationId);
         return statusChanges.findFirstByApplicationIdOrderByCreatedAtDesc(applicationId);
+    }
+
+    /**
+     * Whether each of these applications' partners is suspended now — a whole listing's standing
+     * in one query, where reading it one application at a time cost the carrier's directory a
+     * request per rider.
+     *
+     * <p>An application nobody ever suspended reads false. Two changes at the same instant resolve
+     * to suspended, the side that cannot hide a suspension.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Boolean> suspendedByApplication(Collection<UUID> applicationIds) {
+        if (applicationIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Boolean> suspended = new HashMap<>();
+        applicationIds.forEach(id -> suspended.put(id, false));
+        for (PartnerStatusChange change : statusChanges.findCurrentForApplications(applicationIds)) {
+            suspended.merge(change.getApplicationId(), change.isSuspended(), Boolean::logicalOr);
+        }
+        return suspended;
     }
 
     /** Every suspension and reinstatement ever, newest first. Empty when there were none. */

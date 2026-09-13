@@ -37,6 +37,7 @@ class RiderAttendanceScreen extends StatefulWidget {
     required this.riderName,
     this.initialMonth,
     this.onBack,
+    this.backTooltip,
   });
 
   final TrackingApi api;
@@ -51,6 +52,10 @@ class RiderAttendanceScreen extends StatefulWidget {
 
   /// Back to the page this was opened from. Null draws no back control.
   final VoidCallback? onBack;
+
+  /// What the back control says it returns to. "Back to riders" when null — the Shifts page's
+  /// rider list, where this page was first opened from; a rider's profile passes its own.
+  final String? backTooltip;
 
   @override
   State<RiderAttendanceScreen> createState() => _RiderAttendanceScreenState();
@@ -176,7 +181,7 @@ class _RiderAttendanceScreenState extends State<RiderAttendanceScreen> {
         if (widget.onBack != null) ...<Widget>[
           ConsoleIconAction(
             icon: Icons.arrow_back,
-            tooltip: t.attendanceBackToRiders,
+            tooltip: widget.backTooltip ?? t.attendanceBackToRiders,
             onPressed: widget.onBack,
           ),
           const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),

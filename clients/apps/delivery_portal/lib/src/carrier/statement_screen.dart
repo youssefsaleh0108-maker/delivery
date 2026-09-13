@@ -1,5 +1,6 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -96,7 +97,9 @@ class _CarrierStatementScreenState extends State<CarrierStatementScreen> {
   Widget build(BuildContext context) {
     return ConsolePage(
       header: ConsoleTopbar(
-        title: 'Statement',
+        // Named as the rail heading that opens it: "Reconciliation" landing on a page called
+        // something else reads as having opened the wrong page.
+        title: DeliveryStrings.of(context).carrRidersNavReconciliation,
         subtitle: 'What the platform owes you for the jobs your riders carried in this period',
         actions: <Widget>[
           ConsoleFilterButton(

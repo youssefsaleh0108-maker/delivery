@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../shell/console_controls.dart';
 import '../shell/shell.dart';
+import 'company_standing.dart';
 
 /// The delivery company's own page — Figma `carrier-dashboard` (3:3429), "Carrier Control Tower".
 ///
@@ -48,12 +49,13 @@ class CarrierDashboardScreen extends StatefulWidget {
   /// be worse than no subtitle.
   final DeliveryProviderApi providerApi;
 
-  /// The carrier-scoped daily series, for the week-over-week line the design draws. Optional
-  /// because the portal shell has not been rewired to pass it yet; absent, the cards show their
-  /// day-over-day alone rather than a movement nothing measured.
+  /// The carrier-scoped daily series, for the week-over-week line the design draws. The portal
+  /// passes it; absent, the cards show their day-over-day alone rather than a movement nothing
+  /// measured.
   final AggregatesApi? aggregatesApi;
 
-  /// Per-rider delivered-today counts, carrier-scoped. Optional for the same reason.
+  /// Per-rider delivered-today counts, carrier-scoped. The portal passes it; absent, the fleet
+  /// card says what it cannot know rather than a count.
   final RiderPerformanceApi? performanceApi;
 
   /// Today's work leads to the job board. A count with nowhere to go is decoration.
@@ -190,6 +192,11 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
         subtitle: _company == null
             ? 'Operational health dashboard'
             : 'Operational health dashboard for ${_company!.name}',
+        // In the header, under the company's name: the switch that stops this company being offered
+        // work. It sat at the foot of the page, below the fold on any laptop — the wrong place for a
+        // brake — and the header's own column lets it wrap on a narrow window rather than crowd the
+        // search and the bell out of the bar.
+        below: CarrierAvailabilitySwitch(api: widget.providerApi),
         actions: <Widget>[
           // Live, and over the one population this page holds: the recent jobs the chart and the
           // feed are both drawn from.
@@ -215,6 +222,10 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
       children: <Widget>[
         ConsoleKpiRow(cards: _kpis(s)),
         _split(s, jobs),
+        // How much work this company is offered. It sat under the old riders table; the riders page
+        // is an HR directory now, and this is the page a company opens to ask how it is doing. It
+        // loads on its own, so a failure there never takes the figures above down with it.
+        CarrierScoreCard(api: widget.providerApi),
       ],
     );
   }

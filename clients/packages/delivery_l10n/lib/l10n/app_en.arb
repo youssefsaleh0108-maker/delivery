@@ -3709,5 +3709,314 @@
         "type": "int"
       }
     }
-  }
+  },
+  "carrRidersNavReconciliation": "Reconciliation",
+  "carrRidersNavRidersHr": "Riders HR",
+  "carrRidersNavDirectory": "Directory",
+  "carrRidersNavStatement": "Statement",
+  "carrRidersTitle": "Riders HR Directory",
+  "carrRidersSubtitle": "Manage rider profiles, status and regions",
+  "carrRidersStatTotal": "Total onboarded riders",
+  "carrRidersStatTotalNote": "Registered company fleet",
+  "carrRidersStatOnDuty": "Active on duty",
+  "carrRidersStatOnDutyNote": "Available or on a job",
+  "carrRidersStatSignalLost": "Signal lost",
+  "carrRidersStatSignalLostNote": "On duty, but their phone has gone quiet",
+  "carrRidersStatOffline": "Offline / inactive",
+  "carrRidersStatOfflineNote": "Declared themselves off duty",
+  "carrRidersPresenceUnknown": "Presence could not be read just now",
+  "carrRidersSearchHint": "Search riders by name, ID...",
+  "carrRidersZoneAll": "Zone: All",
+  "carrRidersZoneValue": "Zone: {zone}",
+  "@carrRidersZoneValue": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersZoneTooltip": "A zone here is the region each rider wrote on their application",
+  "carrRidersVehicleAll": "Vehicle: All",
+  "carrRidersVehicleValue": "Vehicle: {vehicle}",
+  "@carrRidersVehicleValue": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersVehicleMotorcycle": "Motorcycle",
+  "carrRidersVehicleCar": "Car",
+  "carrRidersVehicleBicycle": "Bicycle",
+  "carrRidersVehicleVan": "Van",
+  "carrRidersVehicleTruck": "Truck",
+  "carrRidersAddRider": "Add Rider",
+  "carrRidersAddRiderTooltip": "Approve somebody who has applied to ride for you",
+  "carrRidersAddRiderUnavailable": "Applications could not be read just now, so nobody can be approved from here",
+  "carrRidersManageProfile": "Manage Profile",
+  "carrRidersDeliveredToday": "({count} today)",
+  "@carrRidersDeliveredToday": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersRatingNew": "New",
+  "carrRidersStatusActive": "Active",
+  "carrRidersStatusSignalLost": "Signal lost",
+  "carrRidersStatusOffline": "Offline",
+  "carrRidersStatusSuspended": "Suspended",
+  "carrRidersStatusOnAJob": "On a job",
+  "carrRidersNoMatch": "No rider matches that.",
+  "carrRidersShowingOnly": "Showing only: {filter}",
+  "@carrRidersShowingOnly": {
+    "placeholders": {
+      "filter": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersShowEveryone": "Show everyone",
+  "carrRidersDirectoryFootnote": "Zone is the region each rider gave on their application — the platform does not assign riders to your coverage zones. Rating is what customers left across all of a rider's deliveries. Presence reaches this page once a rider has carried your work, so a rider who has not yet shows none.",
+  "carrRidersWaitingTitle": "Add a rider",
+  "carrRidersWaitingCount": "{count, plural, =0{Nobody is waiting to ride for you} =1{1 person waiting to ride for you} other{{count} people waiting to ride for you}}",
+  "@carrRidersWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersWaitingEmpty": "Nobody has applied to ride for you. Riders reach a fleet by applying — there is no way to create one directly.",
+  "carrRidersApprove": "Approve",
+  "carrRidersOnYourFleet": "On your fleet",
+  "carrRidersSuspendTitle": "Suspend {name}",
+  "@carrRidersSuspendTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReinstateTitle": "Reinstate {name}",
+  "@carrRidersReinstateTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersSuspendBody": "They keep their sign-in and their history, and stop being offered work. You can reinstate them at any time.",
+  "carrRidersReinstateBody": "They can be offered work again from the moment this is saved.",
+  "carrRidersChooseReason": "Choose a reason",
+  "carrRidersNoteHint": "A note for the record (optional)",
+  "carrRidersSuspendRider": "Suspend Rider",
+  "carrRidersReinstateRider": "Reinstate Rider",
+  "carrRidersSuspendedToast": "{name} is suspended and will not be offered work.",
+  "@carrRidersSuspendedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReinstatedToast": "{name} can take work again.",
+  "@carrRidersReinstatedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReasonFraud": "Fraud",
+  "carrRidersReasonAbuse": "Abuse",
+  "carrRidersReasonNonPayment": "Non-payment",
+  "carrRidersReasonPolicyViolation": "Policy violation",
+  "carrRidersReasonPartnerRequest": "Partner request",
+  "carrRidersReasonOther": "Other",
+  "carrRidersProfileTitle": "Rider HR Profile",
+  "carrRidersProfileSubtitle": "Documents, employment details and performance",
+  "carrRidersBackToDirectory": "Back to riders",
+  "carrRidersBadgeId": "Badge ID: {code}",
+  "@carrRidersBadgeId": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersPhone": "Phone",
+  "carrRidersEmail": "Email",
+  "carrRidersLastSeen": "Last seen",
+  "carrRidersNoPresenceYet": "No duty or location yet",
+  "carrRidersStaleNote": "Declared on duty, but the last location is too old to dispatch on.",
+  "carrRidersNoApplication": "The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.",
+  "carrRidersDocumentsTitle": "Documents Verification",
+  "carrRidersDocNationalId": "National ID",
+  "carrRidersDocDrivingLicence": "Driving licence",
+  "carrRidersDocVehicleRegistration": "Vehicle registration",
+  "carrRidersDocVerified": "Verified",
+  "carrRidersDocWaiting": "Waiting",
+  "carrRidersDocRefused": "Refused",
+  "carrRidersDocNotUploaded": "Not uploaded",
+  "carrRidersDocOpen": "Open the document",
+  "carrRidersCouldNotRead": "Could not be read just now.",
+  "carrRidersAvgRating": "Avg rating",
+  "carrRidersHappyCustomers": "{percent}% happy customers",
+  "@carrRidersHappyCustomers": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNoRatingsYet": "No ratings yet",
+  "carrRidersDeliveriesWindow": "Deliveries, last {days} days",
+  "@carrRidersDeliveriesWindow": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersClaimedCaption": "{claimed} claimed, {cancelled} cancelled after claiming",
+  "@carrRidersClaimedCaption": {
+    "placeholders": {
+      "claimed": {
+        "type": "int"
+      },
+      "cancelled": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersCompletionRate": "Completion rate",
+  "carrRidersCompletionCaption": "Delivered out of claimed, for your company",
+  "carrRidersNothingClaimed": "Nothing claimed in this window",
+  "carrRidersDeliveredTodayLabel": "Delivered today",
+  "carrRidersDeliveredTodayCaption": "For your company, since midnight",
+  "carrRidersOutputTitle": "Delivery output, last {days} days",
+  "@carrRidersOutputTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersOutputEmpty": "No deliveries in this period",
+  "carrRidersOutputNote": "Days are split in the {zone} time zone, and only deliveries made for your company are counted.",
+  "@carrRidersOutputNote": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersHoursTitle": "Hours online, last {days} days",
+  "@carrRidersHoursTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersHoursValue": "{hours} h",
+  "@carrRidersHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersHoursTotal": "{hours} h in total",
+  "@carrRidersHoursTotal": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersShifts": "{count, plural, =1{1 shift} other{{count} shifts}}",
+  "@carrRidersShifts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersHoursNone": "No hours online to show for your company.",
+  "carrRidersHoursZone": "Days are split in the {zone} time zone, as the server reports them.",
+  "@carrRidersHoursZone": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersEmploymentTitle": "Employment Details",
+  "carrRidersStartDate": "Start date",
+  "carrRidersApplied": "Applied",
+  "carrRidersRegion": "Region (from their application)",
+  "carrRidersVehicle": "Vehicle",
+  "carrRidersEmploymentNote": "Contract type, pay rate and zone assignment are not recorded on this platform.",
+  "carrRidersSuspendUnavailable": "Suspending works through a rider's application to you. The platform attached this rider directly, so ask YouDrop to suspend them.",
+  "carrRidersTerminate": "Terminate Contract",
+  "carrRidersTerminateTitle": "End {name}'s contract?",
+  "@carrRidersTerminateTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateBody": "{name} comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop's own riders: they can take no work at all until another company hires them or YouDrop takes them on.",
+  "@carrRidersTerminateBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateJobs": "Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.",
+  "carrRidersTerminateMoney": "Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.",
+  "carrRidersTerminateUndo": "Taking them back later means hiring them again.",
+  "carrRidersTerminateConfirm": "Terminate contract",
+  "carrRidersTerminated": "{name} is no longer on your fleet.",
+  "@carrRidersTerminated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateCarrying": "{count, plural, =1{They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.} other{They are carrying {count} of your jobs right now. Their contract can end once those are delivered or cancelled.}}",
+  "@carrRidersTerminateCarrying": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNotOnFleet": "This rider is no longer on your fleet.",
+  "carrRidersNoPresenceCount": "{count, plural, =1{1 more has no duty or location yet} other{{count} more have no duty or location yet}}",
+  "@carrRidersNoPresenceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNoPresenceNote": "Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.",
+  "carrRidersVehicleModel": "Vehicle model",
+  "carrRidersPlateNumber": "Plate number",
+  "carrRidersDateOfBirth": "Date of birth",
+  "carrRidersNationalIdNumber": "National ID number",
+  "carrRidersDutyChanged": "Duty last changed",
+  "carrRidersVehicleYear": "Vehicle year",
+  "carrRidersTerminateReason": "Reason, kept on record",
+  "carrRidersTerminateReasonHint": "Why is this contract ending?",
+  "carrRidersStatusStandingUnknown": "Standing unknown",
+  "carrRidersStandingUnknownNote": "Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.",
+  "attendanceBackToProfile": "Back to profile"
 }

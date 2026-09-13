@@ -5,7 +5,6 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_portal/src/carrier/shift_schedule_screen.dart';
-import 'package:delivery_portal/src/portal_shell.dart';
 import 'package:delivery_portal/src/shell/console_controls.dart';
 import 'package:delivery_portal/src/shell/shell.dart';
 import 'package:dio/dio.dart';
@@ -428,18 +427,5 @@ void main() {
     expect(find.text(ar.attendanceShiftsTitle), findsOneWidget);
     expect(find.text(ar.attendanceRidersCard), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
-
-  test('the carrier rail opens Shifts & attendance right after the fleet, moving no link', () {
-    final List<PortalDestination> rail = PortalArea.carrier_.destinations;
-    final List<String> labels = <String>[for (final PortalDestination d in rail) d.label(en)];
-    final int fleet = labels.indexOf(en.navCompany);
-
-    expect(labels[fleet + 1], en.attendanceNavShifts);
-    expect(labels[fleet + 2], en.navApplicants);
-    // The dashboard's "see jobs" link jumps to index 1; the insertion must not have moved it.
-    expect(labels[1], en.navJobs);
-    expect(rail[fleet + 1].label(ar), ar.attendanceNavShifts);
-    expect(ar.attendanceNavShifts, isNot(en.attendanceNavShifts));
   });
 }

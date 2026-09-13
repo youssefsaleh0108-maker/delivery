@@ -156,7 +156,8 @@ class AttendanceServiceTest {
 
         PresenceService presence = mock(PresenceService.class);
         DutySessionService duty = new DutySessionService(sessions, presenceRows, carrierScope,
-                presence, "Asia/Beirut", Duration.ofMinutes(2), Duration.ofHours(4));
+                presence, "Asia/Beirut", Duration.ofMinutes(2), Duration.ofHours(4),
+                mock(FleetMembershipGuard.class));
         service = new AttendanceService(duty, carrierScope, presenceRows, templates, assignments,
                 entries, 400);
     }

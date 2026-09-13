@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.delivery.tracking.domain.DutySession;
 import com.delivery.tracking.domain.DutySessionRepository;
 import com.delivery.tracking.domain.DutyState;
+import com.delivery.tracking.domain.MembershipWindow;
 import com.delivery.tracking.domain.RiderDutyEvent;
 import com.delivery.tracking.domain.RiderPresence;
 import com.delivery.tracking.domain.RiderPresenceRepository;
@@ -64,6 +65,8 @@ public class DutySessionService {
     private final ZoneId dayZone;
     private final Duration presenceWindow;
     private final Duration expireAfter;
+    /** Confirms with Order Manager that a rider is on the calling company's fleet NOW. */
+    private final FleetMembershipGuard fleetGuard;
 
     public DutySessionService(DutySessionRepository sessions,
                               RiderPresenceRepository presenceRows,
@@ -74,7 +77,8 @@ public class DutySessionService {
                               // boundary, shift window and lateness verdict back on UTC.
                               @Value("${delivery.tracking.duty-session.day-zone:Asia/Beirut}") String dayZone,
                               @Value("${delivery.tracking.presence.ttl:120s}") Duration presenceWindow,
-                              @Value("${delivery.tracking.duty-session.expire-after:4h}") Duration expireAfter) {
+                              @Value("${delivery.tracking.duty-session.expire-after:4h}") Duration expireAfter,
+                              FleetMembershipGuard fleetGuard) {
         this.sessions = sessions;
         this.presenceRows = presenceRows;
         this.carrierScope = carrierScope;
@@ -82,6 +86,7 @@ public class DutySessionService {
         this.dayZone = ZoneId.of(dayZone);
         this.presenceWindow = presenceWindow;
         this.expireAfter = expireAfter;
+        this.fleetGuard = fleetGuard;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -109,8 +114,17 @@ public class DutySessionService {
      */
     @Transactional(readOnly = true)
     public HoursOnline riderHours(String riderId, String callerId, boolean isBackoffice, int days) {
-        requireReadable(riderId, callerId, isBackoffice);
-        return aggregate(riderId, days, Instant.now());
+        ReadAccess access = requireReadable(riderId, callerId, isBackoffice);
+        if (isBackoffice) {
+            return aggregate(riderId, days, Instant.now());
+        }
+        // ...and still on that fleet now, by Order Manager's account: the linkage requireReadable
+        // checked is only cleared by a membership event. The same not-found; an unreachable Order
+        // Manager refuses.
+        fleetGuard.requireOnCallersFleet(callerId, riderId);
+        // Only the time they were this company's rider: never a shift from before it hired them —
+        // worked for another company, or for YouDrop — nor from a spell away in between.
+        return aggregate(riderId, days, Instant.now(), access.carrierId());
     }
 
     /**
@@ -195,9 +209,30 @@ public class DutySessionService {
 
     /**
      * The sum. Package-private overload with an explicit clock instant so tests can put a session
-     * either side of a midnight they control.
+     * either side of a midnight they control. Every session counts: the rider's own hours, and
+     * Backoffice's view.
      */
     HoursOnline aggregate(String riderId, int days, Instant now) {
+        return aggregate(riderId, days, now, null);
+    }
+
+    /** The parts of {@code [start, end)} inside the windows; all of it when there is nothing to clip to. */
+    private static List<Instant[]> clip(Instant start, Instant end, List<MembershipWindow> windows) {
+        if (windows == null) {
+            return List.<Instant[]>of(new Instant[] {start, end});
+        }
+        return windows.stream()
+                .map(window -> new Instant[] {max(start, window.start()), min(end, window.end())})
+                .filter(part -> part[0].isBefore(part[1]))
+                .toList();
+    }
+
+    /**
+     * The sum as one delivery company may see it when {@code clipToCarrier} is set: only the parts
+     * of each session inside the windows the rider was on that company's fleet
+     * ({@link FleetMembershipGuard#membershipWindows}). Null counts every session.
+     */
+    HoursOnline aggregate(String riderId, int days, Instant now, UUID clipToCarrier) {
         LocalDate today = LocalDate.ofInstant(now, dayZone);
         LocalDate from = today.minusDays(days - 1L);
         Instant windowStart = from.atStartOfDay(dayZone).toInstant();
@@ -207,6 +242,9 @@ public class DutySessionService {
             // Nothing has happened. An empty list, not a row of zeros — zeros are a statement.
             return new HoursOnline(riderId, dayZone.getId(), from, today, List.of());
         }
+        List<MembershipWindow> windows = clipToCarrier == null
+                ? null
+                : fleetGuard.membershipWindows(clipToCarrier, riderId, windowStart, now);
 
         Instant lastSeen = presenceRows.findById(riderId)
                 .map(RiderPresence::getLastSeenAt)
@@ -217,19 +255,25 @@ public class DutySessionService {
         for (DutySession session : overlapping) {
             Instant start = max(session.getStartedAt(), windowStart);
             Instant end = min(effectiveEnd(session, lastSeen, now), now);
+            // A session counts once on each day it touches, however many windows cut it there.
+            java.util.Set<LocalDate> touched = new java.util.HashSet<>();
 
-            // Walk the session across midnights, crediting each slice to its own day. A 23:00–01:00
-            // shift is one hour today and one tomorrow, never two on either.
-            Instant cursor = start;
-            while (cursor.isBefore(end)) {
-                LocalDate day = LocalDate.ofInstant(cursor, dayZone);
-                Instant dayEnd = day.plusDays(1).atStartOfDay(dayZone).toInstant();
-                Instant sliceEnd = min(end, dayEnd);
+            for (Instant[] part : clip(start, end, windows)) {
+                // Walk the part across midnights, crediting each slice to its own day. A 23:00–01:00
+                // shift is one hour today and one tomorrow, never two on either.
+                Instant cursor = part[0];
+                while (cursor.isBefore(part[1])) {
+                    LocalDate day = LocalDate.ofInstant(cursor, dayZone);
+                    Instant dayEnd = day.plusDays(1).atStartOfDay(dayZone).toInstant();
+                    Instant sliceEnd = min(part[1], dayEnd);
 
-                long[] agg = perDay.computeIfAbsent(day, d -> new long[2]);
-                agg[0] += Duration.between(cursor, sliceEnd).getSeconds();
-                agg[1] += 1;
-                cursor = sliceEnd;
+                    long[] agg = perDay.computeIfAbsent(day, d -> new long[2]);
+                    agg[0] += Duration.between(cursor, sliceEnd).getSeconds();
+                    if (touched.add(day)) {
+                        agg[1] += 1;
+                    }
+                    cursor = sliceEnd;
+                }
             }
         }
 

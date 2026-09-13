@@ -87,8 +87,11 @@ class DutySessionServiceTest {
                         .orElseThrow(() -> new PresenceService.NoCarrierException(
                                 "You are not a member of any delivery company")));
 
+        // Order Manager confirming the local linkage; a rider it no longer puts on the fleet, and an
+        // outage, are CarrierReadsAfterReleaseTest's, with the real guard.
+        FleetMembershipGuard fleetGuard = mock(FleetMembershipGuard.class);
         service = new DutySessionService(sessions, presenceRows, carrierScope, presence,
-                "UTC", PRESENCE_WINDOW, EXPIRE_AFTER);
+                "UTC", PRESENCE_WINDOW, EXPIRE_AFTER, fleetGuard);
     }
 
     private DutySession closed(Instant from, Instant to) {
@@ -341,7 +344,7 @@ class DutySessionServiceTest {
         @BeforeEach
         void inBeirut() {
             beirut = new DutySessionService(sessions, presenceRows, carrierScope, presence,
-                    "Asia/Beirut", PRESENCE_WINDOW, EXPIRE_AFTER);
+                    "Asia/Beirut", PRESENCE_WINDOW, EXPIRE_AFTER, mock(FleetMembershipGuard.class));
         }
 
         /**

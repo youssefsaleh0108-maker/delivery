@@ -99,9 +99,17 @@ class PresenceServiceTest {
                                 "You are not a member of any delivery company")));
         when(dutySessions.findByRiderIdAndEndedAtIsNull(anyString())).thenReturn(Optional.empty());
 
+        // Order Manager confirming the local linkage for every rider these cases put on a fleet.
+        // What happens when it does not — a rider the company let go, an outage — is
+        // CarrierReadsAfterReleaseTest, with the real guard.
+        FleetMembershipGuard fleetGuard = mock(FleetMembershipGuard.class);
+        when(fleetGuard.isOnCallersFleet(anyString(), anyString())).thenReturn(true);
+        when(fleetGuard.retainCallersFleet(anyString(), any(), any()))
+                .thenAnswer(call -> List.copyOf((java.util.Collection<?>) call.getArgument(1)));
+
         presence = new PresenceService(presenceRepo, dutyEvents, dutySessions, memberships,
                 carrierScope, participants, redis, new ObjectMapper().registerModule(new JavaTimeModule()),
-                PRESENCE_WINDOW, Duration.ofSeconds(30));
+                PRESENCE_WINDOW, Duration.ofSeconds(30), fleetGuard);
     }
 
     /** A rider row in the given state whose last fix arrived {@code fixAge} ago. */
