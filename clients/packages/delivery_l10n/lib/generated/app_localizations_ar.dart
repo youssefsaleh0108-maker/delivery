@@ -10356,4 +10356,28 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get payrollHoursNotListed =>
       'لا يُظهر الحضور أي وقت عمل فيه هذا السائق لشركتك خلال هذه الفترة، لذا ساعاته غير معروفة.';
+
+  @override
+  String get svcVerticalServices => 'خدمات';
+
+  @override
+  String get svcCategoryPrinting => 'طباعة';
+
+  @override
+  String get svcCategoryTailoring => 'خياطة وتعديل ملابس';
+
+  @override
+  String get svcCategoryRepairs => 'تصليحات';
+
+  @override
+  String get svcCategoryPhotography => 'تصوير';
+
+  @override
+  String get svcCategoryCleaning => 'تنظيف';
+
+  @override
+  String get svcCategoryBeauty => 'تجميل';
+
+  @override
+  String get svcCategoryTutoring => 'دروس خصوصية';
 }

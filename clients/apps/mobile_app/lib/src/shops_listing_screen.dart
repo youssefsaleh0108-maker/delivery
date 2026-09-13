@@ -94,9 +94,14 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
     ));
   }
 
+  /// The goods verticals only: this storefront never lists a service shop, so a Services chip here
+  /// would filter it down to nothing.
   List<StoreVertical> get _verticals => widget.chips.isEmpty
-      ? StoreVertical.values
-      : widget.chips.map((CategoryChip c) => c.vertical).toList();
+      ? StoreVertical.pickerVerticals
+      : widget.chips
+          .map((CategoryChip c) => c.vertical)
+          .where(StoreVertical.pickerVerticals.contains)
+          .toList();
 
   @override
   Widget build(BuildContext context) {

@@ -71,6 +71,7 @@ export 'src/api/store_api.dart';
 export 'src/api/whatsapp_api.dart';
 export 'src/models/whatsapp_models.dart';
 export 'src/models/store_models.dart';
+export 'src/models/service_category_icons.dart';
 export 'src/models/accounting_models.dart';
 export 'src/models/butler_models.dart';
 export 'src/models/provider_models.dart';

@@ -10241,4 +10241,28 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get payrollHoursNotListed =>
       'Attendance shows no time this rider worked for your company in this period, so their hours are not known.';
+
+  @override
+  String get svcVerticalServices => 'Services';
+
+  @override
+  String get svcCategoryPrinting => 'Printing';
+
+  @override
+  String get svcCategoryTailoring => 'Tailoring & alterations';
+
+  @override
+  String get svcCategoryRepairs => 'Repairs';
+
+  @override
+  String get svcCategoryPhotography => 'Photography';
+
+  @override
+  String get svcCategoryCleaning => 'Cleaning';
+
+  @override
+  String get svcCategoryBeauty => 'Beauty';
+
+  @override
+  String get svcCategoryTutoring => 'Tutoring';
 }

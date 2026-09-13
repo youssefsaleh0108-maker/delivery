@@ -299,11 +299,18 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   /// The verticals to show as chips.
   ///
-  /// Driven by the curated categories when there are any, falling back to the full enum — so the
-  /// strip still works on a database where nobody has tagged a category yet.
+  /// Driven by the curated categories when there are any, falling back to the goods verticals — so
+  /// the strip still works on a database where nobody has tagged a category yet.
+  ///
+  /// Never Services. Service shops are not on Home and this storefront never lists one, so a
+  /// Services chip would open onto nothing. The server refuses to tag a Services chip; one that
+  /// arrived anyway is dropped here.
   List<StoreVertical> get _chipVerticals => _chips.isEmpty
-      ? StoreVertical.values
-      : _chips.map((CategoryChip c) => c.vertical).toList();
+      ? StoreVertical.pickerVerticals
+      : _chips
+          .map((CategoryChip c) => c.vertical)
+          .where(StoreVertical.pickerVerticals.contains)
+          .toList();
 
   CategoryChip? _chipFor(StoreVertical vertical) {
     for (final CategoryChip c in _chips) {

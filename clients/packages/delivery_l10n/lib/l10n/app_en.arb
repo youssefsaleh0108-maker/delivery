@@ -5286,5 +5286,13 @@
   "payrollApproveWithoutMissing": "Approve without what is missing",
   "payrollErrNeedsAcknowledgement": "Something is missing from these figures. Tick the box to approve without it.",
   "payrollErrRecomputeNeeded": "These figures were read before the period ended. Recompute, check them and approve again.",
-  "payrollHoursNotListed": "Attendance shows no time this rider worked for your company in this period, so their hours are not known."
+  "payrollHoursNotListed": "Attendance shows no time this rider worked for your company in this period, so their hours are not known.",
+  "svcVerticalServices": "Services",
+  "svcCategoryPrinting": "Printing",
+  "svcCategoryTailoring": "Tailoring & alterations",
+  "svcCategoryRepairs": "Repairs",
+  "svcCategoryPhotography": "Photography",
+  "svcCategoryCleaning": "Cleaning",
+  "svcCategoryBeauty": "Beauty",
+  "svcCategoryTutoring": "Tutoring"
 }

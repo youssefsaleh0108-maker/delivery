@@ -3188,5 +3188,13 @@
   "payrollApproveWithoutMissing": "الاعتماد من دون ما ينقص",
   "payrollErrNeedsAcknowledgement": "تنقص هذه الأرقام بعض المعطيات. حدّد الخانة للاعتماد من دونها.",
   "payrollErrRecomputeNeeded": "قُرئت هذه الأرقام قبل انتهاء الفترة. أعد الحساب وراجع الأرقام ثم اعتمد مجدداً.",
-  "payrollHoursNotListed": "لا يُظهر الحضور أي وقت عمل فيه هذا السائق لشركتك خلال هذه الفترة، لذا ساعاته غير معروفة."
+  "payrollHoursNotListed": "لا يُظهر الحضور أي وقت عمل فيه هذا السائق لشركتك خلال هذه الفترة، لذا ساعاته غير معروفة.",
+  "svcVerticalServices": "خدمات",
+  "svcCategoryPrinting": "طباعة",
+  "svcCategoryTailoring": "خياطة وتعديل ملابس",
+  "svcCategoryRepairs": "تصليحات",
+  "svcCategoryPhotography": "تصوير",
+  "svcCategoryCleaning": "تنظيف",
+  "svcCategoryBeauty": "تجميل",
+  "svcCategoryTutoring": "دروس خصوصية"
 }

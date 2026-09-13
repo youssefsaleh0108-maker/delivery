@@ -764,7 +764,9 @@ class _CategoryImagesState extends State<_CategoryImages> {
               ),
               items: <DropdownMenuItem<StoreVertical?>>[
                 const DropdownMenuItem<StoreVertical?>(value: null, child: Text('None')),
-                for (final StoreVertical vertical in StoreVertical.values)
+                // Goods verticals only: a category's vertical puts a chip on Home, service shops
+                // are never on Home, and the server refuses a Services chip.
+                for (final StoreVertical vertical in StoreVertical.pickerVerticals)
                   if (!taken.contains(vertical))
                     DropdownMenuItem<StoreVertical?>(
                         value: vertical, child: Text(vertical.label)),
