@@ -35,14 +35,66 @@ class CatalogApi {
         response.data as Map<String, dynamic>, Product.fromJson);
   }
 
-  /// The Merchant Portal's list — the caller's own products, in any status.
-  Future<Paged<Product>> myProducts({int page = 0, int size = 20}) async {
+  /// The Merchant Portal's list — the caller's own products, in any status, or in [status] alone.
+  ///
+  /// The provider dashboard's "Active offers" is `myProducts(status: ProductStatus.active, size: 1)`
+  /// read as [Paged.totalElements]: a count the server made, not the length of a page.
+  Future<Paged<Product>> myProducts({ProductStatus? status, int page = 0, int size = 20}) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '/api/products/mine',
-      queryParameters: <String, dynamic>{'page': page, 'size': size},
+      queryParameters: <String, dynamic>{
+        if (status != null) 'status': status.wireValue,
+        'page': page,
+        'size': size,
+      },
     );
     return Paged<Product>.fromJson(
         response.data as Map<String, dynamic>, Product.fromJson);
+  }
+
+  /// The Services tab's offer search: live offers of listed service shops in open categories.
+  ///
+  /// Never a goods product or a paused offer. A [serviceCategory] the platform has closed answers an
+  /// empty page. For signed-in customers.
+  Future<Paged<Product>> searchServices({
+    String? search,
+    ServiceCategory? serviceCategory,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/products/services',
+      queryParameters: <String, dynamic>{
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
+        'page': page,
+        'size': size,
+      },
+    );
+    return Paged<Product>.fromJson(
+        response.data as Map<String, dynamic>, Product.fromJson);
+  }
+
+  /// The Services tab's "Popular" row: offers ranked by real delivered orders, each with its count.
+  ///
+  /// Empty until enough orders have been delivered, and the tab shows services near the customer
+  /// then. A row this build cannot read is dropped rather than drawn with a guess.
+  Future<List<PopularService>> popularServices({
+    ServiceCategory? serviceCategory,
+    int limit = 10,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/products/services/popular',
+      queryParameters: <String, dynamic>{
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
+        'limit': limit,
+      },
+    );
+    final Object? rows = response.data;
+    if (rows is! List) {
+      return const <PopularService>[];
+    }
+    return rows.map(PopularService.maybeFromJson).whereType<PopularService>().toList();
   }
 
   Future<Product> read(String id) async {
@@ -65,6 +117,21 @@ class CatalogApi {
   /// Fails with 422 if the product has no images — the service refuses to publish a blank listing.
   Future<Product> publish(String id) async {
     final Response<dynamic> response = await _dio.post<dynamic>('/api/products/$id/publish');
+    return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Takes a live service offer off sale for now. The provider's own offers only (404 for anyone
+  /// else's); a goods product answers 422, because goods are archived instead.
+  Future<Product> pause(String id) async {
+    final Response<dynamic> response = await _dio.post<dynamic>('/api/products/$id/pause');
+    return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Puts a paused service offer back on sale. Fails with 422 without a photo, or for an offer that
+  /// can be delivered when the shop has neither delivery areas nor a pin; with 403 while the provider
+  /// is still awaiting approval, as publishing does.
+  Future<Product> resume(String id) async {
+    final Response<dynamic> response = await _dio.post<dynamic>('/api/products/$id/resume');
     return Product.fromJson(response.data as Map<String, dynamic>);
   }
 
