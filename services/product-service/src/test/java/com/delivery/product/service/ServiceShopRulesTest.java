@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.env.MockEnvironment;
@@ -55,6 +57,9 @@ import static org.mockito.Mockito.when;
 class ServiceShopRulesTest {
 
     private static final String MERCHANT = "merchant-sub";
+
+    /** A name in the setting that is not a category: the platform's mistake, never the merchant's. */
+    private static final String TYPO = "PRINTNG";
 
     private StoreRepository stores;
     private MockEnvironment environment;
@@ -137,6 +142,33 @@ class ServiceShopRulesTest {
             assertThat(opened.getVertical()).isEqualTo(RESTAURANT);
             assertThat(opened.getServiceCategory()).isNull();
         }
+
+        /**
+         * A typo in the setting is a server error, which the handler logs and answers without naming
+         * anything internal. It is not a 422, whose sentence would send a merchant to a property they
+         * cannot see. The same answer as re-filing a shop under the same typo, below.
+         */
+        @Test
+        void a_typo_in_the_setting_is_a_server_error_not_a_refusal() {
+            environment.setProperty(ServiceCategories.PROPERTY, TYPO);
+
+            assertThatThrownBy(() -> service.create(MERCHANT,
+                    profile("Al Fakhry Press", SERVICES, PRINTING)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .isNotInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessageContaining(TYPO);
+            verify(stores, never()).save(any(Store.class));
+        }
+
+        /** A goods shop never reads the setting, so a mistake in it cannot stop one opening. */
+        @Test
+        void a_typo_in_the_setting_never_stops_a_goods_shop_opening() {
+            environment.setProperty(ServiceCategories.PROPERTY, TYPO);
+
+            Store opened = service.create(MERCHANT, profile("Beirut Grill", RESTAURANT, null)).store();
+
+            assertThat(opened.getVertical()).isEqualTo(RESTAURANT);
+        }
     }
 
     @Nested
@@ -213,6 +245,38 @@ class ServiceShopRulesTest {
             assertThat(press.getServiceCategory()).isEqualTo(PRINTING);
         }
 
+        /**
+         * Re-filing under a typo in the setting: the same server error as opening a shop under it.
+         * The setting used to be read inside the block that turns a refused save into a 422, so the
+         * merchant was answered with a sentence naming it, and only after the profile had been
+         * applied to the shop.
+         */
+        @Test
+        void a_typo_in_the_setting_fails_a_refiling_as_a_server_error_before_touching_the_shop() {
+            environment.setProperty(ServiceCategories.PROPERTY, TYPO);
+
+            assertThatThrownBy(() -> service.update(press.getId(), MERCHANT,
+                    profile("Renamed mid-save", SERVICES, PHOTOGRAPHY)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .isNotInstanceOf(CatalogRuleViolationException.class)
+                    .hasMessageContaining(TYPO);
+
+            assertThat(press.getServiceCategory()).isEqualTo(PRINTING);
+            assertThat(press.getName()).isEqualTo("Al Fakhry Press");
+        }
+
+        /** A save that re-files nothing judges no category, so a tagline edit survives the typo. */
+        @Test
+        void a_typo_in_the_setting_does_not_stop_a_save_that_refiles_nothing() {
+            environment.setProperty(ServiceCategories.PROPERTY, TYPO);
+
+            service.update(press.getId(), MERCHANT,
+                    profile("Al Fakhry Press & Sons", SERVICES, PRINTING));
+
+            assertThat(press.getName()).isEqualTo("Al Fakhry Press & Sons");
+            assertThat(press.getServiceCategory()).isEqualTo(PRINTING);
+        }
+
         /** Closing a category is about what is offered next, not a reason to rewrite a shop in it. */
         @Test
         void a_shop_whose_category_has_since_closed_can_still_save_its_profile() {
@@ -248,10 +312,7 @@ class ServiceShopRulesTest {
         /** The shipped configuration opens the same four: owner default 1. */
         @Test
         void the_shipped_configuration_opens_the_same_four() throws Exception {
-            List<PropertySource<?>> yaml = new YamlPropertySourceLoader()
-                    .load("application", new ClassPathResource("application.yml"));
-            MockEnvironment shipped = new MockEnvironment();
-            yaml.forEach(source -> shipped.getPropertySources().addLast(source));
+            MockEnvironment shipped = shippedConfiguration();
 
             assertThat(shipped.getProperty(ServiceCategories.PROPERTY)).isNotNull();
             assertThat(new ServiceCategories(shipped).enabled())
@@ -276,6 +337,35 @@ class ServiceShopRulesTest {
             assertThat(new ServiceCategories(env).enabled()).containsExactly(REPAIRS, BEAUTY);
         }
 
+        /**
+         * The shape a Config Server or a profile override takes: a YAML list, in a source above
+         * application.yml, whose own value is the flat launch default. The list replaces the default,
+         * as a list does for any Spring Boot setting. Asking the environment for the property by name
+         * found the flat default first, so a category closed this way stayed open.
+         */
+        @Test
+        void a_list_set_above_the_shipped_default_replaces_it() throws Exception {
+            MockEnvironment env = shippedConfiguration();
+            env.getPropertySources().addFirst(new MapPropertySource("configserver", Map.of(
+                    ServiceCategories.PROPERTY + "[0]", "PRINTING",
+                    ServiceCategories.PROPERTY + "[1]", "REPAIRS")));
+
+            assertThat(new ServiceCategories(env).enabled()).containsExactly(PRINTING, REPAIRS);
+        }
+
+        /** And the other way round: one value above a listed default replaces the whole list. */
+        @Test
+        void a_value_set_above_a_listed_default_replaces_it() {
+            MockEnvironment env = new MockEnvironment();
+            env.getPropertySources().addLast(new MapPropertySource("defaults", Map.of(
+                    ServiceCategories.PROPERTY + "[0]", "PRINTING",
+                    ServiceCategories.PROPERTY + "[1]", "TAILORING")));
+            env.getPropertySources().addFirst(new MapPropertySource("override", Map.of(
+                    ServiceCategories.PROPERTY, "REPAIRS")));
+
+            assertThat(new ServiceCategories(env).enabled()).containsExactly(REPAIRS);
+        }
+
         @Test
         void a_blank_setting_closes_every_category() {
             MockEnvironment env = new MockEnvironment().withProperty(ServiceCategories.PROPERTY, "");
@@ -286,11 +376,11 @@ class ServiceShopRulesTest {
         @Test
         void a_name_that_is_not_a_category_fails_loudly() {
             MockEnvironment env = new MockEnvironment()
-                    .withProperty(ServiceCategories.PROPERTY, "PRINTNG");
+                    .withProperty(ServiceCategories.PROPERTY, TYPO);
 
             assertThatThrownBy(() -> new ServiceCategories(env).enabled())
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("PRINTNG")
+                    .hasMessageContaining(TYPO)
                     .hasMessageContaining("PRINTING");
         }
 
@@ -299,6 +389,15 @@ class ServiceShopRulesTest {
             environment.setProperty(ServiceCategories.PROPERTY, "PHOTOGRAPHY,PRINTING");
 
             assertThat(service.openServiceCategories()).containsExactly(PRINTING, PHOTOGRAPHY);
+        }
+
+        /** application.yml as the service loads it, as the lowest-precedence source. */
+        private MockEnvironment shippedConfiguration() throws Exception {
+            List<PropertySource<?>> yaml = new YamlPropertySourceLoader()
+                    .load("application", new ClassPathResource("application.yml"));
+            MockEnvironment shipped = new MockEnvironment();
+            yaml.forEach(source -> shipped.getPropertySources().addLast(source));
+            return shipped;
         }
     }
 }

@@ -789,9 +789,14 @@ public class StoreService {
      * <p>A service shop is opened with its category, and only in an open one. The vertical and the
      * category must agree (see {@link Store}); a mismatch is refused as a 422 with a sentence, not
      * as a constraint name.
+     *
+     * <p>The open categories are read first, before anything here can turn an exception into a 422;
+     * see {@link #openCategoriesFor}.
      */
     @Transactional
     public StoreView create(String merchantId, StoreRequest request) {
+        Set<Store.ServiceCategory> open =
+                openCategoriesFor(request.vertical() == Store.Vertical.SERVICES);
         Store store;
         try {
             store = new Store(merchantId, request.name(), request.vertical(),
@@ -800,7 +805,7 @@ public class StoreService {
             throw new CatalogService.CatalogRuleViolationException(e.getMessage());
         }
         if (store.isServices()) {
-            requireOpen(store.getServiceCategory());
+            requireOpen(store.getServiceCategory(), open);
         }
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
@@ -809,11 +814,31 @@ public class StoreService {
     }
 
     /**
+     * The open service categories, for a write that is about to judge one; none for a write that is
+     * not.
+     *
+     * <p>Called before the write's own checks, outside any block that turns an exception into a 422,
+     * because a name in the setting that is not a category is the platform's mistake, not a rule the
+     * merchant broke. {@link ServiceCategories} throws for one. Read inside {@link #update}'s try, it
+     * came back to the merchant as a 422 naming an internal property, while {@link #create} answered
+     * the same typo with a 500. Read here, both let it reach the handler as the server error it is:
+     * logged once, there, with nothing internal in the reply.
+     *
+     * <p>Not read for a goods shop, nor for a save that re-files nothing, so a mistake in the setting
+     * cannot stop a grocer opening a shop or a print shop fixing its tagline.
+     */
+    private Set<Store.ServiceCategory> openCategoriesFor(boolean judgesACategory) {
+        return judgesACategory ? serviceCategories.enabled() : Set.of();
+    }
+
+    /**
      * Refuses a service category that is not open (422). Only a choice is judged: see
      * {@link #update} for the shop already filed under a category that has since closed.
+     *
+     * @param open the open categories, read by {@link #openCategoriesFor} before the write began
      */
-    private void requireOpen(Store.ServiceCategory category) {
-        Set<Store.ServiceCategory> open = serviceCategories.enabled();
+    private static void requireOpen(Store.ServiceCategory category,
+                                    Set<Store.ServiceCategory> open) {
         if (!open.contains(category)) {
             throw new CatalogService.CatalogRuleViolationException(
                     "Services in " + category + " are not offered yet. Open categories: " + open);
@@ -851,12 +876,16 @@ public class StoreService {
         Store.ServiceCategory refiled = request.serviceCategory() != null
                 && request.serviceCategory() != store.getServiceCategory()
                 ? request.serviceCategory() : null;
+        // Before the try, so a typo in the setting is not answered as a rule the merchant broke (see
+        // openCategoriesFor). Whether this is a service shop is asked before the save, which is safe:
+        // the save refuses to move a shop into or out of SERVICES.
+        Set<Store.ServiceCategory> open = openCategoriesFor(refiled != null && store.isServices());
         try {
             store.updateProfile(request.name(), request.tagline(), request.description(),
                     request.vertical(), request.tags(), request.timezone(), request.address());
             if (refiled != null) {
                 if (store.isServices()) {
-                    requireOpen(refiled);
+                    requireOpen(refiled, open);
                 }
                 store.changeServiceCategory(refiled);
             }

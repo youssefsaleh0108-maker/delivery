@@ -1,6 +1,5 @@
 package com.delivery.product.service;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -8,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -81,23 +82,21 @@ public class ServiceCategories {
     }
 
     /**
-     * The configured names, or null when nothing is configured. A comma-separated value and a YAML
-     * list arrive differently: the first as the property itself, the second as indexed keys, which
-     * {@link Environment#getProperty(String)} does not see. Reading only the first would silently put
-     * a YAML list back to the launch set.
+     * The configured names, or null when nothing is configured.
+     *
+     * <p>Bound the way {@code @ConfigurationProperties} binds, not looked up by name. A comma-separated
+     * value arrives as the property itself and a YAML list as indexed keys, and the two can sit in
+     * different sources. This used to ask {@link Environment#getProperty(String)} first, which finds
+     * the flat default in application.yml even when a Config Server or a profile above it sets a
+     * list. The list lost, so a category closed that way stayed open, and nothing said so. The binder
+     * takes the whole value from the highest-precedence source that sets it, in whichever shape that
+     * source uses: a list replaces a list, as it does for every other setting in Spring Boot.
+     *
+     * <p>Bound on every call rather than once, so a refresh is still seen (see the class comment).
      */
     private List<String> configuredNames() {
-        String flat = environment.getProperty(PROPERTY);
-        if (flat != null) {
-            return Arrays.asList(flat.split(","));
-        }
-        if (!environment.containsProperty(PROPERTY + "[0]")) {
-            return null;
-        }
-        List<String> listed = new ArrayList<>();
-        for (int i = 0; environment.containsProperty(PROPERTY + "[" + i + "]"); i++) {
-            listed.add(environment.getProperty(PROPERTY + "[" + i + "]"));
-        }
-        return listed;
+        return Binder.get(environment)
+                .bind(PROPERTY, Bindable.listOf(String.class))
+                .orElse(null);
     }
 }
