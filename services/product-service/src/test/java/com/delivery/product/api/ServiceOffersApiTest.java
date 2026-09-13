@@ -410,13 +410,33 @@ class ServiceOffersApiTest {
             verify(serviceOffers, never()).search(any(), any(), any(Pageable.class));
         }
 
+        /**
+         * Any signed-in caller, as every other catalogue read is, so the seeded merchant-only account
+         * is not refused.
+         */
         @Test
-        void a_merchant_without_the_customer_role_is_refused() throws Exception {
+        void a_merchant_without_the_customer_role_searches_too() throws Exception {
             signedInAs(PROVIDER, "MERCHANT");
+            when(serviceOffers.search(any(), any(), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(offer)));
 
-            mvc.perform(get("/api/products/services")).andExpect(status().isForbidden());
+            mvc.perform(get("/api/products/services"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].name").value("Business card printing"));
+        }
 
-            verify(serviceOffers, never()).search(any(), any(), any(Pageable.class));
+        /** Back office's catalogue reads service offers here, from a back-office-only account. */
+        @Test
+        void back_office_searches_too() throws Exception {
+            signedInAs("keycloak-sub-backoffice", "BACKOFFICE");
+            when(serviceOffers.search(any(), any(), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(offer)));
+
+            mvc.perform(get("/api/products/services").param("serviceCategory", "PRINTING"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].service.unitLabel").value("cards"));
+
+            verify(serviceOffers).search(any(), eq(Store.ServiceCategory.PRINTING), any(Pageable.class));
         }
 
         @Test

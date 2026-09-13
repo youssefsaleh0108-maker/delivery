@@ -119,17 +119,19 @@ public class ProductController {
     }
 
     /**
-     * The Services tab's offer search: live offers of listed service shops in open categories, by name.
+     * The services offer search: live offers of listed service shops in open categories, by name.
      *
      * <p>Never a goods product, a paused offer, or an offer of a draft, suspended or closed-category
      * shop ({@link ServiceOfferSearch}). A category the platform does not have is a 400; one it has
      * but has closed answers an empty page, as a category with no offers does.
      *
-     * <p>For signed-in customers: the tab it serves is the customer app's. A literal path, resolved
-     * before {@code /{id}}.
+     * <p>Any signed-in caller, like every other catalogue read (the browse, a product, a shop's
+     * shelf): the customer app's Services tab, a merchant-only or back-office-only account, and back
+     * office's catalogue, which reads offers here. It returns nothing a customer may not see. A
+     * literal path, resolved before {@code /{id}}.
      */
     @GetMapping("/services")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("isAuthenticated()")
     public PageResponse<ProductResponse> services(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Store.ServiceCategory serviceCategory,
