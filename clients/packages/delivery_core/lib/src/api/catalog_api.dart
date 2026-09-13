@@ -35,14 +35,24 @@ class CatalogApi {
         response.data as Map<String, dynamic>, Product.fromJson);
   }
 
-  /// The Merchant Portal's list — the caller's own products, in any status, or in [status] alone.
+  /// The Merchant Portal's list — the caller's own products, in any status or in [status] alone, from
+  /// every shop the account owns or from [storeId] alone.
   ///
-  /// The provider dashboard's "Active offers" is `myProducts(status: ProductStatus.active, size: 1)`
-  /// read as [Paged.totalElements]: a count the server made, not the length of a page.
-  Future<Paged<Product>> myProducts({ProductStatus? status, int page = 0, int size = 20}) async {
+  /// The provider dashboard's "Active offers" is
+  /// `myProducts(storeId: serviceShop.id, status: ProductStatus.active, size: 1)` read as
+  /// [Paged.totalElements]: a count the server made, not the length of a page, and of that service
+  /// shop's offers only, since the same account may own a goods shop too. A [storeId] the caller does
+  /// not own answers 404, as an id that was never issued does.
+  Future<Paged<Product>> myProducts({
+    String? storeId,
+    ProductStatus? status,
+    int page = 0,
+    int size = 20,
+  }) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '/api/products/mine',
       queryParameters: <String, dynamic>{
+        if (storeId != null) 'storeId': storeId,
         if (status != null) 'status': status.wireValue,
         'page': page,
         'size': size,
@@ -52,10 +62,12 @@ class CatalogApi {
         response.data as Map<String, dynamic>, Product.fromJson);
   }
 
-  /// The Services tab's offer search: live offers of listed service shops in open categories.
+  /// The services offer search: live offers of listed service shops in open categories.
   ///
   /// Never a goods product or a paused offer. A [serviceCategory] the platform has closed answers an
-  /// empty page. For signed-in customers.
+  /// empty page. For any signed-in caller: the Services tab, and back office's catalogue.
+  ///
+  /// The Services tab's "Popular near you" row is shops, not offers: [StoreApi.popularServices].
   Future<Paged<Product>> searchServices({
     String? search,
     ServiceCategory? serviceCategory,
@@ -73,28 +85,6 @@ class CatalogApi {
     );
     return Paged<Product>.fromJson(
         response.data as Map<String, dynamic>, Product.fromJson);
-  }
-
-  /// The Services tab's "Popular" row: offers ranked by real delivered orders, each with its count.
-  ///
-  /// Empty until enough orders have been delivered, and the tab shows services near the customer
-  /// then. A row this build cannot read is dropped rather than drawn with a guess.
-  Future<List<PopularService>> popularServices({
-    ServiceCategory? serviceCategory,
-    int limit = 10,
-  }) async {
-    final Response<dynamic> response = await _dio.get<dynamic>(
-      '/api/products/services/popular',
-      queryParameters: <String, dynamic>{
-        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
-        'limit': limit,
-      },
-    );
-    final Object? rows = response.data;
-    if (rows is! List) {
-      return const <PopularService>[];
-    }
-    return rows.map(PopularService.maybeFromJson).whereType<PopularService>().toList();
   }
 
   Future<Product> read(String id) async {

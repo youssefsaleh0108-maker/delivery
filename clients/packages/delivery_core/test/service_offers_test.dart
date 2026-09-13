@@ -6,11 +6,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Service offers on the client: the `service` block and "From" price a product carries, the paused
-/// status, and the catalogue calls the provider dashboard and the Services tab make.
+/// status, and the calls the provider dashboard and the Services tab make.
 ///
 /// Pinned here: every term parses as product-service writes it; a term, status or block this build
 /// does not know reads as unknown or absent rather than as a guess, and is never saved back as
-/// something else; and each call uses the verb, path and query ProductController serves.
+/// something else; and each call uses the verb, path and query ProductController or StoreController
+/// serves.
 class _Recorder implements HttpClientAdapter {
   _Recorder(this.respond);
 
@@ -268,29 +269,86 @@ void main() {
       expect(recorder.requests.single.uri.queryParameters, <String, String>{'page': '0', 'size': '20'});
     });
 
-    test('popular reads each offer with its delivered orders, and drops a row it cannot read', () async {
+    test('a two-shop account counts one shop\'s active offers by naming the shop', () async {
+      answering((_) => _page(<Map<String, dynamic>>[_offer()], total: 2));
+
+      final Paged<Product> active =
+          await api.myProducts(storeId: 'press-1', status: ProductStatus.active, size: 1);
+
+      final RequestOptions sent = recorder.requests.single;
+      expect(sent.uri.path, '/api/products/mine');
+      expect(sent.uri.queryParameters,
+          <String, String>{'storeId': 'press-1', 'status': 'ACTIVE', 'page': '0', 'size': '1'});
+      expect(active.totalElements, 2);
+    });
+  });
+
+  group('StoreApi.popularServices', () {
+    late _Recorder recorder;
+    late StoreApi api;
+
+    void answering(Object? Function(RequestOptions options) respond) {
+      recorder = _Recorder(respond);
+      api = StoreApi(Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = recorder);
+    }
+
+    Map<String, dynamic> row(String id, String name, int metres) => <String, dynamic>{
+          'store': <String, dynamic>{
+            'id': id,
+            'name': name,
+            'vertical': 'SERVICES',
+            'serviceCategory': 'PRINTING',
+          },
+          'latitude': 33.9,
+          'longitude': 35.5,
+          'distanceMetres': metres,
+        };
+
+    test('asks for shops near the point, keeps the server\'s order and drops a row it cannot read',
+        () async {
       answering((_) => <Object?>[
-            <String, dynamic>{'offer': _offer(), 'deliveredOrders': 7},
-            <String, dynamic>{'offer': _offer(), 'deliveredOrders': null},
-            <String, dynamic>{'deliveredOrders': 4},
+            row('press-1', 'Al Fakhry Press', 2950),
+            row('tailor-1', 'Hamra Tailor', 420),
+            <String, dynamic>{
+              'store': <String, dynamic>{'name': 'No id'},
+              'latitude': 33.9,
+              'longitude': 35.5,
+            },
+            <String, dynamic>{
+              'store': <String, dynamic>{'id': 'unpinned', 'name': 'No pin'},
+            },
             'not a row',
           ]);
 
-      final List<PopularService> popular =
-          await api.popularServices(serviceCategory: ServiceCategory.printing, limit: 5);
+      final List<NearbyStore> popular = await api.popularServices(33.8977, 35.4829,
+          serviceCategory: ServiceCategory.printing, limit: 5);
 
       final RequestOptions sent = recorder.requests.single;
-      expect(sent.uri.path, '/api/products/services/popular');
-      expect(sent.uri.queryParameters, <String, String>{'serviceCategory': 'PRINTING', 'limit': '5'});
-      expect(popular, hasLength(1));
-      expect(popular.single.deliveredOrders, 7);
-      expect(popular.single.offer.name, 'Business card printing');
+      expect(sent.method, 'GET');
+      expect(sent.uri.path, '/api/stores/services/popular');
+      expect(sent.uri.queryParameters, <String, String>{
+        'latitude': '33.8977',
+        'longitude': '35.4829',
+        'serviceCategory': 'PRINTING',
+        'limit': '5',
+      });
+      expect(popular.map((NearbyStore s) => s.store.name), <String>['Al Fakhry Press', 'Hamra Tailor']);
+      expect(popular.first.distanceMetres, 2950);
+      expect(popular.first.store.serviceCategory, ServiceCategory.printing);
     });
 
-    test('no popular offers yet is an empty list, never a guess', () async {
+    test('no popular shops nearby yet is an empty list, never a guess', () async {
       answering((_) => <Object?>[]);
 
-      expect(await api.popularServices(), isEmpty);
+      expect(await api.popularServices(33.8977, 35.4829), isEmpty);
+      expect(recorder.requests.single.uri.queryParameters,
+          <String, String>{'latitude': '33.8977', 'longitude': '35.4829', 'limit': '10'});
+    });
+
+    test('an answer that is not a list is no shops', () async {
+      answering((_) => <String, dynamic>{'content': <Object?>[]});
+
+      expect(await api.popularServices(33.8977, 35.4829), isEmpty);
     });
   });
 }

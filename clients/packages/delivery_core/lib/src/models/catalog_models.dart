@@ -346,35 +346,6 @@ class ServiceTerms {
   }
 }
 
-/// A row of the Services tab's "Popular" list: a live offer, and how many delivered orders it was in.
-///
-/// [deliveredOrders] is a count of real delivered orders and the only figure the row has. An empty list
-/// means no offer has enough of them yet, and the tab shows services near the customer instead.
-class PopularService {
-  const PopularService({required this.offer, required this.deliveredOrders});
-
-  final Product offer;
-  final int deliveredOrders;
-
-  /// The row, or null when [json] is not one this build can draw: no readable offer, or no count. A
-  /// row is dropped rather than shown with a number the server did not send.
-  static PopularService? maybeFromJson(Object? json) {
-    if (json is! Map<String, dynamic>) {
-      return null;
-    }
-    final Object? offer = json['offer'];
-    final Object? count = json['deliveredOrders'];
-    if (offer is! Map<String, dynamic> ||
-        offer['id'] is! String ||
-        offer['name'] is! String ||
-        offer['price'] is! num ||
-        count is! num) {
-      return null;
-    }
-    return PopularService(offer: Product.fromJson(offer), deliveredOrders: count.toInt());
-  }
-}
-
 int? _intOrNull(Object? value) => value is num ? value.toInt() : null;
 
 double? _doubleOrNull(Object? value) => value is num ? value.toDouble() : null;
