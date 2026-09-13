@@ -18,6 +18,13 @@ class ConsoleStatusPill extends StatelessWidget {
     this.accent = DeliveryAccent.neutral,
   })  : _color = null;
 
+  /// Slate on a slate wash, for a state that is really the absence of one — a rider who is simply
+  /// offline. [DeliveryAccent.neutral] is violet, which would give "nothing is happening" the
+  /// weight of a status someone should act on.
+  const ConsoleStatusPill.quiet({super.key, required this.label})
+      : accent = DeliveryAccent.neutral,
+        _color = DeliveryColors.muted;
+
   /// The variant for anything on the order lifecycle.
   ConsoleStatusPill.status(DeliveryStatusColor status, {super.key, String? label})
       : label = label ?? status.label,

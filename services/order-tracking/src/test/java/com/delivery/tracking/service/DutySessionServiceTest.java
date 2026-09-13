@@ -3,6 +3,7 @@ package com.delivery.tracking.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,10 +18,14 @@ import com.delivery.tracking.domain.CarrierMembershipRepository;
 import com.delivery.tracking.domain.DutySession;
 import com.delivery.tracking.domain.DutySessionRepository;
 import com.delivery.tracking.domain.DutyState;
+import com.delivery.tracking.domain.MembershipWindow;
 import com.delivery.tracking.domain.RiderDutyEvent;
 import com.delivery.tracking.domain.RiderPresence;
 import com.delivery.tracking.domain.RiderPresenceRepository;
+import com.delivery.tracking.service.DutySessionService.DayOnline;
 import com.delivery.tracking.service.DutySessionService.HoursOnline;
+import com.delivery.tracking.service.DutySessionService.ReadAccess;
+import com.delivery.tracking.service.DutySessionService.SessionView;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,6 +63,7 @@ class DutySessionServiceTest {
     private CarrierMembershipRepository memberships;
     private CarrierScopeResolver carrierScope;
     private PresenceService presence;
+    private FleetMembershipGuard fleetGuard;
     private DutySessionService service;
 
     @BeforeEach
@@ -84,8 +90,11 @@ class DutySessionServiceTest {
                         .orElseThrow(() -> new PresenceService.NoCarrierException(
                                 "You are not a member of any delivery company")));
 
+        // Order Manager confirming the local linkage; a rider it no longer puts on the fleet, and an
+        // outage, are CarrierReadsAfterReleaseTest's, with the real guard.
+        fleetGuard = mock(FleetMembershipGuard.class);
         service = new DutySessionService(sessions, presenceRows, carrierScope, presence,
-                "UTC", PRESENCE_WINDOW, EXPIRE_AFTER);
+                "UTC", PRESENCE_WINDOW, EXPIRE_AFTER, fleetGuard);
     }
 
     private DutySession closed(Instant from, Instant to) {
@@ -294,6 +303,116 @@ class DutySessionServiceTest {
             assertThatThrownBy(() -> service.riderHours(RIDER, DISPATCHER, false, 7))
                     .isInstanceOf(PresenceService.NoCarrierException.class);
         }
+
+        /**
+         * The sessions list and the attendance month go through the same check as the hours, so
+         * a competitor's rider is the same not-found on all three.
+         */
+        @Test
+        void the_shared_read_check_refuses_another_fleets_rider_like_the_hours_do() {
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+            riderCarriesFor(OTHER_CARRIER);
+
+            assertThatThrownBy(() -> service.requireReadable(RIDER, DISPATCHER, false))
+                    .isInstanceOf(PresenceService.PresenceNotFoundException.class);
+            assertThatThrownBy(() -> service.requireOwnFleet(RIDER, DISPATCHER))
+                    .isInstanceOf(PresenceService.PresenceNotFoundException.class);
+        }
+
+        @Test
+        void a_carrier_reads_its_own_rider_in_its_own_fleets_name() {
+            employs(DISPATCHER, CARRIER, CarrierMembership.Kind.STAFF);
+            riderCarriesFor(CARRIER);
+
+            assertThat(service.requireReadable(RIDER, DISPATCHER, false))
+                    .isEqualTo(new ReadAccess(RIDER, CARRIER));
+        }
+
+        /** Backoffice reads a rider against the fleet they ride for now. */
+        @Test
+        void backoffice_reads_a_rider_in_their_current_fleets_name() {
+            riderCarriesFor(CARRIER);
+
+            assertThat(service.requireReadable(RIDER, "backoffice-sub", true).carrierId())
+                    .isEqualTo(CARRIER);
+        }
+    }
+
+    @Nested
+    @DisplayName("days split in Beirut")
+    class Beirut {
+
+        private DutySessionService beirut;
+
+        @BeforeEach
+        void inBeirut() {
+            beirut = new DutySessionService(sessions, presenceRows, carrierScope, presence,
+                    "Asia/Beirut", PRESENCE_WINDOW, EXPIRE_AFTER, mock(FleetMembershipGuard.class));
+        }
+
+        /**
+         * 23:00-01:00 in Beirut on 26/27 August (UTC+3) is 20:00Z-22:00Z: one UTC day, two Beirut
+         * days. The split has to be at the rider's midnight.
+         */
+        @Test
+        void a_shift_across_beirut_midnight_is_split_at_local_midnight_not_utc() {
+            sessionsAre(closed(Instant.parse("2026-08-26T20:00:00Z"),
+                    Instant.parse("2026-08-26T22:00:00Z")));
+
+            HoursOnline result = beirut.aggregate(RIDER, 7, NOW);
+
+            assertThat(result.zone()).isEqualTo("Asia/Beirut");
+            assertThat(result.days()).extracting(DayOnline::date)
+                    .containsExactly(LocalDate.parse("2026-08-26"), LocalDate.parse("2026-08-27"));
+            assertThat(result.days()).extracting(DayOnline::secondsOnline)
+                    .containsExactly(3600L, 3600L);
+        }
+
+        /**
+         * 24 October 2026 in Beirut runs from 21:00Z on the 23rd to 22:00Z on the 24th — the clocks
+         * go back at midnight, so the day really is 25 hours, and a rider on duty throughout is
+         * credited all 25.
+         */
+        @Test
+        void the_day_the_clocks_go_back_is_twenty_five_hours_long() {
+            sessionsAre(closed(Instant.parse("2026-10-23T20:00:00Z"),
+                    Instant.parse("2026-10-25T00:00:00Z")));
+
+            HoursOnline result = beirut.aggregate(RIDER, 2,
+                    Instant.parse("2026-10-25T10:00:00Z"));
+
+            assertThat(result.days()).extracting(DayOnline::date)
+                    .containsExactly(LocalDate.parse("2026-10-24"), LocalDate.parse("2026-10-25"));
+            assertThat(result.days().get(0).secondsOnline()).isEqualTo(25 * 3600L);
+            assertThat(result.days().get(1).secondsOnline()).isEqualTo(2 * 3600L);
+        }
+
+        /** A sessions read for 6 October asks for Beirut's 6 October, 21:00Z to 21:00Z. */
+        @Test
+        void a_sessions_read_covers_the_beirut_day_not_the_utc_one() {
+            beirut.sessionsIn(RIDER, new AttendancePeriod(LocalDate.parse("2026-10-06"),
+                    LocalDate.parse("2026-10-06")), NOW);
+
+            verify(sessions).findOverlapping(RIDER, Instant.parse("2026-10-05T21:00:00Z"),
+                    Instant.parse("2026-10-06T21:00:00Z"));
+        }
+
+        /** Each row carries what it may be credited, by the same rule as the hours. */
+        @Test
+        void each_listed_session_is_credited_only_what_there_is_evidence_for() {
+            DutySession quiet = DutySession.open(RIDER, NOW.minus(Duration.ofHours(3)));
+            sessionsAre(closed(NOW.minus(Duration.ofHours(8)), NOW.minus(Duration.ofHours(6))),
+                    quiet);
+            lastSeenAt(NOW.minus(Duration.ofHours(1)));
+
+            List<SessionView> rows = beirut.sessionsIn(RIDER, new AttendancePeriod(TODAY, TODAY),
+                    NOW).sessions();
+
+            assertThat(rows).extracting(SessionView::countedSeconds)
+                    .containsExactly(2 * 3600L, 2 * 3600L);
+            assertThat(rows.get(1).open()).isTrue();
+            assertThat(rows.get(1).countedUntil()).isEqualTo(NOW.minus(Duration.ofHours(1)));
+        }
     }
 
     @Nested
@@ -364,6 +483,102 @@ class DutySessionServiceTest {
 
             assertThat(service.expireAbandoned(NOW)).isZero();
             verify(presence, never()).declare(anyString(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("a session as a company may see it")
+    class AsACompanySeesIt {
+
+        private final ZoneId utc = ZoneId.of("UTC");
+        private final Instant nine = Instant.parse("2026-08-26T09:00:00Z");
+        private final Instant later = NOW.plus(Duration.ofDays(1));
+
+        private SessionView view(Instant from, Instant to) {
+            return SessionView.of(closed(from, to), to, utc);
+        }
+
+        @Test
+        void a_session_running_at_the_hire_starts_at_the_hire() {
+            SessionView shift = view(nine, nine.plus(Duration.ofHours(4)));
+            Instant hired = nine.plus(Duration.ofHours(1));
+
+            SessionView seen = shift.within(new MembershipWindow(hired, later), utc).orElseThrow();
+
+            assertThat(seen.startedAt()).isEqualTo(hired);
+            assertThat(seen.startedAtLocal()).isEqualTo("2026-08-26T10:00");
+            assertThat(seen.countedSeconds()).isEqualTo(3 * 3600);
+            // Its end is still the rider's own.
+            assertThat(seen.endedAt()).isEqualTo(shift.endedAt());
+            assertThat(seen.endReason()).isEqualTo(DutySession.EndReason.RIDER);
+        }
+
+        @Test
+        void a_session_running_at_the_departure_ends_there_with_no_reason_given() {
+            SessionView shift = view(nine, nine.plus(Duration.ofHours(4)));
+            Instant left = nine.plus(Duration.ofHours(1));
+
+            SessionView seen = shift.within(new MembershipWindow(nine.minus(Duration.ofDays(3)), left),
+                    utc).orElseThrow();
+
+            assertThat(seen.startedAt()).isEqualTo(nine);
+            assertThat(seen.endedAt()).isEqualTo(left);
+            assertThat(seen.countedUntil()).isEqualTo(left);
+            assertThat(seen.countedSeconds()).isEqualTo(3600);
+            // The rider did not go off duty: they stopped being this company's rider.
+            assertThat(seen.endReason()).isNull();
+            assertThat(seen.open()).isFalse();
+        }
+
+        @Test
+        void a_session_outside_the_window_is_not_seen_at_all() {
+            SessionView before = view(nine, nine.plus(Duration.ofHours(4)));
+            assertThat(before.within(new MembershipWindow(nine.plus(Duration.ofHours(5)), later), utc))
+                    .isEmpty();
+
+            // One with nothing credited is seen only where it began inside the window.
+            SessionView nothing = view(nine, nine);
+            assertThat(nothing.within(new MembershipWindow(nine.plusSeconds(1), later), utc)).isEmpty();
+            assertThat(nothing.within(new MembershipWindow(nine, later), utc)).contains(nothing);
+        }
+
+        @Test
+        void a_spell_away_in_the_middle_of_a_session_leaves_two_parts() {
+            SessionView shift = view(nine, nine.plus(Duration.ofHours(6)));
+
+            List<SessionView> parts = service.clippedTo(List.of(shift), List.of(
+                    new MembershipWindow(nine.minus(Duration.ofHours(1)), nine.plus(Duration.ofHours(2))),
+                    new MembershipWindow(nine.plus(Duration.ofHours(4)), later)));
+
+            assertThat(parts).extracting(SessionView::countedSeconds)
+                    .containsExactly(2 * 3600L, 2 * 3600L);
+        }
+
+        /**
+         * The list keeps a session whole across the edge of the period when the rider was the
+         * company's all along: the windows are asked for around the sessions, not only the period.
+         */
+        @Test
+        void a_night_across_the_first_of_the_month_is_listed_whole_for_a_rider_long_on_the_fleet() {
+            DutySession night = closed(Instant.parse("2026-07-31T23:00:00Z"),
+                    Instant.parse("2026-08-01T02:00:00Z"));
+            when(sessions.findOverlapping(eq(RIDER), any(), any())).thenReturn(List.of(night));
+            Instant hired = Instant.parse("2026-06-01T00:00:00Z");
+            // As the guard answers: the period on record, cut to the range asked about.
+            when(fleetGuard.membershipWindows(eq(CARRIER), eq(RIDER), any(), any())).thenAnswer(call -> {
+                Instant from = call.getArgument(2);
+                return List.of(new MembershipWindow(from.isAfter(hired) ? from : hired,
+                        call.getArgument(3)));
+            });
+
+            DutySessionService.DutySessions august = service.sessionsIn(RIDER,
+                    new AttendancePeriod(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)), NOW,
+                    CARRIER);
+
+            assertThat(august.sessions()).singleElement().satisfies(listed -> {
+                assertThat(listed.startedAt()).isEqualTo(night.getStartedAt());
+                assertThat(listed.countedSeconds()).isEqualTo(3 * 3600);
+            });
         }
     }
 }

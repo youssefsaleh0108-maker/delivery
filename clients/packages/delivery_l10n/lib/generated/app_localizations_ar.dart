@@ -8088,4 +8088,968 @@ class DeliveryStringsAr extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get attendanceNavShifts => 'الورديات والحضور';
+
+  @override
+  String get attendanceTitle => 'حضور السائقين وسجلّ الورديات';
+
+  @override
+  String get attendanceSubtitle =>
+      'تابِع تسجيلات الدخول اليومية والتأخير والغياب وتعديلات الورديات';
+
+  @override
+  String attendanceForMonth(String month) {
+    return 'الحضور وسجلّات الدوام لشهر $month';
+  }
+
+  @override
+  String get attendanceBackToRiders => 'العودة إلى السائقين';
+
+  @override
+  String get attendanceManualLog => 'تسجيل حضور يدوي';
+
+  @override
+  String get attendancePrevMonth => 'الشهر السابق';
+
+  @override
+  String get attendanceNextMonth => 'الشهر التالي';
+
+  @override
+  String get attendanceLegendPresent => 'حاضر';
+
+  @override
+  String get attendanceLegendLate => 'متأخر';
+
+  @override
+  String get attendanceLegendAbsent => 'غائب';
+
+  @override
+  String get attendanceLegendOff => 'يوم عطلة';
+
+  @override
+  String get attendanceLegendOnDuty => 'في الخدمة';
+
+  @override
+  String get attendanceWeekMon => 'إثنين';
+
+  @override
+  String get attendanceWeekTue => 'ثلاثاء';
+
+  @override
+  String get attendanceWeekWed => 'أربعاء';
+
+  @override
+  String get attendanceWeekThu => 'خميس';
+
+  @override
+  String get attendanceWeekFri => 'جمعة';
+
+  @override
+  String get attendanceWeekSat => 'سبت';
+
+  @override
+  String get attendanceWeekSun => 'أحد';
+
+  @override
+  String get attendanceAggregatesTitle => 'ملخّص الحضور';
+
+  @override
+  String get attendanceDaysWorked => 'أيام العمل';
+
+  @override
+  String get attendanceAbsences => 'الغياب';
+
+  @override
+  String get attendanceTimesLate => 'مرات التأخير';
+
+  @override
+  String get attendanceOvertime => 'الساعات الإضافية المتراكمة';
+
+  @override
+  String get attendanceHoursOnDuty => 'ساعات الخدمة';
+
+  @override
+  String get attendanceManualHours => 'ساعات مسجّلة يدويًا';
+
+  @override
+  String get attendanceExcusedDays => 'أعذار أو مرض أو إجازة';
+
+  @override
+  String attendanceDaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count يوم',
+      many: '$count يومًا',
+      few: '$count أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+      zero: '0 يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attendanceHoursValue(String hours) {
+    return '$hours ساعة';
+  }
+
+  @override
+  String attendanceHoursShort(String hours) {
+    return '$hours س';
+  }
+
+  @override
+  String get attendanceLogsTitle => 'أحدث سجلّات الدخول والخروج';
+
+  @override
+  String get attendanceColDate => 'التاريخ';
+
+  @override
+  String get attendanceColShift => 'الوردية المجدولة';
+
+  @override
+  String get attendanceColClockIn => 'الدخول';
+
+  @override
+  String get attendanceColClockOut => 'الخروج';
+
+  @override
+  String get attendanceColHours => 'الساعات';
+
+  @override
+  String get attendanceColStatus => 'الحالة';
+
+  @override
+  String get attendanceColNotes => 'ملاحظات';
+
+  @override
+  String attendanceShiftLabel(String name, String start, String end) {
+    return '$name ($start - $end)';
+  }
+
+  @override
+  String get attendanceStatusOnTime => 'في الموعد';
+
+  @override
+  String get attendanceStatusLate => 'دخول متأخر';
+
+  @override
+  String get attendanceStatusAbsent => 'غائب';
+
+  @override
+  String get attendanceStatusPending => 'لم يصل بعد';
+
+  @override
+  String get attendanceStatusDayOff => 'يوم عطلة';
+
+  @override
+  String get attendanceStatusExtra => 'عمل في يوم عطلة';
+
+  @override
+  String get attendanceStatusWorked => 'في الخدمة';
+
+  @override
+  String get attendanceStatusLateExcused => 'متأخر (بعذر)';
+
+  @override
+  String get attendanceStatusExcused => 'غياب بعذر';
+
+  @override
+  String get attendanceStatusSick => 'إجازة مرضية';
+
+  @override
+  String get attendanceStatusLeave => 'إجازة';
+
+  @override
+  String get attendanceOnShiftNow => 'في الوردية الآن';
+
+  @override
+  String get attendanceAutoClosed => 'أُغلقت تلقائيًا: انقطعت الإشارة';
+
+  @override
+  String attendanceLateBy(int minutes) {
+    return 'متأخر $minutes دقيقة';
+  }
+
+  @override
+  String attendanceOvertimeNote(int minutes) {
+    return '$minutes دقيقة إضافية';
+  }
+
+  @override
+  String get attendanceLoggedByHand => 'مسجّل يدويًا';
+
+  @override
+  String get attendanceNoSchedule =>
+      'لا توجد وردية مجدولة لهذا السائق، لذا يظهر وقت الخدمة فقط.';
+
+  @override
+  String get attendanceEmptyMonth =>
+      'لا يوجد دوام مسجّل لهذا الشهر. يبدأ السجلّ منذ بدء تتبّع الدوام، ولا يُضاف أي شيء بأثر رجعي.';
+
+  @override
+  String attendanceZoneNote(String zone) {
+    return 'تُقسَّم الأيام حسب المنطقة الزمنية $zone.';
+  }
+
+  @override
+  String get attendanceNotOnFleet =>
+      'هذا السائق غير مرتبط بأسطولك في نظام التتبّع بعد، لذا لا يمكن عرض حضوره. يُربط عندما يصل خبر تعيينه إلى نظام التتبّع، أو عندما ينقل طلبًا لشركتك.';
+
+  @override
+  String get attendanceLoadFailed => 'تعذّر تحميل الحضور حاليًا.';
+
+  @override
+  String attendanceLogTitle(String name) {
+    return 'تسجيل حضور $name';
+  }
+
+  @override
+  String get attendanceLogStatus => 'ما الذي حدث';
+
+  @override
+  String get attendanceLogChooseStatus => 'اختر الحالة';
+
+  @override
+  String get attendanceKindPresent => 'حاضر (لم يظهر في التطبيق)';
+
+  @override
+  String get attendanceKindLateExcused => 'متأخر بعذر';
+
+  @override
+  String get attendanceKindAbsentExcused => 'غائب بعذر';
+
+  @override
+  String get attendanceKindSick => 'مريض';
+
+  @override
+  String get attendanceKindLeave => 'في إجازة';
+
+  @override
+  String get attendanceLogClockIn => 'وقت الدخول (اختياري)';
+
+  @override
+  String get attendanceLogClockOut => 'وقت الخروج (اختياري)';
+
+  @override
+  String get attendanceLogNote => 'ملاحظة (اختيارية)';
+
+  @override
+  String get attendanceLogSave => 'حفظ السجل';
+
+  @override
+  String get attendanceLogWithdraw => 'حذف السجل';
+
+  @override
+  String get attendanceLogSaved => 'تم حفظ سجل الحضور.';
+
+  @override
+  String get attendanceLogRemoved =>
+      'تم حذف السجل. يعرض اليوم ما سجّله التطبيق.';
+
+  @override
+  String get attendanceLogTimesRule =>
+      'تُسجَّل الأوقات في يوم الحضور فقط، ويجب إدخال وقتي الدخول والخروج معًا.';
+
+  @override
+  String get attendanceLogManualNote =>
+      'تُحتسب الساعات المُدخلة هنا ساعاتٍ يدوية، وليست دليلًا من التطبيق، ويُتجاهَل إدخالها في يوم يُظهره التطبيق أصلًا.';
+
+  @override
+  String get attendanceLogFutureRule =>
+      'اليوم الذي لم يأتِ بعد لا يمكن تسجيله إلا إجازةً أو مرضًا أو غيابًا بعذر.';
+
+  @override
+  String get attendanceTimeInvalid => 'استخدم صيغة 24 ساعة مثل 08:00.';
+
+  @override
+  String get attendanceShiftsTitle => 'جداول الورديات';
+
+  @override
+  String get attendanceShiftsSubtitle =>
+      'حدّد الورديات التي يعمل بها سائقوك، ثم افتح الحضور الشهري لأيٍّ منهم.';
+
+  @override
+  String get attendanceShiftsCard => 'الورديات';
+
+  @override
+  String get attendanceAddShift => 'إضافة وردية';
+
+  @override
+  String get attendanceNoShifts =>
+      'لا توجد ورديات بعد. يُعامَل السائقون دون وردية كعاملين أحرار: لا تأخير ولا غياب.';
+
+  @override
+  String attendanceShiftGrace(int minutes) {
+    return 'مهلة $minutes دقيقة';
+  }
+
+  @override
+  String attendanceShiftRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق',
+      many: '$count سائقًا',
+      few: '$count سائقين',
+      two: 'سائقان',
+      one: 'سائق واحد',
+      zero: 'لا سائقين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceShiftOvernight => 'تنتهي في اليوم التالي';
+
+  @override
+  String get attendanceRetireShift => 'إيقاف الوردية';
+
+  @override
+  String get attendanceRetireBlocked =>
+      'انقل السائقين في هذه الوردية إلى وردية أخرى أولًا.';
+
+  @override
+  String get attendanceShiftRetired => 'تم إيقاف الوردية.';
+
+  @override
+  String get attendanceRidersCard => 'السائقون';
+
+  @override
+  String get attendanceColRider => 'السائق';
+
+  @override
+  String get attendanceColCurrentShift => 'الوردية';
+
+  @override
+  String get attendanceColActions => 'إجراءات';
+
+  @override
+  String get attendanceFreelancer => 'بلا جدول (عمل حر)';
+
+  @override
+  String get attendanceChangeShift => 'تغيير الوردية';
+
+  @override
+  String get attendanceOpenAttendance => 'الحضور';
+
+  @override
+  String attendanceUpcomingShift(String name, String date) {
+    return '$name اعتبارًا من $date';
+  }
+
+  @override
+  String get attendanceNoRiders => 'لا يوجد سائقون في أسطولك بعد.';
+
+  @override
+  String get attendanceNewShiftTitle => 'وردية جديدة';
+
+  @override
+  String get attendanceShiftName => 'الاسم';
+
+  @override
+  String get attendanceShiftStart => 'تبدأ (HH:mm)';
+
+  @override
+  String get attendanceShiftEnd => 'تنتهي (HH:mm)';
+
+  @override
+  String get attendanceShiftDays => 'الأيام';
+
+  @override
+  String get attendanceShiftGraceField =>
+      'المهلة قبل احتساب التأخير (بالدقائق)';
+
+  @override
+  String get attendanceShiftImmutable =>
+      'لا يمكن تعديل ساعات الوردية لاحقًا. لتغييرها، أضِف وردية جديدة وانقل السائقين إليها، لتبقى الأيام السابقة على الوردية التي عُمل بها.';
+
+  @override
+  String get attendanceCreateShift => 'إنشاء الوردية';
+
+  @override
+  String get attendanceShiftCreated => 'تم إنشاء الوردية.';
+
+  @override
+  String get attendanceShiftNeedsName => 'أدخل اسمًا للوردية.';
+
+  @override
+  String get attendanceShiftNeedsDays => 'اختر يومًا واحدًا على الأقل.';
+
+  @override
+  String get attendanceShiftSameTimes =>
+      'لا يمكن أن تبدأ الوردية وتنتهي في الوقت نفسه.';
+
+  @override
+  String get attendanceGraceInvalid => 'أدخل عدد دقائق بين 0 و120.';
+
+  @override
+  String attendanceAssignTitle(String name) {
+    return 'وردية $name';
+  }
+
+  @override
+  String get attendanceAssignFrom => 'ابتداءً من';
+
+  @override
+  String get attendanceAssignNote =>
+      'تبدأ الجداول اليوم أو لاحقًا. بعد أن تبدأ وردية اليوم، أو بعد أن يعمل السائق اليوم، يسري أي تغيير لليوم ابتداءً من الغد، لتبقى الأيام السابقة واليوم الجاري على الجدول الذي تُحتسب عليه.';
+
+  @override
+  String get attendanceAssignSave => 'حفظ الجدول';
+
+  @override
+  String get attendanceAssignSaved => 'تم تحديث الجدول.';
+
+  @override
+  String get attendanceHistoryLimit =>
+      'هذا الشهر أقدم من سجلّ الدوام الذي تحتفظ به المنصّة، لذا لا يمكن عرضه بعد الآن.';
+
+  @override
+  String get attendanceManualTag => 'يدوي';
+
+  @override
+  String get attendanceTypedByHand =>
+      'أُدخل يدويًا في سجل الحضور اليدوي، ولم يسجّله التطبيق';
+
+  @override
+  String get attendanceLogPresentKeepsLate =>
+      'تسجيل الحضور لا يلغي الدخول المتأخر. لاعتباره بعذر، اختر «متأخر بعذر».';
+
+  @override
+  String get attendanceLogChecking =>
+      'جارٍ التحقق من وجود سجل سابق لهذا اليوم…';
+
+  @override
+  String get attendanceLogCheckFailed =>
+      'تعذّر التحقق من وجود سجل سابق لهذا اليوم، لذا لا يمكن الحفظ له بعد. اختر التاريخ مجددًا لإعادة المحاولة.';
+
+  @override
+  String attendanceRetiredShifts(int count) {
+    return 'الورديات الموقوفة ($count)';
+  }
+
+  @override
+  String get attendanceRetireKeepsHistory =>
+      'تبقى الأيام السابقة محسوبة على هذه الوردية. إيقافها يمنع اختيارها في الجداول الجديدة فقط.';
+
+  @override
+  String attendanceLiveOnDuty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مباشر: $count سائق في الخدمة',
+      many: 'مباشر: $count سائقًا في الخدمة',
+      few: 'مباشر: $count سائقين في الخدمة',
+      two: 'مباشر: سائقان في الخدمة',
+      one: 'مباشر: سائق واحد في الخدمة',
+      zero: 'مباشر: لا سائقين في الخدمة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNavReconciliation => 'التسويات';
+
+  @override
+  String get carrRidersNavRidersHr => 'شؤون السائقين';
+
+  @override
+  String get carrRidersNavDirectory => 'دليل السائقين';
+
+  @override
+  String get carrRidersNavStatement => 'كشف الحساب';
+
+  @override
+  String get carrRidersTitle => 'دليل شؤون السائقين';
+
+  @override
+  String get carrRidersSubtitle => 'إدارة ملفات السائقين وحالاتهم ومناطقهم';
+
+  @override
+  String get carrRidersStatTotal => 'إجمالي السائقين المنضمّين';
+
+  @override
+  String get carrRidersStatTotalNote => 'أسطول الشركة المسجّل';
+
+  @override
+  String get carrRidersStatOnDuty => 'في الخدمة الآن';
+
+  @override
+  String get carrRidersStatOnDutyNote => 'متاحون أو في مهمة';
+
+  @override
+  String get carrRidersStatSignalLost => 'انقطعت الإشارة';
+
+  @override
+  String get carrRidersStatSignalLostNote =>
+      'في الخدمة، لكن هواتفهم توقفت عن الإرسال';
+
+  @override
+  String get carrRidersStatOffline => 'غير متصلين / غير نشطين';
+
+  @override
+  String get carrRidersStatOfflineNote => 'أعلنوا أنهم خارج الخدمة';
+
+  @override
+  String get carrRidersPresenceUnknown => 'تعذّرت قراءة حالة التواجد حالياً';
+
+  @override
+  String get carrRidersSearchHint => 'ابحث عن السائقين بالاسم أو الرقم...';
+
+  @override
+  String get carrRidersZoneAll => 'المنطقة: الكل';
+
+  @override
+  String carrRidersZoneValue(String zone) {
+    return 'المنطقة: $zone';
+  }
+
+  @override
+  String get carrRidersZoneTooltip =>
+      'المنطقة هنا هي التي كتبها كل سائق في طلب انضمامه';
+
+  @override
+  String get carrRidersVehicleAll => 'المركبة: الكل';
+
+  @override
+  String carrRidersVehicleValue(String vehicle) {
+    return 'المركبة: $vehicle';
+  }
+
+  @override
+  String get carrRidersVehicleMotorcycle => 'دراجة نارية';
+
+  @override
+  String get carrRidersVehicleCar => 'سيارة';
+
+  @override
+  String get carrRidersVehicleBicycle => 'دراجة هوائية';
+
+  @override
+  String get carrRidersVehicleVan => 'شاحنة صغيرة';
+
+  @override
+  String get carrRidersVehicleTruck => 'شاحنة';
+
+  @override
+  String get carrRidersAddRider => 'إضافة سائق';
+
+  @override
+  String get carrRidersAddRiderTooltip =>
+      'وافق على شخص تقدّم للعمل سائقاً لديك';
+
+  @override
+  String get carrRidersAddRiderUnavailable =>
+      'تعذّرت قراءة الطلبات حالياً، لذا لا يمكن الموافقة على أحد من هنا';
+
+  @override
+  String get carrRidersManageProfile => 'إدارة الملف';
+
+  @override
+  String carrRidersDeliveredToday(int count) {
+    return '($count اليوم)';
+  }
+
+  @override
+  String get carrRidersRatingNew => 'جديد';
+
+  @override
+  String get carrRidersStatusActive => 'نشط';
+
+  @override
+  String get carrRidersStatusSignalLost => 'انقطعت الإشارة';
+
+  @override
+  String get carrRidersStatusOffline => 'غير متصل';
+
+  @override
+  String get carrRidersStatusSuspended => 'موقوف';
+
+  @override
+  String get carrRidersStatusOnAJob => 'في مهمة';
+
+  @override
+  String get carrRidersNoMatch => 'لا يوجد سائق مطابق.';
+
+  @override
+  String carrRidersShowingOnly(String filter) {
+    return 'المعروض فقط: $filter';
+  }
+
+  @override
+  String get carrRidersShowEveryone => 'عرض الجميع';
+
+  @override
+  String get carrRidersDirectoryFootnote =>
+      'المنطقة هي التي ذكرها كل سائق في طلبه — لا تعيّن المنصّة السائقين إلى مناطق تغطيتك. التقييم هو ما تركه العملاء عبر جميع توصيلات السائق. تظهر حالة التواجد هنا بعد أن يحمل السائق عملاً لشركتك، لذا لا تظهر لمن لم يفعل ذلك بعد.';
+
+  @override
+  String get carrRidersWaitingTitle => 'إضافة سائق';
+
+  @override
+  String carrRidersWaitingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count شخص ينتظرون العمل لديك',
+      many: '$count شخصًا ينتظرون العمل لديك',
+      few: '$count أشخاص ينتظرون العمل لديك',
+      two: 'شخصان ينتظران العمل لديك',
+      one: 'شخص واحد ينتظر العمل لديك',
+      zero: 'لا أحد ينتظر العمل لديك',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersWaitingEmpty =>
+      'لم يتقدّم أحد للعمل سائقاً لديك. ينضمّ السائقون إلى الأسطول بتقديم طلب — ولا توجد طريقة لإنشاء سائق مباشرة.';
+
+  @override
+  String get carrRidersApprove => 'موافقة';
+
+  @override
+  String get carrRidersOnYourFleet => 'ضمن أسطولك';
+
+  @override
+  String carrRidersSuspendTitle(String name) {
+    return 'إيقاف $name';
+  }
+
+  @override
+  String carrRidersReinstateTitle(String name) {
+    return 'إعادة $name إلى العمل';
+  }
+
+  @override
+  String get carrRidersSuspendBody =>
+      'يحتفظ بتسجيل دخوله وسجلّه، ويتوقف عرض العمل عليه. يمكنك إعادته في أي وقت.';
+
+  @override
+  String get carrRidersReinstateBody =>
+      'يمكن عرض العمل عليه مجدداً فور حفظ هذا.';
+
+  @override
+  String get carrRidersChooseReason => 'اختر سبباً';
+
+  @override
+  String get carrRidersNoteHint => 'ملاحظة للسجل (اختيارية)';
+
+  @override
+  String get carrRidersSuspendRider => 'إيقاف السائق';
+
+  @override
+  String get carrRidersReinstateRider => 'إعادة السائق';
+
+  @override
+  String carrRidersSuspendedToast(String name) {
+    return 'تم إيقاف $name ولن يُعرض عليه عمل.';
+  }
+
+  @override
+  String carrRidersReinstatedToast(String name) {
+    return 'يمكن لـ$name استلام العمل مجدداً.';
+  }
+
+  @override
+  String get carrRidersReasonFraud => 'احتيال';
+
+  @override
+  String get carrRidersReasonAbuse => 'إساءة';
+
+  @override
+  String get carrRidersReasonNonPayment => 'عدم الدفع';
+
+  @override
+  String get carrRidersReasonPolicyViolation => 'مخالفة السياسة';
+
+  @override
+  String get carrRidersReasonPartnerRequest => 'بطلب من الشريك';
+
+  @override
+  String get carrRidersReasonOther => 'سبب آخر';
+
+  @override
+  String get carrRidersProfileTitle => 'ملف السائق';
+
+  @override
+  String get carrRidersProfileSubtitle => 'المستندات وتفاصيل العمل والأداء';
+
+  @override
+  String get carrRidersBackToDirectory => 'العودة إلى السائقين';
+
+  @override
+  String carrRidersBadgeId(String code) {
+    return 'رقم الشارة: $code';
+  }
+
+  @override
+  String get carrRidersPhone => 'الهاتف';
+
+  @override
+  String get carrRidersEmail => 'البريد الإلكتروني';
+
+  @override
+  String get carrRidersLastSeen => 'آخر ظهور';
+
+  @override
+  String get carrRidersNoPresenceYet => 'لا توجد حالة خدمة أو موقع بعد';
+
+  @override
+  String get carrRidersStaleNote =>
+      'أعلن أنه في الخدمة، لكن آخر موقع قديم جداً لإسناد المهام إليه.';
+
+  @override
+  String get carrRidersNoApplication =>
+      'أضافت المنصّة هذا السائق مباشرة، لذا لا يوجد طلب في السجل — لا اسم ولا بيانات تواصل ولا مستندات لعرضها.';
+
+  @override
+  String get carrRidersDocumentsTitle => 'التحقق من المستندات';
+
+  @override
+  String get carrRidersDocNationalId => 'الهوية الوطنية';
+
+  @override
+  String get carrRidersDocDrivingLicence => 'رخصة القيادة';
+
+  @override
+  String get carrRidersDocVehicleRegistration => 'تسجيل المركبة';
+
+  @override
+  String get carrRidersDocVerified => 'موثّق';
+
+  @override
+  String get carrRidersDocWaiting => 'قيد المراجعة';
+
+  @override
+  String get carrRidersDocRefused => 'مرفوض';
+
+  @override
+  String get carrRidersDocNotUploaded => 'لم يُرفع';
+
+  @override
+  String get carrRidersDocOpen => 'فتح المستند';
+
+  @override
+  String get carrRidersCouldNotRead => 'تعذّرت القراءة حالياً.';
+
+  @override
+  String get carrRidersAvgRating => 'متوسط التقييم';
+
+  @override
+  String carrRidersHappyCustomers(int percent) {
+    return '$percent% من العملاء راضون';
+  }
+
+  @override
+  String get carrRidersNoRatingsYet => 'لا توجد تقييمات بعد';
+
+  @override
+  String carrRidersDeliveriesWindow(int days) {
+    return 'التوصيلات، آخر $days يوماً';
+  }
+
+  @override
+  String carrRidersClaimedCaption(int claimed, int cancelled) {
+    return '$claimed مُستلمة، $cancelled أُلغيت بعد الاستلام';
+  }
+
+  @override
+  String get carrRidersCompletionRate => 'نسبة الإنجاز';
+
+  @override
+  String get carrRidersCompletionCaption => 'ما وُصّل من المُستلم، لشركتك';
+
+  @override
+  String get carrRidersNothingClaimed => 'لم يُستلم شيء في هذه الفترة';
+
+  @override
+  String get carrRidersDeliveredTodayLabel => 'وُصّل اليوم';
+
+  @override
+  String get carrRidersDeliveredTodayCaption => 'لشركتك، منذ منتصف الليل';
+
+  @override
+  String carrRidersOutputTitle(int days) {
+    return 'ناتج التوصيل، آخر $days يوماً';
+  }
+
+  @override
+  String get carrRidersOutputEmpty => 'لا توجد توصيلات في هذه الفترة';
+
+  @override
+  String carrRidersOutputNote(String zone) {
+    return 'تُقسَم الأيام حسب المنطقة الزمنية $zone، ولا تُحتسب إلا التوصيلات التي تمّت لشركتك.';
+  }
+
+  @override
+  String carrRidersHoursTitle(int days) {
+    return 'ساعات الخدمة، آخر $days أيام';
+  }
+
+  @override
+  String carrRidersHoursValue(String hours) {
+    return '$hours س';
+  }
+
+  @override
+  String carrRidersHoursTotal(String hours) {
+    return '$hours س إجمالاً';
+  }
+
+  @override
+  String carrRidersShifts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count نوبة',
+      many: '$count نوبة',
+      few: '$count نوبات',
+      two: 'نوبتان',
+      one: 'نوبة واحدة',
+      zero: 'لا نوبات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersHoursNone => 'لا توجد ساعات خدمة لعرضها لشركتك.';
+
+  @override
+  String carrRidersHoursZone(String zone) {
+    return 'تُقسَم الأيام حسب المنطقة الزمنية $zone، كما يوردها الخادم.';
+  }
+
+  @override
+  String get carrRidersEmploymentTitle => 'تفاصيل العمل';
+
+  @override
+  String get carrRidersStartDate => 'تاريخ البدء';
+
+  @override
+  String get carrRidersApplied => 'تاريخ التقديم';
+
+  @override
+  String get carrRidersRegion => 'المنطقة (من طلبه)';
+
+  @override
+  String get carrRidersVehicle => 'المركبة';
+
+  @override
+  String get carrRidersEmploymentNote =>
+      'نوع العقد وأجر التوصيل وتعيين المنطقة غير مسجّلة على هذه المنصّة.';
+
+  @override
+  String get carrRidersSuspendUnavailable =>
+      'يتم الإيقاف عبر طلب السائق لديك. أضافت المنصّة هذا السائق مباشرة، لذا اطلب من YouDrop إيقافه.';
+
+  @override
+  String get carrRidersTerminate => 'إنهاء العقد';
+
+  @override
+  String carrRidersTerminateTitle(String name) {
+    return 'إنهاء عقد $name؟';
+  }
+
+  @override
+  String carrRidersTerminateBody(String name) {
+    return 'يخرج $name من أسطولك فوراً ولا يُعرض عليه أي من عملك. يحتفظ بتسجيل دخوله في YouDrop وبسجلّه، لكنه لا يصبح من سائقي YouDrop: لا يمكنه تولّي أي عمل إلى أن تعيّنه شركة أخرى أو تضمّه YouDrop إلى سائقيها.';
+  }
+
+  @override
+  String get carrRidersTerminateJobs =>
+      'المهام الجارية: ما دام يحمل مهمة لك، يُرفض هذا الإجراء حتى تُسلَّم تلك المهمة أو تُلغى. لا يُسقَط شيء مما يحمله ولا يُسلَّم لشخص آخر.';
+
+  @override
+  String get carrRidersTerminateMoney =>
+      'استلم منه أولاً أي نقد تحصيل يحمله لك. إنهاء العقد لا يسوّي أي مبالغ: ما كسبه وما حصّله يبقى في السجل كما هو تماماً.';
+
+  @override
+  String get carrRidersTerminateUndo =>
+      'إعادته إلى أسطولك لاحقاً تعني تعيينه من جديد.';
+
+  @override
+  String get carrRidersTerminateConfirm => 'إنهاء العقد';
+
+  @override
+  String carrRidersTerminated(String name) {
+    return 'لم يعد $name ضمن أسطولك.';
+  }
+
+  @override
+  String carrRidersTerminateCarrying(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      many:
+          'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      few: 'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      two: 'يحمل مهمتين من مهامك الآن. يمكن إنهاء عقده بعد تسليمهما أو إلغائهما.',
+      one: 'يحمل إحدى مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      zero: 'لا يحمل أي مهمة لك الآن.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNotOnFleet => 'لم يعد هذا السائق ضمن أسطولك.';
+
+  @override
+  String carrRidersNoPresenceCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق آخر بلا حالة خدمة أو موقع بعد',
+      many: '$count سائقاً آخر بلا حالة خدمة أو موقع بعد',
+      few: '$count سائقين آخرين بلا حالة خدمة أو موقع بعد',
+      two: 'سائقان آخران بلا حالة خدمة أو موقع بعد',
+      one: 'سائق آخر بلا حالة خدمة أو موقع بعد',
+      zero: 'لا أحد غيرهم بلا حالة خدمة أو موقع',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNoPresenceNote =>
+      'تظهر حالة خدمته وموقعه هنا بعد أن تربطه YouDrop بأسطولك — على أبعد تقدير بعد أول توصيل له لشركتك. وحتى ذلك الحين لا تستطيع هذه الصفحة معرفة ما إذا كان في الخدمة.';
+
+  @override
+  String get carrRidersVehicleModel => 'طراز المركبة';
+
+  @override
+  String get carrRidersPlateNumber => 'رقم اللوحة';
+
+  @override
+  String get carrRidersDateOfBirth => 'تاريخ الميلاد';
+
+  @override
+  String get carrRidersNationalIdNumber => 'رقم الهوية الوطنية';
+
+  @override
+  String get carrRidersDutyChanged => 'آخر تغيير لحالة الخدمة';
+
+  @override
+  String get carrRidersVehicleYear => 'سنة صنع المركبة';
+
+  @override
+  String get carrRidersTerminateReason => 'السبب، ويُحفظ في السجل';
+
+  @override
+  String get carrRidersTerminateReasonHint => 'لماذا ينتهي هذا العقد؟';
+
+  @override
+  String get carrRidersStatusStandingUnknown => 'الوضع غير معروف';
+
+  @override
+  String get carrRidersStandingUnknownNote =>
+      'تعذّرت معرفة ما إذا كان هذا السائق موقوفاً حالياً، لذلك لا يُعرض الإيقاف ولا إعادة التفعيل. أعد تحميل الصفحة للمحاولة مجدداً.';
+
+  @override
+  String get attendanceBackToProfile => 'العودة إلى الملف الشخصي';
 }

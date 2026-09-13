@@ -71,7 +71,8 @@ class ApplicantDocumentAccessTest {
         payouts = mock(PayoutDetailsService.class);
         mvc = MockMvcBuilders.standaloneSetup(new OnboardingController(
                         onboarding, mock(VerificationService.class), mock(PlatformClient.class),
-                        mock(CustomerSignUpService.class), documents, payouts))
+                        mock(CustomerSignUpService.class), documents, payouts,
+                        mock(com.delivery.onboarding.service.PartnerManagementService.class)))
                 .build();
 
         samsApplication = application(Kind.RIDER);

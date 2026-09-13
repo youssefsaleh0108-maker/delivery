@@ -8047,4 +8047,944 @@ class DeliveryStringsEn extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get attendanceNavShifts => 'Shifts & attendance';
+
+  @override
+  String get attendanceTitle => 'Rider Attendance & Shift Logs';
+
+  @override
+  String get attendanceSubtitle =>
+      'Track daily check-ins, lates, absences, and shift overrides';
+
+  @override
+  String attendanceForMonth(String month) {
+    return 'Attendance & clock logs for $month';
+  }
+
+  @override
+  String get attendanceBackToRiders => 'Back to riders';
+
+  @override
+  String get attendanceManualLog => 'Manual Attendance Log';
+
+  @override
+  String get attendancePrevMonth => 'Previous month';
+
+  @override
+  String get attendanceNextMonth => 'Next month';
+
+  @override
+  String get attendanceLegendPresent => 'Present';
+
+  @override
+  String get attendanceLegendLate => 'Late';
+
+  @override
+  String get attendanceLegendAbsent => 'Absent';
+
+  @override
+  String get attendanceLegendOff => 'Day off';
+
+  @override
+  String get attendanceLegendOnDuty => 'On duty';
+
+  @override
+  String get attendanceWeekMon => 'MON';
+
+  @override
+  String get attendanceWeekTue => 'TUE';
+
+  @override
+  String get attendanceWeekWed => 'WED';
+
+  @override
+  String get attendanceWeekThu => 'THU';
+
+  @override
+  String get attendanceWeekFri => 'FRI';
+
+  @override
+  String get attendanceWeekSat => 'SAT';
+
+  @override
+  String get attendanceWeekSun => 'SUN';
+
+  @override
+  String get attendanceAggregatesTitle => 'Attendance Aggregates';
+
+  @override
+  String get attendanceDaysWorked => 'Days worked';
+
+  @override
+  String get attendanceAbsences => 'Absences';
+
+  @override
+  String get attendanceTimesLate => 'Times late';
+
+  @override
+  String get attendanceOvertime => 'Overtime accumulated';
+
+  @override
+  String get attendanceHoursOnDuty => 'Hours on duty';
+
+  @override
+  String get attendanceManualHours => 'Hours logged by hand';
+
+  @override
+  String get attendanceExcusedDays => 'Excused, sick or on leave';
+
+  @override
+  String attendanceDaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attendanceHoursValue(String hours) {
+    return '$hours hours';
+  }
+
+  @override
+  String attendanceHoursShort(String hours) {
+    return '$hours hrs';
+  }
+
+  @override
+  String get attendanceLogsTitle => 'Recent Clock-In / Clock-Out Logs';
+
+  @override
+  String get attendanceColDate => 'Date';
+
+  @override
+  String get attendanceColShift => 'Scheduled shift';
+
+  @override
+  String get attendanceColClockIn => 'Clock in';
+
+  @override
+  String get attendanceColClockOut => 'Clock out';
+
+  @override
+  String get attendanceColHours => 'Hours';
+
+  @override
+  String get attendanceColStatus => 'Status';
+
+  @override
+  String get attendanceColNotes => 'Notes';
+
+  @override
+  String attendanceShiftLabel(String name, String start, String end) {
+    return '$name ($start - $end)';
+  }
+
+  @override
+  String get attendanceStatusOnTime => 'On time';
+
+  @override
+  String get attendanceStatusLate => 'Late check-in';
+
+  @override
+  String get attendanceStatusAbsent => 'Absent';
+
+  @override
+  String get attendanceStatusPending => 'Not in yet';
+
+  @override
+  String get attendanceStatusDayOff => 'Day off';
+
+  @override
+  String get attendanceStatusExtra => 'Worked a day off';
+
+  @override
+  String get attendanceStatusWorked => 'On duty';
+
+  @override
+  String get attendanceStatusLateExcused => 'Late (excused)';
+
+  @override
+  String get attendanceStatusExcused => 'Excused';
+
+  @override
+  String get attendanceStatusSick => 'Sick leave';
+
+  @override
+  String get attendanceStatusLeave => 'Leave';
+
+  @override
+  String get attendanceOnShiftNow => 'On shift now';
+
+  @override
+  String get attendanceAutoClosed => 'Auto-closed: signal lost';
+
+  @override
+  String attendanceLateBy(int minutes) {
+    return '$minutes min late';
+  }
+
+  @override
+  String attendanceOvertimeNote(int minutes) {
+    return '$minutes min overtime';
+  }
+
+  @override
+  String get attendanceLoggedByHand => 'Logged by hand';
+
+  @override
+  String get attendanceNoSchedule =>
+      'No shift schedule is set for this rider, so only time on duty is shown.';
+
+  @override
+  String get attendanceEmptyMonth =>
+      'No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.';
+
+  @override
+  String attendanceZoneNote(String zone) {
+    return 'Days are split in the $zone time zone.';
+  }
+
+  @override
+  String get attendanceNotOnFleet =>
+      'This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.';
+
+  @override
+  String get attendanceLoadFailed => 'Attendance could not be loaded just now.';
+
+  @override
+  String attendanceLogTitle(String name) {
+    return 'Log attendance for $name';
+  }
+
+  @override
+  String get attendanceLogStatus => 'What happened';
+
+  @override
+  String get attendanceLogChooseStatus => 'Choose a status';
+
+  @override
+  String get attendanceKindPresent => 'Present (not shown by the app)';
+
+  @override
+  String get attendanceKindLateExcused => 'Late, excused';
+
+  @override
+  String get attendanceKindAbsentExcused => 'Absent, excused';
+
+  @override
+  String get attendanceKindSick => 'Sick';
+
+  @override
+  String get attendanceKindLeave => 'On leave';
+
+  @override
+  String get attendanceLogClockIn => 'Clock in (optional)';
+
+  @override
+  String get attendanceLogClockOut => 'Clock out (optional)';
+
+  @override
+  String get attendanceLogNote => 'Note (optional)';
+
+  @override
+  String get attendanceLogSave => 'Save entry';
+
+  @override
+  String get attendanceLogWithdraw => 'Remove entry';
+
+  @override
+  String get attendanceLogSaved => 'Attendance entry saved.';
+
+  @override
+  String get attendanceLogRemoved =>
+      'Entry removed. The day shows what the app recorded.';
+
+  @override
+  String get attendanceLogTimesRule =>
+      'Times go only on a present day, and need both a clock-in and a clock-out.';
+
+  @override
+  String get attendanceLogManualNote =>
+      'Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.';
+
+  @override
+  String get attendanceLogFutureRule =>
+      'A day that has not happened yet can only be marked as leave, sick or excused.';
+
+  @override
+  String get attendanceTimeInvalid => 'Use a 24-hour time such as 08:00.';
+
+  @override
+  String get attendanceShiftsTitle => 'Shift schedules';
+
+  @override
+  String get attendanceShiftsSubtitle =>
+      'Set the shifts your riders work, then open anyone’s monthly attendance.';
+
+  @override
+  String get attendanceShiftsCard => 'Shifts';
+
+  @override
+  String get attendanceAddShift => 'Add shift';
+
+  @override
+  String get attendanceNoShifts =>
+      'No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.';
+
+  @override
+  String attendanceShiftGrace(int minutes) {
+    return '$minutes min grace';
+  }
+
+  @override
+  String attendanceShiftRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count riders',
+      one: '1 rider',
+      zero: 'No riders',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceShiftOvernight => 'Ends next day';
+
+  @override
+  String get attendanceRetireShift => 'Retire shift';
+
+  @override
+  String get attendanceRetireBlocked =>
+      'Move the riders on this shift to another one first.';
+
+  @override
+  String get attendanceShiftRetired => 'Shift retired.';
+
+  @override
+  String get attendanceRidersCard => 'Riders';
+
+  @override
+  String get attendanceColRider => 'Rider';
+
+  @override
+  String get attendanceColCurrentShift => 'Shift';
+
+  @override
+  String get attendanceColActions => 'Actions';
+
+  @override
+  String get attendanceFreelancer => 'No schedule (freelancer)';
+
+  @override
+  String get attendanceChangeShift => 'Change shift';
+
+  @override
+  String get attendanceOpenAttendance => 'Attendance';
+
+  @override
+  String attendanceUpcomingShift(String name, String date) {
+    return '$name from $date';
+  }
+
+  @override
+  String get attendanceNoRiders => 'No riders on your fleet yet.';
+
+  @override
+  String get attendanceNewShiftTitle => 'New shift';
+
+  @override
+  String get attendanceShiftName => 'Name';
+
+  @override
+  String get attendanceShiftStart => 'Starts (HH:mm)';
+
+  @override
+  String get attendanceShiftEnd => 'Ends (HH:mm)';
+
+  @override
+  String get attendanceShiftDays => 'Days';
+
+  @override
+  String get attendanceShiftGraceField => 'Grace before late (minutes)';
+
+  @override
+  String get attendanceShiftImmutable =>
+      'Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.';
+
+  @override
+  String get attendanceCreateShift => 'Create shift';
+
+  @override
+  String get attendanceShiftCreated => 'Shift created.';
+
+  @override
+  String get attendanceShiftNeedsName => 'Give the shift a name.';
+
+  @override
+  String get attendanceShiftNeedsDays => 'Choose at least one day.';
+
+  @override
+  String get attendanceShiftSameTimes =>
+      'A shift cannot start and end at the same time.';
+
+  @override
+  String get attendanceGraceInvalid => 'Use a number of minutes from 0 to 120.';
+
+  @override
+  String attendanceAssignTitle(String name) {
+    return 'Shift for $name';
+  }
+
+  @override
+  String get attendanceAssignFrom => 'Starting';
+
+  @override
+  String get attendanceAssignNote =>
+      'Schedules start today or later. Once today\'s shift has begun, or once the rider has worked today, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.';
+
+  @override
+  String get attendanceAssignSave => 'Save schedule';
+
+  @override
+  String get attendanceAssignSaved => 'Schedule updated.';
+
+  @override
+  String get attendanceHistoryLimit =>
+      'This month is older than the duty history the platform keeps, so it can no longer be shown.';
+
+  @override
+  String get attendanceManualTag => 'Manual';
+
+  @override
+  String get attendanceTypedByHand =>
+      'Typed by hand in the Manual Attendance Log, not recorded by the app';
+
+  @override
+  String get attendanceLogPresentKeepsLate =>
+      'Present does not clear a late check-in. To excuse one, choose “Late, excused”.';
+
+  @override
+  String get attendanceLogChecking =>
+      'Checking this day for an existing entry…';
+
+  @override
+  String get attendanceLogCheckFailed =>
+      'This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.';
+
+  @override
+  String attendanceRetiredShifts(int count) {
+    return 'Retired shifts ($count)';
+  }
+
+  @override
+  String get attendanceRetireKeepsHistory =>
+      'Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.';
+
+  @override
+  String attendanceLiveOnDuty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Live: $count riders on duty',
+      one: 'Live: 1 rider on duty',
+      zero: 'Live: no riders on duty',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNavReconciliation => 'Reconciliation';
+
+  @override
+  String get carrRidersNavRidersHr => 'Riders HR';
+
+  @override
+  String get carrRidersNavDirectory => 'Directory';
+
+  @override
+  String get carrRidersNavStatement => 'Statement';
+
+  @override
+  String get carrRidersTitle => 'Riders HR Directory';
+
+  @override
+  String get carrRidersSubtitle => 'Manage rider profiles, status and regions';
+
+  @override
+  String get carrRidersStatTotal => 'Total onboarded riders';
+
+  @override
+  String get carrRidersStatTotalNote => 'Registered company fleet';
+
+  @override
+  String get carrRidersStatOnDuty => 'Active on duty';
+
+  @override
+  String get carrRidersStatOnDutyNote => 'Available or on a job';
+
+  @override
+  String get carrRidersStatSignalLost => 'Signal lost';
+
+  @override
+  String get carrRidersStatSignalLostNote =>
+      'On duty, but their phone has gone quiet';
+
+  @override
+  String get carrRidersStatOffline => 'Offline / inactive';
+
+  @override
+  String get carrRidersStatOfflineNote => 'Declared themselves off duty';
+
+  @override
+  String get carrRidersPresenceUnknown => 'Presence could not be read just now';
+
+  @override
+  String get carrRidersSearchHint => 'Search riders by name, ID...';
+
+  @override
+  String get carrRidersZoneAll => 'Zone: All';
+
+  @override
+  String carrRidersZoneValue(String zone) {
+    return 'Zone: $zone';
+  }
+
+  @override
+  String get carrRidersZoneTooltip =>
+      'A zone here is the region each rider wrote on their application';
+
+  @override
+  String get carrRidersVehicleAll => 'Vehicle: All';
+
+  @override
+  String carrRidersVehicleValue(String vehicle) {
+    return 'Vehicle: $vehicle';
+  }
+
+  @override
+  String get carrRidersVehicleMotorcycle => 'Motorcycle';
+
+  @override
+  String get carrRidersVehicleCar => 'Car';
+
+  @override
+  String get carrRidersVehicleBicycle => 'Bicycle';
+
+  @override
+  String get carrRidersVehicleVan => 'Van';
+
+  @override
+  String get carrRidersVehicleTruck => 'Truck';
+
+  @override
+  String get carrRidersAddRider => 'Add Rider';
+
+  @override
+  String get carrRidersAddRiderTooltip =>
+      'Approve somebody who has applied to ride for you';
+
+  @override
+  String get carrRidersAddRiderUnavailable =>
+      'Applications could not be read just now, so nobody can be approved from here';
+
+  @override
+  String get carrRidersManageProfile => 'Manage Profile';
+
+  @override
+  String carrRidersDeliveredToday(int count) {
+    return '($count today)';
+  }
+
+  @override
+  String get carrRidersRatingNew => 'New';
+
+  @override
+  String get carrRidersStatusActive => 'Active';
+
+  @override
+  String get carrRidersStatusSignalLost => 'Signal lost';
+
+  @override
+  String get carrRidersStatusOffline => 'Offline';
+
+  @override
+  String get carrRidersStatusSuspended => 'Suspended';
+
+  @override
+  String get carrRidersStatusOnAJob => 'On a job';
+
+  @override
+  String get carrRidersNoMatch => 'No rider matches that.';
+
+  @override
+  String carrRidersShowingOnly(String filter) {
+    return 'Showing only: $filter';
+  }
+
+  @override
+  String get carrRidersShowEveryone => 'Show everyone';
+
+  @override
+  String get carrRidersDirectoryFootnote =>
+      'Zone is the region each rider gave on their application — the platform does not assign riders to your coverage zones. Rating is what customers left across all of a rider\'s deliveries. Presence reaches this page once a rider has carried your work, so a rider who has not yet shows none.';
+
+  @override
+  String get carrRidersWaitingTitle => 'Add a rider';
+
+  @override
+  String carrRidersWaitingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people waiting to ride for you',
+      one: '1 person waiting to ride for you',
+      zero: 'Nobody is waiting to ride for you',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersWaitingEmpty =>
+      'Nobody has applied to ride for you. Riders reach a fleet by applying — there is no way to create one directly.';
+
+  @override
+  String get carrRidersApprove => 'Approve';
+
+  @override
+  String get carrRidersOnYourFleet => 'On your fleet';
+
+  @override
+  String carrRidersSuspendTitle(String name) {
+    return 'Suspend $name';
+  }
+
+  @override
+  String carrRidersReinstateTitle(String name) {
+    return 'Reinstate $name';
+  }
+
+  @override
+  String get carrRidersSuspendBody =>
+      'They keep their sign-in and their history, and stop being offered work. You can reinstate them at any time.';
+
+  @override
+  String get carrRidersReinstateBody =>
+      'They can be offered work again from the moment this is saved.';
+
+  @override
+  String get carrRidersChooseReason => 'Choose a reason';
+
+  @override
+  String get carrRidersNoteHint => 'A note for the record (optional)';
+
+  @override
+  String get carrRidersSuspendRider => 'Suspend Rider';
+
+  @override
+  String get carrRidersReinstateRider => 'Reinstate Rider';
+
+  @override
+  String carrRidersSuspendedToast(String name) {
+    return '$name is suspended and will not be offered work.';
+  }
+
+  @override
+  String carrRidersReinstatedToast(String name) {
+    return '$name can take work again.';
+  }
+
+  @override
+  String get carrRidersReasonFraud => 'Fraud';
+
+  @override
+  String get carrRidersReasonAbuse => 'Abuse';
+
+  @override
+  String get carrRidersReasonNonPayment => 'Non-payment';
+
+  @override
+  String get carrRidersReasonPolicyViolation => 'Policy violation';
+
+  @override
+  String get carrRidersReasonPartnerRequest => 'Partner request';
+
+  @override
+  String get carrRidersReasonOther => 'Other';
+
+  @override
+  String get carrRidersProfileTitle => 'Rider HR Profile';
+
+  @override
+  String get carrRidersProfileSubtitle =>
+      'Documents, employment details and performance';
+
+  @override
+  String get carrRidersBackToDirectory => 'Back to riders';
+
+  @override
+  String carrRidersBadgeId(String code) {
+    return 'Badge ID: $code';
+  }
+
+  @override
+  String get carrRidersPhone => 'Phone';
+
+  @override
+  String get carrRidersEmail => 'Email';
+
+  @override
+  String get carrRidersLastSeen => 'Last seen';
+
+  @override
+  String get carrRidersNoPresenceYet => 'No duty or location yet';
+
+  @override
+  String get carrRidersStaleNote =>
+      'Declared on duty, but the last location is too old to dispatch on.';
+
+  @override
+  String get carrRidersNoApplication =>
+      'The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.';
+
+  @override
+  String get carrRidersDocumentsTitle => 'Documents Verification';
+
+  @override
+  String get carrRidersDocNationalId => 'National ID';
+
+  @override
+  String get carrRidersDocDrivingLicence => 'Driving licence';
+
+  @override
+  String get carrRidersDocVehicleRegistration => 'Vehicle registration';
+
+  @override
+  String get carrRidersDocVerified => 'Verified';
+
+  @override
+  String get carrRidersDocWaiting => 'Waiting';
+
+  @override
+  String get carrRidersDocRefused => 'Refused';
+
+  @override
+  String get carrRidersDocNotUploaded => 'Not uploaded';
+
+  @override
+  String get carrRidersDocOpen => 'Open the document';
+
+  @override
+  String get carrRidersCouldNotRead => 'Could not be read just now.';
+
+  @override
+  String get carrRidersAvgRating => 'Avg rating';
+
+  @override
+  String carrRidersHappyCustomers(int percent) {
+    return '$percent% happy customers';
+  }
+
+  @override
+  String get carrRidersNoRatingsYet => 'No ratings yet';
+
+  @override
+  String carrRidersDeliveriesWindow(int days) {
+    return 'Deliveries, last $days days';
+  }
+
+  @override
+  String carrRidersClaimedCaption(int claimed, int cancelled) {
+    return '$claimed claimed, $cancelled cancelled after claiming';
+  }
+
+  @override
+  String get carrRidersCompletionRate => 'Completion rate';
+
+  @override
+  String get carrRidersCompletionCaption =>
+      'Delivered out of claimed, for your company';
+
+  @override
+  String get carrRidersNothingClaimed => 'Nothing claimed in this window';
+
+  @override
+  String get carrRidersDeliveredTodayLabel => 'Delivered today';
+
+  @override
+  String get carrRidersDeliveredTodayCaption =>
+      'For your company, since midnight';
+
+  @override
+  String carrRidersOutputTitle(int days) {
+    return 'Delivery output, last $days days';
+  }
+
+  @override
+  String get carrRidersOutputEmpty => 'No deliveries in this period';
+
+  @override
+  String carrRidersOutputNote(String zone) {
+    return 'Days are split in the $zone time zone, and only deliveries made for your company are counted.';
+  }
+
+  @override
+  String carrRidersHoursTitle(int days) {
+    return 'Hours online, last $days days';
+  }
+
+  @override
+  String carrRidersHoursValue(String hours) {
+    return '$hours h';
+  }
+
+  @override
+  String carrRidersHoursTotal(String hours) {
+    return '$hours h in total';
+  }
+
+  @override
+  String carrRidersShifts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shifts',
+      one: '1 shift',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersHoursNone => 'No hours online to show for your company.';
+
+  @override
+  String carrRidersHoursZone(String zone) {
+    return 'Days are split in the $zone time zone, as the server reports them.';
+  }
+
+  @override
+  String get carrRidersEmploymentTitle => 'Employment Details';
+
+  @override
+  String get carrRidersStartDate => 'Start date';
+
+  @override
+  String get carrRidersApplied => 'Applied';
+
+  @override
+  String get carrRidersRegion => 'Region (from their application)';
+
+  @override
+  String get carrRidersVehicle => 'Vehicle';
+
+  @override
+  String get carrRidersEmploymentNote =>
+      'Contract type, pay rate and zone assignment are not recorded on this platform.';
+
+  @override
+  String get carrRidersSuspendUnavailable =>
+      'Suspending works through a rider\'s application to you. The platform attached this rider directly, so ask YouDrop to suspend them.';
+
+  @override
+  String get carrRidersTerminate => 'Terminate Contract';
+
+  @override
+  String carrRidersTerminateTitle(String name) {
+    return 'End $name\'s contract?';
+  }
+
+  @override
+  String carrRidersTerminateBody(String name) {
+    return '$name comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop\'s own riders: they can take no work at all until another company hires them or YouDrop takes them on.';
+  }
+
+  @override
+  String get carrRidersTerminateJobs =>
+      'Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.';
+
+  @override
+  String get carrRidersTerminateMoney =>
+      'Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.';
+
+  @override
+  String get carrRidersTerminateUndo =>
+      'Taking them back later means hiring them again.';
+
+  @override
+  String get carrRidersTerminateConfirm => 'Terminate contract';
+
+  @override
+  String carrRidersTerminated(String name) {
+    return '$name is no longer on your fleet.';
+  }
+
+  @override
+  String carrRidersTerminateCarrying(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'They are carrying $count of your jobs right now. Their contract can end once those are delivered or cancelled.',
+      one: 'They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNotOnFleet => 'This rider is no longer on your fleet.';
+
+  @override
+  String carrRidersNoPresenceCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more have no duty or location yet',
+      one: '1 more has no duty or location yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNoPresenceNote =>
+      'Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.';
+
+  @override
+  String get carrRidersVehicleModel => 'Vehicle model';
+
+  @override
+  String get carrRidersPlateNumber => 'Plate number';
+
+  @override
+  String get carrRidersDateOfBirth => 'Date of birth';
+
+  @override
+  String get carrRidersNationalIdNumber => 'National ID number';
+
+  @override
+  String get carrRidersDutyChanged => 'Duty last changed';
+
+  @override
+  String get carrRidersVehicleYear => 'Vehicle year';
+
+  @override
+  String get carrRidersTerminateReason => 'Reason, kept on record';
+
+  @override
+  String get carrRidersTerminateReasonHint => 'Why is this contract ending?';
+
+  @override
+  String get carrRidersStatusStandingUnknown => 'Standing unknown';
+
+  @override
+  String get carrRidersStandingUnknownNote =>
+      'Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.';
+
+  @override
+  String get attendanceBackToProfile => 'Back to profile';
 }

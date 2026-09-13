@@ -3985,5 +3985,555 @@
         "type": "int"
       }
     }
-  }
+  },
+  "attendanceNavShifts": "Shifts & attendance",
+  "attendanceTitle": "Rider Attendance & Shift Logs",
+  "attendanceSubtitle": "Track daily check-ins, lates, absences, and shift overrides",
+  "attendanceForMonth": "Attendance & clock logs for {month}",
+  "@attendanceForMonth": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceBackToRiders": "Back to riders",
+  "attendanceManualLog": "Manual Attendance Log",
+  "attendancePrevMonth": "Previous month",
+  "attendanceNextMonth": "Next month",
+  "attendanceLegendPresent": "Present",
+  "attendanceLegendLate": "Late",
+  "attendanceLegendAbsent": "Absent",
+  "attendanceLegendOff": "Day off",
+  "attendanceLegendOnDuty": "On duty",
+  "attendanceWeekMon": "MON",
+  "attendanceWeekTue": "TUE",
+  "attendanceWeekWed": "WED",
+  "attendanceWeekThu": "THU",
+  "attendanceWeekFri": "FRI",
+  "attendanceWeekSat": "SAT",
+  "attendanceWeekSun": "SUN",
+  "attendanceAggregatesTitle": "Attendance Aggregates",
+  "attendanceDaysWorked": "Days worked",
+  "attendanceAbsences": "Absences",
+  "attendanceTimesLate": "Times late",
+  "attendanceOvertime": "Overtime accumulated",
+  "attendanceHoursOnDuty": "Hours on duty",
+  "attendanceManualHours": "Hours logged by hand",
+  "attendanceExcusedDays": "Excused, sick or on leave",
+  "attendanceDaysCount": "{count, plural, =1{1 day} other{{count} days}}",
+  "@attendanceDaysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceHoursValue": "{hours} hours",
+  "@attendanceHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceHoursShort": "{hours} hrs",
+  "@attendanceHoursShort": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceLogsTitle": "Recent Clock-In / Clock-Out Logs",
+  "attendanceColDate": "Date",
+  "attendanceColShift": "Scheduled shift",
+  "attendanceColClockIn": "Clock in",
+  "attendanceColClockOut": "Clock out",
+  "attendanceColHours": "Hours",
+  "attendanceColStatus": "Status",
+  "attendanceColNotes": "Notes",
+  "attendanceShiftLabel": "{name} ({start} - {end})",
+  "@attendanceShiftLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceStatusOnTime": "On time",
+  "attendanceStatusLate": "Late check-in",
+  "attendanceStatusAbsent": "Absent",
+  "attendanceStatusPending": "Not in yet",
+  "attendanceStatusDayOff": "Day off",
+  "attendanceStatusExtra": "Worked a day off",
+  "attendanceStatusWorked": "On duty",
+  "attendanceStatusLateExcused": "Late (excused)",
+  "attendanceStatusExcused": "Excused",
+  "attendanceStatusSick": "Sick leave",
+  "attendanceStatusLeave": "Leave",
+  "attendanceOnShiftNow": "On shift now",
+  "attendanceAutoClosed": "Auto-closed: signal lost",
+  "attendanceLateBy": "{minutes} min late",
+  "@attendanceLateBy": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceOvertimeNote": "{minutes} min overtime",
+  "@attendanceOvertimeNote": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceLoggedByHand": "Logged by hand",
+  "attendanceNoSchedule": "No shift schedule is set for this rider, so only time on duty is shown.",
+  "attendanceEmptyMonth": "No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.",
+  "attendanceZoneNote": "Days are split in the {zone} time zone.",
+  "@attendanceZoneNote": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceNotOnFleet": "This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.",
+  "attendanceLoadFailed": "Attendance could not be loaded just now.",
+  "attendanceLogTitle": "Log attendance for {name}",
+  "@attendanceLogTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceLogStatus": "What happened",
+  "attendanceLogChooseStatus": "Choose a status",
+  "attendanceKindPresent": "Present (not shown by the app)",
+  "attendanceKindLateExcused": "Late, excused",
+  "attendanceKindAbsentExcused": "Absent, excused",
+  "attendanceKindSick": "Sick",
+  "attendanceKindLeave": "On leave",
+  "attendanceLogClockIn": "Clock in (optional)",
+  "attendanceLogClockOut": "Clock out (optional)",
+  "attendanceLogNote": "Note (optional)",
+  "attendanceLogSave": "Save entry",
+  "attendanceLogWithdraw": "Remove entry",
+  "attendanceLogSaved": "Attendance entry saved.",
+  "attendanceLogRemoved": "Entry removed. The day shows what the app recorded.",
+  "attendanceLogTimesRule": "Times go only on a present day, and need both a clock-in and a clock-out.",
+  "attendanceLogManualNote": "Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.",
+  "attendanceLogFutureRule": "A day that has not happened yet can only be marked as leave, sick or excused.",
+  "attendanceTimeInvalid": "Use a 24-hour time such as 08:00.",
+  "attendanceShiftsTitle": "Shift schedules",
+  "attendanceShiftsSubtitle": "Set the shifts your riders work, then open anyone’s monthly attendance.",
+  "attendanceShiftsCard": "Shifts",
+  "attendanceAddShift": "Add shift",
+  "attendanceNoShifts": "No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.",
+  "attendanceShiftGrace": "{minutes} min grace",
+  "@attendanceShiftGrace": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceShiftRiders": "{count, plural, =0{No riders} =1{1 rider} other{{count} riders}}",
+  "@attendanceShiftRiders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceShiftOvernight": "Ends next day",
+  "attendanceRetireShift": "Retire shift",
+  "attendanceRetireBlocked": "Move the riders on this shift to another one first.",
+  "attendanceShiftRetired": "Shift retired.",
+  "attendanceRidersCard": "Riders",
+  "attendanceColRider": "Rider",
+  "attendanceColCurrentShift": "Shift",
+  "attendanceColActions": "Actions",
+  "attendanceFreelancer": "No schedule (freelancer)",
+  "attendanceChangeShift": "Change shift",
+  "attendanceOpenAttendance": "Attendance",
+  "attendanceUpcomingShift": "{name} from {date}",
+  "@attendanceUpcomingShift": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceNoRiders": "No riders on your fleet yet.",
+  "attendanceNewShiftTitle": "New shift",
+  "attendanceShiftName": "Name",
+  "attendanceShiftStart": "Starts (HH:mm)",
+  "attendanceShiftEnd": "Ends (HH:mm)",
+  "attendanceShiftDays": "Days",
+  "attendanceShiftGraceField": "Grace before late (minutes)",
+  "attendanceShiftImmutable": "Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.",
+  "attendanceCreateShift": "Create shift",
+  "attendanceShiftCreated": "Shift created.",
+  "attendanceShiftNeedsName": "Give the shift a name.",
+  "attendanceShiftNeedsDays": "Choose at least one day.",
+  "attendanceShiftSameTimes": "A shift cannot start and end at the same time.",
+  "attendanceGraceInvalid": "Use a number of minutes from 0 to 120.",
+  "attendanceAssignTitle": "Shift for {name}",
+  "@attendanceAssignTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceAssignFrom": "Starting",
+  "attendanceAssignNote": "Schedules start today or later. Once today's shift has begun, or once the rider has worked today, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.",
+  "attendanceAssignSave": "Save schedule",
+  "attendanceAssignSaved": "Schedule updated.",
+  "attendanceHistoryLimit": "This month is older than the duty history the platform keeps, so it can no longer be shown.",
+  "attendanceManualTag": "Manual",
+  "attendanceTypedByHand": "Typed by hand in the Manual Attendance Log, not recorded by the app",
+  "attendanceLogPresentKeepsLate": "Present does not clear a late check-in. To excuse one, choose “Late, excused”.",
+  "attendanceLogChecking": "Checking this day for an existing entry…",
+  "attendanceLogCheckFailed": "This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.",
+  "attendanceRetiredShifts": "Retired shifts ({count})",
+  "@attendanceRetiredShifts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceRetireKeepsHistory": "Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.",
+  "attendanceLiveOnDuty": "{count, plural, =0{Live: no riders on duty} =1{Live: 1 rider on duty} other{Live: {count} riders on duty}}",
+  "@attendanceLiveOnDuty": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNavReconciliation": "Reconciliation",
+  "carrRidersNavRidersHr": "Riders HR",
+  "carrRidersNavDirectory": "Directory",
+  "carrRidersNavStatement": "Statement",
+  "carrRidersTitle": "Riders HR Directory",
+  "carrRidersSubtitle": "Manage rider profiles, status and regions",
+  "carrRidersStatTotal": "Total onboarded riders",
+  "carrRidersStatTotalNote": "Registered company fleet",
+  "carrRidersStatOnDuty": "Active on duty",
+  "carrRidersStatOnDutyNote": "Available or on a job",
+  "carrRidersStatSignalLost": "Signal lost",
+  "carrRidersStatSignalLostNote": "On duty, but their phone has gone quiet",
+  "carrRidersStatOffline": "Offline / inactive",
+  "carrRidersStatOfflineNote": "Declared themselves off duty",
+  "carrRidersPresenceUnknown": "Presence could not be read just now",
+  "carrRidersSearchHint": "Search riders by name, ID...",
+  "carrRidersZoneAll": "Zone: All",
+  "carrRidersZoneValue": "Zone: {zone}",
+  "@carrRidersZoneValue": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersZoneTooltip": "A zone here is the region each rider wrote on their application",
+  "carrRidersVehicleAll": "Vehicle: All",
+  "carrRidersVehicleValue": "Vehicle: {vehicle}",
+  "@carrRidersVehicleValue": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersVehicleMotorcycle": "Motorcycle",
+  "carrRidersVehicleCar": "Car",
+  "carrRidersVehicleBicycle": "Bicycle",
+  "carrRidersVehicleVan": "Van",
+  "carrRidersVehicleTruck": "Truck",
+  "carrRidersAddRider": "Add Rider",
+  "carrRidersAddRiderTooltip": "Approve somebody who has applied to ride for you",
+  "carrRidersAddRiderUnavailable": "Applications could not be read just now, so nobody can be approved from here",
+  "carrRidersManageProfile": "Manage Profile",
+  "carrRidersDeliveredToday": "({count} today)",
+  "@carrRidersDeliveredToday": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersRatingNew": "New",
+  "carrRidersStatusActive": "Active",
+  "carrRidersStatusSignalLost": "Signal lost",
+  "carrRidersStatusOffline": "Offline",
+  "carrRidersStatusSuspended": "Suspended",
+  "carrRidersStatusOnAJob": "On a job",
+  "carrRidersNoMatch": "No rider matches that.",
+  "carrRidersShowingOnly": "Showing only: {filter}",
+  "@carrRidersShowingOnly": {
+    "placeholders": {
+      "filter": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersShowEveryone": "Show everyone",
+  "carrRidersDirectoryFootnote": "Zone is the region each rider gave on their application — the platform does not assign riders to your coverage zones. Rating is what customers left across all of a rider's deliveries. Presence reaches this page once a rider has carried your work, so a rider who has not yet shows none.",
+  "carrRidersWaitingTitle": "Add a rider",
+  "carrRidersWaitingCount": "{count, plural, =0{Nobody is waiting to ride for you} =1{1 person waiting to ride for you} other{{count} people waiting to ride for you}}",
+  "@carrRidersWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersWaitingEmpty": "Nobody has applied to ride for you. Riders reach a fleet by applying — there is no way to create one directly.",
+  "carrRidersApprove": "Approve",
+  "carrRidersOnYourFleet": "On your fleet",
+  "carrRidersSuspendTitle": "Suspend {name}",
+  "@carrRidersSuspendTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReinstateTitle": "Reinstate {name}",
+  "@carrRidersReinstateTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersSuspendBody": "They keep their sign-in and their history, and stop being offered work. You can reinstate them at any time.",
+  "carrRidersReinstateBody": "They can be offered work again from the moment this is saved.",
+  "carrRidersChooseReason": "Choose a reason",
+  "carrRidersNoteHint": "A note for the record (optional)",
+  "carrRidersSuspendRider": "Suspend Rider",
+  "carrRidersReinstateRider": "Reinstate Rider",
+  "carrRidersSuspendedToast": "{name} is suspended and will not be offered work.",
+  "@carrRidersSuspendedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReinstatedToast": "{name} can take work again.",
+  "@carrRidersReinstatedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReasonFraud": "Fraud",
+  "carrRidersReasonAbuse": "Abuse",
+  "carrRidersReasonNonPayment": "Non-payment",
+  "carrRidersReasonPolicyViolation": "Policy violation",
+  "carrRidersReasonPartnerRequest": "Partner request",
+  "carrRidersReasonOther": "Other",
+  "carrRidersProfileTitle": "Rider HR Profile",
+  "carrRidersProfileSubtitle": "Documents, employment details and performance",
+  "carrRidersBackToDirectory": "Back to riders",
+  "carrRidersBadgeId": "Badge ID: {code}",
+  "@carrRidersBadgeId": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersPhone": "Phone",
+  "carrRidersEmail": "Email",
+  "carrRidersLastSeen": "Last seen",
+  "carrRidersNoPresenceYet": "No duty or location yet",
+  "carrRidersStaleNote": "Declared on duty, but the last location is too old to dispatch on.",
+  "carrRidersNoApplication": "The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.",
+  "carrRidersDocumentsTitle": "Documents Verification",
+  "carrRidersDocNationalId": "National ID",
+  "carrRidersDocDrivingLicence": "Driving licence",
+  "carrRidersDocVehicleRegistration": "Vehicle registration",
+  "carrRidersDocVerified": "Verified",
+  "carrRidersDocWaiting": "Waiting",
+  "carrRidersDocRefused": "Refused",
+  "carrRidersDocNotUploaded": "Not uploaded",
+  "carrRidersDocOpen": "Open the document",
+  "carrRidersCouldNotRead": "Could not be read just now.",
+  "carrRidersAvgRating": "Avg rating",
+  "carrRidersHappyCustomers": "{percent}% happy customers",
+  "@carrRidersHappyCustomers": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNoRatingsYet": "No ratings yet",
+  "carrRidersDeliveriesWindow": "Deliveries, last {days} days",
+  "@carrRidersDeliveriesWindow": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersClaimedCaption": "{claimed} claimed, {cancelled} cancelled after claiming",
+  "@carrRidersClaimedCaption": {
+    "placeholders": {
+      "claimed": {
+        "type": "int"
+      },
+      "cancelled": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersCompletionRate": "Completion rate",
+  "carrRidersCompletionCaption": "Delivered out of claimed, for your company",
+  "carrRidersNothingClaimed": "Nothing claimed in this window",
+  "carrRidersDeliveredTodayLabel": "Delivered today",
+  "carrRidersDeliveredTodayCaption": "For your company, since midnight",
+  "carrRidersOutputTitle": "Delivery output, last {days} days",
+  "@carrRidersOutputTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersOutputEmpty": "No deliveries in this period",
+  "carrRidersOutputNote": "Days are split in the {zone} time zone, and only deliveries made for your company are counted.",
+  "@carrRidersOutputNote": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersHoursTitle": "Hours online, last {days} days",
+  "@carrRidersHoursTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersHoursValue": "{hours} h",
+  "@carrRidersHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersHoursTotal": "{hours} h in total",
+  "@carrRidersHoursTotal": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersShifts": "{count, plural, =1{1 shift} other{{count} shifts}}",
+  "@carrRidersShifts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersHoursNone": "No hours online to show for your company.",
+  "carrRidersHoursZone": "Days are split in the {zone} time zone, as the server reports them.",
+  "@carrRidersHoursZone": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersEmploymentTitle": "Employment Details",
+  "carrRidersStartDate": "Start date",
+  "carrRidersApplied": "Applied",
+  "carrRidersRegion": "Region (from their application)",
+  "carrRidersVehicle": "Vehicle",
+  "carrRidersEmploymentNote": "Contract type, pay rate and zone assignment are not recorded on this platform.",
+  "carrRidersSuspendUnavailable": "Suspending works through a rider's application to you. The platform attached this rider directly, so ask YouDrop to suspend them.",
+  "carrRidersTerminate": "Terminate Contract",
+  "carrRidersTerminateTitle": "End {name}'s contract?",
+  "@carrRidersTerminateTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateBody": "{name} comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop's own riders: they can take no work at all until another company hires them or YouDrop takes them on.",
+  "@carrRidersTerminateBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateJobs": "Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.",
+  "carrRidersTerminateMoney": "Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.",
+  "carrRidersTerminateUndo": "Taking them back later means hiring them again.",
+  "carrRidersTerminateConfirm": "Terminate contract",
+  "carrRidersTerminated": "{name} is no longer on your fleet.",
+  "@carrRidersTerminated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateCarrying": "{count, plural, =1{They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.} other{They are carrying {count} of your jobs right now. Their contract can end once those are delivered or cancelled.}}",
+  "@carrRidersTerminateCarrying": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNotOnFleet": "This rider is no longer on your fleet.",
+  "carrRidersNoPresenceCount": "{count, plural, =1{1 more has no duty or location yet} other{{count} more have no duty or location yet}}",
+  "@carrRidersNoPresenceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNoPresenceNote": "Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.",
+  "carrRidersVehicleModel": "Vehicle model",
+  "carrRidersPlateNumber": "Plate number",
+  "carrRidersDateOfBirth": "Date of birth",
+  "carrRidersNationalIdNumber": "National ID number",
+  "carrRidersDutyChanged": "Duty last changed",
+  "carrRidersVehicleYear": "Vehicle year",
+  "carrRidersTerminateReason": "Reason, kept on record",
+  "carrRidersTerminateReasonHint": "Why is this contract ending?",
+  "carrRidersStatusStandingUnknown": "Standing unknown",
+  "carrRidersStandingUnknownNote": "Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.",
+  "attendanceBackToProfile": "Back to profile"
 }

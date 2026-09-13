@@ -28,6 +28,7 @@ import com.delivery.onboarding.domain.PayoutDetails;
 import com.delivery.onboarding.service.ApplicantDocumentService;
 import com.delivery.onboarding.service.CustomerSignUpService;
 import com.delivery.onboarding.service.OnboardingService;
+import com.delivery.onboarding.service.PartnerManagementService;
 import com.delivery.onboarding.service.PayoutDetailsService;
 import com.delivery.onboarding.service.VerificationService;
 import com.delivery.platform.security.CurrentUser;
@@ -65,16 +66,20 @@ public class OnboardingController {
     private final CustomerSignUpService signUps;
     private final ApplicantDocumentService documents;
     private final PayoutDetailsService payouts;
+    /** Partners' standing, for a company's listing — read for the whole listing at once. */
+    private final PartnerManagementService partners;
 
     public OnboardingController(OnboardingService onboarding, VerificationService verifications,
                                 PlatformClient platform, CustomerSignUpService signUps,
-                                ApplicantDocumentService documents, PayoutDetailsService payouts) {
+                                ApplicantDocumentService documents, PayoutDetailsService payouts,
+                                PartnerManagementService partners) {
         this.onboarding = onboarding;
         this.verifications = verifications;
         this.platform = platform;
         this.signUps = signUps;
         this.documents = documents;
         this.payouts = payouts;
+        this.partners = partners;
     }
 
     // ---------------------------------------------------------------- shapes
@@ -179,10 +184,25 @@ public class OnboardingController {
                                   String documentIssueOverride,
                                   PayoutSummary payout,
                                   List<ReviewerDocumentView> documents,
-                                  String provisionedUserRef, UUID provisionedEntityId) {
+                                  String provisionedUserRef, UUID provisionedEntityId,
+                                  Boolean suspended) {
 
         static ApplicationView of(OnboardingApplication a) {
             return of(a, null, List.of());
+        }
+
+        /**
+         * This view with the partner's current standing on it.
+         *
+         * <p>Filled only on a delivery company's own listing, where the Riders HR directory needs
+         * it for every rider at once; null everywhere else, which a client reads as "not known
+         * here" — never as "not suspended".
+         */
+        ApplicationView withSuspended(Boolean standing) {
+            return new ApplicationView(id, reference, kind, businessName, contactName, contactEmail,
+                    contactPhone, targetProviderId, emailVerifiedAt, phoneVerifiedAt, notes, details,
+                    status, createdAt, decidedAt, decidedBy, rejectionReason, documentIssueOverride,
+                    payout, documents, provisionedUserRef, provisionedEntityId, standing);
         }
 
         static ApplicationView of(OnboardingApplication a, PayoutSummary payout,
@@ -208,7 +228,10 @@ public class OnboardingController {
                     // fifty applications is fifty IBANs on one screen otherwise. The full number
                     // has its own endpoint, one application at a time.
                     payout, documents,
-                    a.getProvisionedUserRef(), a.getProvisionedEntityId());
+                    a.getProvisionedUserRef(), a.getProvisionedEntityId(),
+                    // Standing is not part of an application's own record; a company's listing
+                    // adds it for the whole page at once (withSuspended).
+                    null);
         }
     }
 
@@ -685,7 +708,17 @@ public class OnboardingController {
     public List<ApplicationView> forCompany(@PathVariable UUID providerId,
                                             @RequestParam(defaultValue = "false") boolean all) {
         requireRuns(providerId);
-        return listing(all ? onboarding.allFor(providerId) : onboarding.queueFor(providerId));
+        List<OnboardingApplication> applications =
+                all ? onboarding.allFor(providerId) : onboarding.queueFor(providerId);
+        // Each partner's standing rides on the listing, read for all of them in one query. The
+        // carrier's Riders HR directory used to follow this call with one standing request per
+        // rider — over eighty for a fleet of forty, straight into the gateway's per-address rate
+        // limit, which the page then drew as nobody being suspended.
+        Map<UUID, Boolean> suspended = partners.suspendedByApplication(
+                applications.stream().map(OnboardingApplication::getId).toList());
+        return listing(applications).stream()
+                .map(view -> view.withSuspended(suspended.get(view.id())))
+                .toList();
     }
 
     @PostMapping("/applications/for-company/{providerId}/{id}/approve")

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.delivery.tracking.domain.OrderParticipants;
 import com.delivery.tracking.domain.OrderParticipantsRepository;
 import com.delivery.tracking.route.GeoPoint;
+import com.delivery.tracking.service.MembershipPeriodRecorder;
 import com.delivery.tracking.service.PresenceService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,13 +38,17 @@ public class OrderEventListener {
     private final OrderParticipantsRepository participants;
     private final PresenceService presence;
     private final ObjectMapper objectMapper;
+    /** Whether an order may still say which fleet a rider rides for; see mayInferFromOrder. */
+    private final MembershipPeriodRecorder periods;
 
     public OrderEventListener(OrderParticipantsRepository participants,
                               PresenceService presence,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              MembershipPeriodRecorder periods) {
         this.participants = participants;
         this.presence = presence;
         this.objectMapper = objectMapper;
+        this.periods = periods;
     }
 
     @RabbitListener(queues = "${delivery.tracking.order-events-queue:tracking.order-events}")
@@ -92,7 +97,11 @@ public class OrderEventListener {
             // of the two sources this service has - see CarrierMembership.Source - and the only one
             // that exists until a membership event does, which is why the inference is made here
             // rather than left as a gap the carrier console falls into.
-            if (riderId != null && carrierId != null) {
+            // Not once Order Manager has said where the rider works, unless it is this fleet: a late
+            // or replayed order for a company the rider has left must not put them back on its
+            // roster. See MembershipPeriodRecorder.mayInferFromOrder.
+            if (riderId != null && carrierId != null
+                    && periods.mayInferFromOrder(riderId, carrierId)) {
                 presence.learnCarrier(riderId, carrierId);
             }
 

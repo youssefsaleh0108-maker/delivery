@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/attendance_models.dart';
 import '../models/tracking_models.dart';
 
 /// Client for the Order Tracking ETA, duty and presence APIs.
@@ -138,5 +139,153 @@ class TrackingApi {
     return (response.data as List<dynamic>)
         .map((dynamic e) => RiderPresence.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  // ---------------------------------------------------------------- attendance (Riders HR)
+  //
+  // Scoped exactly like [riderDutyHours]: BACKOFFICE reads any rider, a CARRIER only its own fleet
+  // (resolved from its token), and a foreign rider is the same 404 as an unknown one. Every write
+  // is CARRIER only, and the fleet written to is never a parameter.
+
+  static String _day(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}'
+      '-${d.day.toString().padLeft(2, '0')}';
+
+  static String _month(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}';
+
+  /// One rider's calendar month, every day judged against their schedule, with the totals.
+  Future<RiderAttendance> riderAttendance(String riderId, {required DateTime month}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/riders/$riderId/attendance',
+      queryParameters: <String, dynamic>{'month': _month(month)},
+    );
+    return RiderAttendance.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// One rider's attendance over [from]..[to] — inclusive dates in the server's zone, at most 31
+  /// days. A single day is what the Manual Attendance Log reads to learn a day's live entry when
+  /// that day lies outside the month on screen.
+  Future<RiderAttendance> riderAttendanceBetween(String riderId,
+      {required DateTime from, required DateTime to}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/riders/$riderId/attendance',
+      queryParameters: <String, dynamic>{'from': _day(from), 'to': _day(to)},
+    );
+    return RiderAttendance.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// One rider's duty sessions over at most 31 days, whole (a session crossing an edge is listed
+  /// once, not clipped).
+  Future<List<DutySessionView>> riderDutySessions(String riderId,
+      {required DateTime from, required DateTime to}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/riders/$riderId/duty/sessions',
+      queryParameters: <String, dynamic>{'from': _day(from), 'to': _day(to)},
+    );
+    final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+    return (body['sessions'] as List<dynamic>? ?? <dynamic>[])
+        .map((dynamic s) => DutySessionView.fromJson(s as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// The caller's whole fleet for one month, totals only — what a pay run reads.
+  Future<FleetAttendance> fleetAttendance({required DateTime month}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/tracking/carrier/attendance',
+      queryParameters: <String, dynamic>{'month': _month(month)},
+    );
+    return FleetAttendance.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// The caller's company's shifts, retired ones included and marked.
+  Future<List<ShiftTemplate>> shifts() async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/tracking/carrier/shifts');
+    return (response.data as List<dynamic>)
+        .map((dynamic s) => ShiftTemplate.fromJson(s as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// A new shift. Its hours cannot be edited afterwards — see [ShiftTemplate].
+  ///
+  /// [weekdays] are ISO weekdays, [DateTime.monday]..[DateTime.sunday].
+  Future<ShiftTemplate> createShift({
+    required String name,
+    required String startTime,
+    required String endTime,
+    required List<int> weekdays,
+    int? lateGraceMinutes,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/tracking/carrier/shifts',
+      data: <String, dynamic>{
+        'name': name,
+        'startTime': startTime,
+        'endTime': endTime,
+        'days': <String>[for (final int d in weekdays) ShiftTemplate.weekdayWire[d - 1]],
+        if (lateGraceMinutes != null) 'lateGraceMinutes': lateGraceMinutes,
+      },
+    );
+    return ShiftTemplate.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Retires a shift. 409 while riders are still on it — the body's `riders` says how many.
+  Future<ShiftTemplate> retireShift(String shiftId) async {
+    final Response<dynamic> response =
+        await _dio.delete<dynamic>('/api/tracking/carrier/shifts/$shiftId');
+    return ShiftTemplate.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Who in the fleet is on which shift, today and from later dates.
+  Future<List<ShiftAssignment>> shiftAssignments() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/tracking/carrier/shift-assignments');
+    return (response.data as List<dynamic>)
+        .map((dynamic a) => ShiftAssignment.fromJson(a as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Puts a rider on [shiftId] from [effectiveFrom] (today when null), or — with a null
+  /// [shiftId] — takes them off their schedule. Never backdated; the server refuses a past date.
+  /// Answers with the rider's schedule from today.
+  Future<List<ShiftAssignment>> assignShift(String riderId,
+      {String? shiftId, DateTime? effectiveFrom}) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/tracking/riders/$riderId/shift-assignment',
+      data: <String, dynamic>{
+        'shiftId': shiftId,
+        if (effectiveFrom != null) 'effectiveFrom': _day(effectiveFrom),
+      },
+    );
+    return (response.data as List<dynamic>)
+        .map((dynamic a) => ShiftAssignment.fromJson(a as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Records or replaces the office's entry for one day. Clock times (`HH:mm`) only with
+  /// [AttendanceEntryKind.present], and both or neither.
+  Future<ManualAttendanceEntry> recordAttendanceEntry(
+    String riderId, {
+    required DateTime date,
+    required AttendanceEntryKind status,
+    String? clockIn,
+    String? clockOut,
+    String? note,
+  }) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/tracking/riders/$riderId/attendance/entries/${_day(date)}',
+      data: <String, dynamic>{
+        'status': status.wire,
+        if (clockIn != null) 'clockIn': clockIn,
+        if (clockOut != null) 'clockOut': clockOut,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+    );
+    return ManualAttendanceEntry.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Withdraws the office's entry for a day; the day goes back to what the app recorded.
+  Future<void> withdrawAttendanceEntry(String riderId, DateTime date) async {
+    await _dio.delete<dynamic>('/api/tracking/riders/$riderId/attendance/entries/${_day(date)}');
   }
 }

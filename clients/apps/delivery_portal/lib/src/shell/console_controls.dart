@@ -540,11 +540,18 @@ class ConsoleBarChart extends StatelessWidget {
     this.height = 130,
     this.color = DeliveryColors.brand,
     this.emptyLabel = 'Nothing to chart yet',
+    this.barWidth = 16,
+    this.gap = DeliverySpacing.xl,
   });
 
   final List<ConsoleBar> bars;
   final double height;
   final Color color;
+
+  /// The design's 16px bars 32px apart suit a day's hours. A month of days — thirty columns in a
+  /// card — needs narrower ones closer together to be read at a glance rather than scrolled.
+  final double barWidth;
+  final double gap;
 
   /// Shown in place of the columns when every value is zero — a row of hairlines looks like a
   /// rendering fault rather than a quiet day.
@@ -573,8 +580,14 @@ class ConsoleBarChart extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
             for (int i = 0; i < bars.length; i++) ...<Widget>[
-              if (i > 0) const SizedBox(width: DeliverySpacing.xl),
-              _Column(bar: bars[i], peak: peak, height: height, color: color),
+              if (i > 0) SizedBox(width: gap),
+              _Column(
+                bar: bars[i],
+                peak: peak,
+                height: height,
+                color: color,
+                width: barWidth,
+              ),
             ],
           ],
         ),
@@ -589,12 +602,14 @@ class _Column extends StatelessWidget {
     required this.peak,
     required this.height,
     required this.color,
+    required this.width,
   });
 
   final ConsoleBar bar;
   final num peak;
   final double height;
   final Color color;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -609,7 +624,7 @@ class _Column extends StatelessWidget {
         Tooltip(
           message: bar.tooltip ?? '${bar.label}: ${bar.value}',
           child: Container(
-            width: 16,
+            width: width,
             height: filled.clamp(2, height),
             decoration: BoxDecoration(
               color: bar.value <= 0 ? DeliveryColors.border : color,

@@ -78,7 +78,16 @@ class OnboardingApplication {
     required this.provisionedUserRef,
     required this.provisionedEntityId,
     this.details = const <String, String>{},
+    this.suspended,
   });
+
+  /// Whether the partner is suspended now — carried only on a delivery company's own applications
+  /// listing, which reads every rider's standing at once so the Riders HR directory needs no request
+  /// per rider.
+  ///
+  /// Null wherever the server did not say, and null is its own answer: never read it as "not
+  /// suspended", or a suspended rider whose standing was not delivered shows as fit to work.
+  final bool? suspended;
 
   final String id;
   final String reference;
@@ -143,6 +152,7 @@ class OnboardingApplication {
         provisionedUserRef: json['provisionedUserRef'] as String?,
         provisionedEntityId: json['provisionedEntityId'] as String?,
         details: _details(json['details']),
+        suspended: json['suspended'] as bool?,
       );
 
   /// Anything that is not a JSON object reads as no details at all, including the null the receipt

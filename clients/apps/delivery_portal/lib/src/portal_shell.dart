@@ -24,15 +24,17 @@ import 'backoffice/statements_screen.dart';
 // delivers to. The prefix goes on this one because it is the local file of the two.
 import 'backoffice/zones_screen.dart' as backoffice;
 import 'carrier/applicants_screen.dart';
-// carr-cash (feat/carrier-cash-custody): the Reconciliation destination below.
 import 'carrier/cash_reconciliation_screen.dart';
-import 'carrier/company_screen.dart';
 import 'carrier/dashboard_screen.dart';
 import 'carrier/earnings_screen.dart';
 import 'carrier/jobs_screen.dart';
+import 'carrier/rider_attendance_screen.dart';
+import 'carrier/rider_profile_screen.dart';
+import 'carrier/riders_directory_screen.dart';
 // No prefix needed: this file's class is `CarrierSettingsScreen`, distinct from the Backoffice
 // `SettingsScreen` imported above, because the two administer entirely different things.
 import 'carrier/settings_screen.dart';
+import 'carrier/shift_schedule_screen.dart';
 // Likewise `CarrierStatementScreen` — the carrier reads only its own, through /mine, where the
 // Backoffice screen reads everybody's.
 import 'carrier/statement_screen.dart';
@@ -118,6 +120,13 @@ class PortalApis {
   final ReportsApi reports;
 }
 
+/// How a page in the rail is built.
+///
+/// `jump` moves the rail — the dashboards use it for "see all orders" style links, which is why a
+/// page takes a callback rather than being a bare widget.
+typedef PortalPageBuilder = Widget Function(PortalApis apis, LocaleController locale,
+    Future<void> Function() onSignOut, void Function(int) jump);
+
 /// One destination in a rail.
 class PortalDestination {
   const PortalDestination({
@@ -125,7 +134,21 @@ class PortalDestination {
     required this.selectedIcon,
     required this.label,
     required this.build,
-  });
+  }) : pages = const <PortalPage>[];
+
+  /// A heading with pages filed under it — the carrier rail's Reconciliation and Riders HR.
+  ///
+  /// Tapping the heading opens its first page. Once there are two or more, the rail draws every
+  /// page as an indented row under the heading; with one, the heading is simply that page's row.
+  /// So a heading is declared the day its first page exists — never before, which would be a menu
+  /// item that opens nothing — and grows rows as the others arrive, with no change to the shell.
+  PortalDestination.section({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.pages,
+  })  : assert(pages.isNotEmpty, 'a heading with no page under it would open nothing'),
+        build = pages.first.build;
 
   final IconData icon;
   final IconData selectedIcon;
@@ -134,10 +157,30 @@ class PortalDestination {
   /// rail without rebuilding the area list.
   final String Function(DeliveryStrings) label;
 
-  /// `jump` moves the rail — the dashboards use it for "see all orders" style links, which is why
-  /// this takes a callback rather than returning a bare widget.
-  final Widget Function(PortalApis apis, LocaleController locale,
-      Future<void> Function() onSignOut, void Function(int) jump) build;
+  /// This destination's page — for a [PortalDestination.section], its first page.
+  final PortalPageBuilder build;
+
+  /// The pages under a heading, in the order their rows are drawn. Empty for a plain destination.
+  final List<PortalPage> pages;
+
+  /// The page the rail has open here: the [page]th under a heading, or the destination's own. An
+  /// index the heading does not have opens its first page rather than failing.
+  Widget buildPage(int page, PortalApis apis, LocaleController locale,
+      Future<void> Function() onSignOut, void Function(int) jump) {
+    final PortalPageBuilder builder =
+        page > 0 && page < pages.length ? pages[page].build : build;
+    return builder(apis, locale, onSignOut, jump);
+  }
+}
+
+/// One page filed under a rail heading — see [PortalDestination.section].
+class PortalPage {
+  const PortalPage({required this.label, required this.build});
+
+  /// The page's row under its heading, resolved against the active locale.
+  final String Function(DeliveryStrings) label;
+
+  final PortalPageBuilder build;
 }
 
 /// One of the three former portals, as a role and the destinations it grants.
@@ -315,14 +358,20 @@ class PortalArea {
 
   // ------------------------------------------------------------------- carrier
   //
-  // In the order a company thinks about its day: how are we doing, what are we carrying, what will
-  // we be paid, who rides for us, who is waiting to be hired, and how are we set up.
+  // The rail the 2026-09 carrier frames draw (Figma 112:414): Dashboard, Orders, Fleet,
+  // Reconciliation, Riders HR, Earnings, Coverage, Settings — in that order, less the two headings
+  // with no page behind them yet. Fleet has no page anywhere, and Coverage (the company's delivery
+  // areas) is only edited from the phone app today, so neither is drawn: a heading that opens
+  // nothing is a dead control. Each joins at its place in that order the day its first page does.
   //
-  // The 2026-08 Figma carrier rail (3:3438) draws four items — Dashboard, Riders, Onboarding,
-  // Settings — and this one has six. The two extra are Jobs and Earnings, which answer the two
-  // questions a delivery company actually opens the portal to ask and which the design has no
-  // frame for; dropping them to match a four-item rail would delete working pages. Their glyphs and
-  // the order around them follow the design.
+  // Every page the older seven-item rail listed is still one tap away, filed under the design's
+  // headings: Jobs is Orders, the statement is the page under Reconciliation, and the riders
+  // directory and the applicant queue are the pages under Riders HR. The lists those headings are
+  // built from sit under this area — [carrierReconciliationPages], [carrierRidersHrPages], and for
+  // pages about one rider [carrierRiderPages] — and they are where the next pages go.
+  //
+  // Orders has to stay at index 1: the dashboard's "see the job board" is `jump(1)`. Nothing is
+  // inserted ahead of it; Fleet, when it exists, goes straight after it.
   static final PortalArea carrier_ = PortalArea(
     role: DeliveryRole.carrier,
     title: (DeliveryStrings t) => t.carrierPortal,
@@ -331,77 +380,46 @@ class PortalArea {
     logoIcon: Icons.local_shipping,
     destinations: <PortalDestination>[
       PortalDestination(
-        icon: Icons.insights_outlined,
-        selectedIcon: Icons.insights,
+        icon: Icons.grid_view_outlined,
+        selectedIcon: Icons.grid_view_rounded,
         label: (DeliveryStrings t) => t.navDashboard,
+        // Every client it reads. It was built with two, which left its week-over-week lines and the
+        // fleet card's delivered-today count dead in the deployed build — the same withheld-client
+        // fault the riders page had — while the screen's own tests, which pass them, stayed green.
         build: (PortalApis a, _, __, void Function(int) jump) => CarrierDashboardScreen(
           api: a.order,
           providerApi: a.provider,
+          aggregatesApi: a.aggregates,
+          performanceApi: a.riderPerformance,
           onShowJobs: () => jump(1),
         ),
       ),
+      // The design's "Orders": the work this company carries.
       PortalDestination(
-        icon: Icons.local_shipping_outlined,
-        selectedIcon: Icons.local_shipping,
-        label: (DeliveryStrings t) => t.navJobs,
+        icon: Icons.shopping_cart_outlined,
+        selectedIcon: Icons.shopping_cart,
+        label: (DeliveryStrings t) => t.navOrders,
         build: (PortalApis a, _, __, ___) => JobsScreen(api: a.order),
       ),
-      PortalDestination(
-        icon: Icons.payments_outlined,
-        selectedIcon: Icons.payments,
-        label: (DeliveryStrings t) => t.navEarnings,
-        build: (PortalApis a, _, __, ___) => EarningsScreen(api: a.order),
-      ),
-      // Immediately after Earnings, because the two are the same money asked about twice: Earnings
-      // is the rolling window off the order service, this is the ledger's own arithmetic for a
-      // closed period — the figures the platform would actually pay against.
-      //
-      // An inline English label rather than a [DeliveryStrings] key, matching Riders and Promo Codes
-      // in the Backoffice rail: the console screens are English-only in this wave.
-      PortalDestination(
-        icon: Icons.receipt_long_outlined,
-        selectedIcon: Icons.receipt_long,
-        label: (DeliveryStrings _) => 'Statement',
-        build: (PortalApis a, _, __, ___) => CarrierStatementScreen(api: a.statements),
-      ),
-      // ---- carr-cash (feat/carrier-cash-custody) ------------------------------------------------
-      // Rider cash reconciliation, Figma 112:9, with each rider's settlement page (112:235) opening
-      // inside it so this item stays selected, as the design draws it. Right after Statement
-      // because both are the ledger's figures for this company: the statement is what the platform
-      // owes it; this is the cash its riders owe it, and what it owes the platform in turn. Nothing
-      // is inserted before Jobs, which the dashboard reaches with jump(1). A carrier rail being
-      // restructured elsewhere only needs to keep this one destination.
-      PortalDestination(
+      PortalDestination.section(
         icon: Icons.calculate_outlined,
         selectedIcon: Icons.calculate,
-        label: (DeliveryStrings t) => t.carrCashNavLabel,
-        build: (PortalApis a, _, __, ___) => CarrierCashScreen(
-          api: a.accounting.carrierCash,
-          notificationApi: a.notification,
-          orderApi: a.order,
-        ),
+        label: (DeliveryStrings t) => t.carrRidersNavReconciliation,
+        pages: carrierReconciliationPages,
       ),
-      // ---- end carr-cash ------------------------------------------------------------------------
-      // The design's `users-round` glyph. This is the fleet page — the company's own record is on
-      // Settings now, where the design puts it.
-      PortalDestination(
-        icon: Icons.groups_outlined,
-        selectedIcon: Icons.groups,
-        label: (DeliveryStrings t) => t.navCompany,
-        build: (PortalApis a, _, __, ___) =>
-            CompanyScreen(api: a.provider, orderApi: a.order),
+      PortalDestination.section(
+        icon: Icons.people_outline,
+        selectedIcon: Icons.people,
+        label: (DeliveryStrings t) => t.carrRidersNavRidersHr,
+        pages: carrierRidersHrPages,
       ),
-      // Immediately after the fleet, as drawn. Hiring is occasional and must not be missed:
-      // somebody is waiting to be told yes or no, which is not true of any other page here.
+      // The rolling window off the order service — how the work is paying. The ledger's own
+      // figures for a closed period are the statement, under Reconciliation.
       PortalDestination(
-        icon: Icons.description_outlined,
-        selectedIcon: Icons.description,
-        label: (DeliveryStrings t) => t.navApplicants,
-        build: (PortalApis a, _, __, ___) => ApplicantsScreen(
-          api: a.onboarding,
-          providerApi: a.provider,
-          documentsApi: a.documents,
-        ),
+        icon: Icons.bar_chart_outlined,
+        selectedIcon: Icons.bar_chart,
+        label: (DeliveryStrings t) => t.navEarnings,
+        build: (PortalApis a, _, __, ___) => EarningsScreen(api: a.order),
       ),
       // Last, per the design and for the same reason the Backoffice's is: the least-used page here.
       PortalDestination(
@@ -416,6 +434,107 @@ class PortalArea {
       ),
     ],
   );
+
+  /// The pages under the carrier rail's Reconciliation heading, in the order their rows are drawn.
+  ///
+  /// EXTENSION POINT for the pages that square money between this company, its riders and YouDrop:
+  /// append a page here and the heading grows a row for it, with nothing else in the shell to
+  /// change. The heading opens whichever page is first.
+  ///
+  /// The rider cash reconciliation is first, so the heading opens on it: it is the page the design
+  /// draws under this heading (Figma 112:9), and each rider's settlement (112:235) opens inside it,
+  /// so the heading stays selected there too. Its row carries the page's own title rather than the
+  /// design's one-word label, because that word is the heading's, and a row under a heading that
+  /// repeats the heading's name tells the reader nothing.
+  ///
+  /// The statement is here because it is this company's side of that reconciliation: the ledger's
+  /// own figures for a closed period, of what YouDrop owes it and what it owes YouDrop.
+  static final List<PortalPage> carrierReconciliationPages = <PortalPage>[
+    // Every client it reads is passed, as the rail destination it replaces passed them.
+    PortalPage(
+      label: (DeliveryStrings t) => t.carrCashTitle,
+      build: (PortalApis a, _, __, ___) => CarrierCashScreen(
+        api: a.accounting.carrierCash,
+        notificationApi: a.notification,
+        orderApi: a.order,
+      ),
+    ),
+    PortalPage(
+      label: (DeliveryStrings t) => t.carrRidersNavStatement,
+      build: (PortalApis a, _, __, ___) => CarrierStatementScreen(api: a.statements),
+    ),
+  ];
+
+  /// The pages under Riders HR, in the order their rows are drawn.
+  ///
+  /// EXTENSION POINT for pages about the whole fleet's people — attendance across the fleet, and
+  /// payroll with its pay runs (Figma 112:1162) — appended after the applicant queue. A page about
+  /// ONE rider does not belong here: it opens from that rider's profile, through
+  /// [carrierRiderPages].
+  static final List<PortalPage> carrierRidersHrPages = <PortalPage>[
+    // First, so the heading opens on it (Figma 112:413). Every client it reads is passed: the page
+    // it replaced shipped with four of its six withheld, which left names, presence, Add Rider and
+    // suspension dead in the deployed build while every test of the screen itself passed.
+    PortalPage(
+      label: (DeliveryStrings t) => t.carrRidersNavDirectory,
+      build: (PortalApis a, _, __, ___) => RidersDirectoryScreen(
+        api: a.provider,
+        orderApi: a.order,
+        onboardingApi: a.onboarding,
+        managementApi: a.partnerManagement,
+        trackingApi: a.tracking,
+        performanceApi: a.riderPerformance,
+        documentsApi: a.documents,
+        notificationApi: a.notification,
+        riderPages: carrierRiderPages(a),
+      ),
+    ),
+    // Beside the directory. Hiring is occasional and must not be missed: somebody is waiting to be
+    // told yes or no. The directory's Add Rider approves in place; this is the full review, papers
+    // and all.
+    PortalPage(
+      label: (DeliveryStrings t) => t.navApplicants,
+      build: (PortalApis a, _, __, ___) => ApplicantsScreen(
+        api: a.onboarding,
+        providerApi: a.provider,
+        documentsApi: a.documents,
+      ),
+    ),
+    // After the applicant queue, where fleet-wide pages go: the company's shifts and who works
+    // which — the part of the attendance frame (Figma 112:945) that it implies but does not draw.
+    // Each rider's attendance month opens in place from here as well as from their profile.
+    PortalPage(
+      label: (DeliveryStrings t) => t.attendanceNavShifts,
+      build: (PortalApis a, _, __, ___) => ShiftScheduleScreen(
+        api: a.tracking,
+        providerApi: a.provider,
+        onboardingApi: a.onboarding,
+      ),
+    ),
+  ];
+
+  /// Pages about ONE rider: each is a button on that rider's profile and opens in place there, with
+  /// a way back to the profile — see [RiderPage].
+  ///
+  /// EXTENSION POINT for per-rider HR pages: their pay history is next. A function of the clients
+  /// rather than a list, so an entry can hand its page whatever it reads without threading clients
+  /// through the directory and the profile.
+  static List<RiderPage> carrierRiderPages(PortalApis apis) => <RiderPage>[
+        // The rider's attendance month (Figma 112:945) — the same page the Shifts page opens, here
+        // with its way back leading to the profile it was opened from.
+        RiderPage(
+          icon: Icons.event_available_outlined,
+          label: (DeliveryStrings t) => t.attendanceOpenAttendance,
+          build: (BuildContext context, RiderPageContext rider, VoidCallback onBack) =>
+              RiderAttendanceScreen(
+            api: apis.tracking,
+            riderId: rider.riderId,
+            riderName: rider.name,
+            onBack: onBack,
+            backTooltip: DeliveryStrings.of(context).attendanceBackToProfile,
+          ),
+        ),
+      ];
 
   // ---------------------------------------------------------------- backoffice
   static final PortalArea backoffice_ = PortalArea(
@@ -605,12 +724,25 @@ class _PortalShellState extends State<PortalShell> {
   int _area = 0;
   int _index = 0;
 
+  /// Which page under the open heading is showing — see [PortalDestination.section]. Zero on a
+  /// plain destination, and back to zero whenever the rail moves to another destination, because a
+  /// heading opens on its first page.
+  int _page = 0;
+
   void _switchArea(int area) {
     setState(() {
       _area = area;
       // Back to the first destination. Carrying the index across would land on whatever page
       // happened to share that position in the other area.
       _index = 0;
+      _page = 0;
+    });
+  }
+
+  void _open(int index, {int page = 0}) {
+    setState(() {
+      _index = index;
+      _page = page;
     });
   }
 
@@ -689,20 +821,27 @@ class _PortalShellState extends State<PortalShell> {
             onAreaSelected: widget.areas.length > 1 ? _switchArea : null,
             entries: <ConsoleNavEntry>[
               for (final PortalDestination d in area.destinations)
-                ConsoleNavEntry(icon: d.icon, label: d.label(t)),
+                ConsoleNavEntry(
+                  icon: d.icon,
+                  label: d.label(t),
+                  children: <String>[for (final PortalPage p in d.pages) p.label(t)],
+                ),
             ],
             selectedIndex: _index,
-            onSelected: (int i) => setState(() => _index = i),
+            onSelected: (int i) => _open(i),
+            selectedChild: _page,
+            onChildSelected: (int i, int page) => _open(i, page: page),
             userName: widget.session.displayName,
             userRole: area.accountRole(t),
             accountMenu: _accountMenu(t),
           ),
           Expanded(
-            child: area.destinations[_index].build(
+            child: area.destinations[_index].buildPage(
+              _page,
               widget.apis,
               widget.locale,
               widget.onSignOut,
-              (int i) => setState(() => _index = i),
+              (int i) => _open(i),
             ),
           ),
         ],
