@@ -61,11 +61,21 @@ public class ShopOwnership {
     }
 
     /**
-     * Whom a customer's message should be pushed to live. A hint only: a stale or missing answer
-     * costs a live frame, never access — the merchant still reads the thread through {@link #owns}.
+     * Whom a customer's message should be pushed to live: the merchant Product Service confirmed as
+     * the shop's owner within {@link ShopChatProperties#getOwnerConfirmationTtl()}, or nobody.
+     *
+     * <p><strong>The same freshness rule as {@link #owns}, for the same reason.</strong> A live frame
+     * carries the customer's words. A confirmation hours old may name somebody who has since sold the
+     * shop or lost it, and pushing to them would hand a former owner every new message the moment it
+     * is written — the one thing reading through {@link #owns} is careful never to allow. So a stale
+     * confirmation sends nothing: the message waits in the inbox, which asks Product Service again
+     * before it shows anything, and a merchant whose app reads the inbox keeps the confirmation fresh.
      */
     @Transactional(readOnly = true)
-    public Optional<String> lastConfirmedOwnerOf(UUID storeId) {
-        return owners.findById(storeId).map(ChatStoreOwner::getMerchantId);
+    public Optional<String> freshOwnerOf(UUID storeId) {
+        Instant freshSince = Instant.now().minus(properties.getOwnerConfirmationTtl());
+        return owners.findById(storeId)
+                .filter(owner -> owner.getConfirmedAt().isAfter(freshSince))
+                .map(ChatStoreOwner::getMerchantId);
     }
 }

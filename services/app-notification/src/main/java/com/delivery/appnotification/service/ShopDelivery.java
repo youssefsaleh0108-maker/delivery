@@ -43,10 +43,11 @@ public class ShopDelivery {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void deliver(ChatShopMessage message, UUID storeId, String customerId) {
         String recipient = message.getSenderSide() == ShopThreadSide.CUSTOMER
-                ? ownership.lastConfirmedOwnerOf(storeId).orElse(null)
+                ? ownership.freshOwnerOf(storeId).orElse(null)
                 : customerId;
         if (recipient == null || recipient.equals(message.getSenderId())) {
-            // No merchant has opened their inbox since this shop was confirmed: they will see it there.
+            // No owner confirmed recently enough to be trusted with the words: the inbox shows it,
+            // after asking Product Service who the owner is now.
             return;
         }
         try {

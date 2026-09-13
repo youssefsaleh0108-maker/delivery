@@ -116,6 +116,23 @@ class ShopOwnershipAndDeliveryTest {
             assertThat(frame.getValue().storeId()).isEqualTo(STORE);
         }
 
+        /**
+         * A confirmation an hour old may name somebody who has sold the shop since. Pushing to them
+         * would give a former owner every new message the moment it is written.
+         */
+        @Test
+        @DisplayName("sends nothing live on a stale confirmation, which may name a former owner")
+        void a_stale_owner_gets_no_frame() {
+            when(owners.findById(STORE)).thenReturn(Optional.of(
+                    new ChatStoreOwner(STORE, FORMER_OWNER, Instant.now().minus(Duration.ofHours(1)))));
+            ChatShopMessage message = new ChatShopMessage(UUID.randomUUID(), 1L, CUSTOMER,
+                    ShopThreadSide.CUSTOMER, "My address is 12 Armenia Street", null, Instant.now());
+
+            delivery.deliver(message, STORE, CUSTOMER);
+
+            verifyNoInteractions(websocket);
+        }
+
         @Test
         @DisplayName("sends nothing live when no owner has been confirmed; the inbox shows it")
         void no_owner_no_frame() {
