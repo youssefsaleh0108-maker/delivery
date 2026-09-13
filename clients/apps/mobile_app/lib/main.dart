@@ -178,6 +178,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// BACKOFFICE-gated server-side and are not reachable from any screen here.
   late final StatementsApi _statementsApi = StatementsApi(_dio);
   late final ChatApi _chatApi = ChatApi(_dio);
+
+  /// Neighbourhood rooms and conversations with shops — the same App Notification service as order
+  /// chat, and the same [_socket] for their live frames.
+  late final NeighbourhoodChatApi _neighbourhoodChatApi = NeighbourhoodChatApi(_dio);
+  late final ShopChatApi _shopChatApi = ShopChatApi(_dio);
   late final NotificationPrefsApi _prefsApi = NotificationPrefsApi(_dio);
 
   /// One socket for the session's live frames (chat, and whatever joins it later). Lazy, so a
@@ -550,6 +555,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       trackingApi: _trackingApi,
       trackingSocket: _trackingSocket,
       chatApi: _chatApi,
+      neighbourhoodChatApi: _neighbourhoodChatApi,
+      shopChatApi: _shopChatApi,
+      // App Notification's socket, not _trackingSocket: rooms and shop threads ride the socket
+      // order chat already uses for riders.
+      chatSocket: _socket,
       prefsApi: _prefsApi,
       profileApi: _profileApi,
       pointsApi: _pointsApi,
@@ -908,6 +918,8 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               inventoryApi: _inventoryApi,
               staffApi: _storeStaffApi,
               reportsApi: _reportsApi,
+              shopChatApi: _shopChatApi,
+              chatSocket: _socket,
               session: session,
               locale: _locale,
               pendingApproval: pending,

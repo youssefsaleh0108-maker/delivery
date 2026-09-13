@@ -42,6 +42,8 @@ class MerchantShell extends StatefulWidget {
     this.inventoryApi,
     this.staffApi,
     this.reportsApi,
+    this.shopChatApi,
+    this.chatSocket,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -81,6 +83,13 @@ class MerchantShell extends StatefulWidget {
 
   /// Sales reports. Wired now so the dashboard can take it the day the service lands.
   final ReportsApi? reportsApi;
+
+  /// Customers' conversations with the shop, behind Settings' Customer messages row. Null leaves
+  /// the row undrawn.
+  final ShopChatApi? shopChatApi;
+
+  /// App Notification's socket, so a customer's message refreshes the inbox as it arrives.
+  final UserQueueSocket? chatSocket;
 
   final AuthSession session;
 
@@ -255,6 +264,10 @@ class _MerchantShellState extends State<MerchantShell> {
           accountContact: widget.session.email ?? widget.session.username,
           onEditAccount: _openAccountPreferences,
           onShopProfile: _access.isOwner ? _openShopProfile : null,
+          // Owner-only, like the shop profile above it: which shop's threads a merchant may read is
+          // Product Service's "shops you own", so an employee's inbox would always be empty.
+          onShopMessages:
+              _access.isOwner && widget.shopChatApi != null ? _openShopMessages : null,
           onNotificationSettings:
               widget.prefsApi == null ? null : _openNotificationPreferences,
           aggregates: _access.isOwner ? widget.aggregatesApi : null,
@@ -329,6 +342,14 @@ class _MerchantShellState extends State<MerchantShell> {
         storeId: _storeId,
         onBack: navigator.pop,
       ),
+    ));
+  }
+
+  void _openShopMessages() {
+    final ShopChatApi? api = widget.shopChatApi;
+    if (api == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ShopInboxScreen(api: api, socket: widget.chatSocket),
     ));
   }
 

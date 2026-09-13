@@ -12,6 +12,7 @@ import 'my_orders_screen.dart';
 import 'notification_inbox.dart';
 import 'profile_drawer.dart';
 import 'rewards_screen.dart';
+import 'shop_chat_pill.dart';
 import 'store_home_screen.dart';
 
 /// The Customer surface: shops, basket, orders, notifications.
@@ -31,6 +32,9 @@ class CustomerShell extends StatefulWidget {
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
+    this.neighbourhoodChatApi,
+    this.shopChatApi,
+    this.chatSocket,
     this.prefsApi,
     this.profileApi,
     this.pointsApi,
@@ -62,6 +66,18 @@ class CustomerShell extends StatefulWidget {
   /// The tracking service socket, threaded to the tracking panel for pushed positions.
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
+
+  /// The neighbourhood room behind Home's chat entry (Figma 121:102). Null leaves the entry undrawn.
+  final NeighbourhoodChatApi? neighbourhoodChatApi;
+
+  /// Conversations with shops. When present, the shell builds the "Chat with …" pill every dekkane
+  /// shop page draws above its basket bar (see [StorePageScreen.shopChatAction]); null draws none.
+  final ShopChatApi? shopChatApi;
+
+  /// App Notification's socket, which carries chat frames — NOT [trackingSocket], which is the
+  /// tracking service's own endpoint and knows nothing of rooms or shop threads. Null loses only
+  /// liveness in the chat screens.
+  final UserQueueSocket? chatSocket;
   final NotificationPrefsApi? prefsApi;
 
   /// The account's own picture, for the profile drawer and the home header. Null keeps the
@@ -187,6 +203,13 @@ class _CustomerShellState extends State<CustomerShell> {
           transferApi: widget.transferApi,
           onSignOut: widget.onSignOut,
           onOpenBasket: _openBasket,
+          neighbourhoodChatApi: widget.neighbourhoodChatApi,
+          chatSocket: widget.chatSocket,
+          // Built here because this is where the chat client and its socket live; Home hands it to
+          // the neighbourhood browse, which hands it to every shop it opens.
+          shopChatAction: widget.shopChatApi == null
+              ? null
+              : shopChatActionFor(api: widget.shopChatApi!, socket: widget.chatSocket),
         );
       case CustomerNavBar.ordersIndex:
         return MyOrdersScreen(

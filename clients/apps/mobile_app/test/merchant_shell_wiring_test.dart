@@ -47,7 +47,8 @@ void main() {
     dio = Dio(BaseOptions(baseUrl: 'http://gateway'))..httpClientAdapter = adapter;
   });
 
-  Future<void> pumpSettingsTab(WidgetTester tester, {required bool wireStatements}) async {
+  Future<void> pumpSettingsTab(WidgetTester tester,
+      {required bool wireStatements, bool wireChat = false}) async {
     tester.view.physicalSize = const Size(1100, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -61,6 +62,7 @@ void main() {
         storeApi: StoreApi(dio),
         catalogApi: CatalogApi(dio),
         statementsApi: wireStatements ? StatementsApi(dio) : null,
+        shopChatApi: wireChat ? ShopChatApi(dio) : null,
         session: AuthSession(
           accessToken: 'token',
           refreshToken: null,
@@ -105,5 +107,25 @@ void main() {
     expect(find.text(MerchantStatementWords.of(
             tester.element(find.byType(MerchantShell)))
         .title), findsNothing);
+  });
+
+  /// Customers can message a shop from its page; without this row the shop could never read them.
+  testWidgets('the shop can open its customers\' messages from Settings', (WidgetTester tester) async {
+    await pumpSettingsTab(tester, wireStatements: false, wireChat: true);
+    final DeliveryStrings t = DeliveryStrings.of(tester.element(find.byType(MerchantShell)));
+
+    await tester.tap(find.text(t.chatShopInboxTitle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(ShopInboxScreen), findsOneWidget);
+  });
+
+  testWidgets('and without a chat client there is no messages row to open',
+      (WidgetTester tester) async {
+    await pumpSettingsTab(tester, wireStatements: false);
+    final DeliveryStrings t = DeliveryStrings.of(tester.element(find.byType(MerchantShell)));
+
+    expect(find.text(t.chatShopInboxTitle), findsNothing);
   });
 }
