@@ -537,6 +537,46 @@ void main() {
       );
       expect(find.text('LBP 313,000'), findsOneWidget);
     });
+
+    testWidgets('the add button and the stepper glyphs answer a thumb-sized target, drawn as before',
+        (WidgetTester tester) async {
+      int added = 0;
+      await pumpTile(tester,
+          ShelfGridTile(name: 'Halloumi', price: r'$3.50', addLabel: 'Add', onAdd: () => added++));
+
+      // Drawn at the frame's 32px...
+      final Rect button = tester
+          .getRect(find.ancestor(of: find.text('Add'), matching: find.byType(Material)).first);
+      expect(button.height, ShelfGridTile.controlHeight);
+      // ...but a thumb landing just above or below it still adds, rather than opening the product
+      // behind it.
+      await tester.tapAt(button.topCenter - const Offset(0, 6));
+      await tester.tapAt(button.bottomCenter + const Offset(0, 6));
+      expect(added, 2);
+
+      await pumpTile(
+        tester,
+        ShelfGridTile(
+          name: 'Halloumi',
+          price: r'$3.50',
+          addLabel: 'Add',
+          quantityInBasket: 1,
+          onAdd: () => added++,
+          onRemove: () {},
+        ),
+      );
+      for (final IconData glyph in <IconData>[Icons.remove_rounded, Icons.add_rounded]) {
+        final Size target = tester.getSize(
+            find.ancestor(of: find.byIcon(glyph), matching: find.byType(GestureDetector)).first);
+        expect(target.width, greaterThanOrEqualTo(48));
+        expect(target.height, greaterThanOrEqualTo(48));
+        // The glyph itself sits in the same 36 × 32 cell it always did.
+        expect(
+            tester.getSize(
+                find.ancestor(of: find.byIcon(glyph), matching: find.byType(SizedBox)).first),
+            const Size(36, ShelfGridTile.controlHeight));
+      }
+    });
   });
 
   group('YouDropPill', () {

@@ -1083,7 +1083,15 @@ class ShelfGridTile extends StatelessWidget {
   final String? addMoreSemanticLabel;
 
   static const double imageHeight = 100;
+
+  /// How tall the add button and the stepper are drawn: the frame's 32px.
   static const double controlHeight = 32;
+
+  /// How tall a target they answer. A 32px control is under the 44–48px a thumb needs, so the 8px
+  /// above and below the drawn control answer its tap too. That room is spacing the tile already
+  /// had — the gap over the control and part of the bottom padding — moved inside the control's
+  /// box, so the tile keeps its shape and nothing it draws moves.
+  static const double hitHeight = 48;
 
   @override
   Widget build(BuildContext context) {
@@ -1101,7 +1109,12 @@ class ShelfGridTile extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
+            // Short at the bottom by the part of [hitHeight] the control's box spans below it.
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                DeliverySpacing.md - 4,
+                DeliverySpacing.md - 4,
+                DeliverySpacing.md - 4,
+                DeliverySpacing.md - 4 - (hitHeight - controlHeight) / 2),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1146,14 +1159,16 @@ class ShelfGridTile extends StatelessWidget {
                         secondaryPrice!,
                         style: const TextStyle(
                           fontSize: 10,
-                          color: DeliveryColors.faint,
+                          // Muted, not faint: faint is for decoration, and this is a price.
+                          color: DeliveryColors.muted,
                           height: 1.2,
                         ),
                       ),
                     ],
                   ],
                 ),
-                const SizedBox(height: DeliverySpacing.sm),
+                // No gap here: the 8px the tile used to leave above the control is the top of the
+                // control's own tap area now ([hitHeight]).
                 _control(),
               ],
             ),
@@ -1165,30 +1180,44 @@ class ShelfGridTile extends StatelessWidget {
 
   Widget _control() {
     if (onAdd == null) {
-      return const SizedBox(height: controlHeight);
+      return const SizedBox(height: hitHeight);
     }
     final BorderRadius corners = BorderRadius.circular(DeliveryRadius.sm);
     if (quantityInBasket == 0) {
-      return Semantics(
-        button: true,
-        child: Material(
-          color: DeliveryColors.brand,
-          borderRadius: corners,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onAdd,
-            child: SizedBox(
-              height: controlHeight,
-              child: Center(
-                child: Text(
-                  addLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: DeliveryColors.white,
-                    height: 1.2,
+      // Drawn [controlHeight] tall, centred in a [hitHeight] box. A tap on the band above or below
+      // reaches [onAdd] through the outer detector; one on the button itself through the InkWell,
+      // whose ink stays inside the drawn button. Only the button is announced.
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onAdd,
+        child: SizedBox(
+          height: hitHeight,
+          child: Center(
+            child: Semantics(
+              button: true,
+              child: Material(
+                color: DeliveryColors.brand,
+                borderRadius: corners,
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onAdd,
+                  child: SizedBox(
+                    height: controlHeight,
+                    width: double.infinity,
+                    child: Center(
+                      child: Text(
+                        addLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1197,34 +1226,60 @@ class ShelfGridTile extends StatelessWidget {
         ),
       );
     }
-    return Container(
-      height: controlHeight,
-      decoration: BoxDecoration(color: DeliveryColors.brand, borderRadius: corners),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return SizedBox(
+      height: hitHeight,
+      child: Stack(
+        fit: StackFit.expand,
         children: <Widget>[
-          _step(Icons.remove_rounded, onRemove, removeSemanticLabel),
-          Text(
-            '$quantityInBasket',
-            style: const TextStyle(
-                color: DeliveryColors.white, fontWeight: FontWeight.w800, fontSize: 13),
+          Center(
+            child: SizedBox(
+              height: controlHeight,
+              width: double.infinity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: DeliveryColors.brand, borderRadius: corners),
+              ),
+            ),
           ),
-          _step(Icons.add_rounded, onAdd, addMoreSemanticLabel),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              _step(Icons.remove_rounded, onRemove, removeSemanticLabel,
+                  AlignmentDirectional.centerStart),
+              Text(
+                '$quantityInBasket',
+                style: const TextStyle(
+                    color: DeliveryColors.white, fontWeight: FontWeight.w800, fontSize: 13),
+              ),
+              _step(Icons.add_rounded, onAdd, addMoreSemanticLabel, AlignmentDirectional.centerEnd),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _step(IconData icon, VoidCallback? onTap, String? label) {
+  /// One stepper glyph, drawn where the frame draws it — a 36px cell at the pill's end — but
+  /// answering a [hitHeight]-square target that reaches over the band above and below the pill and
+  /// 12px in towards the count. A GestureDetector rather than an InkWell: the old InkWell's ink was
+  /// painted beneath the pill's own fill and never seen, and over the band it would be.
+  Widget _step(IconData icon, VoidCallback? onTap, String? label, AlignmentGeometry end) {
     return Semantics(
       button: true,
       label: label,
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: SizedBox(
-          width: 36,
-          height: controlHeight,
-          child: Icon(icon, size: 17, color: DeliveryColors.white),
+          width: hitHeight,
+          height: hitHeight,
+          child: Align(
+            alignment: end,
+            child: SizedBox(
+              width: 36,
+              height: controlHeight,
+              child: Icon(icon, size: 17, color: DeliveryColors.white),
+            ),
+          ),
         ),
       ),
     );
