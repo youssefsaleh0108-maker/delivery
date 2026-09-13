@@ -14,8 +14,9 @@ class DemandApi {
 
   final Dio _dio;
 
-  /// The windows the screen offers. The server clamps anything else into 60..10080 with no error,
-  /// and never goes below an hour.
+  /// The windows the screen offers, and the only ones the server answers: anything else is a 400.
+  /// Each answer is the snapshot for the window's last fixed boundary — the quarter hour for the
+  /// hour, the hour for the day, midnight UTC for the week — so asking more often changes nothing.
   static const int lastHour = 60;
   static const int lastDay = 24 * 60;
   static const int lastWeek = 7 * 24 * 60;

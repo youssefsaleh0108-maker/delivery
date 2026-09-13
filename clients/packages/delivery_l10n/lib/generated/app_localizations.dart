@@ -13037,7 +13037,7 @@ abstract class DeliveryStrings {
   /// No description provided for @heatmapNoAreaMessage.
   ///
   /// In en, this message translates to:
-  /// **'Add the areas you deliver to, or drop your shop\'s pin, and demand around your shop will show here.'**
+  /// **'Demand shows for the mapped areas near your shop\'s pin. Drop your pin if you haven\'t yet, and nearby areas will appear here once they\'re on the map.'**
   String get heatmapNoAreaMessage;
 
   /// No description provided for @heatmapNotEnoughTitle.
@@ -13117,6 +13117,48 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Not on the demand map'**
   String get heatmapZoneNotOnMap;
+
+  /// No description provided for @heatmapSubtitleDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood pulses over the last 24 hours'**
+  String get heatmapSubtitleDay;
+
+  /// No description provided for @heatmapSubtitleWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood pulses over the last 7 days'**
+  String get heatmapSubtitleWeek;
+
+  /// No description provided for @heatmapUpdatedHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated every hour'**
+  String get heatmapUpdatedHourly;
+
+  /// No description provided for @heatmapUpdatedDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated once a day'**
+  String get heatmapUpdatedDaily;
+
+  /// No description provided for @heatmapLegendRelative.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with the busiest area around you'**
+  String get heatmapLegendRelative;
+
+  /// No description provided for @heatmapNotLiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop isn\'t live yet'**
+  String get heatmapNotLiveTitle;
+
+  /// No description provided for @heatmapNotLiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand around your shop shows here once your shop is published.'**
+  String get heatmapNotLiveMessage;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

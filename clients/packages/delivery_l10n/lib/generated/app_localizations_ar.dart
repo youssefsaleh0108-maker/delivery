@@ -7335,7 +7335,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get heatmapNoAreaMessage =>
-      'أضف المناطق التي توصل إليها أو حدّد موقع متجرك على الخريطة، وسيظهر هنا الطلب من حول متجرك.';
+      'يظهر الطلب للمناطق المحددة على الخريطة قرب موقع متجرك. حدّد موقع متجرك إن لم تفعل بعد، وستظهر هنا المناطق القريبة فور إضافتها إلى الخريطة.';
 
   @override
   String get heatmapNotEnoughTitle => 'لا توجد طلبات كافية بالقرب منك بعد';
@@ -7390,4 +7390,26 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get heatmapZoneNotOnMap => 'ليست على خريطة الطلب';
+
+  @override
+  String get heatmapSubtitleDay => 'نبض الأحياء خلال آخر 24 ساعة';
+
+  @override
+  String get heatmapSubtitleWeek => 'نبض الأحياء خلال آخر 7 أيام';
+
+  @override
+  String get heatmapUpdatedHourly => 'يُحدَّث كل ساعة';
+
+  @override
+  String get heatmapUpdatedDaily => 'يُحدَّث مرة واحدة يومياً';
+
+  @override
+  String get heatmapLegendRelative => 'مقارنةً بأكثر منطقة طلباً من حولك';
+
+  @override
+  String get heatmapNotLiveTitle => 'متجرك غير منشور بعد';
+
+  @override
+  String get heatmapNotLiveMessage =>
+      'سيظهر هنا الطلب من حول متجرك بعد نشر متجرك.';
 }

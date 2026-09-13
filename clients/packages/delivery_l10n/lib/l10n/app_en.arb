@@ -3489,7 +3489,7 @@
   "heatmapNoneOnMap": "These areas aren't on the map yet",
   "heatmapMapUnavailable": "The map can't load right now",
   "heatmapNoAreaTitle": "We don't know your neighbourhood yet",
-  "heatmapNoAreaMessage": "Add the areas you deliver to, or drop your shop's pin, and demand around your shop will show here.",
+  "heatmapNoAreaMessage": "Demand shows for the mapped areas near your shop's pin. Drop your pin if you haven't yet, and nearby areas will appear here once they're on the map.",
   "heatmapNotEnoughTitle": "Not enough orders nearby yet",
   "heatmapNotEnoughMessage": "{count, plural, other{An area appears once {count} different customers have ordered there in this period, so no single customer can be picked out.}}",
   "@heatmapNotEnoughMessage": {
@@ -3510,5 +3510,12 @@
   "heatmapZoneCentreLatRange": "A latitude between -90 and 90",
   "heatmapZoneCentreLngRange": "A longitude between -180 and 180",
   "heatmapZoneOnMap": "On the demand map",
-  "heatmapZoneNotOnMap": "Not on the demand map"
+  "heatmapZoneNotOnMap": "Not on the demand map",
+  "heatmapSubtitleDay": "Neighborhood pulses over the last 24 hours",
+  "heatmapSubtitleWeek": "Neighborhood pulses over the last 7 days",
+  "heatmapUpdatedHourly": "Updated every hour",
+  "heatmapUpdatedDaily": "Updated once a day",
+  "heatmapLegendRelative": "Compared with the busiest area around you",
+  "heatmapNotLiveTitle": "Your shop isn't live yet",
+  "heatmapNotLiveMessage": "Demand around your shop shows here once your shop is published."
 }

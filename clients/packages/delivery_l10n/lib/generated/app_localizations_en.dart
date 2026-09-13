@@ -7328,7 +7328,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get heatmapNoAreaMessage =>
-      'Add the areas you deliver to, or drop your shop\'s pin, and demand around your shop will show here.';
+      'Demand shows for the mapped areas near your shop\'s pin. Drop your pin if you haven\'t yet, and nearby areas will appear here once they\'re on the map.';
 
   @override
   String get heatmapNotEnoughTitle => 'Not enough orders nearby yet';
@@ -7379,4 +7379,27 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get heatmapZoneNotOnMap => 'Not on the demand map';
+
+  @override
+  String get heatmapSubtitleDay => 'Neighborhood pulses over the last 24 hours';
+
+  @override
+  String get heatmapSubtitleWeek => 'Neighborhood pulses over the last 7 days';
+
+  @override
+  String get heatmapUpdatedHourly => 'Updated every hour';
+
+  @override
+  String get heatmapUpdatedDaily => 'Updated once a day';
+
+  @override
+  String get heatmapLegendRelative =>
+      'Compared with the busiest area around you';
+
+  @override
+  String get heatmapNotLiveTitle => 'Your shop isn\'t live yet';
+
+  @override
+  String get heatmapNotLiveMessage =>
+      'Demand around your shop shows here once your shop is published.';
 }

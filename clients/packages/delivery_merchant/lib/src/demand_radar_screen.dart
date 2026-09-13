@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -23,33 +24,46 @@ const double _areaZoom = 14;
 /// customer gets to browse. The endpoint behind it answers MERCHANT (their own shop) and BACKOFFICE
 /// only, and the hosts open it for the shop's owner.
 ///
-/// **What it can say.** Order Manager counts different customers per delivery area around the shop
-/// and answers with a level per area — never a count — and only for areas that reached a privacy
-/// floor (the answer carries it: five customers in the window). So the map draws circles at area
-/// centres labelled "Hamra (High)", the list names the same areas, and when nothing reaches the floor
-/// the screen says so and why, instead of drawing an empty map that reads as a quiet city.
+/// **What it can say.** Order Manager counts different customers per delivery area around the shop —
+/// never the shop owner's own trade — and answers with a level per area, never a count, and only for
+/// areas that reached a privacy floor (the answer carries it: five customers in the window). So the
+/// map draws circles at area centres labelled "Hamra (High)", the list names the same areas, and when
+/// nothing reaches the floor the screen says so and why, instead of drawing an empty map that reads as
+/// a quiet city. Levels are relative to the busiest area shown, and the legend says so: a lone quiet
+/// area is still the high one.
 ///
-/// **Two honest empty states, not one.** A shop with no pin and no delivery areas has no
-/// neighbourhood yet: the platform does not know what "around" means for it. A neighbourhood that is
-/// too quiet to show is a different thing to tell a merchant, and it gets its own words.
+/// **Honest empty states, not one.** A shop with no pin, or no placed area near its pin, has no
+/// neighbourhood yet: the platform does not know what "around" means for it. A neighbourhood too quiet
+/// to show is a different thing to tell a merchant, and it gets its own words. So does a shop that is
+/// not live: its neighbourhood is not served at all, and the 404 that brings is said as "not live
+/// yet" rather than offered as a retry that cannot work.
 ///
 /// **What the frame draws that is not here.** "Trending Searches Near You", with search counts and
 /// Add to Menu / Stock This buttons. Nothing on the platform records what customers search for, so
 /// every figure in that section would be invented; it is left out rather than drawn with numbers the
 /// platform does not have. Its place holds the list of areas around the shop.
 ///
-/// **The map.** flutter_map over OpenStreetMap tiles — the dependency the merchant package already
-/// has for the shop pin, so nothing new is pulled in. Tiles that will not load fall back to the
-/// styled slot the pin map uses, and the list below still names every area. An area the back office
-/// has not placed has no centre: it is listed, and said to be off the map, but never drawn.
+/// **The map.** flutter_map over the platform's one tile setting ([mapTileUrlTemplate]) — the
+/// dependency the merchant package already has for the shop pin, so nothing new is pulled in. Tiles
+/// that will not load fall back to the styled slot the pin map uses, and the list below still names
+/// every area; another window or a pull to refresh gives the tiles another try. An area arriving
+/// without a centre is listed, and said to be off the map, but never drawn — the server counts only
+/// placed areas, so that is a fallback rather than a state the screen expects.
 ///
-/// **Live.** A silent refresh every minute, like the dashboard. The LIVE badge shows only while the
-/// last refresh succeeded; a failed one keeps the last good answer on screen and says it could not
-/// refresh, rather than blanking the map.
+/// **Live, for the last hour.** A silent refresh every minute, like the dashboard. The LIVE badge, the
+/// "real-time" subtitle and "Live Syncing" belong to the hour window alone, and only while the last
+/// refresh held; a failed one keeps the last good answer on screen and says it could not refresh,
+/// rather than blanking the map. The server moves the 24-hour picture on once an hour and the 7-day
+/// one once a day, and those windows say exactly that.
+///
+/// **Only while it can be seen.** The minute refresh stops while another route covers the radar or the
+/// app is hidden — a phone in the background, a browser tab behind others — and coming back refreshes
+/// at once. A window that has merely lost focus keeps refreshing: it is still on screen with LIVE on
+/// it, and a live badge over a frozen map would be worse than the request it saves.
 ///
 /// **Time windows.** The last hour (the frame's "real-time"), 24 hours or 7 days. The frame has no
 /// control for this; without one a quiet evening or a small neighbourhood would show nothing most of
-/// the day. The server never goes below an hour.
+/// the day. The server answers these three and refuses any other.
 class DemandRadarScreen extends StatefulWidget {
   const DemandRadarScreen({
     super.key,
@@ -67,14 +81,14 @@ class DemandRadarScreen extends StatefulWidget {
   /// Drawn as the header's back button when the host has somewhere to go back to.
   final VoidCallback? onBack;
 
-  /// How often the answer is silently refreshed.
+  /// How often the answer is silently refreshed while the radar can be seen.
   final Duration pollInterval;
 
   @override
   State<DemandRadarScreen> createState() => _DemandRadarScreenState();
 }
 
-class _DemandRadarScreenState extends State<DemandRadarScreen> {
+class _DemandRadarScreenState extends State<DemandRadarScreen> with WidgetsBindingObserver {
   static const List<int> _windows = <int>[
     DemandApi.lastHour,
     DemandApi.lastDay,
@@ -91,10 +105,24 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
   /// True when the most recent request failed. The last good answer stays; the LIVE badge goes.
   bool _refreshFailed = false;
 
+  /// True when the answer was a 404: the shop is not live, so it has no neighbourhood to show.
+  bool _notLive = false;
+
   /// Bumped by every request, so an answer for a window the merchant has since left is dropped.
   int _generation = 0;
 
   Timer? _poll;
+
+  /// Whether the app is on screen: resumed, or inactive (visible without focus). Not hidden, paused
+  /// or detached.
+  bool _appOnScreen = true;
+
+  /// Whether no other route covers the radar's.
+  bool _routeOnTop = true;
+
+  /// Set when the refresh was stopped for being unseen, so coming back asks at once instead of
+  /// leaving an old answer up for another minute.
+  bool _stale = false;
 
   late final MapTileWatch _tiles = MapTileWatch(onGiveUp: _tilesGaveUp);
   bool _tilesFailed = false;
@@ -103,13 +131,53 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
   void initState() {
     super.initState();
     if (widget.storeId == null) return;
+    WidgetsBinding.instance.addObserver(this);
+    final AppLifecycleState? lifecycle = WidgetsBinding.instance.lifecycleState;
+    _appOnScreen = lifecycle == null || _isOnScreen(lifecycle);
     _loading = true;
     _load();
+    // The minute refresh starts in didChangeDependencies, which runs next: the first moment the
+    // route can be asked whether it is on top.
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Depends on isCurrent alone, so this runs again exactly when another route covers the radar or
+    // uncovers it. A host with no route around the screen answers null, as good as on top.
+    _routeOnTop = ModalRoute.isCurrentOf(context) ?? true;
+    _syncRefresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appOnScreen = _isOnScreen(state);
+    _syncRefresh();
+  }
+
+  static bool _isOnScreen(AppLifecycleState state) =>
+      state == AppLifecycleState.resumed || state == AppLifecycleState.inactive;
+
+  /// Runs the minute refresh while the radar can be seen, and stops it while it cannot.
+  void _syncRefresh() {
+    if (widget.storeId == null) return;
+    if (!_appOnScreen || !_routeOnTop) {
+      _poll?.cancel();
+      _poll = null;
+      _stale = true;
+      return;
+    }
+    if (_poll != null) return;
     _poll = Timer.periodic(widget.pollInterval, (_) => _load(silent: true));
+    if (_stale) {
+      _stale = false;
+      _load(silent: true);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     _tiles.dispose();
     super.dispose();
@@ -135,14 +203,28 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
         _density = density;
         _loading = false;
         _refreshFailed = false;
+        _notLive = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted || generation != _generation) return;
+      // A 404 is not a failure worth retrying: the neighbourhood of a shop that is not live is not
+      // served at all. Anything else keeps the last good answer and says the refresh failed.
+      final bool notLive = error is DioException && error.response?.statusCode == 404;
       setState(() {
         _loading = false;
-        _refreshFailed = true;
+        _notLive = notLive;
+        _refreshFailed = !notLive;
+        if (notLive) _density = null;
       });
     }
+  }
+
+  /// A refresh somebody asked for: a pull, or Try again. It gives failed tiles another try too, which
+  /// the minute refresh does not — a map whose tiles are blocked would otherwise flash back and give
+  /// up again every minute.
+  Future<void> _refresh() {
+    if (_tilesFailed) setState(() => _tilesFailed = false);
+    return _load();
   }
 
   void _choose(int window) {
@@ -153,6 +235,8 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
       _density = null;
       _refreshFailed = false;
       _loading = true;
+      // A fresh look: tiles that failed a moment ago may load now.
+      _tilesFailed = false;
     });
     _load();
   }
@@ -168,8 +252,15 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
         children: <Widget>[
           _RadarHeader(
             title: t.heatmapTitle,
-            subtitle: t.heatmapSubtitle,
-            liveLabel: density != null && !_refreshFailed ? t.carrBadgeLive : null,
+            subtitle: switch (_window) {
+              DemandApi.lastDay => t.heatmapSubtitleDay,
+              DemandApi.lastWeek => t.heatmapSubtitleWeek,
+              _ => t.heatmapSubtitle,
+            },
+            // LIVE belongs to the hour window, and only while the last refresh held.
+            liveLabel: _window == DemandApi.lastHour && density != null && !_refreshFailed
+                ? t.carrBadgeLive
+                : null,
             region: density?.region,
             onBack: widget.onBack,
             backLabel: t.back,
@@ -190,7 +281,7 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       color: DeliveryColors.brand,
       child: Align(
         alignment: AlignmentDirectional.topCenter,
@@ -205,38 +296,47 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
               DeliverySpacing.lg,
             ),
             children: <Widget>[
-              _windowChips(t),
-              const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-              if (density != null) ...<Widget>[
-                _mapCard(t, density),
-                if (density.zones.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: DeliverySpacing.lg),
-                  YdSectionHeader(title: t.heatmapAreasTitle, fontSize: 15),
-                  const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-                  for (final DemandZone zone in density.zones)
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: DeliverySpacing.md - DeliverySpacing.xs,
-                      ),
-                      child: _AreaRow(zone: zone, strings: t),
-                    ),
-                ],
-              ] else if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: DeliverySpacing.xxl),
-                  child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
-                )
-              else
+              if (_notLive)
+                // No window chips: there is no window in which a shop that is not live has demand.
                 YdEmptyState(
-                  icon: Icons.cloud_off_rounded,
-                  title: t.heatmapCouldNotLoad,
-                  action: YdPillButton.secondary(
-                    label: t.tryAgain,
-                    onPressed: _load,
-                    size: YdPillButtonSize.compact,
-                    expand: false,
+                  icon: Icons.storefront_outlined,
+                  title: t.heatmapNotLiveTitle,
+                  message: t.heatmapNotLiveMessage,
+                )
+              else ...<Widget>[
+                _windowChips(t),
+                const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                if (density != null) ...<Widget>[
+                  _mapCard(t, density),
+                  if (density.zones.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.lg),
+                    YdSectionHeader(title: t.heatmapAreasTitle, fontSize: 15),
+                    const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+                    for (final DemandZone zone in density.zones)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: DeliverySpacing.md - DeliverySpacing.xs,
+                        ),
+                        child: _AreaRow(zone: zone, strings: t),
+                      ),
+                  ],
+                ] else if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: DeliverySpacing.xxl),
+                    child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+                  )
+                else
+                  YdEmptyState(
+                    icon: Icons.cloud_off_rounded,
+                    title: t.heatmapCouldNotLoad,
+                    action: YdPillButton.secondary(
+                      label: t.tryAgain,
+                      onPressed: _refresh,
+                      size: YdPillButtonSize.compact,
+                      expand: false,
+                    ),
                   ),
-                ),
+              ],
             ],
           ),
         ),
@@ -287,7 +387,15 @@ class _DemandRadarScreenState extends State<DemandRadarScreen> {
               const SizedBox(width: DeliverySpacing.sm),
               Flexible(
                 child: Text(
-                  _refreshFailed ? t.heatmapCantRefresh : t.heatmapLiveSyncing,
+                  _refreshFailed
+                      ? t.heatmapCantRefresh
+                      // How often this window's picture actually moves: live for the hour, and
+                      // no livelier than the server's own boundaries for the day and the week.
+                      : switch (_window) {
+                          DemandApi.lastDay => t.heatmapUpdatedHourly,
+                          DemandApi.lastWeek => t.heatmapUpdatedDaily,
+                          _ => t.heatmapLiveSyncing,
+                        },
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.end,
@@ -404,7 +512,8 @@ class _RadarHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  /// Null hides the badge — nothing is live until an answer has arrived and the last refresh held.
+  /// Null hides the badge — nothing is live until an answer has arrived and the last refresh held,
+  /// and nothing but the hour window is live at all.
   final String? liveLabel;
 
   /// The region most of the shop's areas name. Data from the server, never a translated string.
@@ -573,7 +682,8 @@ class _DensityMapState extends State<_DensityMap> {
   @override
   void initState() {
     super.initState();
-    // The deadline starts when a map is actually on screen, not when the page opens.
+    // The deadline starts when a map is actually on screen, not when the page opens — and again
+    // for each map built after tiles failed, which is what gives a retry its fresh attempt.
     widget.tiles.start();
   }
 
@@ -721,7 +831,11 @@ class _MapLabel extends StatelessWidget {
   }
 }
 
-/// What the circle colours mean.
+/// What the circle colours mean, and what they are measured against.
+///
+/// The scale is said because it is relative: High is the busiest area shown, whatever that is. A
+/// lone area five customers deep over a week reads High, and without this line a merchant would read
+/// that as a busy street rather than the busiest of a quiet few.
 class _Legend extends StatelessWidget {
   const _Legend({required this.strings});
 
@@ -729,30 +843,41 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: DeliverySpacing.md,
-      runSpacing: DeliverySpacing.xs,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        for (final DemandLevel level in <DemandLevel>[
-          DemandLevel.high,
-          DemandLevel.medium,
-          DemandLevel.low,
-        ])
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(color: _levelColor(level), shape: BoxShape.circle),
+        Wrap(
+          spacing: DeliverySpacing.md,
+          runSpacing: DeliverySpacing.xs,
+          children: <Widget>[
+            for (final DemandLevel level in <DemandLevel>[
+              DemandLevel.high,
+              DemandLevel.medium,
+              DemandLevel.low,
+            ])
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: _levelColor(level), shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: DeliverySpacing.xs + 2),
+                  Text(
+                    _levelLabel(strings, level)!,
+                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
+                  ),
+                ],
               ),
-              const SizedBox(width: DeliverySpacing.xs + 2),
-              Text(
-                _levelLabel(strings, level)!,
-                style: const TextStyle(fontSize: 12, color: DeliveryColors.muted),
-              ),
-            ],
-          ),
+          ],
+        ),
+        const SizedBox(height: DeliverySpacing.xs),
+        Text(
+          strings.heatmapLegendRelative,
+          style: const TextStyle(fontSize: 11, color: DeliveryColors.faint, height: 1.3),
+        ),
       ],
     );
   }
