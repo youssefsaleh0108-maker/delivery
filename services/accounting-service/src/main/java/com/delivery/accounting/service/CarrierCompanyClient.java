@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -65,6 +66,10 @@ public class CarrierCompanyClient {
      * rendering an empty statement, which is the whole failure this replaces.
      *
      * @param bearerToken the caller's own Authorization header value, without the "Bearer " prefix
+     * @throws NoCompanyException    the caller is staff of no company — the caller's 403
+     * @throws IllegalStateException Order Manager could not be asked or gave no readable answer,
+     *                               whatever went wrong on the way — the caller's 503, never
+     *                               "no company"
      */
     public String companyIdFor(String bearerToken) {
         try {
@@ -90,6 +95,16 @@ public class CarrierCompanyClient {
             // "you have no company" — that reads to a carrier as "you are owed nothing".
             log.error("Could not resolve the caller's delivery company: {} {}",
                     e.getStatusCode(), e.getMessage());
+            throw new IllegalStateException(
+                    "Could not reach Order Manager to find your delivery company", e);
+
+        } catch (RestClientException e) {
+            // No answer to judge at all: the connection was refused or timed out
+            // (ResourceAccessException), or what came back could not be read as a company. Every
+            // caller turns IllegalStateException into a 503; letting this through instead made
+            // every carrier page a 500 for as long as Order Manager was down. And, for the reason
+            // above, never "you have no company".
+            log.error("Could not resolve the caller's delivery company: {}", e.getMessage());
             throw new IllegalStateException(
                     "Could not reach Order Manager to find your delivery company", e);
         }
