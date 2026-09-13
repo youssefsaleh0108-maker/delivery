@@ -109,14 +109,27 @@ public class OrderTrackingAttendanceClient implements RiderAttendanceSource {
         }
 
         Map<String, PayslipCalculator.RiderHours> riders = new LinkedHashMap<>();
+        Map<String, String> unreadable = new LinkedHashMap<>();
         for (JsonNode rider : body.path("riders")) {
             String id = rider.path("riderId").asText(null);
+            if (id == null || id.isBlank()) {
+                // Figures belonging to nobody. If that rider is on the run, their payslip says
+                // attendance did not list them, which is exactly true.
+                log.warn("Attendance for {} {}..{} listed a rider with no id", carrierRef, from, to);
+                continue;
+            }
             JsonNode totals = rider.path("totals");
-            if (id == null || id.isBlank() || !totals.isObject()
+            // One rider's figures not to be believed — or listed twice, so neither is — cost that
+            // rider's hours, not everybody's.
+            if (riders.containsKey(id) || unreadable.containsKey(id) || !totals.isObject()
                     || !whole(totals, "workedSeconds") || !whole(totals, "manualSeconds")
                     || !whole(totals, "overtimeSeconds") || !whole(totals, "lates")
                     || !whole(totals, "absences")) {
-                return AttendanceRead.unavailable("UNREADABLE");
+                log.warn("Attendance for {} {}..{} gave figures for {} that cannot be paid on",
+                        carrierRef, from, to, id);
+                riders.remove(id);
+                unreadable.put(id, "UNREADABLE");
+                continue;
             }
             riders.put(id, new PayslipCalculator.RiderHours(
                     totals.path("workedSeconds").asLong(),
@@ -125,7 +138,7 @@ public class OrderTrackingAttendanceClient implements RiderAttendanceSource {
                     totals.path("lates").asInt(),
                     totals.path("absences").asInt()));
         }
-        return AttendanceRead.of(riders);
+        return AttendanceRead.of(riders, unreadable);
     }
 
     /** A present, whole, non-negative number: anything else is not a figure to pay on. */

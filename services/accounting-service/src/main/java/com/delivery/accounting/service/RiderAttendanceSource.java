@@ -13,6 +13,15 @@ import java.util.Map;
  * for their deliveries, and none may be mistaken for "nobody worked any hours". So this never
  * throws: every failure is an {@link AttendanceRead} that says it is unavailable and why, the run
  * computes without hours, and it says so on the page and at approval.
+ *
+ * <p><strong>Per rider, not per fleet.</strong> The read is one call for the whole fleet, but one
+ * rider's figures that cannot be believed make that rider's hours unknown and nobody else's: the rider
+ * is named at approval and everyone else is paid their hours.
+ *
+ * <p><strong>Moves between companies are order-tracking's to clip.</strong> Every figure it gives a
+ * company is cut to the rider's time on that company's fleet (the contract's "Whose time a company
+ * sees"): a rider who joined or left mid-period is listed with their own part only. So payroll pays
+ * exactly the figures it is given and adds no adjustment of its own for a move.
  */
 public interface RiderAttendanceSource {
 
@@ -31,20 +40,29 @@ public interface RiderAttendanceSource {
     /**
      * What came back.
      *
-     * @param reason why it is unavailable, as a code the page words: {@code NOT_DEPLOYED},
-     *               {@code REFUSED}, {@code PERIOD_REFUSED}, {@code UNREACHABLE}, {@code MISMATCH}
-     *               or {@code UNREADABLE}; null when available
-     * @param riders rider to totals when available; empty otherwise
+     * @param reason     why the whole read is unavailable, as a code the page words:
+     *                   {@code NOT_DEPLOYED}, {@code REFUSED}, {@code PERIOD_REFUSED},
+     *                   {@code UNREACHABLE}, {@code MISMATCH} or {@code UNREADABLE}; null when
+     *                   available
+     * @param riders     rider to totals when available; empty otherwise
+     * @param unreadable riders the read listed whose own figures could not be believed, with why
+     *                   ({@code UNREADABLE}); never in {@code riders}
      */
     record AttendanceRead(boolean available, String reason,
-                          Map<String, PayslipCalculator.RiderHours> riders) {
+                          Map<String, PayslipCalculator.RiderHours> riders,
+                          Map<String, String> unreadable) {
 
         public static AttendanceRead of(Map<String, PayslipCalculator.RiderHours> riders) {
-            return new AttendanceRead(true, null, Map.copyOf(riders));
+            return of(riders, Map.of());
+        }
+
+        public static AttendanceRead of(Map<String, PayslipCalculator.RiderHours> riders,
+                                        Map<String, String> unreadable) {
+            return new AttendanceRead(true, null, Map.copyOf(riders), Map.copyOf(unreadable));
         }
 
         public static AttendanceRead unavailable(String reason) {
-            return new AttendanceRead(false, reason, Map.of());
+            return new AttendanceRead(false, reason, Map.of(), Map.of());
         }
     }
 }

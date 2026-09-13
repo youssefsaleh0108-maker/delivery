@@ -295,9 +295,19 @@ public class CarrierPayrollService {
     public record LineView(CarrierPayLine line, String createdByName) {
     }
 
-    /** @param hoursUnknown the rules pay or judge hours and none were read for this rider */
+    /**
+     * @param hoursUnknown the rules pay or judge hours and none were read for this rider
+     * @param hoursReason  why, when they are unknown: the whole read's reason, {@code UNREADABLE} for
+     *                     this rider's own figures, or {@code NOT_LISTED} when attendance gave no time
+     *                     of theirs with the company in the period; null otherwise
+     */
     public record PayslipView(CarrierPayslip slip, String name, List<LineView> lines,
-                              boolean hoursUnknown, String paidByName, String failedByName) {
+                              boolean hoursUnknown, String hoursReason, String paidByName,
+                              String failedByName) {
+    }
+
+    /** A rider on a run whose hours are unknown, named for whoever approves it, and why. */
+    public record MissingHours(String riderRef, String name, String reason) {
     }
 
     /**
@@ -333,13 +343,16 @@ public class CarrierPayrollService {
      * @param periodChanged     the rules now cut this draft's days into a different period
      * @param readBeforePeriodEnd this draft's figures were last read before its period ended: it is
      *                          recomputed before it can be approved
+     * @param hoursMissingFor   the riders whose hours the rules need and this run does not have, in
+     *                          payslip order — one rider's, several, or everyone's when the whole
+     *                          read failed
      */
     public record RunView(CarrierPayRun run, PolicyView policy, String approvedByName,
                           List<PayslipView> payslips, Totals totals,
                           List<CorrectionView> corrections, List<EventView> history,
                           boolean periodOver, long jobsSinceComputed,
                           boolean needsAcknowledgement, boolean periodChanged,
-                          boolean readBeforePeriodEnd) {
+                          boolean readBeforePeriodEnd, List<MissingHours> hoursMissingFor) {
     }
 
     public enum ApprovalOutcome {
@@ -965,12 +978,18 @@ public class CarrierPayrollService {
 
     // ------------------------------------------------------------------------------ computing
 
-    /** The hours a computation uses, and where they came from. */
+    /**
+     * The hours a computation uses, and where they came from.
+     *
+     * @param unreadable riders the read listed whose own figures were not believed, with why: their
+     *                   hours are unknown, and nobody else's are
+     */
     private record Hours(Attendance status, String note, Instant readAt,
-                         Map<String, RiderHours> riders, boolean fresh) {
+                         Map<String, RiderHours> riders, Map<String, String> unreadable,
+                         boolean fresh) {
 
         static Hours notNeeded() {
-            return new Hours(Attendance.NOT_NEEDED, null, null, Map.of(), false);
+            return new Hours(Attendance.NOT_NEEDED, null, null, Map.of(), Map.of(), false);
         }
     }
 
@@ -983,8 +1002,8 @@ public class CarrierPayrollService {
         Instant at = now();
         AttendanceRead read = attendance.fleet(bearer, company, zone, period.from(), period.to());
         return read.available()
-                ? new Hours(Attendance.INCLUDED, null, at, read.riders(), true)
-                : new Hours(Attendance.UNAVAILABLE, read.reason(), at, Map.of(), true);
+                ? new Hours(Attendance.INCLUDED, null, at, read.riders(), read.unreadable(), true)
+                : new Hours(Attendance.UNAVAILABLE, read.reason(), at, Map.of(), Map.of(), true);
     }
 
     /** The copy a draft already holds, under the rules in force now. Never a live read. */
@@ -994,17 +1013,24 @@ public class CarrierPayrollService {
         }
         return switch (run.getAttendance()) {
             // The rules came to need hours after this draft was computed: nobody has read them.
-            case NOT_NEEDED -> new Hours(Attendance.UNAVAILABLE, "NOT_READ", null, Map.of(), false);
+            case NOT_NEEDED -> new Hours(Attendance.UNAVAILABLE, "NOT_READ", null, Map.of(),
+                    Map.of(), false);
             case UNAVAILABLE -> new Hours(Attendance.UNAVAILABLE, run.getAttendanceNote(),
-                    run.getAttendanceAt(), Map.of(), false);
+                    run.getAttendanceAt(), Map.of(), Map.of(), false);
             case INCLUDED -> {
                 Map<String, RiderHours> riders = new HashMap<>();
+                Map<String, String> unreadable = new HashMap<>();
                 for (CarrierPayAttendance row : snapshots.findByRunId(run.getId())) {
-                    riders.put(row.getRiderRef(), new RiderHours(row.getWorkedSeconds(),
-                            row.getManualSeconds(), row.getOvertimeSeconds(), row.getLates(),
-                            row.getAbsences()));
+                    if (row.isReadable()) {
+                        riders.put(row.getRiderRef(), new RiderHours(row.getWorkedSeconds(),
+                                row.getManualSeconds(), row.getOvertimeSeconds(), row.getLates(),
+                                row.getAbsences()));
+                    } else {
+                        unreadable.put(row.getRiderRef(), row.getUnavailableReason());
+                    }
                 }
-                yield new Hours(Attendance.INCLUDED, null, run.getAttendanceAt(), riders, false);
+                yield new Hours(Attendance.INCLUDED, null, run.getAttendanceAt(), riders,
+                        unreadable, false);
             }
         };
     }
@@ -1153,12 +1179,19 @@ public class CarrierPayrollService {
         payslips.flush();
 
         if (hours.fresh() && hours.status() == Attendance.INCLUDED) {
-            snapshots.saveAll(hours.riders().entrySet().stream()
+            List<CarrierPayAttendance> copies = new ArrayList<>();
+            hours.riders().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
-                    .map(e -> CarrierPayAttendance.of(id, e.getKey(), e.getValue().workedSeconds(),
-                            e.getValue().manualSeconds(), e.getValue().overtimeSeconds(),
-                            e.getValue().lates(), e.getValue().absences()))
-                    .toList());
+                    .forEach(e -> copies.add(CarrierPayAttendance.of(id, e.getKey(),
+                            e.getValue().workedSeconds(), e.getValue().manualSeconds(),
+                            e.getValue().overtimeSeconds(), e.getValue().lates(),
+                            e.getValue().absences())));
+            // Kept with no figures, so an edit or the approval still knows why they are unknown.
+            hours.unreadable().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(e -> copies.add(
+                            CarrierPayAttendance.unreadable(id, e.getKey(), e.getValue())));
+            snapshots.saveAll(copies);
         }
         if (delivered.fresh() && delivered.source() == Deliveries.ORDERS) {
             deliveredCopies.saveAll(delivered.riders().entrySet().stream()
@@ -1317,7 +1350,8 @@ public class CarrierPayrollService {
     private record RunData(CarrierPayRun run, CarrierPayPolicy policy, boolean aligned,
                            List<CarrierPayslip> slips, List<CarrierPayLine> lines,
                            List<CarrierPayAdjustment> corrections,
-                           List<CarrierPayrollEvent> history, long jobsSinceComputed) {
+                           List<CarrierPayrollEvent> history, long jobsSinceComputed,
+                           Map<String, String> unreadableHours) {
     }
 
     private RunData load(CarrierPayRun run) {
@@ -1337,7 +1371,37 @@ public class CarrierPayrollService {
                 run.getDeliveries() == Deliveries.LEDGER
                         ? riderLedger.countJobsForCarrierRecordedAfter(run.getCarrierRef(),
                                 period.startIn(zone), period.endIn(zone), run.getComputedAt())
-                        : 0L);
+                        : 0L,
+                unreadableHours(run));
+    }
+
+    /** The riders whose own figures a run's attendance read did not believe, with why. */
+    private Map<String, String> unreadableHours(CarrierPayRun run) {
+        if (run.getAttendance() != Attendance.INCLUDED) {
+            return Map.of();
+        }
+        Map<String, String> out = new HashMap<>();
+        for (CarrierPayAttendance row : snapshots.findByRunId(run.getId())) {
+            if (!row.isReadable()) {
+                out.put(row.getRiderRef(), row.getUnavailableReason());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Why one rider's hours are unknown. The whole read failed or was never made — its reason; this
+     * rider's own figures were not believed; or attendance listed no time of theirs with the company
+     * in the period. Figures are clipped to each rider's time on the fleet, so a rider who joined or
+     * left mid-period is listed with their part — one who is not listed at all has no time with the
+     * company that attendance knows of.
+     */
+    private static String hoursReason(CarrierPayRun run, Map<String, String> unreadable,
+                                      String riderRef) {
+        if (run.getAttendance() != Attendance.INCLUDED) {
+            return run.getAttendanceNote() == null ? "NOT_READ" : run.getAttendanceNote();
+        }
+        return unreadable.getOrDefault(riderRef, "NOT_LISTED");
     }
 
     /** Names are resolved outside the read transaction: a Keycloak lookup holds no connection. */
@@ -1357,10 +1421,15 @@ public class CarrierPayrollService {
                                 : nameOf(line.getCreatedBy()))));
 
         List<PayslipView> slips = d.slips().stream()
-                .map(slip -> new PayslipView(slip, nameOf(slip.getRiderRef()),
-                        List.copyOf(linesByRider.getOrDefault(slip.getRiderRef(), List.of())),
-                        needsHours && slip.figures().workedSeconds() == null,
-                        nameOf(slip.getPaidBy()), nameOf(slip.getFailedBy())))
+                .map(slip -> {
+                    boolean unknown = needsHours && slip.figures().workedSeconds() == null;
+                    return new PayslipView(slip, nameOf(slip.getRiderRef()),
+                            List.copyOf(linesByRider.getOrDefault(slip.getRiderRef(), List.of())),
+                            unknown,
+                            unknown ? hoursReason(run, d.unreadableHours(), slip.getRiderRef())
+                                    : null,
+                            nameOf(slip.getPaidBy()), nameOf(slip.getFailedBy()));
+                })
                 .sorted(Comparator.comparing((PayslipView v) -> v.name() == null)
                         .thenComparing(v -> v.name() == null ? "" : v.name(),
                                 String.CASE_INSENSITIVE_ORDER)
@@ -1370,6 +1439,10 @@ public class CarrierPayrollService {
         boolean hoursMissing = needsHours && (run.getAttendance() != Attendance.INCLUDED
                 || slips.stream().anyMatch(PayslipView::hoursUnknown));
         boolean periodOver = today().isAfter(run.getPeriodTo());
+        List<MissingHours> missing = slips.stream()
+                .filter(PayslipView::hoursUnknown)
+                .map(v -> new MissingHours(v.slip().getRiderRef(), v.name(), v.hoursReason()))
+                .toList();
         return new RunView(run, policyView(d.policy()), nameOf(run.getApprovedBy()), slips,
                 totals(d.slips()),
                 d.corrections().stream()
@@ -1383,7 +1456,8 @@ public class CarrierPayrollService {
                 run.isDraft() && (hoursMissing || deliveriesUncounted(run, d.policy()))
                         && !slips.isEmpty(),
                 run.isDraft() && !d.aligned(),
-                run.isDraft() && periodOver && readBeforeItEnded(run));
+                run.isDraft() && periodOver && readBeforeItEnded(run),
+                missing);
     }
 
     static Totals totals(List<CarrierPayslip> slips) {

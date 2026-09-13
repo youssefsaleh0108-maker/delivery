@@ -14,6 +14,10 @@ import jakarta.persistence.Table;
  * arrival, a session still open, an office entry made weeks later — so the live figures are not the
  * ones a run was computed with. Only an explicit recompute of a draft replaces these rows; editing a
  * draft and approving it read them, and an approved run keeps them as the hours its approver saw.
+ *
+ * <p>A rider the read listed whose own figures could not be believed is kept too, with no figures and
+ * the reason: their hours are unknown and everyone else's are not, and an edit or the approval still
+ * knows why without reading attendance again.
  */
 @Entity
 @Table(name = "carrier_pay_attendance")
@@ -29,20 +33,24 @@ public class CarrierPayAttendance {
     @Column(name = "rider_ref", nullable = false, updatable = false, length = 64)
     private String riderRef;
 
-    @Column(name = "worked_seconds", nullable = false, updatable = false)
-    private long workedSeconds;
+    @Column(name = "worked_seconds", updatable = false)
+    private Long workedSeconds;
 
-    @Column(name = "manual_seconds", nullable = false, updatable = false)
-    private long manualSeconds;
+    @Column(name = "manual_seconds", updatable = false)
+    private Long manualSeconds;
 
-    @Column(name = "overtime_seconds", nullable = false, updatable = false)
-    private long overtimeSeconds;
+    @Column(name = "overtime_seconds", updatable = false)
+    private Long overtimeSeconds;
 
-    @Column(name = "lates", nullable = false, updatable = false)
-    private int lates;
+    @Column(name = "lates", updatable = false)
+    private Integer lates;
 
-    @Column(name = "absences", nullable = false, updatable = false)
-    private int absences;
+    @Column(name = "absences", updatable = false)
+    private Integer absences;
+
+    /** Why this rider's figures were not believed, as a code; null when they were. */
+    @Column(name = "unavailable_reason", updatable = false, length = 32)
+    private String unavailableReason;
 
     protected CarrierPayAttendance() {
         // for JPA
@@ -63,6 +71,21 @@ public class CarrierPayAttendance {
         return row;
     }
 
+    /** A rider the read listed whose figures could not be paid on: no figures, and why. */
+    public static CarrierPayAttendance unreadable(UUID runId, String riderRef, String reason) {
+        CarrierPayAttendance row = new CarrierPayAttendance();
+        row.id = UUID.randomUUID();
+        row.runId = runId;
+        row.riderRef = riderRef;
+        row.unavailableReason = reason;
+        return row;
+    }
+
+    /** Whether this row carries figures. When false every figure is null and the reason says why. */
+    public boolean isReadable() {
+        return unavailableReason == null;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -75,23 +98,27 @@ public class CarrierPayAttendance {
         return riderRef;
     }
 
-    public long getWorkedSeconds() {
+    public Long getWorkedSeconds() {
         return workedSeconds;
     }
 
-    public long getManualSeconds() {
+    public Long getManualSeconds() {
         return manualSeconds;
     }
 
-    public long getOvertimeSeconds() {
+    public Long getOvertimeSeconds() {
         return overtimeSeconds;
     }
 
-    public int getLates() {
+    public Integer getLates() {
         return lates;
     }
 
-    public int getAbsences() {
+    public Integer getAbsences() {
         return absences;
+    }
+
+    public String getUnavailableReason() {
+        return unavailableReason;
     }
 }

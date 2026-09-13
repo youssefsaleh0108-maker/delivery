@@ -234,21 +234,34 @@ CREATE INDEX idx_payslip_rider ON carrier_payslip (rider_ref);
 -- a late delivery can put them on a payslip — and only an explicit recompute of a draft reads them
 -- again. Editing a draft's lines and approving it use this copy, never a live read, so an approved
 -- run's hours are the hours its approver saw.
+--
+-- Order-tracking clips every rider's figures to their time on this company's fleet, so a rider who
+-- joined or left mid-period is copied with their own part only, and payroll adds nothing for a move.
 
 CREATE TABLE carrier_pay_attendance (
-    id                uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
-    run_id            uuid         NOT NULL REFERENCES carrier_pay_run (id),
-    rider_ref         varchar(64)  NOT NULL,
-    worked_seconds    bigint       NOT NULL,
-    manual_seconds    bigint       NOT NULL,
-    overtime_seconds  bigint       NOT NULL,
-    lates             integer      NOT NULL,
-    absences          integer      NOT NULL,
+    id                  uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id              uuid         NOT NULL REFERENCES carrier_pay_run (id),
+    rider_ref           varchar(64)  NOT NULL,
+    -- All null, with the reason, for a rider the read listed whose own figures could not be
+    -- believed: that rider's hours are unknown, and nobody else's.
+    worked_seconds      bigint,
+    manual_seconds      bigint,
+    overtime_seconds    bigint,
+    lates               integer,
+    absences            integer,
+    unavailable_reason  varchar(32),
 
     CONSTRAINT uq_pay_attendance_rider UNIQUE (run_id, rider_ref),
     CONSTRAINT chk_pay_attendance_facts
         CHECK (worked_seconds >= 0 AND manual_seconds >= 0 AND overtime_seconds >= 0
-            AND lates >= 0 AND absences >= 0)
+            AND lates >= 0 AND absences >= 0),
+    CONSTRAINT chk_pay_attendance_read
+        CHECK ((unavailable_reason IS NULL AND worked_seconds IS NOT NULL
+                AND manual_seconds IS NOT NULL AND overtime_seconds IS NOT NULL
+                AND lates IS NOT NULL AND absences IS NOT NULL)
+            OR (unavailable_reason IS NOT NULL AND worked_seconds IS NULL
+                AND manual_seconds IS NULL AND overtime_seconds IS NULL
+                AND lates IS NULL AND absences IS NULL))
 );
 
 -- The deliveries a run was computed with, the same way.

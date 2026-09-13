@@ -521,6 +521,14 @@ public class CarrierPayrollController {
         out.put("periodOver", view.periodOver());
         out.put("jobsSinceComputed", view.jobsSinceComputed());
         out.put("needsAcknowledgement", view.needsAcknowledgement());
+        // Named, so whoever approves without them knows whose hours they are leaving out.
+        out.put("hoursMissingFor", view.hoursMissingFor().stream().map(m -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("riderRef", m.riderRef());
+            row.put("name", m.name());
+            row.put("reason", m.reason());
+            return row;
+        }).toList());
         out.put("periodChanged", view.periodChanged());
         out.put("policy", policyPayload(view.policy()));
 
@@ -587,6 +595,7 @@ public class CarrierPayrollController {
         out.put("lates", f.lates());
         out.put("absences", f.absences());
         out.put("hoursUnknown", view.hoursUnknown());
+        out.put("hoursReason", view.hoursReason());
         out.put("basePay", money(f.basePay()));
         out.put("deliveryPay", money(f.deliveryPay()));
         out.put("bonuses", money(f.bonuses()));

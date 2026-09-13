@@ -3,8 +3,10 @@ package com.delivery.accounting.service;
 import java.net.ConnectException;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
@@ -122,23 +124,51 @@ class OrderTrackingAttendanceClientTest {
         assertThat(read().reason()).isEqualTo("MISMATCH");
     }
 
+    private static String twoRiders(String youssef, String rania) {
+        return """
+                {"carrierId":"provider-77","zone":"Asia/Beirut","from":"2026-10-01","to":"2026-10-15",
+                 "riders":[{"riderId":"kc-youssef","hasSchedule":true,"totals":%s},
+                           {"riderId":"kc-rania","hasSchedule":false,"totals":%s}]}
+                """.formatted(youssef, rania);
+    }
+
+    /**
+     * The read is one call for the fleet, but a figure that cannot be believed is one rider's: their
+     * hours are unknown, and everyone else's are still read and paid.
+     */
     @Test
-    @DisplayName("totals that are missing, fractional or negative make the whole read unreadable")
+    @DisplayName("one rider's totals that are missing, fractional or negative make that rider's hours unknown, and nobody else's")
+    void oneUnreadableRider() {
+        for (String bad : List.of(
+                "{\"workedSeconds\":12.5,\"manualSeconds\":0,\"overtimeSeconds\":0,\"lates\":0,"
+                        + "\"absences\":0}",
+                "{\"workedSeconds\":-1,\"manualSeconds\":0,\"overtimeSeconds\":0,\"lates\":0,"
+                        + "\"absences\":0}",
+                "{\"manualSeconds\":0,\"overtimeSeconds\":0,\"lates\":0,\"absences\":0}",
+                "null")) {
+            server.reset();
+            server.expect(requestTo(URL)).andRespond(withSuccess(twoRiders(bad, TOTALS),
+                    MediaType.APPLICATION_JSON));
+
+            RiderAttendanceSource.AttendanceRead read = read();
+
+            assertThat(read.available()).as(bad).isTrue();
+            assertThat(read.unreadable()).as(bad).containsExactly(entry("kc-youssef", "UNREADABLE"));
+            assertThat(read.riders()).as(bad).containsOnlyKeys("kc-rania");
+        }
+
+        // Listed twice: neither set of figures is believed.
+        server.reset();
+        server.expect(requestTo(URL)).andRespond(withSuccess(twoRiders(TOTALS, TOTALS)
+                .replace("kc-rania", "kc-youssef"), MediaType.APPLICATION_JSON));
+        RiderAttendanceSource.AttendanceRead twice = read();
+        assertThat(twice.riders()).isEmpty();
+        assertThat(twice.unreadable()).containsOnlyKeys("kc-youssef");
+    }
+
+    @Test
+    @DisplayName("an answer with no list of riders is unreadable as a whole")
     void unreadable() {
-        server.expect(requestTo(URL)).andRespond(withSuccess(
-                body("provider-77", "Asia/Beirut", "{\"workedSeconds\":12.5,\"manualSeconds\":0,"
-                        + "\"overtimeSeconds\":0,\"lates\":0,\"absences\":0}"),
-                MediaType.APPLICATION_JSON));
-        assertThat(read().reason()).isEqualTo("UNREADABLE");
-
-        server.reset();
-        server.expect(requestTo(URL)).andRespond(withSuccess(
-                body("provider-77", "Asia/Beirut", "{\"workedSeconds\":-1,\"manualSeconds\":0,"
-                        + "\"overtimeSeconds\":0,\"lates\":0,\"absences\":0}"),
-                MediaType.APPLICATION_JSON));
-        assertThat(read().reason()).isEqualTo("UNREADABLE");
-
-        server.reset();
         server.expect(requestTo(URL)).andRespond(withSuccess("{\"carrierId\":\"provider-77\"}",
                 MediaType.APPLICATION_JSON));
         assertThat(read().reason()).isEqualTo("UNREADABLE");

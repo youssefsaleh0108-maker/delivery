@@ -169,8 +169,10 @@ class CarrierPayrollAccessTest {
                         List.of(new CarrierPayrollService.LineView(deliveries, null),
                                 new CarrierPayrollService.LineView(hours, null),
                                 new CarrierPayrollService.LineView(bonus, "Kamal M.")),
-                        false, null, null)),
-                totals, List.of(), List.of(), true, 2, false, false, false);
+                        false, null, null, null)),
+                totals, List.of(), List.of(), true, 2, false, false, false,
+                List.of(new CarrierPayrollService.MissingHours("rider-rania", "Rania Ghandour",
+                        "UNREADABLE")));
     }
 
     // ----------------------------------------------------------------------------- the company
@@ -276,6 +278,9 @@ class CarrierPayrollAccessTest {
                 .andExpect(jsonPath("$.deliveriesReason").doesNotExist())
                 .andExpect(jsonPath("$.deliveriesAt").value("2026-10-20T09:00:00Z"))
                 .andExpect(jsonPath("$.readBeforePeriodEnd").value(false))
+                .andExpect(jsonPath("$.hoursMissingFor[0].name").value("Rania Ghandour"))
+                .andExpect(jsonPath("$.hoursMissingFor[0].reason").value("UNREADABLE"))
+                .andExpect(jsonPath("$.payslips[0].hoursReason").doesNotExist())
                 .andExpect(jsonPath("$.jobsSinceComputed").value(2))
                 .andExpect(jsonPath("$.policy.perDeliveryRate").value("2.35"))
                 .andExpect(jsonPath("$.policy.overtimeMultiplier").value("1.50"))

@@ -142,6 +142,15 @@ class CarrierPayrollConstraintTest {
     }
 
     @Test
+    void a_rider_whose_figures_were_not_believed_is_kept_with_a_reason_and_no_figures() {
+        CarrierPayRun run = run("company-" + UUID.randomUUID(), "2026-10-01", "2026-10-15");
+
+        assertThatCode(() -> snapshots.saveAndFlush(
+                CarrierPayAttendance.unreadable(run.getId(), "rider-a", "UNREADABLE")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void a_run_keeps_one_count_of_each_riders_deliveries() {
         CarrierPayRun run = run("company-" + UUID.randomUUID(), "2026-10-01", "2026-10-15");
         deliveredCopies.saveAndFlush(CarrierPayDelivered.of(run.getId(), "rider-a", 17));

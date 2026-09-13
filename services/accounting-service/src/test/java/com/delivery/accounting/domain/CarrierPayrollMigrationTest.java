@@ -91,7 +91,10 @@ class CarrierPayrollMigrationTest {
     void hoursAreASnapshot() {
         assertThat(the("CREATE TABLE carrier_pay_attendance"))
                 .contains("run_id uuid NOT NULL REFERENCES carrier_pay_run (id)")
-                .contains("UNIQUE (run_id, rider_ref)");
+                .contains("UNIQUE (run_id, rider_ref)")
+                // One rider's figures not believed: kept with a reason and no figures, never both.
+                .contains("unavailable_reason IS NULL AND worked_seconds IS NOT NULL")
+                .contains("unavailable_reason IS NOT NULL AND worked_seconds IS NULL");
         assertThat(the("CREATE TABLE carrier_pay_run"))
                 .contains("attendance_at timestamptz")
                 .contains("attendance <> 'INCLUDED' OR attendance_at IS NOT NULL");

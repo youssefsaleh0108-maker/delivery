@@ -591,6 +591,10 @@ class CarrierPayrollServiceTest {
         assertThat(run.run().getAttendanceNote()).isEqualTo("NOT_DEPLOYED");
         assertThat(run.needsAcknowledgement()).isTrue();
         assertThat(slip(run, YOUSSEF).hoursUnknown()).isTrue();
+        assertThat(run.hoursMissingFor()).singleElement().satisfies(m -> {
+            assertThat(m.name()).isEqualTo("Youssef Kanaan");
+            assertThat(m.reason()).isEqualTo("NOT_DEPLOYED");
+        });
         assertThat(slip(run, YOUSSEF).slip().getNet()).isEqualByComparingTo("2.00");
 
         Approval unacknowledged = service.approve(COMPANY, id, 1, false, STAFF);
@@ -601,6 +605,77 @@ class CarrierPayrollServiceTest {
                 .isEqualTo(ApprovalOutcome.APPROVED);
         // Approval never reads attendance: the approved hours are the ones the approver saw.
         verify(attendance, times(1)).fleet(anyString(), anyString(), any(), any(), any());
+    }
+
+    /**
+     * Attendance is read for the whole fleet at once, but a figure that cannot be believed is one
+     * rider's problem: that rider's hours are unknown and named at approval, and everyone else is
+     * paid theirs.
+     */
+    @Test
+    @DisplayName("one rider's unreadable hours are that rider's alone: named for the approver, and everyone else is paid")
+    void oneRidersHoursUnreadable() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", "4.00");
+        read = AttendanceRead.of(Map.of(YOUSSEF, new RiderHours(36_000, 0, 0, 0, 0)),
+                Map.of(RANIA, "UNREADABLE"));
+        delivered(YOUSSEF, "2026-10-03");
+        delivered(RANIA, "2026-10-04");
+        RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+        UUID id = run.run().getId();
+
+        assertThat(run.run().getAttendance()).isEqualTo(Attendance.INCLUDED);
+        assertThat(slip(run, YOUSSEF).hoursUnknown()).isFalse();
+        assertThat(slip(run, YOUSSEF).slip().figures().basePay()).isEqualByComparingTo("40.00");
+        assertThat(slip(run, RANIA).hoursUnknown()).isTrue();
+        assertThat(slip(run, RANIA).hoursReason()).isEqualTo("UNREADABLE");
+        assertThat(slip(run, RANIA).slip().getNet()).isEqualByComparingTo("2.00");
+        assertThat(run.hoursMissingFor()).singleElement().satisfies(m -> {
+            assertThat(m.riderRef()).isEqualTo(RANIA);
+            assertThat(m.name()).isEqualTo("Rania Ghandour");
+            assertThat(m.reason()).isEqualTo("UNREADABLE");
+        });
+        assertThat(run.needsAcknowledgement()).isTrue();
+
+        // An edit reads the copy, which still knows why Rania's hours are unknown.
+        RunView edited = service.addLine(COMPANY, id, YOUSSEF, Kind.BONUS, "Eid bonus",
+                new BigDecimal("5.00"), STAFF);
+        assertThat(edited.hoursMissingFor()).extracting(CarrierPayrollService.MissingHours::reason)
+                .containsExactly("UNREADABLE");
+        assertThat(slip(edited, YOUSSEF).slip().figures().basePay()).isEqualByComparingTo("40.00");
+        verify(attendance, times(1)).fleet(anyString(), anyString(), any(), any(), any());
+
+        assertThat(service.approve(COMPANY, id, 2, false, STAFF).outcome())
+                .isEqualTo(ApprovalOutcome.NEEDS_ACKNOWLEDGEMENT);
+        assertThat(service.approve(COMPANY, id, 2, true, STAFF).outcome())
+                .isEqualTo(ApprovalOutcome.APPROVED);
+    }
+
+    /**
+     * Order-tracking clips every figure to the rider's time on the company's fleet, so a rider who
+     * joined on the 9th is listed with their hours from the 9th, and one who left keeps theirs up to
+     * the day they left. Payroll pays exactly what it is given and adds nothing for the move. A rider
+     * on the run whom attendance does not list has no time with the company it knows of: their hours
+     * are unknown, and they are named as not listed.
+     */
+    @Test
+    @DisplayName("a rider on the fleet for part of the period is paid the part attendance gives; one it does not list is named")
+    void partOfThePeriod() {
+        rules("2026-09-01", PayCycle.SEMI_MONTHLY, "2.00", "4.00");
+        // Rania joined on the 9th: the company's figures for her start there — five hours.
+        read = AttendanceRead.of(Map.of(RANIA, new RiderHours(18_000, 0, 0, 0, 0)));
+        delivered(RANIA, "2026-10-10");
+        delivered(YOUSSEF, "2026-10-03");
+
+        RunView run = service.start(COMPANY, OCT_1, STAFF, TOKEN);
+
+        verify(attendance, times(1)).fleet(TOKEN, COMPANY, BEIRUT, OCT_1, OCT_15);
+        assertThat(slip(run, RANIA).hoursUnknown()).isFalse();
+        assertThat(slip(run, RANIA).slip().figures().workedSeconds()).isEqualTo(18_000L);
+        assertThat(slip(run, RANIA).slip().figures().basePay()).isEqualByComparingTo("20.00");
+        assertThat(slip(run, YOUSSEF).hoursUnknown()).isTrue();
+        assertThat(slip(run, YOUSSEF).hoursReason()).isEqualTo("NOT_LISTED");
+        assertThat(run.hoursMissingFor()).extracting(CarrierPayrollService.MissingHours::riderRef)
+                .containsExactly(YOUSSEF);
     }
 
     @Test
