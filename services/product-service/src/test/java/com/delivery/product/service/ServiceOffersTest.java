@@ -427,6 +427,24 @@ class ServiceOffersTest {
             nothingRecorded();
         }
 
+        /**
+         * Keeping delivery is not switching to it. An offer published or resumed with delivery met the
+         * rule then, so a shop that has since cleared its pin and its areas still fixes a typo without
+         * pausing the offer; resuming and publishing check again.
+         */
+        @Test
+        void a_live_delivery_offer_is_still_edited_after_the_shop_cleared_its_reach() {
+            Product offer = offer(backRoomPress, Fulfilment.DELIVERY, Product.Status.ACTIVE);
+
+            catalog.update(offer.getId(), PROVIDER, new ProductRequest("Business card printing, matte",
+                    "Matte, 350gsm", new BigDecimal("15.00"), null, backRoomPress.getId(), null, null,
+                    cardTerms(Fulfilment.BOTH)));
+
+            assertThat(offer.getName()).isEqualTo("Business card printing, matte");
+            assertThat(savedTerms.get(offer.getId()).getFulfilmentModes()).isEqualTo(Fulfilment.BOTH);
+            verify(storeZones, never()).existsByStoreId(any(UUID.class));
+        }
+
         /** A draft is not in front of anybody; publishing it is where the rule is met. */
         @Test
         void a_draft_may_be_switched_and_is_checked_when_published() {

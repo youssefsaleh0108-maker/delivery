@@ -312,11 +312,15 @@ public class CatalogService {
 
         ServiceTerms terms = null;
         if (request.service() != null) {
-            if (product.getStatus() == Product.Status.ACTIVE) {
-                // A live offer switched to delivery meets the rule publishing it would have met.
+            ServiceTerms existing = serviceTerms.findById(product.getId()).orElse(null);
+            if (product.getStatus() == Product.Status.ACTIVE && !offersDelivery(existing)) {
+                // A live offer switched to delivery meets the rule publishing it would have met. Only a
+                // switch: an offer that already offered delivery met the rule when it was published or
+                // resumed, and a shop that has since cleared its pin or its areas must still be able to
+                // fix a typo in it without pausing it first. Resuming checks again, as publishing does.
                 requireDeliveryReach(store, request.service().fulfilmentModes());
             }
-            terms = reviseTerms(product, request.service());
+            terms = reviseTerms(product, existing, request.service());
         }
 
         product.update(request.name(), request.description(), request.price(), request.categoryId(),
@@ -586,12 +590,19 @@ public class CatalogService {
         }
     }
 
+    /** Whether saved terms already let customers have the offer delivered. No terms saved is no. */
+    private static boolean offersDelivery(ServiceTerms terms) {
+        return terms != null && terms.getFulfilmentModes() != null
+                && terms.getFulfilmentModes().includesDelivery();
+    }
+
     /**
      * The offer's terms revised to the request, or created for a service shop's product that was saved
-     * before terms existed. A refused revision changes nothing ({@link ServiceTerms#revise}).
+     * before terms existed ({@code existing} is null). A refused revision changes nothing
+     * ({@link ServiceTerms#revise}).
      */
-    private ServiceTerms reviseTerms(Product product, ServiceTermsRequest request) {
-        ServiceTerms existing = serviceTerms.findById(product.getId()).orElse(null);
+    private ServiceTerms reviseTerms(Product product, ServiceTerms existing,
+                                     ServiceTermsRequest request) {
         if (existing == null) {
             return serviceTerms.save(newTerms(product.getId(), request));
         }
