@@ -2554,5 +2554,10 @@
   "multiCartPlaced": "{count, plural, =1{تم إرسال طلب واحد · {amount}} =2{تم إرسال طلبين · {amount}} few{تم إرسال {count} طلبات · {amount}} many{تم إرسال {count} طلبًا · {amount}} other{تم إرسال {count} طلب · {amount}}}",
   "@multiCartPlaced": {"placeholders":{"count":{"type":"int"},"amount":{"type":"String"}}},
   "multiCartPricesUpdating": "جارٍ تحديث الأسعار…",
-  "multiCartPricesFailed": "تعذّر تأكيد أحدث الأسعار."
+  "multiCartPricesFailed": "تعذّر تأكيد أحدث الأسعار.",
+  "multiCartPriceChangedTitle": "تغيّر المجموع",
+  "multiCartPriceChangedBody": "أصبح مجموع سلتك {total} بدلًا من {agreed} الذي رأيته. هل تريد إتمام طلباتها بالمجموع الجديد؟",
+  "@multiCartPriceChangedBody": {"placeholders":{"total":{"type":"String"},"agreed":{"type":"String"}}},
+  "multiCartEarlierCheckoutPlaced": "{count, plural, =2{نجحت محاولتك السابقة بالفعل: الطلبان كلاهما في «الطلبات».} few{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».} many{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».} other{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».}}",
+  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}}
 }

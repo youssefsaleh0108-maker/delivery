@@ -115,6 +115,7 @@ void main() {
     required Cart cart,
     DeliveryAddressStore? addresses,
     Locale locale = const Locale('en'),
+    VoidCallback? onOrderPlaced,
   }) async {
     tester.view.physicalSize = const Size(1000, 2400);
     tester.view.devicePixelRatio = 1.0;
@@ -135,7 +136,7 @@ void main() {
         addresses: addresses ?? DeliveryAddressStore(ownerId: 'user-1'),
         orderApi: OrderApi(dio),
         offerApi: OfferApi(dio),
-        onOrderPlaced: () {},
+        onOrderPlaced: onOrderPlaced ?? () {},
       ),
     ));
     await tester.pumpAndSettle();
@@ -252,6 +253,71 @@ void main() {
 
     expect(find.text(en.multiCartGiftOneShop), findsOneWidget);
     expect(checkoutButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('an earlier try that placed the whole checkout is not confirmed as one order: the '
+      'customer is sent to Orders, where every order of it is listed', (WidgetTester tester) async {
+    int ordersOpened = 0;
+    final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (RequestOptions o, RequestInterceptorHandler h) {
+        switch (o.path) {
+          case '/api/orders/quote':
+            h.resolve(Response<dynamic>(requestOptions: o, statusCode: 200, data: threeShopQuote()));
+          case '/api/orders/checkout':
+            // This attempt's key already placed a checkout: the basket as it was before it changed.
+            h.reject(DioException(
+              requestOptions: o,
+              type: DioExceptionType.badResponse,
+              response: Response<dynamic>(requestOptions: o, statusCode: 409, data: <String, dynamic>{
+                'code': 'IDEMPOTENCY_KEY_REUSED',
+                'orderId': 'order-1',
+              }),
+            ));
+          case '/api/orders/order-1':
+            // The order carrying the key: one of three.
+            h.resolve(Response<dynamic>(requestOptions: o, statusCode: 200, data: <String, dynamic>{
+              'id': 'order-1',
+              'customerId': 'user-1',
+              'merchantId': 'm1',
+              'riderId': null,
+              'status': 'PLACED',
+              'totalAmount': 12,
+              'storeId': 's1',
+              'deliveryAddress': '12 Rose Street',
+              'paymentMethod': 'CASH',
+              'paymentStatus': 'DUE',
+              'items': <dynamic>[],
+              'availableActions': <dynamic>[],
+              'checkoutId': 'checkout-1',
+              'checkoutSize': 3,
+            }));
+          default:
+            h.reject(DioException(
+              requestOptions: o,
+              type: DioExceptionType.badResponse,
+              response: Response<dynamic>(requestOptions: o, statusCode: 404),
+            ));
+        }
+      },
+    ));
+    final DeliveryAddressStore addresses = DeliveryAddressStore(ownerId: 'user-1');
+    await addresses.select(const DeliveryAddress(line: '12 Rose Street', label: 'Home'));
+    final Cart cart = threeShops();
+    await pumpBasket(tester,
+        dio: dio, cart: cart, addresses: addresses, onOrderPlaced: () => ordersOpened++);
+
+    // The basket's checkout, then checkout's own button.
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text(en.multiCartEarlierCheckoutPlaced(3)), findsOneWidget);
+    expect(find.text(en.offlineAlreadyPlaced), findsNothing,
+        reason: 'That sentence confirms a single order, and this try placed three.');
+    expect(ordersOpened, 1);
+    expect(cart.isEmpty, isTrue);
   });
 
   testWidgets('a basket from one shop keeps its own layout, priced for the address\'s area',

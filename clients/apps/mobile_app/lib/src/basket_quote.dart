@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:delivery_core/delivery_core.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/foundation.dart';
 
 import 'cart.dart';
@@ -21,6 +22,23 @@ BasketQuestion? questionFor(
             deliveryTier: tier,
             promoCode: promoCode,
           );
+
+/// Why [shop]'s part of a basket cannot be checked out as the server priced it, calling the shop
+/// [name] — or null when it can.
+///
+/// One sentence for both places that say it: the Basket tab, on that shop's own card, and checkout,
+/// which has no shop cards and says it over the button the refusal holds back.
+String? shopRefusalSentence(DeliveryStrings t, ShopQuote shop, String name) {
+  final ShopRefusal? refusal = shop.refusal;
+  if (refusal == null) return null;
+  return switch (refusal) {
+    ShopRefusal.belowMinimum =>
+      t.multiCartBelowMinimum('\$${(shop.shortfall ?? 0).toStringAsFixed(2)}', name),
+    ShopRefusal.closed => t.multiCartShopClosed(name),
+    ShopRefusal.notServed => t.multiCartShopNotServing(name),
+    ShopRefusal.unknown => shop.refusalMessage ?? t.multiCartShopUnavailable(name),
+  };
+}
 
 /// Keeps the server's price for a basket current as the basket changes (`POST /api/orders/quote`).
 ///

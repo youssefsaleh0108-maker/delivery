@@ -446,6 +446,8 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
         return CartScreen(
           cart: _cart,
           addresses: _addresses,
+          // Built with every other tab and kept alive, but priced only while it is the tab on screen.
+          showing: _index == CustomerNavBar.basketIndex,
           orderApi: widget.orderApi,
           offerApi: widget.offerApi,
           zoneApi: widget.zoneApi,

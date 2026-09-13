@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' as intl;
 import 'cart.dart';
 import 'order_tracking_panel.dart';
 import 'rate_rider_sheet.dart';
+import 'shop_limit_dialog.dart';
 import 'store_page_screen.dart';
 
 /// One order, in full — the 2026-08 Figma redesign's `customer-order-details` (node 3:542).
@@ -215,7 +216,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             availability: StoreAvailability.open,
           );
       if (widget.cart.exceedsShopLimit(byId.values.first, from: card)) {
-        _say(DeliveryStrings.of(context).multiCartShopLimitTitle(Cart.maxShops));
+        // Said as the shop page says it: that nothing was added, what to do about it, and the way to
+        // the basket, where the customer makes room. Nothing is in hand while they read it.
+        setState(() => _reordering = false);
+        if (await explainShopLimit(context) && mounted) widget.onOpenBasket();
         return;
       }
 

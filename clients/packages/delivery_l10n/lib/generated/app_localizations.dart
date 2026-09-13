@@ -13609,6 +13609,24 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'We couldn\'t confirm the latest prices.'**
   String get multiCartPricesFailed;
+
+  /// No description provided for @multiCartPriceChangedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The total has changed'**
+  String get multiCartPriceChangedTitle;
+
+  /// No description provided for @multiCartPriceChangedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your basket now comes to {total}, not the {agreed} you saw. Place its orders at the new total?'**
+  String multiCartPriceChangedBody(String total, String agreed);
+
+  /// No description provided for @multiCartEarlierCheckoutPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}'**
+  String multiCartEarlierCheckoutPlaced(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'cart.dart';
 import 'product_detail_screen.dart';
 import 'product_options_sheet.dart';
+import 'shop_limit_dialog.dart';
 import 'store_state_mapping.dart';
 
 /// A store's landing page: Shop, Aisles, Offers, Buy Again.
@@ -312,37 +313,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// away. Nothing is thrown away now: the customer is shown the way to the basket, where they
   /// choose which shop to check out or remove.
   Future<void> _explainShopLimit() async {
-    final bool? openBasket = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        backgroundColor: DeliveryColors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
-        title: Text(DeliveryStrings.of(context).multiCartShopLimitTitle(Cart.maxShops),
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
-        content: Text(
-          DeliveryStrings.of(context).multiCartShopLimitBody,
-          style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4),
-        ),
-        actions: <Widget>[
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
-              child: Text(DeliveryStrings.of(context).close)),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: DeliveryColors.brand,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(DeliveryRadius.md)),
-            ),
-            child: Text(DeliveryStrings.of(context).viewBasket),
-          ),
-        ],
-      ),
-    );
-    if (openBasket == true && mounted) widget.onOpenBasket();
+    final bool openBasket = await explainShopLimit(context);
+    if (openBasket && mounted) widget.onOpenBasket();
   }
 
   Future<void> _toggleFavorite() async {

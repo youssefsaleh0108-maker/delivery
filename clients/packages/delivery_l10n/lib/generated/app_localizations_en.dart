@@ -7724,4 +7724,23 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get multiCartPricesFailed => 'We couldn\'t confirm the latest prices.';
+
+  @override
+  String get multiCartPriceChangedTitle => 'The total has changed';
+
+  @override
+  String multiCartPriceChangedBody(String total, String agreed) {
+    return 'Your basket now comes to $total, not the $agreed you saw. Place its orders at the new total?';
+  }
+
+  @override
+  String multiCartEarlierCheckoutPlaced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Your earlier checkout already went through: all $count of its orders are in Orders.',
+    );
+    return '$_temp0';
+  }
 }

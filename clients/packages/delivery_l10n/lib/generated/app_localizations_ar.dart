@@ -7744,4 +7744,26 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get multiCartPricesFailed => 'تعذّر تأكيد أحدث الأسعار.';
+
+  @override
+  String get multiCartPriceChangedTitle => 'تغيّر المجموع';
+
+  @override
+  String multiCartPriceChangedBody(String total, String agreed) {
+    return 'أصبح مجموع سلتك $total بدلًا من $agreed الذي رأيته. هل تريد إتمام طلباتها بالمجموع الجديد؟';
+  }
+
+  @override
+  String multiCartEarlierCheckoutPlaced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      many: 'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      few: 'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      two: 'نجحت محاولتك السابقة بالفعل: الطلبان كلاهما في «الطلبات».',
+    );
+    return '$_temp0';
+  }
 }

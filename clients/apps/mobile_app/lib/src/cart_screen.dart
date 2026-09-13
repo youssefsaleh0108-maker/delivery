@@ -62,6 +62,7 @@ class CartScreen extends StatefulWidget {
     this.outbox,
     this.connectivity,
     this.deliveryTerms,
+    this.showing = true,
   });
 
   final Cart cart;
@@ -103,6 +104,16 @@ class CartScreen extends StatefulWidget {
   /// "where is it?", and the Orders tab is where both answers live.
   final VoidCallback onOrderPlaced;
 
+  /// Whether the Basket tab is the one on screen.
+  ///
+  /// The shell builds every tab at once and keeps them alive (an IndexedStack), so this screen is in
+  /// the tree while the customer shops on another tab. Its price follows the basket and the address,
+  /// and without this every add on a shop page and every change of address asked Order Manager for a
+  /// whole quote nobody was looking at. A hidden basket asks nothing: it asks once as it comes on
+  /// screen, and follows every change from then on — including under a checkout pushed from it,
+  /// which is where the customer comes back to. True by default, for a basket shown on its own.
+  final bool showing;
+
   @override
   State<CartScreen> createState() => _CartScreenState();
 }
@@ -133,6 +144,14 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   @override
+  void didUpdateWidget(CartScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // On screen again: the basket and the address may both have changed while it was hidden, and
+    // nothing asked about them then.
+    if (widget.showing && !oldWidget.showing) _askForQuote();
+  }
+
+  @override
   void dispose() {
     widget.cart.removeListener(_askForQuote);
     widget.addresses.removeListener(_askForQuote);
@@ -152,7 +171,8 @@ class _CartScreenState extends State<CartScreen> {
   String? get _zoneId => widget.addresses.selected?.zoneId;
 
   void _askForQuote() {
-    if (!mounted) return;
+    // Behind another tab nothing is on screen, so nothing is asked ([CartScreen.showing]).
+    if (!mounted || !widget.showing) return;
     _quoter.ask(questionFor(widget.cart, zoneId: _zoneId, promoCode: _promo.text));
   }
 
@@ -240,6 +260,16 @@ class _CartScreenState extends State<CartScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(DeliveryStrings.of(context).multiCartPlaced(
               outcome.orders.length, '\$${outcome.totalAmount.toStringAsFixed(2)}'))));
+      widget.onOrderPlaced();
+      return;
+    }
+    if (outcome is EarlierCheckoutPlaced) {
+      // An earlier try went through as one order per shop. Not one order's receipt, which would read
+      // them as a single order: the customer is sent to Orders, where each carries its badge.
+      _removePromo();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(DeliveryStrings.of(context)
+              .multiCartEarlierCheckoutPlaced(outcome.order.checkoutSize ?? 2))));
       widget.onOrderPlaced();
       return;
     }
@@ -1450,16 +1480,7 @@ class _CartScreenState extends State<CartScreen> {
   /// the platform's own for an address with no area; the server's minimum for an area may differ,
   /// and replaces it as soon as it answers.
   String? _shopWarning(DeliveryStrings t, String storeId, ShopQuote? priced, String name) {
-    final ShopRefusal? refusal = priced?.refusal;
-    if (priced != null && refusal != null) {
-      return switch (refusal) {
-        ShopRefusal.belowMinimum =>
-          t.multiCartBelowMinimum('\$${(priced.shortfall ?? 0).toStringAsFixed(2)}', name),
-        ShopRefusal.closed => t.multiCartShopClosed(name),
-        ShopRefusal.notServed => t.multiCartShopNotServing(name),
-        ShopRefusal.unknown => priced.refusalMessage ?? t.multiCartShopUnavailable(name),
-      };
-    }
+    if (priced != null && priced.refusal != null) return shopRefusalSentence(t, priced, name);
     if (priced == null) {
       final double shortfall = widget.cart.shortfallAt(storeId);
       if (shortfall > 0) return t.multiCartBelowMinimum('\$${shortfall.toStringAsFixed(2)}', name);

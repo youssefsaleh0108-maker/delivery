@@ -49,8 +49,12 @@ void main() {
   /// basket, and has its own cases at the bottom.
   double minOrder = 0;
 
+  /// Every price the app asked Order Manager for (`POST /api/orders/quote`), in order.
+  final List<RequestOptions> quotes = <RequestOptions>[];
+
   setUp(() {
     minOrder = 0;
+    quotes.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(storageChannel, (MethodCall call) async => null);
   });
@@ -143,6 +147,7 @@ void main() {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+        if (options.path == '/api/orders/quote') quotes.add(options);
         final Object? body = options.method == 'GET' ? answer(options.path) : null;
         if (body == null) {
           handler.reject(DioException(
@@ -411,5 +416,24 @@ void main() {
     expect(find.byType(CartScreen), findsOneWidget);
     expect(find.text(en.multiCartShopCount(3)), findsOneWidget);
     expect(tester.widget<CustomerNavBar>(find.byType(CustomerNavBar)).basketCount, 3);
+  });
+
+  testWidgets('a basket behind another tab asks for no price, and asks once when it is opened',
+      (WidgetTester tester) async {
+    await pumpShell(tester);
+    await fillABasketOnTheShopPage(tester);
+    // Well past the quote's debounce: a basket following every add from behind Home has asked by now.
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(quotes, isEmpty,
+        reason: 'The basket is not on screen, so a price for it is a request nobody looks at.');
+
+    await tester.tap(find.text(en.viewBasket));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expectOnTheBasket(tester);
+    expect(quotes, hasLength(1));
   });
 }

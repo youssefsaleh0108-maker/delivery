@@ -112,7 +112,9 @@ class OrderApi {
   /// Order Manager groups them by shop itself and places one order per shop, all of them or none.
   /// Every rule of [place] holds. The key goes on every retry, and a repeat is answered with every
   /// order the first copy placed ([CheckoutPlaced.replayed]); [expectedTotal] is the whole
-  /// checkout's; a key that already placed something else comes back as [CheckoutAlreadyPlaced];
+  /// checkout's — which the live checkout always sends, as the quote its customer is looking at, and
+  /// confirms with them again on [CheckoutPriceChanged]; a key that already placed something else
+  /// comes back as [CheckoutAlreadyPlaced];
   /// and [mayHavePlaced] reads a thrown send exactly as it reads one from [place].
   ///
   /// A shop that refuses — closed, not delivering to the area, under its minimum — is a 422 whose
