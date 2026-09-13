@@ -13397,7 +13397,7 @@ abstract class DeliveryStrings {
   /// No description provided for @attendanceLogManualNote.
   ///
   /// In en, this message translates to:
-  /// **'Hours typed here are reported as manual, never as app evidence.'**
+  /// **'Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.'**
   String get attendanceLogManualNote;
 
   /// No description provided for @attendanceLogFutureRule.
@@ -13631,7 +13631,7 @@ abstract class DeliveryStrings {
   /// No description provided for @attendanceAssignNote.
   ///
   /// In en, this message translates to:
-  /// **'Schedules start today or later. Past days keep the schedule they were worked against.'**
+  /// **'Schedules start today or later. Once today\'s shift has begun, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.'**
   String get attendanceAssignNote;
 
   /// No description provided for @attendanceAssignSave.
@@ -13651,6 +13651,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'This month is older than the duty history the platform keeps, so it can no longer be shown.'**
   String get attendanceHistoryLimit;
+
+  /// No description provided for @attendanceManualTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get attendanceManualTag;
+
+  /// No description provided for @attendanceTypedByHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Typed by hand in the Manual Attendance Log, not recorded by the app'**
+  String get attendanceTypedByHand;
+
+  /// No description provided for @attendanceLogPresentKeepsLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Present does not clear a late check-in. To excuse one, choose “Late, excused”.'**
+  String get attendanceLogPresentKeepsLate;
+
+  /// No description provided for @attendanceLogChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking this day for an existing entry…'**
+  String get attendanceLogChecking;
+
+  /// No description provided for @attendanceLogCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.'**
+  String get attendanceLogCheckFailed;
+
+  /// No description provided for @attendanceRetiredShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'Retired shifts ({count})'**
+  String attendanceRetiredShifts(int count);
+
+  /// No description provided for @attendanceRetireKeepsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.'**
+  String get attendanceRetireKeepsHistory;
+
+  /// No description provided for @attendanceLiveOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Live: no riders on duty} =1{Live: 1 rider on duty} other{Live: {count} riders on duty}}'**
+  String attendanceLiveOnDuty(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

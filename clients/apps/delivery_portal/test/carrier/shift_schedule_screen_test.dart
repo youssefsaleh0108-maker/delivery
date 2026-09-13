@@ -277,8 +277,9 @@ void main() {
     // Once as the shift, once as Nadia's shift today.
     expect(find.text('Beirut Central Day (08:00 - 18:00)'), findsNWidgets(2));
     expect(find.text('Night (22:00 - 06:00)'), findsOneWidget);
-    // Retired shifts are history, not choices.
+    // Retired shifts are history, not choices: folded away under their own heading.
     expect(find.text('Old (06:00 - 12:00)'), findsNothing);
+    expect(find.text(en.attendanceRetiredShifts(1)), findsOneWidget);
     expect(find.text('MON · TUE · WED · THU · FRI'), findsOneWidget);
     expect(find.text(en.attendanceShiftOvernight), findsOneWidget);
     expect(find.text(en.attendanceShiftRiders(1)), findsOneWidget);
@@ -292,6 +293,11 @@ void main() {
     expect(find.text(en.attendanceFreelancer), findsNWidgets(2));
     expect(find.textContaining('Night from'), findsOneWidget);
     expect(find.text(en.attendanceUnlinkedRiders(1)), findsOneWidget);
+
+    // Past days are still judged against a retired shift, so it can still be found.
+    await tester.tap(find.text(en.attendanceRetiredShifts(1)));
+    await tester.pumpAndSettle();
+    expect(find.text('Old (06:00 - 12:00)'), findsOneWidget);
   });
 
   testWidgets('a shift somebody is on cannot be retired; an empty one can',
@@ -305,6 +311,8 @@ void main() {
 
     await tester.tap(find.byTooltip(en.attendanceRetireShift));
     await tester.pumpAndSettle();
+    // The confirmation says what retiring leaves alone.
+    expect(find.text(en.attendanceRetireKeepsHistory), findsOneWidget);
     await tester.tap(find.widgetWithText(ConsoleSoftButton, en.attendanceRetireShift));
     await tester.pumpAndSettle();
 
@@ -373,6 +381,8 @@ void main() {
     await tester.tap(find.descendant(
         of: find.byType(AlertDialog), matching: find.text(en.attendanceFreelancer)));
     await tester.pumpAndSettle();
+    // A retired shift is never offered.
+    expect(find.text('Old (06:00 - 12:00)'), findsNothing);
     await tester.tap(find.text('Beirut Central Day (08:00 - 18:00)').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text(en.attendanceAssignSave));

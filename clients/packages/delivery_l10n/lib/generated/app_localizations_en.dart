@@ -7536,7 +7536,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get attendanceLogManualNote =>
-      'Hours typed here are reported as manual, never as app evidence.';
+      'Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.';
 
   @override
   String get attendanceLogFutureRule =>
@@ -7685,7 +7685,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get attendanceAssignNote =>
-      'Schedules start today or later. Past days keep the schedule they were worked against.';
+      'Schedules start today or later. Once today\'s shift has begun, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.';
 
   @override
   String get attendanceAssignSave => 'Save schedule';
@@ -7696,4 +7696,44 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get attendanceHistoryLimit =>
       'This month is older than the duty history the platform keeps, so it can no longer be shown.';
+
+  @override
+  String get attendanceManualTag => 'Manual';
+
+  @override
+  String get attendanceTypedByHand =>
+      'Typed by hand in the Manual Attendance Log, not recorded by the app';
+
+  @override
+  String get attendanceLogPresentKeepsLate =>
+      'Present does not clear a late check-in. To excuse one, choose “Late, excused”.';
+
+  @override
+  String get attendanceLogChecking =>
+      'Checking this day for an existing entry…';
+
+  @override
+  String get attendanceLogCheckFailed =>
+      'This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.';
+
+  @override
+  String attendanceRetiredShifts(int count) {
+    return 'Retired shifts ($count)';
+  }
+
+  @override
+  String get attendanceRetireKeepsHistory =>
+      'Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.';
+
+  @override
+  String attendanceLiveOnDuty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Live: $count riders on duty',
+      one: 'Live: 1 rider on duty',
+      zero: 'Live: no riders on duty',
+    );
+    return '$_temp0';
+  }
 }

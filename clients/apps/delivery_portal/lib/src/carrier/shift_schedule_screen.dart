@@ -13,7 +13,8 @@ import 'rider_attendance_screen.dart';
 ///
 /// Two blocks. The company's shifts, which can be added and retired but never re-timed (a shift
 /// whose hours changed would silently re-judge every day already worked against it — the server
-/// refuses, and the dialog says why before anybody tries). Then the riders, each with the shift
+/// refuses, and the dialog says why before anybody tries). Retired shifts stay listed, folded away:
+/// they are never offered again, but past days are still judged against them. Then the riders, each with the shift
 /// they are on today and any change already set to start, and two actions: change the shift, or
 /// open the rider's monthly attendance, which replaces this page in place so the rail stays.
 ///
@@ -52,6 +53,9 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   /// The rider whose attendance is open in place of this page, or null.
   String? _openRider;
 
+  /// Whether the retired shifts are unfolded.
+  bool _retiredOpen = false;
+
   /// The page's read, marked handled the moment it is made: after an action it is made outside a
   /// frame, and a failure landing before the FutureBuilder subscribes would otherwise be reported as
   /// uncaught although the page shows it. [Future.ignore] does not stop the builder receiving it.
@@ -77,10 +81,10 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
         .map((RiderPresence p) => p.riderId)
         .toSet()
         .toList();
+    final List<ShiftTemplate> shifts = core[0] as List<ShiftTemplate>;
     return _Schedule(
-      shifts: (core[0] as List<ShiftTemplate>)
-          .where((ShiftTemplate s) => !s.archived)
-          .toList(),
+      shifts: shifts.where((ShiftTemplate s) => !s.archived).toList(),
+      retired: shifts.where((ShiftTemplate s) => s.archived).toList(),
       assignments: core[1] as List<ShiftAssignment>,
       riders: roster,
       names: <String, String>{
@@ -166,18 +170,69 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
   Widget _shiftsCard(DeliveryStrings t, _Schedule data) {
     return ConsoleCard(
       title: t.attendanceShiftsCard,
-      child: data.shifts.isEmpty
-          ? Text(t.attendanceNoShifts, style: ConsoleText.pageSubtitle)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (data.shifts.isEmpty)
+            Text(t.attendanceNoShifts, style: ConsoleText.pageSubtitle)
+          else
+            for (int i = 0; i < data.shifts.length; i++) ...<Widget>[
+              if (i > 0) const Divider(height: DeliverySpacing.lg, color: DeliveryColors.border),
+              _shiftRow(t, data.shifts[i]),
+            ],
+          if (data.retired.isNotEmpty) _retiredBlock(t, data.retired),
+        ],
+      ),
+    );
+  }
+
+  /// Retired shifts, folded under their own heading. They are history rather than choices — never
+  /// offered for a schedule again — but every past day worked on one is still judged against it,
+  /// so the office can still find what "Old (06:00 - 12:00)" was.
+  Widget _retiredBlock(DeliveryStrings t, List<ShiftTemplate> retired) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Divider(height: DeliverySpacing.lg, color: DeliveryColors.border),
+        InkWell(
+          onTap: () => setState(() => _retiredOpen = !_retiredOpen),
+          borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.xs),
+            child: Row(
               children: <Widget>[
-                for (int i = 0; i < data.shifts.length; i++) ...<Widget>[
-                  if (i > 0) const Divider(height: DeliverySpacing.lg, color: DeliveryColors.border),
-                  _shiftRow(t, data.shifts[i]),
-                ],
+                Icon(
+                  _retiredOpen ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                  color: DeliveryColors.muted,
+                ),
+                const SizedBox(width: DeliverySpacing.xs),
+                Text(t.attendanceRetiredShifts(retired.length), style: ConsoleText.cellMuted),
               ],
             ),
+          ),
+        ),
+        if (_retiredOpen)
+          for (final ShiftTemplate shift in retired)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: DeliverySpacing.lg,
+                top: DeliverySpacing.sm,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(t.attendanceShiftLabel(shift.name, shift.startTime, shift.endTime),
+                      style: ConsoleText.cellMuted),
+                  const SizedBox(height: 2),
+                  Text(_days(t, shift.weekdays), style: ConsoleText.meta),
+                ],
+              ),
+            ),
+      ],
     );
   }
 
@@ -360,9 +415,22 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
         surfaceTintColor: DeliveryColors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
         title: Text(t.attendanceRetireShift, style: ConsoleText.cardTitle),
-        content: Text(
-          t.attendanceShiftLabel(shift.name, shift.startTime, shift.endTime),
-          style: ConsoleText.pageSubtitle,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              t.attendanceShiftLabel(shift.name, shift.startTime, shift.endTime),
+              style: ConsoleText.pageSubtitle,
+            ),
+            const SizedBox(height: DeliverySpacing.sm),
+            // What retiring does not do, said where it is decided: the days already worked on
+            // this shift keep being judged against it.
+            Text(
+              t.attendanceRetireKeepsHistory,
+              style: ConsoleText.body.copyWith(color: DeliveryColors.muted),
+            ),
+          ],
         ),
         actions: <Widget>[
           TextButton(
@@ -477,6 +545,7 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
 class _Schedule {
   const _Schedule({
     required this.shifts,
+    required this.retired,
     required this.assignments,
     required this.riders,
     required this.names,
@@ -485,6 +554,9 @@ class _Schedule {
 
   /// Current shifts only; retired ones are history and are not offered.
   final List<ShiftTemplate> shifts;
+
+  /// Retired shifts: listed, folded away, for the past days still judged against them.
+  final List<ShiftTemplate> retired;
   final List<ShiftAssignment> assignments;
 
   /// The tracking roster: the riders the attendance endpoints answer for.

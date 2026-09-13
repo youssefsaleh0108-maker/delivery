@@ -7547,7 +7547,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get attendanceLogManualNote =>
-      'تُحتسب الساعات المُدخلة هنا ساعاتٍ يدوية، وليست دليلًا من التطبيق.';
+      'تُحتسب الساعات المُدخلة هنا ساعاتٍ يدوية، وليست دليلًا من التطبيق، ويُتجاهَل إدخالها في يوم يُظهره التطبيق أصلًا.';
 
   @override
   String get attendanceLogFutureRule =>
@@ -7707,7 +7707,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get attendanceAssignNote =>
-      'تبدأ الجداول اليوم أو لاحقًا. تبقى الأيام السابقة على الجدول الذي عُمل به.';
+      'تبدأ الجداول اليوم أو لاحقًا. بعد أن تبدأ وردية اليوم، يسري أي تغيير لليوم ابتداءً من الغد، لتبقى الأيام السابقة واليوم الجاري على الجدول الذي تُحتسب عليه.';
 
   @override
   String get attendanceAssignSave => 'حفظ الجدول';
@@ -7718,4 +7718,47 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get attendanceHistoryLimit =>
       'هذا الشهر أقدم من سجلّ الدوام الذي تحتفظ به المنصّة، لذا لا يمكن عرضه بعد الآن.';
+
+  @override
+  String get attendanceManualTag => 'يدوي';
+
+  @override
+  String get attendanceTypedByHand =>
+      'أُدخل يدويًا في سجل الحضور اليدوي، ولم يسجّله التطبيق';
+
+  @override
+  String get attendanceLogPresentKeepsLate =>
+      'تسجيل الحضور لا يلغي الدخول المتأخر. لاعتباره بعذر، اختر «متأخر بعذر».';
+
+  @override
+  String get attendanceLogChecking =>
+      'جارٍ التحقق من وجود سجل سابق لهذا اليوم…';
+
+  @override
+  String get attendanceLogCheckFailed =>
+      'تعذّر التحقق من وجود سجل سابق لهذا اليوم، لذا لا يمكن الحفظ له بعد. اختر التاريخ مجددًا لإعادة المحاولة.';
+
+  @override
+  String attendanceRetiredShifts(int count) {
+    return 'الورديات الموقوفة ($count)';
+  }
+
+  @override
+  String get attendanceRetireKeepsHistory =>
+      'تبقى الأيام السابقة محسوبة على هذه الوردية. إيقافها يمنع اختيارها في الجداول الجديدة فقط.';
+
+  @override
+  String attendanceLiveOnDuty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مباشر: $count سائق في الخدمة',
+      many: 'مباشر: $count سائقًا في الخدمة',
+      few: 'مباشر: $count سائقين في الخدمة',
+      two: 'مباشر: سائقان في الخدمة',
+      one: 'مباشر: سائق واحد في الخدمة',
+      zero: 'مباشر: لا سائقين في الخدمة',
+    );
+    return '$_temp0';
+  }
 }
