@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'address_sheet.dart';
+import 'basket_quote.dart';
 import 'split_complete_screen.dart';
 import 'cart.dart';
 import 'delivery_address.dart';
@@ -20,16 +21,28 @@ import 'order_placement.dart';
 /// strip, the order note — and a sticky white summary bar carrying the total on the start side and
 /// the pill CTA on the end.
 ///
-/// The total shown here is computed from cached catalog prices, and the server recomputes it from
-/// the live catalog when the order is placed. They can legitimately differ if a merchant re-priced
-/// mid-session, so the confirmation shows the SERVER's total rather than the one on this screen.
+/// **The total is the server's.** A [BasketQuoter] asks Order Manager about this basket, delivered
+/// to the chosen address, at the chosen tier, with the basket's promo code (`POST
+/// /api/orders/quote`), and asks again whenever the address or the tier changes. So the total on
+/// the button includes what this screen could not show before placement: the EXPRESS premium, the
+/// fee for the address's area, and what a promo code is worth at that fee. The server still prices
+/// again at placement — a merchant can re-price mid-session — and the confirmation shows ITS total.
 ///
-/// Its delivery fee is the one Order Manager will charge to the chosen address whenever this phone
-/// knows it: the shop's terms for the address's area ([DeliveryTermsBook]), or the shop's flat fee
-/// for an address with no area. Two parts of the server's total it still cannot show before
-/// placement — the EXPRESS surcharge, which nothing publishes until an order exists (the tier says
-/// a surcharge applies), and what a promo code quoted at the basket's fee is worth at another fee.
-/// A queued checkout asserts its total to the server, so it is queued only when neither applies.
+/// Without an answer — the platform unreachable — a one-shop basket falls back to what the phone
+/// knows: the shop's terms for the address's area as last learned ([DeliveryTermsBook]), or the
+/// shop's flat fee for an address with no area. A queued checkout asserts its total to the server,
+/// so it is queued at the quote's total when there is one, and otherwise only when that fallback is
+/// exactly what Order Manager will charge — never for Express, an unlearned area fee, or a promo
+/// quoted at another fee.
+///
+/// **A basket from several shops** is placed as one checkout (`OrderApi.placeCheckout`): every
+/// shop's order or none, under the basket's one key. It is placed only at a total the server has
+/// quoted for it as it stands, every shop able to take its part, and that total goes with it as the
+/// one the customer agreed to — so a price that moved since is shown and confirmed, never charged
+/// unseen. Until there is such a quote the button is held, and the line over it says why. Every
+/// shop's delivery circle is checked before anything is sent; the USD/LBP cash split is not offered,
+/// because there is no one order total to split; and it is never queued for later — see
+/// [_whyItCannotWait].
 ///
 /// The basket recap the previous layout carried is gone, as in the design: the Basket screen this
 /// is pushed from lists every line immediately before, and the money — the part that must not be a
@@ -162,12 +175,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// order agreeing when that default ever changes.
   ///
   /// The premium is priced entirely server-side from `delivery.orders.express-surcharge` and
-  /// snapshotted onto the order at placement. **Nothing publishes that figure before an order
-  /// exists** — there is no quote endpoint and, by the contract, never a surcharge field on the
-  /// request — so this screen offers the choice and says a surcharge applies, and the amount is
-  /// itemised on the receipt from the order's own `expressSurcharge`. A number guessed here would
-  /// be a price the server never quoted — which is also why an EXPRESS checkout is never queued: a
-  /// queued checkout asserts its total, and this screen cannot state that one.
+  /// snapshotted onto the order at placement — by the contract there is never a surcharge field on
+  /// the request. The checkout's quote includes it once the tier is chosen, so the total on the
+  /// button is the one charged; the tier card itself only says a surcharge applies rather than
+  /// restating a figure, and the receipt itemises the order's own `expressSurcharge`.
   DeliveryTier _tier = DeliveryTier.standard;
 
   /// The two tiers, in the order the server declares them.
@@ -177,6 +188,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   ];
 
   bool _placing = false;
+
+  /// The server's price for this checkout as it stands: this basket, to the chosen address, at the
+  /// chosen tier, with the basket's code. See the class comment.
+  late final BasketQuoter _quoter = BasketQuoter(widget.api);
 
   @override
   void initState() {
@@ -194,10 +209,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     widget.addresses.addListener(_onAddressesChanged);
     _loadMoney();
+    // Asked before listening, so the ask's own notification does not rebuild an unbuilt screen.
+    _askForQuote();
+    _quoter.addListener(_onQuote);
+  }
+
+  void _onQuote() {
+    if (mounted) setState(() {});
+  }
+
+  void _askForQuote() {
+    _quoter.ask(questionFor(widget.cart,
+        zoneId: _address?.zoneId, tier: _tier, promoCode: widget.promo?.code));
   }
 
   @override
   void dispose() {
+    _quoter.removeListener(_onQuote);
+    _quoter.dispose();
     widget.addresses.removeListener(_onAddressesChanged);
     _phone.dispose();
     _notes.dispose();
@@ -226,6 +255,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Another address can be another area, and another delivery fee.
       _followAreaTerms();
     });
+    _askForQuote();
   }
 
   /// The shop's terms for the chosen address's area, as [CheckoutScreen.deliveryTerms] last had
@@ -294,6 +324,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _place() async {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    // A basket from several shops is placed at the total its customer is looking at — the server's
+    // current quote for it — or not at all. Read before anything below awaits.
+    final double? agreedTotal = _quotedTotal;
+    if (widget.cart.isMultiShop && agreedTotal == null) return;
     final DeliveryAddress? address = _address;
     if (address == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.addressRequired)));
@@ -301,14 +335,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     if (!_form.currentState!.validate()) return;
 
-    // The merchant's delivery circle, honoured before promising — the rule every checkout shares
-    // (isOutsideDeliveryRadius): an address with no pin passes, because the zones still gate it.
-    final StoreCard? shop = widget.cart.store;
-    if (isOutsideDeliveryRadius(shop, address)) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(t.custOutsideDeliveryArea(shop!.name,
-              (shop.deliveryRadiusMetres! / 1000).toStringAsFixed(1)))));
-      return;
+    // Every shop's delivery circle, honoured before promising — the rule every checkout shares
+    // (isOutsideDeliveryRadius): an address with no pin passes, because the zones still gate it. On
+    // a basket from several shops, the shop that cannot reach the address is the one named.
+    for (final String storeId in widget.cart.storeIds) {
+      final StoreCard? shop = widget.cart.storeFor(storeId);
+      if (isOutsideDeliveryRadius(shop, address)) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(t.custOutsideDeliveryArea(shop!.name,
+                (shop.deliveryRadiusMetres! / 1000).toStringAsFixed(1)))));
+        return;
+      }
     }
 
     // Read before the await below: re-selecting the address notifies the store, which re-seeds this
@@ -365,62 +402,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // the door instructions the address had been carrying.
       await widget.addresses.select(address);
 
-      final PlaceOrderResult result = await widget.api.place(submission);
-      final DeliveryOrder order;
-      switch (result) {
-        case OrderPlaced(order: final DeliveryOrder placed):
-          order = placed;
-        case OrderAlreadyPlaced(orderId: final String orderId):
-          // An earlier try of this basket went through before the customer changed it. That order
-          // is the truth; placing the changed basket as well is the duplicate the key prevents.
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(t.offlineAlreadyPlaced)));
-          }
-          DeliveryOrder? existing;
-          try {
-            existing = await widget.api.read(orderId);
-          } catch (_) {
-            existing = null;
-          }
-          if (existing == null) {
-            // It exists; it just could not be fetched to show. The basket it came from is done.
-            widget.cart.settleCheckout();
-            if (mounted) Navigator.of(context).pop();
-            return;
-          }
-          order = existing;
-        case OrderPriceChanged():
-          // Only ever the answer to a request that asserts a total, which this screen does not
-          // send: the customer is looking at it, and the confirmation shows the server's own.
-          if (!mounted) return;
-          setState(() => _placing = false);
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(t.couldNotPlaceOrder)));
-          return;
-      }
+      // One order for a one-shop basket; one checkout — every shop's order or none — for a basket
+      // from several. Null when the answer was dealt with where it came.
+      final ({Object outcome, List<DeliveryOrder> orders})? placed = widget.cart.isMultiShop
+          ? await _sendCheckout(submission, agreedTotal!, t)
+          : await _sendOrder(submission, t);
+      if (placed == null) return;
       // The approved payment intent, into the transfer ledger with the locked rate — which
       // instrument actually carries the money (cash split, Whish, OMT), a fact the order's own
       // cash/wallet field is too coarse to hold. Best-effort by design: the order exists either
-      // way, and cash collection reads the ledger only when a row is there to read.
+      // way, and cash collection reads the ledger only when a row is there to read. One intent per
+      // order, because each is collected at its own door.
       final TransferApi? transfers = widget.transferApi;
       if (transfers != null) {
-        try {
-          await transfers.initiate(
-            orderId: order.id,
-            method: _walletChoice ?? 'CASH_ON_DELIVERY',
-            amountUsd: order.totalAmount,
-            splitUsd:
-                _payment == PaymentMethod.cash ? _splitUsdValue : null,
-          );
-        } catch (_) {
-          // The ledger missed one intent; the order and its payment method stand.
+        for (final DeliveryOrder order in placed.orders) {
+          try {
+            await transfers.initiate(
+              orderId: order.id,
+              method: _walletChoice ?? 'CASH_ON_DELIVERY',
+              amountUsd: order.totalAmount,
+              // The USD/LBP split is offered for a one-shop basket only: several orders have no
+              // one total to split.
+              splitUsd: _payment == PaymentMethod.cash && placed.orders.length == 1
+                  ? _splitUsdValue
+                  : null,
+            );
+          } catch (_) {
+            // The ledger missed one intent; the order and its payment method stand.
+          }
         }
       }
       // A group split closes over its order and gets its All-Shares-Paid moment. Read before
-      // clear() wipes it with the rest of the basket's order-scoped state.
+      // clear() wipes it with the rest of the basket's order-scoped state. Only ever one order: a
+      // basket from several shops is never split.
       final String? planId = widget.cart.splitPlanId;
-      if (planId != null && widget.splitApi != null) {
+      if (planId != null && widget.splitApi != null && placed.orders.length == 1) {
+        final DeliveryOrder order = placed.orders.single;
         try {
           final SplitPlan plan =
               await widget.splitApi!.attachOrder(planId, order.id);
@@ -439,7 +456,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Placed: the attempt has its answer, and the next basket is a new one under a new key.
       widget.cart.settleCheckout();
       if (!mounted) return;
-      Navigator.of(context).pop(order);
+      Navigator.of(context).pop(placed.outcome);
     } on DioException catch (e) {
       // First, and whether or not this screen is still up: a send that may have placed the order
       // pins the basket's key, so nothing the customer does to the basket next can place a second
@@ -471,6 +488,132 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(placementRefusalMessage(e, t))));
     }
+  }
+
+  /// Sends a one-shop basket as the single order it is. Null when the answer was dealt with here.
+  Future<({Object outcome, List<DeliveryOrder> orders})?> _sendOrder(
+      OrderSubmission submission, DeliveryStrings t) async {
+    final PlaceOrderResult result = await widget.api.place(submission);
+    if (result is OrderPlaced) {
+      return (outcome: result.order, orders: <DeliveryOrder>[result.order]);
+    }
+    if (result is OrderAlreadyPlaced) return _earlierAttempt(result.orderId, t);
+    _unexpectedPriceChange(t);
+    return null;
+  }
+
+  /// Sends a basket from several shops as one checkout: every shop's order, or none. Null when the
+  /// answer was dealt with here.
+  ///
+  /// Sent at [agreedTotal] — the server's quote the customer is looking at — which Order Manager
+  /// refuses to place at any other total. When the total has moved since (a price edited, an offer's
+  /// budget spent, a code's last use taken) nothing is placed: the customer is shown the new total
+  /// beside the old, and the checkout goes only if they confirm it, at that total. Several orders
+  /// charged at a total nobody was shown is exactly what this prevents.
+  ///
+  /// A shop that refuses — closed, not delivering to the address, under its minimum — is thrown,
+  /// and the refusal sentence every checkout shares ([placementRefusalMessage]) is the server's,
+  /// which names the shop.
+  Future<({Object outcome, List<DeliveryOrder> orders})?> _sendCheckout(
+      OrderSubmission submission, double agreedTotal, DeliveryStrings t) async {
+    double expectedTotal = agreedTotal;
+    while (true) {
+      // The same submission every time, key and all: confirming a new total is the same attempt.
+      final PlaceCheckoutResult result =
+          await widget.api.placeCheckout(submission, expectedTotal: expectedTotal);
+      switch (result) {
+        case CheckoutPlaced():
+          return (outcome: result, orders: result.orders);
+        case CheckoutAlreadyPlaced(orderId: final String orderId):
+          return _earlierAttempt(orderId, t);
+        case CheckoutPriceChanged(total: final double total):
+          // Nothing is being placed while the customer decides, so nothing says it is; and the bar
+          // follows the server to its new figures behind the question.
+          if (!mounted) return null;
+          setState(() => _placing = false);
+          _quoter.retry();
+          if (!await _confirmNewTotal(total, expectedTotal, t) || !mounted) return null;
+          setState(() => _placing = true);
+          expectedTotal = total;
+      }
+    }
+  }
+
+  /// Shows a checkout's new [total] beside the [agreed] one it was sent at, and asks whether to place
+  /// it at the new one. True only for an explicit yes: dismissing the question places nothing.
+  Future<bool> _confirmNewTotal(double total, double agreed, DeliveryStrings t) async {
+    final String newTotal = '\$${total.toStringAsFixed(2)}';
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        backgroundColor: DeliveryColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+        title: Text(t.multiCartPriceChangedTitle,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
+        content: Text(
+          t.multiCartPriceChangedBody(newTotal, '\$${agreed.toStringAsFixed(2)}'),
+          style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
+            child: Text(t.notNow),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: DeliveryColors.brand,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.md)),
+            ),
+            child: Text(t.custPlaceOrderAmount(newTotal)),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  /// An earlier try of this basket went through before the customer changed it. What it placed is
+  /// the truth; placing the changed basket as well is the duplicate the key prevents. It is read to
+  /// be shown — or, when it cannot be read, the basket it came from is settled and the screen closes.
+  ///
+  /// The key sits on one order, but a try from several shops placed one order per shop. An order
+  /// that belongs to such a checkout is therefore never confirmed as the purchase, which would read
+  /// three orders as one: an [EarlierCheckoutPlaced] goes back instead, and the basket sends the
+  /// customer to Orders, where every order of that checkout carries its badge. No payment intent is
+  /// recorded for it — this screen knows neither all of its orders nor the payment that try used.
+  Future<({Object outcome, List<DeliveryOrder> orders})?> _earlierAttempt(
+      String orderId, DeliveryStrings t) async {
+    DeliveryOrder? existing;
+    try {
+      existing = await widget.api.read(orderId);
+    } catch (_) {
+      existing = null;
+    }
+    if (existing != null && existing.isPartOfCheckout) {
+      return (outcome: EarlierCheckoutPlaced(existing), orders: const <DeliveryOrder>[]);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.offlineAlreadyPlaced)));
+    }
+    if (existing == null) {
+      // It exists; it just could not be fetched to show. The basket it came from is done.
+      widget.cart.settleCheckout();
+      if (mounted) Navigator.of(context).pop();
+      return null;
+    }
+    return (outcome: existing, orders: <DeliveryOrder>[existing]);
+  }
+
+  /// A price-changed answer to a one-shop placement, which only ever comes back to a request that
+  /// asserts a total — and this screen sends none for one shop: the customer is looking at the total,
+  /// and the confirmation shows the server's own.
+  void _unexpectedPriceChange(DeliveryStrings t) {
+    if (!mounted) return;
+    setState(() => _placing = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.couldNotPlaceOrder)));
   }
 
   /// Offers to keep this checkout on the phone and send it when the connection returns.
@@ -576,19 +719,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Why this checkout cannot wait for the connection, in the customer's words — or null when it
   /// can.
   ///
+  /// * From several shops: its orders are placed together, as one checkout, while online.
   /// * Not cash: a card or wallet hold needs the payment provider while the customer waits.
   /// * Split with friends: the plan closes over its order the moment it exists, which the outbox
   ///   does not do.
-  /// * EXPRESS: the surcharge is server configuration that nothing publishes before an order exists,
-  ///   so its total cannot be asserted.
-  /// * Any other total this phone cannot price exactly as Order Manager will ([_assertableTotal]):
-  ///   an area whose fee it never learned, or a promo quoted at another fee. Queued, those would
-  ///   come back PRICE_CHANGED although nothing had changed.
+  /// * Without the server's quote for this checkout, anything the phone cannot price exactly as
+  ///   Order Manager will ([_assertableTotal]): EXPRESS, whose premium is server configuration; an
+  ///   area whose fee it never learned; a promo quoted at another fee. Queued, those would come back
+  ///   PRICE_CHANGED although nothing had changed. With the quote, the total is the server's own.
   String? _whyItCannotWait(OrderSubmission submission, DeliveryStrings t) {
+    // First, because nothing else could make it queueable: a basket from several shops is placed as
+    // one checkout of several orders, which the outbox — one order per queued item — does not send.
+    // Refused whole rather than queued shop by shop, which could place part of the basket.
+    if (widget.cart.isMultiShop) return t.multiCartCannotWait;
     if (submission.paymentMethod != PaymentMethod.cash) return t.offlineQueueCashOnly;
     // After cash: a split basket already pays cash, and telling its host to "choose cash" would be
     // advice they cannot follow.
     if (widget.cart.splitPlanId != null) return t.offlineQueueUnavailable;
+    // With the server's quote for exactly this checkout, its total — Express premium, area fee and
+    // code included — is known, and it is the total the queue asserts.
+    if (_quotedTotal != null) return null;
     if (submission.deliveryTier != DeliveryTier.standard) return t.offlineQueueStandardOnly;
     if (_assertableTotal == null) return t.offlineQueueTotalUnknown;
     return null;
@@ -877,7 +1027,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ? t.custExpressSurchargeApplies
                       : null,
                   selected: _tier == _tiers[i],
-                  onTap: () => setState(() => _tier = _tiers[i]),
+                  onTap: () {
+                    setState(() => _tier = _tiers[i]);
+                    // Express changes the total by its premium; the quote says by how much.
+                    _askForQuote();
+                  },
                 ),
               ),
             ],
@@ -987,7 +1141,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return fee;
   }
 
-  /// The total on the summary bar and the button.
+  /// The server's total for this checkout as it stands — when it has answered this very question and
+  /// would accept the checkout: every shop priced, and none refusing its part. The only total a
+  /// basket from several shops is placed at.
+  double? get _quotedTotal {
+    final BasketQuote? quote = _quoter.quote;
+    if (quote == null || !quote.placeable) return null;
+    if (quote.shops.any((ShopQuote shop) => shop.refusal != null)) return null;
+    return quote.totalAmount;
+  }
+
+  /// The total on the summary bar and the button: the server's quote — kept on screen while a newer
+  /// one is on its way — or, without one, what the phone reckons for a one-shop basket. Null for a
+  /// basket from several shops the server has not priced: a sum of shop cards' fees is not its total.
+  double? get _displayTotal {
+    final double? shown = _quoter.shown?.totalAmount;
+    if (shown != null) return shown;
+    return widget.cart.isMultiShop ? null : _orderTotal;
+  }
+
+  /// What the phone reckons the total is without the server: the goods and [_deliveryFeeCharged],
+  /// less the basket's code. The fallback for [_displayTotal], and the base of [_assertableTotal].
   double get _orderTotal {
     final double promoDiscount = widget.promo?.discount ?? 0;
     return (widget.cart.subtotal + _deliveryFeeCharged - promoDiscount)
@@ -998,11 +1172,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// The total a queued checkout may assert as the one the customer agreed to — or null when this
   /// phone cannot price it exactly as Order Manager will, in which case it is not queued.
   ///
+  /// The server's quote for this very checkout is exactly that, and wins whenever there is one. Only
+  /// without it does the rest of this apply.
+  ///
   /// Three things must be known. The tier's premium: STANDARD carries none, and the EXPRESS
   /// surcharge is never published before an order exists. The delivery fee: [_serverDeliveryFee].
   /// And that this screen's total is built on that fee — which, with a promo quoted at a different
   /// one, it is not (see [_deliveryFeeCharged]).
   double? get _assertableTotal {
+    final double? quoted = _quotedTotal;
+    if (quoted != null) return quoted;
+    if (widget.cart.isMultiShop) return null;
     if (_tier != DeliveryTier.standard) return null;
     final double? fee = _serverDeliveryFee;
     if (fee == null) return null;
@@ -1015,7 +1195,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   /// The USD half of the cash split: what was typed, clamped into [0, total]. Blank = all USD.
   double get _splitUsdValue {
-    final double total = _orderTotal;
+    final double total = _displayTotal ?? _orderTotal;
     final double typed = double.tryParse(_splitUsd.text.trim()) ?? total;
     return typed.clamp(0, total).toDouble();
   }
@@ -1024,7 +1204,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// notes to mix. USD side is typed; the lira side is COMPUTED at the locked rate, because two
   /// editable halves that must sum is an argument waiting to happen.
   Widget _splitCard(DeliveryStrings t) {
-    final double total = _orderTotal;
+    final double total = _displayTotal ?? _orderTotal;
     final double rate = _lbpRate;
     if (total <= 0 || rate <= 0) return const SizedBox.shrink();
     final double usdPart = _splitUsdValue;
@@ -1243,7 +1423,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             }),
           ),
         ],
-        if (_payment == PaymentMethod.cash) ...<Widget>[
+        if (_payment == PaymentMethod.cash && !widget.cart.isMultiShop) ...<Widget>[
           const SizedBox(height: DeliverySpacing.md),
           _splitCard(t),
         ],
@@ -1436,10 +1616,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ------------------------------------------------------------------ the sticky summary
 
   Widget _summaryBar(DeliveryStrings t, List<CartLine> lines) {
-    // The same total the button carries: the validated code's quote off this screen's total, whose
-    // delivery fee is the chosen address's when known. The server recomputes at placement and the
-    // confirmation shows ITS total.
-    final double payable = _orderTotal;
+    // The same total the button carries: the server's quote for this checkout, or the phone's own
+    // reckoning while it has none — a dash for a basket from several shops. The server recomputes at
+    // placement and the confirmation shows ITS total.
+    final double? payable = _displayTotal;
+    // A basket from several shops waits for a current quote every shop accepts ([_quotedTotal]) —
+    // the total it is placed at. While that is on its way, cannot be had, or a shop refuses its part,
+    // the button is held and the line over it says why.
+    final bool severalShops = widget.cart.isMultiShop;
+    final bool held = severalShops && _quotedTotal == null;
 
     return Container(
       width: double.infinity,
@@ -1451,39 +1636,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(DeliverySpacing.lg),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              if (held && lines.isNotEmpty) _heldNote(t),
+              Row(
                 children: <Widget>[
-                  Text(
-                    t.custTotalPrice,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: DeliveryColors.faint,
-                      height: 1.3,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        t.custTotalPrice,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: DeliveryColors.faint,
+                          height: 1.3,
+                        ),
+                      ),
+                      Text(
+                        payable == null ? '—' : payable.toStringAsFixed(2),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: DeliveryColors.brand,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    payable.toStringAsFixed(2),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: DeliveryColors.brand,
-                      height: 1.3,
-                    ),
+                  const Spacer(),
+                  YdPillButton(
+                    // The frame prints the total on the button.
+                    label: payable == null
+                        ? t.checkout
+                        : t.custPlaceOrderAmount('\$${payable.toStringAsFixed(2)}'),
+                    expand: false,
+                    busy: _placing || (severalShops && _quoter.asking),
+                    onPressed: _placing || lines.isEmpty || held ? null : _place,
                   ),
                 ],
-              ),
-              const Spacer(),
-              YdPillButton(
-                // The frame prints the total on the button.
-                label: t.custPlaceOrderAmount(
-                    '\$${_orderTotal.toStringAsFixed(2)}'),
-                expand: false,
-                busy: _placing,
-                onPressed: _placing || lines.isEmpty ? null : _place,
               ),
             ],
           ),
@@ -1491,4 +1684,81 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
     );
   }
+
+  /// Why a basket from several shops cannot be placed yet, over the button it holds: its price on the
+  /// way; a price that could not be had, with a way to ask again — and, when the platform is known to
+  /// be out of reach, why this basket cannot wait for it; or each shop that cannot take its part,
+  /// named. Nothing once the quote is one every shop accepts.
+  Widget _heldNote(DeliveryStrings t) {
+    final TextStyle warning =
+        TextStyle(fontSize: 12, color: DeliveryAccent.critical.color, height: 1.35);
+    final Widget? note;
+    if (_quoter.asking) {
+      note = Row(
+        children: <Widget>[
+          const SizedBox.square(
+            dimension: 12,
+            child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Expanded(
+            child: Text(t.multiCartPricesUpdating,
+                style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3)),
+          ),
+        ],
+      );
+    } else if (_quoter.failed) {
+      note = Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              widget.connectivity?.value == false ? t.multiCartCannotWait : t.multiCartPricesFailed,
+              style: warning,
+            ),
+          ),
+          TextButton(
+            onPressed: _quoter.retry,
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+            child: Text(t.tryAgain),
+          ),
+        ],
+      );
+    } else {
+      final List<String> refusals = <String>[];
+      for (final ShopQuote shop in _quoter.quote?.shops ?? const <ShopQuote>[]) {
+        final String? sentence = shopRefusalSentence(t, shop, _shopName(t, shop));
+        if (sentence != null) refusals.add(sentence);
+      }
+      note = refusals.isEmpty
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[for (final String sentence in refusals) Text(sentence, style: warning)],
+            );
+    }
+    if (note == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: DeliverySpacing.sm),
+      child: note,
+    );
+  }
+
+  /// What a shop's line is called: the server's name for it, else the basket's card for it.
+  String _shopName(DeliveryStrings t, ShopQuote shop) {
+    final String? id = shop.storeId;
+    return shop.storeName ?? (id == null ? null : widget.cart.storeFor(id)?.name) ?? t.tabShop;
+  }
+}
+
+/// What [CheckoutScreen] hands back when an earlier try of the basket turns out to have been placed
+/// already as a checkout of several shops' orders ([DeliveryOrder.isPartOfCheckout]).
+///
+/// Not the order itself, which the basket would confirm as the one purchase when it is one of
+/// several: the basket says the earlier checkout went through and opens Orders, where every one of
+/// its orders is listed with its badge.
+class EarlierCheckoutPlaced {
+  const EarlierCheckoutPlaced(this.order);
+
+  /// The order carrying the attempt's key — one of the checkout's.
+  final DeliveryOrder order;
 }

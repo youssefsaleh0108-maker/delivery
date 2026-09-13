@@ -17953,6 +17953,144 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 unread message} other{{count} unread messages}}'**
   String chatShopUnreadCount(int count);
+
+  /// No description provided for @multiCartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Basket'**
+  String get multiCartTitle;
+
+  /// No description provided for @multiCartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One checkout, every shop'**
+  String get multiCartSubtitle;
+
+  /// No description provided for @multiCartShopCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 shop} other{{count} shops}}'**
+  String multiCartShopCount(int count);
+
+  /// No description provided for @multiCartFromShop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{From {store} (1 item)} other{From {store} ({count} items)}}'**
+  String multiCartFromShop(int count, String store);
+
+  /// No description provided for @multiCartShopDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery from this shop'**
+  String get multiCartShopDelivery;
+
+  /// No description provided for @multiCartDeliveryFromShops.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Delivery from 1 shop} other{Delivery from {count} shops}}'**
+  String multiCartDeliveryFromShops(int count);
+
+  /// No description provided for @multiCartCheckoutAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout — {amount}'**
+  String multiCartCheckoutAmount(String amount);
+
+  /// No description provided for @multiCartBelowMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {amount} more from {store} to reach its minimum order'**
+  String multiCartBelowMinimum(String amount, String store);
+
+  /// No description provided for @multiCartShopClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} is closed right now. Remove its items to check out.'**
+  String multiCartShopClosed(String store);
+
+  /// No description provided for @multiCartShopNotServing.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} doesn\'t deliver to your address. Remove its items to check out.'**
+  String multiCartShopNotServing(String store);
+
+  /// No description provided for @multiCartShopUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} can\'t take this order right now.'**
+  String multiCartShopUnavailable(String store);
+
+  /// No description provided for @multiCartRemoveShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {store}'**
+  String multiCartRemoveShop(String store);
+
+  /// No description provided for @multiCartShopLimitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{max, plural, =1{One shop per basket} other{Up to {max} shops per basket}}'**
+  String multiCartShopLimitTitle(int max);
+
+  /// No description provided for @multiCartShopLimitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Check out, or remove a shop from your basket, before adding items from another.'**
+  String get multiCartShopLimitBody;
+
+  /// No description provided for @multiCartPartOfOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Part of a {count}-shop order}}'**
+  String multiCartPartOfOrder(int count);
+
+  /// No description provided for @multiCartCannotWait.
+  ///
+  /// In en, this message translates to:
+  /// **'A basket from several shops can\'t wait for the connection: its shops\' orders are placed together, while you\'re online. Check out once you\'re back.'**
+  String get multiCartCannotWait;
+
+  /// No description provided for @multiCartGiftOneShop.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift is sent from one shop at a time. Remove the other shops\' items, or send this basket as an ordinary order.'**
+  String get multiCartGiftOneShop;
+
+  /// No description provided for @multiCartPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 order placed · {amount}} other{{count} orders placed · {amount}}}'**
+  String multiCartPlaced(int count, String amount);
+
+  /// No description provided for @multiCartPricesUpdating.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating prices…'**
+  String get multiCartPricesUpdating;
+
+  /// No description provided for @multiCartPricesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm the latest prices.'**
+  String get multiCartPricesFailed;
+
+  /// No description provided for @multiCartPriceChangedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The total has changed'**
+  String get multiCartPriceChangedTitle;
+
+  /// No description provided for @multiCartPriceChangedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your basket now comes to {total}, not the {agreed} you saw. Place its orders at the new total?'**
+  String multiCartPriceChangedBody(String total, String agreed);
+
+  /// No description provided for @multiCartEarlierCheckoutPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}'**
+  String multiCartEarlierCheckoutPlaced(int count);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

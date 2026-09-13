@@ -49,8 +49,12 @@ void main() {
   /// basket, and has its own cases at the bottom.
   double minOrder = 0;
 
+  /// Every price the app asked Order Manager for (`POST /api/orders/quote`), in order.
+  final List<RequestOptions> quotes = <RequestOptions>[];
+
   setUp(() {
     minOrder = 0;
+    quotes.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(storageChannel, (MethodCall call) async => null);
   });
@@ -91,6 +95,18 @@ void main() {
     'status': 'ACTIVE',
   };
 
+  /// The one dish on each shop's shelf: the falafel at the first shop, a plain dish elsewhere.
+  Map<String, dynamic> dishOf(String shopId) => shopId == 's1'
+      ? falafel
+      : <String, dynamic>{
+          'id': 'p-$shopId',
+          'merchantId': shopId,
+          'storeId': shopId,
+          'name': 'Dish of $shopId',
+          'price': 5.0,
+          'status': 'ACTIVE',
+        };
+
   Map<String, dynamic> page(List<Map<String, dynamic>> content) => <String, dynamic>{
         'content': content,
         'page': 0,
@@ -100,24 +116,25 @@ void main() {
 
   /// What the fake server says to a GET, or null for "not found".
   ///
-  /// Two shops — the first with one product without options, the second with an empty shelf,
-  /// since nothing is ever added there — and an empty answer for the rest of what the shell's five
-  /// tabs ask on start. Everything else — butler terms, offer previews — is refused, and every
-  /// screen that asks already treats a refusal as "nothing to show".
+  /// Four shops, each with one product without options, and an empty answer for the rest of what
+  /// the shell's five tabs ask on start. Everything else — butler terms, offer previews, the
+  /// basket's quote — is refused, and every screen that asks already treats a refusal as "nothing
+  /// to show".
   Object? answer(String path) {
     if (path.startsWith('/api/orders')) return page(const <Map<String, dynamic>>[]);
+    for (final String id in <String>['s1', 's2', 's3', 's4']) {
+      if (path == '/api/stores/$id') return shop(id);
+      if (path == '/api/stores/$id/products') return page(<Map<String, dynamic>>[dishOf(id)]);
+      if (path == '/api/stores/$id/aisles') return const <dynamic>[];
+      if (path == '/api/stores/$id/offers') return page(const <Map<String, dynamic>>[]);
+      if (path == '/api/products/${dishOf(id)['id']}/options') return const <dynamic>[];
+    }
     return switch (path) {
-      '/api/stores' => page(<Map<String, dynamic>>[shop('s1'), shop('s2')]),
+      '/api/stores' =>
+        page(<Map<String, dynamic>>[shop('s1'), shop('s2'), shop('s3'), shop('s4')]),
       '/api/stores/favorites' => page(const <Map<String, dynamic>>[]),
       '/api/banners' => const <dynamic>[],
       '/api/categories/chips' => const <dynamic>[],
-      '/api/stores/s1' => shop('s1'),
-      '/api/stores/s2' => shop('s2'),
-      '/api/stores/s1/products' => page(<Map<String, dynamic>>[falafel]),
-      '/api/stores/s2/products' => page(const <Map<String, dynamic>>[]),
-      '/api/stores/s1/aisles' || '/api/stores/s2/aisles' => const <dynamic>[],
-      '/api/stores/s1/offers' || '/api/stores/s2/offers' => page(const <Map<String, dynamic>>[]),
-      '/api/products/p1/options' => const <dynamic>[],
       '/api/notifications/unread-count' => const <String, dynamic>{'unread': 0},
       '/api/butler/mine' => page(const <Map<String, dynamic>>[]),
       _ => null,
@@ -130,6 +147,7 @@ void main() {
     final Dio dio = Dio(BaseOptions(baseUrl: 'http://127.0.0.1:1'));
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+        if (options.path == '/api/orders/quote') quotes.add(options);
         final Object? body = options.method == 'GET' ? answer(options.path) : null;
         if (body == null) {
           handler.reject(DioException(
@@ -336,5 +354,86 @@ void main() {
     // The basket that opens is s1's, and it is the basket that explains s1's minimum.
     expectOnTheBasket(tester);
     expectCheckoutHeldByTheMinimum();
+  });
+
+  /// Add on the named shop's page, then back to Home.
+  Future<void> addFrom(WidgetTester tester, String name) async {
+    await openShop(tester, name);
+    await tester.tap(find.descendant(
+        of: find.byType(StorePageScreen), matching: find.byType(AddButton)));
+    await tester.pumpAndSettle();
+    await Navigator.of(tester.element(find.byType(StorePageScreen))).maybePop();
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a second shop\'s dish joins the basket — no "start a new basket" — and View basket '
+      'still opens the one basket', (WidgetTester tester) async {
+    await pumpShell(tester);
+    await addFrom(tester, shopName);
+    await openShop(tester, otherShopName);
+
+    await tester.tap(find.descendant(
+        of: find.byType(StorePageScreen), matching: find.byType(AddButton)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing,
+        reason: 'A basket holds several shops now; adding from a second one asks nothing.');
+    expect(find.text(en.startNewBasket), findsNothing);
+
+    await tester.tap(find.text(en.viewBasket));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CartScreen), findsOneWidget);
+    expect(find.text(en.multiCartTitle), findsOneWidget);
+    // Each shop's lines in a group of their own, each dish named with its quantity.
+    expect(find.text(en.giftLineQty(1, productName)), findsOneWidget);
+    expect(find.text(en.giftLineQty(1, 'Dish of s2')), findsOneWidget);
+    expect(tester.widget<CustomerNavBar>(find.byType(CustomerNavBar)).basketCount, 2);
+    expect(tester.widget<CustomerNavBar>(find.byType(CustomerNavBar)).index,
+        CustomerNavBar.basketIndex);
+  });
+
+  testWidgets('a shop past the basket\'s limit is explained at the tap, and nothing in the basket '
+      'is lost', (WidgetTester tester) async {
+    await pumpShell(tester);
+    for (final String name in <String>[shopName, otherShopName, 'Shop s3']) {
+      await addFrom(tester, name);
+    }
+    await openShop(tester, 'Shop s4');
+
+    await tester.tap(find.descendant(
+        of: find.byType(StorePageScreen), matching: find.byType(AddButton)));
+    await tester.pumpAndSettle();
+
+    expect(find.text(en.multiCartShopLimitTitle(3)), findsOneWidget);
+    expect(find.text(en.multiCartShopLimitBody), findsOneWidget);
+
+    // The dialog's way on is the one basket, with all three shops still in it.
+    await tester.tap(find.widgetWithText(FilledButton, en.viewBasket));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StorePageScreen), findsNothing);
+    expect(find.byType(CartScreen), findsOneWidget);
+    expect(find.text(en.multiCartShopCount(3)), findsOneWidget);
+    expect(tester.widget<CustomerNavBar>(find.byType(CustomerNavBar)).basketCount, 3);
+  });
+
+  testWidgets('a basket behind another tab asks for no price, and asks once when it is opened',
+      (WidgetTester tester) async {
+    await pumpShell(tester);
+    await fillABasketOnTheShopPage(tester);
+    // Well past the quote's debounce: a basket following every add from behind Home has asked by now.
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(quotes, isEmpty,
+        reason: 'The basket is not on screen, so a price for it is a request nobody looks at.');
+
+    await tester.tap(find.text(en.viewBasket));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expectOnTheBasket(tester);
+    expect(quotes, hasLength(1));
   });
 }

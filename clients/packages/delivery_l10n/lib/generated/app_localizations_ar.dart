@@ -10652,4 +10652,166 @@ class DeliveryStringsAr extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String get multiCartTitle => 'السلة الذكية';
+
+  @override
+  String get multiCartSubtitle => 'دفعة واحدة لكل المتاجر';
+
+  @override
+  String multiCartShopCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count متجر',
+      many: '$count متجرًا',
+      few: '$count متاجر',
+      two: 'متجران',
+      one: 'متجر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartFromShop(int count, String store) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'من $store ($count صنف)',
+      many: 'من $store ($count صنفًا)',
+      few: 'من $store ($count أصناف)',
+      two: 'من $store (صنفان)',
+      one: 'من $store (صنف واحد)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopDelivery => 'التوصيل من هذا المتجر';
+
+  @override
+  String multiCartDeliveryFromShops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'التوصيل من $count متجر',
+      many: 'التوصيل من $count متجرًا',
+      few: 'التوصيل من $count متاجر',
+      two: 'التوصيل من متجرين',
+      one: 'التوصيل من متجر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartCheckoutAmount(String amount) {
+    return 'إتمام الطلب — $amount';
+  }
+
+  @override
+  String multiCartBelowMinimum(String amount, String store) {
+    return 'أضف $amount من $store لبلوغ الحد الأدنى للطلب';
+  }
+
+  @override
+  String multiCartShopClosed(String store) {
+    return '$store مغلق الآن. أزل منتجاته لإتمام الطلب.';
+  }
+
+  @override
+  String multiCartShopNotServing(String store) {
+    return '$store لا يوصّل إلى عنوانك. أزل منتجاته لإتمام الطلب.';
+  }
+
+  @override
+  String multiCartShopUnavailable(String store) {
+    return 'لا يستطيع $store استلام هذا الطلب الآن.';
+  }
+
+  @override
+  String multiCartRemoveShop(String store) {
+    return 'إزالة $store';
+  }
+
+  @override
+  String multiCartShopLimitTitle(int max) {
+    String _temp0 = intl.Intl.pluralLogic(
+      max,
+      locale: localeName,
+      other: 'حتى $max متجر في السلة',
+      many: 'حتى $max متجرًا في السلة',
+      few: 'حتى $max متاجر في السلة',
+      two: 'حتى متجرين في السلة',
+      one: 'متجر واحد في السلة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopLimitBody =>
+      'أتمّ طلبك أو أزل متجرًا من سلتك قبل إضافة منتجات من متجر آخر.';
+
+  @override
+  String multiCartPartOfOrder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'جزء من طلب من $count متجر',
+      many: 'جزء من طلب من $count متجرًا',
+      few: 'جزء من طلب من $count متاجر',
+      two: 'جزء من طلب من متجرين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartCannotWait =>
+      'لا يمكن لسلة من عدة متاجر أن تنتظر عودة الاتصال: تُرسل طلبات متاجرها معًا وأنت متصل. أتمّ الطلب عند عودة الاتصال.';
+
+  @override
+  String get multiCartGiftOneShop =>
+      'تُرسل الهدية من متجر واحد في كل مرة. أزل منتجات المتاجر الأخرى، أو أرسل هذه السلة كطلب عادي.';
+
+  @override
+  String multiCartPlaced(int count, String amount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم إرسال $count طلب · $amount',
+      many: 'تم إرسال $count طلبًا · $amount',
+      few: 'تم إرسال $count طلبات · $amount',
+      two: 'تم إرسال طلبين · $amount',
+      one: 'تم إرسال طلب واحد · $amount',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartPricesUpdating => 'جارٍ تحديث الأسعار…';
+
+  @override
+  String get multiCartPricesFailed => 'تعذّر تأكيد أحدث الأسعار.';
+
+  @override
+  String get multiCartPriceChangedTitle => 'تغيّر المجموع';
+
+  @override
+  String multiCartPriceChangedBody(String total, String agreed) {
+    return 'أصبح مجموع سلتك $total بدلًا من $agreed الذي رأيته. هل تريد إتمام طلباتها بالمجموع الجديد؟';
+  }
+
+  @override
+  String multiCartEarlierCheckoutPlaced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      many: 'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      few: 'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      two: 'نجحت محاولتك السابقة بالفعل: الطلبان كلاهما في «الطلبات».',
+    );
+    return '$_temp0';
+  }
 }

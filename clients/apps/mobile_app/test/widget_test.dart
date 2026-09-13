@@ -75,18 +75,21 @@ void main() {
       expect(cart.qtyOf('a'), 2);
     });
 
-    test('adding a second shop is refused', () {
+    test('a second shop joins the basket rather than replacing it', () {
       final Cart cart = Cart();
       cart.add(product('a', 'm1', 5.00));
 
       final Product other = product('b', 'm2', 5.00);
-      expect(cart.conflictsWith(other), isTrue);
-      // Order Manager rejects this too; failing here just means the customer hears about it at
-      // the moment of the tap rather than at checkout.
-      expect(() => cart.add(other), throwsStateError);
+      // A basket holds several shops (Figma 121:358); only a shop past Cart.maxShops is refused,
+      // and cart_test.dart covers that.
+      expect(cart.exceedsShopLimit(other), isFalse);
+      cart.add(other);
+
+      expect(cart.storeIds, <String>['m1', 'm2']);
+      expect(cart.itemCount, 2);
     });
 
-    test('emptying the basket releases the store lock', () {
+    test('emptying the basket forgets its shops', () {
       final Cart cart = Cart();
       cart.add(product('a', 'm1', 5.00));
       expect(cart.storeId, 'm1');
@@ -95,20 +98,7 @@ void main() {
 
       expect(cart.isEmpty, isTrue);
       expect(cart.storeId, isNull);
-      // Which means a different shop is now addable without an explicit "clear basket".
-      expect(cart.conflictsWith(product('b', 'm2', 5.00)), isFalse);
-    });
-
-    test('switching shops discards the old basket and re-locks in one step', () {
-      final Cart cart = Cart();
-      cart.add(product('a', 'm1', 5.00), from: storeCard('m1'));
-
-      cart.switchTo(storeCard('m2'));
-
-      expect(cart.isEmpty, isTrue);
-      expect(cart.storeId, 'm2');
-      // Re-locked immediately, so the product that triggered the switch goes straight in.
-      expect(cart.conflictsWith(product('b', 'm2', 5.00)), isFalse);
+      expect(cart.storeIds, isEmpty);
     });
 
     test('the delivery fee is added to the total but not to the subtotal', () {

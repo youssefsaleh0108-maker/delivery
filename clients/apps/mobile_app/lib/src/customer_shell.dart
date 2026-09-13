@@ -35,7 +35,6 @@ class CustomerShell extends StatefulWidget {
     required this.butlerApi,
     required this.zoneApi,
     required this.offerApi,
-    this.promoApi,
     this.transferApi,
     this.splitApi,
     this.geocodingApi,
@@ -64,8 +63,8 @@ class CustomerShell extends StatefulWidget {
 
   // The capability APIs, optional like everywhere else — but this shell is the ONLY road from
   // main.dart to the customer screens, so a null here is a feature dark for every customer.
-  // main.dart passes all five; the nullability exists for tests, not for the app.
-  final PromoApi? promoApi;
+  // main.dart passes all of them; the nullability exists for tests, not for the app. Promo codes
+  // have no API of their own here any more: the basket's quote from Order Manager judges them.
 
   /// Checkout's money surface — rate lock, USD/LBP split, wallet methods.
   final TransferApi? transferApi;
@@ -261,7 +260,11 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
   /// Crossing an offer's minimum is exactly the moment the customer should see the fee disappear,
   /// so this follows the subtotal rather than only firing when the Basket tab opens.
   void _requoteDelivery() {
-    final String signature = '${_cart.storeId}|${_cart.subtotal.toStringAsFixed(2)}';
+    // Every shop in the basket, not just one: a basket from several shops has no single offer to
+    // ask about (Cart.refreshWaiver clears it, and the basket's quote prices each shop's waiver),
+    // but each of its shops' area fees is worth learning.
+    final String signature =
+        '${_cart.storeIds.join(',')}|${_cart.subtotal.toStringAsFixed(2)}';
     if (signature == _quotedFor) {
       return;
     }
@@ -280,7 +283,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
   void _learnDeliveryTerms() {
     if (!mounted || !_online.value) return;
     final Set<String> shops = <String>{
-      if (_cart.storeId != null) _cart.storeId!,
+      ..._cart.storeIds.where((String id) => id.isNotEmpty),
       if (_catalog.store != null) _catalog.store!.id,
     };
     final DeliveryAddress? selected = _addresses.selected;
@@ -466,10 +469,11 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
         return CartScreen(
           cart: _cart,
           addresses: _addresses,
+          // Built with every other tab and kept alive, but priced only while it is the tab on screen.
+          showing: _index == CustomerNavBar.basketIndex,
           orderApi: widget.orderApi,
           offerApi: widget.offerApi,
           zoneApi: widget.zoneApi,
-          promoApi: widget.promoApi,
           transferApi: widget.transferApi,
           splitApi: widget.splitApi,
           profileApi: widget.profileApi,

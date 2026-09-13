@@ -356,6 +356,25 @@ void main() {
     expect(checkout.returned(), isFalse);
   });
 
+  testWidgets('a basket from several shops cannot wait for the connection, and says why — it is '
+      'never queued shop by shop', (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> placed}) s =
+        server(<void Function(RequestOptions, RequestInterceptorHandler)>[unreachable]);
+    final _MemoryStore store = _MemoryStore();
+    final OrderOutbox outbox = outboxOver(s.dio, store);
+    final Cart cart = basket()..add(product('b', 's2', 4.00), from: storeCard('s2'));
+    await openCheckout(tester,
+        dio: s.dio, cart: cart, outbox: outbox, connectivity: ValueNotifier<bool>(false));
+
+    await tapPlace(tester);
+
+    expect(find.text(en.multiCartCannotWait), findsOneWidget);
+    expect(find.text(en.offlineQueueAction), findsNothing);
+    expect(s.placed, isEmpty);
+    expect(outbox.isEmpty, isTrue);
+    expect(cart.storeIds, <String>['s1', 's2']);
+  });
+
   group('the total a queued checkout asserts is the one Order Manager will charge', () {
     /// The shop's flat fee is 2.00; to the test address's area it charges 3.50.
     Cart areaPricedBasket() =>

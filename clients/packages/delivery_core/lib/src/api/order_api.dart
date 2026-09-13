@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
+import '../models/checkout_models.dart';
 import '../models/gift_models.dart';
 import '../models/order_models.dart';
 import '../models/order_submission.dart';
@@ -93,6 +94,65 @@ class OrderApi {
     final int? status = e.response?.statusCode;
     if (status != null) return status >= 500;
     return e.type != DioExceptionType.connectionTimeout;
+  }
+
+  /// What a basket would cost if it were checked out now, shop by shop — `POST /api/orders/quote`.
+  ///
+  /// A dry run: nothing is placed, held or redeemed. See [BasketQuote] for why a screen shows these
+  /// figures instead of adding up its own. CUSTOMER only.
+  Future<BasketQuote> quote(BasketQuestion question) async {
+    final Response<dynamic> response =
+        await _dio.post<dynamic>('/api/orders/quote', data: question.toBody());
+    return BasketQuote.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Sends one checkout attempt for a basket from several shops — `POST /api/orders/checkout`.
+  ///
+  /// The same [OrderSubmission] a single placement sends, with every shop's lines in the one list:
+  /// Order Manager groups them by shop itself and places one order per shop, all of them or none.
+  /// Every rule of [place] holds. The key goes on every retry, and a repeat is answered with every
+  /// order the first copy placed ([CheckoutPlaced.replayed]); [expectedTotal] is the whole
+  /// checkout's — which the live checkout always sends, as the quote its customer is looking at, and
+  /// confirms with them again on [CheckoutPriceChanged]; a key that already placed something else
+  /// comes back as [CheckoutAlreadyPlaced];
+  /// and [mayHavePlaced] reads a thrown send exactly as it reads one from [place].
+  ///
+  /// A shop that refuses — closed, not delivering to the area, under its minimum — is a 422 whose
+  /// `detail` names the shop, thrown as a `DioException` like every other refusal.
+  Future<PlaceCheckoutResult> placeCheckout(OrderSubmission submission,
+      {double? expectedTotal}) async {
+    try {
+      final Response<dynamic> response = await _dio.post<dynamic>(
+        '/api/orders/checkout',
+        data: submission.toBody(expectedTotal: expectedTotal),
+        options: Options(
+            headers: <String, dynamic>{idempotencyKeyHeader: submission.idempotencyKey}),
+      );
+      final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+      return CheckoutPlaced(
+        checkoutId: body['checkoutId'] as String?,
+        orders: (body['orders'] as List<dynamic>)
+            .map((dynamic e) => DeliveryOrder.fromJson(e as Map<String, dynamic>))
+            .toList(growable: false),
+        totalAmount: (body['totalAmount'] as num).toDouble(),
+        // 201 is a new checkout; 200 is this attempt's earlier one, answered to a retry.
+        replayed: response.statusCode == 200,
+      );
+    } on DioException catch (e) {
+      final Object? body = e.response?.data;
+      if (e.response?.statusCode == 409 && body is Map<String, dynamic>) {
+        switch (body['code']) {
+          case 'PRICE_CHANGED':
+            return CheckoutPriceChanged(
+              total: (body['total'] as num).toDouble(),
+              expectedTotal: (body['expectedTotal'] as num).toDouble(),
+            );
+          case 'IDEMPOTENCY_KEY_REUSED':
+            return CheckoutAlreadyPlaced(body['orderId'] as String);
+        }
+      }
+      rethrow;
+    }
   }
 
   /// What a gift checkout needs before an order exists — `GET /api/orders/gift-terms`: what

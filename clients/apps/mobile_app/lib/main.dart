@@ -170,7 +170,6 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   // the app decides those features exist. Removing a line here turns the feature off everywhere,
   // silently — treat it like the release switch it is.
   late final TrackingApi _trackingApi = TrackingApi(_dio);
-  late final PromoApi _promoApi = PromoApi(_dio);
   late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
   late final AggregatesApi _aggregatesApi = AggregatesApi(_dio);
 
@@ -563,7 +562,6 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       notificationApi: _notificationApi,
       butlerApi: _butlerApi,
       zoneApi: _zoneApi,
-      promoApi: _promoApi,
       geocodingApi: _geocodingApi,
       trackingApi: _trackingApi,
       trackingSocket: _trackingSocket,
