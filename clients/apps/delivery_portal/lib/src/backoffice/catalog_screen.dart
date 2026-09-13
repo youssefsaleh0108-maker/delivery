@@ -251,8 +251,11 @@ class _CatalogCardState extends State<_CatalogCard> {
                   ),
                   Row(
                     children: <Widget>[
+                      // One line at any width: a narrow tile has no height to spare for a wrap.
                       const Expanded(
                         child: Text('Featured on the gift hub',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                       ),
                       Switch(value: _featured, onChanged: _saving ? null : _setFeatured),
