@@ -170,14 +170,18 @@ spec:
       services: [{ name: sms-connector, port: 8112 }]
       middlewares: *api-mw
     # Object storage over the API hostname. The prefix is NOT stripped: an S3 signature covers
-    # host and path, and the bucket name is the first path segment. Only the public buckets and
-    # the APK drop are routed — merchant-kyc, receipts and delivery-proof stay unreachable.
+    # host and path, and the bucket name is the first path segment. Only the public buckets, the
+    # APK drop and order-attachments are routed — merchant-kyc, receipts and delivery-proof stay
+    # unreachable. order-attachments is PRIVATE (no anonymous policy) and routed anyway because all
+    # of its traffic is presigned: a customer's phone PUTs the file for a service order, and the
+    # provider or back office opens it with a download URL order-manager signed for them. MinIO
+    # itself refuses any request to it that carries no valid signature, a bucket listing included.
     #
-    # The 90 below is under this rule's own length (116) and so demotes it, which is harmless only
-    # because no other rule matches these three prefixes. Do not read it as the priority band the
-    # /api/notifications/direct rule uses.
+    # The 90 below is under this rule's own length (well over 116) and so demotes it, which is
+    # harmless only because no other rule matches these four prefixes. Do not read it as the
+    # priority band the /api/notifications/direct rule uses.
     - kind: Rule
-      match: Host(`__API_HOST__`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`) || PathPrefix(`/apk`))
+      match: Host(`__API_HOST__`) && (PathPrefix(`/product-images`) || PathPrefix(`/user-avatars`) || PathPrefix(`/apk`) || PathPrefix(`/order-attachments`))
       priority: 90
       services: [{ name: minio, port: 9000 }]
       middlewares:
