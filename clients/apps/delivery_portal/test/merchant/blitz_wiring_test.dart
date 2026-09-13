@@ -69,6 +69,7 @@ void main() {
       staff: StoreStaffApi(dio),
       reports: ReportsApi(dio),
       catalogScan: CatalogScanApi(dio),
+      demand: DemandApi(dio),
     );
     final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
     final PortalDestination inventory = PortalArea.merchant_.destinations
