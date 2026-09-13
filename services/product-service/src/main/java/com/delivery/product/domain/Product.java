@@ -99,6 +99,20 @@ public class Product {
     private Status status = Status.DRAFT;
 
     /**
+     * Picked by the back office for the customer gift hub's featured care bundles (V31).
+     *
+     * <p>Moved only by {@link #featureAsGift} and {@link #unfeatureAsGift}, which only the back
+     * office can reach: the hub is the platform's window, and a merchant who could feature their
+     * own products would turn it into ad space. {@link #giftFeaturedAt} orders the hub and says
+     * when the pick was made.
+     */
+    @Column(name = "gift_featured", nullable = false)
+    private boolean giftFeatured;
+
+    @Column(name = "gift_featured_at")
+    private Instant giftFeaturedAt;
+
+    /**
      * Written by the column default, and read straight back.
      *
      * <p>{@code @Generated} is what makes the 201 on a create honest. Without it the entity is
@@ -184,8 +198,45 @@ public class Product {
         this.status = Status.ACTIVE;
     }
 
+    /**
+     * Withdraws the product from sale — and from the gift hub, for good: a product brought back
+     * later is picked for the hub again on purpose, not returned to it by accident.
+     */
     public void archive() {
         this.status = Status.ARCHIVED;
+        unfeatureAsGift();
+    }
+
+    /**
+     * Puts this product on the gift hub.
+     *
+     * <p>Only a live product: a draft or archived one on the hub would be a card nobody can buy.
+     * Featuring what is already featured keeps the original moment, so saving the switch twice
+     * does not reshuffle the hub.
+     */
+    public void featureAsGift(Instant now) {
+        if (this.status != Status.ACTIVE) {
+            throw new IllegalStateException(
+                    "Only a live product can be featured on the gift hub; this one is " + status);
+        }
+        if (!this.giftFeatured) {
+            this.giftFeatured = true;
+            this.giftFeaturedAt = now;
+        }
+    }
+
+    /** Takes this product off the gift hub. Harmless on one that was never on it. */
+    public void unfeatureAsGift() {
+        this.giftFeatured = false;
+        this.giftFeaturedAt = null;
+    }
+
+    public boolean isGiftFeatured() {
+        return giftFeatured;
+    }
+
+    public Instant getGiftFeaturedAt() {
+        return giftFeaturedAt;
     }
 
     public void addImage(String objectKey) {

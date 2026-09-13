@@ -114,6 +114,17 @@ class RepositoryQueryParseTest {
                 """);
     }
 
+    /** The gift hub's featured bundles, kept in step with ProductRepository.findFeaturedGifts. */
+    @Test
+    void the_gift_hub_query_parses() {
+        parses("""
+                SELECT p FROM Product p
+                WHERE p.giftFeatured = true
+                  AND p.status = com.delivery.product.domain.Product$Status.ACTIVE
+                ORDER BY p.giftFeaturedAt DESC, p.id ASC
+                """);
+    }
+
     @Test
     void the_geocode_cache_eviction_query_parses() {
         parsesMutation("DELETE FROM GeocodeCacheEntry e WHERE e.fetchedAt < :cutoff");
