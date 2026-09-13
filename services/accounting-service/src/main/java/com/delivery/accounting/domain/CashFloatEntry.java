@@ -65,8 +65,14 @@ public class CashFloatEntry {
      * here from the start for exactly that, because adding a discriminator to a table that already
      * has rows means deciding what every existing row meant; it maps to
      * {@code CounterpartyKind.CARRIER} on the ledger.
+     *
+     * <p>{@code MERCHANT} is a shop holding the cash for a pickup order, paid at its own counter
+     * (V52): nobody carried the order, so no rider took the notes. Keyed on the shop's Keycloak
+     * subject — the order's {@code merchantId}, as a rider is keyed on theirs — and owed to the
+     * platform directly, so a shop's row never names a delivery company. It maps to
+     * {@code CounterpartyKind.MERCHANT} on the ledger, the party the shop already is there.
      */
-    public enum HolderKind { RIDER, PROVIDER }
+    public enum HolderKind { RIDER, PROVIDER, MERCHANT }
 
     /**
      * How a hand-over or a remittance was made. Recorded, never acted on: nothing in this service
@@ -194,8 +200,13 @@ public class CashFloatEntry {
         this.amount = amount;
         this.currency = currency;
         this.entryKind = entryKind;
-        // A company's own rows always name the company: see chk_float_provider_carrier.
-        this.carrierRef = holderKind == HolderKind.PROVIDER ? holderRef : carrierRef;
+        // A company's own rows always name the company (chk_float_provider_carrier), and a shop's
+        // never name one (chk_float_merchant_carrier): nobody carried a pickup.
+        this.carrierRef = switch (holderKind) {
+            case PROVIDER -> holderRef;
+            case MERCHANT -> null;
+            case RIDER -> carrierRef;
+        };
     }
 
     /** Notes taken at the door for one order, on the platform's own fleet. */

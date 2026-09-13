@@ -139,7 +139,8 @@ public class SettlementService {
      *                   platform's own fleet. It decides who the rider owes the notes to: their
      *                   company, which then owes the platform, or the platform directly. Stamped on
      *                   the float row at collection so the cash stays that company's responsibility
-     *                   even if the rider later moves fleet
+     *                   even if the rider later moves fleet. Always null for a shop holding a
+     *                   pickup's cash: nobody carried it, so it is owed to the platform directly
      */
     public record CashHolder(String ref, CashFloatEntry.HolderKind kind, String carrierRef) {
 
@@ -823,11 +824,18 @@ public class SettlementService {
      * <p>{@code PROVIDER} on the float becomes {@code CARRIER} on the ledger: the two enums were
      * named at different times for the same thing, and mapping them here — once — is better than
      * renaming a column with rows in it or letting a statement query look for the wrong word.
+     *
+     * <p>A shop holding a pickup's cash is the {@code MERCHANT} it already is on the ledger, so its
+     * collection lands on the statement its goods are on. Spelt out for every kind rather than
+     * defaulting to a rider: a default is how a shop's till would have been booked to a rider who
+     * does not exist, and a new holder kind now fails to compile here instead.
      */
     private static CounterpartyKind kindOf(CashFloatEntry.HolderKind holderKind) {
-        return holderKind == CashFloatEntry.HolderKind.PROVIDER
-                ? CounterpartyKind.CARRIER
-                : CounterpartyKind.RIDER;
+        return switch (holderKind) {
+            case PROVIDER -> CounterpartyKind.CARRIER;
+            case MERCHANT -> CounterpartyKind.MERCHANT;
+            case RIDER -> CounterpartyKind.RIDER;
+        };
     }
 
     /**

@@ -29,6 +29,7 @@ import com.delivery.accounting.domain.AccountingTransaction.Leg;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
 import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.domain.CashFloatRepository;
+import com.delivery.accounting.domain.CounterpartyKind;
 
 /**
  * The arithmetic that decides how much everyone gets, and the ordering that decides when.
@@ -671,6 +672,93 @@ class SettlementServiceTest {
                     new BigDecimal("22.40"), CUSTOMER, "ACC-RIDER", RIDER_HOLDING, "corr-1");
 
             verify(floatEntries).save(any(CashFloatEntry.class));
+        }
+    }
+
+    /**
+     * A service order the customer collects at the shop and pays for at its counter (services slice
+     * 6). Nobody carried it — no fee, no carrier, no rider — and the shop is holding the notes. It
+     * settles as a basket does, the shop on its goods at the one commission rate, with the collection
+     * owed by the shop that took it.
+     */
+    @Nested
+    @DisplayName("a pickup, paid for at the shop's counter")
+    class PickupAtTheCounter {
+
+        private static final String SHOP = "merchant-sub-1";
+
+        /** 40.00 of printing, collected and paid for at the shop: no fee, no rider, no carrier. */
+        private List<AccountingTransaction> collectedAtTheShop() {
+            return serviceAt("12.5").settle(orderId, new BigDecimal("40.00"),
+                    new BigDecimal("40.00"), CUSTOMER, MERCHANT, null,
+                    new SettlementService.CashHolder(SHOP, CashFloatEntry.HolderKind.MERCHANT),
+                    "corr-1",
+                    new SettlementService.Waivers(new BigDecimal("0.00"), false, false, false, null),
+                    null, java.time.Instant.now(), new SettlementService.Parties(SHOP, null), null);
+        }
+
+        private AccountingTransaction collectionIn(List<AccountingTransaction> legs) {
+            return legs.stream()
+                    .filter(t -> t.getLeg() == Leg.CASH_COLLECTED)
+                    .findFirst()
+                    .orElseThrow();
+        }
+
+        @Test
+        void nobody_is_paid_for_a_trip_nobody_made() {
+            List<AccountingTransaction> legs = collectedAtTheShop();
+
+            assertThat(amountOf(legs, Leg.PROVIDER_CREDIT)).isNull();
+            assertThat(amountOf(legs, Leg.RIDER_CREDIT)).isNull();
+            verifyNoInteractions(riderLedger);
+        }
+
+        @Test
+        void the_shop_is_commissioned_at_the_goods_rate() {
+            List<AccountingTransaction> legs = collectedAtTheShop();
+
+            // 12.5% of 40.00, exactly as on a basket.
+            assertThat(amountOf(legs, Leg.MERCHANT_CREDIT)).isEqualByComparingTo("35.00");
+            assertThat(amountOf(legs, Leg.PLATFORM_COMMISSION)).isEqualByComparingTo("5.00");
+        }
+
+        @Test
+        void the_collection_is_owed_by_the_shop_never_by_the_customer() {
+            List<AccountingTransaction> legs = collectedAtTheShop();
+
+            // The old fallback's leg, which claimed a customer's bank account moved.
+            assertThat(amountOf(legs, Leg.CUSTOMER_DEBIT)).isNull();
+            AccountingTransaction collection = collectionIn(legs);
+            assertThat(collection.getAmount()).isEqualByComparingTo("40.00");
+            assertThat(collection.getCounterpartyKind()).isEqualTo(CounterpartyKind.MERCHANT);
+            assertThat(collection.getCounterpartyRef()).isEqualTo(SHOP);
+            assertThat(collection.isPostingRequired()).isFalse();
+        }
+
+        @Test
+        void the_float_says_the_shop_is_holding_it_for_the_platform() {
+            collectedAtTheShop();
+
+            ArgumentCaptor<CashFloatEntry> saved = ArgumentCaptor.forClass(CashFloatEntry.class);
+            verify(floatEntries).save(saved.capture());
+            assertThat(saved.getValue().getHolderKind())
+                    .isEqualTo(CashFloatEntry.HolderKind.MERCHANT);
+            assertThat(saved.getValue().getHolderRef()).isEqualTo(SHOP);
+            assertThat(saved.getValue().getAmount()).isEqualByComparingTo("40.00");
+            // Owed to the platform directly: no company carried it (chk_float_merchant_carrier).
+            assertThat(saved.getValue().getCarrierRef()).isNull();
+            assertThat(saved.getValue().isOutstanding()).isTrue();
+        }
+
+        @Test
+        void the_legs_sum_to_what_the_customer_handed_over() {
+            List<AccountingTransaction> legs = collectedAtTheShop();
+
+            BigDecimal credited = legs.stream()
+                    .filter(t -> t.getDirection() == Direction.CREDIT)
+                    .map(AccountingTransaction::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertThat(credited).isEqualByComparingTo(collectionIn(legs).getAmount());
         }
     }
 
