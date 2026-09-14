@@ -22,6 +22,7 @@ class ServiceOffersScreen extends StatefulWidget {
     this.zoneApi,
     this.storeId,
     this.pendingApproval = false,
+    this.onBack,
   });
 
   final CatalogApi api;
@@ -38,6 +39,10 @@ class ServiceOffersScreen extends StatefulWidget {
 
   /// True while the application is still being decided: offers can be drafted, not published.
   final bool pendingApproval;
+
+  /// Draws a back button that calls this, for a host that pushes the offers as a page. Null draws none,
+  /// which is what a tab wants.
+  final VoidCallback? onBack;
 
   @override
   State<ServiceOffersScreen> createState() => _ServiceOffersScreenState();
@@ -159,6 +164,8 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
                   child: MerchantScreenHeader(
                     title: t.svcOffersTitle,
                     subtitle: t.svcOffersSubtitle,
+                    onBack: widget.onBack,
+                    backSemanticLabel: widget.onBack == null ? null : t.back,
                     trailing: _shop == null
                         ? null
                         : YdPillButton(

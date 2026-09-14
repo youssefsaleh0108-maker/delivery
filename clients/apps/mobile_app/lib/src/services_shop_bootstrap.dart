@@ -16,12 +16,38 @@ final class ServicesShopReady extends ServicesShopOutcome {
   final bool opened;
 }
 
-/// Not a services provider — or nothing could be learned. The shell carries on exactly as it did
-/// before services existed, standing in [storeId] (null when there is no shop).
+/// Owns a goods shop and a services shop. The shell stays the goods one — its till and its shelves —
+/// standing in [storeId], and the services shop's orders and offers are a row away in Settings.
+///
+/// Not services mode: swapping the till and the shelves for the one services shop would hide the goods
+/// shop's whole trade, where a row costs the services shop a tap.
+final class GoodsAndServicesShops extends ServicesShopOutcome {
+  const GoodsAndServicesShops(this.storeId, this.servicesShop);
+
+  /// The goods shop the shell stands in.
+  final String storeId;
+
+  final Store servicesShop;
+}
+
+/// Not a services provider: a goods shop, or no shop and no application to offer services. The shell
+/// carries on exactly as it did before services existed, standing in [storeId] (null when there is no
+/// shop).
 final class NotServicesProvider extends ServicesShopOutcome {
   const NotServicesProvider(this.storeId);
 
   final String? storeId;
+}
+
+/// The account's shops, or its application, could not be read, so which shell it needs is not known.
+///
+/// Its own outcome rather than a [NotServicesProvider], which is what a failed read used to be: that
+/// put a print shop in the goods shell, till and shelves, for the whole session. The shell says so and
+/// offers a retry and sign-out instead.
+final class ShopsUnreadable extends ServicesShopOutcome {
+  const ShopsUnreadable(this.error);
+
+  final Object error;
 }
 
 /// Applied to offer services and not approved yet. Nothing is opened until a reviewer or
@@ -81,13 +107,13 @@ class ServicesProviderMemory {
 /// existing services shop when two runs race, so it is never opened twice.
 ///
 /// It costs everybody else nothing beyond the shop list the shell always read. A merchant who owns a
-/// shop is a shop and is not asked about: the server opens no shop at all for a services applicant
-/// until this bootstrap opens theirs, so a provider cannot own a goods shop to be mistaken for. An
-/// account with no shop whose application is not a services one is remembered as such for the session
-/// ([ServicesProviderMemory]). Any read that fails means "nothing learned", never "not a provider,
-/// open nothing for good": the shell carries on as before and the next entry asks again. Only a
-/// failure to open a shop the application clearly describes is reported, because only then is the
-/// shell unusable — and a refusal no retry can change is reported as that ([ServicesCategoryNotOffered]).
+/// shop is decided by the shops they own and is not asked about ([fromOwned]): the server opens no shop
+/// at all for a services applicant until this bootstrap opens theirs. An account with no shop whose
+/// application is not a services one is remembered as such for the session ([ServicesProviderMemory]).
+/// A read that fails is reported as that ([ShopsUnreadable]) — never taken for "not a provider" — so the
+/// shell can offer a retry, and the next entry asks again. A shop the application clearly describes
+/// that could not be opened is reported too, and a refusal no retry can change is reported as that
+/// ([ServicesCategoryNotOffered]).
 class ServicesShopBootstrap {
   ServicesShopBootstrap({
     required StoreApi stores,
@@ -118,15 +144,11 @@ class ServicesShopBootstrap {
     final List<Store> owned;
     try {
       owned = (await _stores.mine(size: 20)).content;
-    } catch (_) {
-      return const NotServicesProvider(null);
+    } catch (error) {
+      return ShopsUnreadable(error);
     }
-    for (final Store store in owned) {
-      if (store.vertical == StoreVertical.services) {
-        return ServicesShopReady(store, opened: false);
-      }
-    }
-    if (owned.isNotEmpty) return NotServicesProvider(owned.first.id);
+    final ServicesShopOutcome? byShops = fromOwned(owned);
+    if (byShops != null) return byShops;
 
     final String? account = _account;
     final ServicesProviderMemory? memory = _memory;
@@ -137,8 +159,8 @@ class ServicesShopBootstrap {
     final OnboardingApplication? application;
     try {
       application = await _onboarding.myApplication();
-    } catch (_) {
-      return const NotServicesProvider(null);
+    } catch (error) {
+      return ShopsUnreadable(error);
     }
     final ServiceApplicationAnswers? answers = application?.service;
     if (application == null || answers == null) {
@@ -176,6 +198,28 @@ class ServicesShopBootstrap {
     } catch (error) {
       return ServicesShopFailed(error);
     }
+  }
+
+  /// What the shops an account owns say about its shell, or null when it owns none and only its
+  /// application can tell.
+  ///
+  /// Services mode is for an account whose every shop is a services shop. One that also runs a goods
+  /// shop keeps the goods shell ([GoodsAndServicesShops]). A shop in a vertical this build does not know
+  /// counts as goods: the shell every shop had before services existed.
+  static ServicesShopOutcome? fromOwned(List<Store> owned) {
+    Store? services;
+    String? goods;
+    for (final Store store in owned) {
+      if (store.vertical == StoreVertical.services) {
+        services ??= store;
+      } else {
+        goods ??= store.id;
+      }
+    }
+    if (goods != null && services != null) return GoodsAndServicesShops(goods, services);
+    if (goods != null) return NotServicesProvider(goods);
+    if (services != null) return ServicesShopReady(services, opened: false);
+    return null;
   }
 
   static String _clip(String value, int max) =>

@@ -16,12 +16,16 @@ import 'package:mobile_app/src/merchant_shell.dart';
 /// and neither is drawn until the shop has said which it is.
 class _Gateway implements HttpClientAdapter {
   List<Map<String, dynamic>> stores = <Map<String, dynamic>>[];
+  int storesStatus = 200;
   Map<String, dynamic>? application;
 
   /// Holds the shop list until completed.
   Completer<void>? holdStores;
 
   final List<String> calls = <String>[];
+
+  /// The query of every read of the merchant's order list, in order.
+  final List<String> merchantOrderQueries = <String>[];
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? requestStream,
@@ -30,7 +34,7 @@ class _Gateway implements HttpClientAdapter {
     calls.add(route);
     if (route == 'GET /api/stores/mine') {
       await holdStores?.future;
-      return _json(200, <String, dynamic>{
+      return _json(storesStatus, <String, dynamic>{
         'content': stores,
         'page': 0,
         'totalElements': stores.length,
@@ -50,6 +54,7 @@ class _Gateway implements HttpClientAdapter {
         'awaitingYou': 1,
       });
     }
+    if (route == 'GET /api/orders/merchant') merchantOrderQueries.add(options.uri.query);
     if (options.path.contains('orders') || options.path.contains('products')) {
       return _json(200, <String, dynamic>{'content': <Object>[], 'totalElements': 0});
     }
@@ -94,6 +99,7 @@ void main() {
     bool wireScan = false,
     bool wireChat = false,
     bool settle = true,
+    Future<void> Function()? onSignOut,
   }) async {
     tester.view.physicalSize = const Size(1100, 2400);
     tester.view.devicePixelRatio = 1.0;
@@ -120,7 +126,7 @@ void main() {
           subject: 'merchant-sub',
         ),
         locale: LocaleController(read: () async => 'en', write: (String _) async {}),
-        onSignOut: () async {},
+        onSignOut: onSignOut ?? () async {},
       ),
     ));
     if (!settle) return;
@@ -182,17 +188,20 @@ void main() {
     expect(navLabels(tester), <String>[en.navDashboard, en.navOrders, en.svcNavOffers, en.navSettings]);
   });
 
-  testWidgets('neither mode is drawn until the shop has said which it is',
+  testWidgets('neither mode is drawn until the shop has said which it is, and sign-out stays in reach',
       (WidgetTester tester) async {
+    int signOuts = 0;
     final _Gateway gateway = _Gateway()
       ..stores = <Map<String, dynamic>>[_printShop]
       ..holdStores = Completer<void>();
-    await pumpShell(tester, gateway, settle: false);
+    await pumpShell(tester, gateway, settle: false, onSignOut: () async => signOuts++);
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(YdBottomNav), findsNothing);
     expect(find.text(en.navPos), findsNothing, reason: 'a print shop is never shown a till');
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.tap(find.text(en.merchbLogOutAccount));
+    expect(signOuts, 1, reason: 'a slow read is never a trap');
 
     gateway.holdStores!.complete();
     for (int i = 0; i < 4; i++) {
@@ -217,8 +226,9 @@ void main() {
     expect(find.text(en.svcNoShopYet), findsOneWidget);
   });
 
-  testWidgets('Settings in services mode leaves out the shelves\' tools, and keeps the messages',
-      (WidgetTester tester) async {
+  testWidgets(
+      'Settings in services mode leaves out the shelves\' tools and the staff roster, and keeps the '
+      'messages', (WidgetTester tester) async {
     final _Gateway gateway = _Gateway()..stores = <Map<String, dynamic>>[_printShop];
     await pumpShell(tester, gateway, wireScan: true, wireChat: true);
     await openTab(tester, en.navSettings);
@@ -228,6 +238,8 @@ void main() {
     expect(settings.onCatalogScan, isNull, reason: 'a shelf scan cannot make a service offer');
     expect(settings.onCategories, isNull);
     expect(settings.onStockCount, isNull);
+    expect(settings.onStaff, isNull, reason: 'nobody on a services shop\'s roster could work here');
+    expect(settings.onServiceOrders, isNull, reason: 'the queue is a tab here');
     expect(settings.onShopMessages, isNotNull, reason: 'customers still write to a print shop');
     expect(find.text(en.chatShopInboxTitle), findsOneWidget);
   });
@@ -241,6 +253,8 @@ void main() {
         tester.widget<MerchantSettingsScreen>(find.byType(MerchantSettingsScreen));
     expect(settings.onCatalogScan, isNotNull);
     expect(settings.onCategories, isNotNull);
+    expect(settings.onStaff, isNotNull);
+    expect(settings.onServiceOrders, isNull, reason: 'a goods shop alone has no services queue');
   });
 
   testWidgets('the services dashboard gets its bell only when notifications are wired, and it opens them',
@@ -277,5 +291,58 @@ void main() {
     }
 
     expect(find.byType(ServiceOrdersScreen), findsOneWidget);
+  });
+
+  testWidgets('a shop list that cannot be read offers a retry and a way out, and never the goods tabs',
+      (WidgetTester tester) async {
+    for (final bool withOnboarding in <bool>[true, false]) {
+      final _Gateway gateway = _Gateway()
+        ..stores = <Map<String, dynamic>>[_printShop]
+        ..storesStatus = 500;
+      await pumpShell(tester, gateway, withOnboarding: withOnboarding);
+
+      expect(find.byType(YdBottomNav), findsNothing);
+      expect(find.text(en.navPos), findsNothing);
+      expect(find.text(en.svcShopReadFailed), findsOneWidget);
+      expect(find.text(en.merchbLogOutAccount), findsOneWidget);
+
+      gateway.storesStatus = 200;
+      await tester.tap(find.text(en.tryAgain));
+      for (int i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(navLabels(tester),
+          <String>[en.navDashboard, en.navOrders, en.svcNavOffers, en.navSettings]);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
+  testWidgets(
+      'an owner of a goods shop and a services shop keeps the goods tabs and a goods-only queue, and '
+      'reaches the services shop\'s orders and offers from Settings', (WidgetTester tester) async {
+    final _Gateway gateway = _Gateway()..stores = <Map<String, dynamic>>[_printShop, _grill];
+    await pumpShell(tester, gateway, wireChat: true);
+
+    expect(navLabels(tester),
+        <String>[en.navDashboard, en.navPos, en.navInventory, en.navOrders, en.navSettings]);
+
+    await openTab(tester, en.navOrders);
+    expect(find.byType(OrdersScreen), findsOneWidget);
+    expect(gateway.merchantOrderQueries, isNotEmpty);
+    expect(gateway.merchantOrderQueries, everyElement(contains('kind=CATALOG')),
+        reason: 'a service order is worked in the services queue, which the goods queue cannot do');
+
+    await openTab(tester, en.navSettings);
+    final MerchantSettingsScreen settings =
+        tester.widget<MerchantSettingsScreen>(find.byType(MerchantSettingsScreen));
+    expect(settings.onStaff, isNotNull, reason: 'the goods shop keeps its roster');
+    expect(settings.onServiceOffers, isNotNull);
+
+    await tester.tap(find.text(en.svcServiceOrdersRow));
+    for (int i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byType(ServiceOrdersScreen), findsOneWidget);
+    expect(gateway.merchantOrderQueries.last, contains('kind=SERVICE'));
   });
 }

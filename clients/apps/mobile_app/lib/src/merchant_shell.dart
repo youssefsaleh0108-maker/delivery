@@ -209,6 +209,14 @@ class _MerchantShellState extends State<MerchantShell> {
   /// shell says so and points to support, with no retry, because none could succeed.
   bool _servicesCategoryClosed = false;
 
+  /// The shops, or the application, could not be read, so which shell this is is not known. The shell
+  /// says so, with a retry and a way out, rather than guessing the goods shell for the whole session.
+  bool _shopReadFailed = false;
+
+  /// The services shop of an owner who also runs a goods shop ([GoodsAndServicesShops]): its queue and
+  /// its offers open from Settings, and the shell stays the goods one. Null for everybody else.
+  String? _servicesShopId;
+
   @override
   void initState() {
     super.initState();
@@ -239,57 +247,59 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Future<void> _resolveStore() async {
     String? storeId;
+    String? servicesShopId;
     bool services = false;
     final OnboardingApi? onboarding = widget.onboardingApi;
-    if (onboarding != null && widget.session.hasRole(DeliveryRole.merchant)) {
-      // An approved services provider's shop is opened here, before anything else, from their
-      // application (see [ServicesShopBootstrap]). Everybody else gets the shop `mine` always gave
-      // them, and the shell carries on exactly as before.
-      final ServicesShopOutcome outcome = await ServicesShopBootstrap(
-        stores: widget.storeApi,
-        onboarding: onboarding,
-        memory: widget.servicesProviderMemory,
-        account: widget.session.subject,
-      ).run(onOpening: () {
-        if (mounted) setState(() => _openingServicesShop = true);
-      });
-      if (!mounted) return;
-      switch (outcome) {
-        case ServicesShopReady(:final Store store):
-          storeId = store.id;
-          services = true;
-        case NotServicesProvider(storeId: final String? standing):
-          storeId = standing;
-        case ServicesApplicationPending():
-          // Nothing is opened before a decision, and a waiting provider owns no shop to stand in —
-          // but they applied to offer services, so they wait in the services shell, not at a till.
-          storeId = null;
-          services = true;
-        case ServicesShopFailed():
-          setState(() {
-            _openingServicesShop = false;
-            _servicesShopFailed = true;
-          });
-          return;
-        case ServicesCategoryNotOffered():
-          setState(() {
-            _openingServicesShop = false;
-            _servicesCategoryClosed = true;
-          });
-          return;
-      }
-      if (_openingServicesShop) setState(() => _openingServicesShop = false);
-    } else {
-      try {
-        final Paged<Store> mine = await widget.storeApi.mine(size: 1);
-        if (mine.content.isNotEmpty) {
-          storeId = mine.content.first.id;
-          services = mine.content.first.vertical == StoreVertical.services;
-        }
-      } catch (_) {
-        // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
-      }
+    // An approved services provider's shop is opened here, before anything else, from their
+    // application (see [ServicesShopBootstrap]). Without the onboarding client, the shops the account
+    // owns decide by the same rule.
+    final ServicesShopOutcome outcome =
+        onboarding != null && widget.session.hasRole(DeliveryRole.merchant)
+            ? await ServicesShopBootstrap(
+                stores: widget.storeApi,
+                onboarding: onboarding,
+                memory: widget.servicesProviderMemory,
+                account: widget.session.subject,
+              ).run(onOpening: () {
+                if (mounted) setState(() => _openingServicesShop = true);
+              })
+            : await _ownedShops();
+    if (!mounted) return;
+    switch (outcome) {
+      case ServicesShopReady(:final Store store):
+        storeId = store.id;
+        services = true;
+      case GoodsAndServicesShops(storeId: final String goods, :final Store servicesShop):
+        // The goods shell, where the till and the shelves are, with the services shop a row away.
+        storeId = goods;
+        servicesShopId = servicesShop.id;
+      case NotServicesProvider(storeId: final String? standing):
+        storeId = standing;
+      case ServicesApplicationPending():
+        // Nothing is opened before a decision, and a waiting provider owns no shop to stand in —
+        // but they applied to offer services, so they wait in the services shell, not at a till.
+        storeId = null;
+        services = true;
+      case ShopsUnreadable():
+        setState(() {
+          _openingServicesShop = false;
+          _shopReadFailed = true;
+        });
+        return;
+      case ServicesShopFailed():
+        setState(() {
+          _openingServicesShop = false;
+          _servicesShopFailed = true;
+        });
+        return;
+      case ServicesCategoryNotOffered():
+        setState(() {
+          _openingServicesShop = false;
+          _servicesCategoryClosed = true;
+        });
+        return;
     }
+    if (_openingServicesShop) setState(() => _openingServicesShop = false);
     if (storeId == null && !services && widget.staffApi != null) {
       // An employee owns no store, so `mine` is empty for them; their membership names the shop.
       try {
@@ -302,6 +312,7 @@ class _MerchantShellState extends State<MerchantShell> {
     if (!mounted) return;
     setState(() {
       _storeId = storeId;
+      _servicesShopId = servicesShopId;
       _servicesMode = services;
       if (!_visibleTabs().contains(_tab)) _tab = _visibleTabs().first;
     });
@@ -319,6 +330,17 @@ class _MerchantShellState extends State<MerchantShell> {
       });
     } catch (_) {
       // Keep whatever we started with.
+    }
+  }
+
+  /// What the shops this account owns say, for a shell with no onboarding client to ask
+  /// ([ServicesShopBootstrap.fromOwned]). A read that fails says that, and nothing else.
+  Future<ServicesShopOutcome> _ownedShops() async {
+    try {
+      final List<Store> owned = (await widget.storeApi.mine(size: 20)).content;
+      return ServicesShopBootstrap.fromOwned(owned) ?? const NotServicesProvider(null);
+    } catch (error) {
+      return ShopsUnreadable(error);
     }
   }
 
@@ -363,26 +385,25 @@ class _MerchantShellState extends State<MerchantShell> {
     MerchantTab.settings,
   ];
 
+  /// A services shop's four tabs, in nav order: no till and no shelves.
+  static const List<MerchantTab> _servicesTabs = <MerchantTab>[
+    MerchantTab.dashboard,
+    MerchantTab.orders,
+    MerchantTab.offers,
+    MerchantTab.settings,
+  ];
+
   /// The tabs this person may see, in nav order.
   ///
   /// Owners see all five. An employee sees the register if they may sell, the shelves if they may
   /// touch stock, and always Settings — which is where the language toggle and sign-out live, so
   /// nobody is ever handed an app with no way out of it.
   ///
-  /// A services shop's owner sees Dashboard, Orders, Offers and Settings. Its employees see Settings:
-  /// the permissions a staff record grants open the register and the shelves, which a services shop
-  /// does not have, and its orders are the owner's for the same reason a goods shop's are.
+  /// A services shop gets Dashboard, Orders, Offers and Settings, and only its owner ever stands here:
+  /// this shell opens for the MERCHANT role, an employee's MERCHANT_STAFF token opens the customer app,
+  /// and services mode is read from the shops the account itself owns.
   List<MerchantTab> _visibleTabs() {
-    if (_servicesMode == true) {
-      return <MerchantTab>[
-        if (_access.isOwner) ...<MerchantTab>[
-          MerchantTab.dashboard,
-          MerchantTab.orders,
-          MerchantTab.offers,
-        ],
-        MerchantTab.settings,
-      ];
-    }
+    if (_servicesMode == true) return _servicesTabs;
     if (_access.isOwner) return _goodsTabs;
     return <MerchantTab>[
       if (_access.can(StorePermission.posSales)) MerchantTab.pos,
@@ -508,7 +529,14 @@ class _MerchantShellState extends State<MerchantShell> {
           onCategories: !services && _access.can(StorePermission.modifyInventoryPricing)
               ? _openCategories
               : null,
-          onStaff: _access.can(StorePermission.manageStaff) ? _openStaff : null,
+          // No roster for a services shop: nobody on it could work here. An employee's MERCHANT_STAFF
+          // token opens the customer app, the portal admits MERCHANT alone, and services mode is read
+          // from the shops the account owns — so staff added to a services shop would have no screen.
+          onStaff: !services && _access.can(StorePermission.manageStaff) ? _openStaff : null,
+          // An owner who also runs a services shop works in this goods shell, with that shop's queue
+          // and offers a row away rather than hidden (see [GoodsAndServicesShops]).
+          onServiceOrders: _servicesShopId == null ? null : _openServiceOrders,
+          onServiceOffers: _servicesShopId == null ? null : _openServiceOffers,
           onStockCount: !services &&
                   _access.can(StorePermission.modifyInventoryPricing) &&
                   _storeId != null
@@ -635,6 +663,44 @@ class _MerchantShellState extends State<MerchantShell> {
     if (mounted && unread != null) unawaited(unread.refresh());
   }
 
+  /// The services shop's queue, for an owner who also runs a goods shop.
+  void _openServiceOrders() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        backgroundColor: DeliveryColors.background,
+        body: SafeArea(
+          child: ServiceOrdersScreen(
+            api: widget.orderApi,
+            shopChat: widget.shopChatApi,
+            chatSocket: widget.chatSocket,
+            files: widget.orderAttachmentApi,
+            onBack: navigator.pop,
+          ),
+        ),
+      ),
+    ));
+  }
+
+  /// The services shop's offers, for an owner who also runs a goods shop.
+  void _openServiceOffers() {
+    final NavigatorState navigator = Navigator.of(context);
+    navigator.push(MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        backgroundColor: DeliveryColors.background,
+        body: SafeArea(
+          child: ServiceOffersScreen(
+            api: widget.catalogApi,
+            storeApi: widget.storeApi,
+            zoneApi: widget.zoneApi,
+            storeId: _servicesShopId,
+            onBack: navigator.pop,
+          ),
+        ),
+      ),
+    ));
+  }
+
   void _openStaff() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => StaffScreen(
@@ -693,24 +759,31 @@ class _MerchantShellState extends State<MerchantShell> {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
 
-    if (_openingServicesShop || _servicesShopFailed || _servicesCategoryClosed) {
-      return _ServicesShopGate(
-        failed: _servicesShopFailed,
-        categoryClosed: _servicesCategoryClosed,
+    // Which shell this is comes from the shop, and until the shop has been read either answer could be
+    // wrong: a till in front of a print shop, or Offers in front of a restaurant. So only the gate is
+    // drawn until then, and the gate always has a way out.
+    final _Gate? gate = _servicesCategoryClosed
+        ? _Gate.categoryClosed
+        : _servicesShopFailed
+            ? _Gate.openFailed
+            : _shopReadFailed
+                ? _Gate.readFailed
+                : _openingServicesShop
+                    ? _Gate.opening
+                    : _servicesMode == null
+                        ? _Gate.reading
+                        : null;
+    if (gate != null) {
+      return _ShopGate(
+        gate: gate,
         onRetry: () {
-          setState(() => _servicesShopFailed = false);
+          setState(() {
+            _servicesShopFailed = false;
+            _shopReadFailed = false;
+          });
           _resolveStore();
         },
         onSignOut: widget.onSignOut,
-      );
-    }
-
-    if (_servicesMode == null) {
-      // Which shell this is comes from the shop, and until the shop has been read either answer
-      // could be wrong: a till in front of a print shop, or Offers in front of a restaurant.
-      return const Scaffold(
-        backgroundColor: DeliveryColors.background,
-        body: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
       );
     }
 
@@ -739,23 +812,41 @@ class _MerchantShellState extends State<MerchantShell> {
   }
 }
 
-/// What an approved services provider sees while their shop is being opened, or when it could not be.
+/// What stands before the tabs until the shell knows which tabs to draw. See [_ShopGate].
+enum _Gate {
+  /// The shops, or the application, are being read.
+  reading,
+
+  /// An approved services provider's shop is being opened.
+  opening,
+
+  /// The shops, or the application, could not be read ([ShopsUnreadable]).
+  readFailed,
+
+  /// The services shop could not be opened just now ([ServicesShopFailed]).
+  openFailed,
+
+  /// The server will not open the services shop in its category ([ServicesCategoryNotOffered]).
+  categoryClosed,
+}
+
+/// What the shop shell shows while it reads the shops or opens a services shop, and when either could
+/// not be done.
 ///
-/// Nothing else is drawn: every tab needs the shop, and a dashboard for a shop that does not exist
-/// would only fail five different ways. Sign-out stays in reach, so nobody is trapped behind a retry
-/// that keeps failing. And a refusal that no retry can change — the shop's category is not offered
-/// right now ([ServicesCategoryNotOffered]) — is said as that, pointing to support, with no retry at
-/// all: a "Try again" there would be a button that cannot work.
-class _ServicesShopGate extends StatelessWidget {
-  const _ServicesShopGate({
-    required this.failed,
-    required this.categoryClosed,
+/// Nothing else is drawn: which tabs to draw depends on the shop, and every tab needs it. Sign-out is on
+/// every one of these screens — a read can take a while on a poor connection, and nobody should wait it
+/// out, or sit behind a retry that keeps failing, with no way out. A failed read is said as that, with a
+/// retry, and is never taken as a goods shop. And a refusal that no retry can change — the shop's
+/// category is not offered right now — is said as that, pointing to support, with no retry at all: a
+/// "Try again" there would be a button that cannot work.
+class _ShopGate extends StatelessWidget {
+  const _ShopGate({
+    required this.gate,
     required this.onRetry,
     required this.onSignOut,
   });
 
-  final bool failed;
-  final bool categoryClosed;
+  final _Gate gate;
   final VoidCallback onRetry;
   final Future<void> Function() onSignOut;
 
@@ -766,43 +857,49 @@ class _ServicesShopGate extends StatelessWidget {
       onPressed: () => onSignOut(),
       child: Text(t.merchbLogOutAccount),
     );
+    Widget failed(String title) => YdEmptyState(
+          icon: Icons.storefront_outlined,
+          title: title,
+          message: t.thatDidNotGoThrough,
+          action: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              YdPillButton(label: t.tryAgain, onPressed: onRetry),
+              const SizedBox(height: DeliverySpacing.sm),
+              signOut,
+            ],
+          ),
+        );
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       body: SafeArea(
         child: Center(
-          child: categoryClosed
-              ? YdEmptyState(
-                  icon: Icons.storefront_outlined,
-                  title: t.svcShopCategoryClosedTitle,
-                  message: t.svcShopCategoryClosedBody,
-                  action: signOut,
-                )
-              : failed
-              ? YdEmptyState(
-                  icon: Icons.storefront_outlined,
-                  title: t.svcOpeningShopFailed,
-                  message: t.thatDidNotGoThrough,
-                  action: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      YdPillButton(label: t.tryAgain, onPressed: onRetry),
-                      const SizedBox(height: DeliverySpacing.sm),
-                      signOut,
-                    ],
-                  ),
-                )
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const CircularProgressIndicator(color: DeliveryColors.brand),
+          child: switch (gate) {
+            _Gate.categoryClosed => YdEmptyState(
+                icon: Icons.storefront_outlined,
+                title: t.svcShopCategoryClosedTitle,
+                message: t.svcShopCategoryClosedBody,
+                action: signOut,
+              ),
+            _Gate.openFailed => failed(t.svcOpeningShopFailed),
+            _Gate.readFailed => failed(t.svcShopReadFailed),
+            _Gate.reading || _Gate.opening => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const CircularProgressIndicator(color: DeliveryColors.brand),
+                  if (gate == _Gate.opening) ...<Widget>[
                     const SizedBox(height: DeliverySpacing.md),
                     Text(
                       t.svcOpeningShop,
                       style: const TextStyle(fontSize: 14, color: DeliveryColors.muted),
                     ),
                   ],
-                ),
+                  const SizedBox(height: DeliverySpacing.lg),
+                  signOut,
+                ],
+              ),
+          },
         ),
       ),
     );

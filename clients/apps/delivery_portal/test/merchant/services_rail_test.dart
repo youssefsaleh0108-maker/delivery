@@ -111,10 +111,15 @@ void main() {
       <String>[for (final PortalDestination d in area.destinations) d.label(en)];
 
   test('the services rail keeps Orders third, puts Offers where Products was, and leaves out the '
-      'till, the shelves and the shelf sections', () {
+      'till, the shelves, the shelf sections and the staff roster', () {
     final List<String> goods = labels(PortalArea.merchant_);
     final List<String> services = labels(PortalArea.merchantServices_);
-    final List<String> goodsOnly = <String>[en.navInventory, en.navPos, en.navCategories];
+    final List<String> goodsOnly = <String>[
+      en.navInventory,
+      en.navPos,
+      en.navCategories,
+      en.navStaff,
+    ];
 
     expect(services.take(3), <String>[en.navDashboard, en.svcNavOffers, en.navOrders]);
     expect(goods[1], en.navProducts, reason: 'the goods rail is unchanged');
@@ -154,9 +159,30 @@ void main() {
     expect(page(2), isA<ServiceOrdersScreen>());
     expect((page(2) as ServiceOrdersScreen).shopChat, isNotNull,
         reason: 'the order detail\'s Chat with customer needs the shop\'s conversations');
+    expect((page(2) as ServiceOrdersScreen).files, isNotNull,
+        reason: 'the order detail opens the customer\'s files');
   });
 
-  Future<void> pumpPortal(WidgetTester tester, _Gateway gateway, {bool settle = true}) async {
+  test(
+      'the rail for an owner of both kinds of shop is the goods rail unchanged, with the services '
+      'shop\'s queue and offers appended', () {
+    final PortalApis apis = _apis(Dio());
+    final List<PortalDestination> rail = PortalArea.merchantWithServices_.destinations;
+    final int goods = PortalArea.merchant_.destinations.length;
+    Widget page(int index) => rail[index].buildPage(0, apis, locale, () async {}, (int _) {});
+
+    expect(labels(PortalArea.merchantWithServices_), <String>[
+      ...labels(PortalArea.merchant_),
+      en.svcServiceOrdersRow,
+      en.svcServiceOffersRow,
+    ]);
+    expect(page(goods), isA<ServiceOrdersScreen>());
+    expect((page(goods) as ServiceOrdersScreen).files, isNotNull);
+    expect(page(goods + 1), isA<ServiceOffersScreen>());
+  });
+
+  Future<void> pumpPortal(WidgetTester tester, _Gateway gateway,
+      {bool settle = true, Future<void> Function()? onSignOut}) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -178,7 +204,7 @@ void main() {
         apis: _apis(dio),
         locale: locale,
         session: session,
-        onSignOut: () async {},
+        onSignOut: onSignOut ?? () async {},
       ),
     ));
     if (!settle) return;
@@ -218,16 +244,20 @@ void main() {
     expect(find.byType(ServiceDashboardScreen), findsNothing);
   });
 
-  testWidgets('no rail is drawn until the shops are read, and a read that fails keeps the goods rail',
-      (WidgetTester tester) async {
+  testWidgets(
+      'no rail is drawn until the shops are read, with sign-out in reach; a read that fails offers a '
+      'retry and sign-out, never a guessed goods rail', (WidgetTester tester) async {
+    int signOuts = 0;
     final _Gateway gateway = _Gateway()
       ..stores = <Map<String, dynamic>>[_printShop]
       ..holdStores = Completer<void>();
-    await pumpPortal(tester, gateway, settle: false);
+    await pumpPortal(tester, gateway, settle: false, onSignOut: () async => signOuts++);
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.byType(ConsoleSidebar), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.tap(find.text(en.signOut));
+    expect(signOuts, 1, reason: 'a slow read is never a trap');
 
     gateway.holdStores!.complete();
     for (int i = 0; i < 4; i++) {
@@ -240,6 +270,35 @@ void main() {
       ..stores = <Map<String, dynamic>>[_printShop]
       ..storesStatus = 500;
     await pumpPortal(tester, broken);
-    expect(railOnScreen(tester), labels(PortalArea.merchant_));
+
+    expect(find.byType(ConsoleSidebar), findsNothing, reason: 'no guessed goods rail');
+    expect(find.text(en.svcShopReadFailed), findsOneWidget);
+    expect(find.text(en.signOut), findsOneWidget);
+
+    broken.storesStatus = 200;
+    await tester.tap(find.text(en.tryAgain));
+    for (int i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(railOnScreen(tester), labels(PortalArea.merchantServices_));
+  });
+
+  testWidgets(
+      'an owner of a goods shop and a services shop gets the goods rail with the services shop\'s '
+      'queue and offers at its end', (WidgetTester tester) async {
+    final _Gateway gateway = _Gateway()..stores = <Map<String, dynamic>>[_printShop, _grill];
+    await pumpPortal(tester, gateway);
+
+    expect(railOnScreen(tester), labels(PortalArea.merchantWithServices_));
+    expect(find.byType(MerchantDashboardScreen), findsOneWidget);
+
+    final Finder entry = find.descendant(
+        of: find.byType(ConsoleSidebar), matching: find.text(en.svcServiceOrdersRow));
+    await tester.ensureVisible(entry);
+    await tester.tap(entry);
+    for (int i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(ServiceOrdersScreen), findsOneWidget);
   });
 }

@@ -11,9 +11,11 @@ import 'package:mobile_app/src/services_shop_bootstrap.dart';
 /// no shop — with the application's name, category and area, and before the shell shows anything
 /// else. Nothing is opened for a goods merchant or a provider still waiting, and a merchant who owns a
 /// shop is not asked about at all; an account whose application is not a services one is asked once a
-/// session. A read that fails is "nothing learned", never a reason to open a shop or to give up on one
-/// for good. And a shop that could not be opened is reported rather than swallowed — as something to
-/// try again, or, when the server refused the category, as something no retry can change.
+/// session. A read that fails is reported as that — never taken for a goods merchant, and never a
+/// reason to open a shop or to give up on one for good. An owner of a goods shop and a services shop
+/// keeps the goods shop, with the services shop named beside it. And a shop that could not be opened is
+/// reported rather than swallowed — as something to try again, or, when the server refused the
+/// category, as something no retry can change.
 class _Server implements HttpClientAdapter {
   List<Map<String, dynamic>> stores = <Map<String, dynamic>>[];
   int storesStatus = 200;
@@ -148,7 +150,7 @@ void main() {
 
   test('a provider whose services shop exists opens nothing, and Onboarding is not asked', () async {
     final _Server server = _Server()
-      ..stores = <Map<String, dynamic>>[_grill, _press]
+      ..stores = <Map<String, dynamic>>[_press]
       ..application = _receipt();
 
     final ServicesShopOutcome outcome = await _bootstrap(server).run();
@@ -157,6 +159,42 @@ void main() {
     expect((outcome as ServicesShopReady).opened, isFalse);
     expect(outcome.store.id, 'store-press');
     expect(server.calls, <String>['GET /api/stores/mine']);
+  });
+
+  test(
+      'an owner of a goods shop and a services shop keeps the goods shop, with the services shop '
+      'beside it, whichever is listed first, and Onboarding is not asked', () async {
+    for (final List<Map<String, dynamic>> stores in <List<Map<String, dynamic>>>[
+      <Map<String, dynamic>>[_grill, _press],
+      <Map<String, dynamic>>[_press, _grill],
+    ]) {
+      final _Server server = _Server()
+        ..stores = stores
+        ..application = _receipt();
+
+      final ServicesShopOutcome outcome = await _bootstrap(server).run();
+
+      expect(outcome, isA<GoodsAndServicesShops>());
+      expect((outcome as GoodsAndServicesShops).storeId, 'store-grill');
+      expect(outcome.servicesShop.id, 'store-press');
+      expect(server.calls, <String>['GET /api/stores/mine']);
+      expect(server.created, isEmpty);
+    }
+  });
+
+  test('a shop in a vertical this build does not know counts as goods; no shop decides nothing', () {
+    final ServicesShopOutcome? outcome = ServicesShopBootstrap.fromOwned(<Store>[
+      Store.fromJson(<String, dynamic>{
+        'id': 'store-x',
+        'slug': 'rockets',
+        'name': 'Rockets',
+        'vertical': 'SPACESHIPS',
+      }),
+    ]);
+
+    expect(outcome, isA<NotServicesProvider>());
+    expect((outcome as NotServicesProvider).storeId, 'store-x');
+    expect(ServicesShopBootstrap.fromOwned(const <Store>[]), isNull);
   });
 
   test('a goods merchant stays in the shop they have: nothing is opened, and Onboarding is not asked',
@@ -249,13 +287,14 @@ void main() {
     expect(waiting.applicationReads, 2, reason: 'approval is what the next entry is looking for');
 
     expect(await _bootstrap(down, memory: memory, account: 'provider-sub').run(),
-        isA<NotServicesProvider>());
+        isA<ShopsUnreadable>());
     down.applicationStatus = 200;
     expect(await _bootstrap(down, memory: memory, account: 'provider-sub').run(),
         isA<ServicesShopReady>());
   });
 
-  test('a read that fails is nothing learned: nothing is opened and the shell carries on', () async {
+  test('a read that fails is reported as that, never taken for a goods merchant, and opens nothing',
+      () async {
     final _Server storesDown = _Server()
       ..storesStatus = 500
       ..application = _receipt();
@@ -266,11 +305,9 @@ void main() {
     final ServicesShopOutcome first = await _bootstrap(storesDown).run();
     final ServicesShopOutcome second = await _bootstrap(onboardingDown).run();
 
-    expect(first, isA<NotServicesProvider>());
-    expect((first as NotServicesProvider).storeId, isNull);
+    expect(first, isA<ShopsUnreadable>());
     expect(storesDown.calls, <String>['GET /api/stores/mine']);
-    expect(second, isA<NotServicesProvider>());
-    expect((second as NotServicesProvider).storeId, isNull);
+    expect(second, isA<ShopsUnreadable>());
     expect(onboardingDown.created, isEmpty);
   });
 
