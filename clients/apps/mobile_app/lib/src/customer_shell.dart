@@ -22,6 +22,9 @@ import 'offline_store.dart';
 import 'order_outbox.dart';
 import 'profile_drawer.dart';
 import 'rewards_screen.dart';
+import 'service_order_files.dart';
+import 'services_home_screen.dart';
+import 'services_kit.dart';
 import 'shop_chat_pill.dart';
 import 'store_home_screen.dart';
 
@@ -49,6 +52,8 @@ class CustomerShell extends StatefulWidget {
     this.pointsApi,
     this.connectivity,
     this.offlineStore,
+    this.catalogApi,
+    this.serviceFiles,
     required this.session,
     required this.locale,
     required this.onSignOut,
@@ -108,6 +113,15 @@ class CustomerShell extends StatefulWidget {
   /// Where queued checkouts and the offline shelf are kept. Null means the device's secure store;
   /// a test passes an in-memory one.
   final OfflineStore? offlineStore;
+
+  /// The services offer search, behind the Services tab's search. Null leaves a search with its
+  /// providers only.
+  final CatalogApi? catalogApi;
+
+  /// Sends a customer's design file with a service order, and reads a placed one's files back:
+  /// main.dart passes `OrderAttachmentFiles`. Null only in tests; an offer that needs a file is then
+  /// not offered for ordering.
+  final ServiceOrderFiles? serviceFiles;
   final AuthSession session;
 
   /// Passed to the home screen for the language toggle in the app bar.
@@ -179,6 +193,25 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
 
   StreamSubscription<OutboxPlaced>? _placedFromOutbox;
 
+  /// Everything the Services tab's chain of screens needs, built once from this shell's clients —
+  /// the same address book as Home and checkout, and the same view of whether the platform answers.
+  late final ServicesKit _servicesKit = ServicesKit(
+    storeApi: widget.storeApi,
+    orderApi: widget.orderApi,
+    catalogApi: widget.catalogApi,
+    zoneApi: widget.zoneApi,
+    geocodingApi: widget.geocodingApi,
+    addresses: _addresses,
+    connectivity: _online,
+    files: widget.serviceFiles,
+    shopChatApi: widget.shopChatApi,
+    chatSocket: widget.chatSocket,
+    trackingApi: widget.trackingApi,
+    trackingSocket: widget.trackingSocket,
+    chatApi: widget.chatApi,
+    openOrders: _openOrdersFromAbove,
+  );
+
   int _index = CustomerNavBar.homeIndex;
 
   /// Whether the Orders tab is showing the cached catalog instead of the order list.
@@ -217,6 +250,16 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     Navigator.of(context)
         .popUntil((Route<dynamic> route) => route == shell || route.isFirst);
     _open(CustomerNavBar.basketIndex);
+  }
+
+  /// Opens the Orders tab from a screen pushed over this shell — a service order whose send may have
+  /// gone through without its answer — popping back to the shell first, as [_openBasket] does and for
+  /// the same reasons.
+  void _openOrdersFromAbove() {
+    final ModalRoute<Object?>? shell = ModalRoute.of(context);
+    Navigator.of(context)
+        .popUntil((Route<dynamic> route) => route == shell || route.isFirst);
+    _open(CustomerNavBar.ordersIndex);
   }
 
   /// Pushes the gift hub (Figma 112:1684) over the shell, from the Home card or the profile menu.
@@ -445,6 +488,9 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
               trackingApi: widget.trackingApi,
               trackingSocket: widget.trackingSocket,
               chatApi: widget.chatApi,
+              shopChatApi: widget.shopChatApi,
+              chatSocket: widget.chatSocket,
+              serviceFiles: widget.serviceFiles,
               cart: _cart,
               onOpenBasket: _openBasket,
               outbox: _outbox,
@@ -498,6 +544,14 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
             _refreshCatalog(force: true);
           },
         );
+      case CustomerNavBar.servicesIndex:
+        // Service shops live here and only here: Home's storefront never lists them.
+        return ServicesHomeScreen(
+          kit: _servicesKit,
+          session: widget.session,
+          // Built with every other tab, but it reads nothing until it is first the one on screen.
+          showing: _index == CustomerNavBar.servicesIndex,
+        );
       case CustomerNavBar.accountIndex:
         // The redesign splits what this tab used to hold: the tab itself shows Rewards & Points,
         // and account management lives in the profile drawer opened from the home header. The old
@@ -518,7 +572,8 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
         );
       default:
         // Unreachable: the loop above is bounded by tabCount. Kept because a switch over an int
-        // has to be exhaustive somehow, and an empty box beats a crash if that ever stops holding.
+        // has to be exhaustive somehow, and an empty box beats a crash if that ever stops holding —
+        // which is exactly why customer_shell_tabs_test fails when any index lands here.
         return const SizedBox.shrink();
     }
   }

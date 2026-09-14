@@ -10878,4 +10878,505 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcDeclineOther => 'Other reason';
+
+  @override
+  String get svcNavServices => 'Services';
+
+  @override
+  String get svcBrandPill => 'YOUDROP SERVICES';
+
+  @override
+  String get svcSearchHint => 'Search for a service…';
+
+  @override
+  String get svcCategoriesTitle => 'Service categories';
+
+  @override
+  String get svcPopularNearYou => 'Popular services near you';
+
+  @override
+  String get svcNearYou => 'Services near you';
+
+  @override
+  String get svcAllProviders => 'Service providers';
+
+  @override
+  String get svcNoServicesNearby => 'No services near you yet';
+
+  @override
+  String get svcNoServicesNearbyHint =>
+      'Try a category, or search for what you need.';
+
+  @override
+  String get svcServicesNotOffered =>
+      'YouDrop isn\'t offering services here yet';
+
+  @override
+  String get svcCouldNotLoadServices => 'Could not load services';
+
+  @override
+  String svcDistanceAway(String distance) {
+    return '$distance away';
+  }
+
+  @override
+  String get svcOffers => 'Offers';
+
+  @override
+  String get svcSearchProviders => 'Providers';
+
+  @override
+  String svcSearchTitle(String query) {
+    return 'Results for “$query”';
+  }
+
+  @override
+  String svcNoResults(String query) {
+    return 'Nothing found for “$query”';
+  }
+
+  @override
+  String svcCategoryEmpty(String category) {
+    return 'No $category providers yet';
+  }
+
+  @override
+  String svcReviewsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reviews',
+      one: '1 review',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcOpenUntil(String time) {
+    return 'Open until $time';
+  }
+
+  @override
+  String get svcTabAbout => 'About';
+
+  @override
+  String svcFromPrice(String price) {
+    return 'From $price';
+  }
+
+  @override
+  String get svcOrderCta => 'Order';
+
+  @override
+  String get svcNoOffers => 'This provider has no offers right now';
+
+  @override
+  String get svcAboutHours => 'Opening hours';
+
+  @override
+  String get svcAboutAddress => 'Address';
+
+  @override
+  String get svcAboutGetIt => 'How you get your order';
+
+  @override
+  String get svcPickupAtShop => 'Pickup at the shop';
+
+  @override
+  String get svcYouDropDelivery => 'YouDrop delivery';
+
+  @override
+  String get svcClosedNoOrders =>
+      'Closed now — you can order when the shop opens';
+
+  @override
+  String get svcNeedsFileUnavailable =>
+      'This offer needs a file, and files can\'t be sent with orders yet';
+
+  @override
+  String svcPackOf(String count, String unit) {
+    return 'Pack of $count $unit';
+  }
+
+  @override
+  String svcPerUnit(String unit) {
+    return 'Per $unit';
+  }
+
+  @override
+  String get svcLoadMore => 'Load more';
+
+  @override
+  String get svcCouldNotLoadOffer => 'Could not load this offer';
+
+  @override
+  String get svcCouldNotLoadReviews => 'Could not load reviews';
+
+  @override
+  String get svcOrderServiceTitle => 'Order service';
+
+  @override
+  String svcProviderLine(String name) {
+    return 'Provider: $name';
+  }
+
+  @override
+  String get svcQuantity => 'Quantity';
+
+  @override
+  String svcUnitsLine(String units, String unit) {
+    return '$units $unit';
+  }
+
+  @override
+  String svcPacksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count packs',
+      one: '1 pack',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcChooseOption => 'Choose one';
+
+  @override
+  String get svcOptionRequired => 'Required';
+
+  @override
+  String get svcOptionOptional => 'Optional';
+
+  @override
+  String get svcUploadDesign => 'Upload design file';
+
+  @override
+  String get svcUploadHint => 'Tap to choose a PDF, JPG or PNG, up to 10 MB';
+
+  @override
+  String get svcUploading => 'Uploading…';
+
+  @override
+  String get svcUploaded => 'Uploaded';
+
+  @override
+  String get svcRemoveFile => 'Remove';
+
+  @override
+  String get svcUploadFailed => 'Couldn\'t upload this file. Try again.';
+
+  @override
+  String get svcAddAnotherFile => 'Add another file';
+
+  @override
+  String get svcFileRequired => 'This provider needs your file to start';
+
+  @override
+  String get svcSpecialInstructions => 'Special instructions';
+
+  @override
+  String get svcInstructionsHint =>
+      'e.g. Leave a white border around the card edges';
+
+  @override
+  String get svcHowYouGetIt => 'How you get it';
+
+  @override
+  String svcDeliveryFeePlus(String amount) {
+    return '+$amount';
+  }
+
+  @override
+  String get svcPayCashPickup => 'Cash — pay when you collect';
+
+  @override
+  String get svcPayCashDelivery => 'Cash — pay on delivery';
+
+  @override
+  String get svcDeliveryFee => 'Delivery fee';
+
+  @override
+  String get svcDiscount => 'Discount';
+
+  @override
+  String svcPlaceOrderTotal(String amount) {
+    return 'Place order — $amount';
+  }
+
+  @override
+  String get svcOfflineNoQueue =>
+      'Service orders need a connection — they can\'t wait on this phone to be sent later.';
+
+  @override
+  String get svcChooseDeliveryAddress => 'Choose where to deliver';
+
+  @override
+  String get svcQuoteFailed => 'Couldn\'t get the price. Try again.';
+
+  @override
+  String svcPriceChangedBody(String total, String agreed) {
+    return 'This order now comes to $total, not the $agreed you saw. Place it at the new total?';
+  }
+
+  @override
+  String get svcDirectoryUnavailable =>
+      'Services are briefly unavailable. Try again in a moment.';
+
+  @override
+  String svcNotServed(String shop) {
+    return '$shop doesn\'t deliver to this address';
+  }
+
+  @override
+  String svcShopClosed(String shop) {
+    return '$shop is closed and isn\'t taking orders right now';
+  }
+
+  @override
+  String svcBelowMinimum(String shop, String amount) {
+    return '$shop delivers orders of $amount or more';
+  }
+
+  @override
+  String get svcRefusedCategoryClosed =>
+      'This service isn\'t offered right now';
+
+  @override
+  String get svcRefusedOfferNotOrderable =>
+      'This offer can\'t be ordered right now';
+
+  @override
+  String get svcRefusedFulfilment =>
+      'The provider doesn\'t offer that way of getting it';
+
+  @override
+  String get svcRefusedAttachmentsUnavailable =>
+      'Files can\'t be sent with orders yet, so this offer can\'t be ordered';
+
+  @override
+  String get svcRefusedWrongType => 'Only PDF, JPG or PNG files';
+
+  @override
+  String get svcRefusedEmpty => 'That file is empty';
+
+  @override
+  String get svcRefusedTooLarge => 'Files must be 10 MB or smaller';
+
+  @override
+  String get svcRefusedTooManyWaiting =>
+      'You have too many files waiting for an order. Remove one first.';
+
+  @override
+  String get svcRefusedNotUploaded =>
+      'That file didn\'t finish uploading. Upload it again.';
+
+  @override
+  String get svcRefusedExpired => 'That file has expired. Upload it again.';
+
+  @override
+  String get svcRefusedAlreadyAttached =>
+      'That file is already on another order. Upload it again.';
+
+  @override
+  String get svcRefusedTooManyFiles => 'Up to 3 files per order';
+
+  @override
+  String get svcRefusedDuplicate => 'That file is already added';
+
+  @override
+  String get svcRefusedNotAccepted => 'This offer doesn\'t take files';
+
+  @override
+  String get svcRefusedUnknownFile =>
+      'That file couldn\'t be found. Upload it again.';
+
+  @override
+  String get svcRefusedPacks => 'Choose between 1 and 99 packs';
+
+  @override
+  String get svcRefusedGeneric => 'This order can\'t be placed as it stands';
+
+  @override
+  String get svcTrackTitle => 'Track service order';
+
+  @override
+  String svcOrderNumber(String ref) {
+    return 'Order #$ref';
+  }
+
+  @override
+  String get svcStatusWaiting => 'Waiting for provider';
+
+  @override
+  String get svcStatusInProgress => 'In progress';
+
+  @override
+  String get svcStatusReadyPickup => 'Ready for pickup';
+
+  @override
+  String get svcStatusReadyDelivery => 'Ready for delivery';
+
+  @override
+  String get svcStatusOnTheWay => 'On the way';
+
+  @override
+  String get svcStatusCompleted => 'Completed';
+
+  @override
+  String get svcStatusCollected => 'Collected';
+
+  @override
+  String get svcStatusDeclined => 'Declined';
+
+  @override
+  String get svcStatusNotCollected => 'Not collected';
+
+  @override
+  String get svcEstimatedCompletion => 'Estimated completion';
+
+  @override
+  String get svcReadyByCaption => 'Ready by';
+
+  @override
+  String svcEstimateAfterAccept(String range) {
+    return '$range, confirmed once the provider accepts';
+  }
+
+  @override
+  String svcTurnaroundRange(String min, String max) {
+    return '$min–$max hours';
+  }
+
+  @override
+  String svcTurnaroundUpTo(String max) {
+    return 'Up to $max hours';
+  }
+
+  @override
+  String svcTodayAt(String time) {
+    return 'Today, $time';
+  }
+
+  @override
+  String svcTomorrowAt(String time) {
+    return 'Tomorrow, $time';
+  }
+
+  @override
+  String svcDateAt(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String get svcOrderStatusTitle => 'Order status';
+
+  @override
+  String get svcTimelinePlaced => 'Order placed';
+
+  @override
+  String get svcTimelineAccepted => 'Provider accepted';
+
+  @override
+  String get svcTimelineInProduction => 'In production';
+
+  @override
+  String get svcTimelineOutForDelivery => 'Out for delivery';
+
+  @override
+  String svcDeclinedReason(String reason) {
+    return 'Declined by the provider: $reason';
+  }
+
+  @override
+  String get svcTimelineNotCollected => 'Cancelled — not collected in time';
+
+  @override
+  String get svcProviderRole => 'Service provider';
+
+  @override
+  String get svcShowNumberAtPickup => 'Show this order number when you collect';
+
+  @override
+  String svcPickupFrom(String shop) {
+    return 'Pickup from $shop';
+  }
+
+  @override
+  String svcDeliveringTo(String address) {
+    return 'Delivering to $address';
+  }
+
+  @override
+  String get svcYourInstructions => 'Your instructions';
+
+  @override
+  String get svcSummary => 'Summary';
+
+  @override
+  String get svcServiceChip => 'Service';
+
+  @override
+  String get svcRefusedTooManyUploads =>
+      'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.';
+
+  @override
+  String svcInstructionsLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get svcOrderNotAccepted =>
+      'This order couldn\'t be sent as it is. Check what you wrote in it, then try again.';
+
+  @override
+  String get svcOrderChangedRequote =>
+      'Your order changed while it was being sent, so nothing was placed. Its total is being checked again.';
+
+  @override
+  String get svcUnconfirmedLeaveTitle => 'Your order may have gone through';
+
+  @override
+  String get svcUnconfirmedLeaveBody =>
+      'We didn\'t hear back after you tapped Place. Check Orders before ordering this again, so you don\'t order it twice.';
+
+  @override
+  String get svcCheckOrders => 'Check Orders';
+
+  @override
+  String get svcLeaveAnyway => 'Leave anyway';
+
+  @override
+  String get svcStayHere => 'Stay';
+
+  @override
+  String get svcYourFiles => 'Your files';
+
+  @override
+  String svcYourFileNumber(int n) {
+    return 'File $n';
+  }
+
+  @override
+  String get svcYourFilesFailed => 'Couldn\'t load your files';
+
+  @override
+  String get svcFileGone => 'This file is no longer available.';
+
+  @override
+  String svcRateProvider(String shop) {
+    return 'Rate $shop';
+  }
+
+  @override
+  String get svcRateProviderPrompt => 'How was the work?';
+
+  @override
+  String svcRatedProvider(String shop) {
+    return 'You rated $shop';
+  }
+
+  @override
+  String get svcReviewNotYet =>
+      'This order isn\'t on record as completed yet, so it can\'t be rated. Try again in a minute.';
 }
