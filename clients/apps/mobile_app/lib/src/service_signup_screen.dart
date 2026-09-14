@@ -4,6 +4,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'application_documents_step.dart';
 import 'application_refusals.dart';
 import 'lebanese_phone.dart';
 import 'one_time_code.dart';
@@ -30,7 +31,16 @@ import 'passcode_pad.dart';
 ///   and a six-digit passcode: the address is proved with a code, the application recorded, and the
 ///   account created and signed in — the open path the wizard walks.
 ///
-/// A phone number is optional, and proved with its own code when one is given.
+/// A phone number is optional, and proved with its own code when one is given. It is typed after a
+/// fixed +961 and laid out left to right in Arabic too, as the gift checkout draws a number.
+///
+/// **The documents come straight after the application is recorded**, on both paths: the national ID
+/// and the commercial registration every shop's application is judged on, in the rows the shop wizard
+/// draws ([ApplicationDocumentsStep]). They are sent there and then — by that point the account exists
+/// and the session carries its token — and the step can be skipped. There is nowhere else in the app
+/// to add them later: a waiting provider is in the shop shell, whose documents row is the payout page.
+/// So the last screen says whether they were sent, rather than pointing to a place that does not
+/// exist. An application auto-approval has already decided takes no documents, and goes straight on.
 ///
 /// The frame's promises that the platform cannot keep are not copied. Turnaround is set per offer, so
 /// nothing says "same-day"; no customer count backs "thousands"; and the button does not say "Create
@@ -40,13 +50,18 @@ class ServiceProviderSignupScreen extends StatefulWidget {
   const ServiceProviderSignupScreen({
     super.key,
     required this.api,
+    required this.documentsApi,
     required this.authService,
     required this.onFinished,
     required this.onClose,
     this.account,
+    this.pickDocument = pickApplicantDocument,
   });
 
   final OnboardingApi api;
+
+  /// Sends the national ID and commercial registration once the application is in.
+  final DocumentsApi documentsApi;
 
   /// Refreshes an existing account's session, or signs a new applicant in.
   final AuthService authService;
@@ -60,6 +75,9 @@ class ServiceProviderSignupScreen extends StatefulWidget {
 
   /// Leaves without applying — and leaves an application that was already decided.
   final VoidCallback onClose;
+
+  /// Opens the file dialog for one document: the platform's own, unless a test hands in another.
+  final Future<PickedDocument?> Function(String groupLabel) pickDocument;
 
   @override
   State<ServiceProviderSignupScreen> createState() => _ServiceProviderSignupScreenState();
@@ -78,6 +96,9 @@ enum _Phase {
 
   /// Recording the application, then the account and the session.
   sending,
+
+  /// Recorded and waiting for a decision: the national ID and commercial registration, or skip them.
+  documents,
 
   /// Applied: waiting for a decision, or approved.
   done,
@@ -130,8 +151,17 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
 
   AuthSession? _session;
 
-  /// The account's application was already decided, so applying granted nothing and never will.
+  /// The account's application was already decided, or is for something else, so applying granted
+  /// nothing and sending again never will.
   bool _applicationClosed = false;
+
+  /// Documents picked and not sent yet, one per kind. A document that is sent leaves this map, so a
+  /// retry after a failure sends only what did not go through.
+  final Map<ApplicantDocumentKind, PickedDocument> _pickedDocs =
+      <ApplicantDocumentKind, PickedDocument>{};
+
+  /// The kinds that reached the reviewer, for the last screen's line about them.
+  final Set<ApplicantDocumentKind> _sentDocs = <ApplicantDocumentKind>{};
 
   bool get _forAccount => widget.account != null;
 
@@ -164,6 +194,10 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
         'serviceCategory': _category!.wireValue,
         'area': <String, String>{'zoneId': _area!.zoneId, 'label': _area!.name},
       };
+
+  /// MERCHANT without APPLICANT: auto-approval has already said yes.
+  static bool _approved(AuthSession session) =>
+      session.hasRole(DeliveryRole.merchant) && !session.hasRole(DeliveryRole.applicant);
 
   @override
   void initState() {
@@ -352,6 +386,11 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
           // An answer to change, not a call to retry: back to the form, with the reason on it.
           _phase = _Phase.form;
           _error = applicationRefusal(t, e);
+        } else if (!_recorded && isFinalAccountRefusal(e)) {
+          // The account already has an application for something else — a shop's, say — or already
+          // trades. Sending again can never change that, so the way out replaces the retry.
+          _applicationClosed = true;
+          _error = applicationRefusal(t, e);
         } else if (!_recorded) {
           _error = applicationRefusal(t, e);
         } else if (_forAccount) {
@@ -379,6 +418,54 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
     }
     setState(() {
       _busy = false;
+      // A decided application's documents can no longer change, so an application auto-approval
+      // has already said yes to goes straight to the last screen.
+      _phase = _approved(session) ? _Phase.done : _Phase.documents;
+    });
+  }
+
+  /// Sends what was picked, one document at a time. Each one that lands leaves [_pickedDocs], so a
+  /// retry sends only what did not go through; when nothing is left, the last screen follows.
+  Future<void> _sendDocuments() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    String? failure;
+    for (final MapEntry<ApplicantDocumentKind, PickedDocument> entry
+        in List<MapEntry<ApplicantDocumentKind, PickedDocument>>.of(_pickedDocs.entries)) {
+      try {
+        await widget.documentsApi.upload(
+          kind: entry.key,
+          bytes: entry.value.bytes,
+          contentType: entry.value.contentType,
+        );
+        _pickedDocs.remove(entry.key);
+        _sentDocs.add(entry.key);
+      } on ArgumentError {
+        // Refused before the transfer, against the upload ticket's limit.
+        failure ??= t.wizDocTooLarge;
+      } catch (_) {
+        failure ??= t.wizDocUploadFailed;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (failure == null) {
+        _phase = _Phase.done;
+      } else {
+        _error = failure;
+      }
+    });
+  }
+
+  /// Carries on without the documents still picked. The application is in either way.
+  void _skipDocuments() {
+    setState(() {
+      _pickedDocs.clear();
+      _error = null;
       _phase = _Phase.done;
     });
   }
@@ -405,6 +492,9 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
             _phase = _Phase.form;
           });
         }
+      case _Phase.documents:
+        // The application is in; leaving the documents is choosing not to send them.
+        _skipDocuments();
       case _Phase.done:
         widget.onFinished(_session!);
     }
@@ -436,6 +526,7 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
                   _Phase.form => _form(t),
                   _Phase.verifyEmail || _Phase.verifyPhone => _verification(t),
                   _Phase.sending => _sending(t),
+                  _Phase.documents => _documents(t),
                   _Phase.done => _done(t),
                 },
               ),
@@ -549,6 +640,10 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
         onSelected: (int i) => setState(() => _category = options.categories[i]),
       ),
       gap,
+      // A phone number reads left to right in Arabic too, +961 first, the way the gift checkout
+      // draws it: laid out right to left, "71 234 567" read back as "567 234 71". Only the number
+      // and its prefix — the label above and the error below are sentences in the reader's language
+      // and keep the reader's direction.
       AuthField(
         label: t.authPhoneNumber,
         hint: t.svcPhoneHint,
@@ -559,6 +654,12 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
         keyboardType: TextInputType.phone,
         textInputAction: TextInputAction.next,
         autofillHints: const <String>[AutofillHints.telephoneNumber],
+        textDirection: TextDirection.ltr,
+        fixedPrefix: LebanesePhone.countryCode,
+        inputFormatters: <TextInputFormatter>[
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9 +\-]')),
+          LengthLimitingTextInputFormatter(20),
+        ],
       ),
       if (_phoneInvalid)
         Padding(
@@ -675,12 +776,39 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
     );
   }
 
+  /// The papers a shop's application is judged on, straight after it is recorded.
+  Widget _documents(DeliveryStrings t) {
+    return ListView(
+      padding: const EdgeInsets.all(DeliverySpacing.lg),
+      children: <Widget>[
+        const _StateTile(icon: Icons.badge_outlined),
+        const SizedBox(height: DeliverySpacing.md),
+        Text(t.svcDocsTitle, style: _titleStyle),
+        const SizedBox(height: DeliverySpacing.lg),
+        if (_error != null) ...<Widget>[
+          SoftNote(text: _error!, accent: DeliveryAccent.critical, icon: Icons.error_outline),
+          const SizedBox(height: DeliverySpacing.md),
+        ],
+        ApplicationDocumentsStep(
+          kinds: expectedDocumentKinds(rider: false),
+          picked: _pickedDocs,
+          enabled: !_busy,
+          intro: t.svcDocsIntro,
+          footnote: t.svcDocsFootnote,
+          pick: widget.pickDocument,
+          onPicked: (ApplicantDocumentKind kind, PickedDocument document) =>
+              setState(() => _pickedDocs[kind] = document),
+          onRemoved: (ApplicantDocumentKind kind) => setState(() => _pickedDocs.remove(kind)),
+        ),
+      ],
+    );
+  }
+
   /// Applied. Pending and approved are said as what they are: a pending provider cannot sell yet,
   /// and an approved one's shop is opened from here, on their first visit to it.
   Widget _done(DeliveryStrings t) {
     final AuthSession session = _session!;
-    final bool approved =
-        session.hasRole(DeliveryRole.merchant) && !session.hasRole(DeliveryRole.applicant);
+    final bool approved = _approved(session);
     final String? email = _forAccount ? (session.email ?? widget.account!.email) : _verifiedEmail;
     final OnboardingStatus? status = _receipt?.status;
 
@@ -717,7 +845,12 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
               style: const TextStyle(fontSize: 13, color: DeliveryColors.muted),
             ),
           const SizedBox(height: DeliverySpacing.md),
-          SoftNote(text: t.svcPendingDocuments, icon: Icons.badge_outlined),
+          // What happened on the documents step, and nothing about a place to add them later: there
+          // is none in the app for a waiting provider.
+          SoftNote(
+            text: _sentDocs.isEmpty ? t.svcDocsSkipped : t.svcDocsSent,
+            icon: Icons.badge_outlined,
+          ),
         ],
       ],
     );
@@ -763,6 +896,25 @@ class _ServiceProviderSignupScreenState extends State<ServiceProviderSignupScree
         return _applicationClosed
             ? AuthPrimaryButton(label: t.close, onPressed: widget.onClose)
             : AuthPrimaryButton(label: t.tryAgain, busy: _busy, onPressed: _busy ? null : _send);
+      case _Phase.documents:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            AuthPrimaryButton(
+              label: t.svcDocsSend,
+              busy: _busy,
+              onPressed: _busy || _pickedDocs.isEmpty ? null : _sendDocuments,
+            ),
+            const SizedBox(height: DeliverySpacing.sm),
+            Center(
+              child: TextButton(
+                onPressed: _busy ? null : _skipDocuments,
+                child: Text(t.skipThis),
+              ),
+            ),
+          ],
+        );
       case _Phase.done:
         return AuthPrimaryButton(
           label: t.continueLabel,
@@ -840,7 +992,7 @@ class _ServicesBanner extends StatelessWidget {
   }
 }
 
-/// The 64px tile that heads the code, pending and approved states.
+/// The 64px tile that heads the code, documents, pending and approved states.
 class _StateTile extends StatelessWidget {
   const _StateTile({required this.icon});
 

@@ -10407,7 +10407,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get svcServiceCategoryHint => 'اختر ما تقدّمه';
 
   @override
-  String get svcPhoneHint => '+961 71 234 567';
+  String get svcPhoneHint => '71 234 567';
 
   @override
   String get svcPhoneInvalid => 'أدخل رقماً لبنانياً، مثل 71 234 567';
@@ -10440,10 +10440,6 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get svcPendingBodyNoEmail =>
       'يقرأ فريق YouDrop كل طلب لبيع الخدمات، وسنبلغك عند اتخاذ القرار.';
-
-  @override
-  String get svcPendingDocuments =>
-      'لتسريع المراجعة، أضف بطاقة هويتك وسجلّك التجاري من الإعدادات في محلّك.';
 
   @override
   String svcReference(String reference) {
@@ -10504,4 +10500,32 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcOpeningShopFailed => 'تعذّر فتح محلّ خدماتك.';
+
+  @override
+  String get svcDocsTitle => 'أضف مستنداتك';
+
+  @override
+  String get svcDocsIntro =>
+      'تساعد بطاقة هويتك وسجلّك التجاري فريق المراجعة على اتخاذ القرار. أرسل صوراً واضحة أو ملفات PDF.';
+
+  @override
+  String get svcDocsFootnote =>
+      'تصل المستندات إلى فريق المراجعة عند الضغط على «أرسل المستندات».';
+
+  @override
+  String get svcDocsSend => 'أرسل المستندات';
+
+  @override
+  String get svcDocsSent => 'مستنداتك لدى فريق المراجعة.';
+
+  @override
+  String get svcDocsSkipped =>
+      'لم تُرسل أي مستندات، لذا سيرى فريق المراجعة أن بطاقة هويتك وسجلّك التجاري غير مرفقين.';
+
+  @override
+  String get svcShopCategoryClosedTitle => 'خدمتك غير متاحة حالياً';
+
+  @override
+  String get svcShopCategoryClosedBody =>
+      'تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم.';
 }

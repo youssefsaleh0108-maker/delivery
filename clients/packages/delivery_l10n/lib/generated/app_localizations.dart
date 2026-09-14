@@ -17585,7 +17585,7 @@ abstract class DeliveryStrings {
   /// No description provided for @svcPhoneHint.
   ///
   /// In en, this message translates to:
-  /// **'+961 71 234 567'**
+  /// **'71 234 567'**
   String get svcPhoneHint;
 
   /// No description provided for @svcPhoneInvalid.
@@ -17641,12 +17641,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'A YouDrop reviewer reads every application to sell services, and we\'ll let you know once it\'s decided.'**
   String get svcPendingBodyNoEmail;
-
-  /// No description provided for @svcPendingDocuments.
-  ///
-  /// In en, this message translates to:
-  /// **'To help the review, add your ID and commercial registration from Settings in your shop.'**
-  String get svcPendingDocuments;
 
   /// No description provided for @svcReference.
   ///
@@ -17755,6 +17749,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'We couldn\'t open your services shop.'**
   String get svcOpeningShopFailed;
+
+  /// No description provided for @svcDocsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your documents'**
+  String get svcDocsTitle;
+
+  /// No description provided for @svcDocsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.'**
+  String get svcDocsIntro;
+
+  /// No description provided for @svcDocsFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'They go to the reviewer when you tap Send documents.'**
+  String get svcDocsFootnote;
+
+  /// No description provided for @svcDocsSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send documents'**
+  String get svcDocsSend;
+
+  /// No description provided for @svcDocsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your documents are with the reviewer.'**
+  String get svcDocsSent;
+
+  /// No description provided for @svcDocsSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents were sent, so the reviewer will see your ID and commercial registration as missing.'**
+  String get svcDocsSkipped;
+
+  /// No description provided for @svcShopCategoryClosedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your service isn\'t offered right now'**
+  String get svcShopCategoryClosedTitle;
+
+  /// No description provided for @svcShopCategoryClosedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application was approved, but YouDrop isn\'t offering this service at the moment, so your shop can\'t be opened. Please contact support.'**
+  String get svcShopCategoryClosedBody;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

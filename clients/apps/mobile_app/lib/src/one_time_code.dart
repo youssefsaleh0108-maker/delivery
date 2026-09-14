@@ -125,6 +125,8 @@ class AuthField extends StatefulWidget {
     this.labelColor = DeliveryColors.ink,
     this.uppercaseLabel = false,
     this.verified = false,
+    this.textDirection,
+    this.fixedPrefix,
   });
 
   /// Already localised by the caller.
@@ -164,6 +166,15 @@ class AuthField extends StatefulWidget {
 
   /// Shows the design's confirmation tick — for an address the server has already proved.
   final bool verified;
+
+  /// The direction the typed value reads in when it is not the reader's: a phone number reads left to
+  /// right in Arabic too. Only the input and its [fixedPrefix] follow it — the label above is a word
+  /// in the reader's language and keeps the reader's direction.
+  final TextDirection? textDirection;
+
+  /// Text fixed before the input and never typed, such as "+961" before a Lebanese number. It is laid
+  /// out with the input, so under [textDirection] it stays on the side the number is read from.
+  final String? fixedPrefix;
 
   @override
   State<AuthField> createState() => _AuthFieldState();
@@ -207,7 +218,7 @@ class _AuthFieldState extends State<AuthField> {
           uppercase: widget.uppercaseLabel,
         ),
         const SizedBox(height: 6),
-        TextField(
+        _inTypedDirection(TextField(
           controller: widget.controller,
           enabled: widget.enabled,
           readOnly: widget.readOnly,
@@ -221,6 +232,7 @@ class _AuthFieldState extends State<AuthField> {
           inputFormatters: widget.inputFormatters,
           onChanged: widget.onChanged,
           onSubmitted: widget.onSubmitted,
+          textDirection: widget.textDirection,
           style: const TextStyle(
             fontSize: 14,
             color: DeliveryColors.ink,
@@ -228,13 +240,29 @@ class _AuthFieldState extends State<AuthField> {
           ),
           decoration: InputDecoration(
             hintText: widget.hint,
+            hintTextDirection: widget.textDirection,
             isDense: true,
             // The design's own 14px box padding, tighter than the theme's default.
             contentPadding: const EdgeInsetsDirectional.symmetric(
               horizontal: 14,
               vertical: 14,
             ),
-            prefixIcon: widget.icon == null
+            // A fixed prefix takes the leading slot rather than the decoration's prefix text, which
+            // is only drawn once the field has focus or a value: "+961" has to be there before
+            // anybody types, or the field reads as asking for the whole number.
+            prefixIcon: widget.fixedPrefix != null
+                ? Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 14, end: 6),
+                    child: Text(
+                      widget.fixedPrefix!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: DeliveryColors.ink,
+                        height: 1.3,
+                      ),
+                    ),
+                  )
+                : widget.icon == null
                 ? null
                 : Padding(
                     padding: const EdgeInsetsDirectional.only(
@@ -261,9 +289,17 @@ class _AuthFieldState extends State<AuthField> {
               borderSide: BorderSide(color: widget.borderColor),
             ),
           ),
-        ),
+        )),
       ],
     );
+  }
+
+  /// The input — prefix, text and hint together — laid out in [AuthField.textDirection] when one is
+  /// given, and in the reader's direction otherwise. The decoration places its prefix by the ambient
+  /// direction, so setting the text's direction alone would leave "+961" on the reader's side.
+  Widget _inTypedDirection(Widget field) {
+    final TextDirection? direction = widget.textDirection;
+    return direction == null ? field : Directionality(textDirection: direction, child: field);
   }
 }
 

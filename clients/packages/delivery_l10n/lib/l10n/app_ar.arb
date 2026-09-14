@@ -3205,7 +3205,7 @@
   "svcBusinessNameHint": "مثلاً: مطبعة الفاخوري",
   "svcServiceCategory": "فئة الخدمة",
   "svcServiceCategoryHint": "اختر ما تقدّمه",
-  "svcPhoneHint": "+961 71 234 567",
+  "svcPhoneHint": "71 234 567",
   "svcPhoneInvalid": "أدخل رقماً لبنانياً، مثل 71 234 567",
   "svcArea": "الموقع / المنطقة",
   "svcAreaHint": "اختر منطقتك",
@@ -3215,7 +3215,6 @@
   "svcPendingTitle": "تم إرسال طلبك",
   "svcPendingBody": "يقرأ فريق YouDrop كل طلب لبيع الخدمات. سنراسلك على {email} عند اتخاذ القرار.",
   "svcPendingBodyNoEmail": "يقرأ فريق YouDrop كل طلب لبيع الخدمات، وسنبلغك عند اتخاذ القرار.",
-  "svcPendingDocuments": "لتسريع المراجعة، أضف بطاقة هويتك وسجلّك التجاري من الإعدادات في محلّك.",
   "svcReference": "المرجع: {reference}",
   "svcApprovedTitle": "تمت الموافقة على طلبك",
   "svcApprovedBody": "نفتح محلّ خدماتك في أول مرة تدخل إليه.",
@@ -3233,5 +3232,13 @@
   "svcIntent": "خدمات",
   "svcIntentBlurb": "أطبع أو أخيّط أو أصلّح أو أصوّر",
   "svcOpeningShop": "نفتح محلّ خدماتك…",
-  "svcOpeningShopFailed": "تعذّر فتح محلّ خدماتك."
+  "svcOpeningShopFailed": "تعذّر فتح محلّ خدماتك.",
+  "svcDocsTitle": "أضف مستنداتك",
+  "svcDocsIntro": "تساعد بطاقة هويتك وسجلّك التجاري فريق المراجعة على اتخاذ القرار. أرسل صوراً واضحة أو ملفات PDF.",
+  "svcDocsFootnote": "تصل المستندات إلى فريق المراجعة عند الضغط على «أرسل المستندات».",
+  "svcDocsSend": "أرسل المستندات",
+  "svcDocsSent": "مستنداتك لدى فريق المراجعة.",
+  "svcDocsSkipped": "لم تُرسل أي مستندات، لذا سيرى فريق المراجعة أن بطاقة هويتك وسجلّك التجاري غير مرفقين.",
+  "svcShopCategoryClosedTitle": "خدمتك غير متاحة حالياً",
+  "svcShopCategoryClosedBody": "تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم."
 }

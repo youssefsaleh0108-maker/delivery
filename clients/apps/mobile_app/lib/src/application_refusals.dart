@@ -59,6 +59,15 @@ bool isServiceAnswerRefusal(Object error) => switch (_codeOf(error)) {
       _ => false,
     };
 
+/// Whether the server refused the account rather than this attempt: it already has an application of
+/// another kind or for another business — a shop's, when services were asked for — or it already
+/// trades as a partner. Sending the same form again can never change either, so a form offers a way
+/// out instead of a retry.
+bool isFinalAccountRefusal(Object error) => switch (_codeOf(error)) {
+      'other-application' || 'already-partner' => true,
+      _ => false,
+    };
+
 String? _codeOf(Object error) {
   if (error is! DioException) return null;
   final Object? body = error.response?.data;

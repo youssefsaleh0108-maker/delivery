@@ -8,13 +8,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/merchant_shell.dart';
+import 'package:mobile_app/src/services_shop_bootstrap.dart';
 
 /// The shop shell opening an approved services provider's shop, seen through the shell itself.
 ///
 /// `services_shop_bootstrap_test.dart` pins what is decided. This pins what the provider sees: nothing
 /// but "Opening your services shop…" until the shop exists, because every tab needs it; a plain
-/// statement and a retry that works when it could not be opened; and, for a goods merchant, their
-/// shop straight away with nothing opened — the shell they had before services existed.
+/// statement and a retry that works when it could not be opened; a plain statement and no retry when
+/// the server will not open it in that category; and, for a goods merchant, their shop straight away
+/// with nothing opened and their application not read — once a session at most.
 class _Gateway implements HttpClientAdapter {
   List<Map<String, dynamic>> stores = <Map<String, dynamic>>[];
   Map<String, dynamic>? application;
@@ -24,6 +26,9 @@ class _Gateway implements HttpClientAdapter {
   Completer<void>? holdCreate;
 
   final List<String> calls = <String>[];
+
+  int get applicationReads =>
+      calls.where((String c) => c == 'GET /api/onboarding/applications/mine').length;
 
   @override
   Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? requestStream,
@@ -84,7 +89,8 @@ const Map<String, dynamic> _approvedPrintShop = <String, dynamic>{
 void main() {
   final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
 
-  Future<void> pumpShell(WidgetTester tester, _Gateway gateway) async {
+  Future<void> pumpShell(WidgetTester tester, _Gateway gateway,
+      {ServicesProviderMemory? memory}) async {
     tester.view.physicalSize = const Size(1100, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -99,6 +105,7 @@ void main() {
         storeApi: StoreApi(dio),
         catalogApi: CatalogApi(dio),
         onboardingApi: OnboardingApi(dio),
+        servicesProviderMemory: memory,
         session: AuthSession(
           accessToken: 'token',
           refreshToken: null,
@@ -160,7 +167,24 @@ void main() {
     expect(gateway.calls.where((String c) => c == 'POST /api/stores'), hasLength(2));
   });
 
-  testWidgets('a goods merchant goes straight to their shop, and nothing is opened',
+  testWidgets(
+      'a category the server will not open is said plainly, points to support, and offers no retry',
+      (WidgetTester tester) async {
+    final _Gateway gateway = _Gateway()
+      ..application = _approvedPrintShop
+      ..createStatus = 422;
+    await pumpShell(tester, gateway);
+    await settle(tester);
+
+    expect(find.text(en.svcShopCategoryClosedTitle), findsOneWidget);
+    expect(find.text(en.svcShopCategoryClosedBody), findsOneWidget);
+    expect(find.text(en.tryAgain), findsNothing, reason: 'no retry could succeed');
+    expect(find.text(en.svcOpeningShopFailed), findsNothing);
+    expect(find.text(en.merchbLogOutAccount), findsOneWidget, reason: 'nobody is trapped here');
+    expect(find.byType(YdBottomNav), findsNothing);
+  });
+
+  testWidgets('a goods merchant goes straight to their shop: nothing is opened, nothing is asked',
       (WidgetTester tester) async {
     final _Gateway gateway = _Gateway()
       ..stores = <Map<String, dynamic>>[
@@ -176,6 +200,23 @@ void main() {
 
     expect(find.text(en.svcOpeningShop), findsNothing);
     expect(find.byType(YdBottomNav), findsOneWidget);
+    expect(gateway.calls, isNot(contains('POST /api/stores')));
+    expect(gateway.applicationReads, 0);
+  });
+
+  testWidgets('an account that is not a services provider is asked about once, across entries',
+      (WidgetTester tester) async {
+    final ServicesProviderMemory memory = ServicesProviderMemory();
+    // A merchant with no shop yet and no application on file: the realm's seeded shops look so.
+    final _Gateway gateway = _Gateway();
+
+    await pumpShell(tester, gateway, memory: memory);
+    await settle(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpShell(tester, gateway, memory: memory);
+    await settle(tester);
+
+    expect(gateway.applicationReads, 1, reason: 'the second entry already knew the answer');
     expect(gateway.calls, isNot(contains('POST /api/stores')));
   });
 }

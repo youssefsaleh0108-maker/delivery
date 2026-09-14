@@ -19,6 +19,7 @@ import 'src/partner_choice_screen.dart';
 import 'src/partner_intro_screen.dart';
 import 'src/pending_application_screen.dart';
 import 'src/service_signup_screen.dart';
+import 'src/services_shop_bootstrap.dart';
 import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
@@ -151,6 +152,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
   late final DocumentsApi _documentsApi = DocumentsApi(_dio);
+
+  /// Accounts this session already knows are not services providers, kept above the shop shell —
+  /// which is built afresh on every entry — so a goods merchant's application is read once, not on
+  /// every entry. See [ServicesProviderMemory].
+  final ServicesProviderMemory _servicesProviderMemory = ServicesProviderMemory();
   late final NotificationApi _notificationApi = NotificationApi(_dio);
   // The merchant suite's four clients. inventory/pos/reports talk to services that are not yet
   // deployed; their screens render a calm unavailable state until they are. Staff is live.
@@ -611,6 +617,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     await _navigator.currentState?.push(MaterialPageRoute<void>(
       builder: (BuildContext context) => ServiceProviderSignupScreen(
         api: _onboardingApi,
+        documentsApi: _documentsApi,
         authService: _authService,
         account: session,
         onClose: () => _navigator.currentState?.pop(),
@@ -725,6 +732,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               if (_applyingForServices) {
                 return ServiceProviderSignupScreen(
                   api: _onboardingApi,
+                  documentsApi: _documentsApi,
                   authService: _authService,
                   onFinished: (AuthSession session) {
                     // Out of the application flow: the account exists and is signed in, and the
@@ -875,6 +883,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             return ServiceProviderSignupScreen(
               key: ValueKey<String>('services-${session.subject}'),
               api: _onboardingApi,
+              documentsApi: _documentsApi,
               authService: _authService,
               account: session,
               onFinished: (AuthSession refreshed) {
@@ -1012,6 +1021,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               pendingApproval: pending,
               // Opens an approved services provider's shop on the first entry, before anything else.
               onboardingApi: _onboardingApi,
+              servicesProviderMemory: _servicesProviderMemory,
               onSwitchToShopping: session.hasRole(DeliveryRole.customer)
                   ? () => setState(() => _preferredSurface = DeliveryRole.customer)
                   : null,

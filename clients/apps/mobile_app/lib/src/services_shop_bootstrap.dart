@@ -1,4 +1,5 @@
 import 'package:delivery_core/delivery_core.dart';
+import 'package:dio/dio.dart';
 
 /// What opening a services provider's shop came to. See [ServicesShopBootstrap].
 sealed class ServicesShopOutcome {
@@ -24,19 +25,48 @@ final class NotServicesProvider extends ServicesShopOutcome {
 }
 
 /// Applied to offer services and not approved yet. Nothing is opened until a reviewer or
-/// auto-approval says yes; the shell stands in [storeId] as before.
+/// auto-approval says yes, and until then the account has no shop to stand in.
 final class ServicesApplicationPending extends ServicesShopOutcome {
-  const ServicesApplicationPending(this.storeId);
-
-  final String? storeId;
+  const ServicesApplicationPending();
 }
 
-/// An approved provider whose shop could not be opened. Nothing a merchant can do works without the
-/// shop, so the shell says so and offers a retry rather than showing screens that would all fail.
+/// An approved provider whose shop could not be opened just now — a dropped connection, a server that
+/// did not answer. Nothing a merchant can do works without the shop, so the shell says so and offers a
+/// retry, which can succeed.
 final class ServicesShopFailed extends ServicesShopOutcome {
   const ServicesShopFailed(this.error);
 
   final Object error;
+}
+
+/// An approved provider whose shop the server refused for good: the service category the application
+/// names is not offered right now (`POST /api/stores` answered 422 — Product Service opens a services
+/// shop only in an open category).
+///
+/// Its own outcome rather than a [ServicesShopFailed], because a retry cannot change it: only YouDrop
+/// opening the category again, or support re-filing the provider, can. A "Try again" that fails the
+/// same way every time is a button that cannot work, so the shell says what happened and that support
+/// can help, and offers no retry.
+final class ServicesCategoryNotOffered extends ServicesShopOutcome {
+  const ServicesCategoryNotOffered();
+}
+
+/// Accounts already known not to be services providers, for as long as the app runs.
+///
+/// What an account applied to be does not change: an account holds one application, and Onboarding
+/// refuses to turn a shop's application into a services one or the other way round. So once the
+/// answer is "no application, or not one to offer services", reading it again on every entry to the
+/// shop shell only costs a request. The app keeps one of these for the whole session, keyed by
+/// account, so somebody else signing in on the same phone is asked afresh.
+///
+/// Only that answer is kept. A provider still waiting is asked again — approval is what the next entry
+/// is looking for — and a read that failed was never an answer.
+class ServicesProviderMemory {
+  final Set<String> _notProviders = <String>{};
+
+  bool isKnownNotProvider(String account) => _notProviders.contains(account);
+
+  void rememberNotProvider(String account) => _notProviders.add(account);
 }
 
 /// Opens an approved services provider's shop on their first entry, before anything else.
@@ -47,22 +77,36 @@ final class ServicesShopFailed extends ServicesShopOutcome {
 /// So the app opens the shop itself, from the application: its business name, its category, and its
 /// area as the shop's neighbourhood (`POST /api/stores`).
 ///
-/// Safe on every entry. A services shop that exists is simply found; it is a SERVICES shop that is
-/// looked for rather than any shop, so a provider who set up a goods shop by hand while waiting still
-/// gets theirs; and the server hands back the existing services shop when two runs race, so it is
-/// never opened twice.
+/// Safe on every entry. A services shop that exists is simply found, and the server hands back the
+/// existing services shop when two runs race, so it is never opened twice.
 ///
-/// The cost to everybody else is one read of their own application per entry, for a merchant with no
-/// services shop. Any read that fails means "nothing learned", never "not a provider, open nothing
-/// for good": the shell carries on as before and the next entry asks again. Only a failure to open a
-/// shop the application clearly describes is reported, because only then is the shell unusable.
+/// It costs everybody else nothing beyond the shop list the shell always read. A merchant who owns a
+/// shop is a shop and is not asked about: the server opens no shop at all for a services applicant
+/// until this bootstrap opens theirs, so a provider cannot own a goods shop to be mistaken for. An
+/// account with no shop whose application is not a services one is remembered as such for the session
+/// ([ServicesProviderMemory]). Any read that fails means "nothing learned", never "not a provider,
+/// open nothing for good": the shell carries on as before and the next entry asks again. Only a
+/// failure to open a shop the application clearly describes is reported, because only then is the
+/// shell unusable — and a refusal no retry can change is reported as that ([ServicesCategoryNotOffered]).
 class ServicesShopBootstrap {
-  ServicesShopBootstrap({required StoreApi stores, required OnboardingApi onboarding})
-      : _stores = stores,
-        _onboarding = onboarding;
+  ServicesShopBootstrap({
+    required StoreApi stores,
+    required OnboardingApi onboarding,
+    ServicesProviderMemory? memory,
+    String? account,
+  })  : _stores = stores,
+        _onboarding = onboarding,
+        _memory = memory,
+        _account = account;
 
   final StoreApi _stores;
   final OnboardingApi _onboarding;
+
+  /// Where a "not a services provider" answer is kept between runs for [_account]. Null keeps nothing.
+  final ServicesProviderMemory? _memory;
+
+  /// The signed-in account the answer is about — the token's subject.
+  final String? _account;
 
   /// The server's limits on a shop's name and neighbourhood (`StoreRequest`). An application's
   /// business name may be longer, and a shop that can never be opened is worse than a trimmed name.
@@ -82,20 +126,29 @@ class ServicesShopBootstrap {
         return ServicesShopReady(store, opened: false);
       }
     }
-    final String? standing = owned.isEmpty ? null : owned.first.id;
+    if (owned.isNotEmpty) return NotServicesProvider(owned.first.id);
+
+    final String? account = _account;
+    final ServicesProviderMemory? memory = _memory;
+    if (account != null && memory != null && memory.isKnownNotProvider(account)) {
+      return const NotServicesProvider(null);
+    }
 
     final OnboardingApplication? application;
     try {
       application = await _onboarding.myApplication();
     } catch (_) {
-      return NotServicesProvider(standing);
+      return const NotServicesProvider(null);
     }
     final ServiceApplicationAnswers? answers = application?.service;
-    if (application == null || answers == null) return NotServicesProvider(standing);
+    if (application == null || answers == null) {
+      if (account != null) memory?.rememberNotProvider(account);
+      return const NotServicesProvider(null);
+    }
 
     final bool approved = application.status == OnboardingStatus.approved ||
         application.status == OnboardingStatus.provisioned;
-    if (!approved) return ServicesApplicationPending(standing);
+    if (!approved) return const ServicesApplicationPending();
 
     final ServiceCategory? category = answers.category;
     if (category == null) {
@@ -115,6 +168,11 @@ class ServicesShopBootstrap {
         neighborhood: answers.area == null ? null : _clip(answers.area!, _maxNeighborhood),
       );
       return ServicesShopReady(store, opened: true);
+    } on DioException catch (error) {
+      // 422 is the server judging the request, not failing to answer it: the category is not open,
+      // and asking again will be refused the same way until somebody changes that.
+      if (error.response?.statusCode == 422) return const ServicesCategoryNotOffered();
+      return ServicesShopFailed(error);
     } catch (error) {
       return ServicesShopFailed(error);
     }

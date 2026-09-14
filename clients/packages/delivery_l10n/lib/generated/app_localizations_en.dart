@@ -10292,7 +10292,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get svcServiceCategoryHint => 'Choose what you offer';
 
   @override
-  String get svcPhoneHint => '+961 71 234 567';
+  String get svcPhoneHint => '71 234 567';
 
   @override
   String get svcPhoneInvalid => 'Enter a Lebanese number, e.g. 71 234 567';
@@ -10325,10 +10325,6 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcPendingBodyNoEmail =>
       'A YouDrop reviewer reads every application to sell services, and we\'ll let you know once it\'s decided.';
-
-  @override
-  String get svcPendingDocuments =>
-      'To help the review, add your ID and commercial registration from Settings in your shop.';
 
   @override
   String svcReference(String reference) {
@@ -10391,4 +10387,33 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcOpeningShopFailed => 'We couldn\'t open your services shop.';
+
+  @override
+  String get svcDocsTitle => 'Add your documents';
+
+  @override
+  String get svcDocsIntro =>
+      'Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.';
+
+  @override
+  String get svcDocsFootnote =>
+      'They go to the reviewer when you tap Send documents.';
+
+  @override
+  String get svcDocsSend => 'Send documents';
+
+  @override
+  String get svcDocsSent => 'Your documents are with the reviewer.';
+
+  @override
+  String get svcDocsSkipped =>
+      'No documents were sent, so the reviewer will see your ID and commercial registration as missing.';
+
+  @override
+  String get svcShopCategoryClosedTitle =>
+      'Your service isn\'t offered right now';
+
+  @override
+  String get svcShopCategoryClosedBody =>
+      'Your application was approved, but YouDrop isn\'t offering this service at the moment, so your shop can\'t be opened. Please contact support.';
 }

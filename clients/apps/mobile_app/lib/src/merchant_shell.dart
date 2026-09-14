@@ -49,6 +49,7 @@ class MerchantShell extends StatefulWidget {
     required this.locale,
     this.pendingApproval = false,
     this.onboardingApi,
+    this.servicesProviderMemory,
     this.onSwitchToShopping,
     required this.onSignOut,
   });
@@ -108,6 +109,11 @@ class MerchantShell extends StatefulWidget {
   /// services existed.
   final OnboardingApi? onboardingApi;
 
+  /// What the app already learned this session about the account's application, so a goods merchant
+  /// is not asked about again on every entry ([ServicesProviderMemory]). Owned by the app rather than
+  /// the shell, because the shell is built afresh on every entry. Null remembers nothing.
+  final ServicesProviderMemory? servicesProviderMemory;
+
   /// Takes an owner who is also a customer to the customer app — the Settings row of the role switch.
   /// Null hides the row.
   final VoidCallback? onSwitchToShopping;
@@ -152,6 +158,10 @@ class _MerchantShellState extends State<MerchantShell> {
   /// Opening that shop failed. The shell says so and offers a retry rather than tabs that cannot work.
   bool _servicesShopFailed = false;
 
+  /// The server will not open that shop, because its category is not offered right now. Final: the
+  /// shell says so and points to support, with no retry, because none could succeed.
+  bool _servicesCategoryClosed = false;
+
   @override
   void initState() {
     super.initState();
@@ -180,6 +190,8 @@ class _MerchantShellState extends State<MerchantShell> {
       final ServicesShopOutcome outcome = await ServicesShopBootstrap(
         stores: widget.storeApi,
         onboarding: onboarding,
+        memory: widget.servicesProviderMemory,
+        account: widget.session.subject,
       ).run(onOpening: () {
         if (mounted) setState(() => _openingServicesShop = true);
       });
@@ -189,12 +201,19 @@ class _MerchantShellState extends State<MerchantShell> {
           storeId = store.id;
         case NotServicesProvider(storeId: final String? standing):
           storeId = standing;
-        case ServicesApplicationPending(storeId: final String? standing):
-          storeId = standing;
+        case ServicesApplicationPending():
+          // Nothing is opened before a decision, and a waiting provider owns no shop to stand in.
+          storeId = null;
         case ServicesShopFailed():
           setState(() {
             _openingServicesShop = false;
             _servicesShopFailed = true;
+          });
+          return;
+        case ServicesCategoryNotOffered():
+          setState(() {
+            _openingServicesShop = false;
+            _servicesCategoryClosed = true;
           });
           return;
       }
@@ -487,9 +506,10 @@ class _MerchantShellState extends State<MerchantShell> {
     final List<MerchantTab> tabs = _visibleTabs();
     final int current = tabs.indexOf(_tab).clamp(0, tabs.length - 1);
 
-    if (_openingServicesShop || _servicesShopFailed) {
+    if (_openingServicesShop || _servicesShopFailed || _servicesCategoryClosed) {
       return _ServicesShopGate(
         failed: _servicesShopFailed,
+        categoryClosed: _servicesCategoryClosed,
         onRetry: () {
           setState(() => _servicesShopFailed = false);
           _resolveStore();
@@ -524,27 +544,42 @@ class _MerchantShellState extends State<MerchantShell> {
 ///
 /// Nothing else is drawn: every tab needs the shop, and a dashboard for a shop that does not exist
 /// would only fail five different ways. Sign-out stays in reach, so nobody is trapped behind a retry
-/// that keeps failing.
+/// that keeps failing. And a refusal that no retry can change — the shop's category is not offered
+/// right now ([ServicesCategoryNotOffered]) — is said as that, pointing to support, with no retry at
+/// all: a "Try again" there would be a button that cannot work.
 class _ServicesShopGate extends StatelessWidget {
   const _ServicesShopGate({
     required this.failed,
+    required this.categoryClosed,
     required this.onRetry,
     required this.onSignOut,
   });
 
   final bool failed;
+  final bool categoryClosed;
   final VoidCallback onRetry;
   final Future<void> Function() onSignOut;
 
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final Widget signOut = TextButton(
+      onPressed: () => onSignOut(),
+      child: Text(t.merchbLogOutAccount),
+    );
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       body: SafeArea(
         child: Center(
-          child: failed
+          child: categoryClosed
+              ? YdEmptyState(
+                  icon: Icons.storefront_outlined,
+                  title: t.svcShopCategoryClosedTitle,
+                  message: t.svcShopCategoryClosedBody,
+                  action: signOut,
+                )
+              : failed
               ? YdEmptyState(
                   icon: Icons.storefront_outlined,
                   title: t.svcOpeningShopFailed,
@@ -554,10 +589,7 @@ class _ServicesShopGate extends StatelessWidget {
                     children: <Widget>[
                       YdPillButton(label: t.tryAgain, onPressed: onRetry),
                       const SizedBox(height: DeliverySpacing.sm),
-                      TextButton(
-                        onPressed: () => onSignOut(),
-                        child: Text(t.merchbLogOutAccount),
-                      ),
+                      signOut,
                     ],
                   ),
                 )

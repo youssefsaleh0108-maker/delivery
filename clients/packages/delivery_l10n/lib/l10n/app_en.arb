@@ -5303,7 +5303,7 @@
   "svcBusinessNameHint": "e.g. Al Fakhry Press",
   "svcServiceCategory": "Service category",
   "svcServiceCategoryHint": "Choose what you offer",
-  "svcPhoneHint": "+961 71 234 567",
+  "svcPhoneHint": "71 234 567",
   "svcPhoneInvalid": "Enter a Lebanese number, e.g. 71 234 567",
   "svcArea": "Location / area",
   "svcAreaHint": "Choose your area",
@@ -5320,7 +5320,6 @@
     }
   },
   "svcPendingBodyNoEmail": "A YouDrop reviewer reads every application to sell services, and we'll let you know once it's decided.",
-  "svcPendingDocuments": "To help the review, add your ID and commercial registration from Settings in your shop.",
   "svcReference": "Reference: {reference}",
   "@svcReference": {
     "placeholders": {
@@ -5345,5 +5344,13 @@
   "svcIntent": "Services",
   "svcIntentBlurb": "I print, tailor, repair or take photos",
   "svcOpeningShop": "Opening your services shop…",
-  "svcOpeningShopFailed": "We couldn't open your services shop."
+  "svcOpeningShopFailed": "We couldn't open your services shop.",
+  "svcDocsTitle": "Add your documents",
+  "svcDocsIntro": "Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.",
+  "svcDocsFootnote": "They go to the reviewer when you tap Send documents.",
+  "svcDocsSend": "Send documents",
+  "svcDocsSent": "Your documents are with the reviewer.",
+  "svcDocsSkipped": "No documents were sent, so the reviewer will see your ID and commercial registration as missing.",
+  "svcShopCategoryClosedTitle": "Your service isn't offered right now",
+  "svcShopCategoryClosedBody": "Your application was approved, but YouDrop isn't offering this service at the moment, so your shop can't be opened. Please contact support."
 }

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_app/src/application_documents_step.dart';
 import 'package:mobile_app/src/one_time_code.dart';
 import 'package:mobile_app/src/service_signup_screen.dart';
 
@@ -15,9 +16,12 @@ import 'package:mobile_app/src/service_signup_screen.dart';
 /// Pinned: nothing is sent until the business, the service and the area are chosen, and the pickers
 /// offer only what the server has open. What is sent is a MERCHANT application whose details say
 /// SERVICES with the category and the area, and the session handed on was refreshed after the grant.
-/// The last screen says plainly that nothing sells until somebody decides — or that auto-approval
-/// did. A refused answer comes back to the form in the reader's words. Somebody with no account goes
-/// through the email code, the application and their own account. And the frame's promises the
+/// Straight after the application is recorded — on both paths — the national ID and commercial
+/// registration are asked for, sent from there, and skippable; the last screen says whether they were
+/// sent, and points to no place in the app that does not exist. It says plainly that nothing sells
+/// until somebody decides — or that auto-approval did, in which case no documents are asked for. A
+/// refused answer comes back to the form in the reader's words, and an account whose application is
+/// for something else is told so with a way out rather than a retry. And the frame's promises the
 /// platform cannot keep are not on the screen.
 const AuthConfig _config = AuthConfig(
   issuer: 'https://iam.test/realms/delivery-platform',
@@ -50,6 +54,8 @@ Finder _field(String label) => find.descendant(
 
 Finder get _apply => find.widgetWithText(AuthPrimaryButton, _en.svcApplyCta);
 
+Finder get _sendDocuments => find.widgetWithText(AuthPrimaryButton, _en.svcDocsSend);
+
 bool _enabled(WidgetTester tester, Finder button) =>
     tester.widget<AuthPrimaryButton>(button).onPressed != null;
 
@@ -66,6 +72,21 @@ Future<void> _pump(WidgetTester tester, {int times = 30}) async {
     await tester.pump(const Duration(milliseconds: 50));
   }
 }
+
+/// Taps something on a screen with no endless animation on it.
+Future<void> _tapText(WidgetTester tester, String text) async {
+  await tester.ensureVisible(find.text(text));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(text));
+  await _pump(tester);
+}
+
+/// The file dialog, answered with a scanned PDF.
+Future<PickedDocument?> _pickScan(String _) async => PickedDocument(
+      bytes: Uint8List.fromList(<int>[37, 80, 68, 70]),
+      contentType: 'application/pdf',
+      fileName: 'scan.pdf',
+    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -98,23 +119,27 @@ void main() {
   });
 
   /// The screen for an account signed in with Google, against [server].
-  Future<({List<AuthSession> handedOn, _Keycloak keycloak})> pumpForAccount(
-      WidgetTester tester, _Server server) async {
+  Future<({List<AuthSession> handedOn, _Keycloak keycloak, _Documents documents, List<bool> closed})>
+      pumpForAccount(WidgetTester tester, _Server server) async {
     _phone(tester);
     final AuthService auth = AuthService(config: _config, oidcClient: server.keycloak);
     final AuthSession account = (await auth.signInWithBroker(AuthService.googleBroker))!;
     final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
     final List<AuthSession> handedOn = <AuthSession>[];
+    final List<bool> closed = <bool>[];
+    final _Documents documents = _Documents();
 
     await tester.pumpWidget(_app(ServiceProviderSignupScreen(
       api: OnboardingApi(dio),
+      documentsApi: documents,
       authService: auth,
       account: account,
+      pickDocument: _pickScan,
       onFinished: handedOn.add,
-      onClose: () {},
+      onClose: () => closed.add(true),
     )));
     await tester.pumpAndSettle();
-    return (handedOn: handedOn, keycloak: server.keycloak);
+    return (handedOn: handedOn, keycloak: server.keycloak, documents: documents, closed: closed);
   }
 
   Future<void> fillPrintShop(WidgetTester tester) async {
@@ -167,11 +192,15 @@ void main() {
   });
 
   testWidgets(
-      'applies as a MERCHANT whose details say SERVICES, and says honestly that it is waiting',
+      'applies as a MERCHANT whose details say SERVICES, asks for the documents, and says honestly that it is waiting',
       (WidgetTester tester) async {
     final _Server server = _Server(_Keycloak());
-    final ({List<AuthSession> handedOn, _Keycloak keycloak}) screen =
-        await pumpForAccount(tester, server);
+    final ({
+      List<AuthSession> handedOn,
+      _Keycloak keycloak,
+      _Documents documents,
+      List<bool> closed
+    }) screen = await pumpForAccount(tester, server);
 
     await fillPrintShop(tester);
     await tapApply(tester);
@@ -191,12 +220,26 @@ void main() {
     expect(body.containsKey('contactEmail'), isFalse);
     expect(screen.keycloak.refreshes, 1, reason: 'the roles changed on the server, not in the token');
 
+    // Recorded and waiting: the papers a shop's application is judged on come next, and can wait.
+    expect(find.text(_en.svcDocsTitle), findsOneWidget);
+    expect(find.text(_en.docNationalId), findsOneWidget);
+    expect(find.text(_en.docCommercialRegistration), findsOneWidget);
+    expect(find.text(_en.svcDocsFootnote), findsOneWidget);
+    expect(find.text(_en.wizDocSentOnSubmit), findsNothing, reason: 'the application is already in');
+    expect(_enabled(tester, _sendDocuments), isFalse, reason: 'nothing picked yet');
+    expect(find.text(_en.svcPendingTitle), findsNothing);
+
+    await _tapText(tester, _en.skipThis);
+
     // Waiting, said as waiting: nothing here suggests they can sell yet.
     expect(find.text(_en.svcPendingTitle), findsOneWidget);
     expect(find.text(_en.svcPendingBody('sam@gmail.example')), findsOneWidget);
     expect(find.text(_en.statusSubmitted), findsOneWidget);
     expect(find.text(_en.svcReference('ref-1')), findsOneWidget);
-    expect(find.text(_en.svcPendingDocuments), findsOneWidget);
+    // What happened to the documents — and no pointer to a Settings row that opens the payout page.
+    expect(find.text(_en.svcDocsSkipped), findsOneWidget);
+    expect(find.textContaining('Settings'), findsNothing);
+    expect(screen.documents.sent, isEmpty);
     expect(find.text(_en.svcApprovedTitle), findsNothing);
 
     await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.continueLabel));
@@ -205,14 +248,81 @@ void main() {
     expect(screen.handedOn.single.hasRole(DeliveryRole.applicant), isTrue);
   });
 
-  testWidgets('says so when auto-approval has already said yes', (WidgetTester tester) async {
+  testWidgets('sends the national ID and commercial registration picked right after applying',
+      (WidgetTester tester) async {
+    final ({
+      List<AuthSession> handedOn,
+      _Keycloak keycloak,
+      _Documents documents,
+      List<bool> closed
+    }) screen = await pumpForAccount(tester, _Server(_Keycloak()));
+    await fillPrintShop(tester);
+    await tapApply(tester);
+
+    await _tapText(tester, _en.docNationalId);
+    await _tapText(tester, _en.docCommercialRegistration);
+    expect(find.text('scan.pdf'), findsNWidgets(2));
+    expect(_enabled(tester, _sendDocuments), isTrue);
+
+    await tester.tap(_sendDocuments);
+    await _pump(tester);
+
+    expect(screen.documents.sent, <ApplicantDocumentKind>[
+      ApplicantDocumentKind.nationalId,
+      ApplicantDocumentKind.commercialRegistration,
+    ]);
+    expect(find.text(_en.svcPendingTitle), findsOneWidget);
+    expect(find.text(_en.svcDocsSent), findsOneWidget);
+    expect(find.text(_en.svcDocsSkipped), findsNothing);
+  });
+
+  testWidgets('a document that did not go through is sent again, and one that did is not',
+      (WidgetTester tester) async {
+    final ({
+      List<AuthSession> handedOn,
+      _Keycloak keycloak,
+      _Documents documents,
+      List<bool> closed
+    }) screen = await pumpForAccount(tester, _Server(_Keycloak()));
+    await fillPrintShop(tester);
+    await tapApply(tester);
+    await _tapText(tester, _en.docNationalId);
+    await _tapText(tester, _en.docCommercialRegistration);
+    screen.documents.failNext = DioException(requestOptions: RequestOptions(path: '/presign'));
+
+    await tester.tap(_sendDocuments);
+    await _pump(tester);
+
+    expect(find.text(_en.svcDocsTitle), findsOneWidget, reason: 'still on the documents');
+    expect(find.text(_en.wizDocUploadFailed), findsOneWidget);
+    expect(screen.documents.sent,
+        <ApplicantDocumentKind>[ApplicantDocumentKind.commercialRegistration]);
+
+    await tester.tap(_sendDocuments);
+    await _pump(tester);
+
+    expect(screen.documents.sent, <ApplicantDocumentKind>[
+      ApplicantDocumentKind.commercialRegistration,
+      ApplicantDocumentKind.nationalId,
+    ]);
+    expect(find.text(_en.svcDocsSent), findsOneWidget);
+  });
+
+  testWidgets('says so when auto-approval has already said yes, and asks for no documents',
+      (WidgetTester tester) async {
     final _Server server = _Server(_Keycloak())..automatic = true;
-    final ({List<AuthSession> handedOn, _Keycloak keycloak}) screen =
-        await pumpForAccount(tester, server);
+    final ({
+      List<AuthSession> handedOn,
+      _Keycloak keycloak,
+      _Documents documents,
+      List<bool> closed
+    }) screen = await pumpForAccount(tester, server);
 
     await fillPrintShop(tester);
     await tapApply(tester);
 
+    // A decided application's documents can no longer change.
+    expect(find.text(_en.svcDocsTitle), findsNothing);
     expect(find.text(_en.svcApprovedTitle), findsOneWidget);
     expect(find.text(_en.svcApprovedBody), findsOneWidget);
     expect(find.text(_en.svcPendingTitle), findsNothing);
@@ -242,8 +352,42 @@ void main() {
     expect(find.text(_en.svcPendingTitle), findsNothing);
 
     await tapApply(tester);
+    await _tapText(tester, _en.skipThis);
 
     expect(find.text(_en.svcPendingTitle), findsOneWidget);
+  });
+
+  // The account's shop application lost its roles half way, so the profile menu offered this form;
+  // the server refuses to resume a shop's application as a services one.
+  testWidgets('an account whose application is for something else is told so, with a way out and no retry',
+      (WidgetTester tester) async {
+    final _Server server = _Server(_Keycloak())
+      ..refusal = (
+        status: 422,
+        body: <String, Object?>{
+          'message': 'This account already has an application to sell goods on YouDrop',
+          'code': 'other-application',
+        },
+      );
+    final ({
+      List<AuthSession> handedOn,
+      _Keycloak keycloak,
+      _Documents documents,
+      List<bool> closed
+    }) screen = await pumpForAccount(tester, server);
+
+    await fillPrintShop(tester);
+    await tapApply(tester);
+
+    expect(find.text(_en.accountOtherApplication), findsOneWidget);
+    expect(find.widgetWithText(AuthPrimaryButton, _en.tryAgain), findsNothing,
+        reason: 'sending the same form again can never change it');
+    expect(find.text(_en.svcDocsTitle), findsNothing);
+    expect(find.text(_en.svcPendingTitle), findsNothing);
+
+    await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.close));
+    await tester.pump();
+    expect(screen.closed, <bool>[true]);
   });
 
   testWidgets('promises nothing the platform cannot back', (WidgetTester tester) async {
@@ -272,15 +416,18 @@ void main() {
   });
 
   testWidgets(
-      'somebody with no account proves the address, applies, and has their account created',
+      'somebody with no account proves the address, applies, has their account created, and is asked for the documents',
       (WidgetTester tester) async {
     _phone(tester);
     final _Server server = _Server(_Keycloak());
     final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
+    final _Documents documents = _Documents();
 
     await tester.pumpWidget(_app(ServiceProviderSignupScreen(
       api: OnboardingApi(dio),
-      authService: AuthService(config: _config, oidcClient: server.keycloak),
+      documentsApi: documents,
+      authService: _PasswordGrant(server.keycloak),
+      pickDocument: _pickScan,
       onFinished: (AuthSession _) {},
       onClose: () {},
     )));
@@ -317,6 +464,17 @@ void main() {
     expect(server.bodies['POST /api/onboarding/applications/ref-open/account'], <String, dynamic>{
       'password': '246810',
     });
+
+    // Signed in with the passcode just chosen, so the documents can travel — as on the other path.
+    expect(find.text(_en.svcDocsTitle), findsOneWidget);
+    await _tapText(tester, _en.docNationalId);
+    await tester.tap(_sendDocuments);
+    await _pump(tester);
+
+    expect(documents.sent, <ApplicantDocumentKind>[ApplicantDocumentKind.nationalId]);
+    expect(find.text(_en.svcPendingTitle), findsOneWidget);
+    expect(find.text(_en.svcPendingBody('sam@example.test')), findsOneWidget);
+    expect(find.text(_en.svcDocsSent), findsOneWidget);
   });
 }
 
@@ -357,6 +515,51 @@ class _Keycloak implements OidcClient {
 
   @override
   Future<void> signOut(AuthConfig config, String? refreshToken) async {}
+}
+
+/// The password grant the open path signs in with, answered as Keycloak would for a new applicant:
+/// the grant itself is a direct HTTP call a widget test cannot make.
+class _PasswordGrant extends AuthService {
+  _PasswordGrant(_Keycloak keycloak) : super(config: _config, oidcClient: keycloak);
+
+  @override
+  Future<AuthSession> signInWithPassword(String username, String password) async => AuthSession(
+        accessToken: 'applicant-token',
+        refreshToken: null,
+        expiresAt: DateTime.now().add(const Duration(minutes: 5)),
+        roles: const <DeliveryRole>{DeliveryRole.merchant, DeliveryRole.applicant},
+        subject: 'sam-open',
+      );
+}
+
+/// The applicant's document endpoints as the signup meets them, without the storage round trip a
+/// widget test cannot make: what was sent, and a failure on demand.
+class _Documents extends DocumentsApi {
+  _Documents() : super(Dio());
+
+  final List<ApplicantDocumentKind> sent = <ApplicantDocumentKind>[];
+
+  /// Fails the next upload with this, once.
+  Object? failNext;
+
+  @override
+  Future<ApplicantDocument> upload({
+    required ApplicantDocumentKind kind,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    final Object? failure = failNext;
+    if (failure != null) {
+      failNext = null;
+      throw failure;
+    }
+    sent.add(kind);
+    return ApplicantDocument.fromJson(<String, dynamic>{
+      'id': 'document-${kind.wire}',
+      'kind': kind.wire,
+      'status': 'PENDING',
+    });
+  }
 }
 
 /// onboarding-service as the signup meets it: the options, the two front doors and the codes.

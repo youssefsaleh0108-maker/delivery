@@ -10,6 +10,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/address_sheet.dart';
 import 'package:mobile_app/src/delivery_address.dart';
+import 'package:mobile_app/src/lebanese_phone.dart';
+import 'package:mobile_app/src/one_time_code.dart';
 import 'package:mobile_app/src/service_signup_screen.dart';
 
 // Arabic is not a translation file — it is whether the app works for the people it is for.
@@ -213,8 +215,7 @@ void main() {
   });
 
   group('the services signup in Arabic', () {
-    testWidgets('lays out right-to-left, in Arabic, down to the service names',
-        (WidgetTester tester) async {
+    Future<void> pumpSignup(WidgetTester tester) async {
       tester.view.physicalSize = const Size(1170, 2532);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.reset);
@@ -232,6 +233,7 @@ void main() {
         ],
         home: ServiceProviderSignupScreen(
           api: OnboardingApi(dio),
+          documentsApi: DocumentsApi(dio),
           authService: AuthService(
             config: const AuthConfig(
               issuer: 'https://iam.test/realms/delivery-platform',
@@ -245,6 +247,41 @@ void main() {
         ),
       ));
       await tester.pumpAndSettle();
+    }
+
+    // A phone number reads left to right in Arabic too, +961 first, as the gift checkout draws it.
+    // Laid out right to left, "71 234 567" read back as "567 234 71".
+    testWidgets('keeps the phone number left to right after a fixed +961, and the words around it Arabic',
+        (WidgetTester tester) async {
+      await pumpSignup(tester);
+      final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
+      final Finder label = find.text(ar.authPhoneNumber.toUpperCase());
+      final Finder phone = find.descendant(
+          of: find.widgetWithText(AuthField, ar.authPhoneNumber.toUpperCase()),
+          matching: find.byType(TextField));
+      await tester.ensureVisible(phone);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<TextField>(phone).textDirection, TextDirection.ltr);
+      expect(Directionality.of(tester.element(phone)), TextDirection.ltr);
+      expect(tester.widget<TextField>(phone).decoration!.hintText, '71 234 567');
+      final Finder prefix =
+          find.descendant(of: phone, matching: find.text(LebanesePhone.countryCode));
+      expect(prefix, findsOneWidget, reason: '+961 is there before anything is typed');
+      expect(tester.getCenter(prefix).dx,
+          lessThan(tester.getCenter(find.descendant(of: phone, matching: find.byType(EditableText))).dx),
+          reason: '+961 comes first, on the left');
+      expect(Directionality.of(tester.element(label)), TextDirection.rtl);
+
+      await tester.enterText(phone, '12');
+      await tester.pump();
+      expect(Directionality.of(tester.element(find.text(ar.svcPhoneInvalid))), TextDirection.rtl,
+          reason: "the error is a sentence in the reader's language");
+    });
+
+    testWidgets('lays out right-to-left, in Arabic, down to the service names',
+        (WidgetTester tester) async {
+      await pumpSignup(tester);
 
       final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
       final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
