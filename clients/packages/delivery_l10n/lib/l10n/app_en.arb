@@ -5726,5 +5726,16 @@
   "@svcFulfilmentDeliveryDetail": {"placeholders":{"address":{"type":"String"}}},
   "svcEstimatedReady": "Estimated ready",
   "svcTurnaroundAfterAccept": "Turnaround once you accept: {range}",
-  "@svcTurnaroundAfterAccept": {"placeholders":{"range":{"type":"String"}}}
+  "@svcTurnaroundAfterAccept": {"placeholders":{"range":{"type":"String"}}},
+  "svcRiderOnTheWay": "A rider is on the way to collect it",
+  "svcLoadMore": "Load more",
+  "svcFileLinkRefreshFailed": "Couldn't get a fresh link to this file. Try again.",
+  "svcOfferTakenDown": "Taken down by YouDrop",
+  "svcOfferTakenDownReason": "YouDrop's reason: {reason}",
+  "@svcOfferTakenDownReason": {"placeholders":{"reason":{"type":"String"}}},
+  "svcOfferTakenDownBody": "Customers can't order it, and it can't be published, paused or resumed until YouDrop restores it. You can still edit it.",
+  "svcOfferChangedElsewhere": "This offer was just changed somewhere else, so it has been read again. Check it and try again.",
+  "svcShopReadFailed": "We couldn't load your shop",
+  "svcServiceOrdersRow": "Service orders",
+  "svcServiceOffersRow": "Service offers"
 }

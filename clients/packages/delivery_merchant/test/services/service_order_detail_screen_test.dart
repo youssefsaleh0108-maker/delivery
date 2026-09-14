@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_merchant/delivery_merchant.dart';
+import 'package:delivery_merchant/src/services/service_order_steps.dart';
 import 'package:delivery_merchant/src/services/service_words.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,8 +19,8 @@ void main() {
 
   setUpAll(() => svcUseLbpRate(90000));
 
-  ServiceOrderFile pdf({String url = 'https://files.example/one?sig=a', DateTime? expires}) =>
-      ServiceOrderFile(
+  OrderAttachment pdf({String url = 'https://files.example/one?sig=a', DateTime? expires}) =>
+      OrderAttachment(
         fileId: 'file-1',
         contentType: 'application/pdf',
         url: url,
@@ -67,7 +68,7 @@ void main() {
   testWidgets('a customer\'s file opens from its link, and an expired link is fetched afresh first',
       (WidgetTester tester) async {
     final DeliveryOrder order = svcOrder();
-    final FakeOrderFiles files = FakeOrderFiles(<ServiceOrderFile>[
+    final FakeOrderFiles files = FakeOrderFiles(<OrderAttachment>[
       pdf(expires: DateTime.now().subtract(const Duration(minutes: 1))),
     ]);
     final List<Uri> opened = <Uri>[];
@@ -87,7 +88,7 @@ void main() {
 
     expect(find.text('${en.svcFileDocument} · ${en.svcFileSizeMb('2.3')}'), findsOneWidget);
 
-    files.files = <ServiceOrderFile>[
+    files.files = <OrderAttachment>[
       pdf(url: 'https://files.example/one?sig=b', expires: DateTime.now().add(const Duration(minutes: 5))),
     ];
     await tester.tap(find.text(en.svcOpenFile));
@@ -97,10 +98,105 @@ void main() {
     expect(opened, <Uri>[Uri.parse('https://files.example/one?sig=b')]);
   });
 
+  testWidgets('a link that runs out within the minute is fetched afresh before it is opened',
+      (WidgetTester tester) async {
+    final DeliveryOrder order = svcOrder();
+    final FakeOrderFiles files = FakeOrderFiles(<OrderAttachment>[
+      pdf(expires: DateTime.now().add(const Duration(seconds: 30))),
+    ]);
+    final List<Uri> opened = <Uri>[];
+    await pumpSvc(
+      tester,
+      ServiceOrderDetailScreen(
+        api: FakeServiceOrders(<DeliveryOrder>[order]),
+        order: order,
+        files: files,
+        openLink: (Uri link) async {
+          opened.add(link);
+          return true;
+        },
+      ),
+    );
+    await svcSettle(tester);
+
+    files.files = <OrderAttachment>[
+      pdf(url: 'https://files.example/one?sig=b', expires: DateTime.now().add(const Duration(minutes: 5))),
+    ];
+    await tester.tap(find.text(en.svcOpenFile));
+    await svcSettle(tester);
+
+    expect(files.reads, 2, reason: 'thirty seconds left is not a link to hand over');
+    expect(opened, <Uri>[Uri.parse('https://files.example/one?sig=b')]);
+  });
+
+  testWidgets('a link that cannot be fetched afresh is not opened dead, and the shop is told',
+      (WidgetTester tester) async {
+    final DeliveryOrder order = svcOrder();
+    final FakeOrderFiles files = FakeOrderFiles(<OrderAttachment>[
+      pdf(expires: DateTime.now().subtract(const Duration(minutes: 1))),
+    ]);
+    final List<Uri> opened = <Uri>[];
+    await pumpSvc(
+      tester,
+      ServiceOrderDetailScreen(
+        api: FakeServiceOrders(<DeliveryOrder>[order]),
+        order: order,
+        files: files,
+        openLink: (Uri link) async {
+          opened.add(link);
+          return true;
+        },
+      ),
+    );
+    await svcSettle(tester);
+
+    files.fail = Exception('storage down');
+    await tester.tap(find.text(en.svcOpenFile));
+    await svcSettle(tester);
+
+    expect(opened, isEmpty);
+    expect(find.text(en.svcFileLinkRefreshFailed), findsOneWidget);
+  });
+
+  testWidgets(
+      'a second tap while a step is out sends nothing more, and the buttons wait for the order to be '
+      'read back', (WidgetTester tester) async {
+    final DeliveryOrder order = svcOrder(status: 'PREPARING', actions: const <String>['READY']);
+    final FakeServiceOrders api = FakeServiceOrders(<DeliveryOrder>[order])
+      ..holdAct = Completer<void>();
+    api.onAct = (String id, OrderAction action) {
+      final DeliveryOrder moved = svcOrder(status: 'READY', actions: const <String>['COLLECTED']);
+      api.orders = <DeliveryOrder>[moved];
+      return moved;
+    };
+    await pumpSvc(tester, ServiceOrderDetailScreen(api: api, order: order));
+    await svcSettle(tester);
+
+    await tester.tap(find.text(en.actionMarkReady));
+    await tester.tap(find.text(en.actionMarkReady));
+    await tester.pump();
+    expect(api.calls.where((String c) => c.startsWith('act ')), hasLength(1));
+
+    api.holdRead = Completer<void>();
+    api.holdAct!.complete();
+    await svcSettle(tester);
+    expect(find.text(en.svcActionCollected), findsNothing);
+    expect(
+      find.descendant(
+          of: find.byType(SvcStepButton), matching: find.byType(CircularProgressIndicator)),
+      findsOneWidget,
+      reason: 'answered, but not read back yet',
+    );
+
+    api.holdRead!.complete();
+    await svcSettle(tester);
+    expect(find.text(en.svcActionCollected), findsOneWidget);
+  });
+
   testWidgets('files that cannot be read say so, and Try again reads them again',
       (WidgetTester tester) async {
     final DeliveryOrder order = svcOrder();
-    final FakeOrderFiles files = FakeOrderFiles(<ServiceOrderFile>[pdf()])
+    final FakeOrderFiles files = FakeOrderFiles(<OrderAttachment>[pdf()])
       ..fail = Exception('storage down');
     await pumpSvc(
       tester,
@@ -122,7 +218,7 @@ void main() {
   testWidgets('files still loading show a spinner; none sent is said; no files client, no section',
       (WidgetTester tester) async {
     final DeliveryOrder order = svcOrder();
-    final FakeOrderFiles files = FakeOrderFiles(<ServiceOrderFile>[])..hold = Completer<void>();
+    final FakeOrderFiles files = FakeOrderFiles(<OrderAttachment>[])..hold = Completer<void>();
     await pumpSvc(
       tester,
       ServiceOrderDetailScreen(
@@ -198,7 +294,7 @@ void main() {
       ServiceOrderDetailScreen(
         api: FakeServiceOrders(<DeliveryOrder>[order]),
         order: order,
-        files: FakeOrderFiles(<ServiceOrderFile>[pdf()]),
+        files: FakeOrderFiles(<OrderAttachment>[pdf()]),
         shopChat: FakeShopChat(),
       ),
       size: const Size(320, 900),
@@ -229,7 +325,7 @@ void main() {
       ServiceOrderDetailScreen(
         api: FakeServiceOrders(<DeliveryOrder>[order]),
         order: order,
-        files: FakeOrderFiles(<ServiceOrderFile>[pdf()]),
+        files: FakeOrderFiles(<OrderAttachment>[pdf()]),
         shopChat: FakeShopChat(),
       ),
       locale: const Locale('ar'),

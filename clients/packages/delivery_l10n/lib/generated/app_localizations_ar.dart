@@ -11542,4 +11542,39 @@ class DeliveryStringsAr extends DeliveryStrings {
   String svcTurnaroundAfterAccept(String range) {
     return 'مدة التنفيذ بعد القبول: $range';
   }
+
+  @override
+  String get svcRiderOnTheWay => 'السائق في طريقه لاستلامه';
+
+  @override
+  String get svcLoadMore => 'تحميل المزيد';
+
+  @override
+  String get svcFileLinkRefreshFailed =>
+      'تعذّر الحصول على رابط جديد لهذا الملف. حاول مجددًا.';
+
+  @override
+  String get svcOfferTakenDown => 'سحبتها يو دروب';
+
+  @override
+  String svcOfferTakenDownReason(String reason) {
+    return 'سبب يو دروب: $reason';
+  }
+
+  @override
+  String get svcOfferTakenDownBody =>
+      'لا يستطيع الزبائن طلبها، ولا يمكن نشرها أو إيقافها مؤقتًا أو استئنافها حتى تعيدها يو دروب. ما زال بإمكانك تعديلها.';
+
+  @override
+  String get svcOfferChangedElsewhere =>
+      'عُدّلت هذه الخدمة للتو من مكان آخر، فأعدنا قراءتها. راجعها وحاول مجددًا.';
+
+  @override
+  String get svcShopReadFailed => 'تعذّر تحميل متجرك';
+
+  @override
+  String get svcServiceOrdersRow => 'طلبات الخدمات';
+
+  @override
+  String get svcServiceOffersRow => 'خدماتك';
 }

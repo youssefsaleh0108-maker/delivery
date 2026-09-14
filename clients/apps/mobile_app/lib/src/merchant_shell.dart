@@ -58,7 +58,7 @@ class MerchantShell extends StatefulWidget {
     this.chatSocket,
     this.notificationApi,
     this.zoneApi,
-    this.serviceOrderFiles,
+    this.orderAttachmentApi,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -125,9 +125,9 @@ class MerchantShell extends StatefulWidget {
   /// that to the shop's pin, and to the server.
   final DeliveryZoneApi? zoneApi;
 
-  /// A service order's files for the provider's order detail. Null draws no files section: the
-  /// order attachment client is built on its own branch, and the host hands it over once it merges.
-  final ServiceOrderFiles? serviceOrderFiles;
+  /// A service order's files, for the provider's order detail: Order Manager's attachment read, which
+  /// the order's shop may make. Null draws no files section.
+  final OrderAttachmentApi? orderAttachmentApi;
 
   final AuthSession session;
 
@@ -468,7 +468,7 @@ class _MerchantShellState extends State<MerchantShell> {
             // owner's, like the Settings row.
             shopChat: _access.isOwner ? widget.shopChatApi : null,
             chatSocket: widget.chatSocket,
-            files: widget.serviceOrderFiles,
+            files: widget.orderAttachmentApi,
           );
         }
         return OrdersScreen(api: widget.orderApi);

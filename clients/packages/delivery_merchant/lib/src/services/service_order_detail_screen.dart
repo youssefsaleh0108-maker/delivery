@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../order_detail_screen.dart';
 import '../shop_inbox_screen.dart';
-import 'service_order_files.dart';
 import 'service_order_steps.dart';
 import 'service_orders_screen.dart';
 import 'service_words.dart';
@@ -49,8 +48,9 @@ class ServiceOrderDetailScreen extends StatefulWidget {
 
   final UserQueueSocket? chatSocket;
 
-  /// The customer's files. Null draws no files section — see [ServiceOrderFiles].
-  final ServiceOrderFiles? files;
+  /// The customer's files: Order Manager's attachment read, which the order's shop may make. Null draws
+  /// no files section, rather than a section that can never load.
+  final OrderAttachmentApi? files;
 
   /// Opens a file's link. Null opens it with the platform, in the browser or the phone's viewer.
   final Future<bool> Function(Uri link)? openLink;
@@ -63,9 +63,24 @@ class ServiceOrderDetailScreen extends StatefulWidget {
 
 class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   late DeliveryOrder _order = widget.order;
+
+  /// A step is on its way, or its order is being read back: the buttons spin and take no second tap.
   bool _busy = false;
-  Future<List<ServiceOrderFile>>? _files;
+
+  /// Moves on each time a step is sent and each time one answers, so a read of the order begun before
+  /// is not drawn over what the step did.
+  int _generation = 0;
+
+  /// Numbers the reads of the order, so one that lands after a newer one has been drawn is dropped.
+  int _read = 0;
+  int _drawn = 0;
+
+  Future<List<OrderAttachment>>? _files;
   Timer? _minute;
+
+  /// How near its expiry a held link is taken as expired: time for the tap, the request, and a phone
+  /// clock running a little fast — so the shop is not handed a link that dies on the way.
+  static const Duration _linkMargin = Duration(seconds: 60);
 
   DateTime _now() => (widget.clock ?? DateTime.now)();
 
@@ -99,9 +114,13 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   /// Reads the order again. Quiet when it fails: the order as the queue read it is still on screen,
   /// and its steps answer for themselves if it has moved on.
   Future<void> _reload() async {
+    final int generation = _generation;
+    final int read = ++_read;
     try {
       final DeliveryOrder fresh = await widget.api.read(_order.id);
-      if (!mounted) return;
+      // Begun before a step moved the order, or overtaken by a newer read: that one says what is true.
+      if (!mounted || generation != _generation || read < _drawn) return;
+      _drawn = read;
       setState(() => _order = fresh);
       widget.onChanged?.call(fresh);
     } catch (_) {
@@ -110,17 +129,22 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   }
 
   Future<void> _step(SvcStep step) async {
+    // A second tap while the step is out, or while the order is read back, does nothing.
+    if (_busy) return;
     final SvcStepResult result = await SvcOrderSteps(widget.api).run(
       context,
       _order,
       step,
       onSending: () {
+        _generation++;
         if (mounted) setState(() => _busy = true);
       },
     );
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (result == SvcStepResult.reload) await _reload();
+    if (!mounted || result == SvcStepResult.dismissed) return;
+    // The step has answered, so what it did is on the server: a read begun before now is stale.
+    _generation++;
+    await _reload();
+    if (mounted) setState(() => _busy = false);
   }
 
   void _reloadFiles() {
@@ -129,23 +153,42 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
     });
   }
 
-  /// Opens a file from a link that works now: the one held, or a fresh one when it has expired.
-  Future<void> _openFile(ServiceOrderFile file) async {
+  /// Opens a file from a link that works now: the one held, or a fresh one when the held one has
+  /// expired or is about to ([_linkMargin], by this device's clock).
+  ///
+  /// When no fresh link can be had, the shop is told so and nothing is opened: a dead link would open a
+  /// storage error page, which says nothing a print shop can act on.
+  Future<void> _openFile(OrderAttachment file) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    try {
-      ServiceOrderFile current = file;
-      if (file.isExpiredAt(_now())) {
-        final List<ServiceOrderFile> fresh = await widget.files!.forOrder(_order.id);
-        current = fresh.firstWhere((ServiceOrderFile f) => f.fileId == file.fileId);
-        if (mounted) {
-          setState(() {
-            _files = Future<List<ServiceOrderFile>>.value(fresh);
-          });
-        }
+    OrderAttachment current = file;
+    final OrderAttachmentApi? files = widget.files;
+    if (files != null && file.isExpiredAt(_now().add(_linkMargin))) {
+      final List<OrderAttachment> fresh;
+      try {
+        fresh = await files.forOrder(_order.id);
+      } catch (_) {
+        messenger.showSnackBar(SnackBar(content: Text(t.svcFileLinkRefreshFailed)));
+        return;
       }
-      final Uri link = Uri.parse(current.url);
-      final bool opened = await (widget.openLink ?? _launch)(link);
+      if (mounted) {
+        setState(() {
+          _files = Future<List<OrderAttachment>>.value(fresh);
+        });
+      }
+      OrderAttachment? match;
+      for (final OrderAttachment candidate in fresh) {
+        if (candidate.fileId == file.fileId) match = candidate;
+      }
+      // Gone from the order since the list was read, or handed back already dead.
+      if (match == null || match.isExpiredAt(_now())) {
+        messenger.showSnackBar(SnackBar(content: Text(t.svcFileCouldNotOpen)));
+        return;
+      }
+      current = match;
+    }
+    try {
+      final bool opened = await (widget.openLink ?? _launch)(Uri.parse(current.url));
       if (!opened) messenger.showSnackBar(SnackBar(content: Text(t.svcFileCouldNotOpen)));
     } catch (_) {
       messenger.showSnackBar(SnackBar(content: Text(t.svcFileCouldNotOpen)));
@@ -382,9 +425,9 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   }
 
   Widget _filesBody(DeliveryStrings t) {
-    return FutureBuilder<List<ServiceOrderFile>>(
+    return FutureBuilder<List<OrderAttachment>>(
       future: _files,
-      builder: (BuildContext context, AsyncSnapshot<List<ServiceOrderFile>> snap) {
+      builder: (BuildContext context, AsyncSnapshot<List<OrderAttachment>> snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.all(DeliverySpacing.sm),
@@ -409,7 +452,7 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
             ],
           );
         }
-        final List<ServiceOrderFile> files = snap.data ?? const <ServiceOrderFile>[];
+        final List<OrderAttachment> files = snap.data ?? const <OrderAttachment>[];
         if (files.isEmpty) {
           return Text(
             t.svcNoFiles,
@@ -493,7 +536,7 @@ class _Fact extends StatelessWidget {
 class _FileRow extends StatelessWidget {
   const _FileRow({required this.file, required this.onOpen});
 
-  final ServiceOrderFile file;
+  final OrderAttachment file;
   final VoidCallback onOpen;
 
   @override

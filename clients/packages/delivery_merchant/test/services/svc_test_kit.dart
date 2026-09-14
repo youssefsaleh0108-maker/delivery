@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
-import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +37,7 @@ DeliveryOrder svcOrder({
   int? turnaroundMin = 24,
   int? turnaroundMax = 48,
   String address = '',
+  String? riderId,
 }) {
   return DeliveryOrder.fromJson(<String, dynamic>{
     'id': id,
@@ -51,6 +52,7 @@ DeliveryOrder svcOrder({
     'totalAmount': total ?? subtotal,
     'deliveryAddress': address,
     'paymentMethod': 'CASH',
+    if (riderId != null) 'riderId': riderId,
     'availableActions': actions,
     'placedAt': DateTime.now().subtract(placedAgo).toUtc().toIso8601String(),
     if (estimatedReadyAt != null) 'estimatedReadyAt': estimatedReadyAt.toUtc().toIso8601String(),
@@ -92,7 +94,23 @@ class FakeServiceOrders extends OrderApi {
   /// Holds the queue read until completed.
   Completer<void>? holdList;
 
+  /// Holds each queue read on a completer of its own, added to [heldLists] in the order the reads
+  /// began, so a test can answer a later read before an earlier one.
+  bool holdEachList = false;
+  final List<Completer<void>> heldLists = <Completer<void>>[];
+
+  /// Answers every state whatever was asked, as an Order Manager from before the status filter does.
+  bool ignoresStatus = false;
+
+  /// Holds the order read, and the order's actions, until completed.
+  Completer<void>? holdRead;
+  Completer<void>? holdAct;
+
   OrderKind? lastKind;
+
+  /// Every queue read as `page STATUS,STATUS` — `0 PLACED,ACCEPTED` — in the order they were made.
+  final List<String> lists = <String>[];
+
   final List<String> calls = <String>[];
 
   DeliveryOrder Function(String id, OrderAction action)? onAct;
@@ -135,29 +153,48 @@ class FakeServiceOrders extends OrderApi {
     int size = 20,
     OrderKind? kind,
     Fulfilment? fulfilment,
+    Iterable<OrderStatus>? statuses,
   }) async {
     calls.add('list');
     lastKind = kind;
+    final List<OrderStatus> asked = statuses?.toList() ?? const <OrderStatus>[];
+    lists.add('$page ${asked.map((OrderStatus s) => s.wire).join(',')}');
+    // What the server holds when the read arrives, not when it answers — which a held read lets a test
+    // choose.
+    final List<DeliveryOrder> matching = <DeliveryOrder>[
+      for (final DeliveryOrder order in orders)
+        if (ignoresStatus || asked.isEmpty || asked.contains(order.status)) order,
+    ];
     await holdList?.future;
+    if (holdEachList) {
+      final Completer<void> held = Completer<void>();
+      heldLists.add(held);
+      await held.future;
+    }
     final Object? failure = failList;
     if (failure != null) throw failure;
+    final int start = page * size;
     return Paged<DeliveryOrder>(
-      content: orders,
-      page: 0,
-      totalElements: orders.length,
-      totalPages: 1,
+      content: start >= matching.length
+          ? const <DeliveryOrder>[]
+          : matching.sublist(start, math.min(start + size, matching.length)),
+      page: page,
+      totalElements: matching.length,
+      totalPages: (matching.length + size - 1) ~/ size,
     );
   }
 
   @override
   Future<DeliveryOrder> read(String orderId) async {
     calls.add('read $orderId');
+    await holdRead?.future;
     return orders.firstWhere((DeliveryOrder o) => o.id == orderId);
   }
 
   @override
   Future<DeliveryOrder> act(String orderId, OrderAction action, {String? reason}) async {
     calls.add('act ${action.wire} $orderId');
+    await holdAct?.future;
     return onAct!(orderId, action);
   }
 
@@ -180,17 +217,17 @@ class FakeServiceOrders extends OrderApi {
   }
 }
 
-/// The attachment service's file list for one order.
-class FakeOrderFiles implements ServiceOrderFiles {
-  FakeOrderFiles(this.files);
+/// Order Manager's attachment read for one order.
+class FakeOrderFiles extends OrderAttachmentApi {
+  FakeOrderFiles(this.files) : super(Dio());
 
-  List<ServiceOrderFile> files;
+  List<OrderAttachment> files;
   Object? fail;
   Completer<void>? hold;
   int reads = 0;
 
   @override
-  Future<List<ServiceOrderFile>> forOrder(String orderId) async {
+  Future<List<OrderAttachment>> forOrder(String orderId) async {
     reads++;
     await hold?.future;
     final Object? failure = fail;
@@ -279,6 +316,8 @@ Product svcOffer({
   int? turnaroundMin = 24,
   int? turnaroundMax = 48,
   String? prompt,
+  bool takenDown = false,
+  String? takenDownReason,
 }) {
   return Product(
     id: id,
@@ -287,7 +326,11 @@ Product svcOffer({
     name: name,
     price: price,
     fromPrice: fromPrice,
-    status: status,
+    // Taken down is archived, as Product Service leaves it, with the hold beside it.
+    status: takenDown ? ProductStatus.archived : status,
+    moderation: takenDown
+        ? ProductModeration(state: ProductModerationState.takenDown, reason: takenDownReason)
+        : null,
     imageRefs: photo ? <String>['products/$id/photo.jpg'] : const <String>[],
     service: ServiceTerms(
       pricingType: pricing,
@@ -329,15 +372,15 @@ Store svcShop({
   });
 }
 
-/// An HTTP refusal, as Dio throws one.
-DioException svcHttpError(int status) {
+/// An HTTP refusal, as Dio throws one — with the `code` Product Service names some refusals by.
+DioException svcHttpError(int status, {String? code}) {
   final RequestOptions request = RequestOptions(path: '/api');
   return DioException(
     requestOptions: request,
     response: Response<dynamic>(
       requestOptions: request,
       statusCode: status,
-      data: <String, dynamic>{'title': 'refused'},
+      data: <String, dynamic>{'title': 'refused', if (code != null) 'code': code},
     ),
   );
 }
@@ -350,10 +393,17 @@ class FakeOffers extends CatalogApi {
   Object? failList;
   Completer<void>? holdList;
   Object? failCreate;
+  Object? failUpdate;
   Object? failPublish;
   Object? failPause;
   Object? failResume;
   final List<String> calls = <String>[];
+
+  /// What the next reads of one offer answer, in order, before the catalogue as it stands.
+  final List<Product> nextReads = <Product>[];
+
+  /// How many times one offer was read.
+  int reads = 0;
 
   /// The request bodies of every create and update, as the app sends them.
   final List<Map<String, dynamic>> sent = <Map<String, dynamic>>[];
@@ -371,6 +421,7 @@ class FakeOffers extends CatalogApi {
       status: status,
       imageRefs: p.imageRefs,
       service: p.service,
+      moderation: p.moderation,
     );
     offers = <Product>[for (final Product o in offers) o.id == id ? moved : o];
     return moved;
@@ -398,7 +449,11 @@ class FakeOffers extends CatalogApi {
   }
 
   @override
-  Future<Product> read(String id) async => offers.firstWhere((Product o) => o.id == id);
+  Future<Product> read(String id) async {
+    reads++;
+    if (nextReads.isNotEmpty) return nextReads.removeAt(0);
+    return offers.firstWhere((Product o) => o.id == id);
+  }
 
   @override
   Future<Product> create(Product product) async {
@@ -424,6 +479,8 @@ class FakeOffers extends CatalogApi {
   Future<Product> update(String id, Product product) async {
     calls.add('update $id');
     sent.add(product.toRequestJson());
+    final Object? failure = failUpdate;
+    if (failure != null) throw failure;
     final Product current = offers.firstWhere((Product o) => o.id == id);
     final Product updated = Product(
       id: id,
@@ -435,6 +492,7 @@ class FakeOffers extends CatalogApi {
       status: current.status,
       imageRefs: current.imageRefs,
       service: product.service,
+      moderation: current.moderation,
     );
     offers = <Product>[for (final Product o in offers) o.id == id ? updated : o];
     return updated;

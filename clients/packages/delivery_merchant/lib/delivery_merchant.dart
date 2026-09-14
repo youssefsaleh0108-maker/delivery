@@ -74,5 +74,4 @@ export 'src/services/service_dashboard_screen.dart';
 export 'src/services/service_offer_form_screen.dart';
 export 'src/services/service_offers_screen.dart';
 export 'src/services/service_order_detail_screen.dart';
-export 'src/services/service_order_files.dart';
 export 'src/services/service_orders_screen.dart';

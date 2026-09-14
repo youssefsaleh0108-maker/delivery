@@ -80,6 +80,7 @@ class PortalApis {
     required this.demand,
     required this.shopChat,
     required this.moderation,
+    required this.attachments,
   });
 
   final CatalogApi catalog;
@@ -142,6 +143,11 @@ class PortalApis {
 
   /// The neighbourhood chat moderation queue. BACKOFFICE-only on the server.
   final ChatModerationApi moderation;
+
+  /// A service order's files. The customer uploads them; the order's shop and back office read them,
+  /// and every back-office read is recorded by the server — which is why the ledger lists them only
+  /// when the operator asks.
+  final OrderAttachmentApi attachments;
 }
 
 /// How a page in the rail is built.
@@ -443,7 +449,7 @@ class PortalArea {
         selectedIcon: Icons.receipt_long,
         label: (DeliveryStrings t) => t.navOrders,
         build: (PortalApis a, _, __, ___) =>
-            ServiceOrdersScreen(api: a.order, shopChat: a.shopChat),
+            ServiceOrdersScreen(api: a.order, shopChat: a.shopChat, files: a.attachments),
       ),
       for (int i = 3; i < merchant_.destinations.length; i++)
         if (!_goodsOnlyPages.contains(i)) merchant_.destinations[i],

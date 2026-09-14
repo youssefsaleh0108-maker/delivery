@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import '../order_detail_screen.dart';
 import '../visible_poller.dart';
 import 'service_order_detail_screen.dart';
-import 'service_order_files.dart';
 import 'service_order_steps.dart';
 import 'service_words.dart';
 
@@ -26,7 +25,13 @@ import 'service_words.dart';
 /// it is still the shop's to hand over. Service orders only: a merchant who also runs a goods shop
 /// sees those in the goods queue.
 ///
-/// No bottom bar and no back button here: the shell that mounts it owns navigation, and this is a tab.
+/// New and In progress are read by status, every page of them; Completed is read on its own, newest
+/// first, a page at a time. Not one newest page split three ways, which is what this screen first did:
+/// a job runs for up to a month and a pickup can wait days at the counter, so on a busy shop the orders
+/// still in hand were exactly the ones that fell off that page — and their buttons with them.
+///
+/// No bottom bar here: the shell that mounts it owns navigation. [onBack] draws a back button, for a
+/// host that pushes the queue as a page rather than showing it as a tab.
 class ServiceOrdersScreen extends StatefulWidget {
   const ServiceOrdersScreen({
     super.key,
@@ -36,6 +41,7 @@ class ServiceOrdersScreen extends StatefulWidget {
     this.files,
     this.openLink,
     this.clock,
+    this.onBack,
   });
 
   final OrderApi api;
@@ -47,9 +53,9 @@ class ServiceOrdersScreen extends StatefulWidget {
   /// Handed on to the conversations, so a customer's reply arrives live. Null loses only liveness.
   final UserQueueSocket? chatSocket;
 
-  /// The customers' files, for the order detail. Null draws no files section — see
-  /// [ServiceOrderFiles].
-  final ServiceOrderFiles? files;
+  /// The customers' files, for the order detail: Order Manager's attachment read, which an order's
+  /// shop may make. Null draws no files section.
+  final OrderAttachmentApi? files;
 
   /// Opens a file's link; null opens it with the platform. A test's seam.
   final Future<bool> Function(Uri link)? openLink;
@@ -57,30 +63,33 @@ class ServiceOrdersScreen extends StatefulWidget {
   /// The clock the pickup countdowns read. Null is the device's own.
   final DateTime Function()? clock;
 
+  /// Draws a back button that calls this. Null draws none, which is what a tab wants.
+  final VoidCallback? onBack;
+
   @override
   State<ServiceOrdersScreen> createState() => _ServiceOrdersScreenState();
 }
 
-/// The frame's three tabs.
+/// The frame's three tabs, cut along the order status machine.
 ///
-/// Counted from one list rather than fetched per tab, so a tab's count and the cards under it can
-/// never disagree. Nothing falls between them: an order a rider has picked up is still in progress to
-/// the shop that made it until it is delivered.
+/// New is an order nobody has answered yet (PLACED). Completed is an order no transition leaves
+/// ([OrderStatus.isTerminal]: collected, delivered, declined or cancelled). In progress is everything
+/// between — accepted, in production, ready, and out with a rider — so nothing falls between the tabs,
+/// and an order a rider has picked up is still in progress to the shop that made it until it is
+/// delivered.
 enum _Tab {
-  fresh(<OrderStatus>[OrderStatus.placed]),
-  inProgress(<OrderStatus>[
-    OrderStatus.accepted,
-    OrderStatus.preparing,
-    OrderStatus.ready,
-    OrderStatus.pickedUp,
-  ]),
-  completed(<OrderStatus>[OrderStatus.delivered, OrderStatus.cancelled]);
+  fresh,
+  inProgress,
+  completed;
 
-  const _Tab(this.statuses);
+  static _Tab of(OrderStatus status) {
+    if (status == OrderStatus.placed) return _Tab.fresh;
+    return status.isTerminal ? _Tab.completed : _Tab.inProgress;
+  }
 
-  final List<OrderStatus> statuses;
-
-  bool holds(DeliveryOrder order) => statuses.contains(order.status);
+  /// Checked on every order drawn, not only asked of the server: an Order Manager from before the
+  /// status filter answers every state, and then this is what keeps each order in its own tab.
+  bool holds(DeliveryOrder order) => of(order.status) == this;
 
   String labelIn(DeliveryStrings t) => switch (this) {
         _Tab.fresh => t.svcTabNew,
@@ -95,10 +104,32 @@ enum _Tab {
       };
 }
 
+/// The states New and In progress hold, asked for in one read — so the two tabs' counts come from one
+/// answer and cannot disagree with each other.
+final List<OrderStatus> _liveStatuses = <OrderStatus>[
+  for (final OrderStatus status in OrderStatus.values)
+    if (_Tab.of(status) != _Tab.completed) status,
+];
+
+final List<OrderStatus> _finishedStatuses = <OrderStatus>[
+  for (final OrderStatus status in OrderStatus.values)
+    if (_Tab.of(status) == _Tab.completed) status,
+];
+
 class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
   /// As often as the goods queue: a new order is a customer waiting to hear whether the shop will do
   /// the job.
   static const Duration _pollEvery = Duration(seconds: 5);
+
+  /// A page of the live queue. Most shops' whole queue fits in one.
+  static const int _livePageSize = 50;
+
+  /// The most pages of live orders one read takes. Only a stop for a read that would not end: a
+  /// thousand jobs in hand at once is not a shop this screen was drawn for.
+  static const int _maxLivePages = 20;
+
+  /// A page of finished orders: the first read, and what each Load more adds.
+  static const int _completedPageSize = 20;
 
   late final VisiblePoller _poller =
       VisiblePoller(every: _pollEvery, onTick: () => _refresh(silent: true));
@@ -106,10 +137,37 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
   /// Moves the pickup countdowns on between polls that bring no change.
   Timer? _minute;
 
-  List<DeliveryOrder> _orders = const <DeliveryOrder>[];
+  /// Every service order in a live state: New's and In progress's.
+  List<DeliveryOrder> _live = const <DeliveryOrder>[];
   Object? _error;
   bool _loading = true;
-  String? _busyOrderId;
+
+  /// Completed's orders, newest first, as many pages as have been read. Null until the tab is first
+  /// opened: a shop that never looks back does not pay for reading its history on every visit.
+  List<DeliveryOrder>? _completed;
+  int _completedPages = 0;
+  bool _completedHasMore = false;
+  bool _completedLoading = false;
+  Object? _completedError;
+  bool _completedMoreFailed = false;
+
+  /// The orders with a step on its way. Their buttons spin and take no second tap until the order has
+  /// been read back — not merely until the step answered, which would leave a moment where the card
+  /// still offers the step it has just taken.
+  final Set<String> _busy = <String>{};
+
+  /// Moves on each time a step is sent and each time one answers. A read begun before the latest move
+  /// may show an order as it stood before the step, so it is not drawn: without this, a poll that left
+  /// before an Accept and landed after it put the Accept button back on an accepted order.
+  int _generation = 0;
+
+  /// Numbers the live reads, so one that lands after a newer read has been drawn is dropped.
+  int _liveRead = 0;
+  int _liveDrawn = 0;
+
+  /// Numbers Completed's reads, so an older one never lands on top of a newer one.
+  int _completedRead = 0;
+
   _Tab _tab = _Tab.fresh;
 
   DateTime _now() => (widget.clock ?? DateTime.now)();
@@ -131,39 +189,143 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
     super.dispose();
   }
 
+  /// Reads the live queue again — and Completed with it, once that tab has been opened, when the shop
+  /// asked ([silent] false) or an order just left the live queue, finished and so Completed's now.
   Future<void> _refresh({bool silent = false}) async {
+    final bool finished = await _readLive(silent: silent);
+    if (!mounted || _completed == null) return;
+    if (finished || !silent) await _readCompleted();
+  }
+
+  /// Reads every live order, and answers whether an order the screen held has left the live states.
+  Future<bool> _readLive({bool silent = false}) async {
+    final int generation = _generation;
+    final int read = ++_liveRead;
     if (!silent) setState(() => _loading = true);
     try {
-      final Paged<DeliveryOrder> page =
-          await widget.api.forMerchant(kind: OrderKind.service, size: 50);
-      if (!mounted) return;
+      final List<DeliveryOrder> live = await _allLive();
+      if (!mounted || generation != _generation || read < _liveDrawn) {
+        // Begun before a step moved an order, or overtaken by a newer read: the read that step began,
+        // or that newer read, says what is true now.
+        return false;
+      }
+      _liveDrawn = read;
+      final Set<String> still = <String>{for (final DeliveryOrder order in live) order.id};
+      final bool finished = _live.any((DeliveryOrder order) => !still.contains(order.id));
       setState(() {
-        _orders = page.content;
+        _live = live;
         _error = null;
         _loading = false;
       });
+      return finished;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       // A failed background poll must not wipe the queue the shop is looking at.
       setState(() {
-        if (!silent) _error = e;
+        if (!silent && generation == _generation) _error = e;
         _loading = false;
+      });
+      return false;
+    }
+  }
+
+  /// The live orders, newest first, page after page to the last.
+  ///
+  /// An Order Manager from before the status filter answers every state, and its later pages would be
+  /// the shop's whole history. A page holding a finished order says that is what answered, and the
+  /// read stops there: the newest page, split by [_Tab.holds], which is what this screen always drew.
+  Future<List<DeliveryOrder>> _allLive() async {
+    final List<DeliveryOrder> found = <DeliveryOrder>[];
+    final Set<String> seen = <String>{};
+    for (int page = 0; page < _maxLivePages; page++) {
+      final Paged<DeliveryOrder> answer = await widget.api.forMerchant(
+        kind: OrderKind.service,
+        statuses: _liveStatuses,
+        page: page,
+        size: _livePageSize,
+      );
+      // An order placed while the pages are read pushes the rest down a place: each is kept once.
+      for (final DeliveryOrder order in answer.content) {
+        if (seen.add(order.id)) found.add(order);
+      }
+      final bool unfiltered = answer.content.any((DeliveryOrder order) => order.status.isTerminal);
+      if (unfiltered || answer.content.isEmpty || page + 1 >= answer.totalPages) break;
+    }
+    return found;
+  }
+
+  /// Completed's newest page, put in front of what was read before — or, with [more], the page after
+  /// the last one read.
+  ///
+  /// In front of, rather than instead of: a finished order never changes again, so nothing read before
+  /// is wrong, and a shop that has loaded three pages keeps them when one more order finishes.
+  Future<void> _readCompleted({bool more = false}) async {
+    final int read = ++_completedRead;
+    final int page = more ? _completedPages : 0;
+    setState(() {
+      _completedLoading = true;
+      _completedMoreFailed = false;
+    });
+    try {
+      final Paged<DeliveryOrder> answer = await widget.api.forMerchant(
+        kind: OrderKind.service,
+        statuses: _finishedStatuses,
+        page: page,
+        size: _completedPageSize,
+      );
+      if (!mounted || read != _completedRead) return;
+      final List<DeliveryOrder> held = _completed ?? const <DeliveryOrder>[];
+      final Set<String> heldIds = <String>{for (final DeliveryOrder order in held) order.id};
+      final Set<String> answered = <String>{
+        for (final DeliveryOrder order in answer.content) order.id,
+      };
+      setState(() {
+        _completed = more
+            ? <DeliveryOrder>[
+                ...held,
+                for (final DeliveryOrder order in answer.content)
+                  if (!heldIds.contains(order.id)) order,
+              ]
+            : <DeliveryOrder>[
+                ...answer.content,
+                for (final DeliveryOrder order in held)
+                  if (!answered.contains(order.id)) order,
+              ];
+        if (more || _completedPages == 0) _completedPages = page + 1;
+        _completedHasMore = _completedPages < answer.totalPages;
+        _completedLoading = false;
+        _completedError = null;
+      });
+    } catch (e) {
+      if (!mounted || read != _completedRead) return;
+      setState(() {
+        _completedLoading = false;
+        if (more) {
+          _completedMoreFailed = true;
+        } else if (_completed == null) {
+          _completedError = e;
+        }
       });
     }
   }
 
   Future<void> _step(DeliveryOrder order, SvcStep step) async {
+    // A second tap while the step is out, or while its order is read back, does nothing.
+    if (_busy.contains(order.id)) return;
     final SvcStepResult result = await SvcOrderSteps(widget.api).run(
       context,
       order,
       step,
       onSending: () {
-        if (mounted) setState(() => _busyOrderId = order.id);
+        _generation++;
+        if (mounted) setState(() => _busy.add(order.id));
       },
     );
-    if (!mounted) return;
-    setState(() => _busyOrderId = null);
-    if (result == SvcStepResult.reload) await _refresh(silent: true);
+    if (!mounted || result == SvcStepResult.dismissed) return;
+    // The step has answered, so what it did is on the server: every read begun before now is stale.
+    _generation++;
+    await _refresh(silent: true);
+    if (mounted) setState(() => _busy.remove(order.id));
   }
 
   void _open(DeliveryOrder order) {
@@ -182,10 +344,17 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
     ));
   }
 
+  void _select(_Tab tab) {
+    setState(() => _tab = tab);
+    if (tab == _Tab.completed && _completed == null && !_completedLoading) _readCompleted();
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final List<DeliveryOrder> visible = _orders.where(_tab.holds).toList(growable: false);
+    final List<DeliveryOrder> source =
+        _tab == _Tab.completed ? (_completed ?? const <DeliveryOrder>[]) : _live;
+    final List<DeliveryOrder> visible = source.where(_tab.holds).toList(growable: false);
 
     return ColoredBox(
       color: DeliveryColors.background,
@@ -201,6 +370,8 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
               SliverToBoxAdapter(
                 child: MerchantScreenHeader(
                   title: t.svcIncomingOrders,
+                  onBack: widget.onBack,
+                  backSemanticLabel: widget.onBack == null ? null : t.back,
                   // The frame's overflow has no defined actions; the portal needs a refresh a mouse can
                   // reach, and a dead "…" would be a control that does nothing.
                   trailing: IconButton(
@@ -212,7 +383,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
                 ),
               ),
               SliverToBoxAdapter(child: _tabs(t)),
-              _body(t, visible, constraints.maxWidth),
+              ..._body(t, visible, constraints.maxWidth),
             ],
           ),
         ),
@@ -236,17 +407,16 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
 
   Widget _tabButton(_Tab tab, DeliveryStrings t) {
     final bool selected = tab == _tab;
-    final int count = _orders.where(tab.holds).length;
     // As drawn: "New (3)", "In progress (2)", and a bare "Completed" — a count of everything ever
     // finished is not a number anybody acts on.
-    final String label =
-        tab == _Tab.completed || count == 0 ? tab.labelIn(t) : '${tab.labelIn(t)} ($count)';
+    final int count = tab == _Tab.completed ? 0 : _live.where(tab.holds).length;
+    final String label = count == 0 ? tab.labelIn(t) : '${tab.labelIn(t)} ($count)';
 
     return Semantics(
       button: true,
       selected: selected,
       child: InkWell(
-        onTap: selected ? null : () => setState(() => _tab = tab),
+        onTap: selected ? null : () => _select(tab),
         child: Container(
           constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
           padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.xs),
@@ -278,7 +448,7 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
     );
   }
 
-  Widget _body(DeliveryStrings t, List<DeliveryOrder> visible, double width) {
+  List<Widget> _body(DeliveryStrings t, List<DeliveryOrder> visible, double width) {
     final double side =
         width > merchantMaxContentWidth ? (width - merchantMaxContentWidth) / 2 : 0;
     final EdgeInsets pad = EdgeInsets.fromLTRB(
@@ -289,50 +459,47 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
     );
 
     final Widget? standIn = _standIn(t, visible);
-    if (standIn != null) {
-      return SliverPadding(padding: pad, sliver: SliverToBoxAdapter(child: standIn));
-    }
-
+    final Widget? footer =
+        _tab == _Tab.completed && _completed != null ? _completedFooter(t) : null;
     final DateTime now = _now();
-    return SliverPadding(
-      padding: pad,
-      sliver: SliverList.separated(
-        itemCount: visible.length,
-        separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md),
-        itemBuilder: (BuildContext context, int i) {
-          final DeliveryOrder order = visible[i];
-          return _ServiceOrderCard(
-            order: order,
-            now: now,
-            busy: _busyOrderId == order.id,
-            onStep: (SvcStep step) => _step(order, step),
-            onOpen: () => _open(order),
-          );
-        },
+
+    return <Widget>[
+      SliverPadding(
+        padding: footer == null ? pad : pad.copyWith(bottom: DeliverySpacing.md),
+        sliver: standIn != null
+            ? SliverToBoxAdapter(child: standIn)
+            : SliverList.separated(
+                itemCount: visible.length,
+                separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md),
+                itemBuilder: (BuildContext context, int i) {
+                  final DeliveryOrder order = visible[i];
+                  return _ServiceOrderCard(
+                    order: order,
+                    now: now,
+                    busy: _busy.contains(order.id),
+                    onStep: (SvcStep step) => _step(order, step),
+                    onOpen: () => _open(order),
+                  );
+                },
+              ),
       ),
-    );
+      if (footer != null)
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(pad.left, 0, pad.right, DeliverySpacing.xl),
+          sliver: SliverToBoxAdapter(child: footer),
+        ),
+    ];
   }
 
   /// Loading, failed, or an empty tab — or null when there are cards to draw.
   Widget? _standIn(DeliveryStrings t, List<DeliveryOrder> visible) {
-    if (_error != null) {
-      return YdEmptyState(
-        icon: Icons.cloud_off_rounded,
-        title: t.couldNotLoadOrdersShort,
-        message: t.thatDidNotGoThrough,
-        action: YdPillButton.secondary(
-          label: t.tryAgain,
-          onPressed: () => _refresh(),
-          size: YdPillButtonSize.compact,
-          expand: false,
-        ),
-      );
-    }
-    if (_loading && _orders.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(DeliverySpacing.xl),
-        child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
-      );
+    if (_tab == _Tab.completed) {
+      if (_completed == null) {
+        return _completedError != null ? _failed(t, _readCompleted) : _spinner();
+      }
+    } else {
+      if (_error != null) return _failed(t, _refresh);
+      if (_loading && _live.isEmpty) return _spinner();
     }
     if (visible.isEmpty) {
       return YdEmptyState(
@@ -342,6 +509,58 @@ class _ServiceOrdersScreenState extends State<ServiceOrdersScreen> {
       );
     }
     return null;
+  }
+
+  Widget _spinner() => const Padding(
+        padding: EdgeInsets.all(DeliverySpacing.xl),
+        child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+      );
+
+  Widget _failed(DeliveryStrings t, Future<void> Function() retry) {
+    return YdEmptyState(
+      icon: Icons.cloud_off_rounded,
+      title: t.couldNotLoadOrdersShort,
+      message: t.thatDidNotGoThrough,
+      action: YdPillButton.secondary(
+        label: t.tryAgain,
+        onPressed: () => retry(),
+        size: YdPillButtonSize.compact,
+        expand: false,
+      ),
+    );
+  }
+
+  /// Under Completed: Load more while the server holds more, a spinner while a page is read, and a line
+  /// that says so when one could not be. Null when everything has been read.
+  Widget? _completedFooter(DeliveryStrings t) {
+    if (_completedLoading) {
+      return const Center(
+        child: SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+        ),
+      );
+    }
+    if (!_completedHasMore) return null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (_completedMoreFailed) ...<Widget>[
+          Text(
+            t.couldNotLoadMore,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: DeliveryColors.muted),
+          ),
+          const SizedBox(height: DeliverySpacing.xs),
+        ],
+        YdPillButton.secondary(
+          label: t.svcLoadMore,
+          onPressed: () => _readCompleted(more: true),
+          size: YdPillButtonSize.compact,
+          expand: false,
+        ),
+      ],
+    );
   }
 }
 
@@ -493,7 +712,11 @@ String? svcOrderNote(BuildContext context, DeliveryOrder order, DateTime now) {
           ? null
           : t.svcReadyBy(svcWhenFormatter(context, clock: () => now)(promised));
     case OrderStatus.ready:
-      if (!order.isPickup) return order.fulfilment == Fulfilment.delivery ? t.svcWaitingForRider : null;
+      if (!order.isPickup) {
+        if (order.fulfilment != Fulfilment.delivery) return null;
+        // A rider who has claimed the job is on the way to the counter; until one has, it waits for one.
+        return order.riderId != null ? t.svcRiderOnTheWay : t.svcWaitingForRider;
+      }
       final Duration? left = order.untilCancellableAsNotCollected(now);
       // The countdown only while the button is still locked: once the server offers the cancel, the
       // button says it.

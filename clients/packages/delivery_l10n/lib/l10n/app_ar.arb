@@ -3523,5 +3523,15 @@
   "svcFulfilmentPickupDetail": "يستلمه الزبون من متجرك",
   "svcFulfilmentDeliveryDetail": "يوصله السائق إلى {address}",
   "svcEstimatedReady": "الجاهزية المتوقعة",
-  "svcTurnaroundAfterAccept": "مدة التنفيذ بعد القبول: {range}"
+  "svcTurnaroundAfterAccept": "مدة التنفيذ بعد القبول: {range}",
+  "svcRiderOnTheWay": "السائق في طريقه لاستلامه",
+  "svcLoadMore": "تحميل المزيد",
+  "svcFileLinkRefreshFailed": "تعذّر الحصول على رابط جديد لهذا الملف. حاول مجددًا.",
+  "svcOfferTakenDown": "سحبتها يو دروب",
+  "svcOfferTakenDownReason": "سبب يو دروب: {reason}",
+  "svcOfferTakenDownBody": "لا يستطيع الزبائن طلبها، ولا يمكن نشرها أو إيقافها مؤقتًا أو استئنافها حتى تعيدها يو دروب. ما زال بإمكانك تعديلها.",
+  "svcOfferChangedElsewhere": "عُدّلت هذه الخدمة للتو من مكان آخر، فأعدنا قراءتها. راجعها وحاول مجددًا.",
+  "svcShopReadFailed": "تعذّر تحميل متجرك",
+  "svcServiceOrdersRow": "طلبات الخدمات",
+  "svcServiceOffersRow": "خدماتك"
 }

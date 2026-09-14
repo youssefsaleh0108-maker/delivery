@@ -19388,6 +19388,66 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Turnaround once you accept: {range}'**
   String svcTurnaroundAfterAccept(String range);
+
+  /// No description provided for @svcRiderOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider is on the way to collect it'**
+  String get svcRiderOnTheWay;
+
+  /// No description provided for @svcLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get svcLoadMore;
+
+  /// No description provided for @svcFileLinkRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get a fresh link to this file. Try again.'**
+  String get svcFileLinkRefreshFailed;
+
+  /// No description provided for @svcOfferTakenDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down by YouDrop'**
+  String get svcOfferTakenDown;
+
+  /// No description provided for @svcOfferTakenDownReason.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop\'s reason: {reason}'**
+  String svcOfferTakenDownReason(String reason);
+
+  /// No description provided for @svcOfferTakenDownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can\'t order it, and it can\'t be published, paused or resumed until YouDrop restores it. You can still edit it.'**
+  String get svcOfferTakenDownBody;
+
+  /// No description provided for @svcOfferChangedElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer was just changed somewhere else, so it has been read again. Check it and try again.'**
+  String get svcOfferChangedElsewhere;
+
+  /// No description provided for @svcShopReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load your shop'**
+  String get svcShopReadFailed;
+
+  /// No description provided for @svcServiceOrdersRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Service orders'**
+  String get svcServiceOrdersRow;
+
+  /// No description provided for @svcServiceOffersRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Service offers'**
+  String get svcServiceOffersRow;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

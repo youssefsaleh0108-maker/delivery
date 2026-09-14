@@ -230,13 +230,24 @@ class OrderApi {
   /// one account asks for [OrderKind.service], a counter for [Fulfilment.pickup] — and with neither
   /// it is the list it always was. Never [OrderKind.unknown] or [Fulfilment.unknown], which name
   /// nothing the server can filter by and are refused here, before anything is sent.
+  ///
+  /// [statuses] narrows it to orders in any of those states, sent as a repeated `status`. A queue
+  /// asks for its live states this way, because they are not the newest orders: a services shop's
+  /// job can run for weeks behind a page of orders finished since. An Order Manager from before the
+  /// filter ignores it and answers every state, so a caller that names statuses still checks the
+  /// status of what comes back.
   Future<Paged<DeliveryOrder>> forMerchant({
     int page = 0,
     int size = 20,
     OrderKind? kind,
     Fulfilment? fulfilment,
+    Iterable<OrderStatus>? statuses,
   }) =>
-      _page('/api/orders/merchant', page, size, extra: _narrowedBy(kind, fulfilment));
+      _page('/api/orders/merchant', page, size, extra: <String, dynamic>{
+        ...?_narrowedBy(kind, fulfilment),
+        if (statuses != null && statuses.isNotEmpty)
+          'status': statuses.map((OrderStatus s) => s.wire).toSet().toList(growable: false),
+      });
 
   /// How the shop is trading, day by day. MERCHANT only, and always about the caller's own shop.
   Future<MerchantSummary> merchantSummary({int days = 14}) async {

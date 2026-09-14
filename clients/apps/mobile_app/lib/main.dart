@@ -221,6 +221,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// configured simply gets an empty list and no picker.
   late final DeliveryZoneApi _zoneApi = DeliveryZoneApi(_dio);
 
+  /// A service order's files: a services shop reads its customers' designs through Order Manager's
+  /// attachment endpoints, with links that work for a few minutes.
+  late final OrderAttachmentApi _orderAttachmentApi = OrderAttachmentApi(_dio);
+
   late Future<AuthSession?> _bootstrap = _restoreAfterSplash();
 
   /// Restores the stored session, but not before the splash has had its full [SplashScreen.hold].
@@ -1026,10 +1030,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               demandApi: _demandApi,
               shopChatApi: _shopChatApi,
               chatSocket: _socket,
-              // A services shop's bell (126:51) and the delivery rule on its offers. The order
-              // attachment client for serviceOrderFiles joins here when its branch merges.
+              // A services shop's bell (126:51), the delivery rule on its offers, and its
+              // customers' files on a service order.
               notificationApi: _notificationApi,
               zoneApi: _zoneApi,
+              orderAttachmentApi: _orderAttachmentApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,

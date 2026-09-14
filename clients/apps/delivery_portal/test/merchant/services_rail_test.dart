@@ -84,6 +84,7 @@ PortalApis _apis(Dio dio) => PortalApis(
       demand: DemandApi(dio),
       shopChat: ShopChatApi(dio),
       moderation: ChatModerationApi(dio),
+      attachments: OrderAttachmentApi(dio),
     );
 
 const Map<String, dynamic> _printShop = <String, dynamic>{

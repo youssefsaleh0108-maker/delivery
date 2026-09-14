@@ -928,6 +928,33 @@ void main() {
       expect(pickups.content.single.isPickup, isTrue);
     });
 
+    test('a merchant\'s narrows to any of the statuses named, each sent once as a repeated status',
+        () async {
+      final s = _orders((RequestOptions o) => (200, _page(<Map<String, dynamic>>[_serviceOrder()])));
+
+      await s.api.forMerchant(
+        kind: OrderKind.service,
+        statuses: <OrderStatus>[OrderStatus.accepted, OrderStatus.ready, OrderStatus.accepted],
+        page: 2,
+        size: 50,
+      );
+      await s.api.forMerchant(kind: OrderKind.service, statuses: const <OrderStatus>[]);
+
+      expect(s.server.requests[0].queryParameters, <String, dynamic>{
+        'page': 2,
+        'size': 50,
+        'kind': 'SERVICE',
+        'status': <String>['ACCEPTED', 'READY'],
+      });
+      // Repeated, which is how the server's Set<OrderStatus> reads a list — not one joined value.
+      expect(s.server.requests[0].uri.query, contains('status=ACCEPTED&status=READY'));
+      expect(s.server.requests[1].queryParameters, <String, dynamic>{
+        'page': 0,
+        'size': 20,
+        'kind': 'SERVICE',
+      }, reason: 'no statuses is no filter');
+    });
+
     test('the back office narrows by status, kind and fulfilment together', () async {
       final s = _orders((RequestOptions o) => (200, _page(<Map<String, dynamic>>[])));
 

@@ -122,6 +122,7 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     demand: DemandApi(_dio),
     shopChat: ShopChatApi(_dio),
     moderation: ChatModerationApi(_dio),
+    attachments: OrderAttachmentApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

@@ -11401,4 +11401,39 @@ class DeliveryStringsEn extends DeliveryStrings {
   String svcTurnaroundAfterAccept(String range) {
     return 'Turnaround once you accept: $range';
   }
+
+  @override
+  String get svcRiderOnTheWay => 'A rider is on the way to collect it';
+
+  @override
+  String get svcLoadMore => 'Load more';
+
+  @override
+  String get svcFileLinkRefreshFailed =>
+      'Couldn\'t get a fresh link to this file. Try again.';
+
+  @override
+  String get svcOfferTakenDown => 'Taken down by YouDrop';
+
+  @override
+  String svcOfferTakenDownReason(String reason) {
+    return 'YouDrop\'s reason: $reason';
+  }
+
+  @override
+  String get svcOfferTakenDownBody =>
+      'Customers can\'t order it, and it can\'t be published, paused or resumed until YouDrop restores it. You can still edit it.';
+
+  @override
+  String get svcOfferChangedElsewhere =>
+      'This offer was just changed somewhere else, so it has been read again. Check it and try again.';
+
+  @override
+  String get svcShopReadFailed => 'We couldn\'t load your shop';
+
+  @override
+  String get svcServiceOrdersRow => 'Service orders';
+
+  @override
+  String get svcServiceOffersRow => 'Service offers';
 }
