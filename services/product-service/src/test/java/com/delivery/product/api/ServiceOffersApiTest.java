@@ -504,4 +504,93 @@ class ServiceOffersApiTest {
         }
 
     }
+
+    /**
+     * An offer back office took down (V36), as its provider and a customer read and act on it. The hold is
+     * applied to the real offer, so the provider's refusals come from the catalogue's own rule.
+     */
+    @Nested
+    @DisplayName("an offer back office took down")
+    class TakenDown {
+
+        private static final String REASON = "Prints copies of official exam papers.";
+
+        @BeforeEach
+        void takenDown() {
+            offer.takeDown(REASON, Instant.parse("2026-09-14T09:30:00Z"));
+        }
+
+        private String offerPath() {
+            return "/api/products/" + offer.getId();
+        }
+
+        /** What the provider's offer screen shows: that YouDrop took it down, when, and why. */
+        @Test
+        void its_provider_reads_the_hold_and_the_reason_on_the_offer() throws Exception {
+            signedInAs(PROVIDER, "MERCHANT");
+
+            mvc.perform(get(offerPath()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("ARCHIVED"))
+                    .andExpect(jsonPath("$.moderation.state").value("TAKEN_DOWN"))
+                    .andExpect(jsonPath("$.moderation.reason").value(REASON))
+                    .andExpect(jsonPath("$.moderation.takenDownAt").exists())
+                    .andExpect(jsonPath("$.service.unitLabel").value("cards"));
+        }
+
+        @Test
+        void its_provider_reads_the_hold_in_their_offer_list() throws Exception {
+            signedInAs(PROVIDER, "MERCHANT");
+            when(products.findByMerchantId(eq(PROVIDER), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(offer)));
+
+            mvc.perform(get("/api/products/mine"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].status").value("ARCHIVED"))
+                    .andExpect(jsonPath("$.content[0].moderation.state").value("TAKEN_DOWN"))
+                    .andExpect(jsonPath("$.content[0].moderation.reason").value(REASON));
+        }
+
+        /** Order Manager reads and prices a line with the customer's token, so these 404s refuse the order too. */
+        @Test
+        void a_customer_is_told_it_does_not_exist_to_read_to_choose_for_and_to_price() throws Exception {
+            signedInAs("keycloak-sub-customer", "CUSTOMER");
+
+            mvc.perform(get(offerPath())).andExpect(status().isNotFound());
+            mvc.perform(get(offerPath() + "/options")).andExpect(status().isNotFound());
+            mvc.perform(post(offerPath() + "/price")).andExpect(status().isNotFound());
+
+            verify(optionService, never()).forProduct(any(UUID.class));
+            verify(optionService, never()).price(any(Product.class), anyList());
+        }
+
+        @Test
+        void its_provider_cannot_publish_resume_or_pause_it_and_is_told_why() throws Exception {
+            signedInAs(PROVIDER, "MERCHANT");
+
+            for (String act : List.of("/publish", "/resume", "/pause")) {
+                mvc.perform(post(offerPath() + act))
+                        .andExpect(status().isUnprocessableEntity())
+                        .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString(REASON)));
+            }
+
+            assertThat(offer.getStatus()).isEqualTo(Product.Status.ARCHIVED);
+            assertThat(offer.isTakenDown()).isTrue();
+        }
+
+        /** Restored, it carries no hold, and its provider's resume is refused by nothing but the usual rules. */
+        @Test
+        void once_restored_it_carries_no_hold_and_its_provider_resumes_it() throws Exception {
+            offer.restore();
+            signedInAs(PROVIDER, "MERCHANT");
+
+            mvc.perform(get(offerPath()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("PAUSED"))
+                    .andExpect(jsonPath("$.moderation").value(org.hamcrest.Matchers.nullValue()));
+            mvc.perform(post(offerPath() + "/resume"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("ACTIVE"));
+        }
+    }
 }
