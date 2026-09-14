@@ -525,6 +525,23 @@ class StoreApi {
     return Store.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Back office grants ([verified] true) or withdraws the Verified Local badge.
+  ///
+  /// BACKOFFICE only on the server — the shop's own merchant is refused too, because a badge a shop
+  /// could award itself would certify nothing to its neighbours. Any store in any status, a goods shop
+  /// or a service shop alike (for a service provider it is the "verified" mark on their page).
+  ///
+  /// Answers the store as the server now holds it, so a screen shows the badge the server stored
+  /// rather than the one it asked for. A refusal (403, or 404 for an unknown id) is thrown as the
+  /// `DioException` it arrives as.
+  Future<Store> setVerifiedLocal(String storeId, {required bool verified}) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/stores/$storeId/verified-local',
+      data: <String, dynamic>{'verified': verified},
+    );
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// Uploads a store's logo or cover.
   ///
   /// Three steps, mirroring [CatalogApi.uploadImage]: ask for a one-shot URL, PUT the bytes
