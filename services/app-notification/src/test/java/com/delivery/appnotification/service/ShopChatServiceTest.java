@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.appnotification.client.OrderReferences;
 import com.delivery.appnotification.client.OrderReferences.OrderReference;
@@ -67,6 +69,7 @@ class ShopChatServiceTest {
     private ShopOwnership ownership;
     private ShopDelivery delivery;
     private ShopChatProperties properties;
+    private TransactionsWithoutADatabase transactions;
     private MovableClock clock;
     private ShopChatService service;
 
@@ -81,9 +84,10 @@ class ShopChatServiceTest {
         ownership = mock(ShopOwnership.class);
         delivery = mock(ShopDelivery.class);
         properties = new ShopChatProperties();
+        transactions = new TransactionsWithoutADatabase();
         clock = new MovableClock(NOW);
         service = new ShopChatService(threads, messages, directory, orders, ownership, delivery, properties,
-                new ChatProperties(), clock);
+                new ChatProperties(), transactions, clock);
 
         thread = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Mini Market",
                 NOW.plus(Duration.ofDays(3)));
@@ -105,7 +109,7 @@ class ShopChatServiceTest {
         void opens_for_a_visible_shop() {
             when(directory.storefront(STORE))
                     .thenReturn(Optional.of(new ProductDirectory.Storefront(STORE, "Abu Hassan Mini Market")));
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
 
             ShopChatService.ThreadState state = service.openForCustomer(STORE, CUSTOMER, "Tania K.", null);
 
@@ -123,7 +127,7 @@ class ShopChatServiceTest {
         void opening_again_is_the_same_thread() {
             when(directory.storefront(STORE))
                     .thenReturn(Optional.of(new ProductDirectory.Storefront(STORE, "Abu Hassan Mini Market")));
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
 
             service.openForCustomer(STORE, CUSTOMER, "Tania K.", null);
             ShopChatService.ThreadState again = service.openForCustomer(STORE, CUSTOMER, "Tania K.", null);
@@ -153,7 +157,7 @@ class ShopChatServiceTest {
         void aVisibleShopAndItsThread() {
             when(directory.storefront(STORE))
                     .thenReturn(Optional.of(new ProductDirectory.Storefront(STORE, "Abu Hassan Print")));
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
         }
 
         @Test
@@ -258,7 +262,7 @@ class ShopChatServiceTest {
 
         @BeforeEach
         void theThreadTheOrderLeadsTo() {
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(thread));
         }
 
         @Test
@@ -313,7 +317,7 @@ class ShopChatServiceTest {
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(ended(orderId, "DELIVERED", delivered)));
             ChatShopThread quiet = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print",
                     NOW.minus(Duration.ofDays(1)));
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
 
             ShopChatService.ThreadState state = service.openForOrder(orderId, MERCHANT);
 
@@ -380,7 +384,7 @@ class ShopChatServiceTest {
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(openOrder(orderId, STORE, CUSTOMER)));
             ChatShopThread quiet = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print",
                     NOW.minus(Duration.ofDays(1)));
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
             properties.setIdleCloseAfter(Duration.ofDays(2));
 
             service.openForOrder(orderId, MERCHANT);
@@ -390,7 +394,7 @@ class ShopChatServiceTest {
 
             ChatShopThread busy = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print",
                     NOW.plus(Duration.ofDays(14)));
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(busy));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(busy));
             Instant customersOwn = busy.getClosesAt();
 
             service.openForOrder(orderId, MERCHANT);
@@ -489,7 +493,7 @@ class ShopChatServiceTest {
         private void opensUntil(OrderReference order, Instant moment, Instant until) {
             clock.set(moment);
             ChatShopThread quiet = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print", placed);
-            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
             when(orders.visibleToCaller(order.id())).thenReturn(Optional.of(order));
 
             service.openForOrder(order.id(), MERCHANT);
@@ -518,6 +522,101 @@ class ShopChatServiceTest {
         private OrderReference goodsOrder(String status, Instant deliveredAt) {
             return new OrderReference(UUID.randomUUID(), STORE, "Abu Hassan Print", CUSTOMER, "CATALOG", status,
                     placed, null, deliveredAt, null, "Tania K.");
+        }
+    }
+
+    /**
+     * Each open reads other services, then changes the thread. A transaction around those reads would
+     * hold a pooled connection for as long as the slowest took to answer, and a change made without the
+     * row lock would fail on the version another open, or a post, had just written.
+     */
+    @Nested
+    @DisplayName("what an open holds while it works")
+    class WhatAnOpenHolds {
+
+        private final List<String> calls = new ArrayList<>();
+
+        @BeforeEach
+        void recordWhereTheThreadIsTouched() {
+            when(threads.insertIfAbsent(any(), any(), any(), any(), any(), any())).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("the upsert"));
+                return 0;
+            });
+            when(threads.lockByStoreIdAndCustomerId(STORE, CUSTOMER)).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("the row lock"));
+                return Optional.of(thread);
+            });
+        }
+
+        @Test
+        @DisplayName("a customer's open asks Product Service and Order Manager outside a transaction, then locks the thread in one")
+        void a_customer_open() {
+            UUID orderId = UUID.randomUUID();
+            when(directory.storefront(STORE)).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("Product Service"));
+                return Optional.of(new ProductDirectory.Storefront(STORE, "Abu Hassan Print"));
+            });
+            when(orders.visibleToCaller(orderId)).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("Order Manager"));
+                return Optional.of(openOrder(orderId, STORE, CUSTOMER));
+            });
+
+            service.openForCustomer(STORE, CUSTOMER, "Tania K.", orderId);
+
+            assertThat(calls).containsExactly(
+                    "Product Service outside a transaction",
+                    "Order Manager outside a transaction",
+                    "the upsert inside a transaction",
+                    "the row lock inside a transaction");
+            assertThat(transactions.begun()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("a merchant's open asks Order Manager and who owns the shop outside a transaction, then locks the thread in one")
+        void a_merchant_open() {
+            UUID orderId = UUID.randomUUID();
+            when(orders.visibleToCaller(orderId)).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("Order Manager"));
+                return Optional.of(openOrder(orderId, STORE, CUSTOMER));
+            });
+            when(ownership.owns(MERCHANT, STORE)).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("the ownership check"));
+                return true;
+            });
+
+            service.openForOrder(orderId, MERCHANT);
+
+            assertThat(calls).containsExactly(
+                    "Order Manager outside a transaction",
+                    "the ownership check outside a transaction",
+                    "the upsert inside a transaction",
+                    "the row lock inside a transaction");
+            assertThat(transactions.begun()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("an open its checks refuse begins no transaction at all")
+        void a_refused_open_begins_nothing() {
+            UUID orderId = UUID.randomUUID();
+            when(orders.visibleToCaller(orderId))
+                    .thenReturn(Optional.of(ended(orderId, "DELIVERED", NOW.minus(Duration.ofDays(8)))));
+
+            assertThatThrownBy(() -> service.openForOrder(orderId, MERCHANT))
+                    .isInstanceOf(OrderChatClosedException.class);
+            assertThat(transactions.begun()).isZero();
+            assertThat(calls).isEmpty();
+        }
+
+        /** The recording above cannot see an annotation, and its proxy would begin the transaction first. */
+        @Test
+        @DisplayName("neither open is declared transactional, so no transaction can wrap its reads")
+        void the_opens_are_not_declared_transactional() throws NoSuchMethodException {
+            assertThat(ShopChatService.class.getAnnotation(Transactional.class)).isNull();
+            assertThat(ShopChatService.class
+                    .getMethod("openForCustomer", UUID.class, String.class, String.class, UUID.class)
+                    .getAnnotation(Transactional.class)).isNull();
+            assertThat(ShopChatService.class.getMethod("openForOrder", UUID.class, String.class)
+                    .getAnnotation(Transactional.class)).isNull();
         }
     }
 

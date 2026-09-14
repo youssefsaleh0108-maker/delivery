@@ -14,9 +14,11 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.delivery.appnotification.client.OrderReferences;
 import com.delivery.appnotification.client.OrderReferences.OrderReference;
@@ -47,6 +49,15 @@ import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedExcept
  * they could not open in their own app, and the shop's side is still never told the customer's user
  * id.
  *
+ * <p><strong>Opening asks first, then writes briefly.</strong> Both opens ask Product Service and,
+ * from an order, Order Manager before any transaction begins, and check what they were told; only
+ * then do they take a connection, for the upsert, the thread's row lock and the change. Each of those
+ * reads can wait seconds for an answer or a timeout, and a transaction around them would hold one of
+ * the pool's few connections all that while, so a slow Order Manager could stall every conversation,
+ * not only the opens waiting on it. That is why the opens are not {@code @Transactional}: a
+ * {@link TransactionTemplate} marks the short part, since a {@code @Transactional} helper called from
+ * inside this class would never pass through the proxy that begins its transaction.
+ *
  * <p>Posting follows order chat's pattern: text refused before any lock, a gapless sequence under the
  * thread's row lock, idempotent retries, delivery after commit. See {@link ChatShopThread} for the
  * closing policy.
@@ -62,6 +73,7 @@ public class ShopChatService {
     private final ShopDelivery delivery;
     private final ShopChatProperties properties;
     private final ChatProperties chatProperties;
+    private final TransactionTemplate writes;
     private final Clock clock;
 
     @Autowired
@@ -72,9 +84,10 @@ public class ShopChatService {
                            ShopOwnership ownership,
                            ShopDelivery delivery,
                            ShopChatProperties properties,
-                           ChatProperties chatProperties) {
+                           ChatProperties chatProperties,
+                           PlatformTransactionManager transactionManager) {
         this(threads, messages, directory, orders, ownership, delivery, properties, chatProperties,
-                Clock.systemUTC());
+                transactionManager, Clock.systemUTC());
     }
 
     /** For tests, which stand "now" exactly on the edge of an order's window. */
@@ -86,6 +99,7 @@ public class ShopChatService {
                     ShopDelivery delivery,
                     ShopChatProperties properties,
                     ChatProperties chatProperties,
+                    PlatformTransactionManager transactionManager,
                     Clock clock) {
         this.threads = threads;
         this.messages = messages;
@@ -95,6 +109,7 @@ public class ShopChatService {
         this.delivery = delivery;
         this.properties = properties;
         this.chatProperties = chatProperties;
+        this.writes = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
@@ -113,9 +128,10 @@ public class ShopChatService {
      * the open is refused, rather than done without the order it was opened from. An open without an
      * order never asks Order Manager and works exactly as before; it also leaves an earlier label be.
      *
+     * <p>Both services are asked before the transaction begins; see the class comment.
+     *
      * @param orderId the order the customer opened the chat from, or null from the shop page
      */
-    @Transactional
     public ThreadState openForCustomer(UUID storeId, String customerId, String customerName, UUID orderId) {
         ProductDirectory.Storefront store = directory.storefront(storeId)
                 .orElseThrow(() -> new RoomNotFoundException(storeId));
@@ -126,16 +142,15 @@ public class ShopChatService {
         String storeName = store.name() == null ? "" : store.name();
         Instant closes = clock.instant().plus(properties.getIdleCloseAfter());
 
-        threads.insertIfAbsent(UUID.randomUUID(), storeId, customerId, customerName, storeName, closes);
-        ChatShopThread thread = threads.findByStoreIdAndCustomerId(storeId, customerId)
-                .orElseThrow(() -> new IllegalStateException("A shop thread vanished right after it was opened"));
-        thread.keepOpenUntil(closes);
-        thread.refresh(storeName, customerName);
-        if (order != null) {
-            thread.attachOrder(order.id(), order.kind());
-        }
-
-        return state(thread, ShopThreadSide.CUSTOMER);
+        return writes.execute(status -> {
+            ChatShopThread thread = lockedAfterUpsert(storeId, customerId, customerName, storeName, closes);
+            thread.keepOpenUntil(closes);
+            thread.refresh(storeName, customerName);
+            if (order != null) {
+                thread.attachOrder(order.id(), order.kind());
+            }
+            return state(thread, ShopThreadSide.CUSTOMER);
+        });
     }
 
     /**
@@ -159,25 +174,24 @@ public class ShopChatService {
      * never move it, and it never shortens a thread the customer is keeping open. What is said
      * afterwards is rate limited as ever.
      *
-     * <p>A thread the merchant creates names the customer as the order's card does; one that already
-     * exists keeps the name its customer's own sign-in gave it.
+     * <p>Order Manager and Product Service are asked, and the window checked, before the transaction
+     * begins; see the class comment. A thread the merchant creates names the customer as the order's
+     * card does; one that already exists keeps the name its customer's own sign-in gave it.
      */
-    @Transactional
     public ThreadState openForOrder(UUID orderId, String merchantId) {
         OrderReference order = orders.visibleToCaller(orderId)
                 .filter(found -> found.storeId() != null && ownership.owns(merchantId, found.storeId()))
                 .orElseThrow(() -> new RoomNotFoundException(orderId));
         Instant until = shopMaySpeakUntil(order, clock.instant());
-
         String storeName = order.storeName() == null ? "" : order.storeName();
-        threads.insertIfAbsent(UUID.randomUUID(), order.storeId(), order.customerId(),
-                order.customerDisplayName(), storeName, until);
-        ChatShopThread thread = threads.findByStoreIdAndCustomerId(order.storeId(), order.customerId())
-                .orElseThrow(() -> new IllegalStateException("A shop thread vanished right after it was opened"));
-        thread.keepOpenUntil(until);
-        thread.attachOrder(order.id(), order.kind());
 
-        return state(thread, ShopThreadSide.SHOP);
+        return writes.execute(status -> {
+            ChatShopThread thread = lockedAfterUpsert(order.storeId(), order.customerId(),
+                    order.customerDisplayName(), storeName, until);
+            thread.keepOpenUntil(until);
+            thread.attachOrder(order.id(), order.kind());
+            return state(thread, ShopThreadSide.SHOP);
+        });
     }
 
     /** The calling merchant's inbox: threads with messages, for the shops they own, newest first. */
@@ -279,6 +293,23 @@ public class ShopChatService {
     }
 
     // ---------------------------------------------------------------------------------- internals
+
+    /**
+     * The thread between this shop and customer, created if it is not there, under its row lock. Only
+     * inside {@code writes}.
+     *
+     * <p>The upsert makes a double tap safe to create; the lock makes an open safe to change. Without
+     * it, two opens of one thread, or an open racing a post (which claims its sequence number under the
+     * same lock), would load the same version, and the second to commit would fail its version check
+     * as a 500. With it the second waits for the first and reads what it wrote. Nothing loads the
+     * thread before the lock, so the lock hands back the row it locked rather than an older copy.
+     */
+    private ChatShopThread lockedAfterUpsert(UUID storeId, String customerId, String customerName,
+                                            String storeName, Instant closesAt) {
+        threads.insertIfAbsent(UUID.randomUUID(), storeId, customerId, customerName, storeName, closesAt);
+        return threads.lockByStoreIdAndCustomerId(storeId, customerId)
+                .orElseThrow(() -> new IllegalStateException("A shop thread vanished right after it was opened"));
+    }
 
     /**
      * The customer first: a merchant who opened a thread with somebody else's shop is that thread's

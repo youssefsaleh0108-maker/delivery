@@ -35,7 +35,20 @@ public interface ChatShopThreadRepository extends JpaRepository<ChatShopThread, 
                        @Param("storeName") String storeName,
                        @Param("closesAt") Instant closesAt);
 
-    Optional<ChatShopThread> findByStoreIdAndCustomerId(UUID storeId, String customerId);
+    /**
+     * The thread between a shop and a customer, under its row lock: what an open changes once the
+     * upsert has made sure the row exists.
+     *
+     * <p>The lock {@link #lockById} takes for a post, reached by the other key. Without it, two opens
+     * of one thread, or an open racing a post, would load the same version, and the second to commit
+     * would fail its version check — a 500 for its caller. Under the lock the second waits for the
+     * first and reads what it wrote. Take it before anything else loads the thread in the same
+     * transaction, for the reason given at {@link #partiesOf}.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from ChatShopThread t where t.storeId = :storeId and t.customerId = :customerId")
+    Optional<ChatShopThread> lockByStoreIdAndCustomerId(@Param("storeId") UUID storeId,
+                                                        @Param("customerId") String customerId);
 
     /**
      * The two facts access is decided on, without loading the entity.
