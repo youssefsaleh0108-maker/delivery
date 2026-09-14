@@ -29,6 +29,12 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
      * waits for the first to commit, re-reads them as already cleared, and records nothing. Only the
      * write path may call this — Postgres refuses {@code FOR UPDATE} in a read-only transaction, which
      * is why the views read {@link #heldBy} instead.
+     *
+     * <p><strong>Every kind of cash the subject holds.</strong> One Keycloak subject can be a shop
+     * and a rider at once — a shop that also delivers — and its till and its bag are owed on
+     * different terms, so a remittance that was not told which of the two is paying refuses rather
+     * than clear both as one. {@link #outstandingFor(String, CashFloatEntry.HolderKind)} is the one
+     * that has been told.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -40,6 +46,23 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
             """)
     List<CashFloatEntry> outstandingFor(@Param("holder") String holder);
 
+    /**
+     * {@link #outstandingFor(String)} for one kind of holder, LOCKED: what a remittance clears once
+     * it knows who is paying — a shop's till without the bag the same account carries as a rider,
+     * or the reverse.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderRef = :holder
+              AND f.holderKind = :holderKind
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> outstandingFor(@Param("holder") String holder,
+                                        @Param("holderKind") CashFloatEntry.HolderKind holderKind);
+
     /** The same rows as {@link #outstandingFor}, unlocked, for pages that only read them. */
     @Query("""
             SELECT f FROM CashFloatEntry f
@@ -50,23 +73,66 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
             """)
     List<CashFloatEntry> heldBy(@Param("holder") String holder);
 
+    /** {@link #outstandingFor(String, CashFloatEntry.HolderKind)}, unlocked: a shop's statement. */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderRef = :holder
+              AND f.holderKind = :holderKind
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> heldBy(@Param("holder") String holder,
+                                @Param("holderKind") CashFloatEntry.HolderKind holderKind);
+
     /**
-     * What one person still owes.
+     * Everything one kind of holder still holds, whoever holds it, oldest first: every shop's till
+     * at once, so the Back Office's list can say what each shop owes out of it in one read.
+     */
+    @Query("""
+            SELECT f FROM CashFloatEntry f
+            WHERE f.holderKind = :holderKind
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+              AND f.clearedBy IS NULL
+            ORDER BY f.createdAt ASC
+            """)
+    List<CashFloatEntry> heldByKind(@Param("holderKind") CashFloatEntry.HolderKind holderKind);
+
+    /**
+     * What one holder still owes, as one kind of holder.
      *
      * <p>COALESCE, because a holder with nothing outstanding must read as zero rather than null —
      * "no rows" and "owes nothing" are the same answer here, and a null would propagate into every
      * report that adds these up.
+     *
+     * <p><strong>The kind is not optional.</strong> A shop that also delivers is one Keycloak subject
+     * with a till and a rider's bag, and each is owed on its own terms: a rider's cash-out nets their
+     * bag and never the shop's till, and a shop's statement counts its till and never the bag.
      */
     @Query("""
             SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
             WHERE f.holderRef = :holder
+              AND f.holderKind = :holderKind
               AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
               AND f.clearedBy IS NULL
             """)
-    BigDecimal outstandingTotalFor(@Param("holder") String holder);
+    BigDecimal outstandingTotalFor(@Param("holder") String holder,
+                                   @Param("holderKind") CashFloatEntry.HolderKind holderKind);
 
     /**
-     * What one holder collected, or banked, inside a window.
+     * What the collections one remittance or transfer cleared came to. With the rows it wrote, this
+     * is what a replayed shop's payment says it kept.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
+            WHERE f.clearedBy = :id
+              AND f.entryKind = com.delivery.accounting.domain.CashFloatEntry$Kind.COLLECTED
+            """)
+    BigDecimal clearedTotal(@Param("id") UUID id);
+
+    /**
+     * What one holder collected, or banked, inside a window, as one kind of holder (see
+     * {@link #outstandingTotalFor} for why the kind is not optional).
      *
      * <p>The two halves of the rider's cash line, and they are asked for separately rather than
      * netted in SQL because a statement has to SHOW both. "You took 2,425 and banked 2,100" is a
@@ -79,10 +145,12 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
     @Query("""
             SELECT COALESCE(SUM(f.amount), 0) FROM CashFloatEntry f
             WHERE f.holderRef = :holder
+              AND f.holderKind = :holderKind
               AND f.entryKind = :kind
               AND f.createdAt >= :from AND f.createdAt < :to
             """)
     BigDecimal totalForHolderBetween(@Param("holder") String holder,
+                                     @Param("holderKind") CashFloatEntry.HolderKind holderKind,
                                      @Param("kind") CashFloatEntry.Kind kind,
                                      @Param("from") java.time.Instant from,
                                      @Param("to") java.time.Instant to);
@@ -100,11 +168,13 @@ public interface CashFloatRepository extends JpaRepository<CashFloatEntry, UUID>
     @Query("""
             SELECT f FROM CashFloatEntry f
             WHERE f.holderRef = :holder
+              AND f.holderKind = :holderKind
               AND f.entryKind = :kind
               AND f.createdAt >= :from AND f.createdAt < :to
             ORDER BY f.createdAt
             """)
     List<CashFloatEntry> forHolderBetween(@Param("holder") String holder,
+                                          @Param("holderKind") CashFloatEntry.HolderKind holderKind,
                                           @Param("kind") CashFloatEntry.Kind kind,
                                           @Param("from") Instant from,
                                           @Param("to") Instant to);

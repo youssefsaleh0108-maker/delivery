@@ -4,9 +4,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,10 +87,32 @@ public class CashFloatService {
                 PAYROLL_KEY_PREFIX.length());
     }
 
-    /** What one holder is still carrying. */
+    /** What one holder is still carrying, as one kind of holder. */
     @Transactional(readOnly = true)
-    public BigDecimal outstandingFor(String holderRef) {
-        return floatEntries.outstandingTotalFor(holderRef);
+    public BigDecimal outstandingFor(String holderRef, CashFloatEntry.HolderKind holderKind) {
+        return floatEntries.outstandingTotalFor(holderRef, holderKind);
+    }
+
+    /**
+     * What every shop holding pickup cash owes out of its till right now, by shop (V52).
+     *
+     * <p>Two reads however many shops there are: every shop's outstanding collections, and the legs
+     * on those orders. The Back Office's list shows it beside each till, so the operator confirms the
+     * figure a shop actually pays — the platform's part — and not the till, most of which is the
+     * shop's own share. See {@link ShopTill}.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, ShopTill> shopTills() {
+        List<CashFloatEntry> rows = floatEntries.heldByKind(CashFloatEntry.HolderKind.MERCHANT);
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        List<AccountingTransaction> legs = transactions.findByOrderIdIn(orderIdsOf(rows));
+        Map<String, List<CashFloatEntry>> byShop = rows.stream().collect(Collectors.groupingBy(
+                CashFloatEntry::getHolderRef, LinkedHashMap::new, Collectors.toList()));
+        Map<String, ShopTill> tills = new LinkedHashMap<>();
+        byShop.forEach((shop, till) -> tills.put(shop, ShopTill.of(shop, till, legs)));
+        return tills;
     }
 
     /**
@@ -97,6 +122,16 @@ public class CashFloatService {
     @Transactional
     public Optional<Remittance> remitAll(String holderRef, String correlationId) {
         return remit(holderRef, correlationId, null, Recorded.nobody());
+    }
+
+    /**
+     * {@link #remit(String, String, BigDecimal, Recorded, CashFloatEntry.HolderKind)}, not told which
+     * kind of holder is paying — the shape of every call made before a shop could hold cash.
+     */
+    @Transactional
+    public Optional<Remittance> remit(String holderRef, String correlationId, BigDecimal expected,
+                                      Recorded recorded) {
+        return remit(holderRef, correlationId, expected, recorded, null);
     }
 
     /**
@@ -116,34 +151,65 @@ public class CashFloatService {
      * second call made at the same moment waits for the first, finds them cleared and records
      * nothing; a repeated {@code requestKey} answers with the first remittance instead of a second.
      *
-     * @param expected what the operator was looking at when they confirmed, or null to skip the
-     *                 check. A delivery company's balance grows every time one of its riders hands
-     *                 over, so "they paid what I saw" and "they paid everything" can differ between
-     *                 page load and click — and the one the operator counted is the one to record
+     * <p><strong>Whose cash (V52).</strong> One Keycloak subject can hold cash as more than one kind
+     * of holder — a shop that also delivers has a till and a rider's bag — and the two are settled on
+     * different terms. Told the kind, this clears only that kind's cash. Not told, it clears what the
+     * subject holds when that is all of one kind, exactly as before, and refuses when it is not,
+     * rather than record the till and the bag as one payment of whichever kind happened to be oldest.
+     *
+     * <p><strong>A shop keeps its share.</strong> A shop's till is cleared against what the shop owes
+     * out of it, never against the till ({@link ShopTill}): what it pays is REMITTED and posted as
+     * every payment is, and the share it keeps is RETAINED and posted nowhere, because none of it
+     * reached the platform. And a shop's payment is only ever recorded against a figure the operator
+     * confirmed: a confirmation naming no figure cannot say whether the operator was looking at the
+     * till or at the commission, and those are two different payments.
+     *
+     * @param expected   what the operator was looking at when they confirmed, or null to skip the
+     *                   check — which a shop's till never may. A delivery company's balance grows
+     *                   every time one of its riders hands over, so "they paid what I saw" and "they
+     *                   paid everything" can differ between page load and click — and the one the
+     *                   operator counted is the one to record. For a shop it is what the shop owes
+     * @param holderKind which of the subject's cash is being paid in, or null when the caller did not
+     *                   say
      * @return the remittance, or empty when there was nothing outstanding
-     * @throws AmountChangedException    the balance is not {@code expected}; nothing was recorded
-     * @throws RequestKeyReusedException the key already recorded something else
+     * @throws AmountChangedException      the balance is not {@code expected}; nothing was recorded
+     * @throws RequestKeyReusedException   the key already recorded something else
+     * @throws HolderKindRequiredException not told the kind, and the subject holds more than one
+     * @throws AmountRequiredException     a shop's till, with no amount confirmed
      */
     @Transactional
     public Optional<Remittance> remit(String holderRef, String correlationId, BigDecimal expected,
-                                      Recorded recorded) {
+                                      Recorded recorded, CashFloatEntry.HolderKind holderKind) {
         Recorded who = recorded == null ? Recorded.nobody() : recorded;
         if (isPayrollKey(who.requestKey())) {
             throw new IllegalArgumentException("That request key is kept for pay runs");
         }
 
-        Optional<Remittance> replay = replayRemittance(holderRef, who);
+        Optional<Remittance> replay = replayRemittance(holderRef, holderKind, who);
         if (replay.isPresent()) {
             return replay;
         }
 
-        List<CashFloatEntry> outstanding = floatEntries.outstandingFor(holderRef);
+        List<CashFloatEntry> outstanding = holderKind == null
+                ? floatEntries.outstandingFor(holderRef)
+                : floatEntries.outstandingFor(holderRef, holderKind);
 
         // Asked again now the rows are locked: a twin of this request holding the same key may have
         // committed while this one waited on its locks, and it recorded the payment already.
-        replay = replayRemittance(holderRef, who);
+        replay = replayRemittance(holderRef, holderKind, who);
         if (replay.isPresent()) {
             return replay;
+        }
+
+        if (outstanding.stream().map(CashFloatEntry::getHolderKind).distinct().count() > 1) {
+            throw new HolderKindRequiredException();
+        }
+        boolean shopsTill = holderKind == null
+                ? !outstanding.isEmpty()
+                        && outstanding.get(0).getHolderKind() == CashFloatEntry.HolderKind.MERCHANT
+                : holderKind == CashFloatEntry.HolderKind.MERCHANT;
+        if (shopsTill) {
+            return payInTill(holderRef, outstanding, correlationId, expected, who);
         }
 
         BigDecimal total = sum(outstanding);
@@ -306,12 +372,99 @@ public class CashFloatService {
                 who.method(), who.note(), who.by(), Instant.now(), false);
     }
 
-    /** What a remittance caller gets back: the id to quote, and what it covered. */
+    /**
+     * A shop paying in its till: the platform's part, with its own share kept. See
+     * {@link #remit(String, String, BigDecimal, Recorded, CashFloatEntry.HolderKind)} and
+     * {@link ShopTill}.
+     *
+     * <p>Two rows, and the pickups are cleared by the one that says what reached the platform: the
+     * platform's part is REMITTED and posted, as every holder's payment is, and the shop's share is
+     * RETAINED and posted nowhere. Where a promotion left none of the till the platform's there is
+     * nothing to pay and nothing to post, so the RETAINED row alone clears the pickups — and carries
+     * the request key, so that a second press still finds the first.
+     */
+    private Optional<Remittance> payInTill(String shopRef, List<CashFloatEntry> till,
+                                           String correlationId, BigDecimal expected,
+                                           Recorded who) {
+        ShopTill owing = ShopTill.of(shopRef, till,
+                till.isEmpty() ? List.of() : transactions.findByOrderIdIn(orderIdsOf(till)));
+        if (expected != null && owing.owed().compareTo(money(expected)) != 0) {
+            throw new AmountChangedException(owing.owed());
+        }
+        if (till.isEmpty()) {
+            log.debug("{} holds nothing from its counter; no payment recorded", shopRef);
+            return Optional.empty();
+        }
+        if (expected == null) {
+            throw new AmountRequiredException();
+        }
+
+        CashFloatEntry paid = owing.owed().signum() > 0
+                ? floatEntries.save(CashFloatEntry.remitted(shopRef,
+                        CashFloatEntry.HolderKind.MERCHANT, owing.owed(), currency, who))
+                : null;
+        CashFloatEntry kept = owing.retained().signum() > 0
+                ? floatEntries.save(CashFloatEntry.retained(shopRef, owing.retained(), currency,
+                        who.by(), paid == null ? who.requestKey() : null))
+                : null;
+        UUID clearing = paid != null ? paid.getId() : kept.getId();
+        for (CashFloatEntry collected : till) {
+            collected.clearedBy(clearing);
+        }
+
+        if (paid != null) {
+            // As on every remittance: the payment's own id stands in for an order, and the bank is
+            // asked only once this has committed.
+            AccountingTransaction posting = new AccountingTransaction(
+                    paid.getId(), Leg.CASH_REMITTANCE, platformAccount,
+                    owing.owed(), currency, Direction.CREDIT, correlationId);
+            transactions.save(posting);
+            afterCommit(() -> postings.request(posting));
+        }
+
+        log.info("{} paid {} out of a till of {} and kept {} as its share, covering {} pickups",
+                shopRef, owing.owed(), owing.held(), owing.retained(), till.size());
+        return Optional.of(new Remittance(clearing, shopRef, owing.owed(), till.size(), false,
+                owing.retained()));
+    }
+
+    /**
+     * What a remittance caller gets back: the id to quote, and what it covered.
+     *
+     * @param amount   what reached the platform
+     * @param retained what a shop kept of its till as its own share (V52); zero for anybody else
+     */
     public record Remittance(UUID id, String holderRef, BigDecimal amount, int collections,
-                             boolean replayed) {
+                             boolean replayed, BigDecimal retained) {
 
         public Remittance(UUID id, String holderRef, BigDecimal amount, int collections) {
             this(id, holderRef, amount, collections, false);
+        }
+
+        public Remittance(UUID id, String holderRef, BigDecimal amount, int collections,
+                          boolean replayed) {
+            this(id, holderRef, amount, collections, replayed, BigDecimal.ZERO);
+        }
+    }
+
+    /**
+     * Not told which kind of holder is paying, when the account holds cash as more than one (V52): a
+     * shop that also delivers, with a till and a rider's bag. Clearing both as one payment would book
+     * the till as a rider's banking or the bag as a shop's, so nothing was recorded.
+     */
+    public static class HolderKindRequiredException extends RuntimeException {
+        public HolderKindRequiredException() {
+            super("This account holds cash as more than one kind of holder; say which one is paying");
+        }
+    }
+
+    /**
+     * A shop's till, with no amount confirmed (V52). A shop pays the platform its commission, not its
+     * till, and a confirmation that named no figure cannot say which of the two the operator saw.
+     */
+    public static class AmountRequiredException extends RuntimeException {
+        public AmountRequiredException() {
+            super("A shop's payment is recorded against the amount it owes; confirm that amount");
         }
     }
 
@@ -351,20 +504,41 @@ public class CashFloatService {
         }
     }
 
-    private Optional<Remittance> replayRemittance(String holderRef, Recorded who) {
+    private Optional<Remittance> replayRemittance(String holderRef,
+                                                  CashFloatEntry.HolderKind holderKind,
+                                                  Recorded who) {
         if (who.requestKey() == null) {
             return Optional.empty();
         }
         return floatEntries.findByRequestKey(who.requestKey()).map(previous -> {
             // A double press repeats everything it sent; a different method is a different request.
-            if (previous.getEntryKind() != CashFloatEntry.Kind.REMITTED
+            // A shop's payment that left none of its till the platform's is keyed on the share it
+            // kept (see payInTill), which records no method because nothing was handed over.
+            boolean paid = previous.getEntryKind() == CashFloatEntry.Kind.REMITTED;
+            boolean keptOnly = previous.getEntryKind() == CashFloatEntry.Kind.RETAINED;
+            if (!(paid || keptOnly)
                     || !holderRef.equals(previous.getHolderRef())
-                    || previous.getMethod() != who.method()) {
+                    || (holderKind != null && previous.getHolderKind() != holderKind)
+                    || (paid && previous.getMethod() != who.method())) {
                 throw new RequestKeyReusedException();
             }
-            return new Remittance(previous.getId(), holderRef, previous.getAmount(),
-                    clearedBy(previous.getId()), true);
+            BigDecimal amount = paid ? previous.getAmount() : money(BigDecimal.ZERO);
+            // What a shop kept is what its payment cleared less what it paid: the RETAINED row
+            // written beside the payment says the same, and this needs no link between the two.
+            BigDecimal retained = previous.getHolderKind() == CashFloatEntry.HolderKind.MERCHANT
+                    ? money(orZero(floatEntries.clearedTotal(previous.getId())).subtract(amount))
+                    : BigDecimal.ZERO;
+            return new Remittance(previous.getId(), holderRef, amount,
+                    clearedBy(previous.getId()), true, retained);
         });
+    }
+
+    private static List<UUID> orderIdsOf(List<CashFloatEntry> rows) {
+        return rows.stream().map(CashFloatEntry::getOrderId).distinct().toList();
+    }
+
+    private static BigDecimal orZero(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO : amount;
     }
 
     private Optional<Handover> replayHandover(String carrierRef, String riderRef, Recorded who) {

@@ -118,17 +118,32 @@ class MerchantCashMigrationTest {
     }
 
     @Test
-    @DisplayName("re-creates only the holder check, keeping riders and companies beside shops")
-    void onlyTheHolderCheckIsRecreated() {
+    @DisplayName("re-creates only the holder and entry-kind checks, each with its earlier values")
+    void onlyTheHolderAndKindChecksAreRecreated() {
         assertThat(v52)
                 .filteredOn(statement -> statement.contains("DROP CONSTRAINT"))
-                .singleElement()
-                .satisfies(drop -> assertThat(drop).endsWith("DROP CONSTRAINT chk_float_holder"));
+                .extracting(drop -> drop.substring(drop.indexOf("DROP CONSTRAINT")))
+                .containsExactly("DROP CONSTRAINT chk_float_holder",
+                        "DROP CONSTRAINT chk_float_kind");
         assertThat(v52)
                 .filteredOn(statement -> statement.contains("ADD CONSTRAINT chk_float_holder "))
                 .singleElement()
                 .satisfies(check -> assertThat(check)
                         .contains("'RIDER'", "'PROVIDER'", "'MERCHANT'"));
+        // V50's values, with the share a shop keeps of its till beside them.
+        assertThat(v52)
+                .filteredOn(statement -> statement.contains("ADD CONSTRAINT chk_float_kind "))
+                .singleElement()
+                .satisfies(check -> assertThat(check).contains("'COLLECTED'", "'REMITTED'",
+                        "'TRANSFERRED'", "'WRITTEN_OFF'", "'RETAINED'"));
+    }
+
+    /** Riders and companies pay in whole; only a shop keeps a share of what it holds. */
+    @Test
+    @DisplayName("lets only a shop keep a share of what it holds")
+    void onlyAShopKeepsAShare() {
+        assertThat(inForce("chk_float_retained_merchant"))
+                .contains("entry_kind <> 'RETAINED' OR holder_kind = 'MERCHANT'");
     }
 
     /** A pickup's notes are the platform's; no company may be made answerable for them. */

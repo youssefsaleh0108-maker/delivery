@@ -55,7 +55,18 @@ public class CashFloatEntry {
          */
         TRANSFERRED,
         /** Written off by an operator — theft, loss, a dispute settled the other way. */
-        WRITTEN_OFF
+        WRITTEN_OFF,
+        /**
+         * A shop keeping its own share of the cash its counter took for pickup orders (V52).
+         *
+         * <p>Written beside the {@link #REMITTED} row that pays the platform its part, and the two
+         * together discharge the shop's collections: a shop keeps its share of a pickup and pays the
+         * platform only what is the platform's (see {@code ShopTill}). Its own kind rather than a
+         * REMITTED row with a flag, for the reason {@link #TRANSFERRED} is: none of this money reached
+         * the platform, and "paid" is exactly the claim it must never be mistaken for — a statement
+         * that counted it would tell the shop the platform owes it the share it already kept.
+         */
+        RETAINED
     }
 
     /**
@@ -240,6 +251,22 @@ public class CashFloatEntry {
         CashFloatEntry entry = new CashFloatEntry(holderRef, holderKind, null, amount, currency,
                 Kind.REMITTED, null);
         entry.record(recorded);
+        return entry;
+    }
+
+    /**
+     * A shop keeping its own share of its till (V52), written beside the payment of the platform's
+     * part. Belongs to no single order. It records who confirmed it and no method, because nothing
+     * was handed over.
+     *
+     * @param requestKey the confirmation's key — only when nothing of the till was the platform's,
+     *                   so that this is the one row the payment wrote; null otherwise
+     */
+    public static CashFloatEntry retained(String shopRef, BigDecimal amount, String currency,
+                                          String recordedBy, String requestKey) {
+        CashFloatEntry entry = new CashFloatEntry(shopRef, HolderKind.MERCHANT, null, amount,
+                currency, Kind.RETAINED, null);
+        entry.record(new Recorded(recordedBy, null, null, requestKey));
         return entry;
     }
 

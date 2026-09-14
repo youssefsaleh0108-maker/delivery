@@ -81,7 +81,7 @@ class ReconciliationCarrierCashTest {
     void recordsTheCountedPayment() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
         UUID id = UUID.randomUUID();
-        when(cashFloat.remit(eq(COMPANY), any(), any(), any())).thenReturn(Optional.of(
+        when(cashFloat.remit(eq(COMPANY), any(), any(), any(), any())).thenReturn(Optional.of(
                 new CashFloatService.Remittance(id, COMPANY, new BigDecimal("485.00"), 3)));
 
         mvc.perform(post("/api/accounting/float/" + COMPANY + "/remit")
@@ -97,7 +97,8 @@ class ReconciliationCarrierCashTest {
         ArgumentCaptor<BigDecimal> expected = ArgumentCaptor.forClass(BigDecimal.class);
         ArgumentCaptor<CashFloatEntry.Recorded> who =
                 ArgumentCaptor.forClass(CashFloatEntry.Recorded.class);
-        verify(cashFloat).remit(eq(COMPANY), any(), expected.capture(), who.capture());
+        verify(cashFloat).remit(eq(COMPANY), any(), expected.capture(), who.capture(),
+                isNull());
         assertThat(expected.getValue()).isEqualByComparingTo("485.00");
         assertThat(who.getValue().by()).isEqualTo("op-1");
         assertThat(who.getValue().method()).isEqualTo(CashFloatEntry.Method.BANK_DEPOSIT);
@@ -109,7 +110,8 @@ class ReconciliationCarrierCashTest {
     @DisplayName("with no body, banks everything as it always did — and still records who")
     void theOldCallStillWorks() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
-        when(cashFloat.remit(eq("rider-1"), any(), isNull(), any())).thenReturn(Optional.empty());
+        when(cashFloat.remit(eq("rider-1"), any(), isNull(), any(), isNull()))
+                .thenReturn(Optional.empty());
 
         mvc.perform(post("/api/accounting/float/rider-1/remit"))
                 .andExpect(status().isOk())
@@ -117,7 +119,7 @@ class ReconciliationCarrierCashTest {
 
         ArgumentCaptor<CashFloatEntry.Recorded> who =
                 ArgumentCaptor.forClass(CashFloatEntry.Recorded.class);
-        verify(cashFloat).remit(eq("rider-1"), any(), isNull(), who.capture());
+        verify(cashFloat).remit(eq("rider-1"), any(), isNull(), who.capture(), isNull());
         assertThat(who.getValue().by()).isEqualTo("op-1");
     }
 
@@ -125,7 +127,7 @@ class ReconciliationCarrierCashTest {
     @DisplayName("answers 409 with the current figure when a hand-over landed meanwhile")
     void amountMoved() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
-        when(cashFloat.remit(eq(COMPANY), any(), any(), any()))
+        when(cashFloat.remit(eq(COMPANY), any(), any(), any(), any()))
                 .thenThrow(new CashFloatService.AmountChangedException(new BigDecimal("525.00")));
 
         mvc.perform(post("/api/accounting/float/" + COMPANY + "/remit")
@@ -150,7 +152,7 @@ class ReconciliationCarrierCashTest {
                                     + "\"}"))
                     .andExpect(status().isBadRequest());
         }
-        verify(cashFloat, never()).remit(any(), any(), any(), any());
+        verify(cashFloat, never()).remit(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -165,7 +167,7 @@ class ReconciliationCarrierCashTest {
                                     + "\"}"))
                     .andExpect(status().isBadRequest());
         }
-        verify(cashFloat, never()).remit(any(), any(), any(), any());
+        verify(cashFloat, never()).remit(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -174,7 +176,7 @@ class ReconciliationCarrierCashTest {
         signedInAs("op-1", "BACKOFFICE");
         // Two presses with one key racing past the replay check: the unique index refuses the second
         // at commit.
-        when(cashFloat.remit(eq(COMPANY), any(), any(), any()))
+        when(cashFloat.remit(eq(COMPANY), any(), any(), any(), any()))
                 .thenThrow(new DataIntegrityViolationException("uq_float_request_key"));
 
         mvc.perform(post("/api/accounting/float/" + COMPANY + "/remit")
@@ -193,7 +195,7 @@ class ReconciliationCarrierCashTest {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/accounting/float/carriers")).andExpect(status().isForbidden());
 
-        verify(cashFloat, never()).remit(any(), any(), any(), any());
+        verify(cashFloat, never()).remit(any(), any(), any(), any(), any());
         verify(carrierCash, never()).carriers();
     }
 

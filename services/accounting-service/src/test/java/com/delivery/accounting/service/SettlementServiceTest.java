@@ -760,6 +760,63 @@ class SettlementServiceTest {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             assertThat(credited).isEqualByComparingTo(collectionIn(legs).getAmount());
         }
+
+        /**
+         * The shop took its share out of the till as the customer paid, so no bank is ever asked to
+         * pay it. Under BANK, which this whole class runs, the shop's credit is discharged at the
+         * counter and the sequence opens straight on the platform's own leg.
+         */
+        @Test
+        void the_shops_share_kept_at_the_counter_is_never_asked_of_the_bank() {
+            List<AccountingTransaction> legs = collectedAtTheShop();
+
+            AccountingTransaction share = legs.stream()
+                    .filter(t -> t.getLeg() == Leg.MERCHANT_CREDIT)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(share.isPostingRequired()).isFalse();
+            assertThat(share.getStatus()).isEqualTo(AccountingTransaction.Status.SETTLED_IN_CASH);
+
+            ArgumentCaptor<AccountingTransaction> published =
+                    ArgumentCaptor.forClass(AccountingTransaction.class);
+            verify(postings).request(published.capture());
+            assertThat(published.getValue().getLeg()).isEqualTo(Leg.PLATFORM_COMMISSION);
+        }
+
+        @Test
+        void the_sequence_passes_the_share_kept_at_the_counter_and_ends_after_the_commission() {
+            List<AccountingTransaction> legs = collectedAtTheShop();
+            org.mockito.Mockito.clearInvocations(postings);
+            when(transactions.findByOrderIdOrderByCreatedAt(orderId)).thenReturn(legs);
+
+            // The commission still waits on the bank: it goes, and the share never does.
+            serviceAt("12.5").releaseNextLeg(orderId);
+            ArgumentCaptor<AccountingTransaction> published =
+                    ArgumentCaptor.forClass(AccountingTransaction.class);
+            verify(postings).request(published.capture());
+            assertThat(published.getValue().getLeg()).isEqualTo(Leg.PLATFORM_COMMISSION);
+
+            // Once it has posted the settlement is complete, and nothing more is asked for.
+            org.mockito.Mockito.clearInvocations(postings);
+            published.getValue().markPosted("commission-ref");
+            serviceAt("12.5").releaseNextLeg(orderId);
+            verifyNoInteractions(postings);
+        }
+
+        /** A rider took the cash on this one, so the shop's share is paid as it always was. */
+        @Test
+        void a_riders_cash_order_still_asks_the_bank_for_the_shops_share() {
+            List<AccountingTransaction> legs = serviceAt("12.5").settle(orderId,
+                    new BigDecimal("40.00"), new BigDecimal("40.00"), CUSTOMER, MERCHANT, null,
+                    RIDER_HOLDING, "corr-1");
+
+            ArgumentCaptor<AccountingTransaction> published =
+                    ArgumentCaptor.forClass(AccountingTransaction.class);
+            verify(postings).request(published.capture());
+            assertThat(published.getValue().getLeg()).isEqualTo(Leg.MERCHANT_CREDIT);
+            assertThat(legs.stream().filter(t -> t.getLeg() == Leg.MERCHANT_CREDIT)
+                    .findFirst().orElseThrow().isPostingRequired()).isTrue();
+        }
     }
 
     @Nested

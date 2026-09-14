@@ -72,15 +72,21 @@ public class ReconciliationController {
      * money physically arrived. A rider marking their own float clear would be the one party with
      * an incentive to get it wrong — and so would a company, and so would a shop.
      *
-     * <p>A shop's till needs no route of its own: it is paid in exactly as a company's custody is,
-     * with the same counted amount, the same refusal when a pickup was paid at the counter after the
-     * page loaded, the same request key and the same record of who confirmed it.
-     *
      * <p>The body is optional, so a caller written before it existed banks exactly as it always did.
      * With one, {@code expectedAmount} is the figure the operator counted against: a company's
      * balance grows with every hand-over at its hub, and if it moved since the page loaded nothing
      * is recorded and the answer is 409 with the current figure. {@code requestKey} makes a double
      * press harmless, and whoever is signed in is recorded as the person who confirmed it.
+     *
+     * <p><strong>A shop's till (V52)</strong> takes this route too, on its own terms: the shop keeps
+     * its share and pays the platform only its commission, so {@code expectedAmount} is what the shop
+     * owes — the {@code owed} figure the cash-on-hand list shows — and never the till, and it is
+     * required (400 {@code AMOUNT_REQUIRED} without it). The answer carries {@code retained}, the
+     * share the shop kept.
+     *
+     * <p>{@code holderKind} says which of the account's cash is being paid in. One account can be a
+     * shop with a till and a rider with a bag, settled on different terms, so when it holds both and
+     * the body does not say, nothing is recorded and the answer is 409 {@code HOLDER_KIND_REQUIRED}.
      */
     @PostMapping("/float/{holderRef}/remit")
     public ResponseEntity<?> remit(@PathVariable String holderRef,
@@ -111,12 +117,23 @@ public class ReconciliationController {
         if (keyProblem != null) {
             return ResponseEntity.badRequest().body(Map.of("error", keyProblem));
         }
+        // Which of the account's cash is being paid in, when the caller says (V52). Unsaid is still
+        // allowed, and refused only when the account really does hold more than one kind.
+        CashFloatEntry.HolderKind holderKind = null;
+        if (body != null && body.holderKind() != null && !body.holderKind().isBlank()) {
+            holderKind = holderKindOf(body.holderKind());
+            if (holderKind == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "holderKind must be one of RIDER, PROVIDER or MERCHANT"));
+            }
+        }
 
         try {
             return cashFloat.remit(holderRef, MDC.get(CorrelationIdFilter.MDC_KEY),
                             body == null ? null : body.expectedAmount(),
                             new CashFloatEntry.Recorded(Callers.jwt().getSubject(), method, note,
-                                    key))
+                                    key),
+                            holderKind)
                     .<ResponseEntity<?>>map(r -> {
                         Map<String, Object> out = new LinkedHashMap<>();
                         out.put("remittanceId", r.id());
@@ -124,6 +141,11 @@ public class ReconciliationController {
                         out.put("amount", r.amount());
                         out.put("collections", r.collections());
                         out.put("replayed", r.replayed());
+                        // A shop's payment: the share it kept of its till, beside what it paid.
+                        // Absent for everybody else, whose answer reads exactly as it always did.
+                        if (r.retained().signum() != 0) {
+                            out.put("retained", r.retained());
+                        }
                         return ResponseEntity.ok(out);
                     })
                     // Nothing outstanding is not an error — it is the answer to "have they banked it".
@@ -133,11 +155,23 @@ public class ReconciliationController {
                             "collections", 0)));
         } catch (CashFloatService.AmountChangedException e) {
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("error", "They are holding " + Statement.money(e.current()).toPlainString()
+            // A shop is asked for what it owes out of its till, never for the till, so its figure is
+            // said that way (V52).
+            out.put("error", (holderKind == CashFloatEntry.HolderKind.MERCHANT
+                    ? "The shop owes " : "They are holding ")
+                    + Statement.money(e.current()).toPlainString()
                     + " now, not the amount you confirmed. Nothing was recorded.");
             out.put("code", "AMOUNT_CHANGED");
             out.put("current", Statement.money(e.current()).toPlainString());
             return ResponseEntity.status(409).body(out);
+        } catch (CashFloatService.HolderKindRequiredException e) {
+            // A shop that also delivers holds a till and a rider's bag, settled on different terms:
+            // nothing was recorded, and the caller says which of the two is paying.
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(), "code", "HOLDER_KIND_REQUIRED"));
+        } catch (CashFloatService.AmountRequiredException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(), "code", "AMOUNT_REQUIRED"));
         } catch (CashFloatService.RequestKeyReusedException e) {
             return ResponseEntity.status(409).body(Map.of(
                     "error", e.getMessage(), "code", "REQUEST_KEY_REUSED"));
@@ -151,9 +185,22 @@ public class ReconciliationController {
         }
     }
 
-    /** {@code {"expectedAmount":"320.00","method":"BANK_DEPOSIT","note":"...","requestKey":"..."}}. */
+    /** A holder kind named in a request, case aside; null for anything that is not one. */
+    private static CashFloatEntry.HolderKind holderKindOf(String value) {
+        for (CashFloatEntry.HolderKind kind : CashFloatEntry.HolderKind.values()) {
+            if (kind.name().equalsIgnoreCase(value.trim())) {
+                return kind;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * {@code {"expectedAmount":"320.00","method":"BANK_DEPOSIT","note":"...","requestKey":"...",
+     * "holderKind":"MERCHANT"}}.
+     */
     public record RemitRequest(BigDecimal expectedAmount, String method, String note,
-                               String requestKey) {
+                               String requestKey, String holderKind) {
     }
 
     /**
@@ -172,6 +219,11 @@ public class ReconciliationController {
      * disagree about what "late" means — and the shop limit for a shop's till. See
      * {@link CarrierCashService#cashOnHand()}.
      *
+     * <p>A shop's line also carries {@code owed} and {@code retained} (V52), as two-decimal strings.
+     * A shop keeps its share of its till and pays the platform its commission, so {@code amount} is
+     * the cash it holds, {@code owed} is the figure its payment is recorded against — what
+     * {@code /float/{ref}/remit} expects — and {@code retained} is the share it keeps.
+     *
      * <p>The role is checked in the method as well as on the class, as on every cash route here: this
      * list names who holds the platform's money, and a standalone test can only prove a lock it can
      * see.
@@ -182,7 +234,13 @@ public class ReconciliationController {
         if (refusal != null) {
             return refusal;
         }
-        return ResponseEntity.ok(carrierCash.cashOnHand().stream()
+        List<CarrierCashService.OnHand> holders = carrierCash.cashOnHand();
+        // Read only when a shop is on the list at all.
+        Map<String, com.delivery.accounting.service.ShopTill> tills = holders.stream()
+                .anyMatch(holder -> holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT)
+                ? cashFloat.shopTills()
+                : Map.of();
+        return ResponseEntity.ok(holders.stream()
                 .map(holder -> {
                     Map<String, Object> out = new LinkedHashMap<String, Object>();
                     out.put("holderRef", holder.holderRef());
@@ -191,6 +249,13 @@ public class ReconciliationController {
                     out.put("orders", holder.orders());
                     out.put("oldest", holder.oldest());
                     out.put("overdue", holder.overdue());
+                    var till = holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT
+                            ? tills.get(holder.holderRef())
+                            : null;
+                    if (till != null) {
+                        out.put("owed", Statement.money(till.owed()).toPlainString());
+                        out.put("retained", Statement.money(till.retained()).toPlainString());
+                    }
                     return out;
                 })
                 .toList());

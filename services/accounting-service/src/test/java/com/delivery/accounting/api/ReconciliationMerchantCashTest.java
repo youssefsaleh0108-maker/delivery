@@ -3,12 +3,15 @@ package com.delivery.accounting.api;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,21 +40,23 @@ import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.domain.CoreBankingSyncLogRepository;
 import com.delivery.accounting.service.CarrierCashService;
 import com.delivery.accounting.service.CashFloatService;
+import com.delivery.accounting.service.ShopTill;
 
 /**
- * The Back Office and a shop's till (V52): a shop holding pickup cash is on the cash-on-hand list as
- * a shop, and its payment is recorded through the route and the safeguards a delivery company's
- * payment uses — and behind the same lock, because a shop is the one party with a reason to mark
- * its own debt paid.
+ * The Back Office and a shop's till (V52). A shop holding pickup cash is on the cash-on-hand list as
+ * a shop, with what it owes out of its till beside the till. Its payment is recorded through the
+ * route a delivery company's payment uses, against what it owes and never the till, and behind the
+ * same lock, because a shop is the one party with a reason to mark its own debt paid.
  */
 @DisplayName("the Back Office and a shop's till")
 class ReconciliationMerchantCashTest {
 
     private static final String SHOP = "merchant-sub-1";
     private static final String REMIT = "/api/accounting/float/" + SHOP + "/remit";
+    /** What the page sends for a shop: what it owes, how it was paid, a key, and who is paying. */
     private static final String COUNTED = """
-            {"expectedAmount":"52.50","method":"CASH","note":"counted at the shop",
-             "requestKey":"till-key-0001"}""";
+            {"expectedAmount":"5.00","method":"CASH","note":"counted at the shop",
+             "requestKey":"till-key-0001","holderKind":"MERCHANT"}""";
 
     private CashFloatService cashFloat;
     private CarrierCashService carrierCash;
@@ -82,40 +87,66 @@ class ReconciliationMerchantCashTest {
     }
 
     @Test
-    @DisplayName("lists a shop holding pickup cash as a shop, with the server's overdue call")
+    @DisplayName("lists a shop as a shop: its till, what it owes out of it, and the overdue call")
     void listsTheShop() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
         when(carrierCash.cashOnHand()).thenReturn(List.of(new CarrierCashService.OnHand(SHOP,
-                CashFloatEntry.HolderKind.MERCHANT, new BigDecimal("52.50"), 2,
+                CashFloatEntry.HolderKind.MERCHANT, new BigDecimal("40.00"), 1,
                 Instant.parse("2026-10-20T09:00:00Z"), true)));
+        when(cashFloat.shopTills()).thenReturn(Map.of(SHOP, new ShopTill(
+                new BigDecimal("40.00"), new BigDecimal("35.00"), new BigDecimal("5.00"))));
 
         mvc.perform(get("/api/accounting/float"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].holderRef").value(SHOP))
                 .andExpect(jsonPath("$[0].holderKind").value("MERCHANT"))
-                .andExpect(jsonPath("$[0].orders").value(2))
-                .andExpect(jsonPath("$[0].overdue").value(true));
+                .andExpect(jsonPath("$[0].amount").value(40.0))
+                .andExpect(jsonPath("$[0].orders").value(1))
+                .andExpect(jsonPath("$[0].overdue").value(true))
+                // The figure the operator confirms when the shop pays, and the share it keeps.
+                .andExpect(jsonPath("$[0].owed").value("5.00"))
+                .andExpect(jsonPath("$[0].retained").value("35.00"));
     }
 
     @Test
-    @DisplayName("records the shop's payment against the counted amount, by the operator")
-    void recordsTheCountedTill() throws Exception {
+    @DisplayName("says nothing of a till beside a rider, and reads no tills for a list with no shop")
+    void aRiderHasNoTill() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+        when(carrierCash.cashOnHand()).thenReturn(List.of(new CarrierCashService.OnHand("rider-1",
+                CashFloatEntry.HolderKind.RIDER, new BigDecimal("13.25"), 1,
+                Instant.parse("2026-10-20T09:00:00Z"), false)));
+
+        mvc.perform(get("/api/accounting/float"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].holderKind").value("RIDER"))
+                .andExpect(jsonPath("$[0].owed").doesNotExist())
+                .andExpect(jsonPath("$[0].retained").doesNotExist());
+        verify(cashFloat, never()).shopTills();
+    }
+
+    @Test
+    @DisplayName("records the shop's payment against what it owes, as the shop, by the operator")
+    void recordsTheShopsPayment() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
         UUID id = UUID.randomUUID();
-        when(cashFloat.remit(eq(SHOP), any(), any(), any())).thenReturn(Optional.of(
-                new CashFloatService.Remittance(id, SHOP, new BigDecimal("52.50"), 2)));
+        when(cashFloat.remit(eq(SHOP), any(), any(), any(), any())).thenReturn(Optional.of(
+                new CashFloatService.Remittance(id, SHOP, new BigDecimal("5.00"), 1, false,
+                        new BigDecimal("35.00"))));
 
         mvc.perform(post(REMIT).contentType(MediaType.APPLICATION_JSON).content(COUNTED))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.remittanceId").value(id.toString()))
-                .andExpect(jsonPath("$.collections").value(2))
+                .andExpect(jsonPath("$.amount").value(5.0))
+                .andExpect(jsonPath("$.retained").value(35.0))
+                .andExpect(jsonPath("$.collections").value(1))
                 .andExpect(jsonPath("$.replayed").value(false));
 
         ArgumentCaptor<BigDecimal> expected = ArgumentCaptor.forClass(BigDecimal.class);
         ArgumentCaptor<CashFloatEntry.Recorded> who =
                 ArgumentCaptor.forClass(CashFloatEntry.Recorded.class);
-        verify(cashFloat).remit(eq(SHOP), any(), expected.capture(), who.capture());
-        assertThat(expected.getValue()).isEqualByComparingTo("52.50");
+        verify(cashFloat).remit(eq(SHOP), any(), expected.capture(), who.capture(),
+                eq(CashFloatEntry.HolderKind.MERCHANT));
+        assertThat(expected.getValue()).isEqualByComparingTo("5.00");
         // Whoever is signed in confirmed it — never a name from the body.
         assertThat(who.getValue().by()).isEqualTo("op-1");
         assertThat(who.getValue().method()).isEqualTo(CashFloatEntry.Method.CASH);
@@ -128,8 +159,9 @@ class ReconciliationMerchantCashTest {
     void aRepeatedPressReplays() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
         UUID first = UUID.randomUUID();
-        when(cashFloat.remit(eq(SHOP), any(), any(), any())).thenReturn(Optional.of(
-                new CashFloatService.Remittance(first, SHOP, new BigDecimal("52.50"), 2, true)));
+        when(cashFloat.remit(eq(SHOP), any(), any(), any(), any())).thenReturn(Optional.of(
+                new CashFloatService.Remittance(first, SHOP, new BigDecimal("5.00"), 1, true,
+                        new BigDecimal("35.00"))));
 
         mvc.perform(post(REMIT).contentType(MediaType.APPLICATION_JSON).content(COUNTED))
                 .andExpect(status().isOk())
@@ -138,28 +170,67 @@ class ReconciliationMerchantCashTest {
     }
 
     @Test
-    @DisplayName("answers 409 with the till's figure when a pickup was paid meanwhile")
+    @DisplayName("answers 409 with what the shop owes now when a pickup was paid meanwhile")
     void theTillMoved() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
-        when(cashFloat.remit(eq(SHOP), any(), any(), any()))
-                .thenThrow(new CashFloatService.AmountChangedException(new BigDecimal("64")));
+        when(cashFloat.remit(eq(SHOP), any(), any(), any(), any()))
+                .thenThrow(new CashFloatService.AmountChangedException(new BigDecimal("6.56")));
 
         mvc.perform(post(REMIT).contentType(MediaType.APPLICATION_JSON).content(COUNTED))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("AMOUNT_CHANGED"))
-                .andExpect(jsonPath("$.current").value("64.00"));
+                .andExpect(jsonPath("$.current").value("6.56"))
+                .andExpect(jsonPath("$.error").value(startsWith("The shop owes 6.56 now")));
     }
 
     @Test
     @DisplayName("answers 409 to a key that already recorded something else")
     void aReusedKey() throws Exception {
         signedInAs("op-1", "BACKOFFICE");
-        when(cashFloat.remit(eq(SHOP), any(), any(), any()))
+        when(cashFloat.remit(eq(SHOP), any(), any(), any(), any()))
                 .thenThrow(new CashFloatService.RequestKeyReusedException());
 
         mvc.perform(post(REMIT).contentType(MediaType.APPLICATION_JSON).content(COUNTED))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("REQUEST_KEY_REUSED"));
+    }
+
+    @Test
+    @DisplayName("answers 409 when an account holding a till and a rider's bag was not told which "
+            + "is paying")
+    void anAccountHoldingBothMustSayWhich() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+        when(cashFloat.remit(eq(SHOP), any(), any(), any(), isNull()))
+                .thenThrow(new CashFloatService.HolderKindRequiredException());
+
+        mvc.perform(post(REMIT).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedAmount\":\"53.25\",\"requestKey\":\"till-key-0002\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("HOLDER_KIND_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("answers 400 to a shop's payment that names no amount")
+    void aShopsTillNeedsItsAmount() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+        when(cashFloat.remit(eq(SHOP), any(), isNull(), any(), isNull()))
+                .thenThrow(new CashFloatService.AmountRequiredException());
+
+        // What a page from before V52 sent: no body at all.
+        mvc.perform(post(REMIT))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AMOUNT_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("refuses a holder kind nobody defined, recording nothing")
+    void anUnknownKindIsRefused() throws Exception {
+        signedInAs("op-1", "BACKOFFICE");
+
+        mvc.perform(post(REMIT).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedAmount\":\"5.00\",\"holderKind\":\"CUSTOMER\"}"))
+                .andExpect(status().isBadRequest());
+        verify(cashFloat, never()).remit(any(), any(), any(), any(), any());
     }
 
     /**
@@ -178,7 +249,8 @@ class ReconciliationMerchantCashTest {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/accounting/float")).andExpect(status().isForbidden());
 
-        verify(cashFloat, never()).remit(any(), any(), any(), any());
+        verify(cashFloat, never()).remit(any(), any(), any(), any(), any());
+        verify(cashFloat, never()).shopTills();
         verify(carrierCash, never()).cashOnHand();
     }
 }
