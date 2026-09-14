@@ -13,7 +13,8 @@ import 'visible_poller.dart';
 /// Which conversations a merchant sees is decided by the server — the shops Product Service confirms
 /// the signed-in merchant owns — so this screen passes no shop id and cannot ask for another shop's
 /// messages. Only conversations with something in them are listed: a customer who opened the chat
-/// and wrote nothing is not a message.
+/// and wrote nothing is not a message. A conversation last opened about an order — by its customer
+/// from the order, or by the shop from the order's "Chat with customer" — names that order on its row.
 ///
 /// Shared by the mobile merchant shell (pushed from Settings, with a back header) and the portal's
 /// merchant rail ([embedded], where the rail draws the chrome and the page carries its own title).
@@ -220,6 +221,7 @@ class _ShopInboxScreenState extends State<ShopInboxScreen> {
             : raw;
     final String? when = _when(context, thread.lastMessageAt);
     final bool unread = thread.unread > 0;
+    final String? order = shopThreadOrderLabel(thread, t);
 
     return YdCard(
       onTap: () => unawaited(_open(thread)),
@@ -254,6 +256,16 @@ class _ShopInboxScreenState extends State<ShopInboxScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 11, color: DeliveryColors.muted),
+                  ),
+                // The order the conversation was last opened about, by its customer or by the shop: a
+                // shop with two jobs on the go for one customer should not have to scroll back to know.
+                if (order != null)
+                  Text(
+                    order,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w600, color: DeliveryColors.muted),
                   ),
                 if (preview != null) ...<Widget>[
                   const SizedBox(height: 2),

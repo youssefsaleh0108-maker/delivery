@@ -46,11 +46,16 @@ Map<String, dynamic> _thread({
   int unread = 0,
   String? preview,
   String? previewSide,
+  String storeId = 's1',
+  String storeName = 'Abu Hassan Mini Market',
+  String? orderId,
+  String? orderShortId,
+  String? orderKind,
 }) =>
     <String, dynamic>{
       'id': id,
-      'storeId': 's1',
-      'storeName': 'Abu Hassan Mini Market',
+      'storeId': storeId,
+      'storeName': storeName,
       'customerName': customerName,
       'yourSide': side,
       'open': open,
@@ -59,6 +64,9 @@ Map<String, dynamic> _thread({
       'unread': unread,
       'lastMessagePreview': preview,
       'lastMessageSide': previewSide,
+      'orderId': orderId,
+      'orderShortId': orderShortId,
+      'orderKind': orderKind,
     };
 
 Map<String, dynamic> _message(int sequence, String side, {required bool mine, required String text}) =>
@@ -314,5 +322,126 @@ void main() {
         lessThan(tester.getTopLeft(find.text('عندكم حلوم؟')).dx),
         reason: "In Arabic the shop's own words sit against the left.");
     expect(tester.takeException(), isNull);
+  });
+
+  group('the order a conversation is about', () {
+    Map<String, dynamic> about({
+      required String shortId,
+      String? customerName = 'Tania K.',
+      String storeName = 'Al Fakhry Press',
+      String preview = 'Are the cards ready?',
+    }) =>
+        _thread(
+          customerName: customerName,
+          storeName: storeName,
+          preview: preview,
+          previewSide: 'CUSTOMER',
+          orderId: '$shortId-9abc-4def-8000-000000000001',
+          orderShortId: shortId,
+          orderKind: 'SERVICE',
+        );
+
+    /// A server holding [thread]: the inbox lists [inbox] (the thread alone by default), and the
+    /// conversation answers with the thread as it is kept.
+    _FakeChat serving(Map<String, dynamic> thread, {List<Map<String, dynamic>>? inbox}) =>
+        _FakeChat((RequestOptions r) {
+          if (r.path == '/api/chat/shop-threads/inbox') {
+            return (status: 200, body: inbox ?? <Map<String, dynamic>>[thread]);
+          }
+          if (r.method == 'GET') {
+            return (
+              status: 200,
+              body: <String, dynamic>{'thread': thread, 'messages': <dynamic>[], 'more': false}
+            );
+          }
+          return (status: 200, body: <String, dynamic>{'updated': 0});
+        });
+
+    test('is named by its short id as it came, kept left to right, and not named without an order', () {
+      final ShopThread labelled = ShopThread.fromJson(about(shortId: '5f0c2a9e'));
+
+      expect(shopThreadOrderLabel(labelled, en), en.svcChatOrderLabel('\u20665f0c2a9e\u2069'));
+      expect(shopThreadOrderLabel(labelled, ar), ar.svcChatOrderLabel('\u20665f0c2a9e\u2069'));
+      expect(shopThreadOrderLabel(ShopThread.fromJson(_thread()), en), isNull);
+    });
+
+    testWidgets('an inbox row names the order, and a row without one names none',
+        (WidgetTester tester) async {
+      final Map<String, dynamic> labelled = about(shortId: '5f0c2a9e');
+      final _FakeChat chat = serving(labelled, inbox: <Map<String, dynamic>>[
+        labelled,
+        _thread(id: 't2', customerName: 'Rami S.', preview: 'Thanks!', previewSide: 'CUSTOMER'),
+      ]);
+
+      await pump(tester, ShopInboxScreen(api: chat.api));
+
+      expect(find.text(shopThreadOrderLabel(ShopThread.fromJson(labelled), en)!), findsOneWidget);
+      expect(find.textContaining(en.svcChatOrderLabel('').trim()), findsOneWidget,
+          reason: 'Only the conversation opened about an order says so.');
+    });
+
+    testWidgets("the conversation's header names the order under the customer",
+        (WidgetTester tester) async {
+      final Map<String, dynamic> labelled = about(shortId: '5f0c2a9e');
+
+      await pump(tester,
+          ShopThreadScreen(api: serving(labelled).api, thread: ShopThread.fromJson(labelled)));
+
+      expect(find.text('Tania K.'), findsOneWidget);
+      expect(find.text(shopThreadOrderLabel(ShopThread.fromJson(labelled), en)!), findsOneWidget);
+    });
+
+    testWidgets("a conversation about no order says nothing about orders in its header",
+        (WidgetTester tester) async {
+      await pump(tester,
+          ShopThreadScreen(api: serving(_thread()).api, thread: ShopThread.fromJson(_thread())));
+
+      expect(find.text('Tania K.'), findsOneWidget);
+      expect(find.textContaining(en.svcChatOrderLabel('').trim()), findsNothing);
+    });
+
+    testWidgets('a long name, a second shop and the order fit a 320dp inbox row, and its header',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      const String longName = 'Jean-Pierre Dupont-Aznavourian';
+      const String longShop = 'Al Fakhry Press and Copy Centre of Greater Mar Mikhael';
+      final Map<String, dynamic> labelled =
+          about(shortId: '5f0c2a9e', customerName: longName, storeName: longShop);
+      final _FakeChat chat = serving(labelled, inbox: <Map<String, dynamic>>[
+        labelled,
+        _thread(id: 't2', storeId: 's2', preview: 'Thanks!', previewSide: 'CUSTOMER'),
+      ]);
+      final String label = shopThreadOrderLabel(ShopThread.fromJson(labelled), en)!;
+
+      await pump(tester, ShopInboxScreen(api: chat.api));
+      expect(find.text(longShop), findsOneWidget);
+      expect(find.text(label), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text(longName));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopThreadScreen), findsOneWidget);
+      expect(find.text(label), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('in Arabic, the row and the header name the order in Arabic, right to left',
+        (WidgetTester tester) async {
+      final Map<String, dynamic> labelled =
+          about(shortId: '12345678', customerName: 'تانيا ك.', preview: 'هل البطاقات جاهزة؟');
+      final String label = shopThreadOrderLabel(ShopThread.fromJson(labelled), ar)!;
+
+      await pump(tester, ShopInboxScreen(api: serving(labelled).api), locale: const Locale('ar'));
+      expect(find.text(label), findsOneWidget);
+      expect(Directionality.of(tester.element(find.text(label))), TextDirection.rtl);
+
+      await tester.tap(find.text('تانيا ك.'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopThreadScreen), findsOneWidget);
+      expect(find.text(label), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

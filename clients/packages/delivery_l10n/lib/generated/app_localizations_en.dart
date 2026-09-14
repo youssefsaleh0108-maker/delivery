@@ -12480,4 +12480,24 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcServiceOffersRow => 'Service offers';
+
+  @override
+  String svcChatOrderLabel(String ref) {
+    return 'Order $ref';
+  }
+
+  @override
+  String svcChatClosedOn(String date) {
+    return 'Chat about this order closed on $date';
+  }
+
+  @override
+  String get svcChatClosed => 'Chat about this order has closed';
+
+  @override
+  String get svcChatUnavailable => 'Chat is unavailable right now.';
+
+  @override
+  String get svcChatOrderNotFound =>
+      'Couldn\'t open this order\'s chat, so the order has been reloaded.';
 }

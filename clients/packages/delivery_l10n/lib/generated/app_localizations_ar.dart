@@ -12627,4 +12627,24 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcServiceOffersRow => 'خدماتك';
+
+  @override
+  String svcChatOrderLabel(String ref) {
+    return 'الطلب $ref';
+  }
+
+  @override
+  String svcChatClosedOn(String date) {
+    return 'أُغلقت المحادثة بشأن هذا الطلب في $date';
+  }
+
+  @override
+  String get svcChatClosed => 'أُغلقت المحادثة بشأن هذا الطلب';
+
+  @override
+  String get svcChatUnavailable => 'المحادثة غير متاحة حاليًا.';
+
+  @override
+  String get svcChatOrderNotFound =>
+      'تعذّر فتح محادثة هذا الطلب، فأعدنا تحميله.';
 }
