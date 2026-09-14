@@ -5667,7 +5667,7 @@
   "svcStatusDeclined": "Declined",
   "svcStatusNotCollected": "Not collected",
   "svcEstimatedCompletion": "Estimated completion",
-  "svcReadyBy": "Ready by",
+  "svcReadyByCaption": "Ready by",
   "svcEstimateAfterAccept": "{range}, confirmed once the provider accepts",
   "@svcEstimateAfterAccept": {"placeholders":{"range":{"type":"String"}}},
   "svcTurnaroundRange": "{min}–{max} hours",

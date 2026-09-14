@@ -19041,11 +19041,11 @@ abstract class DeliveryStrings {
   /// **'Estimated completion'**
   String get svcEstimatedCompletion;
 
-  /// No description provided for @svcReadyBy.
+  /// No description provided for @svcReadyByCaption.
   ///
   /// In en, this message translates to:
   /// **'Ready by'**
-  String get svcReadyBy;
+  String get svcReadyByCaption;
 
   /// No description provided for @svcEstimateAfterAccept.
   ///

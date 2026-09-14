@@ -11381,7 +11381,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get svcEstimatedCompletion => 'موعد الإنجاز المتوقع';
 
   @override
-  String get svcReadyBy => 'جاهز بحلول';
+  String get svcReadyByCaption => 'جاهز بحلول';
 
   @override
   String svcEstimateAfterAccept(String range) {

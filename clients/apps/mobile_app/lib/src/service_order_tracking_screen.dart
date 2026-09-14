@@ -356,7 +356,7 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
     }
     if (value == null) return null;
     // For a delivery the promise is when the work is ready, not when it arrives — said so.
-    final String caption = order.isPickup ? t.svcEstimatedCompletion : t.svcReadyBy;
+    final String caption = order.isPickup ? t.svcEstimatedCompletion : t.svcReadyByCaption;
     return YdCard.bordered(
       child: Row(
         children: <Widget>[

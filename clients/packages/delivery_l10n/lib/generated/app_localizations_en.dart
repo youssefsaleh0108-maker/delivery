@@ -11236,7 +11236,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get svcEstimatedCompletion => 'Estimated completion';
 
   @override
-  String get svcReadyBy => 'Ready by';
+  String get svcReadyByCaption => 'Ready by';
 
   @override
   String svcEstimateAfterAccept(String range) {

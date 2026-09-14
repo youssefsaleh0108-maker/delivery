@@ -332,7 +332,7 @@ void main() {
       expect(find.text(en.svcDeliveringTo('12 Rose Street')), findsOneWidget);
       expect(find.text(en.svcTimelineOutForDelivery), findsOneWidget);
       expect(find.text(en.svcShowNumberAtPickup), findsNothing);
-      expect(find.text(en.svcReadyBy.toUpperCase()), findsNothing,
+      expect(find.text(en.svcReadyByCaption.toUpperCase()), findsNothing,
           reason: 'the work is ready: there is nothing left to promise');
       expect(find.byType(OrderTrackingPanel), findsNothing);
       expect(find.text(en.svcPayCashDelivery), findsOneWidget);
