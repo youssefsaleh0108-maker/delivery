@@ -1,11 +1,15 @@
 package com.delivery.notifications.service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +56,19 @@ public class NotificationDispatchService {
     private final ObjectMapper objectMapper;
     private final String exchange;
     private final String defaultLocale;
+
+    /**
+     * The locale every event type is written in, and what a channel is sent in when the configured
+     * locale has no row for it. See {@link #templatesFor}.
+     */
+    private static final String FALLBACK_LOCALE = "en";
+
+    /**
+     * Each event type and channel already logged as sent in {@link #FALLBACK_LOCALE}, so a gap in the
+     * copy reaches the log once rather than once per notification. Bounded by the template table,
+     * not by traffic.
+     */
+    private final Set<String> fallbacksLogged = ConcurrentHashMap.newKeySet();
 
     public NotificationDispatchService(
             NotificationTemplateRepository templates,
@@ -107,7 +124,7 @@ public class NotificationDispatchService {
                                           Map<String, String> contacts, Map<String, String> values,
                                           String correlationId, String dedupeKey) {
 
-        List<NotificationTemplate> matching = templates.findByEventTypeAndLocale(eventType, defaultLocale);
+        List<NotificationTemplate> matching = templatesFor(eventType);
         if (matching.isEmpty()) {
             // Not an error: most events have no customer-facing message. Adding one is a template
             // row, not a code change.
@@ -177,6 +194,51 @@ public class NotificationDispatchService {
         }
 
         return created;
+    }
+
+    /**
+     * The rows to send for this event: the configured locale's, with the English row for any channel
+     * that locale has none for.
+     *
+     * <p><strong>Why a fallback.</strong> English is the only locale every event type is written in:
+     * V19's service rows are the first Arabic ones, and no basket row has an Arabic twin. Looked up in
+     * the configured locale alone, a default switched to ar found nothing for any basket event and
+     * sent nothing, said only at DEBUG as "nothing to send", which is how a platform goes quiet with
+     * nobody noticing; and while the default stayed en, the Arabic rows could never be sent at all.
+     * Filled per channel rather than per event, so a locale missing one channel's row still sends
+     * that channel, in English, instead of dropping it.
+     *
+     * <p>Logged at INFO, once per event type and channel for the life of the process: a gap in the
+     * copy is worth knowing about, but it is not a failure, and logged per send it would be most of
+     * the log. With English configured there is nothing to fill and nothing is looked up twice.
+     *
+     * <p>Still one locale for everybody. Choosing each recipient's own is not built, and until it is
+     * the default must stay en: set to ar, every customer, shop and rider would be sent whatever
+     * Arabic rows exist and English for the rest.
+     */
+    private List<NotificationTemplate> templatesFor(String eventType) {
+        List<NotificationTemplate> localised =
+                templates.findByEventTypeAndLocale(eventType, defaultLocale);
+        if (FALLBACK_LOCALE.equals(defaultLocale)) {
+            return localised;
+        }
+
+        Set<String> written = new HashSet<>();
+        localised.forEach(template -> written.add(template.getChannel()));
+
+        List<NotificationTemplate> rows = new ArrayList<>(localised);
+        for (NotificationTemplate english
+                : templates.findByEventTypeAndLocale(eventType, FALLBACK_LOCALE)) {
+            if (written.contains(english.getChannel())) {
+                continue;
+            }
+            rows.add(english);
+            if (fallbacksLogged.add(eventType + "|" + english.getChannel())) {
+                log.info("No {} template for {} on {}; sending the {} one", defaultLocale, eventType,
+                        english.getChannel(), FALLBACK_LOCALE);
+            }
+        }
+        return rows;
     }
 
     /**
