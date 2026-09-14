@@ -192,7 +192,8 @@ void main() {
       expect(order.availableActions, <OrderAction>[OrderAction.ready, OrderAction.cancel]);
       expect(order.declineReason, isNull);
       expect(order.wasCancelledAsNotCollected, isFalse);
-      expect(order.canCancelAsNotCollected(DateTime.utc(2030)), isFalse);
+      expect(order.canCancelAsNotCollected, isFalse);
+      expect(order.untilCancellableAsNotCollected(DateTime.utc(2030)), isNull);
     });
   });
 
@@ -239,14 +240,19 @@ void main() {
       expect(
           ServiceOrderRefusal.values.map((ServiceOrderRefusal r) => r.wire).whereType<String>(),
           <String>[
-            // ServiceOrderRefusedException.Refusal, in its order.
+            // ServiceOrderRefusedException.Refusal, in its order, and the decline refusal it gains.
             'ONE_SERVICE_AT_A_TIME', 'PACKS_OUT_OF_RANGE', 'FULFILMENT_NOT_OFFERED',
             'NOT_A_SERVICE_ORDER', 'STANDARD_ONLY', 'NOT_GIFTABLE', 'CASH_ONLY', 'NOT_IN_BASKET',
             'NOT_ON_BEHALF', 'CATEGORY_CLOSED', 'OFFER_NOT_ORDERABLE', 'DECLINE_REASON_REQUIRED',
-            'NOT_COLLECTABLE', 'UNCOLLECTED_TOO_SOON', 'RESERVED_CANCEL_REASON',
-            // OrderAttachmentGate.Refusal, as placement sends it.
-            'ATTACHMENTS_UNAVAILABLE', 'ATTACHMENT_REQUIRED', 'ATTACHMENTS_NOT_ACCEPTED',
-            'ATTACHMENT_NOT_USABLE',
+            'NOT_COLLECTABLE', 'UNCOLLECTED_TOO_SOON', 'RESERVED_CANCEL_REASON', 'NOT_DECLINABLE',
+            // The attachment gate's code while files cannot go with an order.
+            'ATTACHMENTS_UNAVAILABLE',
+            // OrderAttachmentService.Refusal, in its order: a file's upload and a placement naming
+            // it are refused alike. The gate's ATTACHMENT_REQUIRED, ATTACHMENTS_NOT_ACCEPTED and
+            // ATTACHMENT_NOT_USABLE are gone from the server, and from here.
+            'WRONG_TYPE', 'EMPTY', 'TOO_LARGE', 'TOO_MANY_WAITING', 'NOT_UPLOADED', 'EXPIRED',
+            'ALREADY_ATTACHED', 'TOO_MANY_FILES', 'DUPLICATE_FILE', 'NOT_ACCEPTED', 'REQUIRED',
+            'UNKNOWN_FILE',
           ]);
       expect(OrderAction.fromWire('COLLECTED'), OrderAction.collected);
       expect(OrderAction.collected.path, 'collected');
@@ -263,7 +269,8 @@ void main() {
       expect(order.isService, isFalse);
       // Not a pickup, so nothing a counter does is offered for it.
       expect(order.isPickup, isFalse);
-      expect(order.canCancelAsNotCollected(DateTime.utc(2030)), isFalse);
+      expect(order.canCancelAsNotCollected, isFalse);
+      expect(order.untilCancellableAsNotCollected(DateTime.utc(2030)), isNull);
     });
 
     test('null service fields read as what an order without them was', () {
@@ -336,26 +343,50 @@ void main() {
   });
 
   group('cancelling a pickup as not collected', () {
-    DeliveryOrder waiting({String status = 'READY', Object? fulfilment = 'PICKUP', String? from}) =>
+    DeliveryOrder waiting({
+      String status = 'READY',
+      Object? fulfilment = 'PICKUP',
+      List<Object?> actions = const <Object?>['COLLECTED'],
+      String? from = '2026-09-17T09:00:00Z',
+    }) =>
         DeliveryOrder.fromJson(_serviceOrder(
-            status: status, fulfilment: fulfilment, uncollectedCancellableAt: from));
+            status: status,
+            fulfilment: fulfilment,
+            actions: actions,
+            uncollectedCancellableAt: from));
 
-    test('unlocks when the customer\'s time is up, not a second sooner', () {
-      final DeliveryOrder order = waiting(from: '2026-09-17T09:00:00Z');
-
-      expect(order.canCancelAsNotCollected(DateTime.utc(2026, 9, 17, 8, 59, 59)), isFalse);
-      expect(order.canCancelAsNotCollected(DateTime.utc(2026, 9, 17, 9)), isTrue);
-      expect(order.canCancelAsNotCollected(DateTime.utc(2026, 9, 20)), isTrue);
+    test('unlocks when the server offers the shop its cancel, whatever the phone\'s clock says', () {
+      // Order Manager offers CANCEL beside COLLECTED once the wait is over by its own clock.
+      expect(waiting(actions: const <Object?>['COLLECTED', 'CANCEL']).canCancelAsNotCollected,
+          isTrue);
+      // Without it the wait is not over, however long ago the order said it would be: a phone whose
+      // clock runs ahead unlocks nothing.
+      expect(waiting(from: '2020-01-01T00:00:00Z').canCancelAsNotCollected, isFalse);
     });
 
     test('never for an order that is not a pickup still waiting at the counter', () {
-      final DateTime later = DateTime.utc(2030);
+      const List<Object?> cancel = <Object?>['CANCEL'];
 
-      expect(waiting(status: 'DELIVERED', from: '2026-09-17T09:00:00Z').canCancelAsNotCollected(later),
-          isFalse);
-      expect(waiting(fulfilment: 'DELIVERY', from: '2026-09-17T09:00:00Z')
-          .canCancelAsNotCollected(later), isFalse);
-      expect(waiting().canCancelAsNotCollected(later), isFalse);
+      expect(waiting(status: 'PREPARING', actions: cancel).canCancelAsNotCollected, isFalse);
+      expect(waiting(fulfilment: 'DELIVERY', actions: cancel).canCancelAsNotCollected, isFalse);
+      expect(waiting(fulfilment: 'LOCKER', actions: cancel).canCancelAsNotCollected, isFalse);
+    });
+
+    test('counts down by the phone\'s clock to the time the order says, for display alone', () {
+      final DeliveryOrder order = waiting();
+
+      expect(order.untilCancellableAsNotCollected(DateTime.utc(2026, 9, 17, 8, 59, 59)),
+          const Duration(seconds: 1));
+      expect(order.untilCancellableAsNotCollected(DateTime.utc(2026, 9, 17, 9)), Duration.zero);
+      expect(order.untilCancellableAsNotCollected(DateTime.utc(2026, 9, 20)), Duration.zero);
+      // Counting down unlocks nothing: only the server's CANCEL does.
+      expect(order.canCancelAsNotCollected, isFalse);
+
+      // Nothing to count down to: no time sent, or not a pickup waiting at the counter.
+      final DateTime now = DateTime.utc(2026, 9, 15);
+      expect(waiting(from: null).untilCancellableAsNotCollected(now), isNull);
+      expect(waiting(status: 'DELIVERED').untilCancellableAsNotCollected(now), isNull);
+      expect(waiting(fulfilment: 'DELIVERY').untilCancellableAsNotCollected(now), isNull);
     });
   });
 
@@ -522,6 +553,50 @@ void main() {
       }
     });
 
+    test('a file placement refuses comes back with the upload service\'s own code, named', () async {
+      final Map<String, ServiceOrderRefusal> byCode = <String, ServiceOrderRefusal>{
+        'WRONG_TYPE': ServiceOrderRefusal.fileWrongType,
+        'EMPTY': ServiceOrderRefusal.fileEmpty,
+        'TOO_LARGE': ServiceOrderRefusal.fileTooLarge,
+        'TOO_MANY_WAITING': ServiceOrderRefusal.tooManyFilesWaiting,
+        'NOT_UPLOADED': ServiceOrderRefusal.fileNotUploaded,
+        'EXPIRED': ServiceOrderRefusal.fileExpired,
+        'ALREADY_ATTACHED': ServiceOrderRefusal.fileAlreadyAttached,
+        'TOO_MANY_FILES': ServiceOrderRefusal.tooManyFiles,
+        'DUPLICATE_FILE': ServiceOrderRefusal.duplicateFile,
+        'NOT_ACCEPTED': ServiceOrderRefusal.filesNotAccepted,
+        'REQUIRED': ServiceOrderRefusal.fileRequired,
+        'UNKNOWN_FILE': ServiceOrderRefusal.unknownFile,
+      };
+      for (final MapEntry<String, ServiceOrderRefusal> expected in byCode.entries) {
+        // As ApiExceptionHandler writes an AttachmentRuleException.
+        final s = _orders((RequestOptions o) => (422, <String, dynamic>{
+              'type': 'about:blank',
+              'title': 'Attachment refused',
+              'status': 422,
+              'detail': 'One of the files has been deleted',
+              'code': expected.key,
+            }));
+
+        expect(
+            await s.api.place(_pickup()),
+            isA<ServiceOrderRefused>()
+                .having((ServiceOrderRefused r) => r.refusal, 'refusal', expected.value)
+                .having((ServiceOrderRefused r) => r.code, 'code', expected.key)
+                .having((ServiceOrderRefused r) => r.detail, 'detail',
+                    'One of the files has been deleted'),
+            reason: expected.key);
+      }
+      // The attachment gate's old codes, which Order Manager no longer sends, name nothing here.
+      for (final String old in <String>[
+        'ATTACHMENT_REQUIRED',
+        'ATTACHMENTS_NOT_ACCEPTED',
+        'ATTACHMENT_NOT_USABLE',
+      ]) {
+        expect(ServiceOrderRefusal.maybeFromWire(old), isNull, reason: old);
+      }
+    });
+
     test('an unreadable services directory is an outcome of its own', () async {
       final s = _orders((RequestOptions o) => (503, <String, dynamic>{
             'title': 'Temporarily unavailable',
@@ -545,6 +620,39 @@ void main() {
 
         await expectLater(s.api.place(_pickup()), throwsA(isA<DioException>()),
             reason: '$answer');
+      }
+    });
+
+    test('a basket or a gift is thrown whatever its code, a service code included, so its checkout '
+        'still shows Order Manager\'s own sentence', () async {
+      // A basket holding a service offer, and a gift of one: neither names a fulfilment.
+      final OrderSubmission basket = OrderSubmission(
+        items: <OrderLineSubmission>[
+          (productId: 'offer-1', qty: 1, optionIds: const <String>[]),
+          (productId: 'p1', qty: 2, optionIds: const <String>[]),
+        ],
+        deliveryAddress: '12 Rose Street',
+      );
+      final OrderSubmission gift = OrderSubmission(
+        items: <OrderLineSubmission>[(productId: 'offer-1', qty: 1, optionIds: const <String>[])],
+        deliveryAddress: '12 Rose Street',
+        gift: const GiftDetails(recipientName: 'Maya', recipientPhone: '+96171234567'),
+      );
+      for (final (OrderSubmission attempt, int status, Map<String, dynamic> body)
+          in <(OrderSubmission, int, Map<String, dynamic>)>[
+        (basket, 422, _refusal('ONE_SERVICE_AT_A_TIME')),
+        (basket, 422, _refusal('OFFER_NOT_ORDERABLE')),
+        (basket, 422, _refusal('EXPIRED')),
+        (gift, 422, _refusal('NOT_GIFTABLE')),
+        (basket, 503, <String, dynamic>{'status': 503, 'code': 'SERVICES_DIRECTORY_UNAVAILABLE'}),
+      ]) {
+        final s = _orders((RequestOptions o) => (status, body));
+
+        await expectLater(
+            s.api.place(attempt),
+            throwsA(isA<DioException>()
+                .having((DioException e) => e.response?.data, 'response body', body)),
+            reason: '$body');
       }
     });
   });
@@ -729,6 +837,30 @@ void main() {
       ]);
     });
 
+    test('a note too long for the reason Order Manager takes is cut to fit, and says it was cut',
+        () async {
+      final s = _orders((RequestOptions o) =>
+          (200, _serviceOrder(status: 'CANCELLED', cancelReason: 'NOT_COLLECTED')));
+      final String fits = 'a' * OrderApi.notCollectedNoteMaxLength;
+      final String emojiAtTheCut = '${'a' * (OrderApi.notCollectedNoteMaxLength - 2)}😀😀';
+
+      await s.api.cancelNotCollected('o-1', note: fits);
+      await s.api.cancelNotCollected('o-1', note: 'Waited a week. ' * 40);
+      await s.api.cancelNotCollected('o-1', note: emojiAtTheCut);
+
+      final List<String> reasons = s.server.requests
+          .map((RequestOptions o) => (o.data as Map<String, dynamic>)['reason'] as String)
+          .toList();
+      // CancelRequest takes 500 characters, and "NOT_COLLECTED: " is 15 of them.
+      expect(OrderApi.notCollectedNoteMaxLength, 485);
+      expect(reasons[0], 'NOT_COLLECTED: $fits');
+      expect(reasons[0].length, 500);
+      expect(reasons[1], 'NOT_COLLECTED: ${'Waited a week. ' * 32}Wait…');
+      expect(reasons[1].length, 500);
+      // An emoji is two code units, as Java counts it too: the cut takes it whole, never half.
+      expect(reasons[2], 'NOT_COLLECTED: ${'a' * 483}…');
+    });
+
     test('the server\'s refusals are outcomes naming their code, one it does not know included',
         () async {
       Future<ServiceOrderActionResult> refusedWith(
@@ -751,6 +883,11 @@ void main() {
               (OrderApi api) => api.decline('o-1', DeclineReason.tooBusy)),
           isA<ServiceOrderActionRefused>().having((ServiceOrderActionRefused r) => r.refusal,
               'refusal', ServiceOrderRefusal.reservedCancelReason));
+      expect(
+          await refusedWith(
+              'NOT_DECLINABLE', (OrderApi api) => api.decline('o-1', DeclineReason.tooBusy)),
+          isA<ServiceOrderActionRefused>().having((ServiceOrderActionRefused r) => r.refusal,
+              'refusal', ServiceOrderRefusal.notDeclinable));
       expect(
           await refusedWith('SHOP_ON_FIRE', (OrderApi api) => api.collected('o-1')),
           isA<ServiceOrderActionRefused>()

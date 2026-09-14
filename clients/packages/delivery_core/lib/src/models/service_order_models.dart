@@ -162,8 +162,11 @@ enum DeclineReason {
 
 /// Why Order Manager refused a service order, or refused to move one: the `code` on its 422.
 ///
-/// Mirrors `ServiceOrderRefusedException.Refusal`, and the attachment gate's codes as placement sends
-/// them. A screen says each in the reader's own language; the server's English sentence is for logs.
+/// Mirrors `ServiceOrderRefusedException.Refusal`, the attachment gate's one code for files that
+/// cannot go with an order yet, and the order attachment service's `Refusal` — whose twelve codes
+/// refuse a file a placement names just as they refuse its upload, so the words a screen has for an
+/// upload's refusal fit a placement's too. A screen says each in the reader's own language; the
+/// server's English sentence is for logs.
 enum ServiceOrderRefusal {
   /// More than one line: a service is ordered one at a time.
   oneServiceAtATime('ONE_SERVICE_AT_A_TIME'),
@@ -210,20 +213,55 @@ enum ServiceOrderRefusal {
   uncollectedTooSoon('UNCOLLECTED_TOO_SOON'),
 
   /// A cancel reason that begins with a code only Order Manager writes. From a provider's app this is
-  /// a decline sent for an order that is no longer new — accepted meanwhile, say — so read it again.
+  /// a decline that a server from before [notDeclinable] refused for an order no longer new —
+  /// accepted meanwhile, say — so read it again.
   reservedCancelReason('RESERVED_CANCEL_REASON'),
+
+  /// A decline sent for an order that can no longer be declined: accepted meanwhile, by another
+  /// device at the counter, say. Read the order again.
+  notDeclinable('NOT_DECLINABLE'),
 
   /// Files cannot go with an order yet, so an offer that needs one cannot be ordered.
   attachmentsUnavailable('ATTACHMENTS_UNAVAILABLE'),
 
-  /// The offer needs a file and the order names none.
-  attachmentRequired('ATTACHMENT_REQUIRED'),
+  // A file the order names, refused with the code the order attachment service gives it
+  // (`OrderAttachmentService.Refusal`): the wire values of delivery_core's `AttachmentRefusal`.
 
-  /// The offer takes no files and the order names some.
-  attachmentsNotAccepted('ATTACHMENTS_NOT_ACCEPTED'),
+  /// A file that is not a PDF, JPEG or PNG.
+  fileWrongType('WRONG_TYPE'),
 
-  /// A named file cannot go on this order: missing, unconfirmed, not the customer's, or already used.
-  attachmentNotUsable('ATTACHMENT_NOT_USABLE'),
+  /// A file with no bytes at all.
+  fileEmpty('EMPTY'),
+
+  /// A file over the size limit.
+  fileTooLarge('TOO_LARGE'),
+
+  /// The customer already holds as many uploads waiting for an order as the server allows.
+  tooManyFilesWaiting('TOO_MANY_WAITING'),
+
+  /// A file whose upload never arrived in full: upload it again.
+  fileNotUploaded('NOT_UPLOADED'),
+
+  /// A file deleted because it was not ordered in time: upload it again.
+  fileExpired('EXPIRED'),
+
+  /// A file already on an order.
+  fileAlreadyAttached('ALREADY_ATTACHED'),
+
+  /// More files than one order may carry.
+  tooManyFiles('TOO_MANY_FILES'),
+
+  /// The same file named twice.
+  duplicateFile('DUPLICATE_FILE'),
+
+  /// Files named for an offer that takes none.
+  filesNotAccepted('NOT_ACCEPTED'),
+
+  /// No file named for an offer that needs one.
+  fileRequired('REQUIRED'),
+
+  /// A file that is not the customer's own, or does not exist: one answer for both.
+  unknownFile('UNKNOWN_FILE'),
 
   /// A code this build does not know. Still a refusal — nothing was placed or moved — and
   /// [ServiceRefusalOutcome.code] keeps the server's spelling of it.

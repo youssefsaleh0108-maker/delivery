@@ -49,8 +49,10 @@ class OrderApi {
   ///
   /// A service order is placed here too, with its fulfilment, files and instructions in the
   /// submission, and everything above holds for it. What only a service order can meet comes back as
-  /// an outcome as well: [ServiceOrderRefused] for a rule it broke, and [ServicesDirectoryUnavailable]
-  /// when the server could not read which categories are open. Neither placed anything.
+  /// an outcome as well: [ServiceOrderRefused] for a rule it broke — a file included — and
+  /// [ServicesDirectoryUnavailable] when the server could not read which categories are open. Neither
+  /// placed anything. Only for a submission that names its [OrderSubmission.fulfilment], as every
+  /// service order does: a basket's answers are thrown whatever code they carry.
   ///
   /// Everything else — 422 (item gone, shop closed, below the minimum), 402 (payment declined),
   /// 400, and any network failure — is thrown as a `DioException`, exactly as before.
@@ -80,15 +82,21 @@ class OrderApi {
             return OrderAlreadyPlaced(body['orderId'] as String);
         }
       }
-      // Only the codes a service order is refused with. The checkouts that send baskets read their
-      // own refusals (SHOP_REFUSED and the rest) from the exception, so those stay thrown.
-      final _Refusal? refused = _refusalOf(e, anyCode: false);
-      if (refused != null) {
-        return ServiceOrderRefused(
-            refusal: refused.refusal, code: refused.code, detail: refused.detail);
-      }
-      if (_directoryUnavailable(e)) {
-        return const ServicesDirectoryUnavailable();
+      // A service order's own answers, and only a service order's: every one names how the customer
+      // gets it. A basket is thrown whatever its code, exactly as before service orders — one holding
+      // a service offer is refused with a service code (ONE_SERVICE_AT_A_TIME, OFFER_NOT_ORDERABLE,
+      // NOT_GIFTABLE on a gift), and the checkouts that send baskets show Order Manager's own sentence
+      // from the exception, the only explanation they have. SHOP_REFUSED and the rest, and codes this
+      // build does not know, stay thrown for a service order too.
+      if (submission.fulfilment != null) {
+        final _Refusal? refused = _refusalOf(e, anyCode: false);
+        if (refused != null) {
+          return ServiceOrderRefused(
+              refusal: refused.refusal, code: refused.code, detail: refused.detail);
+        }
+        if (_directoryUnavailable(e)) {
+          return const ServicesDirectoryUnavailable();
+        }
       }
       rethrow;
     }
@@ -251,7 +259,8 @@ class OrderApi {
   /// (`PROVIDER_DECLINED: TOO_BUSY`), which the customer's screen says in their own language.
   ///
   /// Only a new order is declined. The same call on an order accepted meanwhile — by another device
-  /// at the counter, say — is refused as [ServiceOrderRefusal.reservedCancelReason]: read it again.
+  /// at the counter, say — is refused as [ServiceOrderRefusal.notDeclinable] (or, by a server that
+  /// predates that code, as [ServiceOrderRefusal.reservedCancelReason]): read it again.
   /// [DeclineReason.unknown] names no reason and is refused here, before anything is sent.
   Future<ServiceOrderActionResult> decline(String orderId, DeclineReason reason) {
     if (reason == DeclineReason.unknown) {
@@ -269,8 +278,14 @@ class OrderApi {
   /// Only once the customer's time is up ([DeliveryOrder.canCancelAsNotCollected]); sooner is refused
   /// as [ServiceOrderRefusal.uncollectedTooSoon], and the order's
   /// [DeliveryOrder.uncollectedCancellableAt] says from when it may be sent.
+  ///
+  /// A [note] longer than [notCollectedNoteMaxLength] is cut to fit and ends in "…" — cut rather than
+  /// refused. Order Manager takes a cancel reason of 500 characters at most and answers a longer one
+  /// with a 400, and no screen can promise to stay under that: a text field's limit counts the
+  /// characters a reader sees, while the server counts UTF-16 code units, two or more for an emoji. A
+  /// cut note loses its end; a refused one would lose the cancel. The cut never splits an emoji.
   Future<ServiceOrderActionResult> cancelNotCollected(String orderId, {String? note}) {
-    final String words = note?.trim() ?? '';
+    final String words = _fitNote(note?.trim() ?? '');
     return _serviceStep(() => _dio.post<dynamic>(
           '/api/orders/$orderId/cancel',
           data: <String, dynamic>{
@@ -279,6 +294,32 @@ class OrderApi {
                 : '${DeliveryOrder.notCollectedCancelReason}: $words',
           },
         ));
+  }
+
+  /// The most of a shop's own words [cancelNotCollected] sends: the 500 characters Order Manager
+  /// takes for a cancel reason (`CancelRequest`), less the `NOT_COLLECTED: ` before them. A note
+  /// field's limit, so the shop sees where its words stop.
+  static const int notCollectedNoteMaxLength =
+      _cancelReasonMaxLength - '${DeliveryOrder.notCollectedCancelReason}: '.length;
+
+  /// The longest cancel reason Order Manager takes, in UTF-16 code units: `String.length`, in Dart
+  /// and in Java alike.
+  static const int _cancelReasonMaxLength = 500;
+
+  /// [words] as they fit after `NOT_COLLECTED: `: unchanged when they do, otherwise cut and ended
+  /// with an ellipsis — never between the two code units of one character.
+  static String _fitNote(String words) {
+    if (words.length <= notCollectedNoteMaxLength) {
+      return words;
+    }
+    // One unit is the ellipsis's.
+    int end = notCollectedNoteMaxLength - 1;
+    final int last = words.codeUnitAt(end - 1);
+    if (last >= 0xD800 && last <= 0xDBFF) {
+      // The first half of a pair whose second half is past the cut: it goes with it.
+      end -= 1;
+    }
+    return '${words.substring(0, end).trimRight()}…';
   }
 
   // ---------------------------------------------------------------- rider
@@ -525,9 +566,10 @@ class OrderApi {
 
   /// The refusal a 422 names in its `code`, or null when it names none.
   ///
-  /// [anyCode] false keeps only the codes a service order is refused with, for the placement path
-  /// baskets share. True reads any code — one this build does not know as
-  /// [ServiceOrderRefusal.unknown] — for the calls only a service order makes.
+  /// [anyCode] false keeps only the codes a service order is refused with, for a service order's
+  /// placement, where everything else is thrown as a basket's refusals are. True reads any code — one
+  /// this build does not know as [ServiceOrderRefusal.unknown] — for the calls only a service order
+  /// makes.
   static _Refusal? _refusalOf(DioException e, {required bool anyCode}) {
     final Object? body = e.response?.data;
     if (e.response?.statusCode != 422 || body is! Map) {

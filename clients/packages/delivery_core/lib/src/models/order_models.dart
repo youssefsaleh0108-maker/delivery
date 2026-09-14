@@ -353,7 +353,8 @@ class DeliveryOrder {
   final DateTime? estimatedReadyAt;
 
   /// When a pickup waiting at the counter may be cancelled by its shop as not collected. Null on every
-  /// other order, and on a pickup not yet ready or already collected. See [canCancelAsNotCollected].
+  /// other order, and on a pickup not yet ready or already collected. For a countdown
+  /// ([untilCancellableAsNotCollected]); whether the shop may cancel is [canCancelAsNotCollected].
   final DateTime? uncollectedCancellableAt;
 
   /// Short form for display. Keycloak subs and order ids are full UUIDs, which are unreadable in a
@@ -403,16 +404,33 @@ class DeliveryOrder {
     return rest.isEmpty || rest.startsWith(':');
   }
 
-  /// Whether the customer's time to collect this pickup is up by [now]: the moment the shop's "Cancel
-  /// as not collected" unlocks.
+  /// Whether the shop may cancel this pickup as not collected: the server offered it CANCEL on a
+  /// pickup waiting at the counter — the moment "Cancel as not collected" unlocks.
   ///
-  /// For a card that counts down to it without reading the order again every minute. It is not
-  /// permission: only the order's own shop may send that cancel, and the server decides again when
-  /// it arrives — answering UNCOLLECTED_TOO_SOON to a phone whose clock runs ahead. Always false for
+  /// The server's say, not the phone's clock. Order Manager offers a shop CANCEL on a READY pickup
+  /// only once its customer's time to collect is up by its own clock, so a phone whose clock runs
+  /// ahead cannot unlock the button early, nor one whose clock runs behind keep it locked. When a
+  /// countdown ([untilCancellableAsNotCollected]) reaches zero, read the order again: its actions say
+  /// whether the time is really up.
+  ///
+  /// Read on the shop's own copy of the order. The back office, which may cancel any order before it
+  /// ends, is offered CANCEL on every READY pickup, and its cancel is its own. Always false for
   /// anything but a pickup still waiting at the counter.
-  bool canCancelAsNotCollected(DateTime now) {
+  bool get canCancelAsNotCollected =>
+      isPickup && status == OrderStatus.ready && availableActions.contains(OrderAction.cancel);
+
+  /// How long the customer still has to collect this pickup, by [now]: for a card's countdown to
+  /// "Cancel as not collected" without reading the order every minute — never for the button, which
+  /// is [canCancelAsNotCollected].
+  ///
+  /// [Duration.zero] once the time is up by [now]. Null when there is nothing to count down to: an
+  /// order that is not a pickup waiting at the counter, or one whose time the server did not send.
+  Duration? untilCancellableAsNotCollected(DateTime now) {
     final DateTime? from = uncollectedCancellableAt;
-    return isPickup && status == OrderStatus.ready && from != null && !now.isBefore(from);
+    if (!isPickup || status != OrderStatus.ready || from == null) {
+      return null;
+    }
+    return now.isBefore(from) ? from.difference(now) : Duration.zero;
   }
 
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) => DeliveryOrder(

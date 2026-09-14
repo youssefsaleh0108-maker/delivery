@@ -233,7 +233,8 @@ class OrderSubmission {
 
 /// What came of sending an [OrderSubmission]. Anything else — a refused basket (422), a declined
 /// payment (402), a network failure — is thrown as the `DioException` it always was. Only a service
-/// order's own refusals come back as outcomes ([ServiceOrderRefused], [ServicesDirectoryUnavailable]).
+/// order — a submission naming its [OrderSubmission.fulfilment] — has refusals of its own that come
+/// back as outcomes ([ServiceOrderRefused], [ServicesDirectoryUnavailable]).
 sealed class PlaceOrderResult {
   const PlaceOrderResult();
 }
@@ -274,9 +275,11 @@ final class OrderAlreadyPlaced extends PlaceOrderResult {
 /// Decided before anything is saved, so nothing exists under the key. Say it in the customer's words
 /// and let them change the order; sending the same submission again can only be refused again.
 ///
-/// Only the codes a service order is refused with. Every other 422 — a closed shop, an item gone, a
-/// multi-shop refusal naming its shop — is thrown as it always was, because the checkouts that send
-/// baskets read those from the exception.
+/// Only for a service order, and only the codes a service order is refused with. Every other 422 — a
+/// closed shop, an item gone, a multi-shop refusal naming its shop — is thrown as it always was, and
+/// so is a basket's whatever its code: a basket holding a service offer is refused with a service
+/// code too (ONE_SERVICE_AT_A_TIME, NOT_GIFTABLE on a gift), and the checkouts that send baskets show
+/// Order Manager's own sentence from the exception.
 final class ServiceOrderRefused extends PlaceOrderResult implements ServiceRefusalOutcome {
   const ServiceOrderRefused({required this.refusal, required this.code, this.detail});
 
