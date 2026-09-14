@@ -305,9 +305,9 @@ public class CatalogService {
                 ? null
                 : newTerms(product.getId(), request.service());
 
-        // The saved instance, not the one handed in. An entity with a client-assigned id is not
-        // "new" to Spring Data, so save() merges and the managed copy — the only one the database
-        // ever writes back into, timestamps included — is the one it returns.
+        // The saved instance, whatever save() did with the one handed in: the managed one is the only
+        // one the database writes back into, timestamps included. The id is assigned here, so Spring
+        // Data tells a new product by its version, which is null until the first save, and persists it.
         Product saved = products.save(product);
         // After the product, whose row the terms reference.
         ServiceTerms savedTerms = terms == null ? null : serviceTerms.save(terms);

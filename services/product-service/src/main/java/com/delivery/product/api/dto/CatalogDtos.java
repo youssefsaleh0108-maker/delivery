@@ -138,7 +138,38 @@ public final class CatalogDtos {
              * <p>Null for a goods product. Goods screens never draw it, and the goods shelf is not made
              * to read every product's options for a figure nobody shows.
              */
-            BigDecimal fromPrice) {
+            BigDecimal fromPrice,
+            /**
+             * Back office's hold on this offer, or null when there is none (V36).
+             *
+             * <p>What the provider's offer list and offer screen show: that YouDrop took the offer
+             * down, when, and why, and so why publishing, resuming and pausing it are refused until
+             * back office restores it. No customer ever receives one: a taken-down offer is ARCHIVED,
+             * and only its provider can read a product that is not on sale.
+             */
+            ModerationResponse moderation) {
+    }
+
+    /** A taken-down offer's hold, as its provider and back office read it. See {@link Product#takeDown}. */
+    public record ModerationResponse(
+            State state,
+            /** Back office's reason, in its own words. */
+            String reason,
+            Instant takenDownAt) {
+
+        public enum State {
+            /** Off sale until back office restores it. */
+            TAKEN_DOWN
+        }
+
+        /** The product's hold as a response, or null when it has none. */
+        public static ModerationResponse of(Product product) {
+            if (!product.isTakenDown()) {
+                return null;
+            }
+            return new ModerationResponse(State.TAKEN_DOWN, product.getTakedownReason(),
+                    product.getTakenDownAt());
+        }
     }
 
     public record ServiceTermsResponse(

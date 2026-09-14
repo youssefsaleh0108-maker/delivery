@@ -89,6 +89,24 @@ spec:
     frameDeny: true
     referrerPolicy: no-referrer
 ---
+# The size limit a customer's file for a service order meets before storage. The file is PUT straight
+# to MinIO with a URL order-manager signed, and neither the signature nor MinIO can cap a body — while
+# the URL works until it expires, as often as whoever holds it likes. order-manager refuses an oversized
+# file once it has arrived; this refuses it on the way in, with a 413, before MinIO stores a byte: at
+# once when the Content-Length is over, and as soon as the limit is crossed when the body is chunked.
+#
+# 10 MiB is order-manager's delivery.attachments.max-size-bytes — keep the two in step — plus 64 KiB of
+# slack for a client that frames its body. Traefik holds the first MiB of a body in memory and spools
+# the rest to disk; downloads on the same route pass through the buffer too, uncapped.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: order-attachment-upload-limit
+spec:
+  buffering:
+    maxRequestBodyBytes: 10551296
+    memRequestBodyBytes: 1048576
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -170,8 +188,9 @@ spec:
       services: [{ name: sms-connector, port: 8112 }]
       middlewares: *api-mw
     # Object storage over the API hostname. The prefix is NOT stripped: an S3 signature covers
-    # host and path, and the bucket name is the first path segment. Only the public buckets and
-    # the APK drop are routed — merchant-kyc, receipts and delivery-proof stay unreachable.
+    # host and path, and the bucket name is the first path segment. Only the public buckets, the
+    # APK drop and order-attachments (the rule after this one) are routed — merchant-kyc, receipts
+    # and delivery-proof stay unreachable.
     #
     # The 90 below is under this rule's own length (116) and so demotes it, which is harmless only
     # because no other rule matches these three prefixes. Do not read it as the priority band the
@@ -181,6 +200,20 @@ spec:
       priority: 90
       services: [{ name: minio, port: 9000 }]
       middlewares:
+        - { name: security-headers }
+    # order-attachments, on a rule of its own for the body limit the other buckets do not carry. It is
+    # PRIVATE (no anonymous policy) and routed anyway because all of its traffic is presigned: a
+    # customer's phone PUTs the file for a service order, and the provider or back office opens it with
+    # a download URL order-manager signed for them. MinIO itself refuses any request to it that carries
+    # no valid signature, a bucket listing included. The limit comes first, so an oversized body is
+    # refused before anything else handles it. The same 90 as above; no other rule matches this prefix,
+    # so the number decides nothing.
+    - kind: Rule
+      match: Host(`api-qa.youdrop.shop`) && PathPrefix(`/order-attachments`)
+      priority: 90
+      services: [{ name: minio, port: 9000 }]
+      middlewares:
+        - { name: order-attachment-upload-limit }
         - { name: security-headers }
 ---
 # Keycloak owns its whole origin: /realms, /resources, the account and admin consoles.
