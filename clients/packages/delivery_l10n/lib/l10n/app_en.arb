@@ -5471,5 +5471,13 @@
   "multiCartPriceChangedBody": "Your basket now comes to {total}, not the {agreed} you saw. Place its orders at the new total?",
   "@multiCartPriceChangedBody": {"placeholders":{"total":{"type":"String"},"agreed":{"type":"String"}}},
   "multiCartEarlierCheckoutPlaced": "{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}",
-  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}}
+  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}},
+  "svcCashShopName": "Shop {id}",
+  "@svcCashShopName": {"placeholders":{"id":{"type":"String"}}},
+  "svcCashShopTakenAtCounter": "{amount} paid at its counter",
+  "@svcCashShopTakenAtCounter": {"placeholders":{"amount":{"type":"String"}}},
+  "svcCashShopConfirmBody": "Confirm {shop} has paid the platform {owed}: its commission on the {held} its customers paid at its counter, covering {orders}. The shop keeps the rest as its own share. This cannot be undone.",
+  "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
+  "svcCashShopAmountChanged": "{shop} now owes {amount}, not the amount you confirmed. Nothing was recorded.",
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}}
 }

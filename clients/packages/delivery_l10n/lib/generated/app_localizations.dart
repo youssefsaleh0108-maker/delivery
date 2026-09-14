@@ -18091,6 +18091,31 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}'**
   String multiCartEarlierCheckoutPlaced(int count);
+
+  /// No description provided for @svcCashShopName.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop {id}'**
+  String svcCashShopName(String id);
+
+  /// No description provided for @svcCashShopTakenAtCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} paid at its counter'**
+  String svcCashShopTakenAtCounter(String amount);
+
+  /// No description provided for @svcCashShopConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {shop} has paid the platform {owed}: its commission on the {held} its customers paid at its counter, covering {orders}. The shop keeps the rest as its own share. This cannot be undone.'**
+  String svcCashShopConfirmBody(
+      String shop, String owed, String held, String orders);
+
+  /// No description provided for @svcCashShopAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} now owes {amount}, not the amount you confirmed. Nothing was recorded.'**
+  String svcCashShopAmountChanged(String shop, String amount);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

@@ -3303,5 +3303,13 @@
   "multiCartPriceChangedBody": "أصبح مجموع سلتك {total} بدلًا من {agreed} الذي رأيته. هل تريد إتمام طلباتها بالمجموع الجديد؟",
   "@multiCartPriceChangedBody": {"placeholders":{"total":{"type":"String"},"agreed":{"type":"String"}}},
   "multiCartEarlierCheckoutPlaced": "{count, plural, =2{نجحت محاولتك السابقة بالفعل: الطلبان كلاهما في «الطلبات».} few{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».} many{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».} other{نجحت محاولتك السابقة بالفعل: الطلبات الـ{count} كلها في «الطلبات».}}",
-  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}}
+  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}},
+  "svcCashShopName": "المتجر {id}",
+  "@svcCashShopName": {"placeholders":{"id":{"type":"String"}}},
+  "svcCashShopTakenAtCounter": "{amount} دفعها الزبائن على صندوقه",
+  "@svcCashShopTakenAtCounter": {"placeholders":{"amount":{"type":"String"}}},
+  "svcCashShopConfirmBody": "أكّد أنّ {shop} دفع للمنصة {owed}: عمولتها من {held} دفعها زبائنه على صندوقه، عن {orders}. يحتفظ المتجر بالباقي حصةً له. لا يمكن التراجع عن ذلك.",
+  "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
+  "svcCashShopAmountChanged": "{shop} مدين الآن بـ {amount}، وليس بالمبلغ الذي أكّدته. لم يُسجَّل شيء.",
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}}
 }

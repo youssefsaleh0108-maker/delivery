@@ -82,6 +82,9 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
   /// un-discharge one, so an accidental click here means a rider is shown as square with the
   /// platform while still holding the notes.
   Future<void> _remit(CashHolder holder) async {
+    // A shop's till is settled on terms of its own, against what it owes rather than what it holds.
+    if (holder.isShop) return _remitShop(holder);
+
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
@@ -111,7 +114,10 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     // reaching through a dead context afterwards is the usual way that crashes.
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     try {
-      final Remittance receipt = await widget.api.remit(holder.holderRef);
+      // Which of the account's cash this is: one account can be a rider and a shop at once, and the
+      // server will not guess between the bag and the till.
+      final Remittance receipt =
+          await widget.api.remit(holder.holderRef, holderKind: holder.holderKind);
       messenger.showSnackBar(SnackBar(
         content: Text(receipt.isEmpty
             ? 'Nothing was outstanding — somebody may have recorded this already.'
@@ -137,10 +143,9 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
     final String requestKey = CarrierCashApi.newRequestKey();
     final _PaymentChoice? choice = await showDialog<_PaymentChoice>(
       context: context,
-      builder: (BuildContext context) => _CarrierPaymentDialog(
-        company: company,
-        amount: _cash(expected),
-        orders: t.carrCashOrderCount(carrier.orders),
+      builder: (BuildContext context) => _PaymentDialog(
+        body: t.carrCashBoConfirmBody(
+            company, _cash(expected), t.carrCashOrderCount(carrier.orders)),
       ),
     );
     if (choice == null || !mounted) return;
@@ -160,6 +165,50 @@ class _ReconciliationScreenState extends State<ReconciliationScreen> {
           : t.carrCashBoRecorded(_cash(expected), company);
     } on CashAmountChanged catch (e) {
       message = t.carrCashBoAmountChanged(company, _cash(e.current));
+    } catch (e) {
+      message = t.carrCashBoFailed('$e');
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+    if (mounted) _reload();
+  }
+
+  /// Records that a shop has paid the platform what it owes out of its till (services V52).
+  ///
+  /// A shop keeps its own share of the cash its counter took for pickups and pays the platform only
+  /// its commission, so the figure confirmed is [CashHolder.owed] and never the till, which is mostly
+  /// the shop's own money. It goes as the counted amount with a key made once per confirmation, as a
+  /// company's payment does: if another pickup was paid at the counter meanwhile the server records
+  /// nothing and says what the shop owes now, and a double press records one payment. The Back
+  /// Office's full screens for shops are their own slice; this makes the one button right.
+  Future<void> _remitShop(CashHolder holder) async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final Money? owed = holder.owed;
+    if (owed == null) return;
+
+    final String shop = t.svcCashShopName(_shortId(holder.holderRef));
+    final String requestKey = CarrierCashApi.newRequestKey();
+    final _PaymentChoice? choice = await showDialog<_PaymentChoice>(
+      context: context,
+      builder: (BuildContext context) => _PaymentDialog(
+        body: t.svcCashShopConfirmBody(
+            shop, _cash(owed), _money(holder.amount), t.carrCashOrderCount(holder.orders)),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    String message;
+    try {
+      final Remittance receipt = await widget.api.remit(
+        holder.holderRef,
+        expected: owed,
+        method: choice.method,
+        requestKey: requestKey,
+        holderKind: holder.holderKind,
+      );
+      message = receipt.isEmpty ? t.carrCashBoNothing : t.carrCashBoRecorded(_cash(owed), shop);
+    } on CashAmountChanged catch (e) {
+      message = t.svcCashShopAmountChanged(shop, _cash(e.current));
     } catch (e) {
       message = t.carrCashBoFailed('$e');
     }
@@ -467,27 +516,42 @@ class _HolderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool late = _isLate(holder);
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final TextStyle? meta =
+        Theme.of(context).textTheme.bodySmall?.copyWith(color: DeliveryColors.muted);
+    final TextStyle? figure =
+        Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
+    // A shop holding pickup cash (services V52) is a shop, not a rider. It is named as one, and
+    // what it is asked for is what it owes out of its till — the platform's commission — with what
+    // its counter took beside it, because most of that is the shop's own share.
+    final bool shop = holder.isShop;
 
     return Padding(
       padding: const EdgeInsets.symmetric(
           horizontal: DeliverySpacing.sm, vertical: DeliverySpacing.sm),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.pedal_bike_outlined, size: 18, color: DeliveryColors.muted),
+          Icon(shop ? Icons.storefront_outlined : Icons.pedal_bike_outlined,
+              size: 18, color: DeliveryColors.muted),
           const SizedBox(width: DeliverySpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(_shortId(holder.holderRef),
+                Text(
+                    shop
+                        ? t.svcCashShopName(_shortId(holder.holderRef))
+                        : _shortId(holder.holderRef),
                     style: Theme.of(context).textTheme.titleSmall),
                 Text(
-                  '${holder.orders} ${holder.orders == 1 ? 'order' : 'orders'} '
-                  '· since ${_ago(holder.oldest)}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: DeliveryColors.muted),
+                  shop
+                      ? <String>[
+                          t.carrCashOrderCount(holder.orders),
+                          t.svcCashShopTakenAtCounter(_money(holder.amount)),
+                        ].join(' · ')
+                      : '${holder.orders} ${holder.orders == 1 ? 'order' : 'orders'} '
+                          '· since ${_ago(holder.oldest)}',
+                  style: meta,
                 ),
               ],
             ),
@@ -496,17 +560,32 @@ class _HolderRow extends StatelessWidget {
             const StatePill(label: 'Overdue', accent: DeliveryAccent.caution),
             const SizedBox(width: DeliverySpacing.sm),
           ],
-          Text(_money(holder.amount),
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700)),
+          if (shop)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(_cash(holder.owed), style: figure),
+                Text(t.carrCashBoOwes, style: meta),
+              ],
+            )
+          else
+            Text(_money(holder.amount), style: figure),
           const SizedBox(width: DeliverySpacing.md),
-          OutlinedButton.icon(
-            onPressed: () => onRemit(holder),
-            icon: const Icon(Icons.account_balance_outlined, size: 16),
-            label: const Text('Banked'),
-          ),
+          if (shop)
+            // Disabled when the server did not say what the shop owes: its payment is recorded
+            // against that figure, and there would be none to confirm.
+            OutlinedButton.icon(
+              onPressed: holder.owed == null ? null : () => onRemit(holder),
+              icon: const Icon(Icons.account_balance_outlined, size: 16),
+              label: Text(t.carrCashBoRecordPayment),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () => onRemit(holder),
+              icon: const Icon(Icons.account_balance_outlined, size: 16),
+              label: const Text('Banked'),
+            ),
         ],
       ),
     );
@@ -647,22 +726,20 @@ class _PaymentChoice {
   final CashMethod? method;
 }
 
-class _CarrierPaymentDialog extends StatefulWidget {
-  const _CarrierPaymentDialog({
-    required this.company,
-    required this.amount,
-    required this.orders,
-  });
+/// Confirms a payment to the platform — a delivery company's, or a shop's — and asks how it was made.
+///
+/// [body] says who paid what, and the two are different sentences on purpose: a company clears
+/// everything it holds, while a shop pays only what it owes out of its till and keeps its share.
+class _PaymentDialog extends StatefulWidget {
+  const _PaymentDialog({required this.body});
 
-  final String company;
-  final String amount;
-  final String orders;
+  final String body;
 
   @override
-  State<_CarrierPaymentDialog> createState() => _CarrierPaymentDialogState();
+  State<_PaymentDialog> createState() => _PaymentDialogState();
 }
 
-class _CarrierPaymentDialogState extends State<_CarrierPaymentDialog> {
+class _PaymentDialogState extends State<_PaymentDialog> {
   CashMethod? _method;
 
   @override
@@ -676,7 +753,7 @@ class _CarrierPaymentDialogState extends State<_CarrierPaymentDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(t.carrCashBoConfirmBody(widget.company, widget.amount, widget.orders)),
+            Text(widget.body),
             const SizedBox(height: DeliverySpacing.md),
             Text(
               t.carrCashBoMethodLabel,

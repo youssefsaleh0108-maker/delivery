@@ -10667,4 +10667,25 @@ class DeliveryStringsEn extends DeliveryStrings {
     );
     return '$_temp0';
   }
+
+  @override
+  String svcCashShopName(String id) {
+    return 'Shop $id';
+  }
+
+  @override
+  String svcCashShopTakenAtCounter(String amount) {
+    return '$amount paid at its counter';
+  }
+
+  @override
+  String svcCashShopConfirmBody(
+      String shop, String owed, String held, String orders) {
+    return 'Confirm $shop has paid the platform $owed: its commission on the $held its customers paid at its counter, covering $orders. The shop keeps the rest as its own share. This cannot be undone.';
+  }
+
+  @override
+  String svcCashShopAmountChanged(String shop, String amount) {
+    return '$shop now owes $amount, not the amount you confirmed. Nothing was recorded.';
+  }
 }
