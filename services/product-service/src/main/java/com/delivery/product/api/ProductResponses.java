@@ -2,6 +2,7 @@ package com.delivery.product.api;
 
 import java.util.List;
 
+import com.delivery.product.api.dto.CatalogDtos.ModerationResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
 import com.delivery.product.api.dto.CatalogDtos.ServiceTermsResponse;
 import com.delivery.product.domain.Product;
@@ -47,6 +48,7 @@ final class ProductResponses {
                 product.getUpdatedAt(),
                 product.isGiftFeatured(),
                 ServiceTermsResponse.of(view.service()),
-                view.fromPrice());
+                view.fromPrice(),
+                ModerationResponse.of(product));
     }
 }
