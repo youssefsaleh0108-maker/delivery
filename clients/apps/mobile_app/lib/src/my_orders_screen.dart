@@ -10,6 +10,8 @@ import 'cart.dart';
 import 'order_details_screen.dart';
 import 'order_outbox.dart';
 import 'outbox_card.dart';
+import 'service_order_tracking_screen.dart';
+import 'service_order_words.dart';
 import 'store_page_screen.dart';
 
 /// The customer's orders, and live tracking for the one currently out for delivery.
@@ -26,6 +28,8 @@ class MyOrdersScreen extends StatefulWidget {
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
+    this.shopChatApi,
+    this.chatSocket,
     required this.cart,
     required this.onOpenBasket,
     this.outbox,
@@ -47,6 +51,12 @@ class MyOrdersScreen extends StatefulWidget {
   /// The tracking service socket, threaded to the tracking panel for pushed positions.
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
+
+  /// Handed to a service order's tracking page, for "Chat with …" its shop; null draws no button.
+  final ShopChatApi? shopChatApi;
+
+  /// App Notification's socket, for that thread's liveness.
+  final UserQueueSocket? chatSocket;
   final Cart cart;
 
   /// The shell's way to its Basket tab. Reorder opens a shop page, and so does the shop card on an
@@ -133,7 +143,26 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
   /// Opens the full order. The tapped row is passed through so the page renders straight away
   /// instead of flashing a spinner over data the list already has.
+  ///
+  /// A service order opens its own tracking page instead (Figma 126:507): a basket's page would draw a
+  /// print run as a delivery being cooked, with a rider stepper a pickup never passes through.
   void _openDetails(DeliveryOrder order) {
+    if (order.isService) {
+      Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => ServiceOrderTrackingScreen(
+          orderApi: widget.api,
+          storeApi: widget.storeApi,
+          orderId: order.id,
+          preview: order,
+          shopChatApi: widget.shopChatApi,
+          chatSocket: widget.chatSocket,
+          trackingApi: widget.trackingApi,
+          trackingSocket: widget.trackingSocket,
+          chatApi: widget.chatApi,
+        ),
+      )).then((_) => _refresh());
+      return;
+    }
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => OrderDetailsScreen(
         orderApi: widget.api,
@@ -332,8 +361,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             onCancel: order.availableActions.contains(OrderAction.cancel)
                 ? () => _cancel(order)
                 : null,
-            onReorder:
-                order.status.isTerminal ? () => _reorder(order) : null,
+            // Reorder rebuilds a basket in a goods shop's page; a service is ordered again from its
+            // provider's page, which a basket cannot reach — so a service order offers none.
+            onReorder: order.status.isTerminal && !order.isService
+                ? () => _reorder(order)
+                : null,
           );
         },
       ),
@@ -420,13 +452,30 @@ class _OrderCard extends StatelessWidget {
                         uppercase: false,
                       ),
                     ],
+                    if (order.isService) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.xs),
+                      YdBadge(
+                        label: t.svcServiceChip,
+                        color: DeliveryColors.brand,
+                        background: DeliveryColors.brandSoft,
+                        uppercase: false,
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: DeliverySpacing.sm),
-              CustomerStatusPill(
-                statusWire: order.status.wire,
-                label: order.status.labelIn(t),
+              // Capped, so a long status ellipsises inside its pill rather than squeezing the shop's
+              // name and its chips out of the card: a service's words ("Waiting for provider") run
+              // longer than a basket's.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.4),
+                child: CustomerStatusPill(
+                  statusWire: order.status.wire,
+                  // A service order in its own words: "Ready for pickup" at a counter, "Declined"
+                  // when the provider declined — not a restaurant's "Preparing" or a bare "Cancelled".
+                  label: order.isService ? serviceStatusLabel(order, t) : order.status.labelIn(t),
+                ),
               ),
             ],
           ),
@@ -444,7 +493,13 @@ class _OrderCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Text(
-                      t.custItemsCountLine(order.items.length),
+                      // A service order is one piece of work, named by its offer; "1 item" would say
+                      // nothing about it.
+                      order.isService && order.items.isNotEmpty
+                          ? order.items.first.productName
+                          : t.custItemsCountLine(order.items.length),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
                         color: DeliveryColors.muted,

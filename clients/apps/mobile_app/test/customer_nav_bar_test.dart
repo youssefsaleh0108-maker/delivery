@@ -5,11 +5,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/customer_nav_bar.dart';
 
-/// The bar is five equal destinations now, and the thing worth pinning down is no longer the
-/// geometry of a raised button — it is the **order**. Every jump between tabs is an integer, the
-/// stack behind the bar is built from the same integers, and the two agreeing is what stops the
-/// basket button from opening Butler. A test that reads the labels off the rendered bar is the
-/// only thing that catches that pair drifting, because both halves keep compiling either way.
+/// The bar is six equal destinations now, and the thing worth pinning down is the **order**. Every
+/// jump between tabs is an integer, the stack behind the bar is built from the same integers, and
+/// the two agreeing is what stops the basket button from opening Butler. A test that reads the labels
+/// off the rendered bar is the only thing that catches that pair drifting, because both halves keep
+/// compiling either way — and Services moving into the fourth seat moved Orders and Account with it.
 void main() {
   Future<int?> pumpBar(
     WidgetTester tester, {
@@ -40,7 +40,7 @@ void main() {
     return tapped;
   }
 
-  testWidgets('the five destinations are in the design\'s order',
+  testWidgets('the six destinations are in the design\'s order, with Services fourth',
       (WidgetTester tester) async {
     await pumpBar(tester);
 
@@ -49,6 +49,7 @@ void main() {
       t.navHome,
       t.navButler,
       t.navBasket,
+      t.svcNavServices,
       t.navOrders,
       t.navAccount,
     ];
@@ -61,6 +62,7 @@ void main() {
         .toList();
 
     expect(onScreen, expected);
+    expect(CustomerNavBar.tabCount, 6);
   });
 
   testWidgets('each destination reports its own index', (WidgetTester tester) async {
@@ -70,6 +72,7 @@ void main() {
       t.navHome: CustomerNavBar.homeIndex,
       t.navOrders: CustomerNavBar.ordersIndex,
       t.navButler: CustomerNavBar.butlerIndex,
+      t.svcNavServices: CustomerNavBar.servicesIndex,
       t.navBasket: CustomerNavBar.basketIndex,
       t.navAccount: CustomerNavBar.accountIndex,
     }.entries) {
@@ -98,6 +101,26 @@ void main() {
 
       expect(tapped, destination.value, reason: destination.key);
     }
+    expect(CustomerNavBar.servicesIndex, 3);
+    expect(CustomerNavBar.ordersIndex, 4);
+    expect(CustomerNavBar.accountIndex, 5);
+  });
+
+  testWidgets('Butler rides a truck, and Services carries the briefcase', (WidgetTester tester) async {
+    await pumpBar(tester);
+    final DeliveryStrings t = await DeliveryStrings.delegate.load(const Locale('en'));
+
+    final Finder truck = find.byIcon(Icons.local_shipping_outlined);
+    final Finder briefcase = find.byIcon(Icons.work_outline_rounded);
+    expect(truck, findsOneWidget);
+    expect(briefcase, findsOneWidget);
+    expect(tester.getCenter(truck).dx, closeTo(tester.getCenter(find.text(t.navButler)).dx, 2));
+    expect(tester.getCenter(briefcase).dx,
+        closeTo(tester.getCenter(find.text(t.svcNavServices)).dx, 2));
+
+    // Selected, each wears its filled glyph.
+    await pumpBar(tester, index: CustomerNavBar.servicesIndex);
+    expect(find.byIcon(Icons.work_rounded), findsOneWidget);
   });
 
   testWidgets('the count rides on the basket', (WidgetTester tester) async {
@@ -125,15 +148,17 @@ void main() {
     expect(find.text('99+'), findsOneWidget);
   });
 
-  testWidgets('it still fits on a small phone', (WidgetTester tester) async {
-    // 320 logical pixels: five labelled destinations with 20px of side padding is the arrangement
+  testWidgets('it still fits on a small phone, in English and in Arabic', (WidgetTester tester) async {
+    // 320 logical pixels: six labelled destinations with 20px of side padding is the arrangement
     // that overflows first, and an overflow here is a red-striped bar on a real device.
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     await pumpBar(tester, basketCount: 12);
+    expect(tester.takeException(), isNull);
 
+    await pumpBar(tester, basketCount: 12, locale: const Locale('ar'));
     expect(tester.takeException(), isNull);
   });
 
@@ -144,7 +169,9 @@ void main() {
     // Home is the first destination, which in RTL means the rightmost one. The bar is a plain Row,
     // so this is really a check that nothing in it reaches for `left`/`right`.
     final double home = tester.getCenter(find.text(ar.navHome)).dx;
+    final double services = tester.getCenter(find.text(ar.svcNavServices)).dx;
     final double account = tester.getCenter(find.text(ar.navAccount)).dx;
-    expect(home, greaterThan(account));
+    expect(home, greaterThan(services));
+    expect(services, greaterThan(account));
   });
 }

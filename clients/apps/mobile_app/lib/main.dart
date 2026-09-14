@@ -580,6 +580,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       storeApi: _storeApi,
       orderApi: _orderApi,
       offerApi: _offerApi,
+      // The Services tab's offer search. Its design files arrive with `serviceFiles`, wired once the
+      // order attachment client merges (see ServiceOrderFiles).
+      catalogApi: _catalogApi,
       notificationApi: _notificationApi,
       butlerApi: _butlerApi,
       zoneApi: _zoneApi,
