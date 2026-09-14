@@ -180,7 +180,7 @@ class CatalogScanServiceTest {
                     Store.ServiceCategory.PRINTING);
             when(stores.ownedBy(MERCHANT)).thenReturn(List.of(store, press));
 
-            assertThatThrownBy(() -> service.create(MERCHANT, press.getId()))
+            assertThatThrownBy(() -> service.create(MERCHANT, press.getId(), FirstShop.ALREADY_OPEN))
                     .isInstanceOf(CatalogRuleViolationException.class)
                     .hasMessageContaining("service shop");
 
@@ -192,10 +192,11 @@ class CatalogScanServiceTest {
         /** The same when the service shop is the merchant's own, and the start names none. */
         @Test
         void a_merchant_whose_own_shop_is_a_service_shop_is_refused_the_same_way() {
-            when(stores.requireStoreFor(MERCHANT)).thenReturn(new Store(MERCHANT, "Al Fakhry Press",
-                    Store.Vertical.SERVICES, Store.ServiceCategory.PRINTING));
+            when(stores.requireStoreFor(MERCHANT, FirstShop.ALREADY_OPEN))
+                    .thenReturn(new Store(MERCHANT, "Al Fakhry Press",
+                            Store.Vertical.SERVICES, Store.ServiceCategory.PRINTING));
 
-            assertThatThrownBy(() -> service.create(MERCHANT, null))
+            assertThatThrownBy(() -> service.create(MERCHANT, null, FirstShop.ALREADY_OPEN))
                     .isInstanceOf(CatalogRuleViolationException.class);
 
             verify(scans, never()).countByMerchantIdAndCreatedAtAfter(any(), any());

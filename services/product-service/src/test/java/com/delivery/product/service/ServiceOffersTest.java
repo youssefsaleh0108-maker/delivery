@@ -46,6 +46,7 @@ import com.delivery.product.event.CatalogEvents.ProductSnapshot;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.StoreService.FirstShop;
 import com.delivery.product.service.StoreService.StoreNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -194,7 +195,8 @@ class ServiceOffersTest {
 
         @Test
         void an_offer_in_a_service_shop_is_saved_with_its_terms() {
-            Product created = catalog.create(PROVIDER, offerIn(press, cardTerms(Fulfilment.BOTH)));
+            Product created = catalog.create(PROVIDER, offerIn(press, cardTerms(Fulfilment.BOTH)),
+                    FirstShop.ALREADY_OPEN);
 
             ServiceTerms terms = savedTerms.get(created.getId());
             assertThat(terms).isNotNull();
@@ -210,7 +212,7 @@ class ServiceOffersTest {
 
         @Test
         void an_offer_in_a_service_shop_without_terms_is_refused_and_nothing_is_saved() {
-            assertThatThrownBy(() -> catalog.create(PROVIDER, offerIn(press, null)))
+            assertThatThrownBy(() -> catalog.create(PROVIDER, offerIn(press, null), FirstShop.ALREADY_OPEN))
                     .isInstanceOf(CatalogRuleViolationException.class)
                     .hasMessageContaining("service terms");
 
@@ -220,7 +222,8 @@ class ServiceOffersTest {
 
         @Test
         void a_goods_product_carrying_terms_is_refused() {
-            assertThatThrownBy(() -> catalog.create(PROVIDER, offerIn(grill, cardTerms(Fulfilment.PICKUP))))
+            assertThatThrownBy(() -> catalog.create(PROVIDER,
+                    offerIn(grill, cardTerms(Fulfilment.PICKUP)), FirstShop.ALREADY_OPEN))
                     .isInstanceOf(CatalogRuleViolationException.class)
                     .hasMessageContaining("goods shop");
 
@@ -231,7 +234,7 @@ class ServiceOffersTest {
         /** A goods form that has never heard of terms keeps working exactly as it did. */
         @Test
         void a_goods_product_without_terms_is_created_as_before() {
-            Product dish = catalog.create(PROVIDER, offerIn(grill, null));
+            Product dish = catalog.create(PROVIDER, offerIn(grill, null), FirstShop.ALREADY_OPEN);
 
             assertThat(dish.getStoreId()).isEqualTo(grill.getId());
             verify(serviceTerms, never()).save(any(ServiceTerms.class));
@@ -240,11 +243,12 @@ class ServiceOffersTest {
         /** The shop a merchant files under by default is still a shop, and still decides. */
         @Test
         void the_default_shop_decides_when_the_request_names_none() {
-            when(storeService.requireStoreFor(PROVIDER)).thenReturn(press);
+            // A merchant who already has a shop is never asked what a first one may be.
+            when(storeService.requireStoreFor(PROVIDER, FirstShop.ALREADY_OPEN)).thenReturn(press);
             ProductRequest noShopNamed = new ProductRequest("Flyers", null, new BigDecimal("25.00"),
                     null, null, null, null, null);
 
-            assertThatThrownBy(() -> catalog.create(PROVIDER, noShopNamed))
+            assertThatThrownBy(() -> catalog.create(PROVIDER, noShopNamed, FirstShop.ALREADY_OPEN))
                     .isInstanceOf(CatalogRuleViolationException.class);
         }
 
@@ -297,7 +301,7 @@ class ServiceOffersTest {
             ServiceTermsRequest backwards = new ServiceTermsRequest(PricingType.FIXED, "cards", 500,
                     72, 24, Fulfilment.BOTH, null, null);
 
-            assertThatThrownBy(() -> catalog.create(PROVIDER, offerIn(press, backwards)))
+            assertThatThrownBy(() -> catalog.create(PROVIDER, offerIn(press, backwards), FirstShop.ALREADY_OPEN))
                     .isInstanceOf(CatalogRuleViolationException.class)
                     .hasMessageContaining("72 hours")
                     .hasMessageContaining("24 hours");
@@ -328,7 +332,7 @@ class ServiceOffersTest {
 
         @Test
         void product_created_carries_the_service_block() {
-            catalog.create(PROVIDER, offerIn(press, cardTerms(Fulfilment.BOTH)));
+            catalog.create(PROVIDER, offerIn(press, cardTerms(Fulfilment.BOTH)), FirstShop.ALREADY_OPEN);
 
             ProductSnapshot snapshot = recorded(CatalogEvents.PRODUCT_CREATED);
             assertThat(snapshot.service()).isNotNull();
@@ -344,7 +348,7 @@ class ServiceOffersTest {
 
         @Test
         void a_goods_product_created_carries_none() {
-            catalog.create(PROVIDER, offerIn(grill, null));
+            catalog.create(PROVIDER, offerIn(grill, null), FirstShop.ALREADY_OPEN);
 
             assertThat(recorded(CatalogEvents.PRODUCT_CREATED).service()).isNull();
         }

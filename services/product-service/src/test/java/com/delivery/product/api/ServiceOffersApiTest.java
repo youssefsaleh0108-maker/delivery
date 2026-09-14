@@ -144,7 +144,7 @@ class ServiceOffersApiTest {
         when(images.resolveImages(any())).thenReturn(List.of());
 
         Object controller = new ProductController(catalog, images, optionService,
-                mock(CrossSellService.class), serviceOffers);
+                mock(CrossSellService.class), serviceOffers, storeService);
         mvc = secured(controller).setControllerAdvice(new ApiExceptionHandler()).build();
         noTokenMvc = secured(controller).build();
     }

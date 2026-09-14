@@ -45,6 +45,7 @@ import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ServiceTermsRequest;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.OnboardingApplicationClient;
 import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ServiceCategories;
 import com.delivery.product.service.ServiceOfferSearch;
@@ -155,7 +156,8 @@ class ServiceOffersDatabaseTest {
         StoreService storeService = new StoreService(stores,
                 repositories.getRepository(StoreOfferRepository.class),
                 repositories.getRepository(StoreFavoriteRepository.class), products, categories,
-                new ServiceCategories(new MockEnvironment()), Clock.fixed(NOW, ZoneOffset.UTC),
+                new ServiceCategories(new MockEnvironment()), mock(OnboardingApplicationClient.class),
+                Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofHours(4));
         catalog = new CatalogService(products, categories, storeService, mock(OutboxRecorder.class),
                 stores, serviceTerms, repositories.getRepository(StoreDeliveryZoneRepository.class),
@@ -398,7 +400,8 @@ class ServiceOffersDatabaseTest {
         transaction(() -> {
             for (String name : List.of("Two shops cake", "Two shops bread")) {
                 Product dish = catalog.create(merchant, new ProductRequest(name, null,
-                        new BigDecimal("4.00"), null, bakery.getId(), null, null, null));
+                        new BigDecimal("4.00"), null, bakery.getId(), null, null, null),
+                        StoreService.FirstShop.ALREADY_OPEN);
                 dish.addImage("products/" + UUID.randomUUID() + ".jpg");
                 catalog.publish(dish.getId(), merchant);
             }
@@ -507,7 +510,8 @@ class ServiceOffersDatabaseTest {
                 repositories.getRepository(StoreOfferRepository.class),
                 repositories.getRepository(StoreFavoriteRepository.class), products,
                 repositories.getRepository(CategoryRepository.class), new ServiceCategories(environment),
-                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
+                mock(OnboardingApplicationClient.class), Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofHours(4));
         return new PopularServiceShops(stores, storeService, new ServiceCategories(environment),
                 Clock.fixed(NOW, ZoneOffset.UTC), 5000, 30, 3);
     }
@@ -562,7 +566,8 @@ class ServiceOffersDatabaseTest {
         Product offer = catalog.create(shop.getMerchantId(), new ProductRequest(name, null,
                 new BigDecimal("15.00"), null, shop.getId(), null, null,
                 new ServiceTermsRequest(ServiceTerms.PricingType.FIXED, "cards", 500, 24, 48,
-                        fulfilment, ServiceTerms.AttachmentPolicy.OPTIONAL, "Which paper colour?")));
+                        fulfilment, ServiceTerms.AttachmentPolicy.OPTIONAL, "Which paper colour?")),
+                StoreService.FirstShop.ALREADY_OPEN);
         offer.addImage("products/" + UUID.randomUUID() + ".jpg");
         return catalog.publish(offer.getId(), shop.getMerchantId());
     }
