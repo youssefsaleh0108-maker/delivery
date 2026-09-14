@@ -11493,4 +11493,35 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcStayHere => 'ابقَ هنا';
+
+  @override
+  String get svcYourFiles => 'ملفاتك';
+
+  @override
+  String svcYourFileNumber(int n) {
+    return 'الملف $n';
+  }
+
+  @override
+  String get svcYourFilesFailed => 'تعذّر تحميل ملفاتك';
+
+  @override
+  String get svcFileGone => 'هذا الملف لم يعد متاحًا.';
+
+  @override
+  String svcRateProvider(String shop) {
+    return 'قيّم $shop';
+  }
+
+  @override
+  String get svcRateProviderPrompt => 'كيف كان العمل؟';
+
+  @override
+  String svcRatedProvider(String shop) {
+    return 'لقد قيّمت $shop';
+  }
+
+  @override
+  String get svcReviewNotYet =>
+      'لم يُسجَّل هذا الطلب مكتملًا بعد، لذا لا يمكن تقييمه الآن. حاول مجددًا بعد دقيقة.';
 }

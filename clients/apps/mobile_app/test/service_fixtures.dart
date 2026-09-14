@@ -117,12 +117,14 @@ Map<String, dynamic> serviceOrderJson({
   String? unitLabel = 'cards',
   int unitSize = 500,
   int packs = 1,
+  String attachmentPolicy = 'REQUIRED',
+  String? riderId,
 }) =>
     <String, dynamic>{
       'id': svcOrderId,
       'customerId': 'user-1',
       'merchantId': 'm1',
-      'riderId': null,
+      'riderId': riderId,
       'status': status,
       'totalAmount': subtotal + fee,
       'subtotal': subtotal,
@@ -154,11 +156,26 @@ Map<String, dynamic> serviceOrderJson({
             'unitLabel': unitLabel,
             'turnaroundMinHours': 24,
             'turnaroundMaxHours': 48,
-            'attachmentPolicy': 'REQUIRED',
+            'attachmentPolicy': attachmentPolicy,
             'instructions': instructions,
           },
         },
       ],
+    };
+
+/// One of the customer's files on an order, as `GET /api/orders/{id}/attachments` lists it.
+Map<String, dynamic> attachmentJson(
+  String fileId, {
+  String contentType = 'application/pdf',
+  String? url,
+}) =>
+    <String, dynamic>{
+      'fileId': fileId,
+      'contentType': contentType,
+      'url': url ?? 'https://storage.test/$fileId',
+      'sizeBytes': 2048,
+      'attachedAt': '2026-09-14T09:05:00Z',
+      'urlExpiresAt': '2026-09-14T09:15:00Z',
     };
 
 /// `GET /api/orders/{id}/history` for the statuses given, oldest first.

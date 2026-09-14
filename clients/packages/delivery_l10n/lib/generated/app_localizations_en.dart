@@ -11348,4 +11348,35 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcStayHere => 'Stay';
+
+  @override
+  String get svcYourFiles => 'Your files';
+
+  @override
+  String svcYourFileNumber(int n) {
+    return 'File $n';
+  }
+
+  @override
+  String get svcYourFilesFailed => 'Couldn\'t load your files';
+
+  @override
+  String get svcFileGone => 'This file is no longer available.';
+
+  @override
+  String svcRateProvider(String shop) {
+    return 'Rate $shop';
+  }
+
+  @override
+  String get svcRateProviderPrompt => 'How was the work?';
+
+  @override
+  String svcRatedProvider(String shop) {
+    return 'You rated $shop';
+  }
+
+  @override
+  String get svcReviewNotYet =>
+      'This order isn\'t on record as completed yet, so it can\'t be rated. Try again in a minute.';
 }

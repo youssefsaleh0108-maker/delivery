@@ -3522,5 +3522,13 @@
   "svcUnconfirmedLeaveBody": "لم يصلنا ردّ بعد أن ضغطت «اطلب». راجع طلباتك قبل أن تطلبه مجددًا، كي لا تطلبه مرتين.",
   "svcCheckOrders": "راجع الطلبات",
   "svcLeaveAnyway": "غادر على أي حال",
-  "svcStayHere": "ابقَ هنا"
+  "svcStayHere": "ابقَ هنا",
+  "svcYourFiles": "ملفاتك",
+  "svcYourFileNumber": "الملف {n}",
+  "svcYourFilesFailed": "تعذّر تحميل ملفاتك",
+  "svcFileGone": "هذا الملف لم يعد متاحًا.",
+  "svcRateProvider": "قيّم {shop}",
+  "svcRateProviderPrompt": "كيف كان العمل؟",
+  "svcRatedProvider": "لقد قيّمت {shop}",
+  "svcReviewNotYet": "لم يُسجَّل هذا الطلب مكتملًا بعد، لذا لا يمكن تقييمه الآن. حاول مجددًا بعد دقيقة."
 }

@@ -19220,6 +19220,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Stay'**
   String get svcStayHere;
+
+  /// No description provided for @svcYourFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Your files'**
+  String get svcYourFiles;
+
+  /// No description provided for @svcYourFileNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'File {n}'**
+  String svcYourFileNumber(int n);
+
+  /// No description provided for @svcYourFilesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your files'**
+  String get svcYourFilesFailed;
+
+  /// No description provided for @svcFileGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is no longer available.'**
+  String get svcFileGone;
+
+  /// No description provided for @svcRateProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate {shop}'**
+  String svcRateProvider(String shop);
+
+  /// No description provided for @svcRateProviderPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'How was the work?'**
+  String get svcRateProviderPrompt;
+
+  /// No description provided for @svcRatedProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'You rated {shop}'**
+  String svcRatedProvider(String shop);
+
+  /// No description provided for @svcReviewNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'This order isn\'t on record as completed yet, so it can\'t be rated. Try again in a minute.'**
+  String get svcReviewNotYet;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

@@ -490,6 +490,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
               chatApi: widget.chatApi,
               shopChatApi: widget.shopChatApi,
               chatSocket: widget.chatSocket,
+              serviceFiles: widget.serviceFiles,
               cart: _cart,
               onOpenBasket: _openBasket,
               outbox: _outbox,

@@ -87,5 +87,6 @@ class ServicesKit {
         trackingApi: trackingApi,
         trackingSocket: trackingSocket,
         chatApi: chatApi,
+        files: files,
       );
 }

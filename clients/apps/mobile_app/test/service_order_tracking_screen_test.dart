@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_merchant/delivery_merchant.dart' show ShopThreadScreen;
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_app/src/order_attachment_files.dart';
 import 'package:mobile_app/src/order_tracking_panel.dart';
+import 'package:mobile_app/src/service_order_files.dart';
 import 'package:mobile_app/src/service_order_tracking_screen.dart';
 import 'package:mobile_app/src/service_order_words.dart';
 
@@ -172,6 +175,8 @@ void main() {
       FakeServer server, {
       Locale locale = const Locale('en'),
       ShopChatApi? chat,
+      ServiceOrderFiles? files,
+      Future<bool> Function(Uri url)? openLink,
       Size size = const Size(390, 2400),
       bool settle = true,
     }) async {
@@ -182,6 +187,8 @@ void main() {
           storeApi: StoreApi(server.dio),
           orderId: svcOrderId,
           shopChatApi: chat,
+          files: files,
+          openLink: openLink,
         ),
         locale: locale,
       ));
@@ -355,6 +362,261 @@ void main() {
 
       expect(find.byType(ShopThreadScreen), findsOneWidget);
       expect(server.sent('POST', '/api/chat/stores/s1/thread'), hasLength(1));
+    });
+
+    testWidgets('the chat button keeps its 38dp circle and takes a tap anywhere in 48dp',
+        (WidgetTester tester) async {
+      final FakeServer server = serve(order: () => serviceOrderJson());
+      await pump(tester, server, chat: ShopChatApi(server.dio));
+
+      final Finder circle = find
+          .ancestor(of: find.byIcon(Icons.chat_bubble_outline_rounded), matching: find.byType(InkWell))
+          .first;
+      expect(tester.getSize(circle), const Size.square(38));
+
+      // Just below the circle, inside the square a finger is given.
+      await tester.tapAt(tester.getCenter(circle) + const Offset(0, 22));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(ShopThreadScreen), findsOneWidget);
+    });
+
+    group('the customer\'s files', () {
+      testWidgets('are listed from the order, and a file opens on a link read at the tap',
+          (WidgetTester tester) async {
+        int reads = 0;
+        final List<Uri> opened = <Uri>[];
+        final FakeServer server = serve(order: () => serviceOrderJson())
+          ..on('GET', '/api/orders/$svcOrderId/attachments', (_) {
+            reads++;
+            return <Map<String, dynamic>>[
+              attachmentJson('file-1', url: 'https://storage.test/design.pdf?read=$reads'),
+              attachmentJson('file-2',
+                  contentType: 'image/png', url: 'https://storage.test/proof.png?read=$reads'),
+            ];
+          });
+        await pump(tester, server,
+            files: OrderAttachmentFiles(OrderAttachmentApi(server.dio)),
+            openLink: (Uri url) async {
+              opened.add(url);
+              return true;
+            });
+
+        expect(find.text(en.svcYourFiles), findsOneWidget);
+        expect(find.text(en.svcYourFileNumber(1)), findsOneWidget);
+        expect(find.text('PDF'), findsOneWidget);
+        expect(find.text('PNG'), findsOneWidget);
+        expect(reads, 1);
+
+        await tester.tap(find.text(en.svcYourFileNumber(2)));
+        await tester.pumpAndSettle();
+
+        expect(reads, 2, reason: 'the link read when the page loaded may have stopped working');
+        expect(opened, <Uri>[Uri.parse('https://storage.test/proof.png?read=2')]);
+      });
+
+      testWidgets('that cannot be read offer to try again, and one no longer on the order says so',
+          (WidgetTester tester) async {
+        int reads = 0;
+        bool launched = false;
+        final FakeServer server = serve(order: () => serviceOrderJson())
+          ..on('GET', '/api/orders/$svcOrderId/attachments', (_) => switch (++reads) {
+                1 => const FakeReply(500),
+                2 => <Map<String, dynamic>>[attachmentJson('file-1')],
+                _ => <Map<String, dynamic>>[],
+              });
+        await pump(tester, server,
+            files: OrderAttachmentFiles(OrderAttachmentApi(server.dio)),
+            openLink: (Uri url) async => launched = true);
+
+        expect(find.text(en.svcYourFilesFailed), findsOneWidget);
+        await tester.tap(find.text(en.tryAgain));
+        await tester.pumpAndSettle();
+        expect(find.text(en.svcYourFileNumber(1)), findsOneWidget);
+
+        await tester.tap(find.text(en.svcYourFileNumber(1)));
+        await tester.pumpAndSettle();
+        expect(find.text(en.svcFileGone), findsOneWidget);
+        expect(find.text(en.svcYourFileNumber(1)), findsNothing);
+        expect(launched, isFalse);
+      });
+
+      testWidgets('are not asked for when the offer took none', (WidgetTester tester) async {
+        final FakeServer server = serve(order: () => serviceOrderJson(attachmentPolicy: 'NONE'));
+        await pump(tester, server, files: OrderAttachmentFiles(OrderAttachmentApi(server.dio)));
+
+        expect(server.sent('GET', '/api/orders/$svcOrderId/attachments'), isEmpty);
+        expect(find.text(en.svcYourFiles), findsNothing);
+      });
+    });
+
+    group('ratings once the work is done', () {
+      const List<String> collected = <String>['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'DELIVERED'];
+      const List<String> delivered = <String>[
+        'PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'PICKED_UP', 'DELIVERED',
+      ];
+      Map<String, dynamic> reviewJson(int rating) => <String, dynamic>{
+            'id': 'review-1',
+            'storeId': 's1',
+            'orderId': svcOrderId,
+            'rating': rating,
+            'comment': null,
+            'createdAt': '2026-09-14T10:00:00Z',
+            'mine': true,
+          };
+      Finder inSheet(Finder finder) => find.descendant(of: find.byType(BottomSheet), matching: finder);
+
+      testWidgets('a collected pickup offers to rate the provider, and the review sent shows as given',
+          (WidgetTester tester) async {
+        final FakeServer server =
+            serve(order: () => serviceOrderJson(status: 'DELIVERED'), history: collected)
+              ..on('GET', '/api/stores/reviews/order/$svcOrderId', (_) => const FakeReply(204))
+              ..on('POST', '/api/stores/s1/reviews', (_) => reviewJson(5));
+        await pump(tester, server);
+
+        expect(find.text(en.svcRateProvider('Al Fakhry Press')), findsOneWidget);
+        expect(find.text(en.custRateYourRider), findsNothing, reason: 'nobody rode a pickup');
+        expect(server.sent('GET', '/api/orders/$svcOrderId/rating'), isEmpty);
+
+        await tester.tap(find.text(en.svcRateProvider('Al Fakhry Press')));
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text(en.svcRateProviderPrompt)), findsOneWidget);
+        await tester.tap(inSheet(find.byIcon(Icons.star_outline_rounded)).at(4));
+        await tester.pump();
+        await tester.enterText(inSheet(find.byType(TextField)), '  Crisp cards, on time ');
+        await tester.tap(inSheet(find.text(en.submitReview)));
+        await tester.pumpAndSettle();
+
+        expect(server.sent('POST', '/api/stores/s1/reviews').single.data, <String, dynamic>{
+          'orderId': svcOrderId,
+          'rating': 5,
+          'comment': 'Crisp cards, on time',
+        });
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.text(en.svcRatedProvider('Al Fakhry Press')), findsOneWidget);
+        expect(find.text(en.svcRateProvider('Al Fakhry Press')), findsNothing);
+      });
+
+      testWidgets('a provider already rated shows its stars, and nothing is offered before the server says',
+          (WidgetTester tester) async {
+        final Completer<Object?> said = Completer<Object?>();
+        final FakeServer server =
+            serve(order: () => serviceOrderJson(status: 'DELIVERED'), history: collected)
+              ..on('GET', '/api/stores/reviews/order/$svcOrderId', (_) => said.future);
+        await pump(tester, server);
+
+        expect(find.text(en.svcRateProvider('Al Fakhry Press')), findsNothing);
+        expect(find.text(en.svcRatedProvider('Al Fakhry Press')), findsNothing);
+
+        said.complete(reviewJson(4));
+        await tester.pumpAndSettle();
+        expect(find.text(en.svcRatedProvider('Al Fakhry Press')), findsOneWidget);
+        expect(find.byIcon(Icons.star_rounded), findsNWidgets(4));
+        expect(find.text(en.svcRateProvider('Al Fakhry Press')), findsNothing);
+      });
+
+      testWidgets('a review the server cannot take yet says to try again shortly, sheet still open',
+          (WidgetTester tester) async {
+        final FakeServer server =
+            serve(order: () => serviceOrderJson(status: 'DELIVERED'), history: collected)
+              ..on('GET', '/api/stores/reviews/order/$svcOrderId', (_) => const FakeReply(204))
+              ..on('POST', '/api/stores/s1/reviews', (_) => const FakeReply(404, <String, dynamic>{
+                    'detail': 'Order $svcOrderId was not found among your delivered orders',
+                  }));
+        await pump(tester, server);
+
+        await tester.tap(find.text(en.svcRateProvider('Al Fakhry Press')));
+        await tester.pumpAndSettle();
+        await tester.tap(inSheet(find.byIcon(Icons.star_outline_rounded)).at(3));
+        await tester.pump();
+        await tester.tap(inSheet(find.text(en.submitReview)));
+        await tester.pumpAndSettle();
+
+        expect(inSheet(find.text(en.svcReviewNotYet)), findsOneWidget);
+        expect(find.text(en.svcRatedProvider('Al Fakhry Press')), findsNothing);
+      });
+
+      testWidgets('a delivered delivery also offers its rider\'s rating, on the Orders page\'s own sheet',
+          (WidgetTester tester) async {
+        final FakeServer server = serve(
+            order: () => serviceOrderJson(
+                status: 'DELIVERED', fulfilment: 'DELIVERY', fee: 2, riderId: 'rider-7'),
+            history: delivered)
+          ..on('GET', '/api/stores/reviews/order/$svcOrderId', (_) => reviewJson(5))
+          ..on('GET', '/api/orders/$svcOrderId/rating', (_) => const FakeReply(404))
+          ..on('POST', '/api/orders/$svcOrderId/rating', (RequestOptions r) => <String, dynamic>{
+                'orderId': svcOrderId,
+                'riderId': 'rider-7',
+                'score': (r.data as Map<dynamic, dynamic>)['score'],
+              });
+        await pump(tester, server);
+
+        expect(find.text(en.custRateYourRider), findsOneWidget);
+        expect(find.text(en.svcRatedProvider('Al Fakhry Press')), findsOneWidget);
+
+        await tester.tap(find.text(en.custRateYourRider));
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text(en.custSubmitRating)), findsOneWidget);
+        await tester.tap(inSheet(find.byIcon(Icons.star_outline_rounded)).at(3));
+        await tester.pump();
+        await tester.tap(inSheet(find.text(en.custSubmitRating)));
+        await tester.pumpAndSettle();
+
+        expect(
+            (server.sent('POST', '/api/orders/$svcOrderId/rating').single.data
+                as Map<dynamic, dynamic>)['score'],
+            4);
+        expect(find.text(en.custAlreadyRatedDelivery), findsOneWidget);
+        expect(find.text(en.custRateYourRider), findsNothing);
+      });
+
+      testWidgets('nothing about rating is asked while the work is not done',
+          (WidgetTester tester) async {
+        final FakeServer server = serve(
+            order: () => serviceOrderJson(status: 'READY', fulfilment: 'DELIVERY', riderId: 'rider-7'),
+            history: const <String>['PLACED', 'ACCEPTED', 'PREPARING', 'READY']);
+        await pump(tester, server);
+
+        expect(server.sent('GET', '/api/stores/reviews/order/$svcOrderId'), isEmpty);
+        expect(server.sent('GET', '/api/orders/$svcOrderId/rating'), isEmpty);
+      });
+
+      testWidgets('a delivery no rider is on record for offers no rider rating',
+          (WidgetTester tester) async {
+        final FakeServer server = serve(
+            order: () => serviceOrderJson(status: 'DELIVERED', fulfilment: 'DELIVERY'),
+            history: delivered)
+          ..on('GET', '/api/stores/reviews/order/$svcOrderId', (_) => const FakeReply(204));
+        await pump(tester, server);
+
+        expect(server.sent('GET', '/api/orders/$svcOrderId/rating'), isEmpty);
+        expect(find.text(en.custRateYourRider), findsNothing);
+        expect(find.text(en.svcRateProvider('Al Fakhry Press')), findsOneWidget);
+      });
+
+      testWidgets('with files and both ratings, reads right to left and fits a 320dp phone',
+          (WidgetTester tester) async {
+        const String longName = 'Al Fakhry Press and Copy Centre of Greater Mar Mikhael';
+        final FakeServer server = serve(
+            order: () => serviceOrderJson(
+                status: 'DELIVERED', fulfilment: 'DELIVERY', riderId: 'rider-7', storeName: longName),
+            history: delivered)
+          ..on('GET', '/api/stores/reviews/order/$svcOrderId', (_) => const FakeReply(204))
+          ..on('GET', '/api/orders/$svcOrderId/rating', (_) => const FakeReply(404))
+          ..on('GET', '/api/orders/$svcOrderId/attachments',
+              (_) => <Map<String, dynamic>>[attachmentJson('file-1')]);
+        await pump(tester, server,
+            locale: const Locale('ar'),
+            files: OrderAttachmentFiles(OrderAttachmentApi(server.dio)),
+            size: const Size(320, 2000));
+
+        expect(find.text(ar.svcRateProvider(longName)), findsOneWidget);
+        expect(find.text(ar.custRateYourRider), findsOneWidget);
+        expect(find.text(ar.svcYourFileNumber(1)), findsOneWidget);
+        // Each invitation's chevron points the way the page reads.
+        expect(find.byIcon(Icons.chevron_left_rounded), findsNWidgets(2));
+        expect(tester.takeException(), isNull);
+      });
     });
 
     testWidgets('reads right to left in Arabic', (WidgetTester tester) async {

@@ -5706,5 +5706,16 @@
   "svcUnconfirmedLeaveBody": "We didn't hear back after you tapped Place. Check Orders before ordering this again, so you don't order it twice.",
   "svcCheckOrders": "Check Orders",
   "svcLeaveAnyway": "Leave anyway",
-  "svcStayHere": "Stay"
+  "svcStayHere": "Stay",
+  "svcYourFiles": "Your files",
+  "svcYourFileNumber": "File {n}",
+  "@svcYourFileNumber": {"placeholders":{"n":{"type":"int"}}},
+  "svcYourFilesFailed": "Couldn't load your files",
+  "svcFileGone": "This file is no longer available.",
+  "svcRateProvider": "Rate {shop}",
+  "@svcRateProvider": {"placeholders":{"shop":{"type":"String"}}},
+  "svcRateProviderPrompt": "How was the work?",
+  "svcRatedProvider": "You rated {shop}",
+  "@svcRatedProvider": {"placeholders":{"shop":{"type":"String"}}},
+  "svcReviewNotYet": "This order isn't on record as completed yet, so it can't be rated. Try again in a minute."
 }

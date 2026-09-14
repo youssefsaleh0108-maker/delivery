@@ -10,6 +10,7 @@ import 'cart.dart';
 import 'order_details_screen.dart';
 import 'order_outbox.dart';
 import 'outbox_card.dart';
+import 'service_order_files.dart';
 import 'service_order_tracking_screen.dart';
 import 'service_order_words.dart';
 import 'store_page_screen.dart';
@@ -30,6 +31,7 @@ class MyOrdersScreen extends StatefulWidget {
     this.chatApi,
     this.shopChatApi,
     this.chatSocket,
+    this.serviceFiles,
     required this.cart,
     required this.onOpenBasket,
     this.outbox,
@@ -57,6 +59,9 @@ class MyOrdersScreen extends StatefulWidget {
 
   /// App Notification's socket, for that thread's liveness.
   final UserQueueSocket? chatSocket;
+
+  /// Handed to a service order's tracking page, for the customer's own files; null lists none.
+  final ServiceOrderFiles? serviceFiles;
   final Cart cart;
 
   /// The shell's way to its Basket tab. Reorder opens a shop page, and so does the shop card on an
@@ -159,6 +164,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           trackingApi: widget.trackingApi,
           trackingSocket: widget.trackingSocket,
           chatApi: widget.chatApi,
+          files: widget.serviceFiles,
         ),
       )).then((_) => _refresh());
       return;

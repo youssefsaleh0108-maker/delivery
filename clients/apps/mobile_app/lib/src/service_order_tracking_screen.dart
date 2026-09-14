@@ -6,8 +6,12 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_merchant/delivery_merchant.dart' show ShopThreadScreen;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'order_tracking_panel.dart';
+import 'rate_provider_sheet.dart';
+import 'rate_rider_sheet.dart';
+import 'service_order_files.dart';
 import 'service_order_words.dart';
 
 /// Tracking one service order (Figma 126:507): straight after placing it, or from the Orders tab.
@@ -27,6 +31,12 @@ import 'service_order_words.dart';
 ///   chat client — a button that cannot open anything is not drawn.
 /// * **Pickup is not a delivery.** A pickup shows where to collect and the shop's hours today, and
 ///   never a rider map: nobody is riding. A delivery mounts the rider tracking panel once it is out.
+/// * **The customer's own files**, listed from the order. Each opens on a link read again at the tap:
+///   the one from when the page loaded may have stopped working.
+/// * **Ratings once the work is done.** A completed order — collected at the counter or delivered to
+///   the door — offers to rate the provider, and a delivery a rider brought also offers the rider's
+///   rating, on the sheet the Orders page uses for a basket. Each shows the stars already given
+///   instead once the server says there are some, and nothing at all until it has said.
 ///
 /// The order is read again every [refreshEvery] while it is still moving, so a provider's accept
 /// arrives without the customer pulling to refresh.
@@ -42,12 +52,14 @@ class ServiceOrderTrackingScreen extends StatefulWidget {
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
+    this.files,
+    this.openLink,
     this.refreshEvery = const Duration(seconds: 20),
   });
 
   final OrderApi orderApi;
 
-  /// The shop's address and hours for a pickup, and its logo.
+  /// The shop's address and hours for a pickup, its logo, and the customer's review of it.
   final StoreApi storeApi;
   final String orderId;
 
@@ -66,6 +78,13 @@ class ServiceOrderTrackingScreen extends StatefulWidget {
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
 
+  /// The customer's files on service orders, for "Your files". Null draws no list.
+  final ServiceOrderFiles? files;
+
+  /// Opens a file's link, answering whether anything could. Null opens it in the phone's own viewer;
+  /// tests replace it.
+  final Future<bool> Function(Uri url)? openLink;
+
   final Duration refreshEvery;
 
   @override
@@ -81,6 +100,27 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
   Store? _shop;
   List<OpeningWindow>? _hours;
   bool _askedShop = false;
+
+  /// The customer's files on the order; null until read. Asked only of an order whose offer takes
+  /// files.
+  List<OrderAttachment>? _attachments;
+  bool _attachmentsFailed = false;
+  bool _askedAttachments = false;
+
+  /// The file whose link is being read again so it can be opened; null while none is.
+  String? _opening;
+
+  /// The customer's review of the provider for this order, and whether the server has said if there
+  /// is one. Until it has, nothing about rating the provider is drawn: an invitation that turns into
+  /// "you rated this" a moment later is the screen guessing out loud.
+  StoreReview? _review;
+  bool _reviewKnown = false;
+  bool _askedReview = false;
+
+  /// The same, for the rider of a delivered delivery.
+  RiderRatingEntry? _riderRating;
+  bool _riderRatingKnown = false;
+  bool _askedRiderRating = false;
 
   bool _failed = false;
   bool _cancelling = false;
@@ -117,11 +157,7 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
         _history = steps;
         _failed = false;
       });
-      final String? storeId = order.storeId;
-      if (!_askedShop && storeId != null) {
-        _askedShop = true;
-        unawaited(_loadShop(storeId, pickup: order.isPickup));
-      }
+      _loadAround(order);
     } catch (_) {
       if (!mounted) return;
       // Only when there is nothing to show: an order already on screen is still the best answer the
@@ -129,6 +165,41 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
       if (_order == null) setState(() => _failed = true);
     }
   }
+
+  /// What the page adds around the order once the server has it — its shop, the customer's files,
+  /// and once the work is done the ratings. Each is asked once, after the order, and a failure in any
+  /// leaves the order itself perfectly readable.
+  void _loadAround(DeliveryOrder order) {
+    final String? storeId = order.storeId;
+    if (!_askedShop && storeId != null) {
+      _askedShop = true;
+      unawaited(_loadShop(storeId, pickup: order.isPickup));
+    }
+    if (!_askedAttachments && widget.files != null && _takesFiles(order)) {
+      _askedAttachments = true;
+      unawaited(_loadAttachments());
+    }
+    if (order.status != OrderStatus.delivered) return;
+    if (!_askedReview && storeId != null) {
+      _askedReview = true;
+      unawaited(_loadReview(order.id));
+    }
+    if (!_askedRiderRating && _riderBrought(order)) {
+      _askedRiderRating = true;
+      unawaited(_loadRiderRating(order.id));
+    }
+  }
+
+  /// Whether the order's offer took files, so there may be some to list.
+  static bool _takesFiles(DeliveryOrder order) => switch (order.serviceLine?.attachmentPolicy) {
+        ServiceAttachmentPolicy.optional || ServiceAttachmentPolicy.required => true,
+        _ => false,
+      };
+
+  /// Whether a rider brought the work to the door: the only service orders with a rider to rate, and
+  /// the only ones the server takes a rider rating on.
+  static bool _riderBrought(DeliveryOrder order) =>
+      order.fulfilment == Fulfilment.delivery && order.riderId != null;
 
   Future<List<OrderStatusChange>> _readHistory() async {
     try {
@@ -149,6 +220,121 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
     } catch (_) {
       // The card keeps the order's own shop name; the address and hours are simply not drawn.
     }
+  }
+
+  Future<void> _loadAttachments() async {
+    try {
+      final List<OrderAttachment> files = await widget.files!.forOrder(widget.orderId);
+      if (!mounted) return;
+      setState(() {
+        _attachments = files;
+        _attachmentsFailed = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _attachmentsFailed = true);
+    }
+  }
+
+  void _retryAttachments() {
+    setState(() => _attachmentsFailed = false);
+    unawaited(_loadAttachments());
+  }
+
+  Future<void> _loadReview(String orderId) async {
+    try {
+      final StoreReview? review = await widget.storeApi.myReviewForOrder(orderId);
+      if (!mounted) return;
+      setState(() {
+        _review = review;
+        _reviewKnown = true;
+      });
+    } catch (_) {
+      // Unanswered stays unanswered: no rating card rather than one that may contradict the server.
+    }
+  }
+
+  Future<void> _loadRiderRating(String orderId) async {
+    try {
+      final RiderRatingEntry? rating = await widget.orderApi.orderRating(orderId);
+      if (!mounted) return;
+      setState(() {
+        _riderRating = rating;
+        _riderRatingKnown = true;
+      });
+    } catch (_) {
+      // As above.
+    }
+  }
+
+  /// Opens one of the customer's files. Its link is read again first, since the one from when the
+  /// page loaded may have stopped working; a file the order no longer carries — deleted after the
+  /// order ended, say — is said to be gone.
+  Future<void> _openAttachment(String fileId) async {
+    final ServiceOrderFiles? files = widget.files;
+    if (files == null || _opening != null) return;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    setState(() => _opening = fileId);
+    String? problem;
+    try {
+      final List<OrderAttachment> fresh = await files.forOrder(widget.orderId);
+      if (!mounted) return;
+      setState(() => _attachments = fresh);
+      final OrderAttachment? file =
+          fresh.where((OrderAttachment a) => a.fileId == fileId).firstOrNull;
+      final Uri? url = file == null ? null : Uri.tryParse(file.url);
+      if (url == null) {
+        problem = t.svcFileGone;
+      } else if (!await _launch(url)) {
+        problem = t.custCouldNotOpenThat;
+      }
+    } catch (_) {
+      problem = t.svcYourFilesFailed;
+    }
+    if (!mounted) return;
+    setState(() => _opening = null);
+    if (problem != null) {
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
+
+  Future<bool> _launch(Uri url) async {
+    final Future<bool> Function(Uri url)? open = widget.openLink;
+    try {
+      return open != null
+          ? await open(url)
+          : await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _rateProvider(DeliveryOrder order, String shopName) async {
+    final String? storeId = order.storeId;
+    if (storeId == null) return;
+    final StoreReview? review = await showRateProviderSheet(
+      context,
+      api: widget.storeApi,
+      storeId: storeId,
+      orderId: order.id,
+      shopName: shopName,
+    );
+    if (review == null || !mounted) return;
+    setState(() {
+      _review = review;
+      _reviewKnown = true;
+    });
+  }
+
+  Future<void> _rateRider(DeliveryOrder order) async {
+    final RiderRatingEntry? entry =
+        await showRateRiderSheet(context, api: widget.orderApi, orderId: order.id);
+    if (entry == null || !mounted) return;
+    setState(() {
+      _riderRating = entry;
+      _riderRatingKnown = true;
+    });
   }
 
   Future<void> _cancel(DeliveryOrder order) async {
@@ -240,9 +426,11 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
     }
 
     final Widget? estimate = _estimateCard(order, t);
+    final Widget? files = _filesCard(order, t);
     final String? instructions = order.serviceLine?.instructions;
     final bool canCancel =
         order.status == OrderStatus.placed && order.availableActions.contains(OrderAction.cancel);
+    final bool done = order.status == OrderStatus.delivered;
     const SizedBox gap = SizedBox(height: DeliverySpacing.md);
 
     return RefreshIndicator(
@@ -253,6 +441,15 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
         children: <Widget>[
           _heading(order, t),
           if (estimate != null) ...<Widget>[gap, estimate],
+          // Once the work is done, what is left to do is rate it: right under the heading.
+          if (done && _reviewKnown && order.storeId != null) ...<Widget>[
+            gap,
+            _providerRatingCard(order, t),
+          ],
+          if (done && _riderRatingKnown && _riderBrought(order)) ...<Widget>[
+            gap,
+            _riderRatingCard(order, t),
+          ],
           const SizedBox(height: DeliverySpacing.md + 4),
           _caption(t.svcOrderStatusTitle),
           const SizedBox(height: DeliverySpacing.sm),
@@ -273,6 +470,7 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
           gap,
           _fulfilmentCard(order, t),
           if (instructions != null) ...<Widget>[gap, _instructionsCard(instructions, t)],
+          if (files != null) ...<Widget>[gap, files],
           gap,
           _summaryCard(order, t),
           if (canCancel) ...<Widget>[
@@ -382,6 +580,104 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
     );
   }
 
+  Widget _providerRatingCard(DeliveryOrder order, DeliveryStrings t) {
+    final String name = order.storeName ?? _shop?.name ?? t.tabShop;
+    final StoreReview? review = _review;
+    if (review != null) return _ratedCard(t.svcRatedProvider(name), review.rating, t);
+    return _inviteCard(
+      title: t.svcRateProvider(name),
+      subtitle: t.svcRateProviderPrompt,
+      onTap: () => _rateProvider(order, name),
+    );
+  }
+
+  Widget _riderRatingCard(DeliveryOrder order, DeliveryStrings t) {
+    final RiderRatingEntry? rating = _riderRating;
+    if (rating != null) return _ratedCard(t.custAlreadyRatedDelivery, rating.score, t);
+    return _inviteCard(
+      title: t.custRateYourRider,
+      subtitle: t.custHowWasDelivery,
+      onTap: () => _rateRider(order),
+    );
+  }
+
+  /// The invitation to rate, as the Orders page draws its rider's: a star, what to rate, a chevron.
+  Widget _inviteCard({
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return YdCard.bordered(
+      onTap: onTap,
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration:
+                const BoxDecoration(color: DeliveryColors.brandSoft, shape: BoxShape.circle),
+            child: const Icon(Icons.star_outline_rounded, size: 20, color: DeliveryColors.brand),
+          ),
+          const SizedBox(width: DeliverySpacing.md - 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: DeliveryColors.ink,
+                        height: 1.25)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.35)),
+              ],
+            ),
+          ),
+          Icon(rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+              size: 18, color: DeliveryColors.muted),
+        ],
+      ),
+    );
+  }
+
+  /// A rating already given: what was rated, and its stars.
+  Widget _ratedCard(String text, int stars, DeliveryStrings t) {
+    return YdCard.bordered(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600, color: DeliveryColors.ink, height: 1.3)),
+          ),
+          const SizedBox(width: DeliverySpacing.sm),
+          Semantics(
+            label: t.ratingStars(stars),
+            excludeSemantics: true,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                for (int star = 1; star <= 5; star++)
+                  Icon(
+                    star <= stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 16,
+                    color: star <= stars ? DeliveryAccent.caution.color : DeliveryColors.border,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _providerCard(DeliveryOrder order, DeliveryStrings t) {
     final String name = order.storeName ?? _shop?.name ?? t.tabShop;
     final bool canChat = widget.shopChatApi != null && order.storeId != null;
@@ -414,16 +710,28 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
               container: true,
               button: true,
               label: t.chatShopWith(name),
-              child: Material(
-                color: DeliveryColors.brandSoft,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => _openChat(order),
-                  child: const SizedBox.square(
-                    dimension: 38,
-                    child: Icon(Icons.chat_bubble_outline_rounded,
-                        size: 18, color: DeliveryColors.brand),
+              // The circle is drawn at the frame's 38dp; a tap anywhere in the 48dp square around it
+              // opens the chat. A tap on the circle is the InkWell's, with its ripple.
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                excludeFromSemantics: true,
+                onTap: () => _openChat(order),
+                child: SizedBox.square(
+                  dimension: kMinInteractiveDimension,
+                  child: Center(
+                    child: Material(
+                      color: DeliveryColors.brandSoft,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => _openChat(order),
+                        child: const SizedBox.square(
+                          dimension: 38,
+                          child: Icon(Icons.chat_bubble_outline_rounded,
+                              size: 18, color: DeliveryColors.brand),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -509,6 +817,96 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
         ],
       ),
     );
+  }
+
+  /// "Your files": the customer's own files on the order, each opened on a fresh link. Null — nothing
+  /// drawn — when the offer took no files, when there are none, or before they have been read.
+  Widget? _filesCard(DeliveryOrder order, DeliveryStrings t) {
+    if (widget.files == null || !_takesFiles(order)) return null;
+    final List<OrderAttachment>? files = _attachments;
+    if (files == null && _attachmentsFailed) {
+      return YdCard.bordered(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            DeliverySpacing.md, DeliverySpacing.xs, DeliverySpacing.xs, DeliverySpacing.xs),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(t.svcYourFilesFailed,
+                  style: const TextStyle(fontSize: 13, color: DeliveryColors.muted)),
+            ),
+            TextButton(
+              onPressed: _retryAttachments,
+              style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+              child: Text(t.tryAgain),
+            ),
+          ],
+        ),
+      );
+    }
+    if (files == null || files.isEmpty) return null;
+    return YdCard.bordered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(t.svcYourFiles,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
+          const SizedBox(height: DeliverySpacing.xs),
+          for (final (int i, OrderAttachment file) in files.indexed) _fileRow(i + 1, file, t),
+        ],
+      ),
+    );
+  }
+
+  Widget _fileRow(int number, OrderAttachment file, DeliveryStrings t) {
+    final bool opening = _opening == file.fileId;
+    final String format = _formatName(file);
+    return Semantics(
+      button: true,
+      label: '${t.svcYourFileNumber(number)}, $format',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: _opening == null ? () => _openAttachment(file.fileId) : null,
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
+          child: Row(
+            children: <Widget>[
+              Icon(file.isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+                  size: 20, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(t.svcYourFileNumber(number),
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600, color: DeliveryColors.ink)),
+                    Text(format,
+                        style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
+                  ],
+                ),
+              ),
+              if (opening)
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: DeliveryColors.brand),
+                )
+              else
+                const Icon(Icons.open_in_new_rounded, size: 18, color: DeliveryColors.muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// "PDF", "JPEG", "PNG": the format's own name, which reads the same in every language.
+  static String _formatName(OrderAttachment file) {
+    final String type = file.contentType;
+    final int slash = type.indexOf('/');
+    return (slash < 0 ? type : type.substring(slash + 1)).toUpperCase();
   }
 
   Widget _summaryCard(DeliveryOrder order, DeliveryStrings t) {
