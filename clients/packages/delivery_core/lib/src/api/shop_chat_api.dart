@@ -42,11 +42,12 @@ class ShopChatApi {
   /// the customer" on an order — opened if the customer never wrote, and labelled with the order.
   /// For a merchant; safe to call on every tap.
   ///
-  /// Allowed while the order is open and for the server's window after it was delivered or cancelled
-  /// (a week by default); later arrives as [ShopOrderChatClosedException]. An order of a shop the
-  /// caller does not answer for is a 404 [DioException], as one that does not exist, and a 503 means
-  /// orders or shops cannot be checked right now. The thread names the customer only as the order's
-  /// card does.
+  /// Allowed for the server's window (a week by default) from when the order ended or was due — its
+  /// promised ready time, or when it was placed if none was promised — whichever came first. So an
+  /// order left open long after it was due is refused too, as [ShopOrderChatClosedException]. An
+  /// order of a shop the caller does not answer for is a 404 [DioException], as one that does not
+  /// exist, and a 503 means orders or shops cannot be checked right now. The thread names the
+  /// customer only as the order's card does.
   Future<ShopThread> openForOrder(String orderId) async {
     try {
       final Response<dynamic> response =

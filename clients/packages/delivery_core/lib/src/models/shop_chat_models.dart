@@ -166,9 +166,10 @@ class ShopThreadQuietException implements Exception {
   String toString() => 'ShopThreadQuietException(closed at $closedAt)';
 }
 
-/// A shop's "chat with the customer" refused because the order was delivered or cancelled longer
-/// ago than a shop may open a conversation about it (409). [closedAt] is when that became so, when
-/// the server says. A thread that already exists stays readable from the inbox.
+/// A shop's "chat with the customer" refused because the order ended, or was due, longer ago than a
+/// shop may open a conversation about it (409) — which can be true of an order still open, once it is
+/// long overdue. [closedAt] is when that became so, when the server says. A thread that already
+/// exists stays readable from the inbox.
 class ShopOrderChatClosedException implements Exception {
   const ShopOrderChatClosedException(this.closedAt);
 
