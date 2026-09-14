@@ -23,9 +23,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * Manager answers that read only for the order's customer, the merchant it was placed with and its
  * rider, and answers everybody else 404 — so nothing learnt here is about an order the caller could
  * not already open in their own app. It carries every fact a link is decided on (the shop, the
- * customer, the kind, the status and when the order was delivered or cancelled, the name on the
- * shop's card), which is why no narrower endpoint was added: a second read of the same row would be a
- * second visibility rule to keep in step with the first.
+ * customer, the kind, the status, when the order was placed, when its work was promised and when it
+ * was delivered or cancelled, the name on the shop's card), which is why no narrower endpoint was
+ * added: a second read of the same row would be a second visibility rule to keep in step with the
+ * first.
  *
  * <p><strong>The customer's user id read here goes no further.</strong> It decides which thread an
  * order belongs to; no view of a thread carries it, so a merchant's app never receives it from chat.
@@ -77,7 +78,7 @@ public class OrderReferences {
             throw new OrderUnavailableException(UNAVAILABLE, e);
         }
         if (order == null || !orderId.equals(order.id()) || order.customerId() == null
-                || order.kind() == null || order.status() == null) {
+                || order.kind() == null || order.status() == null || order.placedAt() == null) {
             log.warn("Order Manager's answer for an order lacked what a chat link is decided on");
             throw new OrderUnavailableException(UNAVAILABLE, null);
         }
@@ -92,6 +93,9 @@ public class OrderReferences {
      * @param customerId          who placed it: decides the thread, and is never shown to a shop
      * @param kind                CATALOG, SERVICE, ... as Order Manager spells it
      * @param status              PLACED ... DELIVERED or CANCELLED, as Order Manager spells it
+     * @param placedAt            when it was placed, which Order Manager records on every order
+     * @param estimatedReadyAt    when a service order's work was promised: its acceptance plus its
+     *                            longest turnaround. Null until it is accepted, and on other kinds
      * @param customerDisplayName the name the shop's card shows (a first name and an initial), or null
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -101,6 +105,8 @@ public class OrderReferences {
                                  String customerId,
                                  String kind,
                                  String status,
+                                 Instant placedAt,
+                                 Instant estimatedReadyAt,
                                  Instant deliveredAt,
                                  Instant cancelledAt,
                                  String customerDisplayName) {
@@ -122,6 +128,19 @@ public class OrderReferences {
                 return cancelledAt;
             }
             return null;
+        }
+
+        /**
+         * When the order was due: when its work was promised, or when it was placed if nothing was — a
+         * goods order, or a service order its shop has not accepted yet. Never before it was placed.
+         *
+         * <p>Once the shop has accepted, this is not the shop's to move. Order Manager fixes the
+         * promise at acceptance, from the turnaround the customer was shown when they ordered, and
+         * marking the order ready or delivered — or never doing so — changes neither time. Before
+         * acceptance the customer can still cancel.
+         */
+        public Instant dueAt() {
+            return estimatedReadyAt != null && estimatedReadyAt.isAfter(placedAt) ? estimatedReadyAt : placedAt;
         }
     }
 }

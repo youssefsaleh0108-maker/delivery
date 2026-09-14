@@ -1,7 +1,10 @@
 package com.delivery.appnotification.service;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -28,7 +31,6 @@ import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedExcept
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
-import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,6 +55,11 @@ class ShopChatServiceTest {
     private static final String MERCHANT = "merchant-sub";
     private static final String OTHER_MERCHANT = "other-shop-merchant-sub";
 
+    /** The service's "now" unless a test moves it; every instant in these tests is counted from it. */
+    private static final Instant NOW = Instant.parse("2026-09-15T09:00:00Z");
+    /** The order chat window's default. */
+    private static final Duration WEEK = Duration.ofDays(7);
+
     private ChatShopThreadRepository threads;
     private ChatShopMessageRepository messages;
     private ProductDirectory directory;
@@ -60,6 +67,7 @@ class ShopChatServiceTest {
     private ShopOwnership ownership;
     private ShopDelivery delivery;
     private ShopChatProperties properties;
+    private MovableClock clock;
     private ShopChatService service;
 
     private ChatShopThread thread;
@@ -73,11 +81,12 @@ class ShopChatServiceTest {
         ownership = mock(ShopOwnership.class);
         delivery = mock(ShopDelivery.class);
         properties = new ShopChatProperties();
+        clock = new MovableClock(NOW);
         service = new ShopChatService(threads, messages, directory, orders, ownership, delivery, properties,
-                new ChatProperties());
+                new ChatProperties(), clock);
 
         thread = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Mini Market",
-                Instant.now().plus(Duration.ofDays(3)));
+                NOW.plus(Duration.ofDays(3)));
         when(threads.findById(thread.getId())).thenReturn(Optional.of(thread));
         when(threads.lockById(thread.getId())).thenReturn(Optional.of(thread));
         when(threads.partiesOf(thread.getId())).thenReturn(Optional.of(parties(STORE, CUSTOMER)));
@@ -120,8 +129,7 @@ class ShopChatServiceTest {
             ShopChatService.ThreadState again = service.openForCustomer(STORE, CUSTOMER, "Tania K.", null);
 
             assertThat(again.thread()).isSameAs(thread);
-            assertThat(thread.getClosesAt())
-                    .isCloseTo(Instant.now().plus(Duration.ofDays(14)), within(Duration.ofSeconds(5)));
+            assertThat(thread.getClosesAt()).isEqualTo(NOW.plus(Duration.ofDays(14)));
         }
 
         @Test
@@ -209,7 +217,8 @@ class ShopChatServiceTest {
             UUID later = UUID.randomUUID();
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(openOrder(orderId, STORE, CUSTOMER)));
             when(orders.visibleToCaller(later)).thenReturn(Optional.of(new OrderReference(later, STORE,
-                    "Abu Hassan Print", CUSTOMER, "CATALOG", "PLACED", null, null, null)));
+                    "Abu Hassan Print", CUSTOMER, "CATALOG", "PLACED", NOW.minus(Duration.ofHours(1)), null,
+                    null, null, null)));
 
             ShopChatService.ThreadState first = service.openForCustomer(STORE, CUSTOMER, "Tania K.", orderId);
             ShopChatService.ThreadState again = service.openForCustomer(STORE, CUSTOMER, "Tania K.", orderId);
@@ -298,36 +307,25 @@ class ShopChatServiceTest {
         }
 
         @Test
-        @DisplayName("while the order is open, the shop may speak for a window from now")
-        void an_open_order() {
-            when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(openOrder(orderId, STORE, CUSTOMER)));
-
-            ShopChatService.ThreadState state = service.openForOrder(orderId, MERCHANT);
-
-            assertThat(state.thread().getClosesAt())
-                    .isCloseTo(Instant.now().plus(Duration.ofDays(7)), within(Duration.ofSeconds(5)));
-        }
-
-        @Test
-        @DisplayName("six days after delivery a quiet thread opens, until seven days after delivery")
+        @DisplayName("six days after an on-time delivery a quiet thread opens, until seven days after delivery")
         void within_the_window_after_delivery() {
-            Instant delivered = Instant.now().minus(Duration.ofDays(6));
+            Instant delivered = NOW.minus(Duration.ofDays(6));
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(ended(orderId, "DELIVERED", delivered)));
             ChatShopThread quiet = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print",
-                    Instant.now().minus(Duration.ofDays(1)));
+                    NOW.minus(Duration.ofDays(1)));
             when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
 
             ShopChatService.ThreadState state = service.openForOrder(orderId, MERCHANT);
 
             assertThat(state.thread()).isSameAs(quiet);
-            assertThat(quiet.getClosesAt()).isEqualTo(delivered.plus(Duration.ofDays(7)));
-            assertThat(quiet.isOpenAt(Instant.now())).isTrue();
+            assertThat(quiet.getClosesAt()).isEqualTo(delivered.plus(WEEK));
+            assertThat(quiet.isOpenAt(NOW)).isTrue();
         }
 
         @Test
         @DisplayName("six days after a cancellation it still opens")
         void within_the_window_after_cancellation() {
-            Instant cancelled = Instant.now().minus(Duration.ofDays(6));
+            Instant cancelled = NOW.minus(Duration.ofDays(6));
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(ended(orderId, "CANCELLED", cancelled)));
 
             assertThat(service.openForOrder(orderId, MERCHANT).thread().getOrderId()).isEqualTo(orderId);
@@ -336,19 +334,19 @@ class ShopChatServiceTest {
         @Test
         @DisplayName("seven days after delivery or cancellation it is refused with when it closed, and opens nothing")
         void past_the_window() {
-            Instant delivered = Instant.now().minus(Duration.ofDays(8));
+            Instant delivered = NOW.minus(Duration.ofDays(8));
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(ended(orderId, "DELIVERED", delivered)));
             UUID cancelledOrder = UUID.randomUUID();
-            Instant cancelled = Instant.now().minus(Duration.ofDays(7)).minusSeconds(60);
+            Instant cancelled = NOW.minus(WEEK).minusSeconds(60);
             when(orders.visibleToCaller(cancelledOrder))
                     .thenReturn(Optional.of(ended(cancelledOrder, "CANCELLED", cancelled)));
 
             assertThatThrownBy(() -> service.openForOrder(orderId, MERCHANT))
                     .isInstanceOfSatisfying(OrderChatClosedException.class, refused ->
-                            assertThat(refused.getClosedAt()).isEqualTo(delivered.plus(Duration.ofDays(7))));
+                            assertThat(refused.getClosedAt()).isEqualTo(delivered.plus(WEEK)));
             assertThatThrownBy(() -> service.openForOrder(cancelledOrder, MERCHANT))
                     .isInstanceOfSatisfying(OrderChatClosedException.class, refused ->
-                            assertThat(refused.getClosedAt()).isEqualTo(cancelled.plus(Duration.ofDays(7))));
+                            assertThat(refused.getClosedAt()).isEqualTo(cancelled.plus(WEEK)));
             verify(threads, never()).insertIfAbsent(any(), any(), any(), any(), any(), any());
             assertThat(thread.getOrderId()).isNull();
         }
@@ -357,7 +355,7 @@ class ShopChatServiceTest {
         @DisplayName("the window is a setting")
         void the_window_is_a_setting() {
             properties.setOrderChatWindow(Duration.ofDays(2));
-            Instant delivered = Instant.now().minus(Duration.ofDays(3));
+            Instant delivered = NOW.minus(Duration.ofDays(3));
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(ended(orderId, "DELIVERED", delivered)));
 
             assertThatThrownBy(() -> service.openForOrder(orderId, MERCHANT))
@@ -368,7 +366,8 @@ class ShopChatServiceTest {
         @DisplayName("an ended order with no recorded end is refused, not read as open")
         void an_ended_order_without_an_end() {
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(new OrderReference(orderId, STORE,
-                    "Abu Hassan Print", CUSTOMER, "SERVICE", "DELIVERED", null, null, "Tania K.")));
+                    "Abu Hassan Print", CUSTOMER, "SERVICE", "DELIVERED", NOW.minus(Duration.ofDays(3)),
+                    NOW.minus(Duration.ofDays(1)), null, null, "Tania K.")));
 
             assertThatThrownBy(() -> service.openForOrder(orderId, MERCHANT))
                     .isInstanceOf(OrderChatClosedException.class);
@@ -380,17 +379,17 @@ class ShopChatServiceTest {
         void bounded_both_ways() {
             when(orders.visibleToCaller(orderId)).thenReturn(Optional.of(openOrder(orderId, STORE, CUSTOMER)));
             ChatShopThread quiet = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print",
-                    Instant.now().minus(Duration.ofDays(1)));
+                    NOW.minus(Duration.ofDays(1)));
             when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
             properties.setIdleCloseAfter(Duration.ofDays(2));
 
             service.openForOrder(orderId, MERCHANT);
             assertThat(quiet.getClosesAt())
                     .as("two idle days are shorter than the seven-day order window, so they bound it")
-                    .isCloseTo(Instant.now().plus(Duration.ofDays(2)), within(Duration.ofSeconds(5)));
+                    .isEqualTo(NOW.plus(Duration.ofDays(2)));
 
             ChatShopThread busy = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print",
-                    Instant.now().plus(Duration.ofDays(14)));
+                    NOW.plus(Duration.ofDays(14)));
             when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(busy));
             Instant customersOwn = busy.getClosesAt();
 
@@ -420,6 +419,105 @@ class ShopChatServiceTest {
 
             assertThat(again.thread()).isSameAs(first.thread());
             assertThat(again.thread().getOrderId()).isEqualTo(orderId);
+        }
+    }
+
+    /**
+     * The window runs from facts the shop cannot stretch: the earlier of when the order ended (now,
+     * while it has not) and when it was due. Each edge is pinned a second before it and on it.
+     */
+    @Nested
+    @DisplayName("how long a shop may open the thread for an order")
+    class OrderWindow {
+
+        private final Instant placed = NOW.minus(Duration.ofDays(30));
+        private final Instant due = placed.plus(Duration.ofDays(3));
+
+        @Test
+        @DisplayName("an open order before its due time: a week from now, which stops moving once it falls due")
+        void an_open_order_before_it_is_due() {
+            OrderReference preparing = serviceOrder("PREPARING", null);
+
+            opensUntil(preparing, due.minusSeconds(1), due.minusSeconds(1).plus(WEEK));
+            opensUntil(preparing, due, due.plus(WEEK));
+            opensUntil(preparing, due.plusSeconds(1), due.plus(WEEK));
+        }
+
+        /** Nothing expires an order and its customer can no longer cancel it: what the due time is for. */
+        @Test
+        @DisplayName("an order left READY long after it was due: a week after it was due, however often the shop opens it")
+        void an_order_stuck_after_it_was_due() {
+            OrderReference ready = serviceOrder("READY", null);
+
+            opensUntil(ready, due.plus(Duration.ofDays(2)), due.plus(WEEK));
+            opensUntil(ready, due.plus(WEEK).minusSeconds(1), due.plus(WEEK));
+            refusedClosedAt(ready, due.plus(WEEK), due.plus(WEEK));
+        }
+
+        @Test
+        @DisplayName("an order delivered late: a week after it was due, not a week after it was delivered")
+        void an_order_completed_late() {
+            OrderReference late = serviceOrder("DELIVERED", due.plus(Duration.ofDays(4)));
+
+            opensUntil(late, due.plus(WEEK).minusSeconds(1), due.plus(WEEK));
+            refusedClosedAt(late, due.plus(WEEK), due.plus(WEEK));
+        }
+
+        @Test
+        @DisplayName("an order delivered early: a week after it was delivered")
+        void an_order_completed_early() {
+            Instant delivered = due.minus(Duration.ofDays(2));
+            OrderReference early = serviceOrder("DELIVERED", delivered);
+
+            opensUntil(early, delivered.plus(WEEK).minusSeconds(1), delivered.plus(WEEK));
+            refusedClosedAt(early, delivered.plus(WEEK), delivered.plus(WEEK));
+        }
+
+        @Test
+        @DisplayName("a goods order, which promises no ready time: a week after it was placed, open or delivered")
+        void a_goods_order_without_an_estimate() {
+            OrderReference preparing = goodsOrder("PREPARING", null);
+            OrderReference delivered = goodsOrder("DELIVERED", placed.plus(Duration.ofDays(1)));
+
+            for (OrderReference goods : List.of(preparing, delivered)) {
+                opensUntil(goods, placed.plus(WEEK).minusSeconds(1), placed.plus(WEEK));
+                refusedClosedAt(goods, placed.plus(WEEK), placed.plus(WEEK));
+            }
+        }
+
+        /** At {@code moment} the shop may open it, and a quiet thread then accepts messages until {@code until}. */
+        private void opensUntil(OrderReference order, Instant moment, Instant until) {
+            clock.set(moment);
+            ChatShopThread quiet = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Print", placed);
+            when(threads.findByStoreIdAndCustomerId(STORE, CUSTOMER)).thenReturn(Optional.of(quiet));
+            when(orders.visibleToCaller(order.id())).thenReturn(Optional.of(order));
+
+            service.openForOrder(order.id(), MERCHANT);
+
+            assertThat(quiet.getClosesAt()).as("opened at %s", moment).isEqualTo(until);
+        }
+
+        /** At {@code moment} the shop may not, and is told the chat closed at {@code closedAt}. */
+        private void refusedClosedAt(OrderReference order, Instant moment, Instant closedAt) {
+            clock.set(moment);
+            when(orders.visibleToCaller(order.id())).thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> service.openForOrder(order.id(), MERCHANT))
+                    .as("opened at %s", moment)
+                    .isInstanceOfSatisfying(OrderChatClosedException.class, refused ->
+                            assertThat(refused.getClosedAt()).isEqualTo(closedAt));
+        }
+
+        /** A service order of this shop, promised for {@code due}, delivered at {@code deliveredAt} if it was. */
+        private OrderReference serviceOrder(String status, Instant deliveredAt) {
+            return new OrderReference(UUID.randomUUID(), STORE, "Abu Hassan Print", CUSTOMER, "SERVICE", status,
+                    placed, due, deliveredAt, null, "Tania K.");
+        }
+
+        /** A goods order of this shop; Order Manager promises no ready time for one. */
+        private OrderReference goodsOrder(String status, Instant deliveredAt) {
+            return new OrderReference(UUID.randomUUID(), STORE, "Abu Hassan Print", CUSTOMER, "CATALOG", status,
+                    placed, null, deliveredAt, null, "Tania K.");
         }
     }
 
@@ -481,8 +579,7 @@ class ShopChatServiceTest {
 
             assertThat(message.getSenderSide()).isEqualTo(ShopThreadSide.CUSTOMER);
             assertThat(message.getSequenceNo()).isEqualTo(1L);
-            assertThat(thread.getClosesAt())
-                    .isCloseTo(Instant.now().plus(Duration.ofDays(14)), within(Duration.ofSeconds(5)));
+            assertThat(thread.getClosesAt()).isEqualTo(NOW.plus(Duration.ofDays(14)));
             verify(delivery).deliver(message, STORE, CUSTOMER);
         }
 
@@ -512,7 +609,7 @@ class ShopChatServiceTest {
         @DisplayName("once idle and closed, the shop cannot revive the thread")
         void the_shop_cannot_post_into_a_closed_thread() {
             ChatShopThread idle = new ChatShopThread(STORE, CUSTOMER, "Tania K.", "Abu Hassan Mini Market",
-                    Instant.now().minus(Duration.ofDays(1)));
+                    NOW.minus(Duration.ofDays(1)));
             when(threads.partiesOf(idle.getId())).thenReturn(Optional.of(parties(STORE, CUSTOMER)));
             when(threads.lockById(idle.getId())).thenReturn(Optional.of(idle));
 
@@ -525,7 +622,7 @@ class ShopChatServiceTest {
         @DisplayName("a retry returns the message already stored")
         void a_retry_is_idempotent() {
             ChatShopMessage stored = new ChatShopMessage(thread.getId(), 1L, CUSTOMER, ShopThreadSide.CUSTOMER,
-                    "Do you have halloumi?", "c-1", Instant.now());
+                    "Do you have halloumi?", "c-1", NOW);
             when(messages.findByThreadIdAndSenderIdAndClientMessageId(thread.getId(), CUSTOMER, "c-1"))
                     .thenReturn(Optional.of(stored));
 
@@ -554,7 +651,7 @@ class ShopChatServiceTest {
             when(ownership.storesOf(MERCHANT)).thenReturn(Set.of(STORE));
             when(threads.inboxFor(eq(Set.of(STORE)), any())).thenReturn(List.of(thread));
             ChatShopMessage latest = new ChatShopMessage(thread.getId(), 2L, CUSTOMER, ShopThreadSide.CUSTOMER,
-                    "Can you set one aside?", null, Instant.now());
+                    "Can you set one aside?", null, NOW);
             when(messages.latestIn(List.of(thread.getId()))).thenReturn(List.of(latest));
             when(messages.unreadFrom(List.of(thread.getId()), ShopThreadSide.CUSTOMER))
                     .thenReturn(List.of(tally(thread.getId(), 2L)));
@@ -577,15 +674,16 @@ class ShopChatServiceTest {
         }
     }
 
-    /** A service order in production: open, placed with {@code storeId} by {@code customerId}. */
+    /** A service order in production, placed yesterday and promised in two days: open, with {@code storeId}, by {@code customerId}. */
     private static OrderReference openOrder(UUID id, UUID storeId, String customerId) {
         return new OrderReference(id, storeId, "Abu Hassan Print", customerId, "SERVICE", "PREPARING",
-                null, null, "Tania K.");
+                NOW.minus(Duration.ofDays(1)), NOW.plus(Duration.ofDays(2)), null, null, "Tania K.");
     }
 
-    /** This shop's customer's service order, delivered or cancelled at {@code at}. */
+    /** This shop's customer's service order, delivered or cancelled at {@code at}, which is when it was due. */
     private static OrderReference ended(UUID id, String status, Instant at) {
         return new OrderReference(id, STORE, "Abu Hassan Print", CUSTOMER, "SERVICE", status,
+                at.minus(Duration.ofDays(3)), at,
                 "DELIVERED".equals(status) ? at : null, "CANCELLED".equals(status) ? at : null, "Tania K.");
     }
 
@@ -615,5 +713,33 @@ class ShopChatServiceTest {
                 return unread;
             }
         };
+    }
+
+    /** A clock a test sets to the exact moment it is about. */
+    private static final class MovableClock extends Clock {
+        private Instant now;
+
+        MovableClock(Instant now) {
+            this.now = now;
+        }
+
+        void set(Instant moment) {
+            now = moment;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
     }
 }

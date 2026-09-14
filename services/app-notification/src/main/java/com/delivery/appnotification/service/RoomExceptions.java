@@ -126,10 +126,10 @@ public final class RoomExceptions {
     }
 
     /**
-     * 409, with when it closed. The order is one of the caller's shop's and is on their screen, but it
-     * was delivered or cancelled longer ago than a shop may open a conversation about it. Null
-     * {@code closedAt} only for an ended order Order Manager recorded no end time for, which is refused
-     * rather than treated as open.
+     * 409, with when it closed. The order is one of the caller's shop's and is on their screen, but its
+     * window has passed: it ended, or fell due, longer ago than a shop may open a conversation about it
+     * ({@code ShopChatService#openForOrder}). Null {@code closedAt} only for an ended order Order
+     * Manager recorded no end time for, which is refused rather than treated as open.
      */
     public static class OrderChatClosedException extends RuntimeException {
         private final Instant closedAt;

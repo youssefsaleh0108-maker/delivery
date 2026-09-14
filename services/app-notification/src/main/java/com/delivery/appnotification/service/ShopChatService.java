@@ -1,5 +1,6 @@
 package com.delivery.appnotification.service;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,7 +62,9 @@ public class ShopChatService {
     private final ShopDelivery delivery;
     private final ShopChatProperties properties;
     private final ChatProperties chatProperties;
+    private final Clock clock;
 
+    @Autowired
     public ShopChatService(ChatShopThreadRepository threads,
                            ChatShopMessageRepository messages,
                            ProductDirectory directory,
@@ -69,6 +73,20 @@ public class ShopChatService {
                            ShopDelivery delivery,
                            ShopChatProperties properties,
                            ChatProperties chatProperties) {
+        this(threads, messages, directory, orders, ownership, delivery, properties, chatProperties,
+                Clock.systemUTC());
+    }
+
+    /** For tests, which stand "now" exactly on the edge of an order's window. */
+    ShopChatService(ChatShopThreadRepository threads,
+                    ChatShopMessageRepository messages,
+                    ProductDirectory directory,
+                    OrderReferences orders,
+                    ShopOwnership ownership,
+                    ShopDelivery delivery,
+                    ShopChatProperties properties,
+                    ChatProperties chatProperties,
+                    Clock clock) {
         this.threads = threads;
         this.messages = messages;
         this.directory = directory;
@@ -77,6 +95,7 @@ public class ShopChatService {
         this.delivery = delivery;
         this.properties = properties;
         this.chatProperties = chatProperties;
+        this.clock = clock;
     }
 
     /**
@@ -105,7 +124,7 @@ public class ShopChatService {
                 .orElseThrow(() -> new RoomNotFoundException(storeId));
 
         String storeName = store.name() == null ? "" : store.name();
-        Instant closes = Instant.now().plus(properties.getIdleCloseAfter());
+        Instant closes = clock.instant().plus(properties.getIdleCloseAfter());
 
         threads.insertIfAbsent(UUID.randomUUID(), storeId, customerId, customerName, storeName, closes);
         ChatShopThread thread = threads.findByStoreIdAndCustomerId(storeId, customerId)
@@ -128,15 +147,17 @@ public class ShopChatService {
      * {@link ShopOwnership} rule the inbox and every thread read use. Any other order, or one with no
      * shop, is the 404 of an order that does not exist, before anything about its state is looked at.
      *
-     * <p><strong>Only while the order is open, or recently ended.</strong> From
-     * {@link ShopChatProperties#getOrderChatWindow()} after it was delivered or cancelled, a 409 with
-     * when that was. Within it, opening keeps the thread accepting messages until the earlier of the
-     * window's end (for an open order, a window from now) and the customer idle window from now.
+     * <p><strong>Only within the order's window.</strong> The window starts at the earlier of when the
+     * order ended — delivered or cancelled, or now while it has not — and when it was due
+     * ({@link OrderReference#dueAt()}), and lasts {@link ShopChatProperties#getOrderChatWindow()}. From
+     * its end, a 409 with when that was. Within it, opening keeps the thread accepting messages until
+     * the earlier of the window's end and the customer idle window from now.
      *
-     * <p>That is the one way a shop moves a thread's closing time, and it is bounded by the order: the
-     * idle rule in {@link ChatShopThread} still stops a shop keeping a line open to a customer with no
-     * open or recent order with it, the shop's replies still never move it, and it never shortens a
-     * thread the customer is keeping open. What is said afterwards is rate limited as ever.
+     * <p>That is the one way a shop moves a thread's closing time, and it is bounded by facts the shop
+     * cannot stretch ({@code shopMaySpeakUntil}): the idle rule in {@link ChatShopThread} still stops a
+     * shop keeping a line open to a customer with no order inside its window, the shop's replies still
+     * never move it, and it never shortens a thread the customer is keeping open. What is said
+     * afterwards is rate limited as ever.
      *
      * <p>A thread the merchant creates names the customer as the order's card does; one that already
      * exists keeps the name its customer's own sign-in gave it.
@@ -146,7 +167,7 @@ public class ShopChatService {
         OrderReference order = orders.visibleToCaller(orderId)
                 .filter(found -> found.storeId() != null && ownership.owns(merchantId, found.storeId()))
                 .orElseThrow(() -> new RoomNotFoundException(orderId));
-        Instant until = shopMaySpeakUntil(order, Instant.now());
+        Instant until = shopMaySpeakUntil(order, clock.instant());
 
         String storeName = order.storeName() == null ? "" : order.storeName();
         threads.insertIfAbsent(UUID.randomUUID(), order.storeId(), order.customerId(),
@@ -228,7 +249,7 @@ public class ShopChatService {
             }
         }
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         if (!thread.isOpenAt(now)) {
             throw new ConversationClosedException(threadId, thread.getClosesAt());
         }
@@ -254,7 +275,7 @@ public class ShopChatService {
                 .orElseThrow(() -> new RoomNotFoundException(threadId));
         ShopThreadSide side = sideOf(threadId, parties.getStoreId(), parties.getCustomerId(), userId,
                 callerIsMerchant);
-        return messages.markReadUpTo(threadId, side.other(), upToSequence, Instant.now());
+        return messages.markReadUpTo(threadId, side.other(), upToSequence, clock.instant());
     }
 
     // ---------------------------------------------------------------------------------- internals
@@ -278,27 +299,35 @@ public class ShopChatService {
      * Until when a shop opening the thread for this order may speak on it: the earlier of the order
      * window's end and the customer idle window from now. Refused once the order window has passed.
      *
-     * <p>For an open order the window runs from now, so however often the shop reopens it while the
-     * work goes on, the thread still closes no later than a window after the order ends.
+     * <p><strong>The window is counted from facts the shop cannot stretch:</strong> the earlier of
+     * when the order ended (now, while it has not) and when it was due. Counted from the end alone it
+     * was the shop's to hold open. A customer can cancel only a PLACED order and nothing expires one,
+     * so a shop that left an order ACCEPTED, PREPARING or READY renewed a week's line to its customer
+     * with every open, for as long as it liked — and a shop thread gives the customer no block or
+     * report. The due time ends that: an order still open past it, or finished after it, closes a
+     * window after it was due, whatever the shop marks and however often it opens. An order finished
+     * before it was due closes a window after it finished.
+     *
+     * <p>An ended order with no recorded end cannot be placed in its window, and is refused rather
+     * than read as open.
      */
     private Instant shopMaySpeakUntil(OrderReference order, Instant now) {
         Duration window = properties.getOrderChatWindow();
-        Instant windowFrom = now;
+        Instant endedOrNow = now;
         if (order.hasEnded()) {
-            Instant endedAt = order.endedAt();
-            if (endedAt == null) {
-                // No end time cannot be placed inside the window, and is not read as still open.
+            endedOrNow = order.endedAt();
+            if (endedOrNow == null) {
                 throw new OrderChatClosedException(order.id(), null);
             }
-            Instant closedAt = endedAt.plus(window);
-            if (!now.isBefore(closedAt)) {
-                throw new OrderChatClosedException(order.id(), closedAt);
-            }
-            windowFrom = endedAt;
         }
-        Instant byWindow = windowFrom.plus(window);
+        Instant due = order.dueAt();
+        Instant windowFrom = endedOrNow.isBefore(due) ? endedOrNow : due;
+        Instant closedAt = windowFrom.plus(window);
+        if (!now.isBefore(closedAt)) {
+            throw new OrderChatClosedException(order.id(), closedAt);
+        }
         Instant byIdle = now.plus(properties.getIdleCloseAfter());
-        return byWindow.isBefore(byIdle) ? byWindow : byIdle;
+        return closedAt.isBefore(byIdle) ? closedAt : byIdle;
     }
 
     private ThreadState state(ChatShopThread thread, ShopThreadSide side) {

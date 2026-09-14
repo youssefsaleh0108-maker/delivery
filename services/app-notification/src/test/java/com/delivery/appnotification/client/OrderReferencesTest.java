@@ -48,7 +48,8 @@ class OrderReferencesTest {
              "storeId":"7a1b2c3d-0000-4000-8000-000000000001","storeName":"Abu Hassan Print",
              "deliveryAddress":null,"contactPhone":"+96170123456","items":[],"actions":[],
              "placedAt":"2026-09-01T09:00:00Z","deliveredAt":"2026-09-10T12:00:00Z","cancelledAt":null,
-             "fulfilment":"PICKUP","customerDisplayName":"Tania K."}
+             "fulfilment":"PICKUP","readyAt":"2026-09-09T15:00:00Z","estimatedReadyAt":"2026-09-08T09:00:00Z",
+             "customerDisplayName":"Tania K."}
             """;
 
     private MockRestServiceServer server;
@@ -86,6 +87,8 @@ class OrderReferencesTest {
         assertThat(order.customerId()).isEqualTo("customer-sub");
         assertThat(order.kind()).isEqualTo("SERVICE");
         assertThat(order.customerDisplayName()).isEqualTo("Tania K.");
+        assertThat(order.placedAt()).isEqualTo(Instant.parse("2026-09-01T09:00:00Z"));
+        assertThat(order.estimatedReadyAt()).isEqualTo(Instant.parse("2026-09-08T09:00:00Z"));
         assertThat(order.hasEnded()).isTrue();
         assertThat(order.endedAt()).isEqualTo(Instant.parse("2026-09-10T12:00:00Z"));
         server.verify();
@@ -106,7 +109,7 @@ class OrderReferencesTest {
 
     /** Neither answer is safe to make up: see OrderUnavailableException. */
     @Test
-    @DisplayName("a failure, a timeout, a rejected token or an answer about another order is unavailable, never empty")
+    @DisplayName("a failure, a timeout, a rejected token, an answer about another order or one without when it was placed is unavailable, never empty")
     void fails_closed() {
         server.expect(once(), requestTo(URL)).andRespond(withServerError());
         server.expect(once(), requestTo(URL)).andRespond(request -> {
@@ -115,8 +118,11 @@ class OrderReferencesTest {
         server.expect(once(), requestTo(URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         server.expect(once(), requestTo(URL)).andRespond(withSuccess(
                 DELIVERED.replace(ORDER.toString(), UUID.randomUUID().toString()), MediaType.APPLICATION_JSON));
+        // Without it, how long the order's shop may open a chat about it cannot be measured.
+        server.expect(once(), requestTo(URL)).andRespond(withSuccess(
+                DELIVERED.replace("\"placedAt\":\"2026-09-01T09:00:00Z\",", ""), MediaType.APPLICATION_JSON));
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 5; i++) {
             assertThatThrownBy(() -> references.visibleToCaller(ORDER))
                     .isInstanceOf(OrderUnavailableException.class);
         }
@@ -137,15 +143,37 @@ class OrderReferencesTest {
     @Test
     @DisplayName("an open order has not ended; a cancelled one ended when it was cancelled")
     void when_an_order_ended() {
+        Instant placedAt = Instant.parse("2026-09-01T09:00:00Z");
         Instant cancelledAt = Instant.parse("2026-09-02T08:00:00Z");
         OrderReference open = new OrderReference(ORDER, STORE, null, "customer-sub", "SERVICE", "PREPARING",
-                null, null, null);
+                placedAt, null, null, null, null);
         OrderReference cancelled = new OrderReference(ORDER, STORE, null, "customer-sub", "SERVICE", "CANCELLED",
-                null, cancelledAt, null);
+                placedAt, null, null, cancelledAt, null);
 
         assertThat(open.hasEnded()).isFalse();
         assertThat(open.endedAt()).isNull();
         assertThat(cancelled.hasEnded()).isTrue();
         assertThat(cancelled.endedAt()).isEqualTo(cancelledAt);
+    }
+
+    /** What a shop's window for opening a chat about the order is counted from, with when it ended. */
+    @Test
+    @DisplayName("an order is due when its work was promised, or when it was placed if nothing was")
+    void when_an_order_was_due() {
+        Instant placedAt = Instant.parse("2026-09-01T09:00:00Z");
+        Instant promised = Instant.parse("2026-09-04T09:00:00Z");
+
+        assertThat(order("SERVICE", "PREPARING", placedAt, promised).dueAt()).isEqualTo(promised);
+        assertThat(order("SERVICE", "PLACED", placedAt, null).dueAt())
+                .as("a service order its shop has not accepted").isEqualTo(placedAt);
+        assertThat(order("CATALOG", "PREPARING", placedAt, null).dueAt())
+                .as("a goods order, which promises no ready time").isEqualTo(placedAt);
+        assertThat(order("SERVICE", "PREPARING", placedAt, placedAt.minusSeconds(1)).dueAt())
+                .as("never before it was placed").isEqualTo(placedAt);
+    }
+
+    private static OrderReference order(String kind, String status, Instant placedAt, Instant estimatedReadyAt) {
+        return new OrderReference(ORDER, STORE, null, "customer-sub", kind, status, placedAt, estimatedReadyAt,
+                null, null, null);
     }
 }

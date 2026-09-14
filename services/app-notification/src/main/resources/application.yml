@@ -177,8 +177,9 @@ delivery:
       max-messages-per-window: 20
       # How long Product Service's "this merchant owns this shop" is trusted before asking again.
       owner-confirmation-ttl: 10m
-      # How long after an order was delivered or cancelled its shop may still open the customer's
-      # thread about it (while the order is open, always). The owner's default is seven days.
+      # How long its shop may open the customer's thread about an order, counted from the earlier of
+      # when the order ended (now, while it is open) and when it was due (its promised ready time, or
+      # when it was placed if none was promised). The owner's default is seven days.
       order-chat-window: ${CHAT_SHOP_ORDER_CHAT_WINDOW:7d}
 
   # Product Service answers what chat cannot know alone: whether a delivery area is real, whether a

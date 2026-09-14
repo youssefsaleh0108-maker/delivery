@@ -21,9 +21,9 @@ import jakarta.persistence.Version;
  * the customer's last activity plus an idle window. The customer moves it: opening the chat from the
  * shop page or from one of their orders, or saying something. The shop's replies do not, so a shop
  * cannot keep a customer's thread alive to message them long after they stopped asking — once idle,
- * only the customer can start it again, unless they have an order with the shop that is open or only
- * recently ended. A shop opening the thread for that order keeps it open while the order is, and at
- * most until a short window after it was delivered or cancelled ({@code ShopChatService#openForOrder}).
+ * only the customer can start it again, unless they have an order with the shop still inside its
+ * window. A shop opening the thread for that order keeps it open no longer than a short window from
+ * when the order ended or was due, whichever came first ({@code ShopChatService#openForOrder}).
  */
 @Entity
 @Table(name = "chat_shop_threads")

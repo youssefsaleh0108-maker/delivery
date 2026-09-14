@@ -42,13 +42,16 @@ public class ShopChatProperties {
     private Duration ownerConfirmationTtl = Duration.ofMinutes(10);
 
     /**
-     * How long after an order was delivered or cancelled its shop may still open the customer's
-     * thread about it. While the order is open, a shop always may.
+     * How long a shop may open its customer's thread about an order, counted from the earlier of when
+     * the order ended (delivered or cancelled; now, while it has not) and when it was due (the ready
+     * time Order Manager promised for it, or when it was placed if nothing was promised).
      *
      * <p>Seven days, the owner's default. Long enough for the questions an order leaves behind — "did
      * the prints come out right?", "you cancelled; shall I keep the fabric?" — and short enough that
-     * one order is not a standing licence to message the person who placed it. It also bounds how long
-     * such an open keeps the thread accepting the shop's messages; see {@code ShopChatService#openForOrder}.
+     * one order is not a standing licence to message the person who placed it. Counted from facts the
+     * shop cannot stretch, because counted from the order's end alone, a shop that never finished an
+     * order would hold that licence for as long as it liked. It also bounds how long such an open keeps
+     * the thread accepting the shop's messages; see {@code ShopChatService#openForOrder}.
      */
     private Duration orderChatWindow = Duration.ofDays(7);
 

@@ -69,9 +69,10 @@ public class ShopChatController {
      * with that order — a provider's "chat with the customer". Idempotent.
      *
      * <p>MERCHANT, for an order of a shop they answer for; any other order is a 404, as one that does
-     * not exist. 409 with {@code closedAt} once the order was delivered or cancelled longer ago than a
-     * shop may open a chat about it; 503 when orders or shops cannot be checked. The view names the
-     * customer only as the order's card does, and never by user id.
+     * not exist. 409 with {@code closedAt} once the order's window has passed: a window from when it
+     * ended or was due, whichever came first, so an order left open long after it was due closes too.
+     * 503 when orders or shops cannot be checked. The view names the customer only as the order's card
+     * does, and never by user id.
      */
     @PostMapping("/orders/{orderId}/shop-thread")
     @PreAuthorize("hasRole('MERCHANT')")
