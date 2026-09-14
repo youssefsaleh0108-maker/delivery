@@ -39,8 +39,9 @@ import com.delivery.accounting.domain.StatementDispatchRepository;
  * Builds a counterparty's statement out of the ledger.
  *
  * <p><strong>The four kinds are not one query with a filter.</strong> A merchant is owed the goods
- * they sold less commission and nothing else. A rider is owed their earnings AND owes the platform
- * every note they took at the door — one party, two directions, and a net that can point either way.
+ * they sold less commission, less any cash they took at their own counter for a pickup and still
+ * hold. A rider is owed their earnings AND owes the platform every note they took at the door — one
+ * party, two directions, and a net that can point either way.
  * A carrier is owed delivery fees on jobs whose goods it never touched. The platform's own statement
  * runs the other way round from all three. Writing that as one generic aggregation over
  * {@code transactions} was the tempting shape and it is wrong: it would silently give a rider a
@@ -148,7 +149,7 @@ public class StatementService {
 
     /**
      * Goods sold, less the platform's commission, plus any gift wrapping, equals what the platform
-     * owes the shop.
+     * owes the shop — less any cash the shop took at its own counter and has not paid in.
      *
      * <p>The goods net is the {@code MERCHANT_CREDIT} legs and nothing else, so it is exact whatever
      * else happened on the order. The two gross lines are derived FROM it — goods sold is the net
@@ -157,6 +158,15 @@ public class StatementService {
      *
      * <p>Gift wrapping is a line of its own, read off the {@code GIFT_WRAP_CREDIT} legs. No
      * commission is taken on it, so it is never grossed up with the goods.
+     *
+     * <p><strong>Cash at the counter (V52).</strong> A pickup is paid at the shop that did the work,
+     * so the shop holds those notes, and the rider's rule applies for the rider's reason: the notes
+     * are the platform's money in the shop's till and the share is the platform's money owed to the
+     * shop, so both belong on one statement and netting them is a plain subtraction. On a pickup the
+     * till holds the whole order and the share is the goods less commission, so the net points the
+     * other way — the shop owes the platform its commission — until the shop pays the till in, when
+     * it is owed its share like any shop. Both halves are shown, as on a rider's statement, and a
+     * shop that never took cash at its counter gets neither line and reads exactly as it always did.
      */
     private Statement merchantStatement(String ref, String name, StatementRange range,
                                         Ledger ledger) {
@@ -168,10 +178,43 @@ public class StatementService {
                 ledger.orderCount() + " orders"));
         addIfAny(lines, Statement.Line.credit("Gift wrapping", wrapping, null));
 
+        // Read from the float, as a rider's are: it is the record of who is holding what, and the
+        // CASH_COLLECTED legs beside it say the same thing from the ledger's side.
+        BigDecimal collected = orZero(floatEntries.totalForHolderBetween(
+                ref, CashFloatEntry.Kind.COLLECTED, range.fromInstant(), range.toExclusive()));
+        BigDecimal paid = orZero(floatEntries.totalForHolderBetween(
+                ref, CashFloatEntry.Kind.REMITTED, range.fromInstant(), range.toExclusive()));
+        addIfAny(lines, Statement.Line.debit("Cash collected from customers", collected,
+                "the platform's money, taken at your counter on pickup orders"));
+        addIfAny(lines, Statement.Line.credit("Cash paid to the platform", paid, null));
+
+        // Independently of the lines, as on every statement: the shop's credits, plus what it paid
+        // in, less what it took.
+        BigDecimal control = goods.add(wrapping).add(paid).subtract(collected);
+
         List<Statement.Entry> entries = ledger.entriesFor(Leg.MERCHANT_CREDIT, take);
         return Statement.of(CounterpartyKind.MERCHANT, ref, name, range, currency,
-                lines, goods.add(wrapping), entries, ledger.orderCount(),
-                note(range, ledger, take, "goods"));
+                lines, control, entries, ledger.orderCount(),
+                withTillNote(note(range, ledger, take, "goods"), ref, collected, paid));
+    }
+
+    /**
+     * Adds what a shop is holding right now from its counter, whenever it took it.
+     *
+     * <p>{@link #withCustodyNote}'s rule for a company, applied to a shop's till: cash taken in July
+     * and still not paid in by August is a fact about today that an August window cannot show. Said
+     * only when it differs from what this period alone suggests, so a shop with no pickups, or one
+     * that pays in as it goes, keeps the note it always had.
+     */
+    private String withTillNote(String note, String ref, BigDecimal collected, BigDecimal paid) {
+        BigDecimal held = orZero(floatEntries.outstandingTotalFor(ref));
+        if (held.signum() == 0 || held.compareTo(collected.subtract(paid)) == 0) {
+            return note;
+        }
+        String till = "You are holding " + Statement.money(held) + " " + currency
+                + " of platform cash in total from pickup orders paid at your counter and not yet "
+                + "paid to the platform, including anything from before this period.";
+        return note == null ? till : note + " " + till;
     }
 
     // -------------------------------------------------------------------------------- carrier
@@ -514,7 +557,8 @@ public class StatementService {
         BigDecimal outstanding = floatEntries.outstandingTotal();
 
         List<String> notes = new ArrayList<>();
-        notes.add("Riders collected " + Statement.money(collected) + " " + currency
+        // Riders at the door and shops at their counters (V52): the float counts both.
+        notes.add("Riders and shops collected " + Statement.money(collected) + " " + currency
                 + " in cash in this period and banked " + Statement.money(banked)
                 + "; " + Statement.money(outstanding)
                 + " is still held across all holders. That cash already contains the commission "
