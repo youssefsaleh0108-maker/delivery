@@ -19172,6 +19172,54 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.'**
   String get svcRefusedTooManyUploads;
+
+  /// No description provided for @svcInstructionsLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String svcInstructionsLength(int used, int max);
+
+  /// No description provided for @svcOrderNotAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This order couldn\'t be sent as it is. Check what you wrote in it, then try again.'**
+  String get svcOrderNotAccepted;
+
+  /// No description provided for @svcOrderChangedRequote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order changed while it was being sent, so nothing was placed. Its total is being checked again.'**
+  String get svcOrderChangedRequote;
+
+  /// No description provided for @svcUnconfirmedLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order may have gone through'**
+  String get svcUnconfirmedLeaveTitle;
+
+  /// No description provided for @svcUnconfirmedLeaveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We didn\'t hear back after you tapped Place. Check Orders before ordering this again, so you don\'t order it twice.'**
+  String get svcUnconfirmedLeaveBody;
+
+  /// No description provided for @svcCheckOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Check Orders'**
+  String get svcCheckOrders;
+
+  /// No description provided for @svcLeaveAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave anyway'**
+  String get svcLeaveAnyway;
+
+  /// No description provided for @svcStayHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay'**
+  String get svcStayHere;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

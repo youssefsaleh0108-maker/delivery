@@ -3514,5 +3514,13 @@
   "svcYourInstructions": "تعليماتك",
   "svcSummary": "الملخص",
   "svcServiceChip": "خدمة",
-  "svcRefusedTooManyUploads": "أرسلت عدة ملفات خلال الدقائق الأخيرة. انتظر بضع دقائق، ثم أضف هذا الملف من جديد."
+  "svcRefusedTooManyUploads": "أرسلت عدة ملفات خلال الدقائق الأخيرة. انتظر بضع دقائق، ثم أضف هذا الملف من جديد.",
+  "svcInstructionsLength": "{used} من {max}",
+  "svcOrderNotAccepted": "تعذّر إرسال هذا الطلب كما هو. راجع ما كتبته فيه، ثم حاول مجددًا.",
+  "svcOrderChangedRequote": "تغيّر طلبك أثناء إرساله، لذا لم يُرسَل شيء. نتحقق الآن من مجموعه من جديد.",
+  "svcUnconfirmedLeaveTitle": "ربما وصل طلبك",
+  "svcUnconfirmedLeaveBody": "لم يصلنا ردّ بعد أن ضغطت «اطلب». راجع طلباتك قبل أن تطلبه مجددًا، كي لا تطلبه مرتين.",
+  "svcCheckOrders": "راجع الطلبات",
+  "svcLeaveAnyway": "غادر على أي حال",
+  "svcStayHere": "ابقَ هنا"
 }

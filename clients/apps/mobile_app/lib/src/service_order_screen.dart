@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'address_sheet.dart';
 import 'delivery_address.dart';
@@ -13,6 +14,7 @@ import 'order_placement.dart';
 import 'service_order_files.dart';
 import 'service_order_words.dart';
 import 'services_kit.dart';
+import 'utf16_length_limit.dart';
 
 /// Configuring and placing one service order (Figma 126:437), pushed from a provider's Order button.
 ///
@@ -36,8 +38,12 @@ import 'services_kit.dart';
 ///   shown and asked about again rather than charged.
 /// * **Cash**, the only payment a service order takes, said as when it is paid.
 /// * **Refusals in words** — a closed category, a file the provider needs, an address the shop does
-///   not deliver to — and a send whose answer never came is never called a failure: trying again
-///   sends the same attempt, which cannot place a second order.
+///   not deliver to, a body the server will not read.
+/// * **The order that was sent, and only it.** Every input is held while a send is out, so a total
+///   that moved is placed only for the order the customer sees; anything changed meanwhile is priced
+///   again instead. A send whose answer never came — or came unreadable — is never called a failure:
+///   trying again sends the same attempt, which cannot place a second order, and leaving the screen
+///   after one warns first, because another visit starts an attempt of its own.
 class ServiceOrderScreen extends StatefulWidget {
   const ServiceOrderScreen({
     super.key,
@@ -57,6 +63,9 @@ class ServiceOrderScreen extends StatefulWidget {
 }
 
 enum _Upload { sending, sent, failed }
+
+/// What the customer chose when asked on the way out after an unanswered send.
+enum _Leave { stay, leave, orders }
 
 /// One file row: its name, where its upload stands, and the id its confirmation gave it.
 class _FileSlot {
@@ -113,7 +122,16 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
   /// whose answer was lost and a later one with changed packs share it, and the server answers the
   /// second with the order the first placed rather than placing another.
   late final String _attemptKey = newIdempotencyKey();
+
+  /// Whether an order is out. While it is, every input — packs, options, files, instructions, how the
+  /// customer gets it, the address — is held, so the order on screen stays the order being sent, and a
+  /// "place it at the new total?" can only ever be about that order.
   bool _placing = false;
+
+  /// Whether a send of this attempt went without an answer this build could read — so it may have
+  /// placed the order — and nothing the server said since has shown that it did not. Leaving then
+  /// warns first ([_confirmLeave]): another visit orders with a fresh attempt the server cannot match.
+  bool _unconfirmed = false;
 
   /// Pickup when the offer allows it — it needs no address and costs nothing — otherwise delivery.
   Fulfilment _initialFulfilment() {
@@ -321,14 +339,10 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
 
   // ------------------------------------------------------------------ placing
 
-  Future<void> _place() async {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    final double? agreed = _total;
-    if (agreed == null || _placing || _blocker(t) != null) return;
+  /// The order exactly as the screen now shows it, as a submission of this visit's attempt.
+  OrderSubmission _submission() {
     final DeliveryAddress? address = _address;
-
-    // Built once and sent unchanged on every try below, key and all.
-    final OrderSubmission submission = OrderSubmission(
+    return OrderSubmission(
       idempotencyKey: _attemptKey,
       items: <OrderLineSubmission>[
         (productId: widget.offer.id, qty: _packs, optionIds: _optionIds),
@@ -348,6 +362,20 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
       ],
       serviceInstructions: _instructions.text.trim().isEmpty ? null : _instructions.text.trim(),
     );
+  }
+
+  /// Whether two submissions ask for the same order: the same body as the server reads it — packs,
+  /// options, files, instructions, fulfilment and address alike. Both carry this visit's key.
+  static bool _sameOrder(OrderSubmission a, OrderSubmission b) =>
+      jsonEncode(a.toBody()) == jsonEncode(b.toBody());
+
+  Future<void> _place() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final double? agreed = _total;
+    if (agreed == null || _placing || _blocker(t) != null) return;
+
+    // Built once and sent unchanged on every try below, key and all.
+    final OrderSubmission submission = _submission();
 
     setState(() => _placing = true);
     double expected = agreed;
@@ -366,31 +394,124 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
             _openTracking(orderId);
             return;
           case OrderPriceChanged(:final double total):
-            setState(() => _placing = false);
+            // Nothing is stored under the key for a total that moved, so no earlier try of this
+            // visit placed an order either.
+            _settled();
             unawaited(_requote(again: true));
             if (!await _confirmNewTotal(total, expected, t) || !mounted) return;
+            // The yes was to the order as it was sent. If what the screen shows has changed since —
+            // an address chosen elsewhere meanwhile — the yes is not about it: its price is asked
+            // again, and nothing is placed until the customer taps Place at that price.
+            if (!_sameOrder(_submission(), submission)) {
+              _say(t.svcOrderChangedRequote);
+              unawaited(_requote());
+              return;
+            }
             setState(() => _placing = true);
             expected = total;
           case ServiceOrderRefused(:final ServiceOrderRefusal refusal):
-            setState(() => _placing = false);
+            _settled();
             _say(serviceRefusalMessage(refusal, t));
             return;
           case ServicesDirectoryUnavailable():
-            setState(() => _placing = false);
+            _settled();
             _say(t.svcDirectoryUnavailable);
             return;
         }
       }
     } on DioException catch (e) {
       if (!mounted) return;
-      setState(() => _placing = false);
       // No answer, or a server error after the request arrived: the order may exist. Never "it did
       // not go through" — and trying again is safe, because it sends this same attempt.
       if (OrderApi.mayHavePlaced(e)) {
-        _say(t.offlineUnconfirmedRetry);
+        _unanswered(t);
         return;
       }
-      _say(placementRefusalMessage(e, t));
+      final int? status = e.response?.statusCode;
+      // A rule's refusal (422) comes after the server looked this attempt's key up and found no order,
+      // so it settles an earlier unanswered try; a 400 is refused before that lookup and settles
+      // nothing.
+      if (status == 422) {
+        _settled();
+      } else {
+        setState(() => _placing = false);
+      }
+      // A 400 is a body the server would not read. placementRefusalMessage calls that "check the
+      // delivery details", which a pickup does not even have: a service order says what it is.
+      _say(status == 400 ? t.svcOrderNotAccepted : placementRefusalMessage(e, t));
+    } catch (_) {
+      // An answer this build could not read — a 201 whose order did not parse, say — still answers a
+      // send that may have placed the order: said as a lost answer is, with Place given back.
+      if (!mounted) return;
+      _unanswered(t);
+    }
+  }
+
+  /// The server answered in a way that shows this attempt placed nothing: Place is back, and leaving
+  /// needs no warning.
+  void _settled() => setState(() {
+        _placing = false;
+        _unconfirmed = false;
+      });
+
+  /// A send with no answer this build could read: the order may exist.
+  void _unanswered(DeliveryStrings t) {
+    setState(() {
+      _placing = false;
+      _unconfirmed = true;
+    });
+    _say(t.offlineUnconfirmedRetry);
+  }
+
+  /// Asked on the way out after a send whose answer never came. Another visit orders with a fresh
+  /// attempt the server cannot match to this one, so ordering again without looking could place the
+  /// same work twice: the customer is told so, and offered the Orders tab to look first.
+  Future<void> _confirmLeave() async {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final VoidCallback? openOrders = _kit.openOrders;
+    final _Leave? choice = await showDialog<_Leave>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        backgroundColor: DeliveryColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
+        title: Text(t.svcUnconfirmedLeaveTitle,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
+        content: Text(t.svcUnconfirmedLeaveBody,
+            style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4)),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_Leave.stay),
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
+            child: Text(t.svcStayHere),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_Leave.leave),
+            style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
+            child: Text(t.svcLeaveAnyway),
+          ),
+          if (openOrders != null)
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(_Leave.orders),
+              style: FilledButton.styleFrom(
+                backgroundColor: DeliveryColors.brand,
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(DeliveryRadius.md)),
+              ),
+              child: Text(t.svcCheckOrders),
+            ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case _Leave.orders:
+        openOrders?.call();
+      case _Leave.leave:
+        // pop, not maybePop: the question on the way out has been answered.
+        Navigator.of(context).pop();
+      case _Leave.stay || null:
+        break;
     }
   }
 
@@ -443,7 +564,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
 
   Future<void> _pickFile() async {
     final ServiceOrderFiles? files = _kit.files;
-    if (files == null) return;
+    if (files == null || _placing) return;
     final DeliveryStrings t = DeliveryStrings.of(context);
     final PickedServiceFile? picked;
     try {
@@ -499,6 +620,8 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
   }
 
   void _removeFile(_FileSlot slot) {
+    // Never while the order is out: the file may already be on it, and its row must not vanish.
+    if (_placing) return;
     final String? fileId = slot.fileId;
     setState(() => _files.remove(slot));
     final ServiceOrderFiles? files = _kit.files;
@@ -515,7 +638,11 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
 
   // ------------------------------------------------------------------ the screen
 
+  // Each of these is also held by its control while an order is out ([_placing]); the checks here
+  // catch a tap already on its way when the send began.
+
   Future<void> _chooseAddress() async {
+    if (_placing) return;
     await showAddressSheet(context, _kit.addresses,
         zoneApi: _kit.zoneApi, geocodingApi: _kit.geocodingApi);
     if (!mounted) return;
@@ -524,16 +651,19 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
   }
 
   void _setPacks(int packs) {
+    if (_placing) return;
     setState(() => _packs = packs.clamp(1, _maxPacks));
     unawaited(_requote());
   }
 
   void _chooseFulfilment(Fulfilment fulfilment) {
+    if (_placing) return;
     setState(() => _fulfilment = fulfilment);
     unawaited(_requote());
   }
 
   void _choose(OptionGroup group, ProductOptionChoice option) {
+    if (_placing) return;
     final List<String> chosen = <String>[...?_chosen[group.id]];
     if (group.singleChoice) {
       chosen
@@ -554,23 +684,31 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final bool configurable = _termsKnown && _groups != null;
-    return Scaffold(
-      backgroundColor: DeliveryColors.background,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          SafeArea(
-            bottom: false,
-            child: YdScreenHeader(
-              title: t.svcOrderServiceTitle,
-              onBack: () => Navigator.of(context).maybePop(),
-              backSemanticLabel: t.back,
+    // After a send whose answer never came, the way out — the header's back or the phone's — asks
+    // first ([_confirmLeave]).
+    return PopScope<Object?>(
+      canPop: !_unconfirmed,
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (!didPop) unawaited(_confirmLeave());
+      },
+      child: Scaffold(
+        backgroundColor: DeliveryColors.background,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            SafeArea(
+              bottom: false,
+              child: YdScreenHeader(
+                title: t.svcOrderServiceTitle,
+                onBack: () => Navigator.of(context).maybePop(),
+                backSemanticLabel: t.back,
+              ),
             ),
-          ),
-          Expanded(child: _body(t)),
-        ],
+            Expanded(child: _body(t)),
+          ],
+        ),
+        bottomNavigationBar: configurable ? _placeBar(t) : null,
       ),
-      bottomNavigationBar: configurable ? _placeBar(t) : null,
     );
   }
 
@@ -662,10 +800,11 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
             semanticLabel: t.custDecreaseQuantity,
             background: DeliveryColors.border,
             foreground: DeliveryColors.ink,
-            onTap: _packs > 1 ? () => _setPacks(_packs - 1) : null,
+            onTap: _packs > 1 && !_placing ? () => _setPacks(_packs - 1) : null,
           ),
           Padding(
-            padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.md - 4),
+            // The frame's 12px between tile and figure, 8 of which each tile's 48dp square now holds.
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.xs),
             child: Text(svcCount(units),
                 style: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
@@ -675,7 +814,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
             semanticLabel: t.custIncreaseQuantity,
             background: DeliveryColors.brandSoft,
             foreground: DeliveryColors.brand,
-            onTap: _packs < _maxPacks ? () => _setPacks(_packs + 1) : null,
+            onTap: _packs < _maxPacks && !_placing ? () => _setPacks(_packs + 1) : null,
           ),
         ],
       ),
@@ -710,11 +849,13 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
                       style: const TextStyle(fontSize: 14, color: DeliveryColors.ink)),
                 ),
             ],
-            onChanged: (String? id) {
-              final ProductOptionChoice? option =
-                  group.options.where((ProductOptionChoice o) => o.id == id).firstOrNull;
-              if (option != null) _choose(group, option);
-            },
+            onChanged: _placing
+                ? null
+                : (String? id) {
+                    final ProductOptionChoice? option =
+                        group.options.where((ProductOptionChoice o) => o.id == id).firstOrNull;
+                    if (option != null) _choose(group, option);
+                  },
           ),
         ),
       );
@@ -727,7 +868,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
             YdChip(
               label: _optionLabel(option),
               selected: chosen.contains(option.id),
-              onTap: option.available ? () => _choose(group, option) : null,
+              onTap: option.available && !_placing ? () => _choose(group, option) : null,
             ),
         ],
       );
@@ -765,7 +906,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
               color: DeliveryColors.white,
               borderRadius: BorderRadius.circular(DeliveryRadius.md),
               child: InkWell(
-                onTap: _pickFile,
+                onTap: _placing ? null : _pickFile,
                 borderRadius: BorderRadius.circular(DeliveryRadius.md),
                 child: Container(
                   padding: const EdgeInsetsDirectional.symmetric(
@@ -841,7 +982,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () => _removeFile(slot),
+                onPressed: _placing ? null : () => _removeFile(slot),
                 style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
                 child: Text(t.svcRemoveFile),
               ),
@@ -877,7 +1018,15 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
         const SizedBox(height: DeliverySpacing.sm),
         TextField(
           controller: _instructions,
-          maxLength: _maxInstructions,
+          // Held as Order Manager counts, in UTF-16 units (`@Size(max = 1000)`): Flutter's maxLength
+          // counts an emoji as one, and would let through instructions the server refuses.
+          inputFormatters: const <TextInputFormatter>[Utf16LengthLimit(_maxInstructions)],
+          buildCounter: (BuildContext context,
+                  {required int currentLength, required bool isFocused, required int? maxLength}) =>
+              Text(t.svcInstructionsLength(_instructions.text.length, _maxInstructions),
+                  style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
+          // Read-only rather than disabled while the order is out: the words stay as sent, and look it.
+          readOnly: _placing,
           minLines: 2,
           maxLines: 5,
           style: const TextStyle(fontSize: 14, color: DeliveryColors.ink),
@@ -922,7 +1071,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
         borderRadius: BorderRadius.circular(DeliveryRadius.md),
         child: InkWell(
           borderRadius: BorderRadius.circular(DeliveryRadius.md),
-          onTap: selected ? null : () => _chooseFulfilment(option),
+          onTap: selected || _placing ? null : () => _chooseFulfilment(option),
           child: Container(
             padding: const EdgeInsetsDirectional.symmetric(
                 horizontal: DeliverySpacing.md, vertical: DeliverySpacing.md - 2),
@@ -976,7 +1125,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
     final DeliveryAddress? address = _kit.addresses.selected;
     final bool rtl = Directionality.of(context) == TextDirection.rtl;
     return YdCard.bordered(
-      onTap: _chooseAddress,
+      onTap: _placing ? null : _chooseAddress,
       padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
       child: Row(
         children: <Widget>[
@@ -1124,8 +1273,11 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
       );
 }
 
-/// One side of the pack stepper: the frame's 28px tile, grey for fewer and brand-tinted for more. A
-/// null [onTap] dims it — at one pack, or at the ninety-ninth.
+/// One side of the pack stepper: the frame's tile, grey for fewer and brand-tinted for more. A null
+/// [onTap] dims it — at one pack, at the ninety-ninth, or while the order is out.
+///
+/// The tile is drawn at 32dp, but a tap anywhere in the 48dp square around it counts: a thumb aimed
+/// at a small tile beside a number misses it easily, and a miss here is a price that did not change.
 class _StepButton extends StatelessWidget {
   const _StepButton({
     required this.icon,
@@ -1147,17 +1299,29 @@ class _StepButton extends StatelessWidget {
       button: true,
       enabled: onTap != null,
       label: semanticLabel,
-      child: Opacity(
-        opacity: onTap == null ? 0.4 : 1,
-        child: Material(
-          color: background,
-          borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: SizedBox.square(
-              dimension: 32,
-              child: Icon(icon, size: 18, color: foreground),
+      // The square around the tile: a tap on the tile is the InkWell's, with its ripple; a tap beside
+      // it lands here and does the same.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onTap,
+        child: SizedBox.square(
+          dimension: kMinInteractiveDimension,
+          child: Center(
+            child: Opacity(
+              opacity: onTap == null ? 0.4 : 1,
+              child: Material(
+                color: background,
+                borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onTap,
+                  child: SizedBox.square(
+                    dimension: 32,
+                    child: Icon(icon, size: 18, color: foreground),
+                  ),
+                ),
+              ),
             ),
           ),
         ),

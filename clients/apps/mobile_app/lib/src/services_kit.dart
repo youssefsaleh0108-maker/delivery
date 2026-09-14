@@ -32,6 +32,7 @@ class ServicesKit {
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
+    this.openOrders,
   });
 
   final StoreApi storeApi;
@@ -69,6 +70,11 @@ class ServicesKit {
   final TrackingApi? trackingApi;
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
+
+  /// Takes the customer to the Orders tab from however deep in the Services chain they are: what the
+  /// order screen offers when a send may have placed the order without its answer arriving. Null
+  /// draws no such button.
+  final VoidCallback? openOrders;
 
   /// The tracking screen for one order, wired with this kit's clients.
   Widget trackingScreen(String orderId, {DeliveryOrder? preview}) => ServiceOrderTrackingScreen(

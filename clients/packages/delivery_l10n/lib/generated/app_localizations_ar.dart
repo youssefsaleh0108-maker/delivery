@@ -11464,4 +11464,33 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get svcRefusedTooManyUploads =>
       'أرسلت عدة ملفات خلال الدقائق الأخيرة. انتظر بضع دقائق، ثم أضف هذا الملف من جديد.';
+
+  @override
+  String svcInstructionsLength(int used, int max) {
+    return '$used من $max';
+  }
+
+  @override
+  String get svcOrderNotAccepted =>
+      'تعذّر إرسال هذا الطلب كما هو. راجع ما كتبته فيه، ثم حاول مجددًا.';
+
+  @override
+  String get svcOrderChangedRequote =>
+      'تغيّر طلبك أثناء إرساله، لذا لم يُرسَل شيء. نتحقق الآن من مجموعه من جديد.';
+
+  @override
+  String get svcUnconfirmedLeaveTitle => 'ربما وصل طلبك';
+
+  @override
+  String get svcUnconfirmedLeaveBody =>
+      'لم يصلنا ردّ بعد أن ضغطت «اطلب». راجع طلباتك قبل أن تطلبه مجددًا، كي لا تطلبه مرتين.';
+
+  @override
+  String get svcCheckOrders => 'راجع الطلبات';
+
+  @override
+  String get svcLeaveAnyway => 'غادر على أي حال';
+
+  @override
+  String get svcStayHere => 'ابقَ هنا';
 }

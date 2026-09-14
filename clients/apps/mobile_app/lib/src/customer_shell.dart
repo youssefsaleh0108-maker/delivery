@@ -209,6 +209,7 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     trackingApi: widget.trackingApi,
     trackingSocket: widget.trackingSocket,
     chatApi: widget.chatApi,
+    openOrders: _openOrdersFromAbove,
   );
 
   int _index = CustomerNavBar.homeIndex;
@@ -249,6 +250,16 @@ class _CustomerShellState extends State<CustomerShell> with WidgetsBindingObserv
     Navigator.of(context)
         .popUntil((Route<dynamic> route) => route == shell || route.isFirst);
     _open(CustomerNavBar.basketIndex);
+  }
+
+  /// Opens the Orders tab from a screen pushed over this shell — a service order whose send may have
+  /// gone through without its answer — popping back to the shell first, as [_openBasket] does and for
+  /// the same reasons.
+  void _openOrdersFromAbove() {
+    final ModalRoute<Object?>? shell = ModalRoute.of(context);
+    Navigator.of(context)
+        .popUntil((Route<dynamic> route) => route == shell || route.isFirst);
+    _open(CustomerNavBar.ordersIndex);
   }
 
   /// Pushes the gift hub (Figma 112:1684) over the shell, from the Home card or the profile menu.

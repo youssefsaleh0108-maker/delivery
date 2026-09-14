@@ -5697,5 +5697,14 @@
   "svcYourInstructions": "Your instructions",
   "svcSummary": "Summary",
   "svcServiceChip": "Service",
-  "svcRefusedTooManyUploads": "You've sent several files in the last few minutes. Wait a few minutes, then add this one again."
+  "svcRefusedTooManyUploads": "You've sent several files in the last few minutes. Wait a few minutes, then add this one again.",
+  "svcInstructionsLength": "{used}/{max}",
+  "@svcInstructionsLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}},
+  "svcOrderNotAccepted": "This order couldn't be sent as it is. Check what you wrote in it, then try again.",
+  "svcOrderChangedRequote": "Your order changed while it was being sent, so nothing was placed. Its total is being checked again.",
+  "svcUnconfirmedLeaveTitle": "Your order may have gone through",
+  "svcUnconfirmedLeaveBody": "We didn't hear back after you tapped Place. Check Orders before ordering this again, so you don't order it twice.",
+  "svcCheckOrders": "Check Orders",
+  "svcLeaveAnyway": "Leave anyway",
+  "svcStayHere": "Stay"
 }

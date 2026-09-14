@@ -80,6 +80,7 @@ void main() {
     ValueListenable<bool>? online,
     ServiceOrderFiles? files,
     ServiceFilePicker? pick,
+    VoidCallback? openOrders,
   }) =>
       ServicesKit(
         storeApi: StoreApi(server.dio),
@@ -89,6 +90,7 @@ void main() {
         connectivity: online ?? ValueNotifier<bool>(true),
         files: files,
         pickFile: pick ?? () async => null,
+        openOrders: openOrders,
       );
 
   Future<void> pump(
@@ -111,6 +113,29 @@ void main() {
       locale: locale,
     ));
     if (settle) await tester.pumpAndSettle();
+  }
+
+  /// The screen pushed over a page, so its way back has somewhere to go.
+  Future<void> pumpPushed(WidgetTester tester, ServicesKit with_) async {
+    phone(tester);
+    await tester.pumpWidget(svcApp(Builder(
+      builder: (BuildContext context) => Scaffold(
+        body: Center(
+          child: TextButton(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => ServiceOrderScreen(
+                kit: with_,
+                store: Store.fromJson(storeJson()),
+                offer: Product.fromJson(offerJson()),
+              ),
+            )),
+            child: const Text('Provider page'),
+          ),
+        ),
+      ),
+    )));
+    await tester.tap(find.text('Provider page'));
+    await tester.pumpAndSettle();
   }
 
   YdPillButton placeButton(WidgetTester tester) => tester.widget<YdPillButton>(find.byWidgetPredicate(
@@ -175,6 +200,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('49,500'), findsOneWidget);
       expect((lastQuote(server)['items'] as List<dynamic>).first['qty'], 99);
+    });
+
+    testWidgets('the stepper\'s tiles keep the frame\'s size, and take a tap anywhere in 48dp',
+        (WidgetTester tester) async {
+      final FakeServer server = serve();
+      await pump(tester, server);
+
+      final Finder plus =
+          find.ancestor(of: find.byIcon(Icons.add_rounded), matching: find.byType(InkWell)).first;
+      expect(tester.getSize(plus), const Size.square(32));
+
+      // Just below the tile, inside the square a finger is given.
+      await tester.tapAt(tester.getCenter(plus) + const Offset(0, 21));
+      await tester.pumpAndSettle();
+      expect(find.text('1,000'), findsOneWidget);
+    });
+
+    testWidgets('instructions are held to 1,000 UTF-16 units, as the server counts: an emoji is two',
+        (WidgetTester tester) async {
+      final FakeServer server = serve();
+      await pump(tester, server);
+      String typed() => tester.widget<TextField>(find.byType(TextField)).controller!.text;
+
+      await tester.enterText(find.byType(TextField), '😀' * 600);
+      await tester.pumpAndSettle();
+      expect(typed().length, 1000);
+      expect(typed().characters.length, 500, reason: 'whole emoji only, never half of one');
+      expect(find.text(en.svcInstructionsLength(1000, 1000)), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '');
+      await tester.enterText(find.byType(TextField), '${'a' * 999}😀');
+      await tester.pumpAndSettle();
+      expect(typed(), 'a' * 999, reason: 'the emoji would make 1,001');
+      expect(find.text(en.svcInstructionsLength(999, 1000)), findsOneWidget);
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+      expect(
+          (server.sent('POST', '/api/orders').single.data as Map<dynamic, dynamic>)['serviceInstructions'],
+          'a' * 999);
     });
 
     testWidgets('a required option is chosen before there is a price to place at',
@@ -515,6 +580,220 @@ void main() {
       expect(placements, hasLength(2));
       expect(placements.last.headers[OrderApi.idempotencyKeyHeader],
           placements.first.headers[OrderApi.idempotencyKeyHeader]);
+      expect(placements.last.data, placements.first.data,
+          reason: 'a retry is the same order, body and all, or the key would refuse it');
+    });
+
+    testWidgets('an edited retry after a lost answer is told the order the first send placed, and shows it',
+        (WidgetTester tester) async {
+      int sends = 0;
+      final FakeServer server = serve(place: (RequestOptions r) {
+        if (++sends == 1) throw noAnswer(r);
+        // Order Manager looks the key up before any rule: a different body under it is refused, and
+        // named the order the key already placed.
+        return const FakeReply(
+            409, <String, dynamic>{'code': 'IDEMPOTENCY_KEY_REUSED', 'orderId': svcOrderId});
+      });
+      await pump(tester, server);
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+      expect(find.text(en.offlineUnconfirmedRetry), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$30.00')));
+      await tester.pumpAndSettle();
+
+      final List<RequestOptions> placements = server.sent('POST', '/api/orders');
+      expect(placements, hasLength(2));
+      expect(((placements.last.data as Map<dynamic, dynamic>)['items'] as List<dynamic>).first['qty'], 2);
+      expect(placements.last.headers[OrderApi.idempotencyKeyHeader],
+          placements.first.headers[OrderApi.idempotencyKeyHeader]);
+      expect(find.text(en.offlineAlreadyPlaced), findsOneWidget);
+      expect(find.byType(ServiceOrderTrackingScreen), findsOneWidget);
+      expect(server.sent('GET', '/api/orders/$svcOrderId'), isNotEmpty);
+    });
+
+    testWidgets('an answer this build cannot read is said as a lost one, and Place comes back',
+        (WidgetTester tester) async {
+      final FakeServer server =
+          serve(place: (_) => const FakeReply(201, <String>['not', 'an', 'order']));
+      await pump(tester, server);
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(en.offlineUnconfirmedRetry), findsOneWidget);
+      expect(placeButton(tester).busy, isFalse);
+      expect(placeButton(tester).onPressed, isNotNull);
+    });
+
+    testWidgets('a body the server will not read is said as that, not as a delivery detail',
+        (WidgetTester tester) async {
+      final FakeServer server =
+          serve(place: (_) => const FakeReply(400, <String, dynamic>{'title': 'Bad Request'}));
+      await pump(tester, server);
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(en.svcOrderNotAccepted), findsOneWidget);
+      expect(find.text(en.checkDeliveryDetails), findsNothing);
+    });
+
+    testWidgets('while an order is out, packs, options, files, instructions and delivery take no input',
+        (WidgetTester tester) async {
+      final Completer<Object?> placed = Completer<Object?>();
+      final _FakeFiles files = _FakeFiles();
+      final FakeServer server =
+          serve(options: <Map<String, dynamic>>[paperType], place: (_) => placed.future);
+      await pump(tester, server,
+          with_: kit(server, files: files, pick: () async => _picked('design.pdf')),
+          offer: offerJson(attachmentPolicy: 'OPTIONAL'));
+      await tester.tap(find.text(en.svcChooseOption).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Matte').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcUploadHint));
+      await tester.pumpAndSettle();
+      final int quotes = server.sent('POST', '/api/orders/quote').length;
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.tap(find.byIcon(Icons.add_rounded), warnIfMissed: false);
+      await tester.tap(find.text(en.svcYouDropDelivery), warnIfMissed: false);
+      await tester.tap(find.text(en.svcRemoveFile), warnIfMissed: false);
+      await tester.tap(find.text(en.svcAddAnotherFile), warnIfMissed: false);
+      await tester.pump();
+
+      expect(find.text('500'), findsOneWidget);
+      expect(find.text('design.pdf'), findsOneWidget);
+      expect(files.removed, isEmpty);
+      expect(files.uploads, hasLength(1));
+      expect(find.text(en.chooseAnAddress), findsNothing);
+      expect(server.sent('POST', '/api/orders/quote'), hasLength(quotes));
+      expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+      expect(tester.widget<DropdownButton<String>>(find.byType(DropdownButton<String>)).onChanged,
+          isNull);
+
+      placed.complete(FakeReply(201, serviceOrderJson(status: 'PLACED')));
+      await tester.pumpAndSettle();
+      final Map<dynamic, dynamic> body =
+          server.sent('POST', '/api/orders').single.data as Map<dynamic, dynamic>;
+      expect(body['attachmentFileIds'], <String>['file-1']);
+      expect(body['fulfilment'], 'PICKUP');
+    });
+
+    testWidgets('a total that moved while the order was out is placed exactly as it was sent',
+        (WidgetTester tester) async {
+      Completer<Object?> answer = Completer<Object?>();
+      final FakeServer server = serve(place: (_) => answer.future);
+      await pump(tester, server);
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pump(const Duration(milliseconds: 1));
+      // A second pack, asked for while the first send is out: not taken.
+      await tester.tap(find.byIcon(Icons.add_rounded), warnIfMissed: false);
+      answer.complete(const FakeReply(
+          409, <String, dynamic>{'code': 'PRICE_CHANGED', 'total': 16.5, 'expectedTotal': 15}));
+      await tester.pumpAndSettle();
+      answer = Completer<Object?>()..complete(FakeReply(201, serviceOrderJson(status: 'PLACED')));
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$16.50')).last);
+      await tester.pumpAndSettle();
+
+      final List<RequestOptions> placements = server.sent('POST', '/api/orders');
+      expect(placements, hasLength(2));
+      expect(placements.last.data, <String, dynamic>{
+        ...placements.first.data as Map<String, dynamic>,
+        'expectedTotal': 16.5,
+      });
+      expect(((placements.last.data as Map<dynamic, dynamic>)['items'] as List<dynamic>).first['qty'], 1);
+      expect(find.byType(ServiceOrderTrackingScreen), findsOneWidget);
+    });
+
+    testWidgets('an address changed while the order was out is not placed on the old yes: it is priced again',
+        (WidgetTester tester) async {
+      final Completer<Object?> answer = Completer<Object?>();
+      final DeliveryAddressStore addresses = DeliveryAddressStore(ownerId: 'test-user');
+      await addresses.select(const DeliveryAddress(line: '12 Rose Street', zoneId: 'zone-home'));
+      final FakeServer server = serve(place: (_) => answer.future);
+      await pump(tester, server,
+          with_: kit(server, addresses: addresses), offer: offerJson(fulfilment: 'DELIVERY'));
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$17.50')));
+      await tester.pump(const Duration(milliseconds: 1));
+      await addresses.select(const DeliveryAddress(line: '3 Cedar Lane', zoneId: 'zone-work'));
+      answer.complete(const FakeReply(
+          409, <String, dynamic>{'code': 'PRICE_CHANGED', 'total': 18, 'expectedTotal': 17.5}));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$18.00')).last);
+      await tester.pumpAndSettle();
+
+      expect(server.sent('POST', '/api/orders'), hasLength(1));
+      expect(find.text(en.svcOrderChangedRequote), findsOneWidget);
+      expect(lastQuote(server)['deliveryZoneId'], 'zone-work');
+      expect(find.byType(ServiceOrderTrackingScreen), findsNothing);
+      expect(find.text(en.svcPlaceOrderTotal('\$17.50')), findsOneWidget,
+          reason: 'priced for the new address, and placeable at that price');
+    });
+
+    testWidgets('leaving after a send whose answer never came warns first, and offers Orders',
+        (WidgetTester tester) async {
+      int ordersOpened = 0;
+      final FakeServer server = serve(place: (RequestOptions r) => throw noAnswer(r));
+      await pumpPushed(tester, kit(server, openOrders: () => ordersOpened++));
+
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pumpAndSettle();
+      expect(find.text(en.svcUnconfirmedLeaveTitle), findsOneWidget);
+      expect(find.text(en.svcUnconfirmedLeaveBody), findsOneWidget);
+
+      await tester.tap(find.text(en.svcCheckOrders));
+      await tester.pumpAndSettle();
+      expect(ordersOpened, 1);
+
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcStayHere));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServiceOrderScreen), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcLeaveAnyway));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServiceOrderScreen), findsNothing);
+      expect(find.text('Provider page'), findsOneWidget);
+    });
+
+    testWidgets('with nothing unanswered, leaving asks nothing — not even after a refusal settles it',
+        (WidgetTester tester) async {
+      int sends = 0;
+      final FakeServer server = serve(place: (RequestOptions r) {
+        if (++sends == 1) throw noAnswer(r);
+        return const FakeReply(422, <String, dynamic>{'code': 'CATEGORY_CLOSED'});
+      });
+      await pumpPushed(tester, kit(server, openOrders: () {}));
+
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServiceOrderScreen), findsNothing, reason: 'nothing was sent');
+
+      await tester.tap(find.text('Provider page'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(en.svcPlaceOrderTotal('\$15.00')));
+      await tester.pumpAndSettle();
+      expect(find.text(en.svcRefusedCategoryClosed), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pumpAndSettle();
+      expect(find.text(en.svcUnconfirmedLeaveTitle), findsNothing);
+      expect(find.byType(ServiceOrderScreen), findsNothing);
     });
 
     testWidgets('never offered offline: no placement until the platform answers again',

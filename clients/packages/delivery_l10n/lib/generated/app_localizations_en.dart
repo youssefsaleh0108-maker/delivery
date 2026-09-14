@@ -11319,4 +11319,33 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcRefusedTooManyUploads =>
       'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.';
+
+  @override
+  String svcInstructionsLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get svcOrderNotAccepted =>
+      'This order couldn\'t be sent as it is. Check what you wrote in it, then try again.';
+
+  @override
+  String get svcOrderChangedRequote =>
+      'Your order changed while it was being sent, so nothing was placed. Its total is being checked again.';
+
+  @override
+  String get svcUnconfirmedLeaveTitle => 'Your order may have gone through';
+
+  @override
+  String get svcUnconfirmedLeaveBody =>
+      'We didn\'t hear back after you tapped Place. Check Orders before ordering this again, so you don\'t order it twice.';
+
+  @override
+  String get svcCheckOrders => 'Check Orders';
+
+  @override
+  String get svcLeaveAnyway => 'Leave anyway';
+
+  @override
+  String get svcStayHere => 'Stay';
 }
