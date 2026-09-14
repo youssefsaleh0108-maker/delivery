@@ -17,6 +17,7 @@ import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductOptionService;
+import com.delivery.product.service.ServiceOfferSearch;
 import com.delivery.product.service.StoreService;
 import com.delivery.product.service.StoreService.FirstShop;
 
@@ -45,7 +46,8 @@ class ProductCreationApiTest {
         catalog = mock(CatalogService.class);
         stores = mock(StoreService.class);
         controller = new ProductController(catalog, mock(ProductImageService.class),
-                mock(ProductOptionService.class), mock(CrossSellService.class), stores);
+                mock(ProductOptionService.class), mock(CrossSellService.class),
+                mock(ServiceOfferSearch.class), stores);
         Jwt token = Jwt.withTokenValue("token").header("alg", "none").subject("merchant-sub").build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(token,
                 AuthorityUtils.createAuthorityList("ROLE_MERCHANT")));
@@ -60,7 +62,7 @@ class ProductCreationApiTest {
     @DisplayName("asks what a first product may open before the catalogue is entered, and hands the answer in")
     void asks_before_the_catalogue() {
         ProductRequest businessCards = new ProductRequest("Business cards", null,
-                new BigDecimal("12.00"), null, null, null, null);
+                new BigDecimal("12.00"), null, null, null, null, null);
         when(stores.firstShopFor("merchant-sub", null))
                 .thenReturn(FirstShop.NOT_FOR_A_SERVICES_APPLICANT);
         when(catalog.create("merchant-sub", businessCards, FirstShop.NOT_FOR_A_SERVICES_APPLICANT))

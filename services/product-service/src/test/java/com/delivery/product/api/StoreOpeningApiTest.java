@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.delivery.product.domain.Store;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
@@ -67,7 +68,8 @@ class StoreOpeningApiTest {
 
         ProxyFactory factory = new ProxyFactory(new StoreController(storeService,
                 mock(CatalogService.class), mock(ProductImageService.class),
-                mock(StoreImageService.class), mock(ReviewService.class)));
+                mock(StoreImageService.class), mock(ReviewService.class),
+                mock(PopularServiceShops.class)));
         factory.setProxyTargetClass(true);
         factory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
 
