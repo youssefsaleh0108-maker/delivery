@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -7956,9 +7955,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String dekkaneDistanceKm(double km) {
     final intl.NumberFormat kmNumberFormat =
         intl.NumberFormat.decimalPatternDigits(
-          locale: localeName,
-          decimalDigits: 1,
-        );
+            locale: localeName, decimalDigits: 1);
     final String kmString = kmNumberFormat.format(km);
 
     return 'على بُعد $kmString كم';
@@ -8974,7 +8971,8 @@ class DeliveryStringsAr extends DeliveryStrings {
       many:
           'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
       few: 'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
-      two: 'يحمل مهمتين من مهامك الآن. يمكن إنهاء عقده بعد تسليمهما أو إلغائهما.',
+      two:
+          'يحمل مهمتين من مهامك الآن. يمكن إنهاء عقده بعد تسليمهما أو إلغائهما.',
       one: 'يحمل إحدى مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
       zero: 'لا يحمل أي مهمة لك الآن.',
     );
@@ -9871,7 +9869,8 @@ class DeliveryStringsAr extends DeliveryStrings {
           'وصلت $count توصيلات إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
       two:
           'وصلت توصيلتان إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينهما.',
-      one: 'وصلت توصيلة واحدة إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
+      one:
+          'وصلت توصيلة واحدة إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
     );
     return '$_temp0';
   }
@@ -9887,8 +9886,10 @@ class DeliveryStringsAr extends DeliveryStrings {
           'وصلت $count توصيلة من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
       few:
           'وصلت $count توصيلات من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
-      two: 'وصلت توصيلتان من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
-      one: 'وصلت توصيلة واحدة من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحاً للسائق المعني.',
+      two:
+          'وصلت توصيلتان من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
+      one:
+          'وصلت توصيلة واحدة من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحاً للسائق المعني.',
     );
     return '$_temp0';
   }
@@ -10998,11 +10999,7 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String svcCashShopConfirmBody(
-    String shop,
-    String owed,
-    String held,
-    String orders,
-  ) {
+      String shop, String owed, String held, String orders) {
     return 'أكّد أنّ $shop دفع للمنصة $owed: عمولتها من $held دفعها زبائنه على صندوقه، عن $orders. يحتفظ المتجر بالباقي حصةً له. لا يمكن التراجع عن ذلك.';
   }
 

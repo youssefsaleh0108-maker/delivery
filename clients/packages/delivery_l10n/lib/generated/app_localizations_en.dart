@@ -1,6 +1,5 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -7924,9 +7923,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String dekkaneDistanceKm(double km) {
     final intl.NumberFormat kmNumberFormat =
         intl.NumberFormat.decimalPatternDigits(
-          locale: localeName,
-          decimalDigits: 1,
-        );
+            locale: localeName, decimalDigits: 1);
     final String kmString = kmNumberFormat.format(km);
 
     return '$kmString km away';
@@ -8914,7 +8911,8 @@ class DeliveryStringsEn extends DeliveryStrings {
       locale: localeName,
       other:
           'They are carrying $count of your jobs right now. Their contract can end once those are delivered or cancelled.',
-      one: 'They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.',
+      one:
+          'They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.',
     );
     return '$_temp0';
   }
@@ -9788,7 +9786,8 @@ class DeliveryStringsEn extends DeliveryStrings {
       locale: localeName,
       other:
           '$count deliveries reached the ledger after these figures were computed. Recompute to include them.',
-      one: '1 delivery reached the ledger after these figures were computed. Recompute to include it.',
+      one:
+          '1 delivery reached the ledger after these figures were computed. Recompute to include it.',
     );
     return '$_temp0';
   }
@@ -9800,7 +9799,8 @@ class DeliveryStringsEn extends DeliveryStrings {
       locale: localeName,
       other:
           '$count deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.',
-      one: '1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.',
+      one:
+          '1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.',
     );
     return '$_temp0';
   }
@@ -10855,11 +10855,7 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String svcCashShopConfirmBody(
-    String shop,
-    String owed,
-    String held,
-    String orders,
-  ) {
+      String shop, String owed, String held, String orders) {
     return 'Confirm $shop has paid the platform $owed: its commission on the $held its customers paid at its counter, covering $orders. The shop keeps the rest as its own share. This cannot be undone.';
   }
 
