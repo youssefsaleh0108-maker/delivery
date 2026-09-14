@@ -46,6 +46,7 @@ class RepositoryQueryParseTest {
                 .addAnnotatedClass(DeliveredOrderLine.class)
                 .addAnnotatedClass(DeliveryZone.class)
                 .addAnnotatedClass(GeocodeCacheEntry.class)
+                .addAnnotatedClass(OfferModerationAction.class)
                 .addAnnotatedClass(Product.class)
                 .addAnnotatedClass(ProductOption.class)
                 .addAnnotatedClass(ProductOptionGroup.class)
@@ -190,6 +191,30 @@ class RepositoryQueryParseTest {
                        t.turnaroundMaxHours, t.fulfilmentModes, t.attachmentPolicy, t.instructionsPrompt
                 FROM ServiceTerms t
                 """);
+    }
+
+    /**
+     * Back office's moderation of service offers (V36), read straight off the repository's annotations so
+     * they cannot drift: the locked read an act takes its offer with, and the list with its optional
+     * filters and its two shop subqueries. Plus the derived trail read, and the trail's and the hold's
+     * columns as the entities map them. What the queries answer is proven against a database in
+     * {@code OfferModerationDatabaseTest}.
+     */
+    @Test
+    void the_offer_moderation_queries_parse() throws NoSuchMethodException {
+        parses(ProductRepository.class.getMethod("findForModerationById", java.util.UUID.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses(ProductRepository.class.getMethod("findServiceOffersForBackoffice", java.util.Collection.class,
+                        boolean.class, boolean.class, java.util.Collection.class, java.util.UUID.class,
+                        String.class, org.springframework.data.domain.Pageable.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+
+        parses("SELECT a FROM OfferModerationAction a WHERE a.productId = :productId ORDER BY a.createdAt DESC");
+        parses("""
+                SELECT a.id, a.productId, a.storeId, a.action, a.reason, a.actorId, a.actorName, a.createdAt
+                FROM OfferModerationAction a
+                """);
+        parses("SELECT p.takenDownAt, p.takedownReason, p.statusBeforeTakedown FROM Product p");
     }
 
     @Test
