@@ -438,6 +438,32 @@ void main() {
     expect(cart.storeIds, <String>['s1', 's2']);
   });
 
+  testWidgets('a one-shop basket refused by a service rule shows Order Manager\'s own sentence',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) recorder = orderManager(
+      // A basket holding a service offer, which is ordered from its own screen or not at all.
+      placement: (RequestOptions o, RequestInterceptorHandler h) => h.reject(DioException(
+        requestOptions: o,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(requestOptions: o, statusCode: 422, data: <String, dynamic>{
+          'title': 'Order rule violated',
+          'code': 'OFFER_NOT_ORDERABLE',
+          'detail': 'Business cards can\'t be ordered right now',
+        }),
+      )),
+    );
+    final Cart cart = cartWithOneItem();
+    await pumpCheckout(tester, dio: recorder.dio, addresses: await storeWithAddresses(), cart: cart);
+
+    await tester.tap(find.byType(YdPillButton));
+    await tester.pumpAndSettle();
+
+    expect(recorder.sent.map((RequestOptions o) => o.path), <String>['/api/orders']);
+    expect(find.text('Business cards can\'t be ordered right now'), findsOneWidget);
+    expect(find.text(en.couldNotPlaceOrder), findsNothing);
+    expect(cart.isEmpty, isFalse);
+  });
+
   testWidgets('every shop\'s delivery circle is checked before anything is sent',
       (WidgetTester tester) async {
     final ({Dio dio, List<RequestOptions> sent}) recorder =

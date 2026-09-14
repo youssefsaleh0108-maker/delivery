@@ -329,10 +329,22 @@ class OrderOutbox extends ChangeNotifier {
   ///
   /// Cash only. A card or wallet hold needs the provider, and an instrument token is never written
   /// to disk ([OrderSubmission.toJson]) — so a queued card order could only ever fail later.
+  ///
+  /// Never a service order (owner default 13): a submission naming how the customer gets the work,
+  /// files for the provider, or instructions. One is always cash, so the rule above lets it through;
+  /// it is refused here, whatever screen built it. Sent hours later, its files may have expired and
+  /// its shop closed. And because none is ever queued, nothing restored carries a fulfilment — one
+  /// this build did not know would make [OrderSubmission.fromJson] refuse the whole outbox.
   Future<void> enqueue(PendingOrder order) async {
-    if (order.submission.paymentMethod != PaymentMethod.cash) {
-      throw ArgumentError.value(order.submission.paymentMethod, 'paymentMethod',
+    final OrderSubmission submission = order.submission;
+    if (submission.paymentMethod != PaymentMethod.cash) {
+      throw ArgumentError.value(submission.paymentMethod, 'paymentMethod',
           'only cash checkouts can be queued');
+    }
+    if (submission.fulfilment != null ||
+        submission.attachmentFileIds.isNotEmpty ||
+        (submission.serviceInstructions?.trim().isNotEmpty ?? false)) {
+      throw ArgumentError('A service order is never queued: it is placed online or not at all');
     }
     await _ready;
     if (_storageKey == null) throw const OutboxWriteException('no signed-in customer');
@@ -441,8 +453,8 @@ class OrderOutbox extends ChangeNotifier {
               newTotal: total,
               maybePlaced: false));
         case ServiceOrderRefused(detail: final String? detail):
-          // Only ever the answer to a service order, which is never queued. Were one sent, it is
-          // refused as any 422 is: before its key placed anything, so nothing exists under it.
+          // Only ever the answer to a service order, which [enqueue] refuses. One found here all the
+          // same is refused as any 422 is: before its key placed anything, so nothing exists under it.
           await _update(item._with(
               status: PendingOrderStatus.failed, error: detail, maybePlaced: false));
         case ServicesDirectoryUnavailable():

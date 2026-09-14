@@ -288,6 +288,31 @@ void main() {
     expect(cart.isGift, isTrue);
   });
 
+  testWidgets('a gift refused by a service rule still shows the server\'s own reason',
+      (WidgetTester tester) async {
+    final ({Dio dio, List<RequestOptions> sent}) gateway = server(
+      place: (RequestOptions o, RequestInterceptorHandler h) => h.reject(DioException(
+        requestOptions: o,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(requestOptions: o, statusCode: 422, data: <String, dynamic>{
+          'title': 'Order rule violated',
+          'code': 'NOT_GIFTABLE',
+          'detail': 'A service order can\'t be sent as a gift',
+        }),
+      )),
+    );
+    final Cart cart = giftBasket();
+    await pumpGiftCheckout(tester, dio: gateway.dio, addresses: await recipientStore(), cart: cart);
+
+    await tester.enterText(phoneField(), '71 234 567');
+    await tester.tap(find.text(en.giftSendAndPay));
+    await tester.pumpAndSettle();
+
+    expect(find.text('A service order can\'t be sent as a gift'), findsOneWidget);
+    expect(find.text(en.couldNotPlaceOrder), findsNothing);
+    expect(cart.isGift, isTrue);
+  });
+
   testWidgets('a double tap sends one request', (WidgetTester tester) async {
     final ({Dio dio, List<RequestOptions> sent}) gateway = server();
     await pumpGiftCheckout(tester,

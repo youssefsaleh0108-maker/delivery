@@ -45,6 +45,31 @@ void main() {
         createdAt: createdAt ?? DateTime.now(),
       );
 
+  /// A pickup print run with a file and instructions for the provider, as the service order screen
+  /// builds one — or, with pieces left out, a submission carrying only some of those fields.
+  OrderSubmission printRun({
+    Fulfilment? fulfilment = Fulfilment.pickup,
+    List<String> files = const <String>['file-1'],
+    String? instructions = 'Leave a white border',
+  }) =>
+      OrderSubmission(
+        items: <OrderLineSubmission>[(productId: 'offer-1', qty: 2, optionIds: const <String>[])],
+        deliveryAddress: fulfilment == Fulfilment.pickup ? '' : '12 Rose Street',
+        fulfilment: fulfilment,
+        attachmentFileIds: files,
+        serviceInstructions: instructions,
+      );
+
+  PendingOrder pendingService(OrderSubmission submission, {bool maybePlaced = false}) =>
+      PendingOrder(
+        submission: submission,
+        expectedTotal: 31.50,
+        storeId: 'press-1',
+        storeName: 'Hamra Press',
+        createdAt: DateTime.now(),
+        maybePlaced: maybePlaced,
+      );
+
   group('across an app restart', () {
     const MethodChannel secureStorage =
         MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
@@ -474,6 +499,29 @@ void main() {
       expect(store.values, isEmpty);
     });
 
+    test('never a service order: one is always cash, so its own fields are what stop it', () async {
+      final _MemoryStore store = _MemoryStore();
+      final _Server server = _Server();
+      final OrderOutbox outbox = OrderOutbox(
+          api: server.api, store: store, ownerId: owner, connectivity: ValueNotifier<bool>(true));
+      addTearDown(outbox.dispose);
+
+      for (final OrderSubmission submission in <OrderSubmission>[
+        printRun(),
+        printRun(fulfilment: Fulfilment.delivery, files: const <String>[], instructions: null),
+        printRun(fulfilment: null, instructions: null),
+        printRun(fulfilment: null, files: const <String>[]),
+      ]) {
+        await expectLater(outbox.enqueue(pendingService(submission)), throwsArgumentError,
+            reason: '${submission.toJson()}');
+      }
+
+      expect(outbox.items, isEmpty);
+      expect(store.values, isEmpty);
+      await settle();
+      expect(server.placements, isEmpty);
+    });
+
     test('a checkout that cannot be written to the phone is not queued, and says so', () async {
       final _MemoryStore store = _MemoryStore()..failWrites = true;
       final OrderOutbox outbox = OrderOutbox(
@@ -518,6 +566,72 @@ void main() {
 
       expect(outbox.items, isEmpty);
       expect(store.values, isEmpty);
+    });
+  });
+
+  group('a service order found in the outbox all the same', () {
+    /// What another build, or a bug, could have left on the phone. [OrderOutbox.enqueue] refuses a
+    /// service order, so it is written straight to the store, as the app would find it on starting.
+    Future<OrderOutbox> restoredWith(_Server server, PendingOrder item) async {
+      final _MemoryStore store = _MemoryStore()
+        ..values[storageKey] = jsonEncode(<String, dynamic>{
+          'items': <Object>[item.toJson()],
+        });
+      final OrderOutbox outbox = OrderOutbox(
+        api: server.api,
+        store: store,
+        ownerId: owner,
+        connectivity: ValueNotifier<bool>(true),
+        retryDelay: const Duration(milliseconds: 200),
+      );
+      addTearDown(outbox.dispose);
+      await outbox.load();
+      await settle();
+      return outbox;
+    }
+
+    test('refused by a rule of its own, it fails with the server\'s words, and nothing says it may '
+        'exist', () async {
+      final _Server server = _Server()
+        ..replies.add(_Server.refused(422, <String, dynamic>{
+          'title': 'Attachment refused',
+          'status': 422,
+          'detail': 'One of the files has been deleted; upload it again',
+          'code': 'EXPIRED',
+        }));
+      final PendingOrder item = pendingService(printRun(), maybePlaced: true);
+
+      final OrderOutbox outbox = await restoredWith(server, item);
+
+      expect(server.keys, <Object?>[item.key]);
+      final PendingOrder failed = outbox.items.single;
+      expect(failed.status, PendingOrderStatus.failed);
+      expect(failed.error, 'One of the files has been deleted; upload it again');
+      expect(failed.maybePlaced, isFalse);
+    });
+
+    test('an unreadable services directory puts it back in the queue unmarked, and it goes again '
+        'later with the same key', () async {
+      final _Server server = _Server()
+        ..replies.add(_Server.refused(503, <String, dynamic>{
+          'title': 'Temporarily unavailable',
+          'status': 503,
+          'code': 'SERVICES_DIRECTORY_UNAVAILABLE',
+        }));
+      final PendingOrder item = pendingService(printRun());
+
+      final OrderOutbox outbox = await restoredWith(server, item);
+
+      final PendingOrder waiting = outbox.items.single;
+      expect(waiting.status, PendingOrderStatus.queued);
+      // Unlike an unlabelled 503, this one proves nothing was placed, so nothing says it may have been.
+      expect(waiting.maybePlaced, isFalse);
+
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await settle();
+
+      expect(server.keys, <Object?>[item.key, item.key]);
+      expect(outbox.items, isEmpty);
     });
   });
 }
