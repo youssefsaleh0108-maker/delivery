@@ -181,16 +181,19 @@ public class CatalogScanService {
      * merchant who has not set a shop up. A named store must be one the caller owns; anybody else's
      * is "not found", the same answer every store-scoped write gives.
      *
+     * @param firstShop what {@link StoreService#firstShopFor} answered for this request, asked before
+     *                  this transaction and this lock — nothing here waits on another service
      * @throws ScanQuotaExceededException past the daily limit
      */
     @Transactional
-    public ScanDetails create(String merchantId, UUID requestedStoreId) {
+    public ScanDetails create(String merchantId, UUID requestedStoreId,
+                              StoreService.FirstShop firstShop) {
         // The merchant's lock before anything is counted, and before the store is resolved, so two
         // first scans from a merchant with no shop yet queue here too. The quota counts every store
         // the merchant owns, so a store's lock would not do — see CatalogScanRepository#lockMerchant.
         scans.lockMerchant(merchantId);
         Store store = requestedStoreId == null
-                ? stores.requireStoreFor(merchantId)
+                ? stores.requireStoreFor(merchantId, firstShop)
                 : requireOwnedStore(merchantId, requestedStoreId);
 
         long recent = recentScans(merchantId);
@@ -478,8 +481,10 @@ public class CatalogScanService {
                 throw new CatalogRuleViolationException("Line " + a.itemId() + " needs a name");
             }
 
+            // The scan's own store is named, so there is no first shop to ask Onboarding about.
             Product product = catalog.create(merchantId, new ProductRequest(
-                    name, null, a.price(), a.categoryId(), scan.getStoreId(), null, null));
+                    name, null, a.price(), a.categoryId(), scan.getStoreId(), null, null),
+                    StoreService.FirstShop.ALREADY_OPEN);
             item.accept(product.getId(), name, a.price(), a.categoryId(), now);
         }
         for (UUID id : rejecting) {

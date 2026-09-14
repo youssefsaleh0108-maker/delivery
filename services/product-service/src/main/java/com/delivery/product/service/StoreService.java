@@ -750,6 +750,56 @@ public class StoreService {
     private static final java.time.LocalTime DEFAULT_CLOSES = java.time.LocalTime.of(23, 59, 59);
 
     /**
+     * What a first product or a first scan may open for a merchant who turns out to have no shop,
+     * learned before the request's transaction begins. See {@link #firstShopFor}.
+     */
+    public enum FirstShop {
+
+        /**
+         * Nothing to open: the merchant has a shop, or the request names the one it is for. Onboarding
+         * was not asked.
+         */
+        ALREADY_OPEN,
+
+        /** No shop yet, and no application to offer services: the restaurant a first product opens. */
+        RESTAURANT,
+
+        /**
+         * No shop yet, and applied to offer services: nothing is opened
+         * ({@link ServicesShopNotOpenedException}). The provider's app opens the services shop itself.
+         */
+        NOT_FOR_A_SERVICES_APPLICANT
+    }
+
+    /**
+     * What a first product or scan may open for this merchant, asked before any transaction is open
+     * or any lock taken — which is why this is <strong>not</strong> {@code @Transactional}, and why
+     * the controllers ask it before they call into the catalogue or the scans.
+     *
+     * <p>The answer can take Onboarding seconds, and it used to be asked inside the transaction that
+     * opens the shop, under the merchant's lock (and, for a first scan, under the scan lock as well).
+     * A transaction holds a pooled connection from the moment it begins and the pool is ten, while a
+     * services applicant who is still waiting holds MERCHANT: every "add product" they sent, refused
+     * each time and never given a shop, held a connection for as long as Onboarding took. Asked here,
+     * the wait holds no connection and no lock, and the lock guards what it has to — the look for a
+     * shop and the insert — rather than another service's answer.
+     *
+     * <p>A merchant who already has a shop — nearly every call — is answered by one indexed read and
+     * Onboarding is not asked. A request that names its store is not asked about at all.
+     *
+     * @throws OnboardingApplicationClient.OnboardingUnavailableException when Onboarding cannot say;
+     *         nothing is opened (503)
+     */
+    public FirstShop firstShopFor(String merchantId, UUID namedStoreId) {
+        if (namedStoreId != null || stores.existsByMerchantId(merchantId)) {
+            return FirstShop.ALREADY_OPEN;
+        }
+        return applications.appliedToOfferServices()
+                ? FirstShop.NOT_FOR_A_SERVICES_APPLICANT
+                : FirstShop.RESTAURANT;
+    }
+
+    /**
      * The store a merchant's products belong to, created on first use.
      *
      * <p>Auto-provisioning keeps {@code products.store_id} non-null without making "create your
@@ -766,13 +816,15 @@ public class StoreService {
      * product or scan sent by an older app or the web portal — must not open a restaurant: a shop
      * never moves into SERVICES afterwards, so that mistake would be permanent. The provider's app
      * opens the services shop itself, from the application, before anything else ({@link #open}).
-     * So a merchant with no shop at all is asked about, once, of Onboarding: a services applicant is
-     * refused with {@link ServicesShopNotOpenedException}, and an Onboarding that cannot answer is a
-     * 503 rather than a guess. A merchant who already has a shop — nearly every call — never waits
-     * on that question.
+     * What may be opened is {@code firstShop}, which the caller learned from {@link #firstShopFor}
+     * before this transaction began, so nothing here waits on Onboarding: a services applicant is
+     * refused with {@link ServicesShopNotOpenedException}, and an Onboarding that could not answer
+     * was a 503 before any of this started.
+     *
+     * @param firstShop what {@link #firstShopFor} answered for this request
      */
     @Transactional
-    public Store requireStoreFor(String merchantId) {
+    public Store requireStoreFor(String merchantId, FirstShop firstShop) {
         List<Store> owned = stores.findByMerchantIdOrderByCreatedAtDesc(merchantId);
         if (!owned.isEmpty()) {
             return owned.get(0);
@@ -784,8 +836,16 @@ public class StoreService {
         if (!owned.isEmpty()) {
             return owned.get(0);
         }
-        if (applications.appliedToOfferServices()) {
-            throw new ServicesShopNotOpenedException();
+        switch (firstShop) {
+            case NOT_FOR_A_SERVICES_APPLICANT -> throw new ServicesShopNotOpenedException();
+            // A shop when the request began and none now. Shops are never deleted, so this should
+            // not happen — and if it does, a restaurant opened on a question nobody asked is the one
+            // mistake here that cannot be undone.
+            case ALREADY_OPEN -> throw new IllegalStateException("Merchant " + merchantId
+                    + " had a shop when this request began and has none now; nothing was opened");
+            case RESTAURANT -> {
+                // Onboarding said, before this transaction, that this is no services applicant.
+            }
         }
         Store store = new Store(merchantId, "My Store", Store.Vertical.RESTAURANT);
         store.replaceHours(java.util.Arrays.stream(DayOfWeek.values())

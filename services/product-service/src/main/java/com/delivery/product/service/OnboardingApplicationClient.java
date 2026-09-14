@@ -1,6 +1,10 @@
 package com.delivery.product.service;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,21 +41,44 @@ import com.fasterxml.jackson.databind.JsonNode;
  * be", Onboarding answers it from the token's subject, and no account id can be put to it by anybody.
  * It also means this service needs no credential of its own.
  *
- * <p>Asked only when a merchant has no shop at all, so it is one call per merchant, once.
+ * <p>Asked only for a merchant with no shop at all ({@link StoreService#firstShopFor}), before the
+ * request's transaction begins, and a yes is remembered for a minute — see
+ * {@link #SERVICES_APPLICANT_REMEMBERED_FOR}.
  */
 @Component
 public class OnboardingApplicationClient {
 
     private static final Logger log = LoggerFactory.getLogger(OnboardingApplicationClient.class);
 
+    /**
+     * How long a "yes, this account applied to offer services" is remembered.
+     *
+     * <p>Only a yes. A yes is what a services applicant who is still waiting gets on every "add
+     * product" and every first scan: refused each time and never given a shop, so nothing stops them
+     * sending it again, and each one was a call to Onboarding holding a request thread. A no is
+     * followed at once by the restaurant it opens, after which the merchant has a shop and is never
+     * asked again, so remembering one would save nothing. Nothing that happens to an application
+     * turns a services one into a shop's, and a minute bounds how long a yes can outlive anything
+     * else.
+     */
+    static final Duration SERVICES_APPLICANT_REMEMBERED_FOR = Duration.ofMinutes(1);
+
+    /** More accounts than this remembered at once, and the memory simply starts again. */
+    private static final int MOST_REMEMBERED = 10_000;
+
     private final RestClient onboarding;
+    private final Clock clock;
+
+    /** Accounts Onboarding said applied to offer services, by token subject, and when it said so. */
+    private final ConcurrentMap<String, Instant> servicesApplicants = new ConcurrentHashMap<>();
 
     @Autowired
     public OnboardingApplicationClient(
             RestClient.Builder builder,
             @Value("${delivery.services.onboarding-service:http://localhost:8117}")
-            String onboardingUrl) {
-        this(builder.clone().baseUrl(onboardingUrl).requestFactory(boundedWait()).build());
+            String onboardingUrl,
+            Clock clock) {
+        this(builder.clone().baseUrl(onboardingUrl).requestFactory(boundedWait()).build(), clock);
     }
 
     /**
@@ -60,12 +87,20 @@ public class OnboardingApplicationClient {
      * replace a mock bound to the builder it was given.
      */
     OnboardingApplicationClient(RestClient onboarding) {
+        this(onboarding, Clock.systemUTC());
+    }
+
+    /** As above, with a clock the test moves. */
+    OnboardingApplicationClient(RestClient onboarding, Clock clock) {
         this.onboarding = onboarding;
+        this.clock = clock;
     }
 
     /**
-     * Bounded, because this is asked inside the transaction that would open a merchant's first shop,
-     * and the default request factory waits for an unresponsive Onboarding for ever.
+     * Bounded, because a merchant's request waits on it, and the default request factory waits for an
+     * unresponsive Onboarding for ever. It no longer holds a database connection while it waits — it
+     * is asked before the transaction (see {@link StoreService#firstShopFor}) — but a request thread
+     * is still a thing to give back.
      */
     private static SimpleClientHttpRequestFactory boundedWait() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -96,14 +131,20 @@ public class OnboardingApplicationClient {
      *         receipt cannot be read
      */
     public boolean appliedToOfferServices() {
-        String token = CurrentUser.jwt().map(Jwt::getTokenValue).orElseThrow(() ->
+        Jwt caller = CurrentUser.jwt().orElseThrow(() ->
                 new OnboardingUnavailableException(
                         "There is no caller token to ask Onboarding with", null));
+        String account = caller.getSubject();
+        Instant now = clock.instant();
+        if (account != null && remembersServicesApplicant(account, now)) {
+            return true;
+        }
+
         JsonNode receipt;
         try {
             receipt = onboarding.get()
                     .uri("/api/onboarding/applications/mine")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + caller.getTokenValue())
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientResponseException e) {
@@ -126,6 +167,26 @@ public class OnboardingApplicationClient {
             throw new OnboardingUnavailableException(
                     "Onboarding answered with something that is not an application", null);
         }
-        return receipt.path("service").isObject();
+        boolean servicesApplicant = receipt.path("service").isObject();
+        if (servicesApplicant && account != null) {
+            if (servicesApplicants.size() >= MOST_REMEMBERED) {
+                servicesApplicants.clear();
+            }
+            servicesApplicants.put(account, now);
+        }
+        return servicesApplicant;
+    }
+
+    /** Whether Onboarding said yes about this account within the last minute. */
+    private boolean remembersServicesApplicant(String account, Instant now) {
+        Instant saidAt = servicesApplicants.get(account);
+        if (saidAt == null) {
+            return false;
+        }
+        if (now.isBefore(saidAt.plus(SERVICES_APPLICANT_REMEMBERED_FOR))) {
+            return true;
+        }
+        servicesApplicants.remove(account, saidAt);
+        return false;
     }
 }

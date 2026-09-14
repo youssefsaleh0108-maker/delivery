@@ -112,14 +112,22 @@ public class CatalogService {
 
     // ---------------------------------------------------------------- writes
 
+    /**
+     * Adds a product to one of the merchant's stores.
+     *
+     * @param firstShop what {@link StoreService#firstShopFor} answered for this request, asked by the
+     *                  caller before this transaction began — so a merchant with no shop yet is given
+     *                  one, or refused one, without this transaction waiting on Onboarding
+     */
     @Transactional
-    public Product create(String merchantId, ProductRequest request) {
+    public Product create(String merchantId, ProductRequest request,
+                          StoreService.FirstShop firstShop) {
         // Every product lives in a store. A merchant who has not set one up yet gets one created
         // here rather than a not-null violation, so "add your first product" never needs "but first
         // go and create a store" wired into the client.
         UUID storeId = request.storeId() != null
                 ? requireOwnedStore(merchantId, request.storeId())
-                : storeService.requireStoreFor(merchantId).getId();
+                : storeService.requireStoreFor(merchantId, firstShop).getId();
 
         // After the store is known, not before: a shop section is only valid for its own store.
         validateCategory(request.categoryId(), storeId);
