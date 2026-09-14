@@ -48,6 +48,7 @@ class Product {
     this.giftFeatured = false,
     this.service,
     this.fromPrice,
+    this.moderation,
   });
 
   final String id;
@@ -122,8 +123,18 @@ class Product {
   /// what an order is charged.
   final double? fromPrice;
 
+  /// YouDrop's hold on this offer, with back office's reason, or null when there is none
+  /// (product-service V36). Only the offer's provider and back office ever receive one: a customer
+  /// cannot read an offer that is not on sale at all.
+  final ProductModeration? moderation;
+
   /// Whether this is a service offer. Only a service shop's products are, and all of them are.
   bool get isServiceOffer => service != null;
+
+  /// Whether YouDrop holds this offer off sale. While it does, the server refuses to publish, resume
+  /// or pause it, so a screen offers none of those and shows [ProductModeration.reason] instead. A hold
+  /// in a state this build does not know is still a hold.
+  bool get isTakenDown => moderation != null;
 
   String? get listImageUrl {
     if (imageThumbUrls.isNotEmpty) {
@@ -154,6 +165,7 @@ class Product {
         giftFeatured: json['giftFeatured'] as bool? ?? false,
         service: ServiceTerms.maybeFromJson(json['service']),
         fromPrice: _doubleOrNull(json['fromPrice']),
+        moderation: ProductModeration.maybeFromJson(json['moderation']),
       );
 
   /// Note the absence of `merchantId` and `status`: the service derives the first from the token
@@ -351,6 +363,61 @@ int? _intOrNull(Object? value) => value is num ? value.toInt() : null;
 double? _doubleOrNull(Object? value) => value is num ? value.toDouble() : null;
 
 String? _textOrNull(Object? value) => value is String && value.trim().isNotEmpty ? value : null;
+
+/// The kind of hold YouDrop has on a service offer. See [ProductModeration].
+enum ProductModerationState {
+  /// Back office took the offer down. It stays off sale until back office restores it.
+  takenDown('TAKEN_DOWN'),
+
+  /// A hold this build does not know. Still a hold ([Product.isTakenDown]), never read as another.
+  unknown(null);
+
+  const ProductModerationState(this.wireValue);
+
+  final String? wireValue;
+
+  static ProductModerationState fromWire(Object? value) {
+    for (final ProductModerationState state in values) {
+      if (state.wireValue != null && state.wireValue == value) {
+        return state;
+      }
+    }
+    return ProductModerationState.unknown;
+  }
+}
+
+/// YouDrop's back office holding a service offer off sale (product-service V36), as the offer's
+/// provider reads it on their own offer.
+///
+/// While it is present, the server refuses to publish, resume or pause the offer, and only back office
+/// can lift it (`BackofficeCatalogApi.restore`). It is never on anything a customer reads: a customer
+/// cannot read an offer that is not on sale.
+class ProductModeration {
+  const ProductModeration({required this.state, this.reason, this.takenDownAt});
+
+  final ProductModerationState state;
+
+  /// Back office's reason, in its own words: what the provider has to fix. Null only when the server
+  /// sent none.
+  final String? reason;
+
+  /// When the offer was taken down, in local time. Null when the server sent no time this build can
+  /// read.
+  final DateTime? takenDownAt;
+
+  /// The block, or null when [json] is not one: an offer nobody took down has none.
+  static ProductModeration? maybeFromJson(Object? json) {
+    if (json is! Map) {
+      return null;
+    }
+    final Object? at = json['takenDownAt'];
+    return ProductModeration(
+      state: ProductModerationState.fromWire(json['state']),
+      reason: _textOrNull(json['reason']),
+      takenDownAt: at is String ? DateTime.tryParse(at)?.toLocal() : null,
+    );
+  }
+}
 
 class Category {
   const Category({
