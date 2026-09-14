@@ -160,12 +160,92 @@ void main() {
     expect(find.text(en.svcPhotoRequired), findsOneWidget);
   });
 
+  testWidgets(
+      'an offer YouDrop took down stays listed, saying so and why, with no Pause or Resume; one its '
+      'provider archived does not', (WidgetTester tester) async {
+    await pumpSvc(
+      tester,
+      screen(FakeOffers(<Product>[
+        svcOffer(),
+        svcOffer(
+          id: 'offer-2',
+          name: 'Wedding invitations',
+          status: ProductStatus.paused,
+          takenDown: true,
+          takenDownReason: 'The photos show another shop\'s work',
+        ),
+        svcOffer(id: 'offer-3', name: 'Old calendars', status: ProductStatus.archived),
+      ])),
+    );
+    await svcSettle(tester);
+
+    expect(find.text('Wedding invitations'), findsOneWidget);
+    expect(find.text(en.svcOfferTakenDown), findsOneWidget);
+    expect(find.text(en.svcOfferTakenDownReason('The photos show another shop\'s work')),
+        findsOneWidget);
+    expect(find.text('Old calendars'), findsNothing);
+    expect(find.text(en.svcPauseOffer), findsOneWidget, reason: 'the live offer\'s alone');
+    expect(find.text(en.svcResumeOffer), findsNothing, reason: 'the server refuses it while held');
+  });
+
+  testWidgets(
+      'a resume refused because YouDrop took the offer down meanwhile says so, not that delivery '
+      'areas are missing, and the row shows the hold', (WidgetTester tester) async {
+    final FakeOffers api = FakeOffers(<Product>[
+      svcOffer(status: ProductStatus.paused, fulfilment: ServiceFulfilment.delivery),
+    ])
+      ..failResume = svcHttpError(422)
+      ..nextReads.add(svcOffer(
+        fulfilment: ServiceFulfilment.delivery,
+        takenDown: true,
+        takenDownReason: 'Prices do not match the photos',
+      ));
+    await pumpSvc(tester, screen(api, shops: <Store>[svcShop()]));
+    await svcSettle(tester);
+
+    await tester.tap(find.text(en.svcResumeOffer));
+    await svcSettle(tester);
+
+    expect(api.calls, contains('resume offer-1'));
+    expect(
+      find.text('${en.svcOfferTakenDown} · '
+          '${en.svcOfferTakenDownReason('Prices do not match the photos')}'),
+      findsOneWidget,
+    );
+    expect(find.text(en.svcDeliveryNeedsAreas), findsNothing);
+    expect(find.text(en.svcResumeOffer), findsNothing);
+  });
+
+  testWidgets('a pause refused because the offer changed elsewhere says so and shows it as it now is',
+      (WidgetTester tester) async {
+    final FakeOffers api = FakeOffers(<Product>[svcOffer()])
+      ..failPause = svcHttpError(409, code: 'PRODUCT_CHANGED')
+      ..nextReads.add(svcOffer(status: ProductStatus.paused));
+    await pumpSvc(tester, screen(api));
+    await svcSettle(tester);
+
+    await tester.tap(find.text(en.svcPauseOffer));
+    await svcSettle(tester);
+
+    expect(find.text(en.svcOfferChangedElsewhere), findsOneWidget);
+    expect(find.text(en.svcOfferPaused), findsOneWidget, reason: 'paused from somewhere else');
+    expect(find.text(en.svcResumeOffer), findsOneWidget);
+  });
+
   testWidgets('the offers fit a 320dp phone', (WidgetTester tester) async {
     await pumpSvc(
       tester,
       screen(FakeOffers(<Product>[
         svcOffer(name: 'Corporate brochure design and full colour offset printing, folded'),
         svcOffer(id: 'offer-2', status: ProductStatus.paused, unitLabel: 'double-sided cards'),
+        svcOffer(
+          id: 'offer-3',
+          name: 'Wedding invitations with gold foil, envelopes and wax seals',
+          takenDown: true,
+          takenDownReason:
+              'The photos show work from another print shop; replace them with your own before '
+              'asking support to restore the offer',
+        ),
       ])),
       size: const Size(320, 900),
     );
@@ -190,6 +270,13 @@ void main() {
           unitSize: 1,
         ),
         svcOffer(id: 'offer-3', name: 'تصميم منشورات', status: ProductStatus.draft, unitLabel: null, unitSize: 1),
+        svcOffer(
+          id: 'offer-4',
+          name: 'دعوات أعراس',
+          unitLabel: 'دعوة',
+          takenDown: true,
+          takenDownReason: 'الصور لا تطابق الأسعار',
+        ),
       ])),
       locale: const Locale('ar'),
       size: const Size(320, 1200),
@@ -200,6 +287,8 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text(ar.svcOffersTitle), findsOneWidget);
     expect(find.text(ar.svcOfferPaused), findsOneWidget);
+    expect(find.text(ar.svcOfferTakenDown), findsOneWidget);
+    expect(find.text(ar.svcOfferTakenDownReason('الصور لا تطابق الأسعار')), findsOneWidget);
     expect(svcLatinText(tester), isEmpty);
   });
 }

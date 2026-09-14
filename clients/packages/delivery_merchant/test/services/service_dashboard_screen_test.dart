@@ -137,6 +137,38 @@ void main() {
     expect(find.text('2'), findsOneWidget, reason: 'one fewer live offer');
   });
 
+  testWidgets(
+      'Active offers counts live offers only: a held offer is listed with its hold, and a resume the '
+      'hold refuses takes nothing off the count', (WidgetTester tester) async {
+    final FakeOffers offers = FakeOffers(<Product>[
+      svcOffer(
+        id: 'offer-6',
+        name: 'Wedding invitations',
+        takenDown: true,
+        takenDownReason: 'Copied photos',
+      ),
+      ...catalogue(),
+    ])
+      ..failResume = svcHttpError(422)
+      ..nextReads.add(svcOffer(
+        id: 'offer-4',
+        name: 'Flyer Design + Print',
+        takenDown: true,
+        takenDownReason: 'Prices do not match the photos',
+      ));
+    await pumpDashboard(tester, offers: offers);
+
+    expect(find.text('3'), findsOneWidget, reason: 'the catalogue\'s own count of live offers');
+    expect(find.text(en.svcOfferTakenDown), findsOneWidget);
+
+    await tester.tap(find.text(en.svcResumeOffer));
+    await svcSettle(tester);
+
+    expect(offers.calls, contains('resume offer-4'));
+    expect(find.text('3'), findsOneWidget, reason: 'a paused offer taken down was never live');
+    expect(find.text(en.svcOfferTakenDown), findsNWidgets(2));
+  });
+
   testWidgets('a resume refused while the application is pending says why',
       (WidgetTester tester) async {
     final FakeOffers offers = FakeOffers(<Product>[svcOffer(status: ProductStatus.paused)])

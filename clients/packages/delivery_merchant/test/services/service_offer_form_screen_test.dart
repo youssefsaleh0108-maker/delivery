@@ -293,9 +293,97 @@ void main() {
     expect(api.calls, <String>['create'], reason: 'nothing is published after a refused save');
   });
 
+  testWidgets(
+      'an offer YouDrop took down says so and why, can still be edited and saved, and offers no '
+      'Publish, Pause or Resume', (WidgetTester tester) async {
+    final Product held = svcOffer(
+      status: ProductStatus.active,
+      takenDown: true,
+      takenDownReason: 'The photos show another shop\'s work',
+    );
+    final FakeOffers api = await pumpForm(tester, existing: held);
+
+    expect(
+      find.text('${en.svcOfferTakenDown} · '
+          '${en.svcOfferTakenDownReason('The photos show another shop\'s work')}\n'
+          '${en.svcOfferTakenDownBody}'),
+      findsOneWidget,
+    );
+    expect(find.text(en.svcPublishOffer), findsNothing);
+
+    await tester.enterText(field(title), 'Wedding invitations, our own photos');
+    await tester.tap(find.text(en.svcSaveChanges));
+    await svcSettle(tester);
+    expect(api.calls, <String>['update offer-1']);
+    expect(snack(en.saved), findsOneWidget);
+
+    await tester.tap(find.byTooltip(en.svcMoreActions));
+    await tester.pumpAndSettle();
+    expect(find.text(en.svcPauseOffer), findsNothing);
+    expect(find.text(en.svcResumeOffer), findsNothing);
+    expect(find.text(en.svcArchiveOffer), findsOneWidget,
+        reason: 'withdrawing it for good is still the provider\'s call');
+  });
+
+  testWidgets('a save refused because the offer changed elsewhere says so, and reads it again',
+      (WidgetTester tester) async {
+    final FakeOffers api = FakeOffers(<Product>[svcOffer()])
+      ..failUpdate = svcHttpError(409, code: 'PRODUCT_CHANGED');
+    await pumpForm(tester, api: api, existing: svcOffer());
+
+    await tester.tap(find.text(en.svcSaveChanges));
+    await svcSettle(tester);
+
+    expect(api.calls, <String>['update offer-1']);
+    expect(api.reads, 1, reason: 'the offer as it now is');
+    expect(snack(en.svcOfferChangedElsewhere), findsOneWidget);
+    expect(snack(en.svcOfferSaveFailed), findsNothing);
+  });
+
+  testWidgets(
+      'a publish refused because YouDrop took the offer down meanwhile says so, not that delivery '
+      'areas are missing', (WidgetTester tester) async {
+    final Product draft = svcOffer(
+      status: ProductStatus.draft,
+      fulfilment: ServiceFulfilment.delivery,
+    );
+    final FakeOffers api = FakeOffers(<Product>[draft])
+      ..failPublish = svcHttpError(422)
+      ..nextReads.addAll(<Product>[
+        draft,
+        svcOffer(
+          fulfilment: ServiceFulfilment.delivery,
+          takenDown: true,
+          takenDownReason: 'Prices do not match the photos',
+        ),
+      ]);
+    await pumpForm(tester, api: api, existing: draft, reach: null);
+
+    await tester.tap(find.text(en.svcPublishOffer));
+    await svcSettle(tester);
+
+    expect(api.calls, containsAllInOrder(<String>['update offer-1', 'publish offer-1']));
+    expect(
+      snack('${en.svcOfferTakenDown} · '
+          '${en.svcOfferTakenDownReason('Prices do not match the photos')}'),
+      findsOneWidget,
+    );
+    expect(snack(en.svcDeliveryNeedsAreas), findsNothing);
+    expect(find.text(en.svcPublishOffer), findsNothing, reason: 'the form shows the hold now');
+  });
+
   testWidgets('the form fits a 320dp phone', (WidgetTester tester) async {
-    await pumpForm(tester, existing: svcOffer(prompt: 'Which names and job titles go on the cards?'),
-        size: const Size(320, 3200));
+    await pumpForm(
+      tester,
+      existing: svcOffer(
+        prompt: 'Which names and job titles go on the cards?',
+        takenDown: true,
+        takenDownReason:
+            'The photos show work from another print shop; replace them with your own before asking '
+            'support to restore the offer',
+      ),
+      size: const Size(320, 3200),
+    );
 
     expect(tester.takeException(), isNull);
     expect(find.text(en.svcSaveChanges), findsOneWidget);

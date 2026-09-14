@@ -148,9 +148,7 @@ class _ServiceDashboardScreenState extends State<ServiceDashboardScreen> {
       _thisWeek = summary?.window.orders;
       _offers = offerPage == null
           ? const <Product>[]
-          : offerPage.content
-              .where((Product offer) => offer.status != ProductStatus.archived)
-              .toList(growable: false);
+          : offerPage.content.where(svcListsOffer).toList(growable: false);
       _offersFailed = offerPage == null;
       _reach = reaches;
       _loading = false;
@@ -182,11 +180,17 @@ class _ServiceDashboardScreenState extends State<ServiceDashboardScreen> {
     setState(() {
       _busyId = null;
       if (moved != null) {
-        _offers = <Product>[for (final Product p in _offers) p.id == moved.id ? moved : p];
-        // A pause or a resume moves the live count by one; the next load says it exactly.
+        _offers = <Product>[
+          for (final Product p in _offers)
+            if (p.id != moved.id) p else if (svcListsOffer(moved)) moved,
+        ];
+        // An offer that went on sale or came off it moves the live count by one; the next load says it
+        // exactly. Not every change of status is that: a paused offer YouDrop took down was never live.
         final int? count = _activeOffers;
-        if (count != null && moved.status != offer.status) {
-          _activeOffers = moved.status == ProductStatus.active ? count + 1 : count - 1;
+        if (count != null) {
+          _activeOffers = count +
+              (moved.status == ProductStatus.active ? 1 : 0) -
+              (offer.status == ProductStatus.active ? 1 : 0);
         }
       }
     });

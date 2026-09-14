@@ -202,6 +202,7 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
           : await widget.api.update(_product!.id, draft);
     } on DioException catch (e) {
       if (!mounted) return;
+      if (await _refusedAsChanged(e, t, messenger) || !mounted) return;
       setState(() => _saving = false);
       messenger.showSnackBar(SnackBar(
           content: Text(e.response?.statusCode == 422 ? t.svcOfferRefused : t.svcOfferSaveFailed)));
@@ -232,13 +233,21 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
 
     if (!publish) {
       setState(() => _saving = false);
-      final bool live =
-          saved.status == ProductStatus.active || saved.status == ProductStatus.paused;
+      final bool live = saved.isTakenDown ||
+          saved.status == ProductStatus.active ||
+          saved.status == ProductStatus.paused;
       messenger.showSnackBar(
           SnackBar(content: Text(photoProblem ?? (live ? t.saved : t.svcDraftSaved))));
       return;
     }
 
+    if (saved.isTakenDown) {
+      // Taken down since the form opened: the changes are saved, and nothing is sent to be published,
+      // which the server refuses until YouDrop restores the offer.
+      setState(() => _saving = false);
+      messenger.showSnackBar(SnackBar(content: Text(svcTakenDownWords(saved, t))));
+      return;
+    }
     if (!svcHasPhoto(saved)) {
       setState(() => _saving = false);
       messenger.showSnackBar(SnackBar(content: Text(photoProblem ?? t.svcPhotoRequired)));
@@ -252,6 +261,7 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
       navigator.pop(live);
     } on DioException catch (e) {
       if (!mounted) return;
+      if (await _refusedAsChanged(e, t, messenger) || !mounted) return;
       setState(() => _saving = false);
       final bool delivers = _fulfilment?.includesDelivery ?? false;
       messenger.showSnackBar(SnackBar(
@@ -268,6 +278,40 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
       setState(() => _saving = false);
       messenger.showSnackBar(SnackBar(content: Text(t.svcOfferSaveFailed)));
     }
+  }
+
+  /// Says so, and reads the offer again, when a refusal means the offer on screen is not the offer on
+  /// the server: YouDrop took it down meanwhile (OFFER_TAKEN_DOWN, or a 422 a held offer answers), or
+  /// another save changed it (409 PRODUCT_CHANGED). False for every other refusal, which the caller
+  /// words — and which is then never mistaken for a hold, or a hold for missing delivery areas.
+  ///
+  /// What the provider typed stays in the form. The read brings back the offer's status, photos and
+  /// hold, and the next save is the provider's to make once they have checked it.
+  Future<bool> _refusedAsChanged(
+    DioException error,
+    DeliveryStrings t,
+    ScaffoldMessengerState messenger,
+  ) async {
+    final Product? product = _product;
+    final int? status = error.response?.statusCode;
+    if (product == null || (status != 409 && status != 422)) return false;
+    final String? code = svcRefusalCode(error);
+    final Product? now = await svcReadOffer(widget.api, product.id);
+    if (!mounted) return true;
+    final String? message = now != null && now.isTakenDown
+        ? svcTakenDownWords(now, t)
+        : switch (code) {
+            'PRODUCT_CHANGED' => t.svcOfferChangedElsewhere,
+            'OFFER_TAKEN_DOWN' => t.svcOfferTakenDown,
+            _ => null,
+          };
+    if (message == null) return false;
+    setState(() {
+      if (now != null) _product = now;
+      _saving = false;
+    });
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+    return true;
   }
 
   /// Uploads the photos picked before the offer existed. Each that lands leaves the queue, so a retry
@@ -468,9 +512,11 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
       icon: const Icon(Icons.more_horiz_rounded, color: DeliveryColors.ink),
       onSelected: (_OfferAction action) => _onAction(action, t),
       itemBuilder: (_) => <PopupMenuEntry<_OfferAction>>[
-        if (product.status == ProductStatus.active)
+        // Never while YouDrop holds the offer: the server refuses both until back office restores it.
+        // Archive stays: withdrawing it for good is still the provider's call.
+        if (!product.isTakenDown && product.status == ProductStatus.active)
           PopupMenuItem<_OfferAction>(value: _OfferAction.pause, child: Text(t.svcPauseOffer)),
-        if (product.status == ProductStatus.paused)
+        if (!product.isTakenDown && product.status == ProductStatus.paused)
           PopupMenuItem<_OfferAction>(value: _OfferAction.resume, child: Text(t.svcResumeOffer)),
         PopupMenuItem<_OfferAction>(value: _OfferAction.archive, child: Text(t.svcArchiveOffer)),
       ],
@@ -493,6 +539,11 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
     ];
 
     return <Widget>[
+      // What YouDrop objected to comes first: it is what the provider opened the offer to fix.
+      if (_product case final Product held when held.isTakenDown) ...<Widget>[
+        SvcNotice(text: '${svcTakenDownWords(held, t)}\n${t.svcOfferTakenDownBody}'),
+        gap,
+      ],
       if (!_editable) ...<Widget>[SvcNotice(text: t.svcOfferNotEditable), gap],
       if (widget.pendingApproval) ...<Widget>[SvcNotice(text: t.svcPublishAfterApproval), gap],
       _Label(t.svcOfferTitle),
@@ -843,7 +894,11 @@ class _ServiceOfferFormScreenState extends State<ServiceOfferFormScreen> {
 
   Widget _actions(DeliveryStrings t) {
     final ProductStatus status = _product?.status ?? ProductStatus.draft;
-    final bool live = status == ProductStatus.active || status == ProductStatus.paused;
+    // A held offer is saved like a live one: its changes, and no Publish, which the server refuses
+    // until YouDrop restores it. Editing it is allowed — it is how the provider fixes what was wrong.
+    final bool live = (_product?.isTakenDown ?? false) ||
+        status == ProductStatus.active ||
+        status == ProductStatus.paused;
     final bool enabled = _editable && !_saving;
 
     return DecoratedBox(

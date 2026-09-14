@@ -12,7 +12,8 @@ import 'service_words.dart';
 /// pauses or is still drafting, each a tap from its form.
 ///
 /// The provider dashboard (126:51) draws the same rows as "Current offers"; this is that list whole,
-/// with Add offer. Archived offers are gone for good and are not listed.
+/// with Add offer. An offer its provider archived is gone for good and is not listed; one YouDrop took
+/// down stays, saying so and why ([svcListsOffer]).
 class ServiceOffersScreen extends StatefulWidget {
   const ServiceOffersScreen({
     super.key,
@@ -87,9 +88,7 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
       setState(() {
         _shop = shop;
         _noShop = false;
-        _offers = page.content
-            .where((Product offer) => offer.status != ProductStatus.archived)
-            .toList(growable: false);
+        _offers = page.content.where(svcListsOffer).toList(growable: false);
         _reach = reaches;
         _loading = false;
       });
@@ -126,7 +125,10 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
     setState(() {
       _busyId = null;
       if (moved != null) {
-        _offers = <Product>[for (final Product p in _offers) p.id == moved.id ? moved : p];
+        _offers = <Product>[
+          for (final Product p in _offers)
+            if (p.id != moved.id) p else if (svcListsOffer(moved)) moved,
+        ];
       }
     });
   }
@@ -271,8 +273,9 @@ class SvcOfferRow extends StatelessWidget {
   final Product offer;
   final VoidCallback? onTap;
 
-  /// Pauses a live offer or resumes a paused one. Null draws no such control; a draft never has one,
-  /// because a draft is published from its form.
+  /// Pauses a live offer or resumes a paused one. Null draws no such control. A draft never has one,
+  /// because a draft is published from its form, and nor does an offer YouDrop holds, which the server
+  /// will neither pause nor resume.
   final VoidCallback? onToggle;
 
   final bool busy;
@@ -281,10 +284,13 @@ class SvcOfferRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final String? pack = svcPackLine(offer.service, t);
-    final Widget? chip = svcOfferStatusChip(offer.status, t);
+    // A held offer's status reads archived, which its provider never chose: its chip names the hold.
+    final bool held = offer.isTakenDown;
+    final Widget? chip = held ? svcOfferTakenDownChip(t) : svcOfferStatusChip(offer.status, t);
+    final String? heldBecause = held ? offer.moderation?.reason : null;
     final String? lbp = svcLbp(svcOfferAmount(offer), t);
     final bool toggles =
-        offer.status == ProductStatus.active || offer.status == ProductStatus.paused;
+        !held && (offer.status == ProductStatus.active || offer.status == ProductStatus.paused);
 
     return YdCard.bordered(
       onTap: onTap,
@@ -327,6 +333,19 @@ class SvcOfferRow extends StatelessWidget {
                       Text(lbp, style: const TextStyle(fontSize: 11, color: DeliveryColors.faint)),
                   ],
                 ),
+                if (heldBecause != null) ...<Widget>[
+                  const SizedBox(height: DeliverySpacing.xs),
+                  Text(
+                    t.svcOfferTakenDownReason(heldBecause),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: DeliveryAccent.critical.onTint,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -361,6 +380,16 @@ class SvcOfferRow extends StatelessWidget {
     );
   }
 }
+
+/// "Taken down by YouDrop": the chip of an offer back office holds off sale, in the critical colours,
+/// because until back office restores it nobody can order it.
+Widget svcOfferTakenDownChip(DeliveryStrings t) => YdBadge(
+      label: t.svcOfferTakenDown,
+      color: DeliveryAccent.critical.onTint,
+      background: DeliveryAccent.critical.tint,
+      uppercase: false,
+      fontSize: 10,
+    );
 
 /// A caution note across the page — the pending-approval banner's look.
 class SvcNotice extends StatelessWidget {

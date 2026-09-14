@@ -36,12 +36,50 @@ Future<bool?> svcDeliveryReach(Store shop, DeliveryZoneApi? zones) async {
 /// Whether an offer has the photo publishing needs.
 bool svcHasPhoto(Product offer) => offer.imageRefs.isNotEmpty || offer.imageUrls.isNotEmpty;
 
+/// Whether an offer belongs on the provider's own lists: every offer but one its provider archived.
+///
+/// An offer YouDrop took down is archived too, but it stays listed, saying so and why. Left out, a
+/// take-down looked like the offer had simply vanished, with nothing to tell the provider what to fix.
+bool svcListsOffer(Product offer) => offer.status != ProductStatus.archived || offer.isTakenDown;
+
+/// What the provider is told about an offer YouDrop holds: that it was taken down, and back office's
+/// reason when it gave one.
+String svcTakenDownWords(Product offer, DeliveryStrings t) {
+  final String? reason = offer.moderation?.reason;
+  return reason == null
+      ? t.svcOfferTakenDown
+      : '${t.svcOfferTakenDown} · ${t.svcOfferTakenDownReason(reason)}';
+}
+
+/// The `code` a refusal names in its body — Product Service's PRODUCT_CHANGED or OFFER_TAKEN_DOWN — or
+/// null when it names none.
+String? svcRefusalCode(DioException error) {
+  final Object? body = error.response?.data;
+  if (body is Map && body['code'] is String) return body['code'] as String;
+  return null;
+}
+
+/// The offer as the server holds it now, or null when it cannot be read just now.
+Future<Product?> svcReadOffer(CatalogApi api, String id) async {
+  try {
+    return await api.read(id);
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Pauses a live offer or puts a paused one back on sale, saying what came of it. Answers the offer as
-/// it now stands, or null when nothing changed.
+/// it now stands, or null when nothing is known to have changed.
 ///
 /// A resume the server would refuse is refused here first, in the provider's language, where the
 /// reason is knowable: no photo, or delivery offered by a shop that reaches nobody. The server's own
 /// refusal is a sentence in English meant for logs.
+///
+/// An offer YouDrop holds is neither paused nor resumed — the server refuses both until back office
+/// restores it — so the provider is told that instead. And a 409 or 422 may mean the offer on screen is
+/// not the offer on the server, so it is read again: YouDrop took it down meanwhile, or another save
+/// changed it (PRODUCT_CHANGED). The provider is told which, never to set delivery areas that are not
+/// the problem.
 Future<Product?> svcToggleOffer(
   BuildContext context,
   CatalogApi api,
@@ -50,34 +88,51 @@ Future<Product?> svcToggleOffer(
 }) async {
   final DeliveryStrings t = DeliveryStrings.of(context);
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  void say(String message) => messenger.showSnackBar(SnackBar(content: Text(message)));
+
+  if (offer.isTakenDown) {
+    say(svcTakenDownWords(offer, t));
+    return null;
+  }
   final bool pausing = offer.status == ProductStatus.active;
   final bool offersDelivery = offer.service?.fulfilmentModes.includesDelivery ?? false;
 
   if (!pausing && !svcHasPhoto(offer)) {
-    messenger.showSnackBar(SnackBar(content: Text(t.svcPhotoRequired)));
+    say(t.svcPhotoRequired);
     return null;
   }
   if (!pausing && offersDelivery && deliveryReach == false) {
-    messenger.showSnackBar(SnackBar(content: Text(t.svcDeliveryNeedsAreas)));
+    say(t.svcDeliveryNeedsAreas);
     return null;
   }
 
   try {
     final Product moved = pausing ? await api.pause(offer.id) : await api.resume(offer.id);
-    messenger.showSnackBar(
-        SnackBar(content: Text(pausing ? t.svcOfferPausedDone : t.svcOfferResumedDone)));
+    say(pausing ? t.svcOfferPausedDone : t.svcOfferResumedDone);
     return moved;
   } on DioException catch (e) {
-    final String message = switch (e.response?.statusCode) {
+    final int? status = e.response?.statusCode;
+    if (status == 409 || status == 422) {
+      final String? code = svcRefusalCode(e);
+      final Product? now = await svcReadOffer(api, offer.id);
+      if (now != null && now.isTakenDown) {
+        say(svcTakenDownWords(now, t));
+        return now;
+      }
+      if (code == 'PRODUCT_CHANGED' || code == 'OFFER_TAKEN_DOWN') {
+        say(code == 'PRODUCT_CHANGED' ? t.svcOfferChangedElsewhere : t.svcOfferTakenDown);
+        return now;
+      }
+    }
+    say(switch (status) {
       // Still awaiting approval: resuming is publishing, and publishing waits for it.
       403 => t.svcPublishAfterApproval,
       422 => offersDelivery && deliveryReach != true ? t.svcDeliveryNeedsAreas : t.svcOfferRefused,
       _ => t.thatDidNotGoThrough,
-    };
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    });
     return null;
   } catch (_) {
-    messenger.showSnackBar(SnackBar(content: Text(t.thatDidNotGoThrough)));
+    say(t.thatDidNotGoThrough);
     return null;
   }
 }
