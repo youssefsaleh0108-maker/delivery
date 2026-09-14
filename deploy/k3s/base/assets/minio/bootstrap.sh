@@ -36,7 +36,10 @@ fi
 #
 # order-attachments holds a customer's files on a service order — the artwork a print shop prints.
 # No expiry rule here: order-manager deletes an upload never attached to an order after 24 hours and
-# an attached one 90 days after its order finished, and only order-manager knows when that was.
+# an attached one 90 days after its order finished, and only order-manager knows when that was. It
+# also removes each deleted file's object once more after the file's upload URL has expired, because
+# until then the URL can put an object back under the key. Not versioned, on purpose: a PUT through a
+# URL used again must replace the object, not keep every copy it replaced.
 echo "==> Keeping delivery-proof, merchant-kyc, user-avatars, receipts, order-attachments private"
 for bucket in delivery-proof merchant-kyc user-avatars receipts order-attachments; do
   mc anonymous set none "local/$bucket"

@@ -91,9 +91,12 @@ invent is the onboarding client secret, which must match what the realm import c
   ```
 
   The same apply routes `/order-attachments` on the API hostname (presigned requests only; MinIO
-  refuses unsigned ones) and hands order-manager its MinIO credentials from `platform-secrets`, as
-  onboarding-service gets them; the Vault seed carries them too from the next vault pod start.
-  order-manager's image must be built against platform-storage 0.1.3, published to GitHub Packages.
+  refuses unsigned ones) behind `order-attachment-upload-limit`, which answers 413 to a body over
+  10 MiB before MinIO stores a byte — keep it in step with order-manager's
+  `delivery.attachments.max-size-bytes` — and hands order-manager its MinIO credentials from
+  `platform-secrets`, as onboarding-service gets them; the Vault seed carries them too from the next
+  vault pod start. order-manager's image must be built against platform-storage 0.1.3, published to
+  GitHub Packages.
 - **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.
