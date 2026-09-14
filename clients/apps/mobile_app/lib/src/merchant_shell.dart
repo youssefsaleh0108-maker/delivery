@@ -485,8 +485,8 @@ class _MerchantShellState extends State<MerchantShell> {
         if (services) {
           return ServiceOrdersScreen(
             api: widget.orderApi,
-            // The order detail's "Chat with customer" opens the shop's conversations, which are the
-            // owner's, like the Settings row.
+            // The order detail's "Chat with customer" opens the customer's thread about that order,
+            // which the server lets only the shop's owner open, as with the Settings row's messages.
             shopChat: _access.isOwner ? widget.shopChatApi : null,
             chatSocket: widget.chatSocket,
             files: widget.orderAttachmentApi,

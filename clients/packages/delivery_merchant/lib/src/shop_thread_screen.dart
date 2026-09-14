@@ -8,13 +8,30 @@ import 'package:flutter/material.dart';
 
 import 'visible_poller.dart';
 
+/// "Order 5f0c2a9e": the order a shop thread was last opened from or for, named as that order's own
+/// screens name it — [ShopThread.orderShortId] is [DeliveryOrder.shortId] as the server copied it, and
+/// is left as it is — or null for a thread no order was ever confirmed on, which then says nothing
+/// about orders at all.
+///
+/// The short id sits inside a left-to-right isolate. It is a code, not a word: in an Arabic line its
+/// letters and digits must still run in the order the order screens print them, whatever the bidi
+/// algorithm would otherwise make of a code that starts with a digit beside Arabic text.
+String? shopThreadOrderLabel(ShopThread thread, DeliveryStrings t) {
+  final String? shortId = thread.orderShortId;
+  if (shortId == null || shortId.isEmpty) return null;
+  return t.svcChatOrderLabel('\u2066$shortId\u2069');
+}
+
 /// One conversation between a customer and a shop, drawn for whichever side is reading it.
 ///
-/// A customer reaches it from the chat pill on a shop's page: [open] asks the server for the thread,
-/// creating it the first time, so the pill never needs to know whether one exists. A merchant
-/// reaches it from [ShopInboxScreen], which already holds the [thread]. The layout is the same for
-/// both, in the conversation language order chat uses — the reader's own words in brand bubbles
-/// against the end, the other side's in white against the start — so the two ends of one
+/// A customer reaches it from the chat pill on a shop's page, where [open] asks the server for the
+/// thread, creating it the first time, so the pill never needs to know whether one exists; or from
+/// one of their service orders, which has already opened the thread for that order and hands it over
+/// with [open] kept for Reopen. A merchant reaches it from [ShopInboxScreen], which already holds the
+/// [thread], or from an order's "Chat with customer", which has just been given it. A thread that
+/// carries an order names it under the other side's name ([shopThreadOrderLabel]). The layout is the
+/// same for both, in the conversation language order chat uses — the reader's own words in brand
+/// bubbles against the end, the other side's in white against the start — so the two ends of one
 /// conversation cannot drift apart.
 ///
 /// Live over the app's one STOMP socket when the host has it, refetching from its sequence cursor on
@@ -286,11 +303,13 @@ class _ShopThreadScreenState extends State<ShopThreadScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final ShopThread? thread = _thread;
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       appBar: YdScreenHeader(
         title: _title(t),
+        subtitle: thread == null ? null : shopThreadOrderLabel(thread, t),
         onBack: () => Navigator.of(context).maybePop(),
         backSemanticLabel: t.back,
         trailing: _refreshButton(t),

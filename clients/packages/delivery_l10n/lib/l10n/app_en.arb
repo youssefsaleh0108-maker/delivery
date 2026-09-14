@@ -6083,5 +6083,12 @@
   "svcOfferChangedElsewhere": "This offer was just changed somewhere else, so it has been read again. Check it and try again.",
   "svcShopReadFailed": "We couldn't load your shop",
   "svcServiceOrdersRow": "Service orders",
-  "svcServiceOffersRow": "Service offers"
+  "svcServiceOffersRow": "Service offers",
+  "svcChatOrderLabel": "Order {ref}",
+  "@svcChatOrderLabel": {"placeholders":{"ref":{"type":"String"}}},
+  "svcChatClosedOn": "Chat about this order closed on {date}",
+  "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
+  "svcChatClosed": "Chat about this order has closed",
+  "svcChatUnavailable": "Chat is unavailable right now.",
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
 }

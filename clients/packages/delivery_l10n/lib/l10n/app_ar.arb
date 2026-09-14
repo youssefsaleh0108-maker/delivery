@@ -3875,5 +3875,10 @@
   "svcOfferChangedElsewhere": "عُدّلت هذه الخدمة للتو من مكان آخر، فأعدنا قراءتها. راجعها وحاول مجددًا.",
   "svcShopReadFailed": "تعذّر تحميل متجرك",
   "svcServiceOrdersRow": "طلبات الخدمات",
-  "svcServiceOffersRow": "خدماتك"
+  "svcServiceOffersRow": "خدماتك",
+  "svcChatOrderLabel": "الطلب {ref}",
+  "svcChatClosedOn": "أُغلقت المحادثة بشأن هذا الطلب في {date}",
+  "svcChatClosed": "أُغلقت المحادثة بشأن هذا الطلب",
+  "svcChatUnavailable": "المحادثة غير متاحة حاليًا.",
+  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله."
 }

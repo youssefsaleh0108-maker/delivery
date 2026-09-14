@@ -21176,6 +21176,36 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Service offers'**
   String get svcServiceOffersRow;
+
+  /// No description provided for @svcChatOrderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {ref}'**
+  String svcChatOrderLabel(String ref);
+
+  /// No description provided for @svcChatClosedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat about this order closed on {date}'**
+  String svcChatClosedOn(String date);
+
+  /// No description provided for @svcChatClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat about this order has closed'**
+  String get svcChatClosed;
+
+  /// No description provided for @svcChatUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat is unavailable right now.'**
+  String get svcChatUnavailable;
+
+  /// No description provided for @svcChatOrderNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
+  String get svcChatOrderNotFound;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

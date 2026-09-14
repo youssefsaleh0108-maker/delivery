@@ -102,6 +102,9 @@ class FakeServiceOrders extends OrderApi {
   /// Answers every state whatever was asked, as an Order Manager from before the status filter does.
   bool ignoresStatus = false;
 
+  /// Thrown by the order read while set.
+  Object? failRead;
+
   /// Holds the order read, and the order's actions, until completed.
   Completer<void>? holdRead;
   Completer<void>? holdAct;
@@ -188,6 +191,8 @@ class FakeServiceOrders extends OrderApi {
   Future<DeliveryOrder> read(String orderId) async {
     calls.add('read $orderId');
     await holdRead?.future;
+    final Object? failure = failRead;
+    if (failure != null) throw failure;
     return orders.firstWhere((DeliveryOrder o) => o.id == orderId);
   }
 
@@ -236,12 +241,73 @@ class FakeOrderFiles extends OrderAttachmentApi {
   }
 }
 
-/// A shop inbox with nobody in it.
-class FakeShopChat extends ShopChatApi {
-  FakeShopChat() : super(Dio());
+/// The shop's conversations with its customers: an inbox with nobody in it, and "chat with the
+/// customer" on an order, which answers a thread about that order unless a test has it refuse
+/// ([failOpen]) or wait ([holdOpen]). Implemented rather than extended, so a call no test expected
+/// fails here instead of reaching a real Dio.
+class FakeShopChat implements ShopChatApi {
+  FakeShopChat({this.customerName = 'Jean-Pierre D.'});
+
+  /// Who the threads it opens are with, as the shop sees them.
+  final String? customerName;
+
+  /// Every order "chat with the customer" was asked about, in the order asked.
+  final List<String> opened = <String>[];
+
+  /// Thrown by [openForOrder] while set: a [ShopOrderChatClosedException], or a 404 or 503 as Dio
+  /// throws them ([svcHttpError]).
+  Object? failOpen;
+
+  /// Holds [openForOrder] until completed.
+  Completer<void>? holdOpen;
+
+  final Map<String, ShopThread> _threads = <String, ShopThread>{};
+
+  /// The thread the server opens for [orderId]: the shop's side, open, labelled with the order's
+  /// first eight characters as its order screens print them.
+  ShopThread threadFor(String orderId) => ShopThread(
+        id: 'thread-$orderId',
+        storeId: 'shop-1',
+        storeName: 'Al Fakhry Press',
+        customerName: customerName,
+        yourSide: ShopThreadSide.shop,
+        open: true,
+        lastSequence: 0,
+        unread: 0,
+        orderId: orderId,
+        orderShortId: orderId.length <= 8 ? orderId : orderId.substring(0, 8),
+        orderKind: OrderKind.service,
+      );
+
+  @override
+  Future<ShopThread> openForOrder(String orderId) async {
+    opened.add(orderId);
+    await holdOpen?.future;
+    final Object? failure = failOpen;
+    if (failure != null) throw failure;
+    final ShopThread thread = threadFor(orderId);
+    _threads[thread.id] = thread;
+    return thread;
+  }
 
   @override
   Future<List<ShopThread>> inbox() async => const <ShopThread>[];
+
+  /// A conversation nobody has written in yet.
+  @override
+  Future<ShopThreadPage> messages(String threadId, {int afterSequence = 0}) async =>
+      ShopThreadPage(thread: _threads[threadId]!, messages: const <ShopMessage>[], more: false);
+
+  @override
+  Future<int> markRead(String threadId, {required int upToSequence}) async => 0;
+
+  @override
+  Future<ShopThread> openWithStore(String storeId, {String? orderId}) =>
+      throw UnimplementedError('a customer opens a thread with a shop; these screens are the shop\'s');
+
+  @override
+  Future<ShopMessage> send(String threadId, String text, {String? clientMessageId}) =>
+      throw UnimplementedError('no provider screen test sends a message');
 }
 
 /// Sets the platform's LBP rate the way the app does, through `/api/market/config`.
