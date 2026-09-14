@@ -65,11 +65,16 @@ public class ReconciliationController {
 
     /**
      * Records that a holder has banked everything they were carrying — a rider of the platform's own
-     * fleet, or a delivery company paying in what its riders handed it.
+     * fleet, a delivery company paying in what its riders handed it, or a shop paying in what its
+     * counter took for pickup orders (V52).
      *
      * <p>BACKOFFICE only, and deliberately so: this is somebody at the platform confirming that
      * money physically arrived. A rider marking their own float clear would be the one party with
-     * an incentive to get it wrong — and so would a company.
+     * an incentive to get it wrong — and so would a company, and so would a shop.
+     *
+     * <p>A shop's till needs no route of its own: it is paid in exactly as a company's custody is,
+     * with the same counted amount, the same refusal when a pickup was paid at the counter after the
+     * page loaded, the same request key and the same record of who confirmed it.
      *
      * <p>The body is optional, so a caller written before it existed banks exactly as it always did.
      * With one, {@code expectedAmount} is the figure the operator counted against: a company's
@@ -159,11 +164,13 @@ public class ReconciliationController {
      * collected this morning is a working day, and the same balance collected three weeks ago is a
      * problem.
      *
-     * <p>A delivery company appears here as a {@code PROVIDER} holder once its riders hand it cash.
+     * <p>A delivery company appears here as a {@code PROVIDER} holder once its riders hand it cash,
+     * and a shop as a {@code MERCHANT} holder once a pickup is paid at its counter (V52).
      * {@code overdue} is the server's call, by the limit for the cash each holder has: a day for a
-     * rider of the platform's own fleet, as this list always flagged them, and the carrier limit for
+     * rider of the platform's own fleet, as this list always flagged them, the carrier limit for
      * a company's custody — the one the company's own reconciliation page states, so the two cannot
-     * disagree about what "late" means. See {@link CarrierCashService#cashOnHand()}.
+     * disagree about what "late" means — and the shop limit for a shop's till. See
+     * {@link CarrierCashService#cashOnHand()}.
      *
      * <p>The role is checked in the method as well as on the class, as on every cash route here: this
      * list names who holds the platform's money, and a standalone test can only prove a lock it can

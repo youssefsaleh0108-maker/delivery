@@ -177,6 +177,10 @@ delivery:
       # reconciliation page and to the Back Office's list alike, so both sides of a hand-over agree
       # on what "late" means.
       carrier-overdue-after-hours: 48
+      # Cash a shop took at its own counter for pickup orders, owed to the platform directly (V52).
+      # Nobody has decided how often a shop pays its till in, so it is a setting of its own; until
+      # somebody does, it is held to the carrier line, the rule partner custody already has.
+      merchant-overdue-after-hours: 48
 
     payroll:
       # The calendar a delivery company's pay periods are in. It must be the zone order-tracking
