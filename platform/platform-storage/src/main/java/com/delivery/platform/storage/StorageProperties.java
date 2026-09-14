@@ -36,6 +36,16 @@ public class StorageProperties {
     private long maxUploadSizeBytes = 10L * 1024 * 1024;
 
     /**
+     * How long a server-side call to storage — a stat, a ranged read, a delete — may wait to connect,
+     * and then for each read and each write on the connection. MinIO's own client waits five minutes
+     * for each, so a storage that hangs would hold whichever thread asked for that long: a request
+     * thread, or a scheduled job's. Presigned URLs are signed locally and never wait on these.
+     */
+    private Duration connectTimeout = Duration.ofSeconds(5);
+    private Duration readTimeout = Duration.ofSeconds(30);
+    private Duration writeTimeout = Duration.ofSeconds(30);
+
+    /**
      * Per purpose, the content types an upload may declare — replacing that purpose's built-in
      * list ({@link FilePurpose#defaultContentTypes()}) and no other purpose's. Empty unless a service
      * configures it:
@@ -124,6 +134,30 @@ public class StorageProperties {
 
     public void setMaxUploadSizeBytes(long maxUploadSizeBytes) {
         this.maxUploadSizeBytes = maxUploadSizeBytes;
+    }
+
+    public Duration getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    public Duration getReadTimeout() {
+        return readTimeout;
+    }
+
+    public void setReadTimeout(Duration readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    public Duration getWriteTimeout() {
+        return writeTimeout;
+    }
+
+    public void setWriteTimeout(Duration writeTimeout) {
+        this.writeTimeout = writeTimeout;
     }
 
     public Map<FilePurpose, List<String>> getAllowedContentTypes() {

@@ -1,8 +1,10 @@
 package com.delivery.platform.storage;
 
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -10,11 +12,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.minio.GetObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 
 /**
@@ -28,10 +32,20 @@ import io.minio.http.Method;
  * because the signature covers the host header — sign against the internal Docker hostname and the
  * browser's request is rejected. Server-side operations use the internal endpoint, which is
  * reachable from inside the network and avoids a pointless round trip through the host.
+ *
+ * <p><strong>A presigned PUT is not used up by a confirm.</strong> It works for its whole TTL, as many
+ * times as anybody holding it likes: after {@link #confirmUpload} passed a file, the same URL can put
+ * something else under the same key, and after a file is deleted it can put an object back that no row
+ * describes. This class cannot shorten that; what it offers a caller is the means to notice — the entity
+ * tag of the bytes that were checked ({@link #confirm}), {@link #inspect} to compare it with later, and
+ * {@link #removeObject} to take the key back once more after the URL has expired.
  */
 public class StorageService {
 
     private static final Logger log = LoggerFactory.getLogger(StorageService.class);
+
+    /** MinIO's code for a key that holds nothing, which a HEAD's 404 is reported as. */
+    private static final String NO_SUCH_KEY = "NoSuchKey";
 
     private final MinioClient internalClient;
     private final MinioClient presignClient;
@@ -116,44 +130,69 @@ public class StorageService {
     }
 
     /**
-     * Confirms the client's upload actually landed, and enforces the size limit after the fact.
+     * Confirms the client's upload actually landed, and is what it was declared to be.
      *
-     * <p>The size cap cannot be enforced by the presigned URL itself, so it is checked here and the
-     * object deleted if it was exceeded. Without this step a service would happily record an image
-     * that was never uploaded, or one far larger than the limit it advertised.
+     * <p>A presigned URL can bind neither a size nor a type, so both are checked here, after the fact:
+     * the object must be within the size limit, stored with the content type declared at presign, and
+     * begin with the bytes a file of that type begins with ({@link FileSignature}) — read with a ranged
+     * request of a few bytes, never the whole object. An upload failing any of them is removed from the
+     * bucket, its row is marked deleted, and an {@link UploadRefusedException} says which check it
+     * failed. Without this step a service would happily record an image that was never uploaded, one
+     * far larger than the limit it advertised, or an HTML page named for a PDF.
+     *
+     * <p>That refusal <strong>commits</strong> ({@code noRollbackFor}): the object is already gone, and a
+     * rolled-back row would go on calling it PENDING. Every other failure rolls back as usual.
+     *
+     * <p>Confirming an upload already confirmed returns it unchecked. A caller that needs to know the
+     * bytes are still the ones that were checked uses {@link #confirm} and {@link #inspect}.
      */
-    @Transactional
+    @Transactional(noRollbackFor = UploadRefusedException.class)
     public FileMetadata confirmUpload(UUID fileId, String callerId) {
-        FileMetadata metadata = repository.findById(fileId)
-                .orElseThrow(() -> new StorageException("No such file: " + fileId));
-
-        if (!metadata.isOwnedBy(callerId)) {
-            throw new StorageException("File " + fileId + " does not belong to the caller");
-        }
+        FileMetadata metadata = owned(fileId, callerId);
         if (metadata.getStatus() == FileMetadata.Status.UPLOADED) {
             return metadata;
         }
+        return check(metadata).file();
+    }
 
-        StatObjectResponse stat;
+    /**
+     * {@link #confirmUpload}, answering with the entity tag of exactly the bytes that passed as well —
+     * for a caller that keeps the file and must notice later if the object under its key stops being
+     * them ({@link ConfirmedUpload}).
+     *
+     * <p>Unlike {@link #confirmUpload}, an upload already confirmed is checked again rather than
+     * returned as it is: a tag is only worth recording if it belongs to bytes that passed.
+     */
+    @Transactional(noRollbackFor = UploadRefusedException.class)
+    public ConfirmedUpload confirm(UUID fileId, String callerId) {
+        return check(owned(fileId, callerId));
+    }
+
+    /**
+     * What the bucket holds under a file's key right now, or empty when the key holds nothing.
+     *
+     * <p>For a caller about to use a file it confirmed some time ago — hand it to somebody, attach it to
+     * something — to compare with what it recorded then ({@link StoredObject#isStill}). The presigned PUT
+     * that created the object may still work, so "confirmed once" is not "still the same file".
+     *
+     * @throws StorageException when storage cannot say — unreachable, or refusing the request — which is
+     *                          not the same answer as the object being gone
+     */
+    public Optional<StoredObject> inspect(FileMetadata metadata) {
         try {
-            stat = internalClient.statObject(StatObjectArgs.builder()
+            StatObjectResponse stat = internalClient.statObject(StatObjectArgs.builder()
                     .bucket(metadata.getBucket())
                     .object(metadata.getObjectKey())
                     .build());
+            return Optional.of(new StoredObject(stat.size(), unquoted(stat.etag()), stat.contentType()));
+        } catch (ErrorResponseException e) {
+            if (e.errorResponse() != null && NO_SUCH_KEY.equals(e.errorResponse().code())) {
+                return Optional.empty();
+            }
+            throw new StorageException("Could not inspect " + metadata.getObjectKey(), e);
         } catch (Exception e) {
-            throw new StorageException(
-                    "Upload for " + fileId + " was not found in the bucket", e);
+            throw new StorageException("Could not inspect " + metadata.getObjectKey(), e);
         }
-
-        if (stat.size() > properties.getMaxUploadSizeBytes()) {
-            delete(metadata.getBucket(), metadata.getObjectKey());
-            metadata.markDeleted();
-            throw new StorageException("Upload exceeds the maximum of "
-                    + properties.getMaxUploadSizeBytes() + " bytes");
-        }
-
-        metadata.markUploaded(stat.size());
-        return metadata;
     }
 
     /**
@@ -191,27 +230,131 @@ public class StorageService {
 
     @Transactional
     public void softDelete(UUID fileId, String callerId) {
+        FileMetadata metadata = owned(fileId, callerId);
+        delete(metadata.getBucket(), metadata.getObjectKey());
+        metadata.markDeleted();
+    }
+
+    /**
+     * Marks a file deleted without touching the bucket: the first half of a deletion whose object the
+     * caller removes with {@link #removeObject} once its own transaction has committed. That way no
+     * storage call is made while the caller holds row locks, and storage being slow or away leaves a
+     * removal to retry rather than a transaction held open or rolled back.
+     */
+    @Transactional
+    public FileMetadata markDeleted(UUID fileId, String callerId) {
+        FileMetadata metadata = owned(fileId, callerId);
+        metadata.markDeleted();
+        return metadata;
+    }
+
+    /**
+     * Removes a file's object from the bucket, and nothing else: its row is the caller's to have marked
+     * deleted already. Safe to repeat — removing a key that holds nothing succeeds, as S3 answers it.
+     *
+     * @return true when storage confirmed the key now holds nothing; false when it could not be asked,
+     *         which is logged and never thrown, so a caller removing many objects after its transaction
+     *         committed cannot stop half way
+     */
+    public boolean removeObject(FileMetadata metadata) {
+        return delete(metadata.getBucket(), metadata.getObjectKey());
+    }
+
+    private FileMetadata owned(UUID fileId, String callerId) {
         FileMetadata metadata = repository.findById(fileId)
                 .orElseThrow(() -> new StorageException("No such file: " + fileId));
         if (!metadata.isOwnedBy(callerId)) {
             throw new StorageException("File " + fileId + " does not belong to the caller");
         }
-        delete(metadata.getBucket(), metadata.getObjectKey());
-        metadata.markDeleted();
+        return metadata;
     }
 
-    private void delete(String bucket, String objectKey) {
+    /** Confirm's checks, in the order that reads the least: size and type from a stat, then a few bytes. */
+    private ConfirmedUpload check(FileMetadata metadata) {
+        if (metadata.getStatus() == FileMetadata.Status.DELETED) {
+            // Deleted is final. The key's URL may still work, and an object PUT through it afterwards
+            // must not bring the row back to life.
+            throw new StorageException("File " + metadata.getId() + " was deleted");
+        }
+
+        StatObjectResponse stat;
+        try {
+            stat = internalClient.statObject(StatObjectArgs.builder()
+                    .bucket(metadata.getBucket())
+                    .object(metadata.getObjectKey())
+                    .build());
+        } catch (Exception e) {
+            throw new StorageException(
+                    "Upload for " + metadata.getId() + " was not found in the bucket", e);
+        }
+
+        if (stat.size() > properties.getMaxUploadSizeBytes()) {
+            throw refused(metadata, UploadRefusedException.Reason.TOO_LARGE, "Upload exceeds the maximum of "
+                    + properties.getMaxUploadSizeBytes() + " bytes");
+        }
+        if (!FileSignature.mediaType(stat.contentType()).equals(FileSignature.mediaType(metadata.getContentType()))) {
+            throw refused(metadata, UploadRefusedException.Reason.WRONG_TYPE, "Upload " + metadata.getId()
+                    + " was stored as '" + stat.contentType() + "', not " + metadata.getContentType());
+        }
+        // An empty object begins with nothing, so it is no type at all — and a range request of an empty
+        // object is refused by storage, which would read as "not found" instead.
+        byte[] head = stat.size() == 0 ? new byte[0] : head(metadata, stat.etag());
+        if (!FileSignature.matches(metadata.getContentType(), head)) {
+            throw refused(metadata, UploadRefusedException.Reason.WRONG_TYPE, "Upload " + metadata.getId()
+                    + " does not begin as a " + metadata.getContentType() + " does");
+        }
+
+        metadata.markUploaded(stat.size());
+        return new ConfirmedUpload(metadata, unquoted(stat.etag()));
+    }
+
+    /**
+     * The first bytes of exactly the object that was measured: a ranged read, so the rest of it never
+     * crosses the network, and conditional on the entity tag the stat saw, so an object replaced between
+     * the two is refused by storage rather than checked in place of the one that was measured.
+     */
+    private byte[] head(FileMetadata metadata, String etag) {
+        try (InputStream in = internalClient.getObject(GetObjectArgs.builder()
+                .bucket(metadata.getBucket())
+                .object(metadata.getObjectKey())
+                .offset(0L)
+                .length((long) FileSignature.BYTES_NEEDED)
+                .matchETag(etag)
+                .build())) {
+            // Bounded as well, in case storage ever answers a range with the whole object.
+            return in.readNBytes(FileSignature.BYTES_NEEDED);
+        } catch (Exception e) {
+            throw new StorageException("Could not read the start of upload " + metadata.getId(), e);
+        }
+    }
+
+    /** Removes the refused object and marks its row, then hands back the refusal for the caller to throw. */
+    private UploadRefusedException refused(FileMetadata metadata, UploadRefusedException.Reason reason,
+                                           String message) {
+        delete(metadata.getBucket(), metadata.getObjectKey());
+        metadata.markDeleted();
+        return new UploadRefusedException(reason, message);
+    }
+
+    private boolean delete(String bucket, String objectKey) {
         try {
             internalClient.removeObject(RemoveObjectArgs.builder()
                     .bucket(bucket)
                     .object(objectKey)
                     .build());
+            return true;
         } catch (Exception e) {
             // The metadata row is still marked deleted by the caller. A stray object is a storage
             // cost; a metadata row pointing at something the user believes is gone is a privacy
             // problem, so the row's state takes precedence over the object's.
             log.warn("Could not remove {}/{} from the bucket", bucket, objectKey, e);
+            return false;
         }
+    }
+
+    /** An entity tag as S3 sends it is quoted; the quotes are not part of it. */
+    private static String unquoted(String etag) {
+        return etag == null ? null : etag.replace("\"", "");
     }
 
     private static String buildObjectKey(String keyPrefix, String contentType) {

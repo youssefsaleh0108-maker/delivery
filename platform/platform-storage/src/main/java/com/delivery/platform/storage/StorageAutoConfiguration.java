@@ -10,6 +10,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 
 import io.minio.MinioClient;
+import io.minio.http.HttpUtils;
+import okhttp3.OkHttpClient;
 
 /**
  * <strong>The consuming service must scan this package for JPA entities and repositories</strong> —
@@ -34,6 +36,7 @@ public class StorageAutoConfiguration {
                 .endpoint(properties.getEndpoint())
                 .credentials(properties.getAccessKey(), properties.getSecretKey())
                 .region(properties.getRegion())
+                .httpClient(httpClient(properties))
                 .build();
     }
 
@@ -49,7 +52,19 @@ public class StorageAutoConfiguration {
                 .endpoint(properties.getPublicEndpoint())
                 .credentials(properties.getAccessKey(), properties.getSecretKey())
                 .region(properties.getRegion())
+                .httpClient(httpClient(properties))
                 .build();
+    }
+
+    /**
+     * MinIO's own HTTP client, but with this service's timeouts ({@link StorageProperties#getConnectTimeout()}
+     * and the rest) in place of its five minutes each. Every stat, ranged read and delete this library
+     * makes goes through it, and a hung storage must not hold a request thread, or a scheduled job's
+     * only thread, for minutes at a time.
+     */
+    static OkHttpClient httpClient(StorageProperties properties) {
+        return HttpUtils.newDefaultHttpClient(properties.getConnectTimeout().toMillis(),
+                properties.getWriteTimeout().toMillis(), properties.getReadTimeout().toMillis());
     }
 
     /**
