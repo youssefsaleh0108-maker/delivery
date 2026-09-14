@@ -3,11 +3,12 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../order_detail_screen.dart';
-import '../shop_inbox_screen.dart';
+import '../shop_thread_screen.dart';
 import 'service_order_steps.dart';
 import 'service_orders_screen.dart';
 import 'service_words.dart';
@@ -18,10 +19,13 @@ import 'service_words.dart';
 /// What the orders frame (126:200) leaves out and a print shop cannot work without — above all the
 /// customer's design files, opened from short-lived links, and what they asked for in their own words.
 ///
-/// "Chat with customer" opens the shop's conversations. Not one thread picked for this order: a shop
-/// thread records no order (the server never writes one) and shows the shop only its customer's
-/// display name, and two customers called "Mohammad K." are not rare. Opening the wrong one would put
-/// one customer's order in front of another, so the shop chooses the conversation it recognises.
+/// "Chat with customer" opens this order's conversation with the customer who placed it, labelled with
+/// the order, in the thread screen the shop's inbox opens. The server finds the thread from the order,
+/// so the customer is the order's own — never a conversation picked by display name, where two
+/// customers called "Mohammad K." are not rare — and it refuses a shop the order is not for. It also
+/// stops a shop opening one a while after the order was due or ended, which can happen to an order
+/// still open once it is long overdue: the button then gives way to when chat about the order closed,
+/// and the order's own steps carry on exactly as before.
 class ServiceOrderDetailScreen extends StatefulWidget {
   const ServiceOrderDetailScreen({
     super.key,
@@ -66,6 +70,19 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
 
   /// A step is on its way, or its order is being read back: the buttons spin and take no second tap.
   bool _busy = false;
+
+  /// "Chat with customer" is asking the server for the thread, or the thread it opened is still on
+  /// screen: the button spins and takes no second tap, so one tap opens one conversation.
+  bool _openingChat = false;
+
+  /// The server said the shop's chance to open a chat about this order has passed (409), and when, if
+  /// it said. Kept while this screen is open; the order opened again asks again.
+  bool _chatClosed = false;
+  DateTime? _chatClosedAt;
+
+  /// The server could not open the chat just now (503, or no answer at all): said in place of the
+  /// button, with Try again.
+  bool _chatUnavailable = false;
 
   /// Moves on each time a step is sent and each time one answers, so a read of the order begun before
   /// is not drawn over what the step did.
@@ -198,10 +215,71 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   static Future<bool> _launch(Uri link) =>
       launchUrl(link, mode: LaunchMode.externalApplication);
 
-  void _openConversations() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => ShopInboxScreen(api: widget.shopChat!, socket: widget.chatSocket),
-    ));
+  /// Opens this order's conversation with its customer, in the thread screen the inbox opens.
+  ///
+  /// The server gets the thread, or creates it if the customer never wrote, and labels it with the
+  /// order. What else it can answer, and what the shop is shown:
+  /// * closed (409) — the shop's window for this order has passed, which an order still open reaches
+  ///   once it is long overdue: the button gives way to when that was, and nothing about the order's
+  ///   own steps changes;
+  /// * not found (404) — not an order of a shop this account answers for, or gone: said, and the order
+  ///   is read again, since whatever changed shows on it;
+  /// * anything else — 503 when the orders or shops behind the check cannot be asked, or no answer at
+  ///   all: said in place of the button, with Try again.
+  Future<void> _openChat() async {
+    final ShopChatApi? chat = widget.shopChat;
+    if (chat == null || _openingChat || !mounted) return;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    setState(() {
+      _openingChat = true;
+      _chatUnavailable = false;
+    });
+    try {
+      final ShopThread thread;
+      try {
+        thread = await chat.openForOrder(_order.id);
+      } on ShopOrderChatClosedException catch (closed) {
+        if (mounted) {
+          setState(() {
+            _chatClosed = true;
+            _chatClosedAt = closed.closedAt;
+          });
+        }
+        return;
+      } on DioException catch (e) {
+        if (!mounted) return;
+        if (e.response?.statusCode == 404) {
+          ScaffoldMessenger.of(context)
+            ..removeCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(t.svcChatOrderNotFound)));
+          unawaited(_reload());
+        } else {
+          setState(() => _chatUnavailable = true);
+        }
+        return;
+      } catch (_) {
+        if (mounted) setState(() => _chatUnavailable = true);
+        return;
+      }
+      if (!mounted) return;
+      // Still spinning while the conversation covers this screen: a second tap as it slides in opens
+      // nothing more.
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => ShopThreadScreen(api: chat, thread: thread, socket: widget.chatSocket),
+      ));
+    } finally {
+      if (mounted) setState(() => _openingChat = false);
+    }
+  }
+
+  /// When chat about the order closed, as a date: day and month, and the year too once it is not this
+  /// one.
+  String _closedOn(DateTime at) {
+    final MaterialLocalizations words = MaterialLocalizations.of(context);
+    final DateTime local = at.toLocal();
+    return local.year == _now().year
+        ? words.formatShortMonthDay(local)
+        : words.formatShortDate(local);
   }
 
   @override
@@ -314,12 +392,39 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
             ),
             if (widget.shopChat != null) ...<Widget>[
               const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
-              YdPillButton.secondary(
-                label: t.svcChatWithCustomer,
-                icon: Icons.chat_bubble_outline_rounded,
-                size: YdPillButtonSize.compact,
-                onPressed: _openConversations,
-              ),
+              // Never a button the server has already said will not work: once chat about this order
+              // has closed, when it closed stands in its place.
+              if (_chatClosed)
+                _Fact(
+                  icon: Icons.speaker_notes_off_outlined,
+                  text: switch (_chatClosedAt) {
+                    final DateTime at => t.svcChatClosedOn(_closedOn(at)),
+                    null => t.svcChatClosed,
+                  },
+                )
+              else if (_chatUnavailable)
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        t.svcChatUnavailable,
+                        style: const TextStyle(fontSize: 13, color: DeliveryColors.muted),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => unawaited(_openChat()),
+                      child: Text(t.tryAgain),
+                    ),
+                  ],
+                )
+              else
+                YdPillButton.secondary(
+                  label: t.svcChatWithCustomer,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  size: YdPillButtonSize.compact,
+                  busy: _openingChat,
+                  onPressed: () => unawaited(_openChat()),
+                ),
             ],
           ],
         ),
