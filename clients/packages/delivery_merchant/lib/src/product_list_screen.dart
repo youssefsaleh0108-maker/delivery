@@ -584,13 +584,18 @@ class _ProductRow extends StatelessWidget {
     );
   }
 
-  /// The frame labels only two states, "Available" and "Off-shelf". The catalog has three, and the
-  /// third one matters: a DRAFT has never been published and usually cannot be, because it has no
+  /// The frame labels only two states, "Available" and "Off-shelf". The catalog has four, and one of
+  /// them matters: a DRAFT has never been published and usually cannot be, because it has no
   /// photo yet. Collapsing it into "Off-shelf" would hide the one thing the merchant has to fix,
   /// so the draft keeps its own word in the frame's colour and position.
+  ///
+  /// A PAUSED service offer is the opposite case: its provider took it off sale for now, and it comes
+  /// back exactly as it was, with nothing to fix. That is what "Off-shelf" already says, so it shares
+  /// the word rather than adding one that would read the same.
   String _stateLabel(DeliveryStrings t, ProductStatus status) => switch (status) {
         ProductStatus.active => t.merchbAvailable,
         ProductStatus.draft => t.draft,
+        ProductStatus.paused => t.merchbOffShelf,
         ProductStatus.archived => t.merchbOffShelf,
       };
 }
