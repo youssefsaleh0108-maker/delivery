@@ -140,7 +140,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
 
   /// A customer's design files on service orders, over order-manager's attachment endpoints: sent
   /// before the order is placed, taken back with Remove, and listed again on its tracking page.
-  late final OrderAttachmentFiles _serviceFiles = OrderAttachmentFiles(OrderAttachmentApi(_dio));
+  late final OrderAttachmentFiles _serviceFiles = OrderAttachmentFiles(_orderAttachmentApi);
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
 
@@ -225,6 +225,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The area list the address sheet offers. Nullable nowhere: a deployment with no areas
   /// configured simply gets an empty list and no picker.
   late final DeliveryZoneApi _zoneApi = DeliveryZoneApi(_dio);
+
+  /// A service order's files: a services shop reads its customers' designs through Order Manager's
+  /// attachment endpoints, with links that work for a few minutes.
+  late final OrderAttachmentApi _orderAttachmentApi = OrderAttachmentApi(_dio);
 
   late Future<AuthSession?> _bootstrap = _restoreAfterSplash();
 
@@ -1035,6 +1039,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               demandApi: _demandApi,
               shopChatApi: _shopChatApi,
               chatSocket: _socket,
+              // A services shop's bell (126:51), the delivery rule on its offers, and its
+              // customers' files on a service order.
+              notificationApi: _notificationApi,
+              zoneApi: _zoneApi,
+              orderAttachmentApi: _orderAttachmentApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,

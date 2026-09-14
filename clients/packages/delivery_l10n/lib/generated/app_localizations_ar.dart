@@ -12080,4 +12080,551 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get svcBoOfferUnreadable =>
       'لم يُسجَّل شيء، لكن تعذّرت إعادة قراءة هذا العرض، لذلك قد لا يكون المعروض محدَّثًا. أغلقه ثم افتحه مجددًا من القائمة.';
+
+  @override
+  String get svcNavOffers => 'خدماتي';
+
+  @override
+  String get svcDashboardActiveOffers => 'خدمات متاحة';
+
+  @override
+  String get svcDashboardThisWeek => 'هذا الأسبوع';
+
+  @override
+  String get svcDashboardThisWeekCaption => 'الطلبات في آخر 7 أيام';
+
+  @override
+  String get svcDashboardRating => 'التقييم';
+
+  @override
+  String get svcQuickActions => 'إجراءات سريعة';
+
+  @override
+  String get svcAddOffer => 'أضف خدمة';
+
+  @override
+  String get svcViewOrders => 'عرض الطلبات';
+
+  @override
+  String get svcCurrentOffers => 'خدماتك الحالية';
+
+  @override
+  String get svcSeeAllOffers => 'عرض الكل';
+
+  @override
+  String get svcOfferActive => 'متاحة';
+
+  @override
+  String get svcOfferPaused => 'متوقفة';
+
+  @override
+  String get svcOfferDraft => 'مسودة';
+
+  @override
+  String get svcPauseOffer => 'إيقاف مؤقت';
+
+  @override
+  String get svcResumeOffer => 'استئناف';
+
+  @override
+  String get svcOfferPausedDone =>
+      'أوقفت الخدمة مؤقتًا. لن يتمكن الزبائن من طلبها حتى تستأنفها.';
+
+  @override
+  String get svcOfferResumedDone => 'الخدمة متاحة من جديد.';
+
+  @override
+  String get svcNoOffersYet => 'لا خدمات بعد';
+
+  @override
+  String get svcNoOffersYetBody => 'أضف خدمتك الأولى ليتمكن الزبائن من طلبها.';
+
+  @override
+  String get svcDashboardLoadFailed => 'تعذّر تحميل لوحة التحكم';
+
+  @override
+  String get svcOffersLoadFailed => 'تعذّر تحميل خدماتك';
+
+  @override
+  String get svcNoShopYet => 'متجر خدماتك لم يُفتح بعد';
+
+  @override
+  String get svcNoShopYetBody => 'سيُفتح فور الموافقة على طلبك.';
+
+  @override
+  String get svcPublishAfterApproval =>
+      'يمكنك نشر خدماتك بعد الموافقة على طلبك.';
+
+  @override
+  String get svcOffersTitle => 'خدماتك';
+
+  @override
+  String get svcOffersSubtitle => 'ما يمكن للزبائن طلبه منك';
+
+  @override
+  String svcUnitPack(String count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcUnitPer(String unit) {
+    return 'لكل $unit';
+  }
+
+  @override
+  String svcPriceUsd(String amount) {
+    return '$amount \$';
+  }
+
+  @override
+  String svcPriceLbp(String amount) {
+    return '$amount ل.ل.';
+  }
+
+  @override
+  String svcLbpPreview(String amount) {
+    return '≈ $amount بسعر اليوم';
+  }
+
+  @override
+  String get svcNewOffer => 'خدمة جديدة';
+
+  @override
+  String get svcEditOffer => 'تعديل الخدمة';
+
+  @override
+  String get svcOfferTitle => 'اسم الخدمة';
+
+  @override
+  String get svcOfferTitleRequired => 'أدخل اسم الخدمة';
+
+  @override
+  String svcTooLong(String max) {
+    return '$max حرفًا كحد أقصى';
+  }
+
+  @override
+  String get svcDescription => 'الوصف';
+
+  @override
+  String get svcCategory => 'الفئة';
+
+  @override
+  String get svcCategoryOfShop => 'تأخذ الخدمات فئة متجرك';
+
+  @override
+  String get svcPriceLabel => 'السعر (بالدولار الأمريكي)';
+
+  @override
+  String get svcPriceInvalid =>
+      'أدخل سعرًا أكبر من صفر بخانتين عشريتين على الأكثر';
+
+  @override
+  String get svcPricingType => 'طريقة التسعير';
+
+  @override
+  String get svcPricingFixed => 'سعر ثابت';
+
+  @override
+  String get svcPricingPerUnit => 'سعر للوحدة';
+
+  @override
+  String get svcPricingFrom => 'سعر ابتدائي (تُضاف إليه الخيارات)';
+
+  @override
+  String get svcUnitLabel => 'الوحدة (مثل: بطاقة، متر مربع)';
+
+  @override
+  String get svcPackSize => 'عدد الوحدات في كل خطوة';
+
+  @override
+  String get svcUnitRequired => 'حدّد الوحدة، مثل بطاقة أو متر مربع';
+
+  @override
+  String svcPackSizeRange(String min, String max) {
+    return 'بين $min و$max';
+  }
+
+  @override
+  String get svcPerUnitIsOne => 'سعر الوحدة هو سعر وحدة واحدة';
+
+  @override
+  String svcPackPreview(String pack) {
+    return 'يطلب الزبائن بخطوات من $pack';
+  }
+
+  @override
+  String get svcPhotos => 'الصور';
+
+  @override
+  String get svcPhotoRequired => 'أضف صورة واحدة على الأقل لتنشر';
+
+  @override
+  String get svcAddPhoto => 'أضف صورة';
+
+  @override
+  String get svcTurnaround => 'مدة التنفيذ';
+
+  @override
+  String get svcTurnaroundSameDay => 'في اليوم نفسه';
+
+  @override
+  String get svcTurnaround1to2 => 'من يوم إلى يومين';
+
+  @override
+  String get svcTurnaround3to5 => 'من 3 إلى 5 أيام';
+
+  @override
+  String get svcTurnaroundWeek => 'نحو أسبوع';
+
+  @override
+  String svcTurnaroundHours(String min, String max) {
+    return '$min–$max ساعة';
+  }
+
+  @override
+  String get svcTurnaroundRequired => 'اختر مدة التنفيذ';
+
+  @override
+  String get svcFulfilment => 'كيف يحصل الزبون عليها';
+
+  @override
+  String get svcFulfilmentPickup => 'الاستلام من متجرك';
+
+  @override
+  String get svcFulfilmentDelivery => 'توصيل يو دروب';
+
+  @override
+  String get svcFulfilmentBoth => 'الاثنان معًا';
+
+  @override
+  String get svcFulfilmentRequired => 'اختر كيف يحصل الزبون عليها';
+
+  @override
+  String get svcDeliveryNeedsAreas =>
+      'حدّد مناطق التوصيل أو ثبّت موقع متجرك قبل عرض توصيل يو دروب';
+
+  @override
+  String get svcCustomerFile => 'ملف من الزبون';
+
+  @override
+  String get svcCustomerFileNone => 'غير مطلوب';
+
+  @override
+  String get svcCustomerFileOptional => 'اختياري';
+
+  @override
+  String get svcCustomerFileRequired => 'مطلوب';
+
+  @override
+  String get svcInstructionsPrompt => 'ماذا يجب أن يخبرك الزبون؟';
+
+  @override
+  String get svcInstructionsPromptHint =>
+      'مثال: الأسماء والمسميات المطلوب طباعتها';
+
+  @override
+  String get svcOptions => 'الخيارات';
+
+  @override
+  String get svcOptionsAfterSave =>
+      'احفظ الخدمة أولًا، ثم أضف خيارات مثل نوع الورق';
+
+  @override
+  String get svcEditOptions => 'تعديل الخيارات';
+
+  @override
+  String get svcNoOptions => 'لا خيارات';
+
+  @override
+  String get svcPublishOffer => 'انشر الخدمة';
+
+  @override
+  String get svcSaveDraft => 'احفظ كمسودة';
+
+  @override
+  String get svcSaveChanges => 'احفظ التغييرات';
+
+  @override
+  String get svcOfferPublished => 'نُشرت الخدمة';
+
+  @override
+  String get svcDraftSaved => 'حُفظت المسودة';
+
+  @override
+  String get svcOfferSaveFailed => 'تعذّر حفظ الخدمة';
+
+  @override
+  String get svcOfferRefused =>
+      'لم تُقبل الخدمة بصيغتها الحالية. راجع تفاصيلها وحاول مجددًا.';
+
+  @override
+  String get svcArchiveOffer => 'أرشفة الخدمة';
+
+  @override
+  String get svcArchiveConfirm =>
+      'أرشفة هذه الخدمة؟ لن يراها الزبائن بعد الآن.';
+
+  @override
+  String get svcOfferArchived => 'أُرشفت الخدمة';
+
+  @override
+  String get svcOfferNotEditable =>
+      'تستخدم هذه الخدمة إعدادات لا يستطيع هذا الإصدار من التطبيق تعديلها. حدّث التطبيق لتعديلها.';
+
+  @override
+  String get svcMoreActions => 'إجراءات أخرى';
+
+  @override
+  String get svcIncomingOrders => 'الطلبات الواردة';
+
+  @override
+  String get svcTabNew => 'جديدة';
+
+  @override
+  String get svcTabInProgress => 'قيد التنفيذ';
+
+  @override
+  String get svcTabCompleted => 'مكتملة';
+
+  @override
+  String get svcChipNew => 'جديد';
+
+  @override
+  String get svcChipAccepted => 'مقبول';
+
+  @override
+  String get svcChipInProduction => 'قيد الإنتاج';
+
+  @override
+  String get svcChipReady => 'جاهز';
+
+  @override
+  String get svcChipOnTheWay => 'في الطريق';
+
+  @override
+  String get svcChipCollected => 'استُلم';
+
+  @override
+  String get svcChipDelivered => 'وُصِّل';
+
+  @override
+  String get svcChipDeclined => 'مرفوض';
+
+  @override
+  String get svcChipNotCollected => 'لم يُستلم';
+
+  @override
+  String get svcChipCancelled => 'ملغى';
+
+  @override
+  String get svcChipPickup => 'استلام';
+
+  @override
+  String get svcChipDelivery => 'توصيل';
+
+  @override
+  String get svcAcceptOrder => 'اقبل الطلب';
+
+  @override
+  String get svcDecline => 'ارفض';
+
+  @override
+  String get svcDeclineTitle => 'لماذا ترفض الطلب؟';
+
+  @override
+  String get svcDeclineBody => 'سيرى الزبون السبب الذي تختاره.';
+
+  @override
+  String get svcDeclineConfirm => 'ارفض الطلب';
+
+  @override
+  String get svcWaitingForPickup => 'بانتظار أن يستلمه الزبون';
+
+  @override
+  String get svcWaitingForRider => 'بانتظار السائق';
+
+  @override
+  String svcReadyBy(String time) {
+    return 'جاهز بحلول $time';
+  }
+
+  @override
+  String svcAcceptedReadyBy(String time) {
+    return 'قُبل الطلب. موعد جاهزيته $time.';
+  }
+
+  @override
+  String get svcAccepted => 'قُبل الطلب';
+
+  @override
+  String get svcMarkedReady => 'حُدِّد كجاهز';
+
+  @override
+  String get svcNoNewOrders => 'لا طلبات جديدة';
+
+  @override
+  String get svcNoOrdersInProgress => 'لا شيء قيد التنفيذ';
+
+  @override
+  String get svcNoCompletedOrders => 'لا طلبات مكتملة بعد';
+
+  @override
+  String get svcOrdersEmptyBody => 'تظهر الطلبات هنا عندما يطلبها الزبائن.';
+
+  @override
+  String get svcCancelNotCollected => 'ألغِ لعدم الاستلام';
+
+  @override
+  String svcCancelNotCollectedIn(String time) {
+    return 'يمكنك إلغاؤه لعدم الاستلام بعد $time';
+  }
+
+  @override
+  String get svcCancelNotCollectedTitle => 'إلغاء هذا الطلب غير المستلم؟';
+
+  @override
+  String get svcCancelNotCollectedBody =>
+      'سيُبلَّغ الزبون أن الطلب أُلغي لأنه لم يُستلم.';
+
+  @override
+  String get svcCancelNotCollectedNote => 'ملاحظة للزبون (اختيارية)';
+
+  @override
+  String get svcKeepOrder => 'أبقِ الطلب';
+
+  @override
+  String svcDurationDaysHours(String days, String hours) {
+    return '$days يوم و$hours ساعة';
+  }
+
+  @override
+  String svcDurationHoursMinutes(String hours, String minutes) {
+    return '$hours ساعة و$minutes دقيقة';
+  }
+
+  @override
+  String svcDurationMinutes(String minutes) {
+    return '$minutes دقيقة';
+  }
+
+  @override
+  String get svcRefusedNotDeclinable =>
+      'قُبل هذا الطلب في هذه الأثناء، فلا يمكن رفضه. جارٍ التحديث.';
+
+  @override
+  String get svcRefusedNotCollectable =>
+      'لم يعد هذا الطلب بانتظار الاستلام لديك. جارٍ التحديث.';
+
+  @override
+  String get svcRefusedTooSoon =>
+      'الوقت مبكر: ما زال أمام الزبون وقت للاستلام. جارٍ التحديث.';
+
+  @override
+  String get svcRefusedOther => 'تعذّر تعديل الطلب. جارٍ التحديث.';
+
+  @override
+  String get svcOrderDeclined => 'رُفض الطلب';
+
+  @override
+  String get svcOrderCollected => 'سُجِّل الاستلام';
+
+  @override
+  String get svcOrderCancelledNotCollected => 'أُلغي لعدم الاستلام';
+
+  @override
+  String svcOrderTitle(String id) {
+    return 'الطلب $id';
+  }
+
+  @override
+  String get svcChatWithCustomer => 'راسل الزبون';
+
+  @override
+  String get svcTheJob => 'العمل المطلوب';
+
+  @override
+  String get svcInstructions => 'تعليمات خاصة';
+
+  @override
+  String get svcNoInstructions => 'لم تُذكر تعليمات';
+
+  @override
+  String get svcCustomerFiles => 'ملفات الزبون';
+
+  @override
+  String get svcNoFiles => 'لم تُرسَل ملفات';
+
+  @override
+  String get svcFilesLoadFailed => 'تعذّر تحميل الملفات';
+
+  @override
+  String get svcOpenFile => 'افتح';
+
+  @override
+  String get svcFileCouldNotOpen => 'تعذّر فتح هذا الملف';
+
+  @override
+  String get svcFileDocument => 'مستند';
+
+  @override
+  String get svcFileImage => 'صورة';
+
+  @override
+  String svcFileSizeKb(String size) {
+    return '$size ك.ب';
+  }
+
+  @override
+  String svcFileSizeMb(String size) {
+    return '$size م.ب';
+  }
+
+  @override
+  String get svcFulfilmentPickupDetail => 'يستلمه الزبون من متجرك';
+
+  @override
+  String svcFulfilmentDeliveryDetail(String address) {
+    return 'يوصله السائق إلى $address';
+  }
+
+  @override
+  String get svcEstimatedReady => 'الجاهزية المتوقعة';
+
+  @override
+  String svcTurnaroundAfterAccept(String range) {
+    return 'مدة التنفيذ بعد القبول: $range';
+  }
+
+  @override
+  String get svcRiderOnTheWay => 'السائق في طريقه لاستلامه';
+
+  @override
+  String get svcFileLinkRefreshFailed =>
+      'تعذّر الحصول على رابط جديد لهذا الملف. حاول مجددًا.';
+
+  @override
+  String get svcOfferTakenDown => 'سحبتها يو دروب';
+
+  @override
+  String svcOfferTakenDownReason(String reason) {
+    return 'سبب يو دروب: $reason';
+  }
+
+  @override
+  String get svcOfferTakenDownBody =>
+      'لا يستطيع الزبائن طلبها، ولا يمكن نشرها أو إيقافها مؤقتًا أو استئنافها حتى تعيدها يو دروب. ما زال بإمكانك تعديلها.';
+
+  @override
+  String get svcOfferChangedElsewhere =>
+      'عُدّلت هذه الخدمة للتو من مكان آخر، فأعدنا قراءتها. راجعها وحاول مجددًا.';
+
+  @override
+  String get svcShopReadFailed => 'تعذّر تحميل متجرك';
+
+  @override
+  String get svcServiceOrdersRow => 'طلبات الخدمات';
+
+  @override
+  String get svcServiceOffersRow => 'خدماتك';
 }

@@ -30,6 +30,10 @@ dependencies:
   image_picker: ^1.0.7
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
+  # A service order's files: the customer's design, opened from the short-lived link the order
+  # attachment service hands out. Here rather than in each host, because both hosts mount the order
+  # detail and a link that opens on the phone but not on the web would be a button that cannot work.
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

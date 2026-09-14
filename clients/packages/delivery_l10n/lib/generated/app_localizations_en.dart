@@ -11930,4 +11930,554 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcBoOfferUnreadable =>
       'Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.';
+
+  @override
+  String get svcNavOffers => 'Offers';
+
+  @override
+  String get svcDashboardActiveOffers => 'Active offers';
+
+  @override
+  String get svcDashboardThisWeek => 'This week';
+
+  @override
+  String get svcDashboardThisWeekCaption => 'Orders, last 7 days';
+
+  @override
+  String get svcDashboardRating => 'Rating';
+
+  @override
+  String get svcQuickActions => 'Quick actions';
+
+  @override
+  String get svcAddOffer => 'Add offer';
+
+  @override
+  String get svcViewOrders => 'View orders';
+
+  @override
+  String get svcCurrentOffers => 'Current offers';
+
+  @override
+  String get svcSeeAllOffers => 'See all';
+
+  @override
+  String get svcOfferActive => 'ACTIVE';
+
+  @override
+  String get svcOfferPaused => 'PAUSED';
+
+  @override
+  String get svcOfferDraft => 'DRAFT';
+
+  @override
+  String get svcPauseOffer => 'Pause';
+
+  @override
+  String get svcResumeOffer => 'Resume';
+
+  @override
+  String get svcOfferPausedDone =>
+      'Offer paused. Customers can\'t order it until you resume it.';
+
+  @override
+  String get svcOfferResumedDone => 'Offer is live again.';
+
+  @override
+  String get svcNoOffersYet => 'No offers yet';
+
+  @override
+  String get svcNoOffersYetBody =>
+      'Add your first service so customers can order it.';
+
+  @override
+  String get svcDashboardLoadFailed => 'Couldn\'t load your dashboard';
+
+  @override
+  String get svcOffersLoadFailed => 'Couldn\'t load your offers';
+
+  @override
+  String get svcNoShopYet => 'Your services shop isn\'t open yet';
+
+  @override
+  String get svcNoShopYetBody =>
+      'It opens as soon as your application is approved.';
+
+  @override
+  String get svcPublishAfterApproval =>
+      'You can publish offers once your application is approved.';
+
+  @override
+  String get svcOffersTitle => 'Your offers';
+
+  @override
+  String get svcOffersSubtitle => 'What customers can order from you';
+
+  @override
+  String svcUnitPack(String count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcUnitPer(String unit) {
+    return 'Per $unit';
+  }
+
+  @override
+  String svcPriceUsd(String amount) {
+    return '\$$amount';
+  }
+
+  @override
+  String svcPriceLbp(String amount) {
+    return '$amount LBP';
+  }
+
+  @override
+  String svcLbpPreview(String amount) {
+    return '≈ $amount at today\'s rate';
+  }
+
+  @override
+  String get svcNewOffer => 'New service offer';
+
+  @override
+  String get svcEditOffer => 'Edit offer';
+
+  @override
+  String get svcOfferTitle => 'Offer title';
+
+  @override
+  String get svcOfferTitleRequired => 'Give the offer a title';
+
+  @override
+  String svcTooLong(String max) {
+    return 'At most $max characters';
+  }
+
+  @override
+  String get svcDescription => 'Description';
+
+  @override
+  String get svcCategory => 'Category';
+
+  @override
+  String get svcCategoryOfShop => 'Offers take your shop\'s category';
+
+  @override
+  String get svcPriceLabel => 'Price (USD)';
+
+  @override
+  String get svcPriceInvalid =>
+      'Enter a price above zero, with at most two decimals';
+
+  @override
+  String get svcPricingType => 'Pricing type';
+
+  @override
+  String get svcPricingFixed => 'Fixed price';
+
+  @override
+  String get svcPricingPerUnit => 'Price per unit';
+
+  @override
+  String get svcPricingFrom => 'Starting price (options add to it)';
+
+  @override
+  String get svcUnitLabel => 'Unit (e.g. cards, sqm)';
+
+  @override
+  String get svcPackSize => 'Units per step';
+
+  @override
+  String get svcUnitRequired => 'Name the unit, such as cards or sqm';
+
+  @override
+  String svcPackSizeRange(String min, String max) {
+    return 'Between $min and $max';
+  }
+
+  @override
+  String get svcPerUnitIsOne => 'A price per unit is for one unit';
+
+  @override
+  String svcPackPreview(String pack) {
+    return 'Customers order in steps of $pack';
+  }
+
+  @override
+  String get svcPhotos => 'Photos';
+
+  @override
+  String get svcPhotoRequired => 'Add at least one photo to publish';
+
+  @override
+  String get svcAddPhoto => 'Add photo';
+
+  @override
+  String get svcTurnaround => 'Turnaround';
+
+  @override
+  String get svcTurnaroundSameDay => 'Same day';
+
+  @override
+  String get svcTurnaround1to2 => '1–2 days';
+
+  @override
+  String get svcTurnaround3to5 => '3–5 days';
+
+  @override
+  String get svcTurnaroundWeek => 'About a week';
+
+  @override
+  String svcTurnaroundHours(String min, String max) {
+    return '$min–$max hours';
+  }
+
+  @override
+  String get svcTurnaroundRequired => 'Choose a turnaround';
+
+  @override
+  String get svcFulfilment => 'How customers get it';
+
+  @override
+  String get svcFulfilmentPickup => 'Pickup at your shop';
+
+  @override
+  String get svcFulfilmentDelivery => 'YouDrop delivery';
+
+  @override
+  String get svcFulfilmentBoth => 'Both';
+
+  @override
+  String get svcFulfilmentRequired => 'Choose how customers get it';
+
+  @override
+  String get svcDeliveryNeedsAreas =>
+      'Set your delivery areas or drop your shop\'s pin before offering YouDrop delivery';
+
+  @override
+  String get svcCustomerFile => 'Customer file';
+
+  @override
+  String get svcCustomerFileNone => 'Not needed';
+
+  @override
+  String get svcCustomerFileOptional => 'Optional';
+
+  @override
+  String get svcCustomerFileRequired => 'Required';
+
+  @override
+  String get svcInstructionsPrompt => 'What should customers tell you?';
+
+  @override
+  String get svcInstructionsPromptHint => 'e.g. Names and job titles to print';
+
+  @override
+  String get svcOptions => 'Options';
+
+  @override
+  String get svcOptionsAfterSave =>
+      'Save the offer first, then add options such as paper type';
+
+  @override
+  String get svcEditOptions => 'Edit options';
+
+  @override
+  String get svcNoOptions => 'No options';
+
+  @override
+  String get svcPublishOffer => 'Publish offer';
+
+  @override
+  String get svcSaveDraft => 'Save draft';
+
+  @override
+  String get svcSaveChanges => 'Save changes';
+
+  @override
+  String get svcOfferPublished => 'Offer published';
+
+  @override
+  String get svcDraftSaved => 'Draft saved';
+
+  @override
+  String get svcOfferSaveFailed => 'Couldn\'t save this offer';
+
+  @override
+  String get svcOfferRefused =>
+      'This offer wasn\'t accepted as it stands. Check its details and try again.';
+
+  @override
+  String get svcArchiveOffer => 'Archive offer';
+
+  @override
+  String get svcArchiveConfirm =>
+      'Archive this offer? Customers won\'t see it again.';
+
+  @override
+  String get svcOfferArchived => 'Offer archived';
+
+  @override
+  String get svcOfferNotEditable =>
+      'This offer uses settings this version of the app can\'t edit. Update the app to change it.';
+
+  @override
+  String get svcMoreActions => 'More actions';
+
+  @override
+  String get svcIncomingOrders => 'Incoming orders';
+
+  @override
+  String get svcTabNew => 'New';
+
+  @override
+  String get svcTabInProgress => 'In progress';
+
+  @override
+  String get svcTabCompleted => 'Completed';
+
+  @override
+  String get svcChipNew => 'NEW';
+
+  @override
+  String get svcChipAccepted => 'ACCEPTED';
+
+  @override
+  String get svcChipInProduction => 'IN PRODUCTION';
+
+  @override
+  String get svcChipReady => 'READY';
+
+  @override
+  String get svcChipOnTheWay => 'ON THE WAY';
+
+  @override
+  String get svcChipCollected => 'COLLECTED';
+
+  @override
+  String get svcChipDelivered => 'DELIVERED';
+
+  @override
+  String get svcChipDeclined => 'DECLINED';
+
+  @override
+  String get svcChipNotCollected => 'NOT COLLECTED';
+
+  @override
+  String get svcChipCancelled => 'CANCELLED';
+
+  @override
+  String get svcChipPickup => 'Pickup';
+
+  @override
+  String get svcChipDelivery => 'Delivery';
+
+  @override
+  String get svcAcceptOrder => 'Accept order';
+
+  @override
+  String get svcDecline => 'Decline';
+
+  @override
+  String get svcDeclineTitle => 'Why are you declining?';
+
+  @override
+  String get svcDeclineBody => 'The customer sees the reason you choose.';
+
+  @override
+  String get svcDeclineConfirm => 'Decline order';
+
+  @override
+  String get svcWaitingForPickup => 'Waiting for the customer to collect';
+
+  @override
+  String get svcWaitingForRider => 'Waiting for a rider';
+
+  @override
+  String svcReadyBy(String time) {
+    return 'Ready by $time';
+  }
+
+  @override
+  String svcAcceptedReadyBy(String time) {
+    return 'Accepted. Promised ready by $time.';
+  }
+
+  @override
+  String get svcAccepted => 'Order accepted';
+
+  @override
+  String get svcMarkedReady => 'Marked ready';
+
+  @override
+  String get svcNoNewOrders => 'No new orders';
+
+  @override
+  String get svcNoOrdersInProgress => 'Nothing in production';
+
+  @override
+  String get svcNoCompletedOrders => 'No completed orders yet';
+
+  @override
+  String get svcOrdersEmptyBody =>
+      'Orders appear here as customers place them.';
+
+  @override
+  String get svcCancelNotCollected => 'Cancel as not collected';
+
+  @override
+  String svcCancelNotCollectedIn(String time) {
+    return 'You can cancel it as not collected in $time';
+  }
+
+  @override
+  String get svcCancelNotCollectedTitle => 'Cancel this uncollected order?';
+
+  @override
+  String get svcCancelNotCollectedBody =>
+      'The customer is told it was cancelled because it wasn\'t collected.';
+
+  @override
+  String get svcCancelNotCollectedNote => 'Note for the customer (optional)';
+
+  @override
+  String get svcKeepOrder => 'Keep order';
+
+  @override
+  String svcDurationDaysHours(String days, String hours) {
+    return '${days}d ${hours}h';
+  }
+
+  @override
+  String svcDurationHoursMinutes(String hours, String minutes) {
+    return '${hours}h ${minutes}m';
+  }
+
+  @override
+  String svcDurationMinutes(String minutes) {
+    return '${minutes}m';
+  }
+
+  @override
+  String get svcRefusedNotDeclinable =>
+      'This order was accepted meanwhile, so it can\'t be declined. Refreshing.';
+
+  @override
+  String get svcRefusedNotCollectable =>
+      'This order isn\'t waiting at your counter any more. Refreshing.';
+
+  @override
+  String get svcRefusedTooSoon =>
+      'It\'s too soon: the customer still has time to collect. Refreshing.';
+
+  @override
+  String get svcRefusedOther => 'The order couldn\'t be changed. Refreshing.';
+
+  @override
+  String get svcOrderDeclined => 'Order declined';
+
+  @override
+  String get svcOrderCollected => 'Marked as collected';
+
+  @override
+  String get svcOrderCancelledNotCollected => 'Cancelled as not collected';
+
+  @override
+  String svcOrderTitle(String id) {
+    return 'Order $id';
+  }
+
+  @override
+  String get svcChatWithCustomer => 'Chat with customer';
+
+  @override
+  String get svcTheJob => 'The job';
+
+  @override
+  String get svcInstructions => 'Special instructions';
+
+  @override
+  String get svcNoInstructions => 'No instructions given';
+
+  @override
+  String get svcCustomerFiles => 'Customer\'s files';
+
+  @override
+  String get svcNoFiles => 'No files sent';
+
+  @override
+  String get svcFilesLoadFailed => 'Couldn\'t load the files';
+
+  @override
+  String get svcOpenFile => 'Open';
+
+  @override
+  String get svcFileCouldNotOpen => 'Couldn\'t open this file';
+
+  @override
+  String get svcFileDocument => 'Document';
+
+  @override
+  String get svcFileImage => 'Image';
+
+  @override
+  String svcFileSizeKb(String size) {
+    return '$size KB';
+  }
+
+  @override
+  String svcFileSizeMb(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String get svcFulfilmentPickupDetail =>
+      'The customer collects it at your shop';
+
+  @override
+  String svcFulfilmentDeliveryDetail(String address) {
+    return 'A rider delivers it to $address';
+  }
+
+  @override
+  String get svcEstimatedReady => 'Estimated ready';
+
+  @override
+  String svcTurnaroundAfterAccept(String range) {
+    return 'Turnaround once you accept: $range';
+  }
+
+  @override
+  String get svcRiderOnTheWay => 'A rider is on the way to collect it';
+
+  @override
+  String get svcFileLinkRefreshFailed =>
+      'Couldn\'t get a fresh link to this file. Try again.';
+
+  @override
+  String get svcOfferTakenDown => 'Taken down by YouDrop';
+
+  @override
+  String svcOfferTakenDownReason(String reason) {
+    return 'YouDrop\'s reason: $reason';
+  }
+
+  @override
+  String get svcOfferTakenDownBody =>
+      'Customers can\'t order it, and it can\'t be published, paused or resumed until YouDrop restores it. You can still edit it.';
+
+  @override
+  String get svcOfferChangedElsewhere =>
+      'This offer was just changed somewhere else, so it has been read again. Check it and try again.';
+
+  @override
+  String get svcShopReadFailed => 'We couldn\'t load your shop';
+
+  @override
+  String get svcServiceOrdersRow => 'Service orders';
+
+  @override
+  String get svcServiceOffersRow => 'Service offers';
 }

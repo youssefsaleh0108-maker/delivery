@@ -48,6 +48,8 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.onShopProfile,
     this.onShopMessages,
     this.shopMessagesUnread,
+    this.onServiceOrders,
+    this.onServiceOffers,
     this.onCategories,
     this.onStaff,
     this.onStockCount,
@@ -86,6 +88,12 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// sign on this screen that a customer wrote. The host keeps it current (`ShopUnreadCount`); null
   /// draws no number, because an unknown count is not a zero.
   final ValueListenable<int?>? shopMessagesUnread;
+
+  /// A services shop's queue and its offers, for an owner who also runs a goods shop and so works in
+  /// the goods shell. Under the shop's own rows, because a service order is a customer waiting. Null
+  /// hides each row: an owner of one kind of shop has nowhere else to go.
+  final VoidCallback? onServiceOrders;
+  final VoidCallback? onServiceOffers;
 
   /// The merchant suite's three management pages, hung off Settings rather than given a tab
   /// each: a shop reorganises its shelves and its roster a few times a year, not a few times a
@@ -293,6 +301,22 @@ class MerchantSettingsScreen extends StatelessWidget {
               title: t.chatShopInboxTitle,
               onTap: onShopMessages,
               count: shopMessagesUnread,
+            ),
+          ],
+          if (onServiceOrders != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.assignment_outlined,
+              title: t.svcServiceOrdersRow,
+              onTap: onServiceOrders,
+            ),
+          ],
+          if (onServiceOffers != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.design_services_outlined,
+              title: t.svcServiceOffersRow,
+              onTap: onServiceOffers,
             ),
           ],
           if (onCategories != null) ...<Widget>[

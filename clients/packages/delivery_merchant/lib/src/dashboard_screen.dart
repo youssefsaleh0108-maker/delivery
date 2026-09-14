@@ -182,8 +182,10 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
 
   Future<void> _refreshRecent() async {
     try {
+      // Goods orders only, as the queue these rows open lists them: a service order is the services
+      // queue's to work.
       final Paged<DeliveryOrder> page =
-          await widget.api.forMerchant(size: _recentCount);
+          await widget.api.forMerchant(kind: OrderKind.catalog, size: _recentCount);
       if (!mounted) return;
       setState(() {
         _recent = page.content;
