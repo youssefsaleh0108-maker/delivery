@@ -203,6 +203,36 @@ class StoreVerifiedLocalAccessTest {
     }
 
     /**
+     * A provider's "Verified" badge on the Services tab is this same flag (owner default 17). So a service
+     * shop is granted it exactly as any shop is: nothing in the endpoint refuses a vertical, and the shop's
+     * own provider is refused as every merchant is.
+     */
+    @Test
+    @DisplayName("BACKOFFICE grants it to a service shop the same way, and the shop's provider is refused")
+    void a_service_shop_is_granted_it_the_same_way() throws Exception {
+        Store press = new Store(OWNER, "Al Fakhry Press", Store.Vertical.SERVICES, Store.ServiceCategory.PRINTING);
+        String pressPath = "/api/stores/" + press.getId() + "/verified-local";
+        org.mockito.Mockito.doAnswer(invocation -> {
+            press.setVerifiedLocal(invocation.getArgument(2));
+            return new StoreView(press, Store.Availability.OPEN, null, false);
+        }).when(storeService).setVerifiedLocal(eq(press.getId()), anyString(), anyBoolean());
+
+        signedInAs(OWNER, "MERCHANT");
+        mvc.perform(put(pressPath).contentType(MediaType.APPLICATION_JSON).content("{\"verified\": true}"))
+                .andExpect(status().isForbidden());
+        verify(storeService, never()).setVerifiedLocal(any(UUID.class), anyString(), anyBoolean());
+
+        signedInAs(BACKOFFICE, "BACKOFFICE");
+        mvc.perform(put(pressPath).contentType(MediaType.APPLICATION_JSON).content("{\"verified\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verifiedLocal").value(true))
+                .andExpect(jsonPath("$.vertical").value("SERVICES"))
+                .andExpect(jsonPath("$.serviceCategory").value("PRINTING"));
+
+        verify(storeService).setVerifiedLocal(eq(press.getId()), eq(BACKOFFICE), eq(true));
+    }
+
+    /**
      * A body that does not say is refused rather than read as a withdrawal. With a primitive on the
      * request this would have quietly taken a shop's badge away and answered 200.
      */

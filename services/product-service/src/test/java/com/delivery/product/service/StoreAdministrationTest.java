@@ -230,6 +230,23 @@ class StoreAdministrationTest {
                     .store().isVerifiedLocal()).isFalse();
         }
 
+        /**
+         * A provider's "Verified" badge is this flag too (owner default 17), so no vertical is refused, a
+         * service shop included.
+         */
+        @Test
+        void backoffice_grants_and_withdraws_it_on_a_service_shop() {
+            Store press = new Store(MERCHANT, "Al Fakhry Press", Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING);
+            when(stores.findById(press.getId())).thenReturn(Optional.of(press));
+
+            assertThat(service.setVerifiedLocal(press.getId(), BACKOFFICE, true)
+                    .store().isVerifiedLocal()).isTrue();
+            assertThat(press.isVerifiedLocal()).isTrue();
+            assertThat(service.setVerifiedLocal(press.getId(), BACKOFFICE, false)
+                    .store().isVerifiedLocal()).isFalse();
+        }
+
         @Test
         void an_id_that_names_no_shop_is_not_found() {
             UUID nothing = UUID.randomUUID();
