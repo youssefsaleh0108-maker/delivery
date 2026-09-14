@@ -241,6 +241,49 @@ void main() {
       );
     });
 
+    test('a file the server refuses once it arrived — too large, or not really its type — arrives as that '
+        'reason, and is not taken back: the server has deleted it already', () async {
+      for (final MapEntry<String, AttachmentRefusal> refused in <String, AttachmentRefusal>{
+        'TOO_LARGE': AttachmentRefusal.tooLarge,
+        'WRONG_TYPE': AttachmentRefusal.wrongType,
+      }.entries) {
+        final OrderAttachmentApi api = apiWith(
+          (RequestOptions o) => o.path.endsWith('/presign')
+              ? _ticket()
+              : <String, dynamic>{'code': refused.key, 'detail': 'Refused once it arrived'},
+          statusOf: (RequestOptions o) => o.path.endsWith('/confirm') ? 422 : 200,
+        );
+
+        await expectLater(
+          api.upload(bytes: Uint8List(2048), contentType: 'application/pdf'),
+          _refusedFor(refused.value),
+        );
+
+        expect(calls(app), <String>[
+          'POST /api/orders/attachments/presign',
+          'POST /api/orders/attachments/file-1/confirm',
+        ]);
+        expect(storage.requests.single.method, 'PUT');
+      }
+    });
+
+    test('too many uploads started in the last few minutes is a reason of its own, before any byte moves',
+        () async {
+      final OrderAttachmentApi api = apiWith(
+        (RequestOptions o) =>
+            <String, dynamic>{'code': 'TOO_MANY_UPLOADS', 'detail': 'Try again in a few minutes'},
+        statusOf: (RequestOptions o) => 422,
+      );
+
+      await expectLater(
+        api.upload(bytes: Uint8List(2048), contentType: 'application/pdf'),
+        _refusedFor(AttachmentRefusal.tooManyUploads),
+      );
+
+      expect(calls(app), <String>['POST /api/orders/attachments/presign']);
+      expect(storage.requests, isEmpty);
+    });
+
     test('a 404 is not a refusal, and passes through untouched', () async {
       final OrderAttachmentApi api = apiWith(
         (RequestOptions o) => <String, dynamic>{'title': 'Attachment not found', 'detail': 'No such file'},

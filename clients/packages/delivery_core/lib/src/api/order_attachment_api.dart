@@ -98,7 +98,13 @@ class OrderAttachmentApi {
   ///
   /// When the upload cannot finish — the ticket's ceiling is lower than the file, or the PUT fails —
   /// the half-made upload is taken back, so it does not hold one of the customer's waiting slots
-  /// until the server's sweep reaches it.
+  /// until the server's sweep reaches it. (The edge refuses a body over the limit with a 413; that
+  /// arrives as a failed PUT.)
+  ///
+  /// Once the bytes are up, the server looks at them at confirm: a file larger than the limit, or one
+  /// that is not really a PDF, JPEG or PNG whatever its name says, is refused there as
+  /// [AttachmentRefusal.tooLarge] or [AttachmentRefusal.wrongType]. The server has already deleted it
+  /// and freed its slot, so nothing is taken back.
   ///
   /// [onSendProgress] reports the PUT, for the picker's progress bar.
   Future<AttachmentUpload> upload({
@@ -158,7 +164,9 @@ class OrderAttachmentApi {
   // ---------------------------------------------------------------- internals
 
   /// A half-made upload nothing will use, taken back. Failure is ignored: the server sweeps it within
-  /// a day regardless, and a second failure here must not hide the first.
+  /// a day regardless, and a second failure here must not hide the first. Nor does a PUT still in
+  /// flight matter — one that timed out here may yet land — because the server removes whatever sits
+  /// under a taken-back file's key once more after its upload link has expired.
   Future<void> _forget(String fileId) async {
     try {
       await _dio.delete<dynamic>('$_base/$fileId');

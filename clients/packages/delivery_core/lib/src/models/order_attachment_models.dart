@@ -4,22 +4,29 @@
 /// Screens put each into words in the customer's language; [unknown] is a code this build has never
 /// heard of, which a screen shows as a plain failure rather than guessing at a reason.
 enum AttachmentRefusal {
-  /// Not a PDF, JPEG or PNG.
+  /// Not a PDF, JPEG or PNG: as picked, or — found by the server at confirm — as stored, or as its
+  /// bytes, whatever its name says. Refused at confirm, the upload is already deleted.
   wrongType('WRONG_TYPE'),
 
   /// No bytes at all.
   empty('EMPTY'),
 
-  /// Over the size limit.
+  /// Over the size limit: as picked, or — found by the server at confirm — as it arrived. Refused at
+  /// confirm, the upload is already deleted and its waiting slot free.
   tooLarge('TOO_LARGE'),
 
   /// The customer already holds as many uploads waiting for an order as the server allows.
   tooManyWaiting('TOO_MANY_WAITING'),
 
+  /// The customer started as many uploads in the last few minutes as the server allows — taken-back ones
+  /// included, because an upload link keeps working until it expires. One frees within minutes.
+  tooManyUploads('TOO_MANY_UPLOADS'),
+
   /// The upload never arrived in full; send it again.
   notUploaded('NOT_UPLOADED'),
 
-  /// Deleted — never ordered in time; send it again.
+  /// No longer available — never ordered in time, or changed in storage since it was confirmed; send
+  /// it again.
   expired('EXPIRED'),
 
   /// Already on an order.
@@ -86,7 +93,8 @@ enum AttachmentUploadStatus {
   /// On an order.
   attached,
 
-  /// Gone: taken back, too large, or never ordered in time.
+  /// Gone: taken back, too large, not really its type, changed in storage since it was confirmed, or
+  /// never ordered in time.
   deleted,
 
   /// A status this build does not know.
