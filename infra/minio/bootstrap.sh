@@ -1,12 +1,13 @@
 #!/bin/sh
-# Creates the five buckets from Section 5 with the access pattern each one requires.
-# Idempotent: safe to re-run, and `docker compose up` re-runs it on every start.
+# Creates the five buckets from Section 5, and order-attachments for service orders, with the access
+# pattern each one requires. Idempotent: safe to re-run, and `docker compose up` re-runs it on every
+# start.
 set -eu
 
 mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
 
 echo "==> Creating buckets"
-for bucket in product-images delivery-proof merchant-kyc user-avatars receipts; do
+for bucket in product-images delivery-proof merchant-kyc user-avatars receipts order-attachments; do
   mc mb --ignore-existing "local/$bucket"
 done
 
@@ -32,8 +33,16 @@ fi
 # Everything else stays private. Clients reach these objects only through short-TTL presigned URLs
 # issued by the file service after it has checked the caller's role AND resource ownership - no
 # client ever holds MinIO credentials (Section 5).
-echo "==> Keeping delivery-proof, merchant-kyc, user-avatars, receipts private"
-for bucket in delivery-proof merchant-kyc user-avatars receipts; do
+#
+# order-attachments holds a customer's files on a service order — the artwork a print shop prints.
+# No expiry rule here: order-manager deletes an upload never attached to an order after 24 hours and
+# an attached one 90 days after its order finished, and only order-manager knows when that was. It
+# also removes each deleted file's object once more after the file's upload URL has expired, because
+# until then the URL can put an object back under the key. Not versioned, on purpose: a PUT through a
+# URL used again must replace the object, not keep every copy it replaced. The same bucket, and the
+# same absence of rules, as deploy/k3s/base/assets/minio/bootstrap.sh.
+echo "==> Keeping delivery-proof, merchant-kyc, user-avatars, receipts, order-attachments private"
+for bucket in delivery-proof merchant-kyc user-avatars receipts order-attachments; do
   mc anonymous set none "local/$bucket"
 done
 
