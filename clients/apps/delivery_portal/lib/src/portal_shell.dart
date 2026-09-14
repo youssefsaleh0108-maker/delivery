@@ -20,7 +20,10 @@ import 'backoffice/promotions_screen.dart';
 import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
 import 'backoffice/riders_screen.dart';
+import 'backoffice/service_offer_moderation.dart';
+import 'backoffice/service_offers_screen.dart';
 import 'backoffice/settings_screen.dart';
+import 'backoffice/shops_screen.dart';
 import 'backoffice/statements_screen.dart';
 // Prefixed: this and delivery_merchant's ZonesScreen share a name and are different pages — the
 // Backoffice one administers platform-wide areas, the merchant one picks which of them a shop
@@ -80,6 +83,8 @@ class PortalApis {
     required this.demand,
     required this.shopChat,
     required this.moderation,
+    required this.attachments,
+    required this.offerModeration,
   });
 
   final CatalogApi catalog;
@@ -142,6 +147,17 @@ class PortalApis {
 
   /// The neighbourhood chat moderation queue. BACKOFFICE-only on the server.
   final ChatModerationApi moderation;
+
+  /// A service order's files. The customer uploads them; the order's shop and back office read them,
+  /// and every back-office read is recorded by the server — which is why the ledger lists them only
+  /// when the operator asks.
+  final OrderAttachmentApi attachments;
+
+  /// Back office's moderation of service offers: null until delivery_core's client for it is merged
+  /// under this branch (see `backoffice/service_offer_moderation.dart`). Required all the same, so a
+  /// host has to say which it is; the Service offers page says moderation is not connected when this is
+  /// null, and draws nothing that could not work.
+  final ServiceOfferModeration? offerModeration;
 }
 
 /// How a page in the rail is built.
@@ -635,8 +651,12 @@ class PortalArea {
         icon: Icons.shopping_bag_outlined,
         selectedIcon: Icons.shopping_bag,
         label: (DeliveryStrings t) => t.navOrders,
-        build: (PortalApis a, _, __, ___) =>
-            DashboardScreen(api: a.order, notificationApi: a.notification),
+        build: (PortalApis a, _, __, ___) => DashboardScreen(
+          api: a.order,
+          notificationApi: a.notification,
+          // A service order's files, through back office's audited read.
+          attachmentApi: a.attachments,
+        ),
       ),
       PortalDestination(
         icon: Icons.category_outlined,
@@ -755,7 +775,9 @@ class PortalArea {
         label: (DeliveryStrings t) => t.chatModerationTitle,
         build: (PortalApis a, _, __, ___) => ModerationScreen(api: a.moderation),
       ),
-      // Last, and deliberately so: the least-used and most consequential page here.
+      // The last of the rail's original pages, and deliberately so: the least-used and most
+      // consequential page here. Pages added since come after it rather than before it, so that no
+      // destination above moves.
       PortalDestination(
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings,
@@ -765,6 +787,27 @@ class PortalArea {
           rateApi: a.rate,
           autoApprovalApi: a.autoApproval,
         ),
+      ),
+      // The services back office. Appended rather than filed beside Catalog, where it would read
+      // best, so every destination above keeps its index: the overview's jump to Orders and anything
+      // else that counts rows stay right.
+      PortalDestination(
+        icon: Icons.design_services_outlined,
+        selectedIcon: Icons.design_services,
+        label: (DeliveryStrings t) => t.svcBoOffersTitle,
+        build: (PortalApis a, _, __, ___) => ServiceOffersScreen(
+          api: a.offerModeration,
+          notificationApi: a.notification,
+        ),
+      ),
+      // Where the Verified Local badge is set, for goods and service shops alike — the one back-office
+      // page that can reach a shop (ShopsScreen says why the Merchants Directory cannot).
+      PortalDestination(
+        icon: Icons.storefront_outlined,
+        selectedIcon: Icons.storefront,
+        label: (DeliveryStrings t) => t.svcBoShopsTitle,
+        build: (PortalApis a, _, __, ___) =>
+            ShopsScreen(api: a.store, notificationApi: a.notification),
       ),
     ],
   );

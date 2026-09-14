@@ -122,6 +122,11 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     demand: DemandApi(_dio),
     shopChat: ShopChatApi(_dio),
     moderation: ChatModerationApi(_dio),
+    attachments: OrderAttachmentApi(_dio),
+    // Null until delivery_core's BackofficeCatalogApi (branch feat/services-offer-moderation) is
+    // merged under this branch; then `BackofficeCatalogApi(_dio)`. See
+    // lib/src/backoffice/service_offer_moderation.dart for the whole of what that merge connects.
+    offerModeration: null,
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

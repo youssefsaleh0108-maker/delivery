@@ -72,6 +72,8 @@ void main() {
       demand: DemandApi(dio),
       shopChat: ShopChatApi(dio),
       moderation: ChatModerationApi(dio),
+      attachments: OrderAttachmentApi(dio),
+      offerModeration: null,
     );
     final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
     final PortalDestination inventory = PortalArea.merchant_.destinations
