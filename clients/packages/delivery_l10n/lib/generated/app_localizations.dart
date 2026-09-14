@@ -18591,12 +18591,6 @@ abstract class DeliveryStrings {
   /// **'This account may not read service offers — only back office staff can.'**
   String get svcBoOffersRefused;
 
-  /// No description provided for @svcBoModerationNotConnected.
-  ///
-  /// In en, this message translates to:
-  /// **'Offer moderation is not connected in this build yet, so there is nothing to show or act on.'**
-  String get svcBoModerationNotConnected;
-
   /// No description provided for @svcBoPageOf.
   ///
   /// In en, this message translates to:

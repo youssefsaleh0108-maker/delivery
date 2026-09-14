@@ -65,7 +65,7 @@ PortalApis _apis(Dio dio) => PortalApis(
       shopChat: ShopChatApi(dio),
       moderation: ChatModerationApi(dio),
       attachments: OrderAttachmentApi(dio),
-      offerModeration: null,
+      offerModeration: BackofficeCatalogApi(dio),
     );
 
 /// A two-row merchant rail whose pages are blank, so what is under test is the rail alone.

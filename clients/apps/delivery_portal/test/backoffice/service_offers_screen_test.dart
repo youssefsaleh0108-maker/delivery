@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
-import 'package:delivery_portal/src/backoffice/service_offer_moderation.dart';
 import 'package:delivery_portal/src/backoffice/service_offers_screen.dart';
 import 'package:delivery_portal/src/shell/shell.dart';
 import 'package:dio/dio.dart';
@@ -16,11 +15,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// category; shop; text; page); an offer's detail shows its shop, terms, price, photos, status and
 /// trail; no take-down and no restore is sent without a reason, and the reason cannot outgrow the
 /// server's 500; a refusal is said as what it is and the list is read again; and the page is honest in
-/// every state — loading, empty, failed, refused, not connected — at 1440, 1280 and a narrow window,
-/// and in Arabic.
+/// every state — loading, empty, failed, refused — at 1440, 1280 and a narrow window, and in Arabic.
 ///
-/// The fake implements the client's interface and builds every row and trail entry with `fromJson`,
-/// so these tests run unchanged once the real client is merged (see service_offer_moderation.dart).
+/// The fake stands in for delivery_core's `BackofficeCatalogApi` and builds every row and trail entry
+/// with `fromJson`, so what the page reads is what the client parses from the server's JSON.
 typedef _ListCall = ({
   ServiceOfferStatusFilter? status,
   ServiceCategory? category,
@@ -30,7 +28,7 @@ typedef _ListCall = ({
   int size,
 });
 
-class _FakeModeration implements ServiceOfferModeration {
+class _FakeModeration implements BackofficeCatalogApi {
   final List<_ListCall> lists = <_ListCall>[];
   final List<({String id, String reason})> takeDowns = <({String id, String reason})>[];
   final List<({String id, String reason})> restores = <({String id, String reason})>[];
@@ -164,8 +162,6 @@ void main() {
 
   Future<void> pump(
     WidgetTester tester, {
-    ServiceOfferModeration? moderation,
-    bool connected = true,
     Size size = const Size(1440, 900),
     Locale locale = const Locale('en'),
     bool settle = true,
@@ -178,7 +174,7 @@ void main() {
       locale: locale,
       localizationsDelegates: DeliveryStrings.localizationsDelegates,
       supportedLocales: DeliveryStrings.supportedLocales,
-      home: Scaffold(body: ServiceOffersScreen(api: connected ? (moderation ?? api) : null)),
+      home: Scaffold(body: ServiceOffersScreen(api: api)),
     ));
     if (settle) await tester.pumpAndSettle();
   }
@@ -233,17 +229,6 @@ void main() {
 
       expect(find.text(en.svcBoOffersRefused), findsOneWidget);
       expect(find.text(en.tryAgain), findsNothing);
-    });
-
-    testWidgets('without the moderation client it says so and draws no control',
-        (WidgetTester tester) async {
-      await pump(tester, connected: false);
-
-      expect(find.text(en.svcBoModerationNotConnected), findsOneWidget);
-      expect(find.byType(ConsoleSearchField), findsNothing);
-      expect(find.byType(ConsoleFilterPills), findsNothing);
-      expect(find.byType(ConsoleTable), findsNothing);
-      expect(api.lists, isEmpty);
     });
   });
 

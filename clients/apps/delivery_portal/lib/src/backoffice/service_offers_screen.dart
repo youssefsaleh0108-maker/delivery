@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../shell/shell.dart';
-import 'service_offer_moderation.dart';
 import 'services_admin_parts.dart';
 
 /// The longest reason the server keeps: product-service `Product.MAX_TAKEDOWN_REASON_LENGTH`. The
@@ -25,13 +24,10 @@ const int _maxReason = 500;
 /// the staff member in the same transaction as the act, and a take-down's reason is what the provider
 /// reads on their offer. A refusal is said as what it is — already down, changed under the act, gone —
 /// and the list is read again, so what stays on screen is the server's.
-///
-/// [api] is null in a build without the moderation client (see `service_offer_moderation.dart`); the
-/// page then says so and draws no filter, row or button that could not work.
 class ServiceOffersScreen extends StatefulWidget {
   const ServiceOffersScreen({super.key, required this.api, this.notificationApi});
 
-  final ServiceOfferModeration? api;
+  final BackofficeCatalogApi api;
 
   /// The operator's own inbox, behind the header's bell. Optional, as on the orders ledger.
   final NotificationApi? notificationApi;
@@ -67,7 +63,7 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
 
   Paged<BackofficeServiceOffer>? _result;
   Object? _error;
-  late bool _loading = widget.api != null;
+  bool _loading = true;
 
   /// Bumped by every read, so an answer to an older one (a slow page 1 after page 2 was asked for) is
   /// dropped rather than drawn over the newer.
@@ -81,7 +77,7 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.api != null) unawaited(_load());
+    unawaited(_load());
   }
 
   @override
@@ -94,13 +90,11 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
   /// Reads the page the filters describe. Answers it too, for a drawer that wants its offer as the
   /// server now has it; null when the read failed or was overtaken.
   Future<Paged<BackofficeServiceOffer>?> _load() async {
-    final ServiceOfferModeration? api = widget.api;
-    if (api == null) return null;
     final int asked = ++_asked;
     if (!_loading) setState(() => _loading = true);
     final String text = _search.text.trim();
     try {
-      final Paged<BackofficeServiceOffer> page = await api.serviceOffers(
+      final Paged<BackofficeServiceOffer> page = await widget.api.serviceOffers(
         status: _status,
         serviceCategory: _category,
         storeId: _storeId,
@@ -155,8 +149,6 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
 
   Future<void> _open(BackofficeServiceOffer row) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final ServiceOfferModeration? api = widget.api;
-    if (api == null) return;
     await showConsoleDrawer<void>(
       context: context,
       title: row.offer.name,
@@ -167,7 +159,7 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
       width: 520,
       builder: (BuildContext _) => _OfferDetail(
         row: row,
-        api: api,
+        api: widget.api,
         onChanged: () => unawaited(_load()),
         reload: _reloadOne,
       ),
@@ -177,7 +169,6 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final bool connected = widget.api != null;
 
     return ConsolePage(
       header: ConsoleTopbar(
@@ -188,21 +179,13 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
           ConsoleIconAction(
             icon: Icons.refresh,
             tooltip: t.refresh,
-            onPressed: connected ? () => unawaited(_load()) : null,
+            onPressed: () => unawaited(_load()),
           ),
         ],
       ),
       children: <Widget>[
-        if (!connected)
-          ServicesStateCard(
-            icon: Icons.link_off,
-            accent: DeliveryAccent.neutral,
-            text: t.svcBoModerationNotConnected,
-          )
-        else ...<Widget>[
-          _filters(t),
-          _body(t),
-        ],
+        _filters(t),
+        _body(t),
       ],
     );
   }
@@ -361,7 +344,7 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
 
 /// An offer's status as back office reads it: held off sale first, whatever status the hold left.
 @visibleForTesting
-String offerStatusLabel(DeliveryStrings t, BackofficeServiceOffer row) => row.hold != null
+String offerStatusLabel(DeliveryStrings t, BackofficeServiceOffer row) => row.offer.isTakenDown
     ? t.svcBoOfferTakenDown
     : switch (row.offer.status) {
         ProductStatus.draft => t.svcBoOfferDraft,
@@ -371,7 +354,7 @@ String offerStatusLabel(DeliveryStrings t, BackofficeServiceOffer row) => row.ho
       };
 
 @visibleForTesting
-DeliveryAccent offerStatusAccent(BackofficeServiceOffer row) => row.hold != null
+DeliveryAccent offerStatusAccent(BackofficeServiceOffer row) => row.offer.isTakenDown
     ? DeliveryAccent.critical
     : switch (row.offer.status) {
         ProductStatus.active => DeliveryAccent.positive,
@@ -408,7 +391,7 @@ class _OfferDetail extends StatefulWidget {
   });
 
   final BackofficeServiceOffer row;
-  final ServiceOfferModeration api;
+  final BackofficeCatalogApi api;
 
   /// The act went through: the list behind should be read again.
   final VoidCallback onChanged;
@@ -502,7 +485,7 @@ class _OfferDetailState extends State<_OfferDetail> {
     final DeliveryStrings t = DeliveryStrings.of(context);
     final Product offer = _row.offer;
     final ServiceTerms? terms = offer.service;
-    final ProductModeration? hold = _row.hold;
+    final ProductModeration? hold = _row.offer.moderation;
     final ({String text, bool good})? outcome = _outcome;
 
     return Column(

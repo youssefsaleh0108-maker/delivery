@@ -64,8 +64,9 @@ class CatalogApi {
 
   /// The services offer search: live offers of listed service shops in open categories.
   ///
-  /// Never a goods product or a paused offer. A [serviceCategory] the platform has closed answers an
-  /// empty page. For any signed-in caller: the Services tab, and back office's catalogue.
+  /// Never a goods product, a paused offer or one back office took down. A [serviceCategory] the
+  /// platform has closed answers an empty page. For any signed-in caller. Back office lists every
+  /// offer, in every status, with `BackofficeCatalogApi.serviceOffers`.
   ///
   /// The Services tab's "Popular near you" row is shops, not offers: [StoreApi.popularServices].
   Future<Paged<Product>> searchServices({

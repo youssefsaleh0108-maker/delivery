@@ -2,7 +2,6 @@ import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_portal/src/backoffice/dashboard_screen.dart';
 import 'package:delivery_portal/src/backoffice/overview_screen.dart';
-import 'package:delivery_portal/src/backoffice/service_offer_moderation.dart';
 import 'package:delivery_portal/src/backoffice/service_offers_screen.dart';
 import 'package:delivery_portal/src/backoffice/shops_screen.dart';
 import 'package:delivery_portal/src/portal_shell.dart';
@@ -16,32 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// position — the overview's "see all orders" jumps to index 1, and any link that counts rows stays
 /// right — with the two new pages after them; and each page is handed its clients by the shell, the
 /// one line that is easiest to get wrong while every test of the screen itself passes.
-class _Moderation implements ServiceOfferModeration {
-  @override
-  Future<Paged<BackofficeServiceOffer>> serviceOffers({
-    ServiceOfferStatusFilter? status,
-    ServiceCategory? serviceCategory,
-    String? storeId,
-    String? search,
-    int page = 0,
-    int size = 20,
-  }) =>
-      throw UnimplementedError();
-
-  @override
-  Future<BackofficeServiceOffer> takeDown(String productId, {required String reason}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<BackofficeServiceOffer> restore(String productId, {required String reason}) =>
-      throw UnimplementedError();
-
-  @override
-  Future<List<OfferModerationAction>> moderationHistory(String productId) =>
-      throw UnimplementedError();
-}
-
-PortalApis _apis({ServiceOfferModeration? moderation}) {
+PortalApis _apis() {
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://gateway'));
   return PortalApis(
     catalog: CatalogApi(dio),
@@ -75,7 +49,7 @@ PortalApis _apis({ServiceOfferModeration? moderation}) {
     shopChat: ShopChatApi(dio),
     moderation: ChatModerationApi(dio),
     attachments: OrderAttachmentApi(dio),
-    offerModeration: moderation,
+    offerModeration: BackofficeCatalogApi(dio),
   );
 }
 
@@ -137,13 +111,11 @@ void main() {
     expect(ledger.attachmentApi, same(apis.attachments));
   });
 
-  test('Service offers is handed the moderation client, and says so when the build has none', () {
-    final _Moderation moderation = _Moderation();
-    final PortalDestination offers = named(en.svcBoOffersTitle);
+  test('Service offers is handed the moderation client', () {
+    final PortalApis apis = _apis();
 
-    expect((_page(offers, _apis(moderation: moderation)) as ServiceOffersScreen).api,
-        same(moderation));
-    expect((_page(offers, _apis()) as ServiceOffersScreen).api, isNull);
+    expect((_page(named(en.svcBoOffersTitle), apis) as ServiceOffersScreen).api,
+        same(apis.offerModeration));
   });
 
   test('Shops is handed the store client, which sets the badge', () {

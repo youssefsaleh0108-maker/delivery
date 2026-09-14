@@ -67,7 +67,7 @@ PortalApis _apis({HttpClientAdapter? adapter}) {
     shopChat: ShopChatApi(dio),
     moderation: ChatModerationApi(dio),
     attachments: OrderAttachmentApi(dio),
-    offerModeration: null,
+    offerModeration: BackofficeCatalogApi(dio),
   );
 }
 

@@ -119,3 +119,7 @@ export 'src/models/catalog_scan_models.dart';
 // order's provider and back office.
 export 'src/api/order_attachment_api.dart';
 export 'src/models/order_attachment_models.dart';
+// Back office's moderation of service offers (V36): every service shop's offers, take-down and restore
+// with a reason, and the trail. The hold a provider reads on their offer is Product.moderation.
+export 'src/api/backoffice_catalog_api.dart';
+export 'src/models/offer_moderation_models.dart';

@@ -10949,10 +10949,6 @@ class DeliveryStringsEn extends DeliveryStrings {
       'This account may not read service offers — only back office staff can.';
 
   @override
-  String get svcBoModerationNotConnected =>
-      'Offer moderation is not connected in this build yet, so there is nothing to show or act on.';
-
-  @override
   String svcBoPageOf(int page, int pages) {
     return 'Page $page of $pages';
   }

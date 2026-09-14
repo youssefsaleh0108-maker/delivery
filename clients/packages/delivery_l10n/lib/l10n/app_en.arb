@@ -5573,7 +5573,6 @@
   "svcBoOffersEmpty": "No service offers match these filters.",
   "svcBoOffersLoadFailed": "Could not load service offers.",
   "svcBoOffersRefused": "This account may not read service offers — only back office staff can.",
-  "svcBoModerationNotConnected": "Offer moderation is not connected in this build yet, so there is nothing to show or act on.",
   "svcBoPageOf": "Page {page} of {pages}",
   "@svcBoPageOf": {"placeholders":{"page":{"type":"int"},"pages":{"type":"int"}}},
   "svcBoOffersCount": "{count, plural, =1{1 offer} other{{count} offers}}",

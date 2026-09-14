@@ -1,11 +1,15 @@
 package com.delivery.product.domain;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+
+import jakarta.persistence.LockModeType;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -40,6 +44,18 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
                                                      Product.Status status, Pageable pageable);
 
     Optional<Product> findByIdAndMerchantId(UUID id, String merchantId);
+
+    /**
+     * One product, with its row locked until the transaction ends. This is how back office reads an offer
+     * it is taking down or restoring ({@code OfferModerationService}).
+     *
+     * <p>Without the lock, two staff acting on one offer at once would both find it not taken down. Both
+     * would write a TAKE_DOWN row, and the second reason would silently replace the first as the one its
+     * provider reads. With the lock, the second waits and then finds the offer already taken down.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findForModerationById(@Param("id") UUID id);
 
     /**
      * The customer-facing catalog. ACTIVE only, optionally filtered by category and name.
@@ -157,7 +173,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
      * <p>Three filters, each for a reason:
      * <ul>
      *   <li>The offer is ACTIVE, so a paused offer, a draft or an archived product never reaches a
-     *       customer.
+     *       customer. Nor does an offer back office took down, which is archived.
      *   <li>Its shop is ACTIVE, so a draft or suspended shop's offers are not listed, as its shelf is
      *       not.
      *   <li>Its shop is a SERVICES shop in one of {@code categories}: never a goods product, whatever
@@ -181,6 +197,50 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             """)
     Page<Product> findListedServiceOffers(
             @Param("categories") java.util.Collection<Store.ServiceCategory> categories,
+            @Param("namePattern") String namePattern,
+            Pageable pageable);
+
+    /**
+     * Back office's list of service offers: every service shop's offers in every status, narrowed by what
+     * the caller names ({@code OfferModerationService#list}).
+     *
+     * <p>This is not a customer read, and it deliberately leaves out what the customer reads filter on. A
+     * draft or suspended shop's offers are here, and so is an offer in a closed category or one back
+     * office took down: those are the offers back office has to be able to find. It is still never a
+     * goods product, which the back office catalogue reads elsewhere.
+     *
+     * <p>Every argument is non-null except {@code storeId}, for the reason {@link #findActiveCatalog}
+     * gives about nullable parameters:
+     * <ul>
+     *   <li>{@code statuses} and {@code categories} are never empty; unfiltered, they hold every value.
+     *   <li>{@code takenDownOnly} and {@code takenDownExcluded} split ARCHIVED in two: taken down by back
+     *       office, or archived by the provider. A hold implies ARCHIVED ({@code chk_product_takedown}),
+     *       so no other status needs the split.
+     *   <li>{@code storeId} is compared only to a typed column, as {@code categoryId} is above.
+     *   <li>{@code namePattern} matches the offer's name or its shop's, since a complaint names either.
+     * </ul>
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.status IN :statuses
+              AND (:takenDownOnly = false OR p.takenDownAt IS NOT NULL)
+              AND (:takenDownExcluded = false OR p.takenDownAt IS NULL)
+              AND p.storeId IN (
+                    SELECT s.id FROM Store s
+                    WHERE s.vertical = com.delivery.product.domain.Store$Vertical.SERVICES
+                      AND s.serviceCategory IN :categories
+                      AND (:storeId IS NULL OR s.id = :storeId))
+              AND (LOWER(p.name) LIKE :namePattern ESCAPE '\\'
+                   OR p.storeId IN (
+                        SELECT n.id FROM Store n
+                        WHERE LOWER(n.name) LIKE :namePattern ESCAPE '\\'))
+            """)
+    Page<Product> findServiceOffersForBackoffice(
+            @Param("statuses") Collection<Product.Status> statuses,
+            @Param("takenDownOnly") boolean takenDownOnly,
+            @Param("takenDownExcluded") boolean takenDownExcluded,
+            @Param("categories") Collection<Store.ServiceCategory> categories,
+            @Param("storeId") UUID storeId,
             @Param("namePattern") String namePattern,
             Pageable pageable);
 }

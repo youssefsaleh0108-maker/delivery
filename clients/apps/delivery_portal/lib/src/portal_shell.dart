@@ -20,7 +20,6 @@ import 'backoffice/promotions_screen.dart';
 import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
 import 'backoffice/riders_screen.dart';
-import 'backoffice/service_offer_moderation.dart';
 import 'backoffice/service_offers_screen.dart';
 import 'backoffice/settings_screen.dart';
 import 'backoffice/shops_screen.dart';
@@ -153,11 +152,9 @@ class PortalApis {
   /// when the operator asks.
   final OrderAttachmentApi attachments;
 
-  /// Back office's moderation of service offers: null until delivery_core's client for it is merged
-  /// under this branch (see `backoffice/service_offer_moderation.dart`). Required all the same, so a
-  /// host has to say which it is; the Service offers page says moderation is not connected when this is
-  /// null, and draws nothing that could not work.
-  final ServiceOfferModeration? offerModeration;
+  /// Back office's moderation of service offers: every service shop's offers, taking one down or
+  /// restoring it with a reason, and the trail. BACKOFFICE-only on the server.
+  final BackofficeCatalogApi offerModeration;
 }
 
 /// How a page in the rail is built.

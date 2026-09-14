@@ -3391,7 +3391,6 @@
   "svcBoOffersEmpty": "لا توجد عروض خدمات تطابق هذه التصفية.",
   "svcBoOffersLoadFailed": "تعذّر تحميل عروض الخدمات.",
   "svcBoOffersRefused": "لا يُسمح لهذا الحساب بقراءة عروض الخدمات — هذا متاح لموظفي الإدارة فقط.",
-  "svcBoModerationNotConnected": "إدارة العروض غير متصلة في هذا الإصدار بعد، لذلك لا يوجد ما يُعرض أو يُتخذ بشأنه إجراء.",
   "svcBoPageOf": "الصفحة {page} من {pages}",
   "@svcBoPageOf": {"placeholders":{"page":{"type":"int"},"pages":{"type":"int"}}},
   "svcBoOffersCount": "{count, plural, =0{لا عروض} =1{عرض واحد} =2{عرضان} few{{count} عروض} many{{count} عرضًا} other{{count} عرض}}",

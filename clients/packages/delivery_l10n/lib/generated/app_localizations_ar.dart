@@ -11093,10 +11093,6 @@ class DeliveryStringsAr extends DeliveryStrings {
       'لا يُسمح لهذا الحساب بقراءة عروض الخدمات — هذا متاح لموظفي الإدارة فقط.';
 
   @override
-  String get svcBoModerationNotConnected =>
-      'إدارة العروض غير متصلة في هذا الإصدار بعد، لذلك لا يوجد ما يُعرض أو يُتخذ بشأنه إجراء.';
-
-  @override
   String svcBoPageOf(int page, int pages) {
     return 'الصفحة $page من $pages';
   }
