@@ -20,7 +20,7 @@ import 'backoffice/promotions_screen.dart';
 import 'backoffice/providers_screen.dart';
 import 'backoffice/reconciliation_screen.dart';
 import 'backoffice/riders_screen.dart';
-import 'backoffice/service_offers_screen.dart';
+import 'backoffice/service_offers_screen.dart' as backoffice;
 import 'backoffice/settings_screen.dart';
 import 'backoffice/shops_screen.dart';
 import 'backoffice/statements_screen.dart';
@@ -880,7 +880,7 @@ class PortalArea {
         icon: Icons.design_services_outlined,
         selectedIcon: Icons.design_services,
         label: (DeliveryStrings t) => t.svcBoOffersTitle,
-        build: (PortalApis a, _, __, ___) => ServiceOffersScreen(
+        build: (PortalApis a, _, __, ___) => backoffice.ServiceOffersScreen(
           api: a.offerModeration,
           notificationApi: a.notification,
         ),
