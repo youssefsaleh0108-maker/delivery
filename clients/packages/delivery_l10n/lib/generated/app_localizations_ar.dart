@@ -11150,7 +11150,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   }
 
   @override
-  String get svcLoadMore => 'عرض المزيد';
+  String get svcLoadMore => 'تحميل المزيد';
 
   @override
   String get svcCouldNotLoadOffer => 'تعذّر تحميل هذا العرض';

@@ -3409,7 +3409,7 @@
   "@svcPackOf": {"placeholders":{"count":{"type":"String"},"unit":{"type":"String"}}},
   "svcPerUnit": "لكل {unit}",
   "@svcPerUnit": {"placeholders":{"unit":{"type":"String"}}},
-  "svcLoadMore": "عرض المزيد",
+  "svcLoadMore": "تحميل المزيد",
   "svcCouldNotLoadOffer": "تعذّر تحميل هذا العرض",
   "svcCouldNotLoadReviews": "تعذّر تحميل المراجعات",
   "svcOrderServiceTitle": "اطلب الخدمة",
