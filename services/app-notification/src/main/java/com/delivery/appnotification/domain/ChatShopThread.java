@@ -1,6 +1,7 @@
 package com.delivery.appnotification.domain;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -17,10 +18,12 @@ import jakarta.persistence.Version;
  * owner is Product Service's fact and the storefront deliberately does not publish it.
  *
  * <p><strong>Closing policy.</strong> A thread accepts posts until {@link #getClosesAt()}, which is
- * the customer's last activity plus an idle window. Only the customer moves it: opening the chat
- * from the shop page, or saying something. The shop's replies do not, so a shop cannot keep a
- * customer's thread alive to message them long after they stopped asking — once idle, only the
- * customer can start it again.
+ * the customer's last activity plus an idle window. The customer moves it: opening the chat from the
+ * shop page or from one of their orders, or saying something. The shop's replies do not, so a shop
+ * cannot keep a customer's thread alive to message them long after they stopped asking — once idle,
+ * only the customer can start it again, unless they have an order with the shop that is open or only
+ * recently ended. A shop opening the thread for that order keeps it open while the order is, and at
+ * most until a short window after it was delivered or cancelled ({@code ShopChatService#openForOrder}).
  */
 @Entity
 @Table(name = "chat_shop_threads")
@@ -42,9 +45,16 @@ public class ChatShopThread {
     @Column(name = "store_name", nullable = false, length = 160)
     private String storeName;
 
-    /** Reserved for a verified order or booking reference; never written from a client. */
+    /**
+     * The latest order Order Manager confirmed for this thread — to its customer as theirs and this
+     * shop's, or to a merchant as an order of this shop. Never anything a client typed.
+     */
     @Column(name = "order_id")
     private UUID orderId;
+
+    /** That order's kind as Order Manager spells it (CATALOG, SERVICE, ...); null exactly when there is no order. */
+    @Column(name = "order_kind", length = 16)
+    private String orderKind;
 
     @Column(name = "opened_at", nullable = false, updatable = false)
     private Instant openedAt;
@@ -100,6 +110,16 @@ public class ChatShopThread {
         }
     }
 
+    /**
+     * Labels the thread with an order Order Manager has just confirmed. The latest confirmed order
+     * replaces any earlier one: a thread is one customer and one shop, so it is about whichever of
+     * their orders it was last opened from. Never called with anything a client sent unchecked.
+     */
+    public void attachOrder(UUID confirmedOrderId, String confirmedKind) {
+        this.orderId = Objects.requireNonNull(confirmedOrderId, "orderId");
+        this.orderKind = Objects.requireNonNull(confirmedKind, "orderKind");
+    }
+
     /** Only safe under the row lock; see {@code ChatShopThreadRepository.lockById}. */
     public long claimSequence(Instant at) {
         long claimed = nextSequence;
@@ -130,6 +150,10 @@ public class ChatShopThread {
 
     public UUID getOrderId() {
         return orderId;
+    }
+
+    public String getOrderKind() {
+        return orderKind;
     }
 
     public Instant getOpenedAt() {

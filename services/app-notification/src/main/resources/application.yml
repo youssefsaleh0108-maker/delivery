@@ -177,6 +177,9 @@ delivery:
       max-messages-per-window: 20
       # How long Product Service's "this merchant owns this shop" is trusted before asking again.
       owner-confirmation-ttl: 10m
+      # How long after an order was delivered or cancelled its shop may still open the customer's
+      # thread about it (while the order is open, always). The owner's default is seven days.
+      order-chat-window: ${CHAT_SHOP_ORDER_CHAT_WINDOW:7d}
 
   # Product Service answers what chat cannot know alone: whether a delivery area is real, whether a
   # shop exists, which shops a merchant owns. Always asked with the caller's own token.
@@ -186,8 +189,9 @@ delivery:
       connect-timeout: 2s
       read-timeout: 5s
     # Order Manager answers where the caller's own orders were delivered, which is what lets a
-    # customer post in a neighbourhood room. Always asked with the caller's own token; when it cannot
-    # be reached, rooms stay readable and nobody posts.
+    # customer post in a neighbourhood room, and shows one order to its customer or shop, which is
+    # what lets a shop thread carry that order. Always asked with the caller's own token; when it
+    # cannot be reached, rooms stay readable and nobody posts, and a thread opened from an order waits.
     order-manager:
       base-url: ${ORDER_MANAGER_URL:http://localhost:8101}
       connect-timeout: 2s

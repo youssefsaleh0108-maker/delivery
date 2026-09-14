@@ -1,5 +1,6 @@
 package com.delivery.appnotification.service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -15,12 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.delivery.appnotification.client.OrderReferences;
+import com.delivery.appnotification.client.OrderReferences.OrderReference;
 import com.delivery.appnotification.client.ProductDirectory;
 import com.delivery.appnotification.domain.ChatShopMessage;
 import com.delivery.appnotification.domain.ChatShopMessageRepository;
 import com.delivery.appnotification.domain.ChatShopThread;
 import com.delivery.appnotification.domain.ChatShopThreadRepository;
 import com.delivery.appnotification.domain.ShopThreadSide;
+import com.delivery.appnotification.service.RoomExceptions.OrderChatClosedException;
 import com.delivery.appnotification.service.RoomExceptions.RoomNotFoundException;
 import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedException;
 
@@ -33,6 +37,14 @@ import com.delivery.appnotification.service.RoomExceptions.SendRateLimitedExcept
  * customer, a merchant of a different shop, a rider — gets the same 404 as a thread that does not
  * exist. No request can name a side or a participant.
  *
+ * <p><strong>Which order a thread is about.</strong> A thread carries at most one order reference:
+ * the latest one Order Manager confirmed, never anything a client typed. A customer attaches one of
+ * their own orders with the shop by opening the thread from it; a merchant opens the thread for an
+ * order of a shop they answer for, which creates it if the customer never wrote. Order Manager is
+ * asked with the caller's own token ({@link OrderReferences}), so neither side can attach an order
+ * they could not open in their own app, and the shop's side is still never told the customer's user
+ * id.
+ *
  * <p>Posting follows order chat's pattern: text refused before any lock, a gapless sequence under the
  * thread's row lock, idempotent retries, delivery after commit. See {@link ChatShopThread} for the
  * closing policy.
@@ -43,6 +55,7 @@ public class ShopChatService {
     private final ChatShopThreadRepository threads;
     private final ChatShopMessageRepository messages;
     private final ProductDirectory directory;
+    private final OrderReferences orders;
     private final ShopOwnership ownership;
     private final ShopDelivery delivery;
     private final ShopChatProperties properties;
@@ -51,6 +64,7 @@ public class ShopChatService {
     public ShopChatService(ChatShopThreadRepository threads,
                            ChatShopMessageRepository messages,
                            ProductDirectory directory,
+                           OrderReferences orders,
                            ShopOwnership ownership,
                            ShopDelivery delivery,
                            ShopChatProperties properties,
@@ -58,6 +72,7 @@ public class ShopChatService {
         this.threads = threads;
         this.messages = messages;
         this.directory = directory;
+        this.orders = orders;
         this.ownership = ownership;
         this.delivery = delivery;
         this.properties = properties;
@@ -70,11 +85,25 @@ public class ShopChatService {
      *
      * <p>The shop must be one Product Service shows this customer. Opening also restarts the idle
      * window: tapping "chat with the shop" is the customer saying they are interested again.
+     *
+     * <p><strong>From an order.</strong> With {@code orderId}, the thread is also labelled with that
+     * order once Order Manager confirms it is this customer's and was placed with this shop. That is
+     * checked before anything is written, and every other answer — somebody else's order, another
+     * shop's, one that does not exist — is the very 404 an unknown shop gets, message and all, so this
+     * cannot be used to learn which orders exist or whose they are. When Order Manager cannot be asked
+     * the open is refused, rather than done without the order it was opened from. An open without an
+     * order never asks Order Manager and works exactly as before; it also leaves an earlier label be.
+     *
+     * @param orderId the order the customer opened the chat from, or null from the shop page
      */
     @Transactional
-    public ThreadState openForCustomer(UUID storeId, String customerId, String customerName) {
+    public ThreadState openForCustomer(UUID storeId, String customerId, String customerName, UUID orderId) {
         ProductDirectory.Storefront store = directory.storefront(storeId)
                 .orElseThrow(() -> new RoomNotFoundException(storeId));
+        OrderReference order = orderId == null ? null : orders.visibleToCaller(orderId)
+                .filter(found -> customerId.equals(found.customerId()) && storeId.equals(found.storeId()))
+                .orElseThrow(() -> new RoomNotFoundException(storeId));
+
         String storeName = store.name() == null ? "" : store.name();
         Instant closes = Instant.now().plus(properties.getIdleCloseAfter());
 
@@ -83,8 +112,51 @@ public class ShopChatService {
                 .orElseThrow(() -> new IllegalStateException("A shop thread vanished right after it was opened"));
         thread.keepOpenUntil(closes);
         thread.refresh(storeName, customerName);
+        if (order != null) {
+            thread.attachOrder(order.id(), order.kind());
+        }
 
         return state(thread, ShopThreadSide.CUSTOMER);
+    }
+
+    /**
+     * The conversation between an order's shop and the customer who placed it, opened if the customer
+     * never wrote, and labelled with that order: a provider's "chat with the customer". Idempotent.
+     *
+     * <p><strong>Only an order of a shop the caller answers for.</strong> Order Manager must show the
+     * order to the caller, and Product Service must confirm they own the shop it was placed with — the
+     * {@link ShopOwnership} rule the inbox and every thread read use. Any other order, or one with no
+     * shop, is the 404 of an order that does not exist, before anything about its state is looked at.
+     *
+     * <p><strong>Only while the order is open, or recently ended.</strong> From
+     * {@link ShopChatProperties#getOrderChatWindow()} after it was delivered or cancelled, a 409 with
+     * when that was. Within it, opening keeps the thread accepting messages until the earlier of the
+     * window's end (for an open order, a window from now) and the customer idle window from now.
+     *
+     * <p>That is the one way a shop moves a thread's closing time, and it is bounded by the order: the
+     * idle rule in {@link ChatShopThread} still stops a shop keeping a line open to a customer with no
+     * open or recent order with it, the shop's replies still never move it, and it never shortens a
+     * thread the customer is keeping open. What is said afterwards is rate limited as ever.
+     *
+     * <p>A thread the merchant creates names the customer as the order's card does; one that already
+     * exists keeps the name its customer's own sign-in gave it.
+     */
+    @Transactional
+    public ThreadState openForOrder(UUID orderId, String merchantId) {
+        OrderReference order = orders.visibleToCaller(orderId)
+                .filter(found -> found.storeId() != null && ownership.owns(merchantId, found.storeId()))
+                .orElseThrow(() -> new RoomNotFoundException(orderId));
+        Instant until = shopMaySpeakUntil(order, Instant.now());
+
+        String storeName = order.storeName() == null ? "" : order.storeName();
+        threads.insertIfAbsent(UUID.randomUUID(), order.storeId(), order.customerId(),
+                order.customerDisplayName(), storeName, until);
+        ChatShopThread thread = threads.findByStoreIdAndCustomerId(order.storeId(), order.customerId())
+                .orElseThrow(() -> new IllegalStateException("A shop thread vanished right after it was opened"));
+        thread.keepOpenUntil(until);
+        thread.attachOrder(order.id(), order.kind());
+
+        return state(thread, ShopThreadSide.SHOP);
     }
 
     /** The calling merchant's inbox: threads with messages, for the shops they own, newest first. */
@@ -200,6 +272,33 @@ public class ShopChatService {
             return ShopThreadSide.SHOP;
         }
         throw new RoomNotFoundException(threadId);
+    }
+
+    /**
+     * Until when a shop opening the thread for this order may speak on it: the earlier of the order
+     * window's end and the customer idle window from now. Refused once the order window has passed.
+     *
+     * <p>For an open order the window runs from now, so however often the shop reopens it while the
+     * work goes on, the thread still closes no later than a window after the order ends.
+     */
+    private Instant shopMaySpeakUntil(OrderReference order, Instant now) {
+        Duration window = properties.getOrderChatWindow();
+        Instant windowFrom = now;
+        if (order.hasEnded()) {
+            Instant endedAt = order.endedAt();
+            if (endedAt == null) {
+                // No end time cannot be placed inside the window, and is not read as still open.
+                throw new OrderChatClosedException(order.id(), null);
+            }
+            Instant closedAt = endedAt.plus(window);
+            if (!now.isBefore(closedAt)) {
+                throw new OrderChatClosedException(order.id(), closedAt);
+            }
+            windowFrom = endedAt;
+        }
+        Instant byWindow = windowFrom.plus(window);
+        Instant byIdle = now.plus(properties.getIdleCloseAfter());
+        return byWindow.isBefore(byIdle) ? byWindow : byIdle;
     }
 
     private ThreadState state(ChatShopThread thread, ShopThreadSide side) {
