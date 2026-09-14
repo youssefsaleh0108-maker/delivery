@@ -399,6 +399,61 @@ class PortalArea {
     ],
   );
 
+  // ------------------------------------------------------------------ merchant, services mode
+  /// The Merchant Hub for a services shop: the phone's services mode, on the web.
+  ///
+  /// The goods rail with the substitution the phone makes, and never reordered. The dashboard becomes
+  /// the services dashboard, Products becomes Offers and Orders the services queue, so index 2 is still
+  /// Orders and the dashboard's jump(2) still lands there. The register, the shelves and the shelf
+  /// sections, which a print shop does not have, are left out. Every page after Orders is the goods
+  /// rail's own destination, taken from it in its order, so a page appended to the goods rail joins
+  /// this one without anybody having to remember to add it.
+  ///
+  /// The service screens are handed no store id: each reads the owner's services shop itself, which
+  /// a merchant who also owns a goods shop needs.
+  static final PortalArea merchantServices_ = PortalArea(
+    role: DeliveryRole.merchant,
+    title: (DeliveryStrings t) => t.merchantPortal,
+    wordmark: 'Merchant Hub',
+    accountRole: (DeliveryStrings t) => t.merchantPartner,
+    logoIcon: Icons.storefront,
+    destinations: <PortalDestination>[
+      PortalDestination(
+        icon: Icons.insights_outlined,
+        selectedIcon: Icons.insights,
+        label: (DeliveryStrings t) => t.navDashboard,
+        build: (PortalApis a, _, __, void Function(int) jump) => ServiceDashboardScreen(
+          orderApi: a.order,
+          catalogApi: a.catalog,
+          storeApi: a.store,
+          zoneApi: a.zone,
+          onViewOrders: () => jump(2),
+          onShowOffers: () => jump(1),
+        ),
+      ),
+      PortalDestination(
+        icon: Icons.design_services_outlined,
+        selectedIcon: Icons.design_services,
+        label: (DeliveryStrings t) => t.svcNavOffers,
+        build: (PortalApis a, _, __, ___) =>
+            ServiceOffersScreen(api: a.catalog, storeApi: a.store, zoneApi: a.zone),
+      ),
+      PortalDestination(
+        icon: Icons.receipt_long_outlined,
+        selectedIcon: Icons.receipt_long,
+        label: (DeliveryStrings t) => t.navOrders,
+        build: (PortalApis a, _, __, ___) =>
+            ServiceOrdersScreen(api: a.order, shopChat: a.shopChat),
+      ),
+      for (int i = 3; i < merchant_.destinations.length; i++)
+        if (!_goodsOnlyPages.contains(i)) merchant_.destinations[i],
+    ],
+  );
+
+  /// Where the goods rail keeps the shelves, the register and the shelf sections: the merchant
+  /// suite's first three pages, appended after My shop and never moved (see [merchant_]).
+  static const Set<int> _goodsOnlyPages = <int>{7, 8, 9};
+
   /// Resolves the signed-in merchant's shop once and hands its id to [child].
   ///
   /// The suite's screens are keyed on a store, and the rail builds synchronously; this is the one
@@ -801,6 +856,15 @@ class PortalShell extends StatefulWidget {
 }
 
 class _PortalShellState extends State<PortalShell> {
+  /// The areas as the signed-in merchant's shop decides them: for a services shop the Merchant Hub is
+  /// its services rail ([PortalArea.merchantServices_]). Starts as handed over, and is swapped once
+  /// the shop has been read.
+  late List<PortalArea> _areas = widget.areas;
+
+  /// True while the merchant's shops are being read. Nothing is drawn meanwhile: the goods rail in
+  /// front of a print shop would offer it a till for a moment, and a click on it.
+  late bool _readingShop = widget.areas.contains(PortalArea.merchant_);
+
   int _area = 0;
   int _index = 0;
 
@@ -816,6 +880,33 @@ class _PortalShellState extends State<PortalShell> {
   @override
   void initState() {
     super.initState();
+    if (_readingShop) {
+      _readShop();
+    } else {
+      _syncBadges();
+    }
+  }
+
+  /// Reads the merchant's shops once, and swaps in the services rail when one is a services shop. A
+  /// read that fails leaves the goods rail, which is what the portal always drew.
+  Future<void> _readShop() async {
+    List<PortalArea> areas = widget.areas;
+    try {
+      final List<Store> owned = (await widget.apis.store.mine(size: 20)).content;
+      if (owned.any((Store store) => store.vertical == StoreVertical.services)) {
+        areas = <PortalArea>[
+          for (final PortalArea area in widget.areas)
+            identical(area, PortalArea.merchant_) ? PortalArea.merchantServices_ : area,
+        ];
+      }
+    } catch (_) {
+      // The goods rail, as before.
+    }
+    if (!mounted) return;
+    setState(() {
+      _areas = areas;
+      _readingShop = false;
+    });
     _syncBadges();
   }
 
@@ -850,7 +941,7 @@ class _PortalShellState extends State<PortalShell> {
   /// on screen. Without it a merchant working here had no sign a customer had written until they
   /// opened the inbox and pulled to refresh — a gesture a mouse cannot make.
   void _syncBadges() {
-    final bool wanted = widget.areas[_area].destinations
+    final bool wanted = _areas[_area].destinations
         .any((PortalDestination d) => d.badge == PortalBadge.shopUnread);
     final ShopUnreadCount? current = _shopUnread;
     if (wanted && current == null) {
@@ -949,7 +1040,13 @@ class _PortalShellState extends State<PortalShell> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final PortalArea area = widget.areas[_area];
+    if (_readingShop) {
+      return const Scaffold(
+        backgroundColor: DeliveryColors.background,
+        body: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+      );
+    }
+    final PortalArea area = _areas[_area];
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,
@@ -959,11 +1056,11 @@ class _PortalShellState extends State<PortalShell> {
           ConsoleSidebar(
             area: ConsoleArea(wordmark: area.wordmark, logoIcon: area.logoIcon),
             areas: <ConsoleArea>[
-              for (final PortalArea a in widget.areas)
+              for (final PortalArea a in _areas)
                 ConsoleArea(wordmark: a.wordmark, logoIcon: a.logoIcon),
             ],
             areaIndex: _area,
-            onAreaSelected: widget.areas.length > 1 ? _switchArea : null,
+            onAreaSelected: _areas.length > 1 ? _switchArea : null,
             entries: <ConsoleNavEntry>[
               for (final PortalDestination d in area.destinations) _entry(d, t),
             ],
