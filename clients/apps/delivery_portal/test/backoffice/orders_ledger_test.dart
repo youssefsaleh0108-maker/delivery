@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_portal/src/backoffice/dashboard_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -103,6 +104,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
+      // The service filters and a service order's detail are worded through DeliveryStrings.
+      localizationsDelegates: DeliveryStrings.localizationsDelegates,
+      supportedLocales: DeliveryStrings.supportedLocales,
       home: Scaffold(body: DashboardScreen(api: api)),
     ));
     await tester.pumpAndSettle();

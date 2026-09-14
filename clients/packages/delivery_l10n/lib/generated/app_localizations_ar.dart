@@ -11524,4 +11524,560 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get svcReviewNotYet =>
       'لم يُسجَّل هذا الطلب مكتملًا بعد، لذا لا يمكن تقييمه الآن. حاول مجددًا بعد دقيقة.';
+
+  @override
+  String get svcBoOffersTitle => 'عروض الخدمات';
+
+  @override
+  String get svcBoOffersSubtitle =>
+      'عروض كل متاجر الخدمات بكل حالاتها — احجب عرضًا أو أعِده مع ذكر السبب';
+
+  @override
+  String get svcBoShopsTitle => 'المتاجر';
+
+  @override
+  String get svcBoShopsSubtitle =>
+      'المتاجر المُدرجة، وأيّها يحمل شارة «محل موثوق»';
+
+  @override
+  String get svcBoFilterAll => 'الكل';
+
+  @override
+  String get svcBoOfferDraft => 'مسودة';
+
+  @override
+  String get svcBoOfferActive => 'نشط';
+
+  @override
+  String get svcBoOfferPaused => 'متوقف مؤقتًا';
+
+  @override
+  String get svcBoOfferArchived => 'مؤرشف';
+
+  @override
+  String get svcBoOfferTakenDown => 'محجوب';
+
+  @override
+  String get svcBoAllCategories => 'كل الفئات';
+
+  @override
+  String get svcBoAllShops => 'كل المتاجر';
+
+  @override
+  String get svcBoShopFilterTooltip => 'المتاجر التي ظهرت في النتائج حتى الآن';
+
+  @override
+  String get svcBoOffersSearchHint => 'ابحث باسم العرض أو المتجر';
+
+  @override
+  String get svcBoColOffer => 'العرض';
+
+  @override
+  String get svcBoColShop => 'المتجر';
+
+  @override
+  String get svcBoColCategory => 'الفئة';
+
+  @override
+  String get svcBoColPrice => 'السعر';
+
+  @override
+  String get svcBoColStatus => 'الحالة';
+
+  @override
+  String get svcBoOffersEmpty => 'لا توجد عروض خدمات تطابق هذه التصفية.';
+
+  @override
+  String get svcBoOffersLoadFailed => 'تعذّر تحميل عروض الخدمات.';
+
+  @override
+  String get svcBoOffersRefused =>
+      'لا يُسمح لهذا الحساب بقراءة عروض الخدمات — هذا متاح لموظفي الإدارة فقط.';
+
+  @override
+  String svcBoPageOf(int page, int pages) {
+    return 'الصفحة $page من $pages';
+  }
+
+  @override
+  String svcBoOffersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عرض',
+      many: '$count عرضًا',
+      few: '$count عروض',
+      two: 'عرضان',
+      one: 'عرض واحد',
+      zero: 'لا عروض',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcBoPriceFrom(String price) {
+    return 'ابتداءً من $price';
+  }
+
+  @override
+  String svcBoPricePer(String price, String unit) {
+    return '$price لكل $unit';
+  }
+
+  @override
+  String svcBoPricePerPack(String price, int count, String unit) {
+    return '$price لكل $count $unit';
+  }
+
+  @override
+  String get svcBoSectionOffer => 'العرض';
+
+  @override
+  String get svcBoSectionShop => 'متجر مقدّم الخدمة';
+
+  @override
+  String get svcBoSectionTerms => 'الشروط';
+
+  @override
+  String get svcBoSectionPhotos => 'الصور';
+
+  @override
+  String get svcBoSectionHold => 'محجوب عن البيع';
+
+  @override
+  String get svcBoSectionModerationHistory => 'سجل الإدارة';
+
+  @override
+  String get svcBoFactDescription => 'الوصف';
+
+  @override
+  String get svcBoFactName => 'الاسم';
+
+  @override
+  String get svcBoFactListing => 'الإدراج';
+
+  @override
+  String get svcBoShopListed => 'مُدرج';
+
+  @override
+  String get svcBoShopDraft => 'غير مُدرج بعد';
+
+  @override
+  String get svcBoShopSuspended => 'معلّق';
+
+  @override
+  String get svcBoTermPricing => 'التسعير';
+
+  @override
+  String get svcBoPricingFixed => 'سعر ثابت';
+
+  @override
+  String get svcBoPricingPerUnit => 'لكل وحدة';
+
+  @override
+  String get svcBoPricingFrom => 'سعر ابتدائي';
+
+  @override
+  String get svcBoTermUnknown => 'غير معروف لهذا الإصدار';
+
+  @override
+  String get svcBoTermPack => 'العبوة الواحدة';
+
+  @override
+  String svcBoPackOf(int count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcBoPackUnits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count وحدة',
+      many: '$count وحدة',
+      few: '$count وحدات',
+      two: 'وحدتان',
+      one: 'وحدة واحدة',
+      zero: 'لا وحدات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcBoTermTurnaround => 'مدة التنفيذ';
+
+  @override
+  String svcBoTurnaroundRange(int min, int max) {
+    return '$min–$max ساعة';
+  }
+
+  @override
+  String svcBoTurnaroundUpTo(int max) {
+    return 'حتى $max ساعة';
+  }
+
+  @override
+  String get svcBoTermFulfilment => 'طريقة التسليم';
+
+  @override
+  String get svcBoFulfilPickup => 'استلام من المتجر';
+
+  @override
+  String get svcBoFulfilDelivery => 'توصيل YouDrop';
+
+  @override
+  String get svcBoFulfilBoth => 'استلام أو توصيل';
+
+  @override
+  String get svcBoTermFiles => 'ملفات الزبون';
+
+  @override
+  String get svcBoFilesPolicyNone => 'بدون ملفات';
+
+  @override
+  String get svcBoFilesPolicyOptional => 'اختيارية';
+
+  @override
+  String get svcBoFilesPolicyRequired => 'إلزامية';
+
+  @override
+  String get svcBoTermPrompt => 'سؤال للزبون';
+
+  @override
+  String get svcBoNoPhotos => 'لا توجد صور';
+
+  @override
+  String get svcBoPhotoUnavailable => 'الصورة غير متاحة';
+
+  @override
+  String get svcBoOpenPhoto => 'فتح الصورة بالحجم الكامل';
+
+  @override
+  String get svcBoPhoto => 'صورة';
+
+  @override
+  String svcBoPhotoPosition(int index, int count) {
+    return '$index من $count';
+  }
+
+  @override
+  String get svcBoHoldReason => 'السبب المذكور';
+
+  @override
+  String get svcBoHoldSince => 'منذ';
+
+  @override
+  String get svcBoTakeDown => 'حجب العرض';
+
+  @override
+  String get svcBoRestore => 'إعادة العرض';
+
+  @override
+  String svcBoTakeDownTitle(String offer) {
+    return 'حجب $offer؟';
+  }
+
+  @override
+  String get svcBoTakeDownBody =>
+      'يُسحب من البيع لجميع الزبائن فورًا. يقرأ مقدّم الخدمة سببك، ولا يمكنه إعادته إلى البيع حتى تعيده الإدارة.';
+
+  @override
+  String svcBoRestoreTitle(String offer) {
+    return 'إعادة $offer؟';
+  }
+
+  @override
+  String get svcBoRestoreBody =>
+      'يُرفع الحجب. العرض الذي كان معروضًا للبيع يعود متوقفًا مؤقتًا ليستأنفه مقدّم الخدمة.';
+
+  @override
+  String get svcBoReasonLabel => 'السبب — إلزامي ويُحفظ في السجل';
+
+  @override
+  String get svcBoReasonRequired => 'اذكر السبب: السبب إلزامي.';
+
+  @override
+  String svcBoTakenDownDone(String offer) {
+    return 'حُجب $offer. يمكن لمقدّم الخدمة قراءة سببك.';
+  }
+
+  @override
+  String svcBoRestoredDone(String offer) {
+    return 'أُعيد $offer. إن كان معروضًا للبيع فهو ينتظر متوقفًا مؤقتًا حتى يستأنفه مقدّم الخدمة.';
+  }
+
+  @override
+  String get svcBoTakeDownRefused =>
+      'لم يُحجب: يفيد الخادم بأن هذا العرض محجوب أصلًا أو ليس عرض خدمة. لم يتغيّر شيء وأُعيد تحميل القائمة.';
+
+  @override
+  String get svcBoRestoreRefused =>
+      'لم يُعَد: يفيد الخادم بأن هذا العرض لم يعد محجوبًا. لم يتغيّر شيء وأُعيد تحميل القائمة.';
+
+  @override
+  String get svcBoOfferChanged =>
+      'تغيّر هذا العرض أثناء إجرائك، لذلك لم يُسجَّل شيء. أُعيد تحميله؛ حاول مجددًا.';
+
+  @override
+  String get svcBoOfferGone => 'هذا العرض لم يعد موجودًا.';
+
+  @override
+  String get svcBoModerateRefused => 'لا يُسمح لهذا الحساب بإدارة العروض.';
+
+  @override
+  String svcBoReasonRejected(int max) {
+    return 'لم يقبل الخادم هذا السبب. اكتب سببًا لا يتجاوز $max حرفًا.';
+  }
+
+  @override
+  String get svcBoActionFailed => 'لم يتم الإجراء ولم يتغيّر شيء. حاول مجددًا.';
+
+  @override
+  String get svcBoHistoryNever => 'لم تتخذ الإدارة أي إجراء بشأن هذا العرض.';
+
+  @override
+  String get svcBoHistoryLoadFailed => 'تعذّر تحميل السجل.';
+
+  @override
+  String get svcBoActTakeDown => 'حُجب';
+
+  @override
+  String get svcBoActRestore => 'أُعيد';
+
+  @override
+  String get svcBoActUnknown => 'إجراء لا يعرفه هذا الإصدار';
+
+  @override
+  String svcBoActBy(String actor) {
+    return 'بواسطة $actor';
+  }
+
+  @override
+  String get svcBoKindAll => 'كل الأنواع';
+
+  @override
+  String get svcBoKindService => 'طلبات الخدمات';
+
+  @override
+  String get svcBoFulfilmentAll => 'الاستلام والتوصيل';
+
+  @override
+  String get svcBoFulfilmentPickup => 'استلام';
+
+  @override
+  String get svcBoFulfilmentDelivery => 'توصيل';
+
+  @override
+  String get svcBoServiceTag => 'خدمة';
+
+  @override
+  String get svcBoStatusPlaced => 'تم الطلب';
+
+  @override
+  String get svcBoStatusAccepted => 'مقبول';
+
+  @override
+  String get svcBoStatusInProduction => 'قيد التنفيذ';
+
+  @override
+  String get svcBoStatusReadyPickup => 'جاهز للاستلام';
+
+  @override
+  String get svcBoStatusReadyDelivery => 'جاهز للتوصيل';
+
+  @override
+  String get svcBoStatusOnTheWay => 'في الطريق';
+
+  @override
+  String get svcBoStatusCollected => 'تم الاستلام';
+
+  @override
+  String get svcBoStatusDelivered => 'تم التوصيل';
+
+  @override
+  String get svcBoStatusDeclined => 'رفضه مقدّم الخدمة';
+
+  @override
+  String get svcBoStatusNotCollected => 'أُلغي: لم يُستلم';
+
+  @override
+  String get svcBoStatusCancelled => 'أُلغي';
+
+  @override
+  String get svcBoDetailKind => 'النوع';
+
+  @override
+  String svcBoKindServiceIn(String category) {
+    return 'خدمة · $category';
+  }
+
+  @override
+  String get svcBoDetailService => 'الخدمة';
+
+  @override
+  String svcBoPacksOfUnits(int packs, int size, String unit) {
+    return '$packs × $size $unit';
+  }
+
+  @override
+  String svcBoPacksOf(int packs, int size) {
+    return '$packs × $size';
+  }
+
+  @override
+  String get svcBoDetailOptions => 'الخيارات';
+
+  @override
+  String get svcBoDetailInstructions => 'التعليمات';
+
+  @override
+  String get svcBoNoInstructions => 'لم تُكتب تعليمات';
+
+  @override
+  String get svcBoDetailReadyBy => 'الجاهزية المتوقعة';
+
+  @override
+  String get svcBoHistoryTitle => 'سجل الحالة';
+
+  @override
+  String get svcBoHistoryNone => 'لا توجد خطوات مسجّلة بعد.';
+
+  @override
+  String get svcBoHistoryFailed => 'تعذّر تحميل سجل الحالة.';
+
+  @override
+  String get svcBoFilesTitle => 'ملفات الزبون';
+
+  @override
+  String get svcBoFilesAuditNotice =>
+      'تُسجَّل قراءات الإدارة لملفات الزبون: عرضها يسجّل حسابك مقابل كل ملف.';
+
+  @override
+  String get svcBoFilesShow => 'عرض الملفات';
+
+  @override
+  String get svcBoFilesNotTaken => 'هذا العرض لا يقبل ملفات.';
+
+  @override
+  String get svcBoFilesEmpty =>
+      'لا توجد ملفات على هذا الطلب. تُحذف الملفات بعد 90 يومًا من اكتمال الطلب.';
+
+  @override
+  String get svcBoFileOpen => 'فتح';
+
+  @override
+  String get svcBoFileOpened =>
+      'فُتح في علامة تبويب جديدة. وصولك إلى هذا الملف مسجَّل.';
+
+  @override
+  String get svcBoFilePdf => 'ملف PDF';
+
+  @override
+  String get svcBoFileImage => 'صورة';
+
+  @override
+  String get svcBoFileOther => 'ملف';
+
+  @override
+  String svcBoSizeMb(String size) {
+    return '$size ميغابايت';
+  }
+
+  @override
+  String svcBoSizeKb(String size) {
+    return '$size كيلوبايت';
+  }
+
+  @override
+  String get svcBoFilesRefused => 'رفض الخادم عرض ملفات هذا الطلب.';
+
+  @override
+  String get svcBoFilesUnavailable =>
+      'تعذّر الوصول إلى الملفات الآن. حاول بعد قليل.';
+
+  @override
+  String get svcBoFilesFailed => 'تعذّر تحميل الملفات.';
+
+  @override
+  String get svcBoLedgerRefused => 'لا يُسمح لهذا الحساب بقراءة سجل الطلبات.';
+
+  @override
+  String get svcBoShopsGoods => 'متاجر السلع';
+
+  @override
+  String get svcBoShopsServices => 'متاجر الخدمات';
+
+  @override
+  String get svcBoShopsSearchHint => 'ابحث باسم المتجر';
+
+  @override
+  String get svcBoShopsListedOnly =>
+      'تظهر هنا فقط المتاجر المُدرجة في الواجهة.';
+
+  @override
+  String get svcBoShopsEmpty => 'لا توجد متاجر مُدرجة مطابقة.';
+
+  @override
+  String get svcBoShopsLoadFailed => 'تعذّر تحميل المتاجر.';
+
+  @override
+  String svcBoVerifyGrantTitle(String shop) {
+    return 'منح $shop شارة «محل موثوق»؟';
+  }
+
+  @override
+  String get svcBoVerifyGrantBody =>
+      'يرى الزبائن الشارة على هذا المتجر أينما ظهر. إنها شهادة من YouDrop لجيران المتجر، فامنحها فقط لمتجر تم التحقق منه.';
+
+  @override
+  String svcBoVerifyRevokeTitle(String shop) {
+    return 'إزالة شارة «محل موثوق» عن $shop؟';
+  }
+
+  @override
+  String get svcBoVerifyRevokeBody =>
+      'تختفي الشارة عن هذا المتجر لدى جميع الزبائن.';
+
+  @override
+  String get svcBoVerifyGrant => 'منح الشارة';
+
+  @override
+  String get svcBoVerifyRevoke => 'إزالة الشارة';
+
+  @override
+  String svcBoVerifyGranted(String shop) {
+    return 'أصبح $shop «محلًا موثوقًا».';
+  }
+
+  @override
+  String svcBoVerifyRevoked(String shop) {
+    return 'لم يعد $shop «محلًا موثوقًا».';
+  }
+
+  @override
+  String get svcBoVerifyRefused => 'تغيير هذه الشارة متاح للإدارة فقط.';
+
+  @override
+  String get svcBoVerifyGone => 'هذا المتجر لم يعد موجودًا.';
+
+  @override
+  String get svcBoVerifyFailed => 'لم تتغيّر الشارة. حاول مجددًا.';
+
+  @override
+  String svcBoVerifiedToggle(String shop) {
+    return 'شارة «محل موثوق» لـ $shop';
+  }
+
+  @override
+  String svcBoReasonLength(int used, int max) {
+    return '$used من $max';
+  }
+
+  @override
+  String get svcBoOfferNotListed =>
+      'لم يُسجَّل شيء، وهذا العرض لم يعد ضمن عروض الخدمات، لذلك لم يبقَ ما يُتخذ بشأنه إجراء.';
+
+  @override
+  String get svcBoOfferUnreadable =>
+      'لم يُسجَّل شيء، لكن تعذّرت إعادة قراءة هذا العرض، لذلك قد لا يكون المعروض محدَّثًا. أغلقه ثم افتحه مجددًا من القائمة.';
 }

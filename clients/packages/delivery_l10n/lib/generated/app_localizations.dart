@@ -19268,6 +19268,936 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'This order isn\'t on record as completed yet, so it can\'t be rated. Try again in a minute.'**
   String get svcReviewNotYet;
+
+  /// No description provided for @svcBoOffersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service offers'**
+  String get svcBoOffersTitle;
+
+  /// No description provided for @svcBoOffersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every service shop\'s offers, in any status — take one down or restore it, with a reason'**
+  String get svcBoOffersSubtitle;
+
+  /// No description provided for @svcBoShopsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops'**
+  String get svcBoShopsTitle;
+
+  /// No description provided for @svcBoShopsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed shops, and which of them carry the Verified Local badge'**
+  String get svcBoShopsSubtitle;
+
+  /// No description provided for @svcBoFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get svcBoFilterAll;
+
+  /// No description provided for @svcBoOfferDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get svcBoOfferDraft;
+
+  /// No description provided for @svcBoOfferActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get svcBoOfferActive;
+
+  /// No description provided for @svcBoOfferPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get svcBoOfferPaused;
+
+  /// No description provided for @svcBoOfferArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get svcBoOfferArchived;
+
+  /// No description provided for @svcBoOfferTakenDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down'**
+  String get svcBoOfferTakenDown;
+
+  /// No description provided for @svcBoAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All categories'**
+  String get svcBoAllCategories;
+
+  /// No description provided for @svcBoAllShops.
+  ///
+  /// In en, this message translates to:
+  /// **'All shops'**
+  String get svcBoAllShops;
+
+  /// No description provided for @svcBoShopFilterTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops seen in the results so far'**
+  String get svcBoShopFilterTooltip;
+
+  /// No description provided for @svcBoOffersSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search offer or shop name'**
+  String get svcBoOffersSearchHint;
+
+  /// No description provided for @svcBoColOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer'**
+  String get svcBoColOffer;
+
+  /// No description provided for @svcBoColShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get svcBoColShop;
+
+  /// No description provided for @svcBoColCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get svcBoColCategory;
+
+  /// No description provided for @svcBoColPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get svcBoColPrice;
+
+  /// No description provided for @svcBoColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get svcBoColStatus;
+
+  /// No description provided for @svcBoOffersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No service offers match these filters.'**
+  String get svcBoOffersEmpty;
+
+  /// No description provided for @svcBoOffersLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load service offers.'**
+  String get svcBoOffersLoadFailed;
+
+  /// No description provided for @svcBoOffersRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This account may not read service offers — only back office staff can.'**
+  String get svcBoOffersRefused;
+
+  /// No description provided for @svcBoPageOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages}'**
+  String svcBoPageOf(int page, int pages);
+
+  /// No description provided for @svcBoOffersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 offer} other{{count} offers}}'**
+  String svcBoOffersCount(int count);
+
+  /// No description provided for @svcBoPriceFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From {price}'**
+  String svcBoPriceFrom(String price);
+
+  /// No description provided for @svcBoPricePer.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} per {unit}'**
+  String svcBoPricePer(String price, String unit);
+
+  /// No description provided for @svcBoPricePerPack.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} per {count} {unit}'**
+  String svcBoPricePerPack(String price, int count, String unit);
+
+  /// No description provided for @svcBoSectionOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer'**
+  String get svcBoSectionOffer;
+
+  /// No description provided for @svcBoSectionShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider shop'**
+  String get svcBoSectionShop;
+
+  /// No description provided for @svcBoSectionTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get svcBoSectionTerms;
+
+  /// No description provided for @svcBoSectionPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get svcBoSectionPhotos;
+
+  /// No description provided for @svcBoSectionHold.
+  ///
+  /// In en, this message translates to:
+  /// **'Held off sale'**
+  String get svcBoSectionHold;
+
+  /// No description provided for @svcBoSectionModerationHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderation history'**
+  String get svcBoSectionModerationHistory;
+
+  /// No description provided for @svcBoFactDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get svcBoFactDescription;
+
+  /// No description provided for @svcBoFactName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get svcBoFactName;
+
+  /// No description provided for @svcBoFactListing.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing'**
+  String get svcBoFactListing;
+
+  /// No description provided for @svcBoShopListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed'**
+  String get svcBoShopListed;
+
+  /// No description provided for @svcBoShopDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet listed'**
+  String get svcBoShopDraft;
+
+  /// No description provided for @svcBoShopSuspended.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended'**
+  String get svcBoShopSuspended;
+
+  /// No description provided for @svcBoTermPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing'**
+  String get svcBoTermPricing;
+
+  /// No description provided for @svcBoPricingFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed price'**
+  String get svcBoPricingFixed;
+
+  /// No description provided for @svcBoPricingPerUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Per unit'**
+  String get svcBoPricingPerUnit;
+
+  /// No description provided for @svcBoPricingFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting price'**
+  String get svcBoPricingFrom;
+
+  /// No description provided for @svcBoTermUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not known to this version'**
+  String get svcBoTermUnknown;
+
+  /// No description provided for @svcBoTermPack.
+  ///
+  /// In en, this message translates to:
+  /// **'One pack'**
+  String get svcBoTermPack;
+
+  /// No description provided for @svcBoPackOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {unit}'**
+  String svcBoPackOf(int count, String unit);
+
+  /// No description provided for @svcBoPackUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unit} other{{count} units}}'**
+  String svcBoPackUnits(int count);
+
+  /// No description provided for @svcBoTermTurnaround.
+  ///
+  /// In en, this message translates to:
+  /// **'Turnaround'**
+  String get svcBoTermTurnaround;
+
+  /// No description provided for @svcBoTurnaroundRange.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}–{max} hours'**
+  String svcBoTurnaroundRange(int min, int max);
+
+  /// No description provided for @svcBoTurnaroundUpTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} hours'**
+  String svcBoTurnaroundUpTo(int max);
+
+  /// No description provided for @svcBoTermFulfilment.
+  ///
+  /// In en, this message translates to:
+  /// **'Fulfilment'**
+  String get svcBoTermFulfilment;
+
+  /// No description provided for @svcBoFulfilPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup at the shop'**
+  String get svcBoFulfilPickup;
+
+  /// No description provided for @svcBoFulfilDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop delivery'**
+  String get svcBoFulfilDelivery;
+
+  /// No description provided for @svcBoFulfilBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup or delivery'**
+  String get svcBoFulfilBoth;
+
+  /// No description provided for @svcBoTermFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer files'**
+  String get svcBoTermFiles;
+
+  /// No description provided for @svcBoFilesPolicyNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No files'**
+  String get svcBoFilesPolicyNone;
+
+  /// No description provided for @svcBoFilesPolicyOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get svcBoFilesPolicyOptional;
+
+  /// No description provided for @svcBoFilesPolicyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get svcBoFilesPolicyRequired;
+
+  /// No description provided for @svcBoTermPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Question to the customer'**
+  String get svcBoTermPrompt;
+
+  /// No description provided for @svcBoNoPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'No photos'**
+  String get svcBoNoPhotos;
+
+  /// No description provided for @svcBoPhotoUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Image unavailable'**
+  String get svcBoPhotoUnavailable;
+
+  /// No description provided for @svcBoOpenPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Open full-size photo'**
+  String get svcBoOpenPhoto;
+
+  /// No description provided for @svcBoPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get svcBoPhoto;
+
+  /// No description provided for @svcBoPhotoPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {count}'**
+  String svcBoPhotoPosition(int index, int count);
+
+  /// No description provided for @svcBoHoldReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason given'**
+  String get svcBoHoldReason;
+
+  /// No description provided for @svcBoHoldSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Since'**
+  String get svcBoHoldSince;
+
+  /// No description provided for @svcBoTakeDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Take down'**
+  String get svcBoTakeDown;
+
+  /// No description provided for @svcBoRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get svcBoRestore;
+
+  /// No description provided for @svcBoTakeDownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take down {offer}?'**
+  String svcBoTakeDownTitle(String offer);
+
+  /// No description provided for @svcBoTakeDownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It goes off sale for every customer at once. Its provider reads your reason, and cannot put it back on sale until back office restores it.'**
+  String get svcBoTakeDownBody;
+
+  /// No description provided for @svcBoRestoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore {offer}?'**
+  String svcBoRestoreTitle(String offer);
+
+  /// No description provided for @svcBoRestoreBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The hold is lifted. An offer that was on sale comes back paused, for its provider to resume.'**
+  String get svcBoRestoreBody;
+
+  /// No description provided for @svcBoReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason — required, kept in the history'**
+  String get svcBoReasonLabel;
+
+  /// No description provided for @svcBoReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Say why: the reason is required.'**
+  String get svcBoReasonRequired;
+
+  /// No description provided for @svcBoTakenDownDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{offer} was taken down. Its provider can read your reason.'**
+  String svcBoTakenDownDone(String offer);
+
+  /// No description provided for @svcBoRestoredDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{offer} was restored. If it was on sale, it waits paused for its provider to resume it.'**
+  String svcBoRestoredDone(String offer);
+
+  /// No description provided for @svcBoTakeDownRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Not taken down: the server says this offer is already down, or is not a service offer. Nothing changed, and the list was reloaded.'**
+  String get svcBoTakeDownRefused;
+
+  /// No description provided for @svcBoRestoreRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Not restored: the server says this offer is not taken down any more. Nothing changed, and the list was reloaded.'**
+  String get svcBoRestoreRefused;
+
+  /// No description provided for @svcBoOfferChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer changed while you were acting, so nothing was recorded. It has been reloaded; try again.'**
+  String get svcBoOfferChanged;
+
+  /// No description provided for @svcBoOfferGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer no longer exists.'**
+  String get svcBoOfferGone;
+
+  /// No description provided for @svcBoModerateRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This account may not moderate offers.'**
+  String get svcBoModerateRefused;
+
+  /// No description provided for @svcBoReasonRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The server did not accept that reason. Write one of at most {max} characters.'**
+  String svcBoReasonRejected(int max);
+
+  /// No description provided for @svcBoActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not go through, and nothing changed. Try again.'**
+  String get svcBoActionFailed;
+
+  /// No description provided for @svcBoHistoryNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Back office has never acted on this offer.'**
+  String get svcBoHistoryNever;
+
+  /// No description provided for @svcBoHistoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the history.'**
+  String get svcBoHistoryLoadFailed;
+
+  /// No description provided for @svcBoActTakeDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down'**
+  String get svcBoActTakeDown;
+
+  /// No description provided for @svcBoActRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored'**
+  String get svcBoActRestore;
+
+  /// No description provided for @svcBoActUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'An action this version does not know'**
+  String get svcBoActUnknown;
+
+  /// No description provided for @svcBoActBy.
+  ///
+  /// In en, this message translates to:
+  /// **'by {actor}'**
+  String svcBoActBy(String actor);
+
+  /// No description provided for @svcBoKindAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All kinds'**
+  String get svcBoKindAll;
+
+  /// No description provided for @svcBoKindService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service orders'**
+  String get svcBoKindService;
+
+  /// No description provided for @svcBoFulfilmentAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup and delivery'**
+  String get svcBoFulfilmentAll;
+
+  /// No description provided for @svcBoFulfilmentPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup'**
+  String get svcBoFulfilmentPickup;
+
+  /// No description provided for @svcBoFulfilmentDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get svcBoFulfilmentDelivery;
+
+  /// No description provided for @svcBoServiceTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get svcBoServiceTag;
+
+  /// No description provided for @svcBoStatusPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Placed'**
+  String get svcBoStatusPlaced;
+
+  /// No description provided for @svcBoStatusAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get svcBoStatusAccepted;
+
+  /// No description provided for @svcBoStatusInProduction.
+  ///
+  /// In en, this message translates to:
+  /// **'In production'**
+  String get svcBoStatusInProduction;
+
+  /// No description provided for @svcBoStatusReadyPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for pickup'**
+  String get svcBoStatusReadyPickup;
+
+  /// No description provided for @svcBoStatusReadyDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for delivery'**
+  String get svcBoStatusReadyDelivery;
+
+  /// No description provided for @svcBoStatusOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get svcBoStatusOnTheWay;
+
+  /// No description provided for @svcBoStatusCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected'**
+  String get svcBoStatusCollected;
+
+  /// No description provided for @svcBoStatusDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get svcBoStatusDelivered;
+
+  /// No description provided for @svcBoStatusDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined by the provider'**
+  String get svcBoStatusDeclined;
+
+  /// No description provided for @svcBoStatusNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled: never collected'**
+  String get svcBoStatusNotCollected;
+
+  /// No description provided for @svcBoStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get svcBoStatusCancelled;
+
+  /// No description provided for @svcBoDetailKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get svcBoDetailKind;
+
+  /// No description provided for @svcBoKindServiceIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Service · {category}'**
+  String svcBoKindServiceIn(String category);
+
+  /// No description provided for @svcBoDetailService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get svcBoDetailService;
+
+  /// No description provided for @svcBoPacksOfUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'{packs} × {size} {unit}'**
+  String svcBoPacksOfUnits(int packs, int size, String unit);
+
+  /// No description provided for @svcBoPacksOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{packs} × {size}'**
+  String svcBoPacksOf(int packs, int size);
+
+  /// No description provided for @svcBoDetailOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get svcBoDetailOptions;
+
+  /// No description provided for @svcBoDetailInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions'**
+  String get svcBoDetailInstructions;
+
+  /// No description provided for @svcBoNoInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'None written'**
+  String get svcBoNoInstructions;
+
+  /// No description provided for @svcBoDetailReadyBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated ready'**
+  String get svcBoDetailReadyBy;
+
+  /// No description provided for @svcBoHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Status history'**
+  String get svcBoHistoryTitle;
+
+  /// No description provided for @svcBoHistoryNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No steps recorded yet.'**
+  String get svcBoHistoryNone;
+
+  /// No description provided for @svcBoHistoryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the status history.'**
+  String get svcBoHistoryFailed;
+
+  /// No description provided for @svcBoFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer\'s files'**
+  String get svcBoFilesTitle;
+
+  /// No description provided for @svcBoFilesAuditNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Back office reads of a customer\'s files are recorded: showing them logs your account against each file.'**
+  String get svcBoFilesAuditNotice;
+
+  /// No description provided for @svcBoFilesShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the files'**
+  String get svcBoFilesShow;
+
+  /// No description provided for @svcBoFilesNotTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer takes no files.'**
+  String get svcBoFilesNotTaken;
+
+  /// No description provided for @svcBoFilesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No files on this order. Files are deleted 90 days after the order is completed.'**
+  String get svcBoFilesEmpty;
+
+  /// No description provided for @svcBoFileOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get svcBoFileOpen;
+
+  /// No description provided for @svcBoFileOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened in a new tab. Your access to this file is recorded.'**
+  String get svcBoFileOpened;
+
+  /// No description provided for @svcBoFilePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get svcBoFilePdf;
+
+  /// No description provided for @svcBoFileImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get svcBoFileImage;
+
+  /// No description provided for @svcBoFileOther.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get svcBoFileOther;
+
+  /// No description provided for @svcBoSizeMb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String svcBoSizeMb(String size);
+
+  /// No description provided for @svcBoSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String svcBoSizeKb(String size);
+
+  /// No description provided for @svcBoFilesRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'The server refused to show this order\'s files.'**
+  String get svcBoFilesRefused;
+
+  /// No description provided for @svcBoFilesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The files cannot be reached right now. Try again shortly.'**
+  String get svcBoFilesUnavailable;
+
+  /// No description provided for @svcBoFilesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the files.'**
+  String get svcBoFilesFailed;
+
+  /// No description provided for @svcBoLedgerRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This account may not read the orders ledger.'**
+  String get svcBoLedgerRefused;
+
+  /// No description provided for @svcBoShopsGoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods shops'**
+  String get svcBoShopsGoods;
+
+  /// No description provided for @svcBoShopsServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Service shops'**
+  String get svcBoShopsServices;
+
+  /// No description provided for @svcBoShopsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search shop name'**
+  String get svcBoShopsSearchHint;
+
+  /// No description provided for @svcBoShopsListedOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only shops listed on the storefront appear here.'**
+  String get svcBoShopsListedOnly;
+
+  /// No description provided for @svcBoShopsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No listed shops match.'**
+  String get svcBoShopsEmpty;
+
+  /// No description provided for @svcBoShopsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load shops.'**
+  String get svcBoShopsLoadFailed;
+
+  /// No description provided for @svcBoVerifyGrantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark {shop} as Verified Local?'**
+  String svcBoVerifyGrantTitle(String shop);
+
+  /// No description provided for @svcBoVerifyGrantBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers see the badge on this shop wherever it appears. It is YouDrop\'s own claim to the shop\'s neighbours, so grant it only to a shop that has been checked.'**
+  String get svcBoVerifyGrantBody;
+
+  /// No description provided for @svcBoVerifyRevokeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Verified Local from {shop}?'**
+  String svcBoVerifyRevokeTitle(String shop);
+
+  /// No description provided for @svcBoVerifyRevokeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge disappears from this shop for every customer.'**
+  String get svcBoVerifyRevokeBody;
+
+  /// No description provided for @svcBoVerifyGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant the badge'**
+  String get svcBoVerifyGrant;
+
+  /// No description provided for @svcBoVerifyRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the badge'**
+  String get svcBoVerifyRevoke;
+
+  /// No description provided for @svcBoVerifyGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} is now Verified Local.'**
+  String svcBoVerifyGranted(String shop);
+
+  /// No description provided for @svcBoVerifyRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} is no longer Verified Local.'**
+  String svcBoVerifyRevoked(String shop);
+
+  /// No description provided for @svcBoVerifyRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Only back office can change this badge.'**
+  String get svcBoVerifyRefused;
+
+  /// No description provided for @svcBoVerifyGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop no longer exists.'**
+  String get svcBoVerifyGone;
+
+  /// No description provided for @svcBoVerifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge was not changed. Try again.'**
+  String get svcBoVerifyFailed;
+
+  /// No description provided for @svcBoVerifiedToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Local for {shop}'**
+  String svcBoVerifiedToggle(String shop);
+
+  /// No description provided for @svcBoReasonLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String svcBoReasonLength(int used, int max);
+
+  /// No description provided for @svcBoOfferNotListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded, and this offer is no longer among the service offers, so there is nothing left to act on.'**
+  String get svcBoOfferNotListed;
+
+  /// No description provided for @svcBoOfferUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.'**
+  String get svcBoOfferUnreadable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

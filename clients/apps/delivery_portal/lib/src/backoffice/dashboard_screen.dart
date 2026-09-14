@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:flutter/material.dart';
 
+import '../shell/console_controls.dart';
 import '../shell/shell.dart';
+import 'service_order_detail.dart';
+import 'services_admin_parts.dart';
 
 /// The cross-merchant orders ledger — Figma `backoffice-orders` (3:2817).
 ///
@@ -21,13 +25,26 @@ import '../shell/shell.dart';
 /// deep links, and renaming it would be a wide change for a screen that has always been the orders
 /// page whatever the file is called.
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key, required this.api, this.notificationApi});
+  const DashboardScreen({
+    super.key,
+    required this.api,
+    this.notificationApi,
+    this.attachmentApi,
+    this.openLink = openExternalLink,
+  });
 
   final OrderApi api;
 
   /// The operator's own in-app inbox, behind the header's bell. Optional so the screen can be
   /// rendered on its own — a null one draws the bell greyed rather than polling nothing.
   final NotificationApi? notificationApi;
+
+  /// A service order's files, through back office's audited read. Optional so the screen renders on
+  /// its own; without it a service order's detail draws no files block rather than a dead button.
+  final OrderAttachmentApi? attachmentApi;
+
+  /// Opens a customer's file in a new browser tab. A parameter so a test can see what was opened.
+  final void Function(String url) openLink;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -82,10 +99,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  /// The kind and fulfilment filters, sent to the server with the state — "every service pickup
+  /// waiting at a counter" is [OrderKind.service], [Fulfilment.pickup] and [OrderStatus.ready]. Null is
+  /// every kind, and both fulfilments.
+  OrderKind? _kind;
+  Fulfilment? _fulfilment;
+
   Future<void> _refresh({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     try {
-      final Paged<DeliveryOrder> page = await widget.api.all(status: _filter, size: 50);
+      final Paged<DeliveryOrder> page = await widget.api
+          .all(status: _filter, kind: _kind, fulfilment: _fulfilment, size: 50);
       if (!mounted) return;
       setState(() {
         _orders = page.content;
@@ -103,6 +127,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _applyFilter(OrderStatus? status) {
     setState(() => _filter = status);
+    _refresh();
+  }
+
+  void _applyKind(OrderKind? kind) {
+    setState(() => _kind = kind);
+    _refresh();
+  }
+
+  void _applyFulfilment(Fulfilment? fulfilment) {
+    setState(() => _fulfilment = fulfilment);
     _refresh();
   }
 
@@ -154,6 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// Figma `filter-row` (3:2871): the search and date controls left, the state pills right.
   Widget _filterRow() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -174,6 +209,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _TodayButton(
               selected: _todayOnly,
               onPressed: () => setState(() => _todayOnly = !_todayOnly),
+            ),
+            // Server-side, unlike the two controls before them: `GET /api/orders` takes a kind and a
+            // fulfilment, so these narrow the whole ledger rather than the page already loaded.
+            ConsoleSelect(
+              label: _kind == OrderKind.service ? t.svcBoKindService : t.svcBoKindAll,
+              icon: Icons.design_services_outlined,
+              options: <ConsoleOption>[
+                ConsoleOption(label: t.svcBoKindAll, value: null),
+                ConsoleOption(label: t.svcBoKindService, value: OrderKind.service.wire),
+              ],
+              onSelected: (String? wire) =>
+                  _applyKind(wire == null ? null : OrderKind.fromWire(wire)),
+            ),
+            ConsoleSelect(
+              label: switch (_fulfilment) {
+                Fulfilment.pickup => t.svcBoFulfilmentPickup,
+                Fulfilment.delivery => t.svcBoFulfilmentDelivery,
+                _ => t.svcBoFulfilmentAll,
+              },
+              icon: Icons.local_shipping_outlined,
+              options: <ConsoleOption>[
+                ConsoleOption(label: t.svcBoFulfilmentAll, value: null),
+                ConsoleOption(label: t.svcBoFulfilmentPickup, value: Fulfilment.pickup.wire),
+                ConsoleOption(label: t.svcBoFulfilmentDelivery, value: Fulfilment.delivery.wire),
+              ],
+              onSelected: (String? wire) =>
+                  _applyFulfilment(wire == null ? null : Fulfilment.fromWire(wire)),
             ),
           ],
         ),
@@ -230,17 +292,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: ConsoleText.cellStrong,
               ),
-              Text(
-                order.storeName ?? _short(order.merchantId),
-                overflow: TextOverflow.ellipsis,
-                style: ConsoleText.cellMuted,
+              Row(
+                children: <Widget>[
+                  Flexible(
+                    child: Text(
+                      order.storeName ?? _short(order.merchantId),
+                      overflow: TextOverflow.ellipsis,
+                      style: ConsoleText.cellMuted,
+                    ),
+                  ),
+                  if (order.isService) ...<Widget>[
+                    const SizedBox(width: DeliverySpacing.sm),
+                    ConsoleSmallBadge(
+                      label: DeliveryStrings.of(context).svcBoServiceTag,
+                      accent: DeliveryAccent.neutral,
+                    ),
+                  ],
+                ],
               ),
               Text(
-                order.riderId == null ? 'Unassigned' : _short(order.riderId!),
+                // A pickup never gets a rider, so "Unassigned" would read as a job nobody took.
+                order.isPickup
+                    ? DeliveryStrings.of(context).svcBoFulfilPickup
+                    : order.riderId == null
+                        ? 'Unassigned'
+                        : _short(order.riderId!),
                 overflow: TextOverflow.ellipsis,
                 style: ConsoleText.cell,
               ),
-              ConsoleStatusPill.status(_paletteFor(order.status), label: order.status.label),
+              ConsoleStatusPill.status(
+                _paletteFor(order.status),
+                label: _statusLabel(DeliveryStrings.of(context), order),
+              ),
               Text(_money(order.totalAmount), style: ConsoleText.cellStrong),
               Text(
                 order.placedAt == null ? '—' : _when(order.placedAt!),
@@ -260,7 +343,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openDetail(DeliveryOrder order) async {
     final bool? changed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) => _OrderDetailDialog(order: order, api: widget.api),
+      builder: (BuildContext context) => _OrderDetailDialog(
+        order: order,
+        api: widget.api,
+        attachmentApi: widget.attachmentApi,
+        openLink: widget.openLink,
+      ),
     );
     if (changed ?? false) await _refresh();
   }
@@ -318,10 +406,17 @@ class _TodayButton extends StatelessWidget {
 
 /// One order, and the one thing Backoffice may do to it.
 class _OrderDetailDialog extends StatefulWidget {
-  const _OrderDetailDialog({required this.order, required this.api});
+  const _OrderDetailDialog({
+    required this.order,
+    required this.api,
+    required this.attachmentApi,
+    required this.openLink,
+  });
 
   final DeliveryOrder order;
   final OrderApi api;
+  final OrderAttachmentApi? attachmentApi;
+  final void Function(String url) openLink;
 
   @override
   State<_OrderDetailDialog> createState() => _OrderDetailDialogState();
@@ -366,6 +461,7 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
     final DeliveryOrder o = widget.order;
     final int units = o.items.fold<int>(0, (int a, OrderLine l) => a + l.qty);
 
@@ -385,7 +481,7 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
               Row(
                 children: <Widget>[
                   Expanded(child: Text('Order #${o.shortId}', style: ConsoleText.cardTitle)),
-                  ConsoleStatusPill.status(_paletteFor(o.status), label: o.status.label),
+                  ConsoleStatusPill.status(_paletteFor(o.status), label: _statusLabel(t, o)),
                 ],
               ),
               const SizedBox(height: ConsoleMetrics.kpiGap),
@@ -393,18 +489,46 @@ class _OrderDetailDialogState extends State<_OrderDetailDialog> {
               _DetailRow(label: 'Customer', value: _short(o.customerId)),
               _DetailRow(
                 label: 'Rider',
-                value: o.riderId == null ? 'Unassigned' : _short(o.riderId!),
+                value: o.isPickup
+                    ? t.svcBoFulfilPickup
+                    : o.riderId == null
+                        ? 'Unassigned'
+                        : _short(o.riderId!),
               ),
               _DetailRow(label: 'Items', value: '$units in ${o.items.length} lines'),
               _DetailRow(label: 'Total', value: _money(o.totalAmount)),
               _DetailRow(label: 'Payment', value: '${o.paymentMethod.label} · ${o.paymentStatus.label}'),
-              _DetailRow(label: 'Address', value: o.deliveryAddress.isEmpty ? '—' : o.deliveryAddress),
+              // A pickup has no address to go to: it waits at the shop.
+              _DetailRow(
+                label: 'Address',
+                value: o.isPickup
+                    ? t.svcBoFulfilPickup
+                    : o.deliveryAddress.isEmpty
+                        ? '—'
+                        : o.deliveryAddress,
+              ),
               _DetailRow(
                 label: 'Placed',
                 value: o.placedAt == null ? '—' : _when(o.placedAt!, withClock: true),
               ),
               if (o.cancelReason != null && o.cancelReason!.isNotEmpty)
-                _DetailRow(label: 'Cancelled because', value: o.cancelReason!),
+                _DetailRow(
+                  label: 'Cancelled because',
+                  // A provider's decline is stored as a code; it is said in words, as the customer
+                  // reads it.
+                  value: o.declineReason?.labelIn(t) ?? o.cancelReason!,
+                ),
+              if (o.isService) ...<Widget>[
+                const SizedBox(height: DeliverySpacing.sm),
+                const Divider(height: 1, color: DeliveryColors.border),
+                const SizedBox(height: ConsoleMetrics.kpiGap),
+                ServiceOrderDetail(
+                  order: o,
+                  orderApi: widget.api,
+                  attachmentApi: widget.attachmentApi,
+                  openLink: widget.openLink,
+                ),
+              ],
               if (_canCancel) ...<Widget>[
                 const SizedBox(height: ConsoleMetrics.kpiGap),
                 const Divider(height: 1, color: DeliveryColors.border),
@@ -568,20 +692,38 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A 403 is this account: the ledger is BACKOFFICE-only, and asking again would only be refused.
+    final bool refused = refusalStatus(error) == 403;
     return Container(
       padding: const EdgeInsets.all(ConsoleMetrics.cardPadding),
       decoration: ConsoleSurface.card(),
       child: Row(
         children: <Widget>[
-          Icon(Icons.error_outline, size: 18, color: DeliveryAccent.critical.color),
+          Icon(
+            refused ? Icons.lock_outline : Icons.error_outline,
+            size: 18,
+            color: DeliveryAccent.critical.color,
+          ),
           const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
-          Expanded(child: Text('Could not load orders. $error', style: ConsoleText.cellMuted)),
-          _DialogButton(label: 'Retry', onPressed: onRetry),
+          Expanded(
+            child: Text(
+              refused
+                  ? DeliveryStrings.of(context).svcBoLedgerRefused
+                  : 'Could not load orders. $error',
+              style: ConsoleText.cellMuted,
+            ),
+          ),
+          if (!refused) _DialogButton(label: 'Retry', onPressed: onRetry),
         ],
       ),
     );
   }
 }
+
+/// A service order's status in its kind's own words ("In production", "Collected"); every other
+/// order's as the ledger has always shown it.
+String _statusLabel(DeliveryStrings t, DeliveryOrder order) =>
+    order.isService ? serviceOrderStatusLabel(t, order) : order.status.label;
 
 /// The lifecycle's colour, mirroring `OrderStatusBadge` in the design system so a status reads the
 /// same here, in the merchant portal and on the customer's tracking screen.
