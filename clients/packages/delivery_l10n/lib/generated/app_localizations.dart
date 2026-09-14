@@ -18458,6 +18458,948 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Other reason'**
   String get svcDeclineOther;
+
+  /// No description provided for @svcNavOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers'**
+  String get svcNavOffers;
+
+  /// No description provided for @svcDashboardActiveOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Active offers'**
+  String get svcDashboardActiveOffers;
+
+  /// No description provided for @svcDashboardThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get svcDashboardThisWeek;
+
+  /// No description provided for @svcDashboardThisWeekCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders, last 7 days'**
+  String get svcDashboardThisWeekCaption;
+
+  /// No description provided for @svcDashboardRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get svcDashboardRating;
+
+  /// No description provided for @svcQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions'**
+  String get svcQuickActions;
+
+  /// No description provided for @svcAddOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add offer'**
+  String get svcAddOffer;
+
+  /// No description provided for @svcViewOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'View orders'**
+  String get svcViewOrders;
+
+  /// No description provided for @svcCurrentOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Current offers'**
+  String get svcCurrentOffers;
+
+  /// No description provided for @svcSeeAllOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get svcSeeAllOffers;
+
+  /// No description provided for @svcOfferActive.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE'**
+  String get svcOfferActive;
+
+  /// No description provided for @svcOfferPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'PAUSED'**
+  String get svcOfferPaused;
+
+  /// No description provided for @svcOfferDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'DRAFT'**
+  String get svcOfferDraft;
+
+  /// No description provided for @svcPauseOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get svcPauseOffer;
+
+  /// No description provided for @svcResumeOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get svcResumeOffer;
+
+  /// No description provided for @svcOfferPausedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer paused. Customers can\'t order it until you resume it.'**
+  String get svcOfferPausedDone;
+
+  /// No description provided for @svcOfferResumedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer is live again.'**
+  String get svcOfferResumedDone;
+
+  /// No description provided for @svcNoOffersYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No offers yet'**
+  String get svcNoOffersYet;
+
+  /// No description provided for @svcNoOffersYetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first service so customers can order it.'**
+  String get svcNoOffersYetBody;
+
+  /// No description provided for @svcDashboardLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your dashboard'**
+  String get svcDashboardLoadFailed;
+
+  /// No description provided for @svcOffersLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your offers'**
+  String get svcOffersLoadFailed;
+
+  /// No description provided for @svcNoShopYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your services shop isn\'t open yet'**
+  String get svcNoShopYet;
+
+  /// No description provided for @svcNoShopYetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It opens as soon as your application is approved.'**
+  String get svcNoShopYetBody;
+
+  /// No description provided for @svcPublishAfterApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'You can publish offers once your application is approved.'**
+  String get svcPublishAfterApproval;
+
+  /// No description provided for @svcOffersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your offers'**
+  String get svcOffersTitle;
+
+  /// No description provided for @svcOffersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What customers can order from you'**
+  String get svcOffersSubtitle;
+
+  /// No description provided for @svcUnitPack.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {unit}'**
+  String svcUnitPack(String count, String unit);
+
+  /// No description provided for @svcUnitPer.
+  ///
+  /// In en, this message translates to:
+  /// **'Per {unit}'**
+  String svcUnitPer(String unit);
+
+  /// No description provided for @svcPriceUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'\${amount}'**
+  String svcPriceUsd(String amount);
+
+  /// No description provided for @svcPriceLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} LBP'**
+  String svcPriceLbp(String amount);
+
+  /// No description provided for @svcFromPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'From {price}'**
+  String svcFromPrice(String price);
+
+  /// No description provided for @svcLbpPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {amount} at today\'s rate'**
+  String svcLbpPreview(String amount);
+
+  /// No description provided for @svcNewOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'New service offer'**
+  String get svcNewOffer;
+
+  /// No description provided for @svcEditOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit offer'**
+  String get svcEditOffer;
+
+  /// No description provided for @svcOfferTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer title'**
+  String get svcOfferTitle;
+
+  /// No description provided for @svcOfferTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the offer a title'**
+  String get svcOfferTitleRequired;
+
+  /// No description provided for @svcTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String svcTooLong(String max);
+
+  /// No description provided for @svcDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get svcDescription;
+
+  /// No description provided for @svcCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get svcCategory;
+
+  /// No description provided for @svcCategoryOfShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers take your shop\'s category'**
+  String get svcCategoryOfShop;
+
+  /// No description provided for @svcPriceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Price (USD)'**
+  String get svcPriceLabel;
+
+  /// No description provided for @svcPriceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a price above zero, with at most two decimals'**
+  String get svcPriceInvalid;
+
+  /// No description provided for @svcPricingType.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing type'**
+  String get svcPricingType;
+
+  /// No description provided for @svcPricingFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed price'**
+  String get svcPricingFixed;
+
+  /// No description provided for @svcPricingPerUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Price per unit'**
+  String get svcPricingPerUnit;
+
+  /// No description provided for @svcPricingFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting price (options add to it)'**
+  String get svcPricingFrom;
+
+  /// No description provided for @svcUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit (e.g. cards, sqm)'**
+  String get svcUnitLabel;
+
+  /// No description provided for @svcPackSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Units per step'**
+  String get svcPackSize;
+
+  /// No description provided for @svcUnitRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Name the unit, such as cards or sqm'**
+  String get svcUnitRequired;
+
+  /// No description provided for @svcPackSizeRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Between {min} and {max}'**
+  String svcPackSizeRange(String min, String max);
+
+  /// No description provided for @svcPerUnitIsOne.
+  ///
+  /// In en, this message translates to:
+  /// **'A price per unit is for one unit'**
+  String get svcPerUnitIsOne;
+
+  /// No description provided for @svcPackPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers order in steps of {pack}'**
+  String svcPackPreview(String pack);
+
+  /// No description provided for @svcPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get svcPhotos;
+
+  /// No description provided for @svcPhotoRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one photo to publish'**
+  String get svcPhotoRequired;
+
+  /// No description provided for @svcAddPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get svcAddPhoto;
+
+  /// No description provided for @svcTurnaround.
+  ///
+  /// In en, this message translates to:
+  /// **'Turnaround'**
+  String get svcTurnaround;
+
+  /// No description provided for @svcTurnaroundSameDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Same day'**
+  String get svcTurnaroundSameDay;
+
+  /// No description provided for @svcTurnaround1to2.
+  ///
+  /// In en, this message translates to:
+  /// **'1–2 days'**
+  String get svcTurnaround1to2;
+
+  /// No description provided for @svcTurnaround3to5.
+  ///
+  /// In en, this message translates to:
+  /// **'3–5 days'**
+  String get svcTurnaround3to5;
+
+  /// No description provided for @svcTurnaroundWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'About a week'**
+  String get svcTurnaroundWeek;
+
+  /// No description provided for @svcTurnaroundHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}–{max} hours'**
+  String svcTurnaroundHours(String min, String max);
+
+  /// No description provided for @svcTurnaroundRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a turnaround'**
+  String get svcTurnaroundRequired;
+
+  /// No description provided for @svcFulfilment.
+  ///
+  /// In en, this message translates to:
+  /// **'How customers get it'**
+  String get svcFulfilment;
+
+  /// No description provided for @svcFulfilmentPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup at your shop'**
+  String get svcFulfilmentPickup;
+
+  /// No description provided for @svcFulfilmentDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop delivery'**
+  String get svcFulfilmentDelivery;
+
+  /// No description provided for @svcFulfilmentBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get svcFulfilmentBoth;
+
+  /// No description provided for @svcFulfilmentRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how customers get it'**
+  String get svcFulfilmentRequired;
+
+  /// No description provided for @svcDeliveryNeedsAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your delivery areas or drop your shop\'s pin before offering YouDrop delivery'**
+  String get svcDeliveryNeedsAreas;
+
+  /// No description provided for @svcCustomerFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer file'**
+  String get svcCustomerFile;
+
+  /// No description provided for @svcCustomerFileNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not needed'**
+  String get svcCustomerFileNone;
+
+  /// No description provided for @svcCustomerFileOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get svcCustomerFileOptional;
+
+  /// No description provided for @svcCustomerFileRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get svcCustomerFileRequired;
+
+  /// No description provided for @svcInstructionsPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'What should customers tell you?'**
+  String get svcInstructionsPrompt;
+
+  /// No description provided for @svcInstructionsPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Names and job titles to print'**
+  String get svcInstructionsPromptHint;
+
+  /// No description provided for @svcOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get svcOptions;
+
+  /// No description provided for @svcOptionsAfterSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the offer first, then add options such as paper type'**
+  String get svcOptionsAfterSave;
+
+  /// No description provided for @svcEditOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit options'**
+  String get svcEditOptions;
+
+  /// No description provided for @svcNoOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'No options'**
+  String get svcNoOptions;
+
+  /// No description provided for @svcPublishOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish offer'**
+  String get svcPublishOffer;
+
+  /// No description provided for @svcSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get svcSaveDraft;
+
+  /// No description provided for @svcSaveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get svcSaveChanges;
+
+  /// No description provided for @svcOfferPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer published'**
+  String get svcOfferPublished;
+
+  /// No description provided for @svcDraftSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft saved'**
+  String get svcDraftSaved;
+
+  /// No description provided for @svcOfferSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save this offer'**
+  String get svcOfferSaveFailed;
+
+  /// No description provided for @svcOfferRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer wasn\'t accepted as it stands. Check its details and try again.'**
+  String get svcOfferRefused;
+
+  /// No description provided for @svcArchiveOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive offer'**
+  String get svcArchiveOffer;
+
+  /// No description provided for @svcArchiveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive this offer? Customers won\'t see it again.'**
+  String get svcArchiveConfirm;
+
+  /// No description provided for @svcOfferArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer archived'**
+  String get svcOfferArchived;
+
+  /// No description provided for @svcOfferNotEditable.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer uses settings this version of the app can\'t edit. Update the app to change it.'**
+  String get svcOfferNotEditable;
+
+  /// No description provided for @svcMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get svcMoreActions;
+
+  /// No description provided for @svcIncomingOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming orders'**
+  String get svcIncomingOrders;
+
+  /// No description provided for @svcTabNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get svcTabNew;
+
+  /// No description provided for @svcTabInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get svcTabInProgress;
+
+  /// No description provided for @svcTabCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get svcTabCompleted;
+
+  /// No description provided for @svcChipNew.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW'**
+  String get svcChipNew;
+
+  /// No description provided for @svcChipAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'ACCEPTED'**
+  String get svcChipAccepted;
+
+  /// No description provided for @svcChipInProduction.
+  ///
+  /// In en, this message translates to:
+  /// **'IN PRODUCTION'**
+  String get svcChipInProduction;
+
+  /// No description provided for @svcChipReady.
+  ///
+  /// In en, this message translates to:
+  /// **'READY'**
+  String get svcChipReady;
+
+  /// No description provided for @svcChipOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'ON THE WAY'**
+  String get svcChipOnTheWay;
+
+  /// No description provided for @svcChipCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'COLLECTED'**
+  String get svcChipCollected;
+
+  /// No description provided for @svcChipDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'DELIVERED'**
+  String get svcChipDelivered;
+
+  /// No description provided for @svcChipDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'DECLINED'**
+  String get svcChipDeclined;
+
+  /// No description provided for @svcChipNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'NOT COLLECTED'**
+  String get svcChipNotCollected;
+
+  /// No description provided for @svcChipCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'CANCELLED'**
+  String get svcChipCancelled;
+
+  /// No description provided for @svcChipPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup'**
+  String get svcChipPickup;
+
+  /// No description provided for @svcChipDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get svcChipDelivery;
+
+  /// No description provided for @svcAcceptOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept order'**
+  String get svcAcceptOrder;
+
+  /// No description provided for @svcDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get svcDecline;
+
+  /// No description provided for @svcDeclineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you declining?'**
+  String get svcDeclineTitle;
+
+  /// No description provided for @svcDeclineBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer sees the reason you choose.'**
+  String get svcDeclineBody;
+
+  /// No description provided for @svcDeclineConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline order'**
+  String get svcDeclineConfirm;
+
+  /// No description provided for @svcWaitingForPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the customer to collect'**
+  String get svcWaitingForPickup;
+
+  /// No description provided for @svcWaitingForRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a rider'**
+  String get svcWaitingForRider;
+
+  /// No description provided for @svcReadyBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready by {time}'**
+  String svcReadyBy(String time);
+
+  /// No description provided for @svcAcceptedReadyBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted. Promised ready by {time}.'**
+  String svcAcceptedReadyBy(String time);
+
+  /// No description provided for @svcAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Order accepted'**
+  String get svcAccepted;
+
+  /// No description provided for @svcMarkedReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked ready'**
+  String get svcMarkedReady;
+
+  /// No description provided for @svcNoNewOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'No new orders'**
+  String get svcNoNewOrders;
+
+  /// No description provided for @svcNoOrdersInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in production'**
+  String get svcNoOrdersInProgress;
+
+  /// No description provided for @svcNoCompletedOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'No completed orders yet'**
+  String get svcNoCompletedOrders;
+
+  /// No description provided for @svcOrdersEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders appear here as customers place them.'**
+  String get svcOrdersEmptyBody;
+
+  /// No description provided for @svcCancelNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel as not collected'**
+  String get svcCancelNotCollected;
+
+  /// No description provided for @svcCancelNotCollectedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'You can cancel it as not collected in {time}'**
+  String svcCancelNotCollectedIn(String time);
+
+  /// No description provided for @svcCancelNotCollectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this uncollected order?'**
+  String get svcCancelNotCollectedTitle;
+
+  /// No description provided for @svcCancelNotCollectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer is told it was cancelled because it wasn\'t collected.'**
+  String get svcCancelNotCollectedBody;
+
+  /// No description provided for @svcCancelNotCollectedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the customer (optional)'**
+  String get svcCancelNotCollectedNote;
+
+  /// No description provided for @svcKeepOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep order'**
+  String get svcKeepOrder;
+
+  /// No description provided for @svcDurationDaysHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d {hours}h'**
+  String svcDurationDaysHours(String days, String hours);
+
+  /// No description provided for @svcDurationHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m'**
+  String svcDurationHoursMinutes(String hours, String minutes);
+
+  /// No description provided for @svcDurationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m'**
+  String svcDurationMinutes(String minutes);
+
+  /// No description provided for @svcRefusedNotDeclinable.
+  ///
+  /// In en, this message translates to:
+  /// **'This order was accepted meanwhile, so it can\'t be declined. Refreshing.'**
+  String get svcRefusedNotDeclinable;
+
+  /// No description provided for @svcRefusedNotCollectable.
+  ///
+  /// In en, this message translates to:
+  /// **'This order isn\'t waiting at your counter any more. Refreshing.'**
+  String get svcRefusedNotCollectable;
+
+  /// No description provided for @svcRefusedTooSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'It\'s too soon: the customer still has time to collect. Refreshing.'**
+  String get svcRefusedTooSoon;
+
+  /// No description provided for @svcRefusedOther.
+  ///
+  /// In en, this message translates to:
+  /// **'The order couldn\'t be changed. Refreshing.'**
+  String get svcRefusedOther;
+
+  /// No description provided for @svcOrderDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Order declined'**
+  String get svcOrderDeclined;
+
+  /// No description provided for @svcOrderCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as collected'**
+  String get svcOrderCollected;
+
+  /// No description provided for @svcOrderCancelledNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled as not collected'**
+  String get svcOrderCancelledNotCollected;
+
+  /// No description provided for @svcOrderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {id}'**
+  String svcOrderTitle(String id);
+
+  /// No description provided for @svcChatWithCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with customer'**
+  String get svcChatWithCustomer;
+
+  /// No description provided for @svcTheJob.
+  ///
+  /// In en, this message translates to:
+  /// **'The job'**
+  String get svcTheJob;
+
+  /// No description provided for @svcInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Special instructions'**
+  String get svcInstructions;
+
+  /// No description provided for @svcNoInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'No instructions given'**
+  String get svcNoInstructions;
+
+  /// No description provided for @svcCustomerFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer\'s files'**
+  String get svcCustomerFiles;
+
+  /// No description provided for @svcNoFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No files sent'**
+  String get svcNoFiles;
+
+  /// No description provided for @svcFilesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the files'**
+  String get svcFilesLoadFailed;
+
+  /// No description provided for @svcOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get svcOpenFile;
+
+  /// No description provided for @svcFileCouldNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this file'**
+  String get svcFileCouldNotOpen;
+
+  /// No description provided for @svcFileDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Document'**
+  String get svcFileDocument;
+
+  /// No description provided for @svcFileImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get svcFileImage;
+
+  /// No description provided for @svcFileSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String svcFileSizeKb(String size);
+
+  /// No description provided for @svcFileSizeMb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String svcFileSizeMb(String size);
+
+  /// No description provided for @svcFulfilmentPickupDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer collects it at your shop'**
+  String get svcFulfilmentPickupDetail;
+
+  /// No description provided for @svcFulfilmentDeliveryDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider delivers it to {address}'**
+  String svcFulfilmentDeliveryDetail(String address);
+
+  /// No description provided for @svcEstimatedReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated ready'**
+  String get svcEstimatedReady;
+
+  /// No description provided for @svcTurnaroundAfterAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Turnaround once you accept: {range}'**
+  String svcTurnaroundAfterAccept(String range);
+
+  /// No description provided for @svcOrderPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get svcOrderPrice;
+
+  /// No description provided for @svcOrderLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load this order'**
+  String get svcOrderLoadFailed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

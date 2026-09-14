@@ -66,3 +66,10 @@ export 'src/store_pin_map.dart';
 export 'src/whatsapp_draft_panel.dart';
 export 'src/whatsapp_screen.dart';
 export 'src/zones_screen.dart';
+// The services marketplace's provider side (Figma 126:51, 126:133, 126:200): a services shop's order
+// queue and order detail, mounted by the phone's shell in services mode and by the portal's services
+// rail like every page above. The files interface is exported because a host hands the order detail
+// its implementation.
+export 'src/services/service_order_detail_screen.dart';
+export 'src/services/service_order_files.dart';
+export 'src/services/service_orders_screen.dart';
