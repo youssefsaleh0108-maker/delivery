@@ -1,6 +1,8 @@
 /// Customer-to-shop threads, mirroring App Notification's `ShopChatController`.
 library;
 
+import 'service_order_models.dart';
+
 DateTime? _date(Object? value) => value is String ? DateTime.tryParse(value)?.toLocal() : null;
 
 /// The two sides of a shop thread. The shop side is a role, not a person: a customer is told "the
@@ -32,6 +34,9 @@ class ShopThread {
     this.lastMessageAt,
     this.lastMessagePreview,
     this.lastMessageSide,
+    this.orderId,
+    this.orderShortId,
+    this.orderKind,
   });
 
   final String id;
@@ -44,7 +49,8 @@ class ShopThread {
   final ShopThreadSide yourSide;
 
   /// Whether the composer should be enabled. A thread goes quiet two weeks after the customer's
-  /// last activity; only the customer can start it again.
+  /// last activity; only the customer can start it again, except that the shop reopening it for an
+  /// open or recently ended order keeps it open for that order.
   final bool open;
 
   final DateTime? closesAt;
@@ -57,6 +63,17 @@ class ShopThread {
   /// The inbox preview; null outside the inbox.
   final String? lastMessagePreview;
   final ShopThreadSide? lastMessageSide;
+
+  /// The order the thread was last opened from or for, once the server confirmed it — to the
+  /// customer as theirs and this shop's, or to the shop's merchant as one of its orders. Null when
+  /// the thread was only ever opened from the shop page.
+  final String? orderId;
+
+  /// That order's number as its order screens show it (`DeliveryOrder.shortId`); null without one.
+  final String? orderShortId;
+
+  /// That order's kind, so a service order can be labelled as one; null without an order.
+  final OrderKind? orderKind;
 
   ShopThread copyWith({bool? open, int? unread}) => ShopThread(
         id: id,
@@ -71,6 +88,9 @@ class ShopThread {
         unread: unread ?? this.unread,
         lastMessagePreview: lastMessagePreview,
         lastMessageSide: lastMessageSide,
+        orderId: orderId,
+        orderShortId: orderShortId,
+        orderKind: orderKind,
       );
 
   factory ShopThread.fromJson(Map<String, dynamic> json) => ShopThread(
@@ -88,6 +108,10 @@ class ShopThread {
         lastMessageSide: json['lastMessageSide'] == null
             ? null
             : ShopThreadSide.fromWire(json['lastMessageSide'] as String?),
+        orderId: json['orderId'] as String?,
+        orderShortId: json['orderId'] == null ? null : json['orderShortId'] as String?,
+        // Only with an order: [OrderKind.fromWire] reads a missing kind as a basket.
+        orderKind: json['orderId'] == null ? null : OrderKind.fromWire(json['orderKind']),
       );
 }
 
@@ -140,6 +164,18 @@ class ShopThreadQuietException implements Exception {
 
   @override
   String toString() => 'ShopThreadQuietException(closed at $closedAt)';
+}
+
+/// A shop's "chat with the customer" refused because the order was delivered or cancelled longer
+/// ago than a shop may open a conversation about it (409). [closedAt] is when that became so, when
+/// the server says. A thread that already exists stays readable from the inbox.
+class ShopOrderChatClosedException implements Exception {
+  const ShopOrderChatClosedException(this.closedAt);
+
+  final DateTime? closedAt;
+
+  @override
+  String toString() => 'ShopOrderChatClosedException(closed at $closedAt)';
 }
 
 /// A thread with a page of its messages.
