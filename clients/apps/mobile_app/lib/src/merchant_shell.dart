@@ -6,7 +6,8 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:flutter/material.dart';
 
-import 'notifications_screen.dart' show NotificationPrefsScreen;
+import 'notification_inbox.dart';
+import 'notifications_screen.dart' show NotificationPrefsScreen, NotificationsScreen;
 import 'services_shop_bootstrap.dart';
 import 'settings_screen.dart';
 
@@ -25,6 +26,14 @@ import 'settings_screen.dart';
 /// are keyed on the caller's own subject and refuse every employee token, so Orders and the
 /// order-backed dashboard are owner-only — gated on ownership, not on a permission that would only
 /// produce a 403.
+///
+/// A services provider — a print shop, a tailor — gets services mode (docs/figma-services-designs.md,
+/// "The provider app experience"): Dashboard, Orders, Offers, Settings. A shop that makes things to
+/// order has no till and no stock ledger, so POS and Inventory are not drawn, and its dashboard,
+/// queue and offers are the services ones (Figma 126:51, 126:200, 126:133). Which mode is read from
+/// the shop itself — its vertical — and nothing is drawn until it is known, so a provider is never
+/// shown a till and a shop is never shown Offers, not even for a frame. A shop that is not a services
+/// shop gets exactly the five tabs it always had.
 ///
 /// Tabs are built on first visit rather than eagerly. The register and the inventory each open a
 /// socket and a poll; building all five at start-up would have every merchant paying for screens
@@ -47,6 +56,9 @@ class MerchantShell extends StatefulWidget {
     this.demandApi,
     this.shopChatApi,
     this.chatSocket,
+    this.notificationApi,
+    this.zoneApi,
+    this.serviceOrderFiles,
     required this.session,
     required this.locale,
     this.pendingApproval = false,
@@ -105,6 +117,18 @@ class MerchantShell extends StatefulWidget {
   /// App Notification's socket, so a customer's message refreshes the inbox as it arrives.
   final UserQueueSocket? chatSocket;
 
+  /// The account's in-app notifications, behind the services dashboard's bell (126:51). Null draws no
+  /// bell. The goods dashboard has never had one, and does not get one here.
+  final NotificationApi? notificationApi;
+
+  /// The shop's delivery areas, which decide whether a service offer may be delivered. Null leaves
+  /// that to the shop's pin, and to the server.
+  final DeliveryZoneApi? zoneApi;
+
+  /// A service order's files for the provider's order detail. Null draws no files section: the
+  /// order attachment client is built on its own branch, and the host hands it over once it merges.
+  final ServiceOrderFiles? serviceOrderFiles;
+
   final AuthSession session;
 
   /// Drives the EN/AR toggle on the Settings tab.
@@ -135,7 +159,10 @@ class MerchantShell extends StatefulWidget {
 
 /// The tabs, named. The dashboard's pending card jumps to Orders and says so by name, and the
 /// visibility rules below read far better against a name than against an index.
-enum MerchantTab { dashboard, pos, inventory, orders, settings }
+///
+/// Offers is appended rather than slotted in beside Orders: nothing reads these by index, but a name
+/// that moved would be one more thing a merge had to notice.
+enum MerchantTab { dashboard, pos, inventory, orders, settings, offers }
 
 class _MerchantShellState extends State<MerchantShell> {
   MerchantTab _tab = MerchantTab.dashboard;
@@ -146,6 +173,11 @@ class _MerchantShellState extends State<MerchantShell> {
   /// The shop this person is standing in. Resolved once from the store API; the register and the
   /// shelves cannot open without it, so they show a waiting state until it lands.
   String? _storeId;
+
+  /// Whether this is a services shop's shell: true for a services shop and for a services applicant
+  /// still waiting for approval, false for everybody else. Null until the shop has been read, and
+  /// the shell draws nothing but a spinner until then — see the class doc.
+  bool? _servicesMode;
 
   /// What this person may do here. Starts as the owner for a MERCHANT account — the account that
   /// has always reached this shell — and is refined, never demoted below that, once the staff API
@@ -162,6 +194,9 @@ class _MerchantShellState extends State<MerchantShell> {
 
   /// Customers' unread messages, on Settings' messages row. Owner-only, like the row.
   ShopUnreadCount? _shopUnread;
+
+  /// The account's notifications, behind the services dashboard's bell. Services mode only.
+  NotificationInbox? _inbox;
 
   /// True while an approved services provider's shop is being opened: the one moment the shell shows
   /// nothing else, because every tab needs the shop.
@@ -197,11 +232,14 @@ class _MerchantShellState extends State<MerchantShell> {
   void dispose() {
     _poll?.cancel();
     _shopUnread?.dispose();
+    _inbox?.removeListener(_inboxChanged);
+    _inbox?.dispose();
     super.dispose();
   }
 
   Future<void> _resolveStore() async {
     String? storeId;
+    bool services = false;
     final OnboardingApi? onboarding = widget.onboardingApi;
     if (onboarding != null && widget.session.hasRole(DeliveryRole.merchant)) {
       // An approved services provider's shop is opened here, before anything else, from their
@@ -219,11 +257,14 @@ class _MerchantShellState extends State<MerchantShell> {
       switch (outcome) {
         case ServicesShopReady(:final Store store):
           storeId = store.id;
+          services = true;
         case NotServicesProvider(storeId: final String? standing):
           storeId = standing;
         case ServicesApplicationPending():
-          // Nothing is opened before a decision, and a waiting provider owns no shop to stand in.
+          // Nothing is opened before a decision, and a waiting provider owns no shop to stand in —
+          // but they applied to offer services, so they wait in the services shell, not at a till.
           storeId = null;
+          services = true;
         case ServicesShopFailed():
           setState(() {
             _openingServicesShop = false;
@@ -241,12 +282,15 @@ class _MerchantShellState extends State<MerchantShell> {
     } else {
       try {
         final Paged<Store> mine = await widget.storeApi.mine(size: 1);
-        if (mine.content.isNotEmpty) storeId = mine.content.first.id;
+        if (mine.content.isNotEmpty) {
+          storeId = mine.content.first.id;
+          services = mine.content.first.vertical == StoreVertical.services;
+        }
       } catch (_) {
         // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
       }
     }
-    if (storeId == null && widget.staffApi != null) {
+    if (storeId == null && !services && widget.staffApi != null) {
       // An employee owns no store, so `mine` is empty for them; their membership names the shop.
       try {
         final StaffMembership membership = await widget.staffApi!.myMembership();
@@ -256,7 +300,12 @@ class _MerchantShellState extends State<MerchantShell> {
       }
     }
     if (!mounted) return;
-    setState(() => _storeId = storeId);
+    setState(() {
+      _storeId = storeId;
+      _servicesMode = services;
+      if (!_visibleTabs().contains(_tab)) _tab = _visibleTabs().first;
+    });
+    if (services) _startInbox();
 
     if (storeId == null || widget.staffApi == null) return;
     try {
@@ -284,13 +333,57 @@ class _MerchantShellState extends State<MerchantShell> {
     }
   }
 
+  /// The bell's notifications, for the owner of a services shop when the host wired the client.
+  void _startInbox() {
+    final NotificationApi? api = widget.notificationApi;
+    if (api == null || _inbox != null || !_access.isOwner) return;
+    setState(() => _inbox = NotificationInbox(api)
+      ..addListener(_inboxChanged)
+      ..start());
+  }
+
+  /// Redraws the bell's count as the inbox changes, once the frame that changed it has finished.
+  ///
+  /// Not a builder listening to the inbox: the notifications page loads the inbox from its own
+  /// initState, so the inbox changes while that page is being built, and the framework refuses a
+  /// rebuild marked then anywhere outside the page being built.
+  void _inboxChanged() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  /// The goods shop's five tabs, in nav order, exactly as they have always been.
+  static const List<MerchantTab> _goodsTabs = <MerchantTab>[
+    MerchantTab.dashboard,
+    MerchantTab.pos,
+    MerchantTab.inventory,
+    MerchantTab.orders,
+    MerchantTab.settings,
+  ];
+
   /// The tabs this person may see, in nav order.
   ///
   /// Owners see all five. An employee sees the register if they may sell, the shelves if they may
   /// touch stock, and always Settings — which is where the language toggle and sign-out live, so
   /// nobody is ever handed an app with no way out of it.
+  ///
+  /// A services shop's owner sees Dashboard, Orders, Offers and Settings. Its employees see Settings:
+  /// the permissions a staff record grants open the register and the shelves, which a services shop
+  /// does not have, and its orders are the owner's for the same reason a goods shop's are.
   List<MerchantTab> _visibleTabs() {
-    if (_access.isOwner) return MerchantTab.values;
+    if (_servicesMode == true) {
+      return <MerchantTab>[
+        if (_access.isOwner) ...<MerchantTab>[
+          MerchantTab.dashboard,
+          MerchantTab.orders,
+          MerchantTab.offers,
+        ],
+        MerchantTab.settings,
+      ];
+    }
+    if (_access.isOwner) return _goodsTabs;
     return <MerchantTab>[
       if (_access.can(StorePermission.posSales)) MerchantTab.pos,
       if (_access.can(StorePermission.modifyInventoryPricing)) MerchantTab.inventory,
@@ -330,8 +423,10 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Widget _tabAt(MerchantTab tab) {
     if (!_visited.contains(tab)) return const SizedBox.shrink();
+    final bool services = _servicesMode == true;
     switch (tab) {
       case MerchantTab.dashboard:
+        if (services) return _servicesDashboard();
         return MerchantDashboardScreen(
           api: widget.orderApi,
           storeApi: widget.storeApi,
@@ -366,7 +461,25 @@ class _MerchantShellState extends State<MerchantShell> {
           catalogScanApi: _mayScan ? widget.catalogScanApi : null,
         );
       case MerchantTab.orders:
+        if (services) {
+          return ServiceOrdersScreen(
+            api: widget.orderApi,
+            // The order detail's "Chat with customer" opens the shop's conversations, which are the
+            // owner's, like the Settings row.
+            shopChat: _access.isOwner ? widget.shopChatApi : null,
+            chatSocket: widget.chatSocket,
+            files: widget.serviceOrderFiles,
+          );
+        }
         return OrdersScreen(api: widget.orderApi);
+      case MerchantTab.offers:
+        return ServiceOffersScreen(
+          api: widget.catalogApi,
+          storeApi: widget.storeApi,
+          zoneApi: widget.zoneApi,
+          storeId: _storeId,
+          pendingApproval: widget.pendingApproval,
+        );
       case MerchantTab.settings:
         return MerchantSettingsScreen(
           locale: widget.locale,
@@ -388,21 +501,54 @@ class _MerchantShellState extends State<MerchantShell> {
           // The suite's three management pages hang off Settings rather than taking a tab each:
           // a shop reorganises its shelves and its roster a few times a year, not a few times a
           // day, and the nav is for the few-times-a-day things.
-          onCategories: _access.can(StorePermission.modifyInventoryPricing)
+          //
+          // A services shop has no shelves: no shelf sections to arrange, no stock to count, and
+          // nothing a shelf photo could list — Product Service refuses an offer without its service
+          // terms, so a scan could only fail. Those three doors are not drawn in services mode.
+          onCategories: !services && _access.can(StorePermission.modifyInventoryPricing)
               ? _openCategories
               : null,
           onStaff: _access.can(StorePermission.manageStaff) ? _openStaff : null,
-          onStockCount: _access.can(StorePermission.modifyInventoryPricing) && _storeId != null
+          onStockCount: !services &&
+                  _access.can(StorePermission.modifyInventoryPricing) &&
+                  _storeId != null
               ? _openStockCount
               : null,
-          onCatalogScan: _mayScan && widget.catalogScanApi != null ? _openBlitz : null,
+          onCatalogScan:
+              !services && _mayScan && widget.catalogScanApi != null ? _openBlitz : null,
           onSwitchToShopping: widget.onSwitchToShopping,
           onSignOut: () => widget.onSignOut(),
         );
     }
   }
 
+  /// The services dashboard. The bell counts the inbox's unread notifications, and the shell redraws
+  /// as that changes ([_inboxChanged]).
+  Widget _servicesDashboard() {
+    final NotificationInbox? inbox = _inbox;
+    return ServiceDashboardScreen(
+      orderApi: widget.orderApi,
+      catalogApi: widget.catalogApi,
+      storeApi: widget.storeApi,
+      zoneApi: widget.zoneApi,
+      storeId: _storeId,
+      pendingApproval: widget.pendingApproval,
+      onViewOrders: () => _open(MerchantTab.orders),
+      onShowOffers: () => _open(MerchantTab.offers),
+      onNotifications: inbox == null ? null : _openNotifications,
+      unreadNotifications: inbox?.unread,
+    );
+  }
+
   // ---------------------------------------------------------------- pushed routes
+
+  void _openNotifications() {
+    final NotificationInbox? inbox = _inbox;
+    if (inbox == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NotificationsScreen(inbox: inbox),
+    ));
+  }
 
   void _openAccountPreferences() {
     Navigator.of(context).push(MaterialPageRoute<void>(
@@ -528,6 +674,12 @@ class _MerchantShellState extends State<MerchantShell> {
           label: t.navOrders,
           badgeCount: _awaitingYou,
         );
+      case MerchantTab.offers:
+        return YdBottomNavItem(
+          icon: Icons.design_services_outlined,
+          activeIcon: Icons.design_services,
+          label: t.svcNavOffers,
+        );
       case MerchantTab.settings:
         return YdBottomNavItem(
           icon: Icons.person_outline_rounded,
@@ -540,8 +692,6 @@ class _MerchantShellState extends State<MerchantShell> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final List<MerchantTab> tabs = _visibleTabs();
-    final int current = tabs.indexOf(_tab).clamp(0, tabs.length - 1);
 
     if (_openingServicesShop || _servicesShopFailed || _servicesCategoryClosed) {
       return _ServicesShopGate(
@@ -554,6 +704,18 @@ class _MerchantShellState extends State<MerchantShell> {
         onSignOut: widget.onSignOut,
       );
     }
+
+    if (_servicesMode == null) {
+      // Which shell this is comes from the shop, and until the shop has been read either answer
+      // could be wrong: a till in front of a print shop, or Offers in front of a restaurant.
+      return const Scaffold(
+        backgroundColor: DeliveryColors.background,
+        body: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+      );
+    }
+
+    final List<MerchantTab> tabs = _visibleTabs();
+    final int current = tabs.indexOf(_tab).clamp(0, tabs.length - 1);
 
     return Scaffold(
       backgroundColor: DeliveryColors.background,

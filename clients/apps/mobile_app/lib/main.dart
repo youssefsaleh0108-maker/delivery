@@ -1026,6 +1026,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               demandApi: _demandApi,
               shopChatApi: _shopChatApi,
               chatSocket: _socket,
+              // A services shop's bell (126:51) and the delivery rule on its offers. The order
+              // attachment client for serviceOrderFiles joins here when its branch merges.
+              notificationApi: _notificationApi,
+              zoneApi: _zoneApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,
