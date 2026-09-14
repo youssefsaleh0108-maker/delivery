@@ -98,6 +98,7 @@ class ServicesStorefrontIsolationTest {
             service = new StoreService(stores, mock(StoreOfferRepository.class),
                     mock(StoreFavoriteRepository.class), mock(ProductRepository.class),
                     mock(CategoryRepository.class), new ServiceCategories(environment),
+                    mock(OnboardingApplicationClient.class),
                     Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
             when(stores.findStorefront(any(), any(), any(), any(), any(), any(), any()))
                     .thenReturn(Page.empty());

@@ -329,6 +329,31 @@ class StoreApi {
     return Paged<Store>.fromJson(response.data as Map<String, dynamic>, Store.fromJson);
   }
 
+  /// Opens a shop for the signed-in merchant — `POST /api/stores`.
+  ///
+  /// For a services provider this is the shop's bootstrap: the app opens it once, on the approved
+  /// provider's first entry, from the application's name, category and area. The server keeps a
+  /// merchant to one services shop, so asking again — a retry, a second phone — hands back the same
+  /// shop rather than opening another. A goods shop opens one per call, as it always has.
+  Future<Store> create({
+    required String name,
+    required StoreVertical vertical,
+    ServiceCategory? serviceCategory,
+    String? neighborhood,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/stores',
+      data: <String, dynamic>{
+        'name': name,
+        'vertical': vertical.wireValue,
+        'tags': const <String>[],
+        if (neighborhood != null) 'neighborhood': neighborhood,
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
+      },
+    );
+    return Store.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// Saves the profile form.
   ///
   /// [neighborhood] follows the server's three-way rule: null leaves the shop's district as it is

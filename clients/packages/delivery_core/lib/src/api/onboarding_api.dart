@@ -190,6 +190,34 @@ class OnboardingApi {
     }
   }
 
+  /// The signed-in applicant's own application, telling "none" apart from "could not ask".
+  ///
+  /// [mine] answers null for both, which suits the screens that use it: to the pending screen and the
+  /// Google path either one means "nothing to show". Opening a services provider's shop is not like
+  /// that — a dropped connection read as "no application" would skip the shop without a word — so
+  /// this is null only for the server's 404 and rethrows everything else.
+  Future<OnboardingApplication?> myApplication() async {
+    try {
+      final Response<dynamic> response =
+          await _dio.get<dynamic>('/api/onboarding/applications/mine');
+      return OnboardingApplication.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// What the services signup form (Figma 126:11) offers: the service categories open right now and
+  /// the areas to pick from.
+  ///
+  /// No token needed — the open application form asks before there is an account — and these are the
+  /// lists the server checks an application against, so nothing offered here is refused there.
+  Future<ServiceSignupOptions> serviceOptions() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/onboarding/service-options');
+    return ServiceSignupOptions.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// Applies to ride or to sell as the account that is already signed in — the Google path.
   ///
   /// The open [applyAsRider] and [applyAsMerchant] take an address and a code-verified proof of it,

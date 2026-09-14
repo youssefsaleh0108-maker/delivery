@@ -57,6 +57,7 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.documents,
     this.statements,
     this.onDemandRadar,
+    this.onSwitchToShopping,
     this.onSignOut,
   });
 
@@ -129,6 +130,10 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// frame does not draw it, so an unwired host simply does not offer it. The host wires it for the
   /// owner only.
   final VoidCallback? onDemandRadar;
+
+  /// Takes an owner who is also a customer to the customer app — the shop's half of the role switch.
+  /// Null hides the row: an account with no customer role has nowhere to switch to.
+  final VoidCallback? onSwitchToShopping;
 
   /// Ends the session. Null hides the button entirely — a sign-out that does nothing is worse
   /// than no sign-out at all.
@@ -367,6 +372,14 @@ class MerchantSettingsScreen extends StatelessWidget {
               icon: Icons.radar,
               title: t.heatmapTitle,
               onTap: onDemandRadar,
+            ),
+          ],
+          if (onSwitchToShopping != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.shopping_bag_outlined,
+              title: t.svcSwitchToShopping,
+              onTap: onSwitchToShopping,
             ),
           ],
           if (onSignOut != null) ...<Widget>[

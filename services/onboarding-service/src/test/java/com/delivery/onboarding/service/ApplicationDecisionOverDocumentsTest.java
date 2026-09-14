@@ -47,6 +47,7 @@ class ApplicationDecisionOverDocumentsTest {
         applications = mock(OnboardingApplicationRepository.class);
         documents = mock(ApplicantDocumentService.class);
         onboarding = new OnboardingService(applications, mock(ApplicationIntake.class),
+                mock(VerificationService.class), mock(ServiceProviderAnswers.class),
                 mock(RuntimeService.class), mock(TaskService.class),
                 mock(KeycloakAdminClient.class), documents,
                 // Manual review: this suite is about a HUMAN deciding over outstanding documents,

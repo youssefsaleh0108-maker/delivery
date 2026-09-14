@@ -38,6 +38,7 @@ import com.delivery.product.service.CatalogScanService;
 import com.delivery.product.service.CatalogScanService.CatalogScanNotFoundException;
 import com.delivery.product.service.CatalogScanService.ScanDetails;
 import com.delivery.product.service.ProductImageService;
+import com.delivery.product.service.StoreService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -88,10 +89,16 @@ class CatalogScanAccessTest {
         }
 
         @Bean
+        StoreService storeService() {
+            return mock(StoreService.class);
+        }
+
+        @Bean
         CatalogScanController catalogScanController(CatalogScanService scans,
                                                     CatalogScanAnalyzer analyzer,
-                                                    ProductImageService images) {
-            return new CatalogScanController(scans, analyzer, images);
+                                                    ProductImageService images,
+                                                    StoreService stores) {
+            return new CatalogScanController(scans, analyzer, images, stores);
         }
     }
 
@@ -100,6 +107,7 @@ class CatalogScanAccessTest {
     private CatalogScanController controller;
     private CatalogScanService scans;
     private CatalogScanAnalyzer analyzer;
+    private StoreService stores;
 
     @BeforeAll
     static void boot() {
@@ -116,7 +124,8 @@ class CatalogScanAccessTest {
         controller = context.getBean(CatalogScanController.class);
         scans = context.getBean(CatalogScanService.class);
         analyzer = context.getBean(CatalogScanAnalyzer.class);
-        Mockito.reset(scans, analyzer);
+        stores = context.getBean(StoreService.class);
+        Mockito.reset(scans, analyzer, stores);
     }
 
     @AfterEach
@@ -162,7 +171,7 @@ class CatalogScanAccessTest {
             assertThatThrownBy(() -> endpoint.accept(controller))
                     .isInstanceOf(AccessDeniedException.class);
         }
-        verifyNoInteractions(scans, analyzer);
+        verifyNoInteractions(scans, analyzer, stores);
     }
 
     @Test
@@ -172,6 +181,27 @@ class CatalogScanAccessTest {
 
         assertThat(controller.read(SCAN).status()).isEqualTo(CatalogScan.Status.UPLOADING);
         verify(scans).read(SCAN, "merchant-sub");
+    }
+
+    /**
+     * What a first scan may open is asked before the scan service is entered — before its transaction
+     * and its merchant lock — and the answer is handed in: Onboarding can take seconds, and inside the
+     * transaction that wait held a pooled connection and both locks.
+     */
+    @Test
+    void a_first_scan_asks_what_it_may_open_before_the_scan_service_is_entered() {
+        signInAs("merchant-sub", "ROLE_MERCHANT");
+        when(stores.firstShopFor("merchant-sub", null))
+                .thenReturn(StoreService.FirstShop.NOT_FOR_A_SERVICES_APPLICANT);
+        when(scans.create("merchant-sub", null, StoreService.FirstShop.NOT_FOR_A_SERVICES_APPLICANT))
+                .thenReturn(emptyScan());
+
+        controller.create(null);
+
+        InOrder order = Mockito.inOrder(stores, scans);
+        order.verify(stores).firstShopFor("merchant-sub", null);
+        order.verify(scans).create("merchant-sub", null,
+                StoreService.FirstShop.NOT_FOR_A_SERVICES_APPLICANT);
     }
 
     /** Somebody else's scan id: the caller's own sub goes to the service, and the answer is a 404. */

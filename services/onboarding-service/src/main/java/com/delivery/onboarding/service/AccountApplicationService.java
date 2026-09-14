@@ -57,17 +57,20 @@ public class AccountApplicationService {
 
     private final OnboardingApplicationRepository applications;
     private final ApplicationIntake intake;
+    private final ServiceProviderAnswers services;
     private final OnboardingService onboarding;
     private final KeycloakAdminClient keycloak;
     private final AutoApprovalPolicy autoApproval;
 
     public AccountApplicationService(OnboardingApplicationRepository applications,
                                      ApplicationIntake intake,
+                                     ServiceProviderAnswers services,
                                      OnboardingService onboarding,
                                      KeycloakAdminClient keycloak,
                                      AutoApprovalPolicy autoApproval) {
         this.applications = applications;
         this.intake = intake;
+        this.services = services;
         this.onboarding = onboarding;
         this.keycloak = keycloak;
         this.autoApproval = autoApproval;
@@ -185,7 +188,7 @@ public class AccountApplicationService {
 
         Optional<OnboardingApplication> existing = existingFor(caller.userRef());
         if (existing.isPresent()) {
-            return resume(caller.userRef(), existing.get(), kind);
+            return resume(caller.userRef(), existing.get(), kind, answers.details());
         }
 
         Optional<Kind> trading = tradingAs(caller);
@@ -221,22 +224,29 @@ public class AccountApplicationService {
                     "Tell us the name of your shop");
         }
 
+        // The last refusal, and the only one that may wait on another service: an application to
+        // offer services is checked against Product Service, here, with no transaction open — never
+        // inside the intake's, which would hold a pooled connection for as long as Product Service
+        // took (see ApplicationIntake). details is applicant-supplied and holds bank details — into
+        // the record and nowhere else, exactly as on the open path.
+        ServiceProviderAnswers.Checked details = services.checked(kind, answers.details());
+
         OnboardingApplication application;
         try {
-            // details is applicant-supplied and holds bank details — into the record and nowhere
-            // else, exactly as on the open path.
             application = intake.recordForAccount(caller.userRef(), kind, businessName,
                     contactName, email, Instant.now(), answers.contactPhone(),
-                    answers.phoneVerificationToken(), answers.notes(), answers.details(),
+                    answers.phoneVerificationToken(), answers.notes(), details,
                     answers.targetProviderId());
         } catch (IllegalArgumentException e) {
             // The domain's own refusals — a shop naming a delivery company, say.
             throw new ApplicationRuleException(e.getMessage());
         } catch (ApplicationRuleException e) {
             // Two taps racing each other: the other one won the insert. Its application is this
-            // caller's application, so hand it back rather than an error about it.
+            // caller's application, so hand it back rather than an error about it — unless it is
+            // for a different business, which resume() refuses and so must this.
             Optional<OnboardingApplication> raced = applications.findByApplicantUserRef(caller.userRef());
-            if (raced.isPresent() && raced.get().getKind() == kind) {
+            if (raced.isPresent() && raced.get().getKind() == kind
+                    && !differentBusiness(raced.get(), answers.details())) {
                 return new Result(raced.get(), false);
             }
             throw e;
@@ -291,8 +301,18 @@ public class AccountApplicationService {
      * <p>A decided application is returned exactly as it is, with no role touched. Re-asserting
      * APPLICANT on an approved partner would take away what approval gave them, and on a rejected
      * one it would change nothing worth changing.
+     *
+     * <p><strong>Selling goods and offering services are one kind and two different
+     * applications.</strong> Both are MERCHANT, so the kind check alone handed a shop's undecided
+     * application to somebody filling in the services signup — which the profile menu offers an
+     * account whose shop application lost its roles half way — and the app then told them a reviewer
+     * reads "every application to sell services" about an application that opens a restaurant when
+     * approved. So a request that says which business it is for must agree with the application on
+     * file, and is refused with the other-application code when it does not. A request that says
+     * nothing — the Google sign-in's resume, which sends no answers — resumes as it always has.
      */
-    private Result resume(String userRef, OnboardingApplication existing, Kind asked) {
+    private Result resume(String userRef, OnboardingApplication existing, Kind asked,
+                          Map<String, Object> askedDetails) {
         if (existing.getKind() != asked) {
             throw new AccountRuleException(AccountRuleException.OTHER_APPLICATION,
                     existing.getKind() == Kind.RIDER
@@ -302,11 +322,29 @@ public class AccountApplicationService {
                                     : "This account already has an application as a delivery "
                                             + "company");
         }
+        if (differentBusiness(existing, askedDetails)) {
+            throw new AccountRuleException(AccountRuleException.OTHER_APPLICATION,
+                    ServiceProviderAnswers.isServices(existing.getDetails())
+                            ? "This account already has an application to offer services on YouDrop"
+                            : "This account already has an application to sell goods on YouDrop");
+        }
         if (existing.isDecided()) {
             return new Result(existing, false);
         }
         grantApplicantAccess(userRef, existing.getKind());
         return new Result(autoApproveIfAutomatic(existing), false);
+    }
+
+    /**
+     * Whether a request names a business and it is not the business of the application on file:
+     * services asked of a shop's application, or a shop's answers sent against a services one. A
+     * request that names none — the Google sign-in's resume — is never a different business.
+     */
+    private static boolean differentBusiness(OnboardingApplication onFile,
+                                             Map<String, Object> askedDetails) {
+        return ServiceProviderAnswers.namesBusinessType(askedDetails)
+                && ServiceProviderAnswers.isServices(askedDetails)
+                        != ServiceProviderAnswers.isServices(onFile.getDetails());
     }
 
     /**

@@ -178,6 +178,11 @@ delivery:
       # for known and unknown addresses alike, so it cannot be used to enumerate accounts.
       - /api/onboarding/password-reset
       - /api/onboarding/password-reset/confirm
+      # What the services signup form offers: the open service categories and the delivery zones to
+      # pick an area from. Open because the open application form runs before there is an account.
+      # It names no shop and no person — category names, and the zone names a customer's address
+      # picker already shows.
+      - /api/onboarding/service-options
 
   onboarding:
     # Who gets in without a human deciding — the SEED, no longer the source of truth.
@@ -264,6 +269,10 @@ delivery:
     # credentials of its own — one sending path for the platform, one delivery log to answer
     # "did it arrive" from.
     notifications-manager: ${NOTIFICATIONS_MANAGER_URL:http://localhost:8104}
+    # Asked which service categories are open and which delivery zones exist, whenever somebody
+    # applies to offer services or opens the services signup form. Product Service owns both lists;
+    # this service keeps no copy of either.
+    product-service: ${PRODUCT_SERVICE_URL:http://localhost:8103}
 
 management:
   endpoints:

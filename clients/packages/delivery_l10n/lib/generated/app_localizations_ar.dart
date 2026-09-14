@@ -10838,4 +10838,152 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcCategoryTutoring => 'دروس خصوصية';
+
+  @override
+  String get svcSignupTitle => 'كبّر عملك مع YouDrop';
+
+  @override
+  String get svcSignupSubtitle => 'اوصل إلى الزبائن في منطقتك.';
+
+  @override
+  String get svcSignupBannerTitle => 'خدمات لبنانية';
+
+  @override
+  String get svcSignupBannerBody =>
+      'طباعة، خياطة، تصليحات، تصوير والمزيد — يستلمها الزبون من محلّك أو يوصلها YouDrop.';
+
+  @override
+  String get svcBusinessName => 'اسم العمل';
+
+  @override
+  String get svcBusinessNameHint => 'مثلاً: مطبعة الفاخوري';
+
+  @override
+  String get svcServiceCategory => 'فئة الخدمة';
+
+  @override
+  String get svcServiceCategoryHint => 'اختر ما تقدّمه';
+
+  @override
+  String get svcPhoneHint => '71 234 567';
+
+  @override
+  String get svcPhoneInvalid => 'أدخل رقماً لبنانياً، مثل 71 234 567';
+
+  @override
+  String get svcArea => 'الموقع / المنطقة';
+
+  @override
+  String get svcAreaHint => 'اختر منطقتك';
+
+  @override
+  String get svcApplyCta => 'قدّم طلب بيع الخدمات';
+
+  @override
+  String get svcOptionsFailed =>
+      'تعذّر تحميل الخدمات المتاحة. تحقّق من اتصالك وحاول مجدداً.';
+
+  @override
+  String get svcNoCategoriesOpen =>
+      'لا يستقبل YouDrop طلبات لبيع الخدمات حالياً.';
+
+  @override
+  String get svcPendingTitle => 'تم إرسال طلبك';
+
+  @override
+  String svcPendingBody(String email) {
+    return 'يقرأ فريق YouDrop كل طلب لبيع الخدمات. سنراسلك على $email عند اتخاذ القرار.';
+  }
+
+  @override
+  String get svcPendingBodyNoEmail =>
+      'يقرأ فريق YouDrop كل طلب لبيع الخدمات، وسنبلغك عند اتخاذ القرار.';
+
+  @override
+  String svcReference(String reference) {
+    return 'المرجع: $reference';
+  }
+
+  @override
+  String get svcApprovedTitle => 'تمت الموافقة على طلبك';
+
+  @override
+  String get svcApprovedBody => 'نفتح محلّ خدماتك في أول مرة تدخل إليه.';
+
+  @override
+  String get svcErrCategoryClosed =>
+      'لا يستقبل YouDrop طلبات لهذه الخدمة بعد. اختر خدمة أخرى.';
+
+  @override
+  String get svcErrCategoryMissing => 'اختر الخدمة التي تقدّمها.';
+
+  @override
+  String get svcErrAreaUnknown =>
+      'لم تعد هذه المنطقة على القائمة. اختر منطقتك من جديد.';
+
+  @override
+  String get svcErrAreaMissing => 'اختر المنطقة التي يقع فيها عملك.';
+
+  @override
+  String get svcErrCatalogUnavailable =>
+      'تعذّر التحقق من الخدمات المتاحة الآن. حاول بعد قليل.';
+
+  @override
+  String get svcOfferYourServices => 'قدّم خدماتك';
+
+  @override
+  String get svcOfferYourServicesSub => 'طباعة، خياطة، تصليحات أو تصوير';
+
+  @override
+  String get svcSwitchToShop => 'انتقل إلى محلّك';
+
+  @override
+  String get svcSwitchToShopping => 'انتقل إلى التسوّق';
+
+  @override
+  String get svcChoiceCard => 'قدّم خدمات';
+
+  @override
+  String get svcChoiceCardBlurb =>
+      'اطبع أو خيّط أو صلّح أو صوّر لزبائن منطقتك، من محلّك.';
+
+  @override
+  String get svcIntent => 'خدمات';
+
+  @override
+  String get svcIntentBlurb => 'أطبع أو أخيّط أو أصلّح أو أصوّر';
+
+  @override
+  String get svcOpeningShop => 'نفتح محلّ خدماتك…';
+
+  @override
+  String get svcOpeningShopFailed => 'تعذّر فتح محلّ خدماتك.';
+
+  @override
+  String get svcDocsTitle => 'أضف مستنداتك';
+
+  @override
+  String get svcDocsIntro =>
+      'تساعد بطاقة هويتك وسجلّك التجاري فريق المراجعة على اتخاذ القرار. أرسل صوراً واضحة أو ملفات PDF.';
+
+  @override
+  String get svcDocsFootnote =>
+      'تصل المستندات إلى فريق المراجعة عند الضغط على «أرسل المستندات».';
+
+  @override
+  String get svcDocsSend => 'أرسل المستندات';
+
+  @override
+  String get svcDocsSent => 'مستنداتك لدى فريق المراجعة.';
+
+  @override
+  String get svcDocsSkipped =>
+      'لم تُرسل أي مستندات، لذا سيرى فريق المراجعة أن بطاقة هويتك وسجلّك التجاري غير مرفقين.';
+
+  @override
+  String get svcShopCategoryClosedTitle => 'خدمتك غير متاحة حالياً';
+
+  @override
+  String get svcShopCategoryClosedBody =>
+      'تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم.';
 }

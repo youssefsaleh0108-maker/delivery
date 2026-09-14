@@ -18,6 +18,8 @@ import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
 import 'src/partner_intro_screen.dart';
 import 'src/pending_application_screen.dart';
+import 'src/service_signup_screen.dart';
+import 'src/services_shop_bootstrap.dart';
 import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
@@ -150,6 +152,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
   late final DocumentsApi _documentsApi = DocumentsApi(_dio);
+
+  /// Accounts this session already knows are not services providers, kept above the shop shell —
+  /// which is built afresh on every entry — so a goods merchant's application is read once, not on
+  /// every entry. See [ServicesProviderMemory].
+  final ServicesProviderMemory _servicesProviderMemory = ServicesProviderMemory();
   late final NotificationApi _notificationApi = NotificationApi(_dio);
   // The merchant suite's four clients. inventory/pos/reports talk to services that are not yet
   // deployed; their screens render a calm unavailable state until they are. Staff is live.
@@ -366,6 +373,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// application is shown, for that account, before the role branch runs. Null otherwise.
   PartnerKind? _accountApplication;
 
+  /// The same for an account that answered "Services" on the Google question: the services signup,
+  /// for that account, before the role branch runs.
+  bool _accountServicesApplication = false;
+
   /// The surface somebody just asked for on the Google question, honoured for this session when
   /// the account holds it. See [homeFor].
   DeliveryRole? _preferredSurface;
@@ -417,8 +428,12 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
         // Into the application for THIS account. The role is granted when it is submitted; until
         // then the account holds whatever it held before — for a new Google account, nothing — so
         // backing out lands on the role question rather than in a shop.
-        _accountApplication =
-            intent == AccountIntent.seller ? PartnerKind.merchant : PartnerKind.rider;
+        if (intent == AccountIntent.services) {
+          _accountServicesApplication = true;
+        } else {
+          _accountApplication =
+              intent == AccountIntent.seller ? PartnerKind.merchant : PartnerKind.rider;
+        }
         _preferredSurface = intent.role;
         _adoptSession(session);
       case BrokerCancelled():
@@ -461,6 +476,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// session. Null kind means the choice screen is showing and they have not picked yet.
   bool _applyingAsPartner = false;
   PartnerKind? _partnerKind;
+
+  /// True when somebody with no account picked Services on the partner choice: the services signup
+  /// (Figma 126:11) shows instead of a shop wizard, and Back returns to the choice.
+  bool _applyingForServices = false;
 
   /// Whether the role's intro has been passed. Once a kind is known the intro sells that role
   /// (Figma `rider-signup-intro` / `merchant-signup-intro`), then the application form follows.
@@ -533,6 +552,8 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       _lockCheckedFor = null;
       // Both belong to the session that just ended; the next person to sign in starts clean.
       _preferredSurface = null;
+      _accountServicesApplication = false;
+      _applyingForServices = false;
       _accountApplication = null;
       // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
       // asserts its callback returns nothing.
@@ -580,7 +601,41 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,
+      onOfferServices: _mayOfferServices(session) ? () => _offerServices(session) : null,
+      onSwitchToShop: session.hasRole(DeliveryRole.merchant)
+          ? () => setState(() => _preferredSurface = DeliveryRole.merchant)
+          : null,
     );
+  }
+
+  /// Whether the profile menu may offer this account the services signup: only an account holding no
+  /// partner role and no application, the one kind the server takes an application from.
+  static bool _mayOfferServices(AuthSession session) =>
+      !session.hasRole(DeliveryRole.merchant) &&
+      !session.hasRole(DeliveryRole.delivery) &&
+      !session.hasRole(DeliveryRole.carrier) &&
+      !session.hasRole(DeliveryRole.applicant);
+
+  /// The services signup over the customer shell, for this account (Figma 126:11).
+  ///
+  /// Pushed, so Back returns to shopping. When it is done the refreshed session is adopted with
+  /// shopping still preferred: somebody who applied from the profile menu stays where they were, and
+  /// the menu now offers the switch to their shop (see [homeFor]).
+  Future<void> _offerServices(AuthSession session) async {
+    await _navigator.currentState?.push(MaterialPageRoute<void>(
+      builder: (BuildContext context) => ServiceProviderSignupScreen(
+        api: _onboardingApi,
+        documentsApi: _documentsApi,
+        authService: _authService,
+        account: session,
+        onClose: () => _navigator.currentState?.pop(),
+        onFinished: (AuthSession refreshed) {
+          _navigator.currentState?.pop();
+          setState(() => _preferredSurface = DeliveryRole.customer);
+          _adoptSession(refreshed);
+        },
+      ),
+    ));
   }
 
   /// The pending screen's "Explore Dashboard", made real.
@@ -682,8 +737,26 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               // The choice first, then the form for whichever they picked. Back from the form
               // returns to the choice rather than all the way out, because picking the wrong one
               // is an easy mistake and should cost one tap.
+              if (_applyingForServices) {
+                return ServiceProviderSignupScreen(
+                  api: _onboardingApi,
+                  documentsApi: _documentsApi,
+                  authService: _authService,
+                  onFinished: (AuthSession session) {
+                    // Out of the application flow: the account exists and is signed in, and the
+                    // role branch below puts it in the shop shell — waiting, or approved.
+                    setState(() {
+                      _applyingForServices = false;
+                      _applyingAsPartner = false;
+                    });
+                    _adoptSession(session);
+                  },
+                  onClose: () => setState(() => _applyingForServices = false),
+                );
+              }
               if (_partnerKind == null) {
                 return PartnerChoiceScreen(
+                  onChooseServices: () => setState(() => _applyingForServices = true),
                   onChoose: (PartnerKind kind) => setState(() {
                     _partnerKind = kind;
                     // The generic intro speaks rider and merchant; the carrier wizard opens on
@@ -812,6 +885,25 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             );
           }
 
+          // Answered "Services" with Google, and no application yet: the services signup comes first,
+          // for this account. See [_land].
+          if (_accountServicesApplication) {
+            return ServiceProviderSignupScreen(
+              key: ValueKey<String>('services-${session.subject}'),
+              api: _onboardingApi,
+              documentsApi: _documentsApi,
+              authService: _authService,
+              account: session,
+              onFinished: (AuthSession refreshed) {
+                setState(() => _accountServicesApplication = false);
+                _adoptSession(refreshed);
+              },
+              // Backing out leaves the application, not the session: what the account holds then
+              // decides where it lands.
+              onClose: () => setState(() => _accountServicesApplication = false),
+            );
+          }
+
           // Asked to ride or sell with Google, and no application yet: the application comes first,
           // for this account. See [_land].
           final PartnerKind? applying = _accountApplication;
@@ -937,6 +1029,12 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               session: session,
               locale: _locale,
               pendingApproval: pending,
+              // Opens an approved services provider's shop on the first entry, before anything else.
+              onboardingApi: _onboardingApi,
+              servicesProviderMemory: _servicesProviderMemory,
+              onSwitchToShopping: session.hasRole(DeliveryRole.customer)
+                  ? () => setState(() => _preferredSurface = DeliveryRole.customer)
+                  : null,
               onSignOut: _signOut,
             );
           }

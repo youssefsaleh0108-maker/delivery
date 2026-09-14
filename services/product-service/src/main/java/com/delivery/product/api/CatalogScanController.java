@@ -39,6 +39,7 @@ import com.delivery.product.service.CatalogScanService.ScanDetails;
 import com.delivery.product.service.CatalogScanService.Started;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
+import com.delivery.product.service.StoreService;
 import com.delivery.product.vision.FakeVisionProvider;
 
 /**
@@ -64,19 +65,30 @@ public class CatalogScanController {
     private final CatalogScanService scans;
     private final CatalogScanAnalyzer analyzer;
     private final ProductImageService images;
+    private final StoreService stores;
 
     public CatalogScanController(CatalogScanService scans, CatalogScanAnalyzer analyzer,
-                                 ProductImageService images) {
+                                 ProductImageService images, StoreService stores) {
         this.scans = scans;
         this.analyzer = analyzer;
         this.images = images;
+        this.stores = stores;
     }
 
-    /** Starts a scan. 429 once the day's scans are spent. */
+    /**
+     * Starts a scan. 429 once the day's scans are spent.
+     *
+     * <p>What a first scan may open for a merchant with no shop yet is asked here, before the scan
+     * service's transaction and its merchant lock, never inside them: Onboarding can take seconds to
+     * answer, and a pooled connection held across that wait is one that a waiting applicant, refused
+     * on every tap, takes from everybody (see {@link StoreService#firstShopFor}).
+     */
     @PostMapping
     public ResponseEntity<ScanResponse> create(@RequestBody(required = false) CreateScanRequest request) {
-        ScanDetails details = scans.create(CurrentUser.requireId(),
-                request == null ? null : request.storeId());
+        String merchantId = CurrentUser.requireId();
+        UUID storeId = request == null ? null : request.storeId();
+        ScanDetails details = scans.create(merchantId, storeId,
+                stores.firstShopFor(merchantId, storeId));
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(details));
     }
 

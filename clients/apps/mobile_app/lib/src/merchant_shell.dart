@@ -7,6 +7,7 @@ import 'package:delivery_merchant/delivery_merchant.dart';
 import 'package:flutter/material.dart';
 
 import 'notifications_screen.dart' show NotificationPrefsScreen;
+import 'services_shop_bootstrap.dart';
 import 'settings_screen.dart';
 
 /// The shop's surface: the five-tab app the merchant suite draws.
@@ -49,6 +50,9 @@ class MerchantShell extends StatefulWidget {
     required this.session,
     required this.locale,
     this.pendingApproval = false,
+    this.onboardingApi,
+    this.servicesProviderMemory,
+    this.onSwitchToShopping,
     required this.onSignOut,
   });
 
@@ -109,6 +113,20 @@ class MerchantShell extends StatefulWidget {
   /// True while the application behind this account is still being decided.
   final bool pendingApproval;
 
+  /// The account's own application, for opening an approved services provider's shop on their first
+  /// entry ([ServicesShopBootstrap]). Null skips that, which is where every shell stood before
+  /// services existed.
+  final OnboardingApi? onboardingApi;
+
+  /// What the app already learned this session about the account's application, so a goods merchant
+  /// is not asked about again on every entry ([ServicesProviderMemory]). Owned by the app rather than
+  /// the shell, because the shell is built afresh on every entry. Null remembers nothing.
+  final ServicesProviderMemory? servicesProviderMemory;
+
+  /// Takes an owner who is also a customer to the customer app — the Settings row of the role switch.
+  /// Null hides the row.
+  final VoidCallback? onSwitchToShopping;
+
   final Future<void> Function() onSignOut;
 
   @override
@@ -145,6 +163,17 @@ class _MerchantShellState extends State<MerchantShell> {
   /// Customers' unread messages, on Settings' messages row. Owner-only, like the row.
   ShopUnreadCount? _shopUnread;
 
+  /// True while an approved services provider's shop is being opened: the one moment the shell shows
+  /// nothing else, because every tab needs the shop.
+  bool _openingServicesShop = false;
+
+  /// Opening that shop failed. The shell says so and offers a retry rather than tabs that cannot work.
+  bool _servicesShopFailed = false;
+
+  /// The server will not open that shop, because its category is not offered right now. Final: the
+  /// shell says so and points to support, with no retry, because none could succeed.
+  bool _servicesCategoryClosed = false;
+
   @override
   void initState() {
     super.initState();
@@ -173,11 +202,49 @@ class _MerchantShellState extends State<MerchantShell> {
 
   Future<void> _resolveStore() async {
     String? storeId;
-    try {
-      final Paged<Store> mine = await widget.storeApi.mine(size: 1);
-      if (mine.content.isNotEmpty) storeId = mine.content.first.id;
-    } catch (_) {
-      // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
+    final OnboardingApi? onboarding = widget.onboardingApi;
+    if (onboarding != null && widget.session.hasRole(DeliveryRole.merchant)) {
+      // An approved services provider's shop is opened here, before anything else, from their
+      // application (see [ServicesShopBootstrap]). Everybody else gets the shop `mine` always gave
+      // them, and the shell carries on exactly as before.
+      final ServicesShopOutcome outcome = await ServicesShopBootstrap(
+        stores: widget.storeApi,
+        onboarding: onboarding,
+        memory: widget.servicesProviderMemory,
+        account: widget.session.subject,
+      ).run(onOpening: () {
+        if (mounted) setState(() => _openingServicesShop = true);
+      });
+      if (!mounted) return;
+      switch (outcome) {
+        case ServicesShopReady(:final Store store):
+          storeId = store.id;
+        case NotServicesProvider(storeId: final String? standing):
+          storeId = standing;
+        case ServicesApplicationPending():
+          // Nothing is opened before a decision, and a waiting provider owns no shop to stand in.
+          storeId = null;
+        case ServicesShopFailed():
+          setState(() {
+            _openingServicesShop = false;
+            _servicesShopFailed = true;
+          });
+          return;
+        case ServicesCategoryNotOffered():
+          setState(() {
+            _openingServicesShop = false;
+            _servicesCategoryClosed = true;
+          });
+          return;
+      }
+      if (_openingServicesShop) setState(() => _openingServicesShop = false);
+    } else {
+      try {
+        final Paged<Store> mine = await widget.storeApi.mine(size: 1);
+        if (mine.content.isNotEmpty) storeId = mine.content.first.id;
+      } catch (_) {
+        // Left null: the screens that need a shop say "no shop yet" rather than guessing one.
+      }
     }
     if (storeId == null && widget.staffApi != null) {
       // An employee owns no store, so `mine` is empty for them; their membership names the shop.
@@ -329,6 +396,7 @@ class _MerchantShellState extends State<MerchantShell> {
               ? _openStockCount
               : null,
           onCatalogScan: _mayScan && widget.catalogScanApi != null ? _openBlitz : null,
+          onSwitchToShopping: widget.onSwitchToShopping,
           onSignOut: () => widget.onSignOut(),
         );
     }
@@ -475,6 +543,18 @@ class _MerchantShellState extends State<MerchantShell> {
     final List<MerchantTab> tabs = _visibleTabs();
     final int current = tabs.indexOf(_tab).clamp(0, tabs.length - 1);
 
+    if (_openingServicesShop || _servicesShopFailed || _servicesCategoryClosed) {
+      return _ServicesShopGate(
+        failed: _servicesShopFailed,
+        categoryClosed: _servicesCategoryClosed,
+        onRetry: () {
+          setState(() => _servicesShopFailed = false);
+          _resolveStore();
+        },
+        onSignOut: widget.onSignOut,
+      );
+    }
+
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       // Edge-to-edge: the shell paints its background behind the now-transparent status bar, and
@@ -492,6 +572,76 @@ class _MerchantShellState extends State<MerchantShell> {
         currentIndex: current,
         onTap: (int index) => _open(tabs[index]),
         items: <YdBottomNavItem>[for (final MerchantTab tab in tabs) _itemFor(tab, t)],
+      ),
+    );
+  }
+}
+
+/// What an approved services provider sees while their shop is being opened, or when it could not be.
+///
+/// Nothing else is drawn: every tab needs the shop, and a dashboard for a shop that does not exist
+/// would only fail five different ways. Sign-out stays in reach, so nobody is trapped behind a retry
+/// that keeps failing. And a refusal that no retry can change — the shop's category is not offered
+/// right now ([ServicesCategoryNotOffered]) — is said as that, pointing to support, with no retry at
+/// all: a "Try again" there would be a button that cannot work.
+class _ServicesShopGate extends StatelessWidget {
+  const _ServicesShopGate({
+    required this.failed,
+    required this.categoryClosed,
+    required this.onRetry,
+    required this.onSignOut,
+  });
+
+  final bool failed;
+  final bool categoryClosed;
+  final VoidCallback onRetry;
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final Widget signOut = TextButton(
+      onPressed: () => onSignOut(),
+      child: Text(t.merchbLogOutAccount),
+    );
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      body: SafeArea(
+        child: Center(
+          child: categoryClosed
+              ? YdEmptyState(
+                  icon: Icons.storefront_outlined,
+                  title: t.svcShopCategoryClosedTitle,
+                  message: t.svcShopCategoryClosedBody,
+                  action: signOut,
+                )
+              : failed
+              ? YdEmptyState(
+                  icon: Icons.storefront_outlined,
+                  title: t.svcOpeningShopFailed,
+                  message: t.thatDidNotGoThrough,
+                  action: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      YdPillButton(label: t.tryAgain, onPressed: onRetry),
+                      const SizedBox(height: DeliverySpacing.sm),
+                      signOut,
+                    ],
+                  ),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const CircularProgressIndicator(color: DeliveryColors.brand),
+                    const SizedBox(height: DeliverySpacing.md),
+                    Text(
+                      t.svcOpeningShop,
+                      style: const TextStyle(fontSize: 14, color: DeliveryColors.muted),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }

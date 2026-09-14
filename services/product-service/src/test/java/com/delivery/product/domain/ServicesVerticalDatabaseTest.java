@@ -347,8 +347,10 @@ class ServicesVerticalDatabaseTest {
         return new StoreService(stores, repositories.getRepository(StoreOfferRepository.class),
                 repositories.getRepository(StoreFavoriteRepository.class), products,
                 repositories.getRepository(CategoryRepository.class),
-                new ServiceCategories(environment), Clock.fixed(NOW, ZoneOffset.UTC),
-                Duration.ofHours(4));
+                new ServiceCategories(environment),
+                org.mockito.Mockito.mock(
+                        com.delivery.product.service.OnboardingApplicationClient.class),
+                Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofHours(4));
     }
 
     private String urlInSchema() {

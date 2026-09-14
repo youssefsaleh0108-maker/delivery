@@ -42,6 +42,7 @@ import com.delivery.product.service.CatalogScanService.ScanQuotaExceededExceptio
 import com.delivery.product.service.CatalogScanService.ScanStateException;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.CategoryNotFoundException;
+import com.delivery.product.service.StoreService.FirstShop;
 import com.delivery.product.service.StoreService.StoreNotFoundException;
 import com.delivery.product.vision.VisionProvider.Box;
 import com.delivery.product.vision.VisionProvider.Detection;
@@ -146,9 +147,9 @@ class CatalogScanServiceTest {
 
         @Test
         void it_is_filed_under_the_callers_own_store() {
-            when(stores.requireStoreFor(MERCHANT)).thenReturn(store);
+            when(stores.requireStoreFor(MERCHANT, FirstShop.RESTAURANT)).thenReturn(store);
 
-            ScanDetails details = service.create(MERCHANT, null);
+            ScanDetails details = service.create(MERCHANT, null, FirstShop.RESTAURANT);
 
             assertThat(details.scan().getMerchantId()).isEqualTo(MERCHANT);
             assertThat(details.scan().getStoreId()).isEqualTo(store.getId());
@@ -162,7 +163,7 @@ class CatalogScanServiceTest {
             Store theirs = new Store(OTHER, "Their Shop", Store.Vertical.RESTAURANT);
             when(stores.ownedBy(MERCHANT)).thenReturn(List.of(store));
 
-            assertThatThrownBy(() -> service.create(MERCHANT, theirs.getId()))
+            assertThatThrownBy(() -> service.create(MERCHANT, theirs.getId(), FirstShop.ALREADY_OPEN))
                     .isInstanceOf(StoreNotFoundException.class);
             verify(scans, never()).save(any());
             verify(scans, never()).countByMerchantIdAndCreatedAtAfter(any(), any());
@@ -207,11 +208,11 @@ class CatalogScanServiceTest {
          */
         @Test
         void the_daily_quota_is_counted_under_the_lock_and_refuses_the_sixth() {
-            when(stores.requireStoreFor(MERCHANT)).thenReturn(store);
+            when(stores.requireStoreFor(MERCHANT, FirstShop.RESTAURANT)).thenReturn(store);
             when(scans.countByMerchantIdAndCreatedAtAfter(MERCHANT, NOW.minus(Duration.ofHours(24))))
                     .thenReturn(5L);
 
-            assertThatThrownBy(() -> service.create(MERCHANT, null))
+            assertThatThrownBy(() -> service.create(MERCHANT, null, FirstShop.RESTAURANT))
                     .isInstanceOf(ScanQuotaExceededException.class)
                     .satisfies(e -> assertThat(((ScanQuotaExceededException) e).getLimit()).isEqualTo(5));
 
@@ -231,8 +232,8 @@ class CatalogScanServiceTest {
             Store second = new Store(MERCHANT, "Second Shop", Store.Vertical.RESTAURANT);
             when(stores.ownedBy(MERCHANT)).thenReturn(List.of(store, second));
 
-            service.create(MERCHANT, store.getId());
-            service.create(MERCHANT, second.getId());
+            service.create(MERCHANT, store.getId(), FirstShop.ALREADY_OPEN);
+            service.create(MERCHANT, second.getId(), FirstShop.ALREADY_OPEN);
 
             InOrder order = inOrder(scans);
             for (int start = 0; start < 2; start++) {
@@ -526,14 +527,14 @@ class CatalogScanServiceTest {
             UUID section = UUID.randomUUID();
             Product draft = new Product(MERCHANT, store.getId(), "Pepsi 1L", null,
                     new BigDecimal("1.25"), section);
-            when(catalog.create(eq(MERCHANT), any(ProductRequest.class))).thenReturn(draft);
+            when(catalog.create(eq(MERCHANT), any(ProductRequest.class), eq(FirstShop.ALREADY_OPEN))).thenReturn(draft);
 
             service.commit(scan.getId(), MERCHANT,
                     List.of(new Acceptance(line.getId(), "  Pepsi 1L ", new BigDecimal("1.25"), section)),
                     List.of());
 
             ArgumentCaptor<ProductRequest> request = ArgumentCaptor.forClass(ProductRequest.class);
-            verify(catalog).create(eq(MERCHANT), request.capture());
+            verify(catalog).create(eq(MERCHANT), request.capture(), eq(FirstShop.ALREADY_OPEN));
             assertThat(request.getValue().storeId()).isEqualTo(store.getId());
             assertThat(request.getValue().name()).isEqualTo("Pepsi 1L");
             // The merchant's price, not the model's guess of 1.20.

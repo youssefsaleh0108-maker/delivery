@@ -80,9 +80,16 @@ public class StoreService {
      */
     private final ServiceCategories serviceCategories;
 
+    /**
+     * Asked whether a merchant with no shop at all applied to offer services, so that
+     * {@link #requireStoreFor} never opens a restaurant for a print shop. Nothing else asks it.
+     */
+    private final OnboardingApplicationClient applications;
+
     public StoreService(StoreRepository stores, StoreOfferRepository offers,
                         StoreFavoriteRepository favorites, ProductRepository products,
                         CategoryRepository categories, ServiceCategories serviceCategories,
+                        OnboardingApplicationClient applications,
                         Clock clock,
                         @Value("${delivery.product.power-declaration-fresh-for:4h}")
                         Duration powerDeclarationFreshFor) {
@@ -92,6 +99,7 @@ public class StoreService {
         this.products = products;
         this.categories = categories;
         this.serviceCategories = serviceCategories;
+        this.applications = applications;
         this.clock = clock;
         this.powerDeclarationFreshFor = powerDeclarationFreshFor;
     }
@@ -758,6 +766,56 @@ public class StoreService {
     private static final java.time.LocalTime DEFAULT_CLOSES = java.time.LocalTime.of(23, 59, 59);
 
     /**
+     * What a first product or a first scan may open for a merchant who turns out to have no shop,
+     * learned before the request's transaction begins. See {@link #firstShopFor}.
+     */
+    public enum FirstShop {
+
+        /**
+         * Nothing to open: the merchant has a shop, or the request names the one it is for. Onboarding
+         * was not asked.
+         */
+        ALREADY_OPEN,
+
+        /** No shop yet, and no application to offer services: the restaurant a first product opens. */
+        RESTAURANT,
+
+        /**
+         * No shop yet, and applied to offer services: nothing is opened
+         * ({@link ServicesShopNotOpenedException}). The provider's app opens the services shop itself.
+         */
+        NOT_FOR_A_SERVICES_APPLICANT
+    }
+
+    /**
+     * What a first product or scan may open for this merchant, asked before any transaction is open
+     * or any lock taken — which is why this is <strong>not</strong> {@code @Transactional}, and why
+     * the controllers ask it before they call into the catalogue or the scans.
+     *
+     * <p>The answer can take Onboarding seconds, and it used to be asked inside the transaction that
+     * opens the shop, under the merchant's lock (and, for a first scan, under the scan lock as well).
+     * A transaction holds a pooled connection from the moment it begins and the pool is ten, while a
+     * services applicant who is still waiting holds MERCHANT: every "add product" they sent, refused
+     * each time and never given a shop, held a connection for as long as Onboarding took. Asked here,
+     * the wait holds no connection and no lock, and the lock guards what it has to — the look for a
+     * shop and the insert — rather than another service's answer.
+     *
+     * <p>A merchant who already has a shop — nearly every call — is answered by one indexed read and
+     * Onboarding is not asked. A request that names its store is not asked about at all.
+     *
+     * @throws OnboardingApplicationClient.OnboardingUnavailableException when Onboarding cannot say;
+     *         nothing is opened (503)
+     */
+    public FirstShop firstShopFor(String merchantId, UUID namedStoreId) {
+        if (namedStoreId != null || stores.existsByMerchantId(merchantId)) {
+            return FirstShop.ALREADY_OPEN;
+        }
+        return applications.appliedToOfferServices()
+                ? FirstShop.NOT_FOR_A_SERVICES_APPLICANT
+                : FirstShop.RESTAURANT;
+    }
+
+    /**
      * The store a merchant's products belong to, created on first use.
      *
      * <p>Auto-provisioning keeps {@code products.store_id} non-null without making "create your
@@ -769,12 +827,41 @@ public class StoreService {
      * invisible to customers, so Order Manager's store lookup 404s and the order is refused. A
      * merchant adding a product is telling us they want to sell it, and an empty shopfront is a
      * smaller problem than an unsellable one.
+     *
+     * <p><strong>Never for a services applicant.</strong> A print shop's first offer — or a first
+     * product or scan sent by an older app or the web portal — must not open a restaurant: a shop
+     * never moves into SERVICES afterwards, so that mistake would be permanent. The provider's app
+     * opens the services shop itself, from the application, before anything else ({@link #open}).
+     * What may be opened is {@code firstShop}, which the caller learned from {@link #firstShopFor}
+     * before this transaction began, so nothing here waits on Onboarding: a services applicant is
+     * refused with {@link ServicesShopNotOpenedException}, and an Onboarding that could not answer
+     * was a 503 before any of this started.
+     *
+     * @param firstShop what {@link #firstShopFor} answered for this request
      */
     @Transactional
-    public Store requireStoreFor(String merchantId) {
+    public Store requireStoreFor(String merchantId, FirstShop firstShop) {
         List<Store> owned = stores.findByMerchantIdOrderByCreatedAtDesc(merchantId);
         if (!owned.isEmpty()) {
             return owned.get(0);
+        }
+        // No shop yet. Take the merchant's lock and look again, so a first product racing another —
+        // or racing the provider app opening its services shop — cannot act on a stale "nothing".
+        stores.lockMerchantStores(merchantId);
+        owned = stores.findByMerchantIdOrderByCreatedAtDesc(merchantId);
+        if (!owned.isEmpty()) {
+            return owned.get(0);
+        }
+        switch (firstShop) {
+            case NOT_FOR_A_SERVICES_APPLICANT -> throw new ServicesShopNotOpenedException();
+            // A shop when the request began and none now. Shops are never deleted, so this should
+            // not happen — and if it does, a restaurant opened on a question nobody asked is the one
+            // mistake here that cannot be undone.
+            case ALREADY_OPEN -> throw new IllegalStateException("Merchant " + merchantId
+                    + " had a shop when this request began and has none now; nothing was opened");
+            case RESTAURANT -> {
+                // Onboarding said, before this transaction, that this is no services applicant.
+            }
         }
         Store store = new Store(merchantId, "My Store", Store.Vertical.RESTAURANT);
         store.replaceHours(java.util.Arrays.stream(DayOfWeek.values())
@@ -800,17 +887,65 @@ public class StoreService {
     }
 
     /**
+     * Refused: this account applied to offer services and its services shop is not open yet, so a
+     * path that would open a shop for it — a first product, a first scan — opens none.
+     *
+     * <p>A catalogue rule, so every caller that already turns those into a 422 keeps working; its own
+     * title lets a client tell it apart (see {@code ApiExceptionHandler}).
+     */
+    public static class ServicesShopNotOpenedException
+            extends CatalogService.CatalogRuleViolationException {
+        public ServicesShopNotOpenedException() {
+            super("This account applied to offer services, so no shop is opened for it "
+                    + "automatically. Open your services shop first.");
+        }
+    }
+
+    /**
+     * What {@link #open} did.
+     *
+     * @param created false when a merchant asked for a services shop and already had one, which is
+     *                handed back exactly as it was
+     */
+    public record Opened(StoreView view, boolean created) {
+    }
+
+    /** Opens a shop; see {@link #open}, which is the same call with what it did said out loud. */
+    @Transactional
+    public StoreView create(String merchantId, StoreRequest request) {
+        return open(merchantId, request).view();
+    }
+
+    /**
      * Opens a shop.
      *
      * <p>A service shop is opened with its category, and only in an open one. The vertical and the
      * category must agree (see {@link Store}); a mismatch is refused as a 422 with a sentence, not
      * as a constraint name.
      *
-     * <p>The open categories are read first, before anything here can turn an exception into a 422;
+     * <p>The open categories are read before anything here can turn an exception into a 422;
      * see {@link #openCategoriesFor}.
+     *
+     * <p><strong>A merchant has one services shop.</strong> The provider's app opens it on its first
+     * entry after approval, from the application's name, category and area, and a retry after a
+     * dropped connection, a second phone or a double tap has to land on that shop rather than open
+     * another. So a SERVICES request from a merchant who already has one hands it back unchanged,
+     * with {@code created} false; changing it is a save, not a second open. The merchant's lock is
+     * taken before looking, so two requests at once cannot both find none. Goods shops open exactly
+     * as before, one per call.
      */
     @Transactional
-    public StoreView create(String merchantId, StoreRequest request) {
+    public Opened open(String merchantId, StoreRequest request) {
+        if (request.vertical() == Store.Vertical.SERVICES) {
+            stores.lockMerchantStores(merchantId);
+            Optional<Store> existing = stores.findByMerchantIdOrderByCreatedAtDesc(merchantId)
+                    .stream()
+                    .filter(Store::isServices)
+                    .findFirst();
+            if (existing.isPresent()) {
+                return new Opened(view(existing.get(), clock.instant()), false);
+            }
+        }
         Set<Store.ServiceCategory> open =
                 openCategoriesFor(request.vertical() == Store.Vertical.SERVICES);
         Store store;
@@ -826,7 +961,7 @@ public class StoreService {
         store.updateProfile(request.name(), request.tagline(), request.description(),
                 request.vertical(), request.tags(), request.timezone(), request.address());
         store.setNeighborhood(request.neighborhood());
-        return view(stores.save(store), clock.instant());
+        return new Opened(view(stores.save(store), clock.instant()), true);
     }
 
     /**

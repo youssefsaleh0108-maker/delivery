@@ -24,6 +24,7 @@ import com.delivery.product.event.CatalogEvents;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.CategoryNotFoundException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
+import com.delivery.product.service.StoreService.FirstShop;
 import com.delivery.product.service.StoreService.StoreNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -223,7 +224,7 @@ class CatalogOwnershipTest {
         void lands_in_the_merchants_own_store_when_one_is_named() {
             Store mine = storeOwnedBy(MERCHANT);
 
-            Product created = catalog.create(MERCHANT, request(mine.getId()));
+            Product created = catalog.create(MERCHANT, request(mine.getId()), FirstShop.ALREADY_OPEN);
 
             assertThat(created.getStoreId()).isEqualTo(mine.getId());
             assertThat(created.getMerchantId()).isEqualTo(MERCHANT);
@@ -239,7 +240,7 @@ class CatalogOwnershipTest {
             Store theirs = new Store(OTHER, "Their shop", Store.Vertical.RESTAURANT);
             when(storeService.ownedBy(MERCHANT)).thenReturn(List.of());
 
-            assertThatThrownBy(() -> catalog.create(MERCHANT, request(theirs.getId())))
+            assertThatThrownBy(() -> catalog.create(MERCHANT, request(theirs.getId()), FirstShop.ALREADY_OPEN))
                     .isInstanceOf(StoreNotFoundException.class);
 
             verify(products, never()).save(any(Product.class));
@@ -255,7 +256,7 @@ class CatalogOwnershipTest {
             Store theirs = new Store(OTHER, "Their shop", Store.Vertical.RESTAURANT);
             when(storeService.ownedBy(MERCHANT)).thenReturn(List.of());
 
-            assertThatThrownBy(() -> catalog.create(MERCHANT, request(theirs.getId())))
+            assertThatThrownBy(() -> catalog.create(MERCHANT, request(theirs.getId()), FirstShop.ALREADY_OPEN))
                     .hasMessageNotContainingAny("yours", "not yours");
         }
 
@@ -263,9 +264,9 @@ class CatalogOwnershipTest {
         @Test
         void a_merchant_with_no_store_yet_gets_one_provisioned() {
             Store provisioned = new Store(MERCHANT, "My Store", Store.Vertical.RESTAURANT);
-            when(storeService.requireStoreFor(MERCHANT)).thenReturn(provisioned);
+            when(storeService.requireStoreFor(MERCHANT, FirstShop.RESTAURANT)).thenReturn(provisioned);
 
-            assertThat(catalog.create(MERCHANT, request(null)).getStoreId())
+            assertThat(catalog.create(MERCHANT, request(null), FirstShop.RESTAURANT).getStoreId())
                     .isEqualTo(provisioned.getId());
         }
 
@@ -274,11 +275,11 @@ class CatalogOwnershipTest {
         void a_category_that_does_not_exist_is_refused() {
             UUID unknown = UUID.randomUUID();
             when(categories.existsById(unknown)).thenReturn(false);
-            when(storeService.requireStoreFor(MERCHANT))
+            when(storeService.requireStoreFor(MERCHANT, FirstShop.RESTAURANT))
                     .thenReturn(new Store(MERCHANT, "My Store", Store.Vertical.RESTAURANT));
 
             assertThatThrownBy(() -> catalog.create(MERCHANT,
-                    new ProductRequest("n", "d", BigDecimal.ONE, unknown, null, null, null, null)))
+                    new ProductRequest("n", "d", BigDecimal.ONE, unknown, null, null, null, null), FirstShop.RESTAURANT))
                     .isInstanceOf(CategoryNotFoundException.class);
 
             verify(products, never()).save(any(Product.class));
@@ -291,10 +292,10 @@ class CatalogOwnershipTest {
 
         @Test
         void a_create_records_a_created_event() {
-            when(storeService.requireStoreFor(MERCHANT))
+            when(storeService.requireStoreFor(MERCHANT, FirstShop.RESTAURANT))
                     .thenReturn(new Store(MERCHANT, "My Store", Store.Vertical.RESTAURANT));
 
-            catalog.create(MERCHANT, request(null));
+            catalog.create(MERCHANT, request(null), FirstShop.RESTAURANT);
 
             verify(outbox).record(eq(CatalogEvents.AGGREGATE_TYPE), anyString(),
                     eq(CatalogEvents.PRODUCT_CREATED), any());

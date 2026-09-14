@@ -46,6 +46,7 @@ import com.delivery.product.service.CatalogService.ProductView;
 import com.delivery.product.service.CrossSellService;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ServiceOfferSearch;
+import com.delivery.product.service.StoreService;
 
 /**
  * The catalog API.
@@ -72,15 +73,17 @@ public class ProductController {
     private final ProductOptionService optionService;
     private final CrossSellService crossSell;
     private final ServiceOfferSearch serviceOffers;
+    private final StoreService stores;
 
     public ProductController(CatalogService catalog, ProductImageService images,
                              ProductOptionService optionService, CrossSellService crossSell,
-                             ServiceOfferSearch serviceOffers) {
+                             ServiceOfferSearch serviceOffers, StoreService stores) {
         this.catalog = catalog;
         this.images = images;
         this.optionService = optionService;
         this.crossSell = crossSell;
         this.serviceOffers = serviceOffers;
+        this.stores = stores;
     }
 
     /** Customer-facing browse. ACTIVE products only, from every merchant. */
@@ -187,10 +190,19 @@ public class ProductController {
                 .toList();
     }
 
+    /**
+     * Adds a product.
+     *
+     * <p>What a merchant's first product may open is asked here, before the catalogue's transaction
+     * begins, and handed in: Onboarding can take seconds to answer, and inside the transaction that
+     * wait held a pooled connection and the merchant's lock (see {@link StoreService#firstShopFor}).
+     */
     @PostMapping
     @PreAuthorize("hasRole('MERCHANT')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
-        Product product = catalog.create(CurrentUser.requireId(), request);
+        String merchantId = CurrentUser.requireId();
+        Product product = catalog.create(merchantId, request,
+                stores.firstShopFor(merchantId, request.storeId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(catalog.view(product)));
     }
 

@@ -5479,5 +5479,63 @@
   "svcCategoryPhotography": "Photography",
   "svcCategoryCleaning": "Cleaning",
   "svcCategoryBeauty": "Beauty",
-  "svcCategoryTutoring": "Tutoring"
+  "svcCategoryTutoring": "Tutoring",
+  "svcSignupTitle": "Grow your business on YouDrop",
+  "svcSignupSubtitle": "Reach customers in your neighbourhood.",
+  "svcSignupBannerTitle": "Lebanese services",
+  "svcSignupBannerBody": "Printing, tailoring, repairs, photography and more — collected at your shop or delivered by YouDrop.",
+  "svcBusinessName": "Business name",
+  "svcBusinessNameHint": "e.g. Al Fakhry Press",
+  "svcServiceCategory": "Service category",
+  "svcServiceCategoryHint": "Choose what you offer",
+  "svcPhoneHint": "71 234 567",
+  "svcPhoneInvalid": "Enter a Lebanese number, e.g. 71 234 567",
+  "svcArea": "Location / area",
+  "svcAreaHint": "Choose your area",
+  "svcApplyCta": "Apply to sell services",
+  "svcOptionsFailed": "We couldn't load the services on offer. Check your connection and try again.",
+  "svcNoCategoriesOpen": "YouDrop isn't taking applications to sell services right now.",
+  "svcPendingTitle": "Application sent",
+  "svcPendingBody": "A YouDrop reviewer reads every application to sell services. We'll email {email} once it's decided.",
+  "@svcPendingBody": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "svcPendingBodyNoEmail": "A YouDrop reviewer reads every application to sell services, and we'll let you know once it's decided.",
+  "svcReference": "Reference: {reference}",
+  "@svcReference": {
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  },
+  "svcApprovedTitle": "You're approved",
+  "svcApprovedBody": "We open your services shop the first time you go to it.",
+  "svcErrCategoryClosed": "YouDrop isn't taking applications for that service yet. Choose another.",
+  "svcErrCategoryMissing": "Choose the service you offer.",
+  "svcErrAreaUnknown": "That area is no longer on the list. Choose your area again.",
+  "svcErrAreaMissing": "Choose the area your business is in.",
+  "svcErrCatalogUnavailable": "We couldn't check the services on offer just now. Try again in a moment.",
+  "svcOfferYourServices": "Offer your services",
+  "svcOfferYourServicesSub": "Printing, tailoring, repairs or photography",
+  "svcSwitchToShop": "Switch to your shop",
+  "svcSwitchToShopping": "Switch to shopping",
+  "svcChoiceCard": "Offer services",
+  "svcChoiceCardBlurb": "Print, tailor, repair or take photos for your neighbourhood, from your own shop.",
+  "svcIntent": "Services",
+  "svcIntentBlurb": "I print, tailor, repair or take photos",
+  "svcOpeningShop": "Opening your services shop…",
+  "svcOpeningShopFailed": "We couldn't open your services shop.",
+  "svcDocsTitle": "Add your documents",
+  "svcDocsIntro": "Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.",
+  "svcDocsFootnote": "They go to the reviewer when you tap Send documents.",
+  "svcDocsSend": "Send documents",
+  "svcDocsSent": "Your documents are with the reviewer.",
+  "svcDocsSkipped": "No documents were sent, so the reviewer will see your ID and commercial registration as missing.",
+  "svcShopCategoryClosedTitle": "Your service isn't offered right now",
+  "svcShopCategoryClosedBody": "Your application was approved, but YouDrop isn't offering this service at the moment, so your shop can't be opened. Please contact support."
 }
