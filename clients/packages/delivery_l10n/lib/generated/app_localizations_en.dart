@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -7923,7 +7924,9 @@ class DeliveryStringsEn extends DeliveryStrings {
   String dekkaneDistanceKm(double km) {
     final intl.NumberFormat kmNumberFormat =
         intl.NumberFormat.decimalPatternDigits(
-            locale: localeName, decimalDigits: 1);
+          locale: localeName,
+          decimalDigits: 1,
+        );
     final String kmString = kmNumberFormat.format(km);
 
     return '$kmString km away';
@@ -8911,8 +8914,7 @@ class DeliveryStringsEn extends DeliveryStrings {
       locale: localeName,
       other:
           'They are carrying $count of your jobs right now. Their contract can end once those are delivered or cancelled.',
-      one:
-          'They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.',
+      one: 'They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.',
     );
     return '$_temp0';
   }
@@ -9786,8 +9788,7 @@ class DeliveryStringsEn extends DeliveryStrings {
       locale: localeName,
       other:
           '$count deliveries reached the ledger after these figures were computed. Recompute to include them.',
-      one:
-          '1 delivery reached the ledger after these figures were computed. Recompute to include it.',
+      one: '1 delivery reached the ledger after these figures were computed. Recompute to include it.',
     );
     return '$_temp0';
   }
@@ -9799,8 +9800,7 @@ class DeliveryStringsEn extends DeliveryStrings {
       locale: localeName,
       other:
           '$count deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.',
-      one:
-          '1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.',
+      one: '1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.',
     );
     return '$_temp0';
   }
@@ -10855,7 +10855,11 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String svcCashShopConfirmBody(
-      String shop, String owed, String held, String orders) {
+    String shop,
+    String owed,
+    String held,
+    String orders,
+  ) {
     return 'Confirm $shop has paid the platform $owed: its commission on the $held its customers paid at its counter, covering $orders. The shop keeps the rest as its own share. This cannot be undone.';
   }
 
@@ -10878,4 +10882,546 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcDeclineOther => 'Other reason';
+
+  @override
+  String get svcBoOffersTitle => 'Service offers';
+
+  @override
+  String get svcBoOffersSubtitle =>
+      'Every service shop\'s offers, in any status — take one down or restore it, with a reason';
+
+  @override
+  String get svcBoShopsTitle => 'Shops';
+
+  @override
+  String get svcBoShopsSubtitle =>
+      'Listed shops, and which of them carry the Verified Local badge';
+
+  @override
+  String get svcBoFilterAll => 'All';
+
+  @override
+  String get svcBoOfferDraft => 'Draft';
+
+  @override
+  String get svcBoOfferActive => 'Active';
+
+  @override
+  String get svcBoOfferPaused => 'Paused';
+
+  @override
+  String get svcBoOfferArchived => 'Archived';
+
+  @override
+  String get svcBoOfferTakenDown => 'Taken down';
+
+  @override
+  String get svcBoAllCategories => 'All categories';
+
+  @override
+  String get svcBoAllShops => 'All shops';
+
+  @override
+  String get svcBoShopFilterTooltip => 'Shops seen in the results so far';
+
+  @override
+  String get svcBoOffersSearchHint => 'Search offer or shop name';
+
+  @override
+  String get svcBoColOffer => 'Offer';
+
+  @override
+  String get svcBoColShop => 'Shop';
+
+  @override
+  String get svcBoColCategory => 'Category';
+
+  @override
+  String get svcBoColPrice => 'Price';
+
+  @override
+  String get svcBoColStatus => 'Status';
+
+  @override
+  String get svcBoOffersEmpty => 'No service offers match these filters.';
+
+  @override
+  String get svcBoOffersLoadFailed => 'Could not load service offers.';
+
+  @override
+  String get svcBoOffersRefused =>
+      'This account may not read service offers — only back office staff can.';
+
+  @override
+  String get svcBoModerationNotConnected =>
+      'Offer moderation is not connected in this build yet, so there is nothing to show or act on.';
+
+  @override
+  String svcBoPageOf(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
+  String svcBoOffersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count offers',
+      one: '1 offer',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcBoPriceFrom(String price) {
+    return 'From $price';
+  }
+
+  @override
+  String svcBoPricePer(String price, String unit) {
+    return '$price per $unit';
+  }
+
+  @override
+  String svcBoPricePerPack(String price, int count, String unit) {
+    return '$price per $count $unit';
+  }
+
+  @override
+  String get svcBoSectionOffer => 'Offer';
+
+  @override
+  String get svcBoSectionShop => 'Provider shop';
+
+  @override
+  String get svcBoSectionTerms => 'Terms';
+
+  @override
+  String get svcBoSectionPhotos => 'Photos';
+
+  @override
+  String get svcBoSectionHold => 'Held off sale';
+
+  @override
+  String get svcBoSectionModerationHistory => 'Moderation history';
+
+  @override
+  String get svcBoFactDescription => 'Description';
+
+  @override
+  String get svcBoFactName => 'Name';
+
+  @override
+  String get svcBoFactListing => 'Listing';
+
+  @override
+  String get svcBoShopListed => 'Listed';
+
+  @override
+  String get svcBoShopDraft => 'Not yet listed';
+
+  @override
+  String get svcBoShopSuspended => 'Suspended';
+
+  @override
+  String get svcBoTermPricing => 'Pricing';
+
+  @override
+  String get svcBoPricingFixed => 'Fixed price';
+
+  @override
+  String get svcBoPricingPerUnit => 'Per unit';
+
+  @override
+  String get svcBoPricingFrom => 'Starting price';
+
+  @override
+  String get svcBoTermUnknown => 'Not known to this version';
+
+  @override
+  String get svcBoTermPack => 'One pack';
+
+  @override
+  String svcBoPackOf(int count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcBoPackUnits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count units',
+      one: '1 unit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcBoTermTurnaround => 'Turnaround';
+
+  @override
+  String svcBoTurnaroundRange(int min, int max) {
+    return '$min–$max hours';
+  }
+
+  @override
+  String svcBoTurnaroundUpTo(int max) {
+    return 'Up to $max hours';
+  }
+
+  @override
+  String get svcBoTermFulfilment => 'Fulfilment';
+
+  @override
+  String get svcBoFulfilPickup => 'Pickup at the shop';
+
+  @override
+  String get svcBoFulfilDelivery => 'YouDrop delivery';
+
+  @override
+  String get svcBoFulfilBoth => 'Pickup or delivery';
+
+  @override
+  String get svcBoTermFiles => 'Customer files';
+
+  @override
+  String get svcBoFilesPolicyNone => 'No files';
+
+  @override
+  String get svcBoFilesPolicyOptional => 'Optional';
+
+  @override
+  String get svcBoFilesPolicyRequired => 'Required';
+
+  @override
+  String get svcBoTermPrompt => 'Question to the customer';
+
+  @override
+  String get svcBoNoPhotos => 'No photos';
+
+  @override
+  String get svcBoPhotoUnavailable => 'Image unavailable';
+
+  @override
+  String get svcBoOpenPhoto => 'Open full-size photo';
+
+  @override
+  String get svcBoPhoto => 'Photo';
+
+  @override
+  String svcBoPhotoPosition(int index, int count) {
+    return '$index of $count';
+  }
+
+  @override
+  String get svcBoHoldReason => 'Reason given';
+
+  @override
+  String get svcBoHoldSince => 'Since';
+
+  @override
+  String get svcBoTakeDown => 'Take down';
+
+  @override
+  String get svcBoRestore => 'Restore';
+
+  @override
+  String svcBoTakeDownTitle(String offer) {
+    return 'Take down $offer?';
+  }
+
+  @override
+  String get svcBoTakeDownBody =>
+      'It goes off sale for every customer at once. Its provider reads your reason, and cannot put it back on sale until back office restores it.';
+
+  @override
+  String svcBoRestoreTitle(String offer) {
+    return 'Restore $offer?';
+  }
+
+  @override
+  String get svcBoRestoreBody =>
+      'The hold is lifted. An offer that was on sale comes back paused, for its provider to resume.';
+
+  @override
+  String get svcBoReasonLabel => 'Reason — required, kept in the history';
+
+  @override
+  String get svcBoReasonRequired => 'Say why: the reason is required.';
+
+  @override
+  String svcBoTakenDownDone(String offer) {
+    return '$offer was taken down. Its provider can read your reason.';
+  }
+
+  @override
+  String svcBoRestoredDone(String offer) {
+    return '$offer was restored. If it was on sale, it waits paused for its provider to resume it.';
+  }
+
+  @override
+  String get svcBoTakeDownRefused =>
+      'Not taken down: the server says this offer is already down, or is not a service offer. Nothing changed, and the list was reloaded.';
+
+  @override
+  String get svcBoRestoreRefused =>
+      'Not restored: the server says this offer is not taken down any more. Nothing changed, and the list was reloaded.';
+
+  @override
+  String get svcBoOfferChanged =>
+      'This offer changed while you were acting, so nothing was recorded. It has been reloaded; try again.';
+
+  @override
+  String get svcBoOfferGone => 'This offer no longer exists.';
+
+  @override
+  String get svcBoModerateRefused => 'This account may not moderate offers.';
+
+  @override
+  String svcBoReasonRejected(int max) {
+    return 'The server did not accept that reason. Write one of at most $max characters.';
+  }
+
+  @override
+  String get svcBoActionFailed =>
+      'That did not go through, and nothing changed. Try again.';
+
+  @override
+  String get svcBoHistoryNever => 'Back office has never acted on this offer.';
+
+  @override
+  String get svcBoHistoryLoadFailed => 'Could not load the history.';
+
+  @override
+  String get svcBoActTakeDown => 'Taken down';
+
+  @override
+  String get svcBoActRestore => 'Restored';
+
+  @override
+  String get svcBoActUnknown => 'An action this version does not know';
+
+  @override
+  String svcBoActBy(String actor) {
+    return 'by $actor';
+  }
+
+  @override
+  String get svcBoKindAll => 'All kinds';
+
+  @override
+  String get svcBoKindService => 'Service orders';
+
+  @override
+  String get svcBoFulfilmentAll => 'Pickup and delivery';
+
+  @override
+  String get svcBoFulfilmentPickup => 'Pickup';
+
+  @override
+  String get svcBoFulfilmentDelivery => 'Delivery';
+
+  @override
+  String get svcBoServiceTag => 'Service';
+
+  @override
+  String get svcBoStatusPlaced => 'Placed';
+
+  @override
+  String get svcBoStatusAccepted => 'Accepted';
+
+  @override
+  String get svcBoStatusInProduction => 'In production';
+
+  @override
+  String get svcBoStatusReadyPickup => 'Ready for pickup';
+
+  @override
+  String get svcBoStatusReadyDelivery => 'Ready for delivery';
+
+  @override
+  String get svcBoStatusOnTheWay => 'On the way';
+
+  @override
+  String get svcBoStatusCollected => 'Collected';
+
+  @override
+  String get svcBoStatusDelivered => 'Delivered';
+
+  @override
+  String get svcBoStatusDeclined => 'Declined by the provider';
+
+  @override
+  String get svcBoStatusNotCollected => 'Cancelled: never collected';
+
+  @override
+  String get svcBoStatusCancelled => 'Cancelled';
+
+  @override
+  String get svcBoDetailKind => 'Kind';
+
+  @override
+  String svcBoKindServiceIn(String category) {
+    return 'Service · $category';
+  }
+
+  @override
+  String get svcBoDetailService => 'Service';
+
+  @override
+  String svcBoPacksOfUnits(int packs, int size, String unit) {
+    return '$packs × $size $unit';
+  }
+
+  @override
+  String svcBoPacksOf(int packs, int size) {
+    return '$packs × $size';
+  }
+
+  @override
+  String get svcBoDetailOptions => 'Options';
+
+  @override
+  String get svcBoDetailInstructions => 'Instructions';
+
+  @override
+  String get svcBoNoInstructions => 'None written';
+
+  @override
+  String get svcBoDetailReadyBy => 'Estimated ready';
+
+  @override
+  String get svcBoHistoryTitle => 'Status history';
+
+  @override
+  String get svcBoHistoryNone => 'No steps recorded yet.';
+
+  @override
+  String get svcBoHistoryFailed => 'Could not load the status history.';
+
+  @override
+  String get svcBoFilesTitle => 'Customer\'s files';
+
+  @override
+  String get svcBoFilesAuditNotice =>
+      'Back office reads of a customer\'s files are recorded: showing them logs your account against each file.';
+
+  @override
+  String get svcBoFilesShow => 'Show the files';
+
+  @override
+  String get svcBoFilesNotTaken => 'This offer takes no files.';
+
+  @override
+  String get svcBoFilesEmpty =>
+      'No files on this order. Files are deleted 90 days after the order is completed.';
+
+  @override
+  String get svcBoFileOpen => 'Open';
+
+  @override
+  String get svcBoFileOpened =>
+      'Opened in a new tab. Your access to this file is recorded.';
+
+  @override
+  String get svcBoFilePdf => 'PDF';
+
+  @override
+  String get svcBoFileImage => 'Image';
+
+  @override
+  String get svcBoFileOther => 'File';
+
+  @override
+  String svcBoSizeMb(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String svcBoSizeKb(String size) {
+    return '$size KB';
+  }
+
+  @override
+  String get svcBoFilesRefused =>
+      'The server refused to show this order\'s files.';
+
+  @override
+  String get svcBoFilesUnavailable =>
+      'The files cannot be reached right now. Try again shortly.';
+
+  @override
+  String get svcBoFilesFailed => 'Could not load the files.';
+
+  @override
+  String get svcBoLedgerRefused =>
+      'This account may not read the orders ledger.';
+
+  @override
+  String get svcBoShopsGoods => 'Goods shops';
+
+  @override
+  String get svcBoShopsServices => 'Service shops';
+
+  @override
+  String get svcBoShopsSearchHint => 'Search shop name';
+
+  @override
+  String get svcBoShopsListedOnly =>
+      'Only shops listed on the storefront appear here.';
+
+  @override
+  String get svcBoShopsEmpty => 'No listed shops match.';
+
+  @override
+  String get svcBoShopsLoadFailed => 'Could not load shops.';
+
+  @override
+  String svcBoVerifyGrantTitle(String shop) {
+    return 'Mark $shop as Verified Local?';
+  }
+
+  @override
+  String get svcBoVerifyGrantBody =>
+      'Customers see the badge on this shop wherever it appears. It is YouDrop\'s own claim to the shop\'s neighbours, so grant it only to a shop that has been checked.';
+
+  @override
+  String svcBoVerifyRevokeTitle(String shop) {
+    return 'Remove Verified Local from $shop?';
+  }
+
+  @override
+  String get svcBoVerifyRevokeBody =>
+      'The badge disappears from this shop for every customer.';
+
+  @override
+  String get svcBoVerifyGrant => 'Grant the badge';
+
+  @override
+  String get svcBoVerifyRevoke => 'Remove the badge';
+
+  @override
+  String svcBoVerifyGranted(String shop) {
+    return '$shop is now Verified Local.';
+  }
+
+  @override
+  String svcBoVerifyRevoked(String shop) {
+    return '$shop is no longer Verified Local.';
+  }
+
+  @override
+  String get svcBoVerifyRefused => 'Only back office can change this badge.';
+
+  @override
+  String get svcBoVerifyGone => 'This shop no longer exists.';
+
+  @override
+  String get svcBoVerifyFailed => 'The badge was not changed. Try again.';
+
+  @override
+  String svcBoVerifiedToggle(String shop) {
+    return 'Verified Local for $shop';
+  }
 }
