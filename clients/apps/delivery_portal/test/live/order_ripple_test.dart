@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:delivery_core/delivery_core.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_portal/src/backoffice/dashboard_screen.dart';
 import 'package:delivery_portal/src/backoffice/reconciliation_screen.dart';
 import 'package:dio/dio.dart';
@@ -104,7 +105,13 @@ void main() {
   Future<void> show(WidgetTester tester, Widget screen) async {
     await tester.binding.setSurfaceSize(window);
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: screen)));
+    await tester.pumpWidget(MaterialApp(
+      // The ledger's service filters and the reconciliation's shop lines are worded through
+      // DeliveryStrings.
+      localizationsDelegates: DeliveryStrings.localizationsDelegates,
+      supportedLocales: DeliveryStrings.supportedLocales,
+      home: Scaffold(body: screen),
+    ));
     // Never pumpAndSettle: the ledger polls for the life of the screen and never settles.
     for (int i = 0; i < 40; i++) {
       await tester.pump(const Duration(milliseconds: 100));
