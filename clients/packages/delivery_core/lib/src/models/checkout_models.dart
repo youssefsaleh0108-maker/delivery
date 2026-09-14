@@ -1,6 +1,7 @@
 import 'order_models.dart';
 import 'order_submission.dart';
 import 'promo_models.dart';
+import 'service_order_models.dart';
 
 /// Why one shop's part of a basket cannot be checked out as it stands — Order Manager's
 /// `ShopRefusal`, reported on that shop's line of a [BasketQuote] and on a checkout's 422.
@@ -181,16 +182,81 @@ class ShopQuote {
       );
 }
 
-/// The question a [BasketQuote] answers: the lines, the address's area, the tier and the code.
-/// Nothing else changes a price, so nothing else is asked.
+/// What came of asking what one service would cost — `OrderApi.quoteService`.
+///
+/// Anything but these three — a 400, a network failure — is thrown as the `DioException` it is.
+sealed class ServiceQuoteResult {
+  const ServiceQuoteResult();
+}
+
+/// The server's figures for the service as asked: the total the service order screen shows.
+final class ServiceQuoted extends ServiceQuoteResult {
+  const ServiceQuoted(this.quote);
+
+  final BasketQuote quote;
+
+  /// The shop's line — what the fee, waiver, discount and total are read from. Null only when the
+  /// server sent no line at all.
+  ShopQuote? get shop => quote.shops.firstOrNull;
+}
+
+/// The service cannot be ordered as asked — Express, a way of getting the work the offer is not sold
+/// with, a closed category — and so has no price. [refusal] says why, in placement's own codes.
+final class ServiceQuoteRefused extends ServiceQuoteResult implements ServiceRefusalOutcome {
+  const ServiceQuoteRefused({required this.refusal, required this.code, this.detail});
+
+  @override
+  final ServiceOrderRefusal refusal;
+
+  @override
+  final String code;
+
+  @override
+  final String? detail;
+}
+
+/// The server could not read which service categories are open, so it priced nothing: the 503
+/// `SERVICES_DIRECTORY_UNAVAILABLE`. Nothing is wrong with the question; ask again shortly.
+final class ServiceQuoteUnavailable extends ServiceQuoteResult {
+  const ServiceQuoteUnavailable();
+}
+
+/// The question a [BasketQuote] answers: the lines, the address's area, the tier and the code — and,
+/// for a service, how the customer gets it. Nothing else changes a price, so nothing else is asked.
 class BasketQuestion {
   BasketQuestion({
     required List<OrderLineSubmission> items,
     this.deliveryZoneId,
     this.deliveryTier = DeliveryTier.standard,
     String? promoCode,
+    this.fulfilment,
   })  : items = List<OrderLineSubmission>.unmodifiable(items),
-        promoCode = promoCode == null || promoCode.trim().isEmpty ? null : promoCode.trim();
+        promoCode = promoCode == null || promoCode.trim().isEmpty ? null : promoCode.trim() {
+    if (fulfilment == Fulfilment.unknown) {
+      throw ArgumentError.value(
+          fulfilment, 'fulfilment', 'An order is either delivered or collected at the shop');
+    }
+  }
+
+  /// The question a service order screen asks: [packs] of one offer with the options chosen, got the
+  /// way the customer chose.
+  ///
+  /// Always the standard tier, the only one a service order is delivered on. [deliveryZoneId] prices
+  /// a delivery at the area's fee; a pickup has no fee whatever area is named.
+  factory BasketQuestion.service({
+    required String productId,
+    required int packs,
+    List<String> optionIds = const <String>[],
+    required Fulfilment fulfilment,
+    String? deliveryZoneId,
+    String? promoCode,
+  }) =>
+      BasketQuestion(
+        items: <OrderLineSubmission>[(productId: productId, qty: packs, optionIds: optionIds)],
+        deliveryZoneId: deliveryZoneId,
+        promoCode: promoCode,
+        fulfilment: fulfilment,
+      );
 
   final List<OrderLineSubmission> items;
 
@@ -203,6 +269,11 @@ class BasketQuestion {
   /// as not recognised rather than refusing the question, so a half-typed code costs nothing.
   final String? promoCode;
 
+  /// How a service would reach its customer: the difference between the area's fee and none. Null
+  /// for a basket, and then not sent — the server reads no fulfilment as a delivery. Never
+  /// [Fulfilment.unknown], which is refused here.
+  final Fulfilment? fulfilment;
+
   Map<String, dynamic> toBody() => <String, dynamic>{
         'items': items
             .map((OrderLineSubmission i) => <String, dynamic>{
@@ -214,6 +285,7 @@ class BasketQuestion {
         if (deliveryZoneId != null) 'deliveryZoneId': deliveryZoneId,
         'deliveryTier': deliveryTier.wire,
         if (promoCode != null) 'promoCode': promoCode,
+        if (fulfilment != null) 'fulfilment': fulfilment!.wire,
       };
 
   /// The same text for the same question however its lines happen to be ordered — so an answer is
@@ -224,7 +296,14 @@ class BasketQuestion {
             '${i.productId}|${(<String>[...i.optionIds]..sort()).join(',')}x${i.qty}')
         .toList()
       ..sort();
-    return <String>[lines.join(';'), deliveryZoneId ?? '', deliveryTier.wire, promoCode ?? '']
+    return <String>[
+      lines.join(';'),
+      deliveryZoneId ?? '',
+      deliveryTier.wire,
+      promoCode ?? '',
+      // Only when asked, so a basket's signature is the one it always had.
+      if (fulfilment != null) fulfilment!.wire!,
+    ]
         .join('');
   }
 }

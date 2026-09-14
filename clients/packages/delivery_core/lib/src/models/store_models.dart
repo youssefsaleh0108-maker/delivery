@@ -1071,3 +1071,60 @@ class OptionDraft {
         'isDefault': isDefault,
       };
 }
+
+/// A customer's review of a shop — product-service's `ReviewResponse`, as `StoreApi.reviews` lists
+/// them, newest first.
+class StoreReview {
+  const StoreReview({
+    required this.id,
+    required this.rating,
+    this.storeId,
+    this.orderId,
+    this.comment,
+    this.createdAt,
+    this.mine = false,
+  });
+
+  final String id;
+  final String? storeId;
+
+  /// The order the review is about: a shop is reviewed once per order.
+  final String? orderId;
+
+  /// One to five stars.
+  final int rating;
+
+  /// What the customer wrote; null when they wrote nothing.
+  final String? comment;
+
+  final DateTime? createdAt;
+
+  /// Whether the review is the caller's own, so the app can offer Edit.
+  final bool mine;
+
+  /// The review, or null when [json] is not one this build can show: no id, or no rating from one to
+  /// five — stars nobody gave are not drawn.
+  static StoreReview? maybeFromJson(Object? json) {
+    if (json is! Map) {
+      return null;
+    }
+    final Object? id = json['id'];
+    final Object? rating = json['rating'];
+    if (id is! String || rating is! num || rating < 1 || rating > 5) {
+      return null;
+    }
+    final Object? storeId = json['storeId'];
+    final Object? orderId = json['orderId'];
+    final Object? comment = json['comment'];
+    final Object? createdAt = json['createdAt'];
+    return StoreReview(
+      id: id,
+      rating: rating.toInt(),
+      storeId: storeId is String ? storeId : null,
+      orderId: orderId is String ? orderId : null,
+      comment: comment is String && comment.trim().isNotEmpty ? comment : null,
+      createdAt: createdAt is String ? DateTime.tryParse(createdAt)?.toLocal() : null,
+      mine: json['mine'] == true,
+    );
+  }
+}

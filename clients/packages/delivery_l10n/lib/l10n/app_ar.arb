@@ -3363,5 +3363,10 @@
   "svcCashShopConfirmBody": "أكّد أنّ {shop} دفع للمنصة {owed}: عمولتها من {held} دفعها زبائنه على صندوقه، عن {orders}. يحتفظ المتجر بالباقي حصةً له. لا يمكن التراجع عن ذلك.",
   "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
   "svcCashShopAmountChanged": "{shop} مدين الآن بـ {amount}، وليس بالمبلغ الذي أكّدته. لم يُسجَّل شيء.",
-  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}}
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}},
+  "svcActionCollected": "استلمه الزبون",
+  "svcDeclineTooBusy": "مشغولون جدًا الآن",
+  "svcDeclineCannotDo": "لا يمكننا تنفيذ هذا العمل",
+  "svcDeclineFileProblem": "مشكلة في الملف",
+  "svcDeclineOther": "سبب آخر"
 }

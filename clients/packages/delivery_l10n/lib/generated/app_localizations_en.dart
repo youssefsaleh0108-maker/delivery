@@ -10863,4 +10863,19 @@ class DeliveryStringsEn extends DeliveryStrings {
   String svcCashShopAmountChanged(String shop, String amount) {
     return '$shop now owes $amount, not the amount you confirmed. Nothing was recorded.';
   }
+
+  @override
+  String get svcActionCollected => 'Customer collected';
+
+  @override
+  String get svcDeclineTooBusy => 'Too busy right now';
+
+  @override
+  String get svcDeclineCannotDo => 'We can\'t do this job';
+
+  @override
+  String get svcDeclineFileProblem => 'Problem with the file';
+
+  @override
+  String get svcDeclineOther => 'Other reason';
 }

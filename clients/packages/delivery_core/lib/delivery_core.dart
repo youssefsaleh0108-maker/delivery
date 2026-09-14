@@ -72,6 +72,7 @@ export 'src/api/order_api.dart';
 export 'src/models/gift_models.dart';
 export 'src/models/order_submission.dart';
 export 'src/models/checkout_models.dart';
+export 'src/models/service_order_models.dart';
 export 'src/network/connectivity.dart';
 export 'src/api/store_api.dart';
 export 'src/api/whatsapp_api.dart';

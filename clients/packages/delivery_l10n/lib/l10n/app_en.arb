@@ -5545,5 +5545,10 @@
   "svcCashShopConfirmBody": "Confirm {shop} has paid the platform {owed}: its commission on the {held} its customers paid at its counter, covering {orders}. The shop keeps the rest as its own share. This cannot be undone.",
   "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
   "svcCashShopAmountChanged": "{shop} now owes {amount}, not the amount you confirmed. Nothing was recorded.",
-  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}}
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}},
+  "svcActionCollected": "Customer collected",
+  "svcDeclineTooBusy": "Too busy right now",
+  "svcDeclineCannotDo": "We can't do this job",
+  "svcDeclineFileProblem": "Problem with the file",
+  "svcDeclineOther": "Other reason"
 }

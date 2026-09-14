@@ -11007,4 +11007,19 @@ class DeliveryStringsAr extends DeliveryStrings {
   String svcCashShopAmountChanged(String shop, String amount) {
     return '$shop مدين الآن بـ $amount، وليس بالمبلغ الذي أكّدته. لم يُسجَّل شيء.';
   }
+
+  @override
+  String get svcActionCollected => 'استلمه الزبون';
+
+  @override
+  String get svcDeclineTooBusy => 'مشغولون جدًا الآن';
+
+  @override
+  String get svcDeclineCannotDo => 'لا يمكننا تنفيذ هذا العمل';
+
+  @override
+  String get svcDeclineFileProblem => 'مشكلة في الملف';
+
+  @override
+  String get svcDeclineOther => 'سبب آخر';
 }

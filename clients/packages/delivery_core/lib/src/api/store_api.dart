@@ -240,6 +240,36 @@ class StoreApi {
     return Paged<Offer>.fromJson(response.data as Map<String, dynamic>, Offer.fromJson);
   }
 
+  // ---------------------------------------------------------------- reviews
+
+  /// A shop's reviews, newest first — `GET /api/stores/{id}/reviews`: what a provider's page lists
+  /// under its rating.
+  ///
+  /// [StoreReview.mine] marks the caller's own, so the app can offer Edit. A row this build cannot
+  /// show is left out of the page; the counts stay the server's.
+  Future<Paged<StoreReview>> reviews(String storeId, {int page = 0, int size = 20}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/stores/$storeId/reviews',
+      queryParameters: <String, dynamic>{'page': page, 'size': size},
+    );
+    final Object? body = response.data;
+    final Map<dynamic, dynamic> json = body is Map ? body : const <dynamic, dynamic>{};
+    int count(String key, int fallback) {
+      final Object? value = json[key];
+      return value is num ? value.toInt() : fallback;
+    }
+
+    final Object? rows = json['content'];
+    return Paged<StoreReview>(
+      content: rows is List
+          ? rows.map(StoreReview.maybeFromJson).whereType<StoreReview>().toList(growable: false)
+          : const <StoreReview>[],
+      page: count('page', page),
+      totalElements: count('totalElements', 0),
+      totalPages: count('totalPages', 0),
+    );
+  }
+
   // ---------------------------------------------------------------- banners and chips
 
   /// The home rail. Live banners only, in the order the Backoffice arranged them.
