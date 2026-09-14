@@ -3311,5 +3311,10 @@
   "svcCategoryPhotography": "تصوير",
   "svcCategoryCleaning": "تنظيف",
   "svcCategoryBeauty": "تجميل",
-  "svcCategoryTutoring": "دروس خصوصية"
+  "svcCategoryTutoring": "دروس خصوصية",
+  "svcActionCollected": "استلمه الزبون",
+  "svcDeclineTooBusy": "مشغولون جدًا الآن",
+  "svcDeclineCannotDo": "لا يمكننا تنفيذ هذا العمل",
+  "svcDeclineFileProblem": "مشكلة في الملف",
+  "svcDeclineOther": "سبب آخر"
 }

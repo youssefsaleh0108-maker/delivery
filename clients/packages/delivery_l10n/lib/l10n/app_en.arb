@@ -5479,5 +5479,10 @@
   "svcCategoryPhotography": "Photography",
   "svcCategoryCleaning": "Cleaning",
   "svcCategoryBeauty": "Beauty",
-  "svcCategoryTutoring": "Tutoring"
+  "svcCategoryTutoring": "Tutoring",
+  "svcActionCollected": "Customer collected",
+  "svcDeclineTooBusy": "Too busy right now",
+  "svcDeclineCannotDo": "We can't do this job",
+  "svcDeclineFileProblem": "Problem with the file",
+  "svcDeclineOther": "Other reason"
 }

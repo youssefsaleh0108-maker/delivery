@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'gift_models.dart';
 import 'order_models.dart';
+import 'service_order_models.dart';
 
 /// One basket line as Order Manager takes it: ids and a quantity, never a price.
 typedef OrderLineSubmission = ({String productId, int qty, List<String> optionIds});
@@ -42,6 +43,11 @@ String newIdempotencyKey() {
 /// For successors building other kinds of checkout on this (gifting, the multi-shop basket): make
 /// the new flow produce an [OrderSubmission] per order and send it through [OrderApi.place]; the
 /// key, the retry rules and the price guard come with it.
+///
+/// A service order is one of these as well: one line whose quantity counts packs of the offer's unit,
+/// the [fulfilment] the customer chose, the [attachmentFileIds] of the files they uploaded and their
+/// [serviceInstructions]. Every one of them is in the body, so every one is part of what a retry
+/// repeats and what the server compares a reused key against.
 class OrderSubmission {
   OrderSubmission({
     required List<OrderLineSubmission> items,
@@ -56,14 +62,26 @@ class OrderSubmission {
     this.deliveryLatitude,
     this.deliveryLongitude,
     this.gift,
+    this.fulfilment,
+    List<String> attachmentFileIds = const <String>[],
+    this.serviceInstructions,
     String? idempotencyKey,
   })  : items = List<OrderLineSubmission>.unmodifiable(items),
-        idempotencyKey = idempotencyKey ?? newIdempotencyKey();
+        attachmentFileIds = List<String>.unmodifiable(attachmentFileIds),
+        idempotencyKey = idempotencyKey ?? newIdempotencyKey() {
+    if (fulfilment == Fulfilment.unknown) {
+      throw ArgumentError.value(
+          fulfilment, 'fulfilment', 'An order is either delivered or collected at the shop');
+    }
+  }
 
   /// Sent as the `Idempotency-Key` header. See the class comment for its one rule.
   final String idempotencyKey;
 
   final List<OrderLineSubmission> items;
+
+  /// Where to deliver. Not sent for a [Fulfilment.pickup] order, which goes nowhere: the server takes
+  /// a pickup without an address, and refuses a delivery without one.
   final String deliveryAddress;
 
   /// The area the address is in, when the customer picked one. Absent on an address saved before
@@ -99,6 +117,25 @@ class OrderSubmission {
   /// the recipient's phone never reaches the phone's own storage through [toJson].
   final GiftDetails? gift;
 
+  /// How the customer gets a service order: [Fulfilment.pickup] at the shop, or
+  /// [Fulfilment.delivery].
+  ///
+  /// Null on everything but a service order, and then not sent: the server reads no fulfilment as a
+  /// delivery, which every basket is. A service order names it even when it is a delivery, so the
+  /// order records the choice the customer made. Never [Fulfilment.unknown], which is refused here.
+  final Fulfilment? fulfilment;
+
+  /// The files the customer uploaded for a service order, by the ids their upload confirmed: three at
+  /// most, and only for an offer that takes files. Ids and nothing else — whether each is the
+  /// customer's own, confirmed and on no other order is the server's to check. Empty on a basket, and
+  /// then not sent.
+  final List<String> attachmentFileIds;
+
+  /// What the customer tells the provider about the work ("leave a white border"), up to 1,000
+  /// characters. Its own field rather than [notes], which stays the note a rider reads at the door.
+  /// Null or blank on a basket, and then not sent.
+  final String? serviceInstructions;
+
   /// The request body.
   ///
   /// [expectedTotal] is the total the customer agreed to, when the caller wants the server to
@@ -113,7 +150,7 @@ class OrderSubmission {
                   if (i.optionIds.isNotEmpty) 'optionIds': i.optionIds,
                 })
             .toList(),
-        'deliveryAddress': deliveryAddress,
+        if (fulfilment != Fulfilment.pickup) 'deliveryAddress': deliveryAddress,
         if (deliveryZoneId != null) 'deliveryZoneId': deliveryZoneId,
         if (contactPhone != null && contactPhone!.isNotEmpty) 'contactPhone': contactPhone,
         if (notes != null && notes!.isNotEmpty) 'notes': notes,
@@ -127,6 +164,11 @@ class OrderSubmission {
           'deliveryLongitude': deliveryLongitude,
         },
         if (gift != null) 'gift': gift!.toJson(),
+        // A basket sends none of these, so its body is exactly what it was before service orders.
+        if (fulfilment != null) 'fulfilment': fulfilment!.wire,
+        if (attachmentFileIds.isNotEmpty) 'attachmentFileIds': attachmentFileIds,
+        if (serviceInstructions != null && serviceInstructions!.trim().isNotEmpty)
+          'serviceInstructions': serviceInstructions,
         if (expectedTotal != null) 'expectedTotal': num.parse(expectedTotal.toStringAsFixed(2)),
       };
 
@@ -150,6 +192,9 @@ class OrderSubmission {
         'deliveryLatitude': deliveryLatitude,
         'deliveryLongitude': deliveryLongitude,
         'gift': gift?.toJson(),
+        'fulfilment': fulfilment?.wire,
+        'attachmentFileIds': attachmentFileIds,
+        'serviceInstructions': serviceInstructions,
       };
 
   factory OrderSubmission.fromJson(Map<String, dynamic> json) => OrderSubmission(
@@ -177,11 +222,18 @@ class OrderSubmission {
         gift: json['gift'] is Map<String, dynamic>
             ? GiftDetails.fromJson(json['gift'] as Map<String, dynamic>)
             : null,
+        // Absent from every attempt stored before service orders, which were all baskets.
+        fulfilment: json['fulfilment'] == null ? null : Fulfilment.fromWire(json['fulfilment']),
+        attachmentFileIds: (json['attachmentFileIds'] as List<dynamic>? ?? <dynamic>[])
+            .whereType<String>()
+            .toList(),
+        serviceInstructions: json['serviceInstructions'] as String?,
       );
 }
 
 /// What came of sending an [OrderSubmission]. Anything else — a refused basket (422), a declined
-/// payment (402), a network failure — is thrown as the `DioException` it always was.
+/// payment (402), a network failure — is thrown as the `DioException` it always was. Only a service
+/// order's own refusals come back as outcomes ([ServiceOrderRefused], [ServicesDirectoryUnavailable]).
 sealed class PlaceOrderResult {
   const PlaceOrderResult();
 }
@@ -213,4 +265,37 @@ final class OrderAlreadyPlaced extends PlaceOrderResult {
   const OrderAlreadyPlaced(this.orderId);
 
   final String orderId;
+}
+
+/// Order Manager refused this service order by one of its rules and placed nothing: the 422 whose
+/// `code` [refusal] names — a closed category, a way of getting the work the offer is not sold with,
+/// a file the offer needs.
+///
+/// Decided before anything is saved, so nothing exists under the key. Say it in the customer's words
+/// and let them change the order; sending the same submission again can only be refused again.
+///
+/// Only the codes a service order is refused with. Every other 422 — a closed shop, an item gone, a
+/// multi-shop refusal naming its shop — is thrown as it always was, because the checkouts that send
+/// baskets read those from the exception.
+final class ServiceOrderRefused extends PlaceOrderResult implements ServiceRefusalOutcome {
+  const ServiceOrderRefused({required this.refusal, required this.code, this.detail});
+
+  @override
+  final ServiceOrderRefusal refusal;
+
+  @override
+  final String code;
+
+  @override
+  final String? detail;
+}
+
+/// Order Manager could not read which service categories are open, so it neither priced nor placed
+/// this service order: the 503 `SERVICES_DIRECTORY_UNAVAILABLE`.
+///
+/// Unlike an unlabelled 5xx this proves nothing was placed — the key is looked up before pricing, and
+/// pricing is where it stopped. Nothing is broken: say "try again", and send the same submission when
+/// the customer does.
+final class ServicesDirectoryUnavailable extends PlaceOrderResult {
+  const ServicesDirectoryUnavailable();
 }

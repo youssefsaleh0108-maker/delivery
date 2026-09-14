@@ -10838,4 +10838,19 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcCategoryTutoring => 'دروس خصوصية';
+
+  @override
+  String get svcActionCollected => 'استلمه الزبون';
+
+  @override
+  String get svcDeclineTooBusy => 'مشغولون جدًا الآن';
+
+  @override
+  String get svcDeclineCannotDo => 'لا يمكننا تنفيذ هذا العمل';
+
+  @override
+  String get svcDeclineFileProblem => 'مشكلة في الملف';
+
+  @override
+  String get svcDeclineOther => 'سبب آخر';
 }

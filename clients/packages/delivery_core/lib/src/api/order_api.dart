@@ -7,7 +7,11 @@ import '../models/order_models.dart';
 import '../models/order_submission.dart';
 import '../models/provider_models.dart';
 import '../models/rating_models.dart';
+import '../models/service_order_models.dart';
 import '../models/summary_models.dart';
+
+/// A service order's refusal as read off a 422.
+typedef _Refusal = ({ServiceOrderRefusal refusal, String code, String? detail});
 
 /// Client for the Order Manager and Order Tracking APIs (Phase 2).
 ///
@@ -24,6 +28,9 @@ class OrderApi {
   /// The header that makes a retried placement safe. See [OrderSubmission].
   static const String idempotencyKeyHeader = 'Idempotency-Key';
 
+  /// The code on the 503 Order Manager answers when it cannot read which service categories are open.
+  static const String _servicesDirectoryUnavailable = 'SERVICES_DIRECTORY_UNAVAILABLE';
+
   /// Sends one checkout attempt.
   ///
   /// Always carries [OrderSubmission.idempotencyKey], so this is safe to call again with the
@@ -39,6 +46,11 @@ class OrderApi {
   ///
   /// [OrderAlreadyPlaced] means this attempt's key had already placed an order for a different
   /// basket; read that order and show it.
+  ///
+  /// A service order is placed here too, with its fulfilment, files and instructions in the
+  /// submission, and everything above holds for it. What only a service order can meet comes back as
+  /// an outcome as well: [ServiceOrderRefused] for a rule it broke, and [ServicesDirectoryUnavailable]
+  /// when the server could not read which categories are open. Neither placed anything.
   ///
   /// Everything else — 422 (item gone, shop closed, below the minimum), 402 (payment declined),
   /// 400, and any network failure — is thrown as a `DioException`, exactly as before.
@@ -67,6 +79,16 @@ class OrderApi {
           case 'IDEMPOTENCY_KEY_REUSED':
             return OrderAlreadyPlaced(body['orderId'] as String);
         }
+      }
+      // Only the codes a service order is refused with. The checkouts that send baskets read their
+      // own refusals (SHOP_REFUSED and the rest) from the exception, so those stay thrown.
+      final _Refusal? refused = _refusalOf(e, anyCode: false);
+      if (refused != null) {
+        return ServiceOrderRefused(
+            refusal: refused.refusal, code: refused.code, detail: refused.detail);
+      }
+      if (_directoryUnavailable(e)) {
+        return const ServicesDirectoryUnavailable();
       }
       rethrow;
     }
@@ -104,6 +126,33 @@ class OrderApi {
     final Response<dynamic> response =
         await _dio.post<dynamic>('/api/orders/quote', data: question.toBody());
     return BasketQuote.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// What one service would cost if it were ordered now — `POST /api/orders/quote`, asked with a
+  /// [BasketQuestion.service]: one line of packs, and how the customer gets the work.
+  ///
+  /// The service order screen's total, priced by the path its placement takes: no fee on a pickup,
+  /// the area's on a delivery, any waiver and the code. [ServiceQuoted.shop] is the shop's line.
+  ///
+  /// What a service order can never be comes back as [ServiceQuoteRefused] with placement's own
+  /// codes — Express, a way of getting the work the offer is not sold with, a closed category — and
+  /// a code this build does not know is still a refusal ([ServiceOrderRefusal.unknown]). An
+  /// unreadable services directory is [ServiceQuoteUnavailable]. Anything else is thrown. CUSTOMER
+  /// only.
+  Future<ServiceQuoteResult> quoteService(BasketQuestion question) async {
+    try {
+      return ServiceQuoted(await quote(question));
+    } on DioException catch (e) {
+      final _Refusal? refused = _refusalOf(e, anyCode: true);
+      if (refused != null) {
+        return ServiceQuoteRefused(
+            refusal: refused.refusal, code: refused.code, detail: refused.detail);
+      }
+      if (_directoryUnavailable(e)) {
+        return const ServiceQuoteUnavailable();
+      }
+      rethrow;
+    }
   }
 
   /// Sends one checkout attempt for a basket from several shops — `POST /api/orders/checkout`.
@@ -167,14 +216,69 @@ class OrderApi {
 
   // ---------------------------------------------------------------- merchant
 
-  Future<Paged<DeliveryOrder>> forMerchant({int page = 0, int size = 20}) =>
-      _page('/api/orders/merchant', page, size);
+  /// The shop's orders, newest first.
+  ///
+  /// [kind] and [fulfilment] narrow it — a merchant running a goods shop and a services shop under
+  /// one account asks for [OrderKind.service], a counter for [Fulfilment.pickup] — and with neither
+  /// it is the list it always was. Never [OrderKind.unknown] or [Fulfilment.unknown], which name
+  /// nothing the server can filter by and are refused here, before anything is sent.
+  Future<Paged<DeliveryOrder>> forMerchant({
+    int page = 0,
+    int size = 20,
+    OrderKind? kind,
+    Fulfilment? fulfilment,
+  }) =>
+      _page('/api/orders/merchant', page, size, extra: _narrowedBy(kind, fulfilment));
 
   /// How the shop is trading, day by day. MERCHANT only, and always about the caller's own shop.
   Future<MerchantSummary> merchantSummary({int days = 14}) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
         '/api/orders/merchant/summary', queryParameters: <String, dynamic>{'days': days});
     return MerchantSummary.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  // ---------------------------------------------------------------- service orders: the provider
+
+  /// The customer collected their pickup at the counter: READY to DELIVERED —
+  /// `POST /api/orders/{id}/collected`. MERCHANT only, and only the caller's own order.
+  ///
+  /// [ServiceOrderRefusal.notCollectable] when the order is not a pickup waiting at the counter —
+  /// most often because another device there already marked it collected: read the order again.
+  Future<ServiceOrderActionResult> collected(String orderId) =>
+      _serviceStep(() => _dio.post<dynamic>('/api/orders/$orderId/collected'));
+
+  /// Declines a new service order for [reason]: the shop's cancel, sent as the picklist's code
+  /// (`PROVIDER_DECLINED: TOO_BUSY`), which the customer's screen says in their own language.
+  ///
+  /// Only a new order is declined. The same call on an order accepted meanwhile — by another device
+  /// at the counter, say — is refused as [ServiceOrderRefusal.reservedCancelReason]: read it again.
+  /// [DeclineReason.unknown] names no reason and is refused here, before anything is sent.
+  Future<ServiceOrderActionResult> decline(String orderId, DeclineReason reason) {
+    if (reason == DeclineReason.unknown) {
+      throw ArgumentError.value(reason, 'reason', 'A decline names a reason from the picklist');
+    }
+    return _serviceStep(() => _dio.post<dynamic>(
+          '/api/orders/$orderId/cancel',
+          data: <String, dynamic>{'reason': reason.cancelReason},
+        ));
+  }
+
+  /// Cancels a pickup its customer never collected: the shop's cancel, sent as `NOT_COLLECTED`, with
+  /// the shop's [note] after it when it gives one.
+  ///
+  /// Only once the customer's time is up ([DeliveryOrder.canCancelAsNotCollected]); sooner is refused
+  /// as [ServiceOrderRefusal.uncollectedTooSoon], and the order's
+  /// [DeliveryOrder.uncollectedCancellableAt] says from when it may be sent.
+  Future<ServiceOrderActionResult> cancelNotCollected(String orderId, {String? note}) {
+    final String words = note?.trim() ?? '';
+    return _serviceStep(() => _dio.post<dynamic>(
+          '/api/orders/$orderId/cancel',
+          data: <String, dynamic>{
+            'reason': words.isEmpty
+                ? DeliveryOrder.notCollectedCancelReason
+                : '${DeliveryOrder.notCollectedCancelReason}: $words',
+          },
+        ));
   }
 
   // ---------------------------------------------------------------- rider
@@ -221,9 +325,19 @@ class OrderApi {
     return CarrierSummary.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<Paged<DeliveryOrder>> all({OrderStatus? status, int page = 0, int size = 20}) =>
-      _page('/api/orders', page, size,
-          extra: status == null ? null : <String, dynamic>{'status': status.wire});
+  /// The whole platform's orders, newest first, narrowed by whatever is given — "every pickup waiting
+  /// at a counter" is [OrderStatus.ready], [OrderKind.service], [Fulfilment.pickup]. BACKOFFICE only.
+  Future<Paged<DeliveryOrder>> all({
+    OrderStatus? status,
+    OrderKind? kind,
+    Fulfilment? fulfilment,
+    int page = 0,
+    int size = 20,
+  }) =>
+      _page('/api/orders', page, size, extra: <String, dynamic>{
+        if (status != null) 'status': status.wire,
+        ...?_narrowedBy(kind, fulfilment),
+      });
 
   Future<OrderStats> stats() async {
     final Response<dynamic> response = await _dio.get<dynamic>('/api/orders/stats');
@@ -235,6 +349,20 @@ class OrderApi {
   Future<DeliveryOrder> read(String orderId) async {
     final Response<dynamic> response = await _dio.get<dynamic>('/api/orders/$orderId');
     return DeliveryOrder.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Every step the order has taken, oldest first — `GET /api/orders/{id}/history`, readable by
+  /// whoever may read the order. A step this build cannot place on a timeline is left out.
+  Future<List<OrderStatusChange>> statusHistory(String orderId) async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/orders/$orderId/history');
+    final Object? rows = response.data;
+    if (rows is! List) {
+      return const <OrderStatusChange>[];
+    }
+    return rows
+        .map(OrderStatusChange.maybeFromJson)
+        .whereType<OrderStatusChange>()
+        .toList(growable: false);
   }
 
   /// Applies one of the actions the server offered on this order.
@@ -360,5 +488,73 @@ class OrderApi {
       response.data as Map<String, dynamic>,
       (Map<String, dynamic> json) => DeliveryOrder.fromJson(json),
     );
+  }
+
+  /// The kind and fulfilment filters as the server spells them; null when neither is given.
+  static Map<String, dynamic>? _narrowedBy(OrderKind? kind, Fulfilment? fulfilment) {
+    if (kind == OrderKind.unknown) {
+      throw ArgumentError.value(kind, 'kind', 'A kind this app does not know cannot be filtered by');
+    }
+    if (fulfilment == Fulfilment.unknown) {
+      throw ArgumentError.value(
+          fulfilment, 'fulfilment', 'A fulfilment this app does not know cannot be filtered by');
+    }
+    if (kind == null && fulfilment == null) {
+      return null;
+    }
+    return <String, dynamic>{
+      if (kind != null) 'kind': kind.wire,
+      if (fulfilment != null) 'fulfilment': fulfilment.wire,
+    };
+  }
+
+  /// A provider's step on a service order, with a refusal read off its 422 rather than thrown.
+  Future<ServiceOrderActionResult> _serviceStep(Future<Response<dynamic>> Function() send) async {
+    try {
+      final Response<dynamic> response = await send();
+      return ServiceOrderUpdated(DeliveryOrder.fromJson(response.data as Map<String, dynamic>));
+    } on DioException catch (e) {
+      final _Refusal? refused = _refusalOf(e, anyCode: true);
+      if (refused == null) {
+        rethrow;
+      }
+      return ServiceOrderActionRefused(
+          refusal: refused.refusal, code: refused.code, detail: refused.detail);
+    }
+  }
+
+  /// The refusal a 422 names in its `code`, or null when it names none.
+  ///
+  /// [anyCode] false keeps only the codes a service order is refused with, for the placement path
+  /// baskets share. True reads any code — one this build does not know as
+  /// [ServiceOrderRefusal.unknown] — for the calls only a service order makes.
+  static _Refusal? _refusalOf(DioException e, {required bool anyCode}) {
+    final Object? body = e.response?.data;
+    if (e.response?.statusCode != 422 || body is! Map) {
+      return null;
+    }
+    final Object? code = body['code'];
+    if (code is! String || code.isEmpty) {
+      return null;
+    }
+    final ServiceOrderRefusal? known = ServiceOrderRefusal.maybeFromWire(code);
+    if (known == null && !anyCode) {
+      return null;
+    }
+    final Object? detail = body['detail'];
+    return (
+      refusal: known ?? ServiceOrderRefusal.unknown,
+      code: code,
+      detail: detail is String ? detail : null,
+    );
+  }
+
+  /// Whether this is the 503 that says the services directory could not be read — which Order
+  /// Manager answers before pricing anything, unlike a gateway's 503.
+  static bool _directoryUnavailable(DioException e) {
+    final Object? body = e.response?.data;
+    return e.response?.statusCode == 503 &&
+        body is Map &&
+        body['code'] == _servicesDirectoryUnavailable;
   }
 }

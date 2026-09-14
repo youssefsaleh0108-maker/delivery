@@ -329,8 +329,9 @@ class _GiftCheckoutScreenState extends State<GiftCheckoutScreen> {
             return;
           }
           order = existing;
-        case OrderPriceChanged():
-          // Only ever the answer to a request that asserts a total, which this screen never sends.
+        case OrderPriceChanged() || ServiceOrderRefused() || ServicesDirectoryUnavailable():
+          // Only ever the answer to a request that asserts a total, which this screen never sends —
+          // or to a service order, which a gift never is.
           if (!mounted) return;
           setState(() => _placing = false);
           _say(t.couldNotPlaceOrder);

@@ -5,6 +5,7 @@ import 'order_models.dart';
 import 'pos_models.dart';
 import 'provider_models.dart';
 import 'report_models.dart';
+import 'service_order_models.dart';
 import 'staff_models.dart';
 import 'store_models.dart';
 
@@ -39,10 +40,23 @@ extension OrderActionLabel on OrderAction {
         OrderAction.accept => t.actionAccept,
         OrderAction.prepare => t.actionPrepare,
         OrderAction.ready => t.actionMarkReady,
+        OrderAction.collected => t.svcActionCollected,
         OrderAction.claim => t.actionClaim,
         OrderAction.pickUp => t.actionPickedUp,
         OrderAction.deliver => t.actionDelivered,
         OrderAction.cancel => t.actionCancel,
+      };
+}
+
+/// A provider's reason for declining a service order: the Decline sheet's picklist, and what the
+/// customer's order says the shop gave. A code this build does not know reads as "Other", which is
+/// exactly what it is to this build.
+extension DeclineReasonLabel on DeclineReason {
+  String labelIn(DeliveryStrings t) => switch (this) {
+        DeclineReason.tooBusy => t.svcDeclineTooBusy,
+        DeclineReason.cannotDo => t.svcDeclineCannotDo,
+        DeclineReason.fileProblem => t.svcDeclineFileProblem,
+        DeclineReason.other || DeclineReason.unknown => t.svcDeclineOther,
       };
 }
 

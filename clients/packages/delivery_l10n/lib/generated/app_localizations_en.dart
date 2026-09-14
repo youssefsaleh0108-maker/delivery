@@ -10691,4 +10691,19 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcCategoryTutoring => 'Tutoring';
+
+  @override
+  String get svcActionCollected => 'Customer collected';
+
+  @override
+  String get svcDeclineTooBusy => 'Too busy right now';
+
+  @override
+  String get svcDeclineCannotDo => 'We can\'t do this job';
+
+  @override
+  String get svcDeclineFileProblem => 'Problem with the file';
+
+  @override
+  String get svcDeclineOther => 'Other reason';
 }

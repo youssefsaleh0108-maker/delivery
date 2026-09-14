@@ -18139,6 +18139,36 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Tutoring'**
   String get svcCategoryTutoring;
+
+  /// No description provided for @svcActionCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer collected'**
+  String get svcActionCollected;
+
+  /// No description provided for @svcDeclineTooBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Too busy right now'**
+  String get svcDeclineTooBusy;
+
+  /// No description provided for @svcDeclineCannotDo.
+  ///
+  /// In en, this message translates to:
+  /// **'We can\'t do this job'**
+  String get svcDeclineCannotDo;
+
+  /// No description provided for @svcDeclineFileProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem with the file'**
+  String get svcDeclineFileProblem;
+
+  /// No description provided for @svcDeclineOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get svcDeclineOther;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

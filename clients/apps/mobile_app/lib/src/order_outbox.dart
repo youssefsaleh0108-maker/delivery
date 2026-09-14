@@ -440,6 +440,16 @@ class OrderOutbox extends ChangeNotifier {
               review: PendingReview.priceChanged,
               newTotal: total,
               maybePlaced: false));
+        case ServiceOrderRefused(detail: final String? detail):
+          // Only ever the answer to a service order, which is never queued. Were one sent, it is
+          // refused as any 422 is: before its key placed anything, so nothing exists under it.
+          await _update(item._with(
+              status: PendingOrderStatus.failed, error: detail, maybePlaced: false));
+        case ServicesDirectoryUnavailable():
+          // A service order's answer too, and a temporary one: back to queued with the same key.
+          await _update(item._with(status: PendingOrderStatus.queued));
+          _scheduleRetry();
+          return false;
       }
       return true;
     } on DioException catch (e) {
