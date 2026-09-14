@@ -11022,4 +11022,442 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcDeclineOther => 'سبب آخر';
+
+  @override
+  String get svcNavServices => 'الخدمات';
+
+  @override
+  String get svcBrandPill => 'خدمات يودروب';
+
+  @override
+  String get svcSearchHint => 'ابحث عن خدمة…';
+
+  @override
+  String get svcCategoriesTitle => 'فئات الخدمات';
+
+  @override
+  String get svcPopularNearYou => 'خدمات رائجة بالقرب منك';
+
+  @override
+  String get svcNearYou => 'خدمات بالقرب منك';
+
+  @override
+  String get svcAllProviders => 'مقدّمو الخدمات';
+
+  @override
+  String get svcNoServicesNearby => 'لا توجد خدمات بالقرب منك بعد';
+
+  @override
+  String get svcNoServicesNearbyHint =>
+      'جرّب إحدى الفئات، أو ابحث عمّا تحتاجه.';
+
+  @override
+  String get svcServicesNotOffered => 'لا تقدّم يودروب خدمات هنا بعد';
+
+  @override
+  String get svcCouldNotLoadServices => 'تعذّر تحميل الخدمات';
+
+  @override
+  String svcDistanceAway(String distance) {
+    return 'على بُعد $distance';
+  }
+
+  @override
+  String get svcOffers => 'العروض';
+
+  @override
+  String get svcSearchProviders => 'مقدّمو الخدمات';
+
+  @override
+  String svcSearchTitle(String query) {
+    return 'نتائج «$query»';
+  }
+
+  @override
+  String svcNoResults(String query) {
+    return 'لم نجد شيئًا لـ«$query»';
+  }
+
+  @override
+  String svcCategoryEmpty(String category) {
+    return 'لا يوجد مقدّمو خدمات في فئة $category بعد';
+  }
+
+  @override
+  String svcReviewsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مراجعة',
+      many: '$count مراجعة',
+      few: '$count مراجعات',
+      two: 'مراجعتان',
+      one: 'مراجعة واحدة',
+      zero: 'لا مراجعات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcOpenUntil(String time) {
+    return 'مفتوح حتى $time';
+  }
+
+  @override
+  String get svcTabAbout => 'نبذة';
+
+  @override
+  String svcFromPrice(String price) {
+    return 'ابتداءً من $price';
+  }
+
+  @override
+  String get svcOrderCta => 'اطلب';
+
+  @override
+  String get svcNoOffers => 'لا توجد عروض لدى مقدّم الخدمة هذا حاليًا';
+
+  @override
+  String get svcAboutHours => 'ساعات العمل';
+
+  @override
+  String get svcAboutAddress => 'العنوان';
+
+  @override
+  String get svcAboutGetIt => 'كيف تحصل على طلبك';
+
+  @override
+  String get svcPickupAtShop => 'الاستلام من المحل';
+
+  @override
+  String get svcYouDropDelivery => 'توصيل يودروب';
+
+  @override
+  String get svcClosedNoOrders => 'مغلق الآن — يمكنك الطلب عندما يفتح المحل';
+
+  @override
+  String get svcNeedsFileUnavailable =>
+      'يحتاج هذا العرض إلى ملف، ولا يمكن إرسال الملفات مع الطلبات بعد';
+
+  @override
+  String svcPackOf(String count, String unit) {
+    return 'حزمة من $count $unit';
+  }
+
+  @override
+  String svcPerUnit(String unit) {
+    return 'لكل $unit';
+  }
+
+  @override
+  String get svcLoadMore => 'عرض المزيد';
+
+  @override
+  String get svcCouldNotLoadOffer => 'تعذّر تحميل هذا العرض';
+
+  @override
+  String get svcCouldNotLoadReviews => 'تعذّر تحميل المراجعات';
+
+  @override
+  String get svcOrderServiceTitle => 'اطلب الخدمة';
+
+  @override
+  String svcProviderLine(String name) {
+    return 'مقدّم الخدمة: $name';
+  }
+
+  @override
+  String get svcQuantity => 'الكمية';
+
+  @override
+  String svcUnitsLine(String units, String unit) {
+    return '$units $unit';
+  }
+
+  @override
+  String svcPacksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count حزمة',
+      many: '$count حزمة',
+      few: '$count حزم',
+      two: 'حزمتان',
+      one: 'حزمة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcChooseOption => 'اختر واحدًا';
+
+  @override
+  String get svcOptionRequired => 'مطلوب';
+
+  @override
+  String get svcOptionOptional => 'اختياري';
+
+  @override
+  String get svcUploadDesign => 'ارفع ملف التصميم';
+
+  @override
+  String get svcUploadHint =>
+      'اضغط لاختيار ملف PDF أو JPG أو PNG، حتى 10 ميغابايت';
+
+  @override
+  String get svcUploading => 'جارٍ الرفع…';
+
+  @override
+  String get svcUploaded => 'تم الرفع';
+
+  @override
+  String get svcRemoveFile => 'إزالة';
+
+  @override
+  String get svcUploadFailed => 'تعذّر رفع هذا الملف. حاول مجددًا.';
+
+  @override
+  String get svcAddAnotherFile => 'أضف ملفًا آخر';
+
+  @override
+  String get svcFileRequired => 'يحتاج مقدّم الخدمة إلى ملفك للبدء';
+
+  @override
+  String get svcSpecialInstructions => 'تعليمات خاصة';
+
+  @override
+  String get svcInstructionsHint => 'مثال: اترك إطارًا أبيض حول حواف البطاقة';
+
+  @override
+  String get svcHowYouGetIt => 'طريقة الحصول على الطلب';
+
+  @override
+  String svcDeliveryFeePlus(String amount) {
+    return '+$amount';
+  }
+
+  @override
+  String get svcPayCashPickup => 'نقدًا — ادفع عند الاستلام';
+
+  @override
+  String get svcPayCashDelivery => 'نقدًا — ادفع عند التوصيل';
+
+  @override
+  String get svcDeliveryFee => 'رسوم التوصيل';
+
+  @override
+  String get svcDiscount => 'الخصم';
+
+  @override
+  String svcPlaceOrderTotal(String amount) {
+    return 'أكّد الطلب — $amount';
+  }
+
+  @override
+  String get svcOfflineNoQueue =>
+      'طلبات الخدمات تحتاج إلى اتصال — لا يمكن حفظها على هذا الهاتف لإرسالها لاحقًا.';
+
+  @override
+  String get svcChooseDeliveryAddress => 'اختر عنوان التوصيل';
+
+  @override
+  String get svcQuoteFailed => 'تعذّر الحصول على السعر. حاول مجددًا.';
+
+  @override
+  String svcPriceChangedBody(String total, String agreed) {
+    return 'أصبح مجموع هذا الطلب $total بدلًا من $agreed الذي رأيته. هل تريد تأكيده بالمجموع الجديد؟';
+  }
+
+  @override
+  String get svcDirectoryUnavailable =>
+      'الخدمات غير متاحة مؤقتًا. حاول مجددًا بعد لحظات.';
+
+  @override
+  String svcNotServed(String shop) {
+    return 'لا يوصل $shop إلى هذا العنوان';
+  }
+
+  @override
+  String svcShopClosed(String shop) {
+    return '$shop مغلق ولا يستقبل طلبات حاليًا';
+  }
+
+  @override
+  String svcBelowMinimum(String shop, String amount) {
+    return 'يوصل $shop الطلبات التي تبلغ $amount أو أكثر';
+  }
+
+  @override
+  String get svcRefusedCategoryClosed => 'هذه الخدمة غير متاحة حاليًا';
+
+  @override
+  String get svcRefusedOfferNotOrderable => 'لا يمكن طلب هذا العرض حاليًا';
+
+  @override
+  String get svcRefusedFulfilment => 'لا يقدّم مقدّم الخدمة طريقة الحصول هذه';
+
+  @override
+  String get svcRefusedAttachmentsUnavailable =>
+      'لا يمكن إرسال الملفات مع الطلبات بعد، لذا لا يمكن طلب هذا العرض';
+
+  @override
+  String get svcRefusedWrongType => 'ملفات PDF أو JPG أو PNG فقط';
+
+  @override
+  String get svcRefusedEmpty => 'هذا الملف فارغ';
+
+  @override
+  String get svcRefusedTooLarge => 'يجب ألا يتجاوز حجم الملف 10 ميغابايت';
+
+  @override
+  String get svcRefusedTooManyWaiting =>
+      'لديك ملفات كثيرة بانتظار طلب. أزل أحدها أولًا.';
+
+  @override
+  String get svcRefusedNotUploaded => 'لم يكتمل رفع هذا الملف. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedExpired => 'انتهت صلاحية هذا الملف. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedAlreadyAttached =>
+      'هذا الملف مرفق بطلب آخر. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedTooManyFiles => '3 ملفات كحدّ أقصى لكل طلب';
+
+  @override
+  String get svcRefusedDuplicate => 'هذا الملف مضاف بالفعل';
+
+  @override
+  String get svcRefusedNotAccepted => 'هذا العرض لا يقبل ملفات';
+
+  @override
+  String get svcRefusedUnknownFile =>
+      'تعذّر العثور على هذا الملف. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedPacks => 'اختر بين 1 و99 حزمة';
+
+  @override
+  String get svcRefusedGeneric => 'لا يمكن تقديم هذا الطلب كما هو';
+
+  @override
+  String get svcTrackTitle => 'تتبّع طلب الخدمة';
+
+  @override
+  String svcOrderNumber(String ref) {
+    return 'الطلب #$ref';
+  }
+
+  @override
+  String get svcStatusWaiting => 'بانتظار مقدّم الخدمة';
+
+  @override
+  String get svcStatusInProgress => 'قيد التنفيذ';
+
+  @override
+  String get svcStatusReadyPickup => 'جاهز للاستلام';
+
+  @override
+  String get svcStatusReadyDelivery => 'جاهز للتوصيل';
+
+  @override
+  String get svcStatusOnTheWay => 'في الطريق';
+
+  @override
+  String get svcStatusCompleted => 'مكتمل';
+
+  @override
+  String get svcStatusCollected => 'تم الاستلام';
+
+  @override
+  String get svcStatusDeclined => 'مرفوض';
+
+  @override
+  String get svcStatusNotCollected => 'لم يُستلم';
+
+  @override
+  String get svcEstimatedCompletion => 'موعد الإنجاز المتوقع';
+
+  @override
+  String get svcReadyBy => 'جاهز بحلول';
+
+  @override
+  String svcEstimateAfterAccept(String range) {
+    return '$range، ويُؤكَّد بعد قبول مقدّم الخدمة';
+  }
+
+  @override
+  String svcTurnaroundRange(String min, String max) {
+    return 'من $min إلى $max ساعة';
+  }
+
+  @override
+  String svcTurnaroundUpTo(String max) {
+    return 'حتى $max ساعة';
+  }
+
+  @override
+  String svcTodayAt(String time) {
+    return 'اليوم، $time';
+  }
+
+  @override
+  String svcTomorrowAt(String time) {
+    return 'غدًا، $time';
+  }
+
+  @override
+  String svcDateAt(String date, String time) {
+    return '$date، $time';
+  }
+
+  @override
+  String get svcOrderStatusTitle => 'حالة الطلب';
+
+  @override
+  String get svcTimelinePlaced => 'تم تقديم الطلب';
+
+  @override
+  String get svcTimelineAccepted => 'قَبِل مقدّم الخدمة الطلب';
+
+  @override
+  String get svcTimelineInProduction => 'قيد الإنجاز';
+
+  @override
+  String get svcTimelineOutForDelivery => 'خرج للتوصيل';
+
+  @override
+  String svcDeclinedReason(String reason) {
+    return 'رفض مقدّم الخدمة الطلب: $reason';
+  }
+
+  @override
+  String get svcTimelineNotCollected => 'أُلغي — لم يُستلم في الوقت المحدد';
+
+  @override
+  String get svcProviderRole => 'مقدّم الخدمة';
+
+  @override
+  String get svcShowNumberAtPickup => 'أظهر رقم الطلب هذا عند الاستلام';
+
+  @override
+  String svcPickupFrom(String shop) {
+    return 'الاستلام من $shop';
+  }
+
+  @override
+  String svcDeliveringTo(String address) {
+    return 'التوصيل إلى $address';
+  }
+
+  @override
+  String get svcYourInstructions => 'تعليماتك';
+
+  @override
+  String get svcSummary => 'الملخص';
+
+  @override
+  String get svcServiceChip => 'خدمة';
 }
