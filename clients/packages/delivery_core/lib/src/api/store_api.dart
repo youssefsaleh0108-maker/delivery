@@ -270,6 +270,66 @@ class StoreApi {
     );
   }
 
+  /// The caller's own review of one of their orders — `GET /api/stores/reviews/order/{orderId}` — or
+  /// null when they have not reviewed it: how a completed order knows whether to invite a rating or
+  /// show the stars already given. CUSTOMER only.
+  ///
+  /// The server answers 204 both when the order has no review and when its review is somebody
+  /// else's, so this learns nothing about an order that is not the caller's. A 200 that is not a
+  /// review this build can read is thrown as a [FormatException] rather than read as "not reviewed":
+  /// a screen then draws nothing about rating instead of inviting a second one.
+  Future<StoreReview?> myReviewForOrder(String orderId) async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/stores/reviews/order/$orderId');
+    if (response.statusCode == 204) {
+      return null;
+    }
+    final StoreReview? review = StoreReview.maybeFromJson(response.data);
+    if (review == null) {
+      throw const FormatException('The review of this order could not be read');
+    }
+    return review;
+  }
+
+  /// Rates a shop for one of the caller's completed orders — `POST /api/stores/{storeId}/reviews` —
+  /// and answers the review as the server stored it. CUSTOMER only.
+  ///
+  /// [rating] is one to five stars; anything else is refused here, before a request. [comment] is
+  /// trimmed, and not sent when blank; the server holds it to 2,000 UTF-16 units.
+  ///
+  /// What product-service decides (`ReviewService.rate`):
+  ///
+  /// * **Only an order it has on record as completed** — delivered to the door, or collected at the
+  ///   counter, both of which Order Manager announces as `order.delivered` — that the caller placed
+  ///   at this shop. Anything else is a 404, the same for a mistyped id, an order still in
+  ///   production and somebody else's order. The record is made from that event, so for a moment
+  ///   after completion a genuine order can be answered 404 too; asking again shortly is right.
+  /// * **One review per order, revisable.** A second review of the same order replaces the first
+  ///   instead of being refused, so there is no "already reviewed" error: a screen that wants to say
+  ///   so asks [myReviewForOrder] first.
+  Future<StoreReview> submitReview(
+    String storeId, {
+    required String orderId,
+    required int rating,
+    String? comment,
+  }) async {
+    RangeError.checkValueInInterval(rating, 1, 5, 'rating');
+    final String words = comment?.trim() ?? '';
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/api/stores/$storeId/reviews',
+      data: <String, dynamic>{
+        'orderId': orderId,
+        'rating': rating,
+        if (words.isNotEmpty) 'comment': words,
+      },
+    );
+    final StoreReview? stored = StoreReview.maybeFromJson(response.data);
+    if (stored == null) {
+      throw const FormatException('The review the server stored could not be read');
+    }
+    return stored;
+  }
+
   // ---------------------------------------------------------------- banners and chips
 
   /// The home rail. Live banners only, in the order the Backoffice arranged them.
