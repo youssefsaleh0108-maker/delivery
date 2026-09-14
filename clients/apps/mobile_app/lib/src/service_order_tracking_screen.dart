@@ -27,8 +27,11 @@ import 'service_order_words.dart';
 ///   that, the offer's turnaround "confirmed once the provider accepts"; after the work is ready, or
 ///   once the order has ended, no card at all.
 /// * **The shop, not "Support Representative".** The card is the provider's. Its chat button opens
-///   the customer's existing thread with that shop, and is drawn only when this app has the shop
-///   chat client — a button that cannot open anything is not drawn.
+///   the customer's thread with that shop from this order, so the thread carries the order once the
+///   server has checked it is the customer's at that shop. The circle spins while it asks and takes
+///   no second tap; an order the server does not find there is read again, and a chat that cannot be
+///   opened right now says so under the shop, with Try again. It is drawn only when this app has the
+///   shop chat client — a button that cannot open anything is not drawn.
 /// * **Pickup is not a delivery.** A pickup shows where to collect and the shop's hours today, and
 ///   never a rider map: nobody is riding. A delivery mounts the rider tracking panel once it is out.
 /// * **The customer's own files**, listed from the order. Each opens on a link read again at the tap:
@@ -125,6 +128,14 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
   bool _failed = false;
   bool _cancelling = false;
   Timer? _refresh;
+
+  /// "Chat with {shop}" is asking the server for the thread, or the thread it opened is still on
+  /// screen: the circle spins and takes no second tap, so one tap opens one conversation.
+  bool _openingChat = false;
+
+  /// The server could not open the chat just now (503, or no answer at all): said under the shop, with
+  /// Try again.
+  bool _chatUnavailable = false;
 
   @override
   void initState() {
@@ -371,18 +382,58 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
     unawaited(_load(silent: true));
   }
 
-  void _openChat(DeliveryOrder order) {
+  /// Opens the customer's conversation with the shop from this order. The server labels the thread
+  /// with the order once it has checked the order is the customer's at that shop, and the thread
+  /// screen the shop page opens shows it.
+  ///
+  /// Asked here rather than by the thread screen, so the circle can spin and take no second tap, and so
+  /// what the server says instead is said on this page: an order it does not find at that shop (a 404,
+  /// as for an unknown shop) is read again, since whatever changed shows on it; anything else — 503
+  /// when orders cannot be checked, or no answer at all — is said under the shop, with Try again.
+  Future<void> _openChat(DeliveryOrder order) async {
     final ShopChatApi? api = widget.shopChatApi;
     final String? storeId = order.storeId;
-    if (api == null || storeId == null) return;
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => ShopThreadScreen(
-        api: api,
-        open: () => api.openWithStore(storeId),
-        title: order.storeName ?? _shop?.name,
-        socket: widget.chatSocket,
-      ),
-    ));
+    if (api == null || storeId == null || _openingChat || !mounted) return;
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    setState(() {
+      _openingChat = true;
+      _chatUnavailable = false;
+    });
+    try {
+      final ShopThread thread;
+      try {
+        thread = await api.openWithStore(storeId, orderId: order.id);
+      } on DioException catch (e) {
+        if (!mounted) return;
+        if (e.response?.statusCode == 404) {
+          ScaffoldMessenger.of(context)
+            ..removeCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(t.svcChatOrderNotFound)));
+          unawaited(_load(silent: true));
+        } else {
+          setState(() => _chatUnavailable = true);
+        }
+        return;
+      } catch (_) {
+        if (mounted) setState(() => _chatUnavailable = true);
+        return;
+      }
+      if (!mounted) return;
+      // Still spinning while the conversation covers this page: a second tap as it slides in opens
+      // nothing more.
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => ShopThreadScreen(
+          api: api,
+          thread: thread,
+          // Reopen, once the conversation has gone quiet, opens it from this order again.
+          open: () => api.openWithStore(storeId, orderId: order.id),
+          title: order.storeName ?? _shop?.name,
+          socket: widget.chatSocket,
+        ),
+      ));
+    } finally {
+      if (mounted) setState(() => _openingChat = false);
+    }
   }
 
   @override
@@ -681,61 +732,93 @@ class _ServiceOrderTrackingScreenState extends State<ServiceOrderTrackingScreen>
   Widget _providerCard(DeliveryOrder order, DeliveryStrings t) {
     final String name = order.storeName ?? _shop?.name ?? t.tabShop;
     final bool canChat = widget.shopChatApi != null && order.storeId != null;
+    // Null while the thread is being asked for: the circle spins instead, and a tap does nothing.
+    final VoidCallback? chat = _openingChat ? null : () => unawaited(_openChat(order));
     return YdCard.bordered(
       padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          ClipOval(child: StoreAvatar(name: name, logoUrl: _shop?.listLogoUrl, size: 40)),
-          const SizedBox(width: DeliverySpacing.md - 4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700, color: DeliveryColors.ink),
+          Row(
+            children: <Widget>[
+              ClipOval(child: StoreAvatar(name: name, logoUrl: _shop?.listLogoUrl, size: 40)),
+              const SizedBox(width: DeliverySpacing.md - 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700, color: DeliveryColors.ink),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(t.svcProviderRole,
+                        style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(t.svcProviderRole,
-                    style: const TextStyle(fontSize: 11.5, color: DeliveryColors.muted)),
-              ],
-            ),
-          ),
-          if (canChat)
-            Semantics(
-              container: true,
-              button: true,
-              label: t.chatShopWith(name),
-              // The circle is drawn at the frame's 38dp; a tap anywhere in the 48dp square around it
-              // opens the chat. A tap on the circle is the InkWell's, with its ripple.
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                excludeFromSemantics: true,
-                onTap: () => _openChat(order),
-                child: SizedBox.square(
-                  dimension: kMinInteractiveDimension,
-                  child: Center(
-                    child: Material(
-                      color: DeliveryColors.brandSoft,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => _openChat(order),
-                        child: const SizedBox.square(
-                          dimension: 38,
-                          child: Icon(Icons.chat_bubble_outline_rounded,
-                              size: 18, color: DeliveryColors.brand),
+              ),
+              if (canChat)
+                Semantics(
+                  container: true,
+                  button: true,
+                  enabled: !_openingChat,
+                  label: t.chatShopWith(name),
+                  // The circle is drawn at the frame's 38dp; a tap anywhere in the 48dp square around
+                  // it opens the chat. A tap on the circle is the InkWell's, with its ripple.
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTap: chat,
+                    child: SizedBox.square(
+                      dimension: kMinInteractiveDimension,
+                      child: Center(
+                        child: Material(
+                          color: DeliveryColors.brandSoft,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: chat,
+                            child: SizedBox.square(
+                              dimension: 38,
+                              child: _openingChat
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(DeliverySpacing.sm + 2),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: DeliveryColors.brand),
+                                    )
+                                  : const Icon(Icons.chat_bubble_outline_rounded,
+                                      size: 18, color: DeliveryColors.brand),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
+            ],
+          ),
+          if (canChat && _chatUnavailable) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(t.svcChatUnavailable,
+                      style: const TextStyle(
+                          fontSize: 12.5, color: DeliveryColors.muted, height: 1.35)),
+                ),
+                TextButton(
+                  onPressed: chat,
+                  style: TextButton.styleFrom(foregroundColor: DeliveryColors.brand),
+                  child: Text(t.tryAgain),
+                ),
+              ],
             ),
+          ],
         ],
       ),
     );

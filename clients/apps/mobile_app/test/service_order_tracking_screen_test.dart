@@ -14,6 +14,71 @@ import 'package:mobile_app/src/service_order_words.dart';
 
 import 'service_fixtures.dart';
 
+/// The customer's side of shop chat, as the tracking page uses it. Implemented rather than served over
+/// HTTP, so a test says exactly what the server answered: every open recorded with the order it names,
+/// answered with a thread about that order unless [fail] is set, and held while [hold] is.
+class _ShopChat implements ShopChatApi {
+  final List<(String storeId, String? orderId)> opens = <(String, String?)>[];
+
+  /// Thrown by the opens while set.
+  Object? fail;
+
+  Completer<void>? hold;
+
+  final Map<String, ShopThread> _threads = <String, ShopThread>{};
+
+  @override
+  Future<ShopThread> openWithStore(String storeId, {String? orderId}) async {
+    opens.add((storeId, orderId));
+    await hold?.future;
+    final Object? failure = fail;
+    if (failure != null) throw failure;
+    final ShopThread thread = ShopThread(
+      id: 'thread-1',
+      storeId: storeId,
+      storeName: 'Al Fakhry Press',
+      yourSide: ShopThreadSide.customer,
+      open: true,
+      lastSequence: 0,
+      unread: 0,
+      orderId: orderId,
+      orderShortId: orderId?.substring(0, 8),
+      orderKind: orderId == null ? null : OrderKind.service,
+    );
+    _threads[thread.id] = thread;
+    return thread;
+  }
+
+  /// A conversation nobody has written in yet.
+  @override
+  Future<ShopThreadPage> messages(String threadId, {int afterSequence = 0}) async =>
+      ShopThreadPage(thread: _threads[threadId]!, messages: const <ShopMessage>[], more: false);
+
+  @override
+  Future<int> markRead(String threadId, {required int upToSequence}) async => 0;
+
+  @override
+  Future<ShopThread> openForOrder(String orderId) =>
+      throw UnimplementedError('a shop opens a thread for its order; this page is the customer\'s');
+
+  @override
+  Future<List<ShopThread>> inbox() => throw UnimplementedError('the inbox is a merchant\'s');
+
+  @override
+  Future<ShopMessage> send(String threadId, String text, {String? clientMessageId}) =>
+      throw UnimplementedError('no tracking test sends a message');
+}
+
+/// A refusal from the shop chat server, as Dio throws one.
+DioException _refused(int status) {
+  final RequestOptions request = RequestOptions(path: '/api/chat/stores/s1/thread');
+  return DioException(
+    requestOptions: request,
+    type: DioExceptionType.badResponse,
+    response: Response<dynamic>(requestOptions: request, statusCode: status),
+  );
+}
+
 /// Tracking a service order (Figma 126:507), and the words every service order screen shares.
 ///
 /// What these pin is what the frame got wrong and what it left out: the order's own reference instead
@@ -345,40 +410,142 @@ void main() {
       expect(find.text(en.svcPayCashDelivery), findsOneWidget);
     });
 
-    testWidgets('chat with the shop is drawn only with the shop chat client, and opens its thread',
-        (WidgetTester tester) async {
-      final FakeServer server = serve(order: () => serviceOrderJson());
-      await pump(tester, server);
-      expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsNothing);
+    group('chat with the shop', () {
+      testWidgets('is drawn only with the shop chat client, and opens the thread from this order',
+          (WidgetTester tester) async {
+        final FakeServer server = serve(order: () => serviceOrderJson());
+        await pump(tester, server);
+        expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsNothing);
 
-      final SemanticsHandle semantics = tester.ensureSemantics();
-      await pump(tester, server, chat: ShopChatApi(server.dio));
-      expect(find.bySemanticsLabel(en.chatShopWith('Al Fakhry Press')), findsOneWidget);
-      semantics.dispose();
+        final _ShopChat chat = _ShopChat();
+        final SemanticsHandle semantics = tester.ensureSemantics();
+        await pump(tester, server, chat: chat);
+        expect(find.bySemanticsLabel(en.chatShopWith('Al Fakhry Press')), findsOneWidget);
+        semantics.dispose();
 
-      await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pumpAndSettle();
 
-      expect(find.byType(ShopThreadScreen), findsOneWidget);
-      expect(server.sent('POST', '/api/chat/stores/s1/thread'), hasLength(1));
-    });
+        expect(chat.opens, <(String, String?)>[('s1', svcOrderId)]);
+        final ShopThreadScreen opened = tester.widget<ShopThreadScreen>(find.byType(ShopThreadScreen));
+        expect(opened.thread?.orderId, svcOrderId);
+        // Its header names the order by the short id this page shows.
+        expect(find.textContaining('abcd1234'), findsOneWidget);
 
-    testWidgets('the chat button keeps its 38dp circle and takes a tap anywhere in 48dp',
-        (WidgetTester tester) async {
-      final FakeServer server = serve(order: () => serviceOrderJson());
-      await pump(tester, server, chat: ShopChatApi(server.dio));
+        // Reopen, once the conversation has gone quiet, still opens it from this order.
+        await opened.open!();
+        expect(chat.opens.last, ('s1', svcOrderId));
+      });
 
-      final Finder circle = find
-          .ancestor(of: find.byIcon(Icons.chat_bubble_outline_rounded), matching: find.byType(InkWell))
-          .first;
-      expect(tester.getSize(circle), const Size.square(38));
+      testWidgets('keeps its 38dp circle and takes a tap anywhere in 48dp', (WidgetTester tester) async {
+        final _ShopChat chat = _ShopChat();
+        await pump(tester, serve(order: () => serviceOrderJson()), chat: chat);
 
-      // Just below the circle, inside the square a finger is given.
-      await tester.tapAt(tester.getCenter(circle) + const Offset(0, 22));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.byType(ShopThreadScreen), findsOneWidget);
+        final Finder circle = find
+            .ancestor(of: find.byIcon(Icons.chat_bubble_outline_rounded), matching: find.byType(InkWell))
+            .first;
+        expect(tester.getSize(circle), const Size.square(38));
+
+        // Just below the circle, inside the square a finger is given.
+        await tester.tapAt(tester.getCenter(circle) + const Offset(0, 22));
+        await tester.pumpAndSettle();
+        expect(find.byType(ShopThreadScreen), findsOneWidget);
+        expect(chat.opens, hasLength(1));
+      });
+
+      testWidgets('a second tap while the thread is being opened asks nothing more, and the circle spins',
+          (WidgetTester tester) async {
+        final _ShopChat chat = _ShopChat()..hold = Completer<void>();
+        await pump(tester, serve(order: () => serviceOrderJson()), chat: chat);
+        final Offset circle = tester.getCenter(find.byIcon(Icons.chat_bubble_outline_rounded));
+
+        await tester.tapAt(circle);
+        await tester.tapAt(circle);
+        await tester.pump();
+        expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsNothing);
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        await tester.tapAt(circle);
+        await tester.pump();
+        expect(chat.opens, hasLength(1));
+
+        chat.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(find.byType(ShopThreadScreen), findsOneWidget);
+        expect(chat.opens, hasLength(1));
+      });
+
+      testWidgets('an order the server does not find at that shop says so, and is read again',
+          (WidgetTester tester) async {
+        final FakeServer server = serve(order: () => serviceOrderJson());
+        final _ShopChat chat = _ShopChat()..fail = _refused(404);
+        await pump(tester, server, chat: chat);
+        final int reads = server.sent('GET', '/api/orders/$svcOrderId').length;
+
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pumpAndSettle();
+
+        expect(find.text(en.svcChatOrderNotFound), findsOneWidget);
+        expect(server.sent('GET', '/api/orders/$svcOrderId'), hasLength(reads + 1));
+        expect(find.byType(ShopThreadScreen), findsNothing);
+        expect(find.text(en.svcChatUnavailable), findsNothing);
+      });
+
+      testWidgets('a chat that cannot be opened right now says so under the shop, and Try again opens it',
+          (WidgetTester tester) async {
+        final _ShopChat chat = _ShopChat()..fail = _refused(503);
+        await pump(tester, serve(order: () => serviceOrderJson()), chat: chat);
+
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pumpAndSettle();
+        expect(find.text(en.svcChatUnavailable), findsOneWidget);
+        expect(find.byType(ShopThreadScreen), findsNothing);
+
+        chat.fail = null;
+        await tester.tap(find.text(en.tryAgain));
+        await tester.pumpAndSettle();
+
+        expect(chat.opens, <(String, String?)>[('s1', svcOrderId), ('s1', svcOrderId)]);
+        expect(find.byType(ShopThreadScreen), findsOneWidget);
+      });
+
+      testWidgets(
+          'in Arabic, an outage reads Arabic, and the thread opens right to left with its short id kept '
+          'left to right', (WidgetTester tester) async {
+        final _ShopChat chat = _ShopChat()..fail = _refused(503);
+        await pump(tester, serve(order: () => serviceOrderJson()),
+            chat: chat, locale: const Locale('ar'));
+
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pumpAndSettle();
+        expect(find.text(ar.svcChatUnavailable), findsOneWidget);
+
+        chat.fail = null;
+        await tester.tap(find.text(ar.tryAgain));
+        await tester.pumpAndSettle();
+
+        expect(Directionality.of(tester.element(find.byType(ShopThreadScreen))), TextDirection.rtl);
+        expect(find.text(ar.svcChatOrderLabel('\u2066abcd1234\u2069')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('with a long shop name, the spinning circle and the outage line fit a 320dp phone',
+          (WidgetTester tester) async {
+        const String longName = 'Al Fakhry Press and Copy Centre of Greater Mar Mikhael';
+        final _ShopChat chat = _ShopChat()..hold = Completer<void>();
+        await pump(tester, serve(order: () => serviceOrderJson(storeName: longName)),
+            chat: chat, size: const Size(320, 1600));
+
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pump();
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        chat.fail = _refused(503);
+        chat.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text(en.svcChatUnavailable), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
     });
 
     group('the customer\'s files', () {
