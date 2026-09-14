@@ -57,7 +57,13 @@ vault kv put secret/product-service \
   spring.datasource.password="product_service_dev_pw" \
   delivery.storage.minio.access-key="${MINIO_ROOT_USER:-delivery}" \
   delivery.storage.minio.secret-key="${MINIO_ROOT_PASSWORD:-delivery123}"
-vault kv put secret/order-manager      spring.datasource.password="order_manager_dev_pw"
+# order-manager holds MinIO credentials too, for the files a customer attaches to a service order
+# (the order-attachments bucket): it presigns the customer's upload, and the downloads for the
+# order's customer, its merchant and back office, after checking which of them is asking.
+vault kv put secret/order-manager \
+  spring.datasource.password="order_manager_dev_pw" \
+  delivery.storage.minio.access-key="${MINIO_ROOT_USER:-delivery}" \
+  delivery.storage.minio.secret-key="${MINIO_ROOT_PASSWORD:-delivery123}"
 vault kv put secret/order-tracking     spring.datasource.password="order_tracking_dev_pw" \
                                        spring.data.redis.password="${REDIS_PASSWORD:-delivery}"
 vault kv put secret/connector-settings spring.datasource.password="connector_settings_dev_pw"

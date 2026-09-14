@@ -13,6 +13,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -43,9 +44,15 @@ public class Product {
         /**
          * Withdrawn from sale. Products are archived, never deleted, because past orders reference
          * them and an order history that cannot name what was bought is worthless.
+         *
+         * <p>Also where back office's take-down leaves a service offer ({@link Product#takeDown}), with
+         * a hold its provider cannot lift. Every reader of products already takes ARCHIVED as off sale.
          */
         ARCHIVED
     }
+
+    /** The longest reason back office may give for taking an offer down, as V36's columns hold it. */
+    public static final int MAX_TAKEDOWN_REASON_LENGTH = 500;
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -125,6 +132,49 @@ public class Product {
     private Instant giftFeaturedAt;
 
     /**
+     * When back office took this offer down (V36), or null while it is not taken down.
+     *
+     * <p>A taken-down offer is ARCHIVED, so every customer read and order-manager refuse it as they
+     * refuse anything not on sale. This column adds the hold. {@link #publish}, {@link #resume} and
+     * {@link #pause} are refused while it is set, so the provider cannot put the offer back on sale, and
+     * only {@link #restore} lifts it. It is moved only by {@link #takeDown} and {@link #restore}, which
+     * only back office can reach ({@code OfferModerationService}).
+     */
+    @Column(name = "taken_down_at")
+    private Instant takenDownAt;
+
+    /** Why back office took the offer down, which its provider reads. Set exactly while taken down. */
+    @Column(name = "takedown_reason", length = MAX_TAKEDOWN_REASON_LENGTH)
+    private String takedownReason;
+
+    /** What the offer was when it was taken down, which {@link #restore} returns it to. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_before_takedown", length = 16)
+    private Status statusBeforeTakedown;
+
+    /**
+     * Moved on by every save, which writes only where the row still holds the version it read (V36).
+     *
+     * <p>Every save judges the product's rules on what it read, and most saves read without a lock: a
+     * provider's edit, publish, pause, resume, archive or photo change, and back office's gift-hub switch.
+     * Two saves from one read would each apply their rules to a product the other had already changed. A
+     * publish after the last photo was removed would put a blank card on sale, a gift-hub pick after an
+     * archive would send the product back to the hub when it is next published, and an archive read just
+     * before a take-down would come back from the restore paused. The second save now matches no row and is
+     * refused, the API answers 409 PRODUCT_CHANGED, and its caller reloads.
+     *
+     * <p>So a save writes every column from what it read, which the version guarantees is still the row as
+     * it stands. Writing only the changed columns protected nothing more, and it mixed two saves' reads into
+     * a row neither of them made.
+     *
+     * <p>Null until the product is first saved, which is how Spring Data tells a new product from one to
+     * merge.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
+    /**
      * Written by the column default, and read straight back.
      *
      * <p>{@code @Generated} is what makes the 201 on a create honest. Without it the entity is
@@ -168,6 +218,10 @@ public class Product {
         return this.merchantId.equals(userId);
     }
 
+    /**
+     * Rewrites what the product says. Allowed while the offer is taken down: fixing what back office
+     * objected to is exactly what its provider should be doing, and an edit puts nothing on sale.
+     */
     public void update(String name, String description, BigDecimal price, UUID categoryId,
                        String sku, String barcode) {
         this.name = name;
@@ -202,7 +256,9 @@ public class Product {
         return (value == null || value.isBlank()) ? null : value.trim();
     }
 
+    /** Puts the product on sale. Refused while back office holds it taken down. */
     public void publish() {
+        refuseWhileTakenDown("published");
         if (this.imageRefs.isEmpty()) {
             throw new IllegalStateException(
                     "A product needs at least one image before it can be published");
@@ -213,10 +269,18 @@ public class Product {
     /**
      * Withdraws the product from sale — and from the gift hub, for good: a product brought back
      * later is picked for the hub again on purpose, not returned to it by accident.
+     *
+     * <p>Allowed while the offer is taken down, when it is the provider withdrawing it for good. The
+     * hold stays, and restoring it then brings back an archived offer rather than a paused one. An archive
+     * that read the offer before it was taken down is refused as stale ({@link #version}), so a take-down
+     * never keeps, as the status to restore, one its provider had already withdrawn.
      */
     public void archive() {
         this.status = Status.ARCHIVED;
         unfeatureAsGift();
+        if (isTakenDown()) {
+            this.statusBeforeTakedown = Status.ARCHIVED;
+        }
     }
 
     /**
@@ -226,6 +290,7 @@ public class Product {
      * published on purpose, not by a resume.
      */
     public void pause() {
+        refuseWhileTakenDown("paused");
         if (this.status != Status.ACTIVE) {
             throw new IllegalStateException("Only a live offer can be paused; this one is " + status);
         }
@@ -237,6 +302,7 @@ public class Product {
      * photo would be a blank card, and a photo removed while the offer was paused is exactly that case.
      */
     public void resume() {
+        refuseWhileTakenDown("resumed");
         if (this.status != Status.PAUSED) {
             throw new IllegalStateException("Only a paused offer can be resumed; this one is " + status);
         }
@@ -245,6 +311,77 @@ public class Product {
                     "An offer needs at least one photo before it can be resumed");
         }
         this.status = Status.ACTIVE;
+    }
+
+    /**
+     * Back office takes this offer down: off sale at once, and held there until back office restores it.
+     *
+     * <p>It is left ARCHIVED and off the gift hub, as {@link #archive} leaves a product, so nothing that
+     * reads products has to learn a new status. It remembers what it was, for {@link #restore}. The
+     * reason is stored trimmed.
+     *
+     * <p>Only service offers are taken down, which {@code OfferModerationService} decides from the shop.
+     *
+     * @throws IllegalStateException    when the offer is already taken down. A second take-down would
+     *                                  otherwise replace the reason its provider was given and what a
+     *                                  restore returns the offer to.
+     * @throws IllegalArgumentException when the reason is blank or longer than
+     *                                  {@value #MAX_TAKEDOWN_REASON_LENGTH} characters
+     */
+    public void takeDown(String reason, Instant at) {
+        if (isTakenDown()) {
+            throw new IllegalStateException("This offer is already taken down");
+        }
+        String given = reason == null ? "" : reason.trim();
+        if (given.isEmpty()) {
+            throw new IllegalArgumentException("Say why the offer is being taken down");
+        }
+        if (given.length() > MAX_TAKEDOWN_REASON_LENGTH) {
+            throw new IllegalArgumentException(
+                    "A reason is at most " + MAX_TAKEDOWN_REASON_LENGTH + " characters");
+        }
+        this.statusBeforeTakedown = this.status;
+        this.status = Status.ARCHIVED;
+        unfeatureAsGift();
+        this.takenDownAt = at;
+        this.takedownReason = given;
+    }
+
+    /**
+     * Back office lifts the hold, and the offer returns to what it was when it was taken down, except
+     * that an offer that was on sale comes back PAUSED.
+     *
+     * <p>Back office never puts an offer in front of customers. Its provider resumes it, and resuming
+     * runs the publishing rules again, which a photo removed or a pin cleared during the hold may now
+     * fail. A draft stays a draft, a paused offer stays paused, and an offer archived before or during
+     * the hold stays archived.
+     *
+     * @throws IllegalStateException when the offer is not taken down
+     */
+    public void restore() {
+        if (!isTakenDown()) {
+            throw new IllegalStateException("This offer is not taken down, so there is nothing to restore");
+        }
+        this.status = this.statusBeforeTakedown == Status.ACTIVE ? Status.PAUSED : this.statusBeforeTakedown;
+        this.takenDownAt = null;
+        this.takedownReason = null;
+        this.statusBeforeTakedown = null;
+    }
+
+    /** Whether back office holds this offer taken down. */
+    public boolean isTakenDown() {
+        return takenDownAt != null;
+    }
+
+    /**
+     * The provider's refusal while the hold is on, with back office's reason: the one thing they can act
+     * on is what back office objected to.
+     */
+    private void refuseWhileTakenDown(String act) {
+        if (isTakenDown()) {
+            throw new IllegalStateException("YouDrop has taken this offer down, so it cannot be " + act
+                    + " until YouDrop restores it. The reason given: " + takedownReason);
+        }
     }
 
     /**
@@ -277,6 +414,18 @@ public class Product {
 
     public Instant getGiftFeaturedAt() {
         return giftFeaturedAt;
+    }
+
+    public Instant getTakenDownAt() {
+        return takenDownAt;
+    }
+
+    public String getTakedownReason() {
+        return takedownReason;
+    }
+
+    public Status getStatusBeforeTakedown() {
+        return statusBeforeTakedown;
     }
 
     public void addImage(String objectKey) {

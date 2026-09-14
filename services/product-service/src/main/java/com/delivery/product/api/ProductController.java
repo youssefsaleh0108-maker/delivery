@@ -131,9 +131,10 @@ public class ProductController {
      * but has closed answers an empty page, as a category with no offers does.
      *
      * <p>Any signed-in caller, like every other catalogue read (the browse, a product, a shop's
-     * shelf): the customer app's Services tab, a merchant-only or back-office-only account, and back
-     * office's catalogue, which reads offers here. It returns nothing a customer may not see. A
-     * literal path, resolved before {@code /{id}}.
+     * shelf): the customer app's Services tab, and a merchant-only or back-office-only account. It
+     * returns nothing a customer may not see, so back office moderates from its own list of every
+     * offer in every status, {@code GET /api/products/services/all} ({@link OfferModerationController}).
+     * A literal path, resolved before {@code /{id}}.
      */
     @GetMapping("/services")
     @PreAuthorize("isAuthenticated()")

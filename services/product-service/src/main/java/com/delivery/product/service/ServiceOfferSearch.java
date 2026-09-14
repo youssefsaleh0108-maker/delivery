@@ -63,7 +63,11 @@ public class ServiceOfferSearch {
         return open.contains(named) ? Set.of(named) : Set.of();
     }
 
-    private static Pageable tieBroken(Pageable pageable) {
+    /**
+     * The caller's page with the id added as the last sort key, unless it is there already. Shared with
+     * back office's offer list ({@code OfferModerationService}), which pages the same rows.
+     */
+    static Pageable tieBroken(Pageable pageable) {
         if (pageable.isUnpaged() || pageable.getSort().getOrderFor("id") != null) {
             return pageable;
         }

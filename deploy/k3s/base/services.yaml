@@ -123,6 +123,13 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8101"
+            # Object storage, for the files customers attach to service orders — mapped exactly as
+            # onboarding-service's are. The endpoints need nothing here: MINIO_ENDPOINT comes with
+            # platform-common and MINIO_PUBLIC_ENDPOINT with each overlay's platform-env.
+            - name: MINIO_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_USER } }
+            - name: MINIO_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: platform-secrets, key: MINIO_ROOT_PASSWORD } }
           ports:
             - containerPort: 8101
           # Ask the application, not the socket.

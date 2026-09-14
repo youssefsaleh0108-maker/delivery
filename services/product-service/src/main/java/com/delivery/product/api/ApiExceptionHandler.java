@@ -353,15 +353,98 @@ public class ApiExceptionHandler {
         return detail;
     }
 
+    /** What a stale product save is answered with, for a client to branch on: the detail is prose. */
+    static final String PRODUCT_CHANGED = "PRODUCT_CHANGED";
+
+    /** What a write refused by V36's take-down CHECK is answered with. */
+    static final String OFFER_TAKEN_DOWN = "OFFER_TAKEN_DOWN";
+
+    /** V36's CHECK that keeps a taken-down offer off sale. */
+    private static final String TAKEDOWN_CHECK = "chk_product_takedown";
+
+    /**
+     * A save that read a product before another save changed it ({@code Product}'s version, V36).
+     *
+     * <p>409 with a code of its own. The save was judged on a product that is no longer there, so it is
+     * refused whole rather than mixed into the change it missed, and only a reload helps: the next try
+     * reads the product as it now is. The provider apps show the detail as it is written, so it says what
+     * to do next rather than naming a lock.
+     *
+     * <p>Spring's translation of Hibernate's refusal at commit, and the persistence API's own exception for
+     * a flush that meets it outside that translation. Product is the only versioned entity here.
+     */
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class})
+    public ProblemDetail onProductChanged(RuntimeException e) {
+        log.info("Refused a save that read a product before it changed: {}", e.getMessage());
+        ProblemDetail detail = problem(HttpStatus.CONFLICT, "Product changed",
+                "This product changed while you were editing it. Reload it and try again.");
+        detail.setProperty("code", PRODUCT_CHANGED);
+        return detail;
+    }
+
+    /**
+     * How Hibernate 6.6 reports a stale product save on PostgreSQL, which is not the optimistic-lock failure
+     * above.
+     *
+     * <p>Product's {@code updated_at} is read back from the UPDATE itself ({@code @Generated}), and Hibernate
+     * reads it before it counts the rows the UPDATE matched. When the version no longer matches there is no
+     * row to read, so Hibernate throws a bare {@code HibernateException} saying the database returned no
+     * generated values, and Spring passes that on as a {@code JpaSystemException}. Products are never
+     * deleted, so for a product an UPDATE that matched no row is exactly a stale save, and it is answered as
+     * one. {@code OfferModerationDatabaseTest} pins this against a real database, and keeps passing if a
+     * later Hibernate throws the optimistic-lock failure instead.
+     *
+     * <p>Every other failure of this kind keeps the catch-all's answer.
+     */
+    @ExceptionHandler(org.springframework.orm.jpa.JpaSystemException.class)
+    public ProblemDetail onPersistenceFailure(org.springframework.orm.jpa.JpaSystemException e) {
+        return isStaleProductUpdate(e) ? onProductChanged(e) : onUnexpected(e);
+    }
+
+    /** Whether Hibernate found no product row to read generated columns back from, as a stale UPDATE leaves. */
+    private static boolean isStaleProductUpdate(Throwable e) {
+        String unread = "returned no natively generated values : "
+                + com.delivery.product.domain.Product.class.getName();
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.HibernateException && cause.getMessage() != null
+                    && cause.getMessage().endsWith(unread)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * A uniqueness clash is the caller's problem, not a server fault — most often re-creating a
      * category that already exists. Returning 500 here would make a retry-safe client give up.
+     *
+     * <p>Except {@code chk_product_takedown} (V36), which refuses to put a taken-down offer back on sale and
+     * is worded as that. The provider apps show the detail as it is written, and "a uniqueness rule" tells
+     * a provider nothing. Product refuses those acts first, and its version refuses a save read before the
+     * take-down, so only a write that goes around Product can meet the CHECK.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail onConflict(DataIntegrityViolationException e) {
         log.debug("Constraint violation", e);
+        if (TAKEDOWN_CHECK.equalsIgnoreCase(violatedConstraint(e))) {
+            ProblemDetail detail = problem(HttpStatus.CONFLICT, "Offer taken down",
+                    "YouDrop has taken this offer down, so it cannot go back on sale until YouDrop restores it.");
+            detail.setProperty("code", OFFER_TAKEN_DOWN);
+            return detail;
+        }
         return problem(HttpStatus.CONFLICT, "Conflict",
                 "That resource already exists or violates a uniqueness rule");
+    }
+
+    /** The constraint the database refused a write on, as Hibernate read it from the error, or null. */
+    private static String violatedConstraint(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+        }
+        return null;
     }
 
     @ExceptionHandler(AccessDeniedException.class)
