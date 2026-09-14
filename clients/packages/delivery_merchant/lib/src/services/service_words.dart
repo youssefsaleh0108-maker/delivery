@@ -52,10 +52,15 @@ String? svcPackLine(ServiceTerms? terms, DeliveryStrings t) {
 /// price and the cheapest required choices — and the price itself otherwise.
 String svcOfferPrice(Product offer, DeliveryStrings t) {
   if (offer.service?.pricingType == ServicePricingType.from) {
-    return t.svcFromPrice(svcUsd(offer.fromPrice ?? offer.price, t));
+    return t.svcFromPrice(svcUsd(svcOfferAmount(offer), t));
   }
   return svcUsd(offer.price, t);
 }
+
+/// The dollar figure an offer's row prints: a starting price's own "from", otherwise its price.
+double svcOfferAmount(Product offer) => offer.service?.pricingType == ServicePricingType.from
+    ? offer.fromPrice ?? offer.price
+    : offer.price;
 
 /// What a service order earns the shop before commission: its subtotal.
 ///

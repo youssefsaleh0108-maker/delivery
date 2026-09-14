@@ -102,6 +102,33 @@ class FakeServiceOrders extends OrderApi {
 
   int count(String call) => calls.where((String c) => c == call).length;
 
+  /// What the trading summary answers; [summaryOf] by default.
+  MerchantSummary? summary;
+  Object? failSummary;
+
+  /// The window the last summary read asked for.
+  int? summaryDays;
+
+  /// A summary with [weekOrders] orders placed in its window.
+  static MerchantSummary summaryOf({int weekOrders = 12, int awaitingYou = 0}) =>
+      MerchantSummary.fromJson(<String, dynamic>{
+        'windowDays': 7,
+        'days': <Object>[],
+        'today': <String, dynamic>{'day': '2026-09-14', 'orders': 2},
+        'yesterday': <String, dynamic>{'day': '2026-09-13', 'orders': 1},
+        'window': <String, dynamic>{'orders': weekOrders, 'delivered': 9},
+        'awaitingYou': awaitingYou,
+      });
+
+  @override
+  Future<MerchantSummary> merchantSummary({int days = 14}) async {
+    calls.add('summary $days');
+    summaryDays = days;
+    final Object? failure = failSummary;
+    if (failure != null) throw failure;
+    return summary ?? summaryOf();
+  }
+
   @override
   Future<Paged<DeliveryOrder>> forMerchant({
     int page = 0,
@@ -233,6 +260,243 @@ Future<void> svcSettle(WidgetTester tester) async {
   for (int i = 0; i < 3; i++) {
     await tester.pump(const Duration(milliseconds: 50));
   }
+}
+
+/// A service offer as Product Service sends it. Its photo is a stored key with no URL: publishing
+/// counts it, and no test fetches an image over the network.
+Product svcOffer({
+  String id = 'offer-1',
+  String name = 'Business Card Printing',
+  ProductStatus status = ProductStatus.active,
+  double price = 15,
+  double? fromPrice,
+  ServicePricingType pricing = ServicePricingType.fixed,
+  String? unitLabel = 'cards',
+  int unitSize = 500,
+  ServiceFulfilment fulfilment = ServiceFulfilment.pickup,
+  ServiceAttachmentPolicy files = ServiceAttachmentPolicy.optional,
+  bool photo = true,
+  int? turnaroundMin = 24,
+  int? turnaroundMax = 48,
+  String? prompt,
+}) {
+  return Product(
+    id: id,
+    merchantId: 'merchant-sub',
+    storeId: 'shop-1',
+    name: name,
+    price: price,
+    fromPrice: fromPrice,
+    status: status,
+    imageRefs: photo ? <String>['products/$id/photo.jpg'] : const <String>[],
+    service: ServiceTerms(
+      pricingType: pricing,
+      fulfilmentModes: fulfilment,
+      unitLabel: unitLabel,
+      unitSize: unitSize,
+      turnaroundMinHours: turnaroundMin,
+      turnaroundMaxHours: turnaroundMax,
+      attachmentPolicy: files,
+      instructionsPrompt: prompt,
+    ),
+  );
+}
+
+/// A services shop as `GET /api/stores/mine` lists it.
+Store svcShop({
+  String id = 'shop-1',
+  String name = 'Al Fakhry Press',
+  bool verifiedLocal = false,
+  double? rating,
+  int ratingCount = 0,
+  double? lat,
+  double? lng,
+  String? neighborhood = 'Mar Mikhael',
+  String vertical = 'SERVICES',
+}) {
+  return Store.fromJson(<String, dynamic>{
+    'id': id,
+    'slug': 'shop-$id',
+    'name': name,
+    'vertical': vertical,
+    'serviceCategory': vertical == 'SERVICES' ? 'PRINTING' : null,
+    'verifiedLocal': verifiedLocal,
+    'rating': rating,
+    'ratingCount': ratingCount,
+    'latitude': lat,
+    'longitude': lng,
+    'neighborhood': neighborhood,
+  });
+}
+
+/// An HTTP refusal, as Dio throws one.
+DioException svcHttpError(int status) {
+  final RequestOptions request = RequestOptions(path: '/api');
+  return DioException(
+    requestOptions: request,
+    response: Response<dynamic>(
+      requestOptions: request,
+      statusCode: status,
+      data: <String, dynamic>{'title': 'refused'},
+    ),
+  );
+}
+
+/// Product Service's catalogue for one provider: the offers it holds, and every call made.
+class FakeOffers extends CatalogApi {
+  FakeOffers(this.offers) : super(Dio());
+
+  List<Product> offers;
+  Object? failList;
+  Completer<void>? holdList;
+  Object? failCreate;
+  Object? failPublish;
+  Object? failPause;
+  Object? failResume;
+  final List<String> calls = <String>[];
+
+  /// The request bodies of every create and update, as the app sends them.
+  final List<Map<String, dynamic>> sent = <Map<String, dynamic>>[];
+
+  Product _moved(String id, ProductStatus status) {
+    final Product p = offers.firstWhere((Product o) => o.id == id);
+    final Product moved = Product(
+      id: p.id,
+      merchantId: p.merchantId,
+      storeId: p.storeId,
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      fromPrice: p.fromPrice,
+      status: status,
+      imageRefs: p.imageRefs,
+      service: p.service,
+    );
+    offers = <Product>[for (final Product o in offers) o.id == id ? moved : o];
+    return moved;
+  }
+
+  @override
+  Future<Paged<Product>> myProducts({
+    String? storeId,
+    ProductStatus? status,
+    int page = 0,
+    int size = 20,
+  }) async {
+    calls.add('mine ${status?.wireValue ?? 'ALL'} ${storeId ?? '-'} $size');
+    await holdList?.future;
+    final Object? failure = failList;
+    if (failure != null) throw failure;
+    final List<Product> found =
+        offers.where((Product o) => status == null || o.status == status).toList();
+    return Paged<Product>(
+      content: found.length > size ? found.sublist(0, size) : found,
+      page: 0,
+      totalElements: found.length,
+      totalPages: 1,
+    );
+  }
+
+  @override
+  Future<Product> read(String id) async => offers.firstWhere((Product o) => o.id == id);
+
+  @override
+  Future<Product> create(Product product) async {
+    calls.add('create');
+    sent.add(product.toRequestJson());
+    final Object? failure = failCreate;
+    if (failure != null) throw failure;
+    final Product created = Product(
+      id: 'offer-new',
+      merchantId: 'merchant-sub',
+      storeId: product.storeId,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      status: ProductStatus.draft,
+      service: product.service,
+    );
+    offers = <Product>[...offers, created];
+    return created;
+  }
+
+  @override
+  Future<Product> update(String id, Product product) async {
+    calls.add('update $id');
+    sent.add(product.toRequestJson());
+    final Product current = offers.firstWhere((Product o) => o.id == id);
+    final Product updated = Product(
+      id: id,
+      merchantId: current.merchantId,
+      storeId: product.storeId,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      status: current.status,
+      imageRefs: current.imageRefs,
+      service: product.service,
+    );
+    offers = <Product>[for (final Product o in offers) o.id == id ? updated : o];
+    return updated;
+  }
+
+  @override
+  Future<Product> publish(String id) async {
+    calls.add('publish $id');
+    final Object? failure = failPublish;
+    if (failure != null) throw failure;
+    return _moved(id, ProductStatus.active);
+  }
+
+  @override
+  Future<Product> pause(String id) async {
+    calls.add('pause $id');
+    final Object? failure = failPause;
+    if (failure != null) throw failure;
+    return _moved(id, ProductStatus.paused);
+  }
+
+  @override
+  Future<Product> resume(String id) async {
+    calls.add('resume $id');
+    final Object? failure = failResume;
+    if (failure != null) throw failure;
+    return _moved(id, ProductStatus.active);
+  }
+
+  @override
+  Future<Product> archive(String id) async {
+    calls.add('archive $id');
+    return _moved(id, ProductStatus.archived);
+  }
+}
+
+/// The shops a provider owns, and no option groups on any offer.
+class FakeStores extends StoreApi {
+  FakeStores(this.stores) : super(Dio());
+
+  List<Store> stores;
+  Object? failMine;
+  int mineReads = 0;
+
+  @override
+  Future<Paged<Store>> mine({int page = 0, int size = 20}) async {
+    mineReads++;
+    final Object? failure = failMine;
+    if (failure != null) throw failure;
+    return Paged<Store>(content: stores, page: 0, totalElements: stores.length, totalPages: 1);
+  }
+
+  @override
+  Future<List<OptionGroup>> productOptions(String productId) async => const <OptionGroup>[];
+}
+
+/// A shop's delivery areas: none.
+class FakeNoZones extends DeliveryZoneApi {
+  FakeNoZones() : super(Dio());
+
+  @override
+  Future<List<ZoneCoverage>> coverage(String storeId) async => const <ZoneCoverage>[];
 }
 
 final RegExp _latin = RegExp('[A-Za-z]');

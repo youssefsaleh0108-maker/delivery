@@ -70,6 +70,9 @@ export 'src/zones_screen.dart';
 // queue and order detail, mounted by the phone's shell in services mode and by the portal's services
 // rail like every page above. The files interface is exported because a host hands the order detail
 // its implementation.
+export 'src/services/service_dashboard_screen.dart';
+export 'src/services/service_offer_form_screen.dart';
+export 'src/services/service_offers_screen.dart';
 export 'src/services/service_order_detail_screen.dart';
 export 'src/services/service_order_files.dart';
 export 'src/services/service_orders_screen.dart';

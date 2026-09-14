@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../order_detail_screen.dart';
+import 'service_choice.dart';
 import 'service_words.dart';
 
 /// A step a provider can take on a service order.
@@ -343,7 +344,7 @@ class _DeclineSheetState extends State<_DeclineSheet> {
             ),
             const SizedBox(height: DeliverySpacing.md),
             for (final DeclineReason reason in DeclineReason.picklist)
-              _ReasonRow(
+              SvcChoiceRow(
                 label: reason.labelIn(t),
                 selected: reason == _chosen,
                 onTap: () => setState(() => _chosen = reason),
@@ -367,50 +368,6 @@ class _DeclineSheetState extends State<_DeclineSheet> {
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReasonRow extends StatelessWidget {
-  const _ReasonRow({required this.label, required this.selected, required this.onTap});
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      selected: selected,
-      inMutuallyExclusiveGroup: true,
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
-          child: Row(
-            children: <Widget>[
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 20,
-                color: selected ? DeliveryColors.brand : DeliveryColors.faint,
-              ),
-              const SizedBox(width: DeliverySpacing.sm),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    color: DeliveryColors.ink,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
