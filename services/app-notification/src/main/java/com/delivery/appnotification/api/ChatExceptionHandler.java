@@ -128,6 +128,28 @@ public class ChatExceptionHandler {
         return withCorrelation(problem);
     }
 
+    /**
+     * 409 with when it closed, the instruction a quiet thread gives: the order is on the shop's screen
+     * and is theirs, so a 404 would be a lie the screen disproves, and nothing about the merchant as a
+     * person is refused, which is what this service's 403s say (a mute, a missing delivery). What
+     * changed is only time, as when a conversation closes.
+     */
+    @ExceptionHandler(RoomExceptions.OrderChatClosedException.class)
+    public ProblemDetail onOrderChatClosed(RoomExceptions.OrderChatClosedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        problem.setTitle("Order chat closed");
+        problem.setProperty("closedAt", e.getClosedAt());
+        return withCorrelation(problem);
+    }
+
+    /** 503: whether an order is the caller's could not be checked, and no order is attached on a guess. */
+    @ExceptionHandler(RoomExceptions.OrderUnavailableException.class)
+    public ProblemDetail onOrderUnavailable(RoomExceptions.OrderUnavailableException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+        problem.setTitle("Temporarily unavailable");
+        return withCorrelation(problem);
+    }
+
     private static ProblemDetail withCorrelation(ProblemDetail problem) {
         String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
         if (correlationId != null) {

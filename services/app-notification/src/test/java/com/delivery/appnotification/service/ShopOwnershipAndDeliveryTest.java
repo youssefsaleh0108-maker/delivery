@@ -2,6 +2,8 @@ package com.delivery.appnotification.service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.appnotification.client.ProductDirectory;
 import com.delivery.appnotification.domain.ChatShopMessage;
@@ -46,7 +49,7 @@ class ShopOwnershipAndDeliveryTest {
     void setUp() {
         directory = mock(ProductDirectory.class);
         owners = mock(ChatStoreOwnerRepository.class);
-        ownership = new ShopOwnership(directory, owners, new ShopChatProperties());
+        ownership = new ShopOwnership(directory, owners, new ShopChatProperties(), new TransactionsWithoutADatabase());
     }
 
     @Nested
@@ -84,6 +87,42 @@ class ShopOwnershipAndDeliveryTest {
 
             assertThat(ownership.owns(MERCHANT, STORE)).isFalse();
             verify(owners, never()).confirm(any(), any(), any());
+        }
+
+        /**
+         * Its answer can take seconds. A merchant opening a thread for an order asks this before any
+         * transaction of theirs begins, and one begun here would hold a pooled connection that long.
+         */
+        @Test
+        @DisplayName("asks Product Service outside any transaction, and records its answer inside a short one")
+        void product_service_is_asked_outside_a_transaction() {
+            List<String> calls = new ArrayList<>();
+            when(owners.findById(STORE)).thenReturn(Optional.empty());
+            when(directory.storesOwnedByCaller()).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("Product Service"));
+                return Set.of(STORE);
+            });
+            when(owners.confirm(eq(STORE), eq(MERCHANT), any(Instant.class))).thenAnswer(call -> {
+                calls.add(TransactionsWithoutADatabase.where("the confirmation"));
+                return 1;
+            });
+
+            assertThat(ownership.owns(MERCHANT, STORE)).isTrue();
+
+            assertThat(calls).containsExactly(
+                    "Product Service outside a transaction",
+                    "the confirmation inside a transaction");
+        }
+
+        /** The recording above cannot see an annotation, and its proxy would begin the transaction first. */
+        @Test
+        @DisplayName("neither ownership question is declared transactional")
+        void not_declared_transactional() throws NoSuchMethodException {
+            assertThat(ShopOwnership.class.getAnnotation(Transactional.class)).isNull();
+            assertThat(ShopOwnership.class.getMethod("owns", String.class, UUID.class)
+                    .getAnnotation(Transactional.class)).isNull();
+            assertThat(ShopOwnership.class.getMethod("storesOf", String.class)
+                    .getAnnotation(Transactional.class)).isNull();
         }
     }
 

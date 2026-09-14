@@ -112,4 +112,35 @@ public final class RoomExceptions {
             super(message, cause);
         }
     }
+
+    /**
+     * 503. Order Manager could not say whether an order is the caller's. Opening a thread from that
+     * order waits rather than guessing: "yes" would put somebody else's order in front of a shop, and
+     * "no" would tell a customer their own order does not exist. An open without an order never asks
+     * Order Manager, so it is unaffected.
+     */
+    public static class OrderUnavailableException extends RuntimeException {
+        public OrderUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /**
+     * 409, with when it closed. The order is one of the caller's shop's and is on their screen, but its
+     * window has passed: it ended, or fell due, longer ago than a shop may open a conversation about it
+     * ({@code ShopChatService#openForOrder}). Null {@code closedAt} only for an ended order Order
+     * Manager recorded no end time for, which is refused rather than treated as open.
+     */
+    public static class OrderChatClosedException extends RuntimeException {
+        private final Instant closedAt;
+
+        public OrderChatClosedException(UUID orderId, Instant closedAt) {
+            super("The shop's chat about order " + orderId + " closed at " + closedAt);
+            this.closedAt = closedAt;
+        }
+
+        public Instant getClosedAt() {
+            return closedAt;
+        }
+    }
 }
