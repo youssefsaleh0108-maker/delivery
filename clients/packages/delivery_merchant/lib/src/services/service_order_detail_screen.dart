@@ -25,7 +25,8 @@ import 'service_words.dart';
 /// customers called "Mohammad K." are not rare — and it refuses a shop the order is not for. It also
 /// stops a shop opening one a while after the order was due or ended, which can happen to an order
 /// still open once it is long overdue: the button then gives way to when chat about the order closed,
-/// and the order's own steps carry on exactly as before.
+/// until the order moves on — accepting a new order left for a week promises its work from now, which
+/// opens chat about it again — and the order's own steps carry on exactly as before.
 class ServiceOrderDetailScreen extends StatefulWidget {
   const ServiceOrderDetailScreen({
     super.key,
@@ -76,9 +77,19 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   bool _openingChat = false;
 
   /// The server said the shop's chance to open a chat about this order has passed (409), and when, if
-  /// it said. Kept while this screen is open; the order opened again asks again.
+  /// it said. Said in place of the button until a read of the order finds it has moved on since
+  /// ([_closedFor]); another order handed over, or this one opened again, asks again.
   bool _chatClosed = false;
   DateTime? _chatClosedAt;
+
+  /// The order's status and promise as they stood when the server said chat about it had closed.
+  ///
+  /// The window is counted from when the order was due, and a step can move that. Nothing expires a
+  /// new order, so one left a week is refused — it was due when it was placed — and accepting it then
+  /// promises the work from now, which opens the window again. So a read that finds either changed
+  /// takes the notice down and the button asks again, while a read that finds both as they were
+  /// leaves the notice where it is, rather than blinking it away on every refresh.
+  ({OrderStatus status, DateTime? promised})? _closedFor;
 
   /// The server could not open the chat just now (503, or no answer at all): said in place of the
   /// button, with Try again.
@@ -120,6 +131,14 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
       _order = widget.order;
       _files = widget.files?.forOrder(widget.order.id);
     }
+    // Nor what the server said about chatting on the previous one: closed, or out just then, for that
+    // order says nothing about this one, whose button asks for itself.
+    if (oldWidget.order.id != widget.order.id) {
+      _chatClosed = false;
+      _chatClosedAt = null;
+      _closedFor = null;
+      _chatUnavailable = false;
+    }
   }
 
   @override
@@ -138,11 +157,33 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
       // Begun before a step moved the order, or overtaken by a newer read: that one says what is true.
       if (!mounted || generation != _generation || read < _drawn) return;
       _drawn = read;
-      setState(() => _order = fresh);
+      setState(() {
+        // Moved on since chat about it was refused, so perhaps due at another time and in another
+        // window: the button asks again. Still as it was: the notice stays.
+        if (_movedSinceChatClosed(fresh)) {
+          _chatClosed = false;
+          _chatClosedAt = null;
+          _closedFor = null;
+        }
+        _order = fresh;
+      });
       widget.onChanged?.call(fresh);
     } catch (_) {
       // Kept as it was.
     }
+  }
+
+  /// Whether [fresh] shows the order moved on from where it stood when chat about it was refused: in
+  /// its status, or in when its work is promised. False while chat has not been refused.
+  bool _movedSinceChatClosed(DeliveryOrder fresh) {
+    final ({OrderStatus status, DateTime? promised})? closedFor = _closedFor;
+    if (closedFor == null) return false;
+    final DateTime? before = closedFor.promised;
+    final DateTime? promised = fresh.estimatedReadyAt;
+    final bool samePromise = before != null && promised != null
+        ? before.isAtSameMomentAs(promised)
+        : before == promised;
+    return fresh.status != closedFor.status || !samePromise;
   }
 
   Future<void> _step(SvcStep step) async {
@@ -220,8 +261,8 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
   /// The server gets the thread, or creates it if the customer never wrote, and labels it with the
   /// order. What else it can answer, and what the shop is shown:
   /// * closed (409) — the shop's window for this order has passed, which an order still open reaches
-  ///   once it is long overdue: the button gives way to when that was, and nothing about the order's
-  ///   own steps changes;
+  ///   once it is long overdue: the button gives way to when that was until a read of the order finds
+  ///   it moved on ([_closedFor]), and nothing about the order's own steps changes;
   /// * not found (404) — not an order of a shop this account answers for, or gone: said, and the order
   ///   is read again, since whatever changed shows on it;
   /// * anything else — 503 when the orders or shops behind the check cannot be asked, or no answer at
@@ -243,6 +284,7 @@ class _ServiceOrderDetailScreenState extends State<ServiceOrderDetailScreen> {
           setState(() {
             _chatClosed = true;
             _chatClosedAt = closed.closedAt;
+            _closedFor = (status: _order.status, promised: _order.estimatedReadyAt);
           });
         }
         return;

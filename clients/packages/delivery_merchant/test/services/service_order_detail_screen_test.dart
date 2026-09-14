@@ -336,7 +336,10 @@ void main() {
       expect(api.calls.where((String c) => c.startsWith('act ')), hasLength(1),
           reason: 'chat about the order closing is not the order closing');
       expect(find.text(en.svcActionCollected), findsOneWidget);
-      expect(find.text(en.svcChatClosedOn(day)), findsOneWidget);
+      // The step moved the order on, so the server is asked again rather than taken at its word from
+      // before.
+      expect(find.text(en.svcChatClosedOn(day)), findsNothing);
+      expect(find.text(en.svcChatWithCustomer), findsOneWidget);
     });
 
     testWidgets('closed with no date given still says chat about the order has closed',
@@ -358,6 +361,55 @@ void main() {
       expect(find.text(en.svcChatWithCustomer), findsNothing);
     });
 
+    testWidgets(
+        'closed on a new order left a week stays closed while a refresh finds it unchanged, and the '
+        'button is back once accepting it promises the work from now', (WidgetTester tester) async {
+      // Nothing expires a new order, and it was due when it was placed: a week on, the window is shut.
+      final DeliveryOrder waiting = svcOrder(placedAgo: const Duration(days: 8));
+      final FakeServiceOrders api = FakeServiceOrders(<DeliveryOrder>[waiting]);
+      api.onAct = (String id, OrderAction action) {
+        final DeliveryOrder accepted = svcOrder(
+          status: 'PREPARING',
+          actions: const <String>['READY'],
+          estimatedReadyAt: DateTime.now().add(const Duration(days: 2)),
+        );
+        api.orders = <DeliveryOrder>[accepted];
+        return accepted;
+      };
+      final FakeShopChat chat = FakeShopChat()
+        ..failOpen = const ShopOrderChatClosedException(null);
+      await pumpSvc(tester, ServiceOrderDetailScreen(api: api, order: waiting, shopChat: chat));
+      await svcSettle(tester);
+
+      await tester.tap(find.text(en.svcChatWithCustomer));
+      await svcSettle(tester);
+      expect(find.text(en.svcChatClosed), findsOneWidget);
+
+      // Read afresh and just as it was: the notice stays, and nothing asks the server again.
+      api.orders = <DeliveryOrder>[svcOrder(placedAgo: const Duration(days: 8))];
+      final int reads = api.count('read 11111111-0000');
+      tester.state<RefreshIndicatorState>(find.byType(RefreshIndicator)).show();
+      // One frame starts the pull's snap, and the next, a second on, finishes it and asks for the read.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await svcSettle(tester);
+      expect(api.count('read 11111111-0000'), reads + 1);
+      expect(find.text(en.svcChatClosed), findsOneWidget);
+      expect(find.text(en.svcChatWithCustomer), findsNothing);
+      expect(chat.opened, hasLength(1));
+
+      // Accepted, the work is promised from now: due later, and the server opens chat again.
+      chat.failOpen = null;
+      await tester.tap(find.text(en.svcAcceptOrder));
+      await svcSettle(tester);
+      expect(find.text(en.svcChatClosed), findsNothing);
+
+      await tester.tap(find.text(en.svcChatWithCustomer));
+      await tester.pumpAndSettle();
+      expect(chat.opened, hasLength(2));
+      expect(find.byType(ShopThreadScreen), findsOneWidget);
+    });
+
     testWidgets('not found (404) says so and reads the order again', (WidgetTester tester) async {
       final DeliveryOrder order = svcOrder();
       final FakeServiceOrders api = FakeServiceOrders(<DeliveryOrder>[order]);
@@ -373,6 +425,32 @@ void main() {
       expect(api.count('read 11111111-0000'), readsBefore + 1);
       expect(find.byType(ShopThreadScreen), findsNothing);
       expect(find.text(en.svcChatWithCustomer), findsOneWidget, reason: 'nothing says chat closed');
+    });
+
+    testWidgets(
+        'not found (404) whose read of the order fails too still says so, and leaves the screen as it '
+        'was and working', (WidgetTester tester) async {
+      final DeliveryOrder order = svcOrder();
+      final FakeServiceOrders api = FakeServiceOrders(<DeliveryOrder>[order]);
+      final FakeShopChat chat = FakeShopChat()..failOpen = svcHttpError(404);
+      await pumpSvc(tester, ServiceOrderDetailScreen(api: api, order: order, shopChat: chat));
+      await svcSettle(tester);
+      final int readsBefore = api.count('read 11111111-0000');
+
+      api.failRead = svcHttpError(503);
+      await tester.tap(find.text(en.svcChatWithCustomer));
+      await svcSettle(tester);
+
+      expect(api.count('read 11111111-0000'), readsBefore + 1);
+      expect(find.text(en.svcChatOrderNotFound), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(find.text(en.svcOrderTitle('11111111')), findsOneWidget);
+      expect(find.text(en.svcAcceptOrder), findsOneWidget);
+
+      chat.failOpen = null;
+      await tester.tap(find.text(en.svcChatWithCustomer));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopThreadScreen), findsOneWidget);
     });
 
     testWidgets(
@@ -478,6 +556,41 @@ void main() {
       expect(find.text(ar.svcChatClosedOn(dayOf(tester, closedAt))), findsOneWidget);
       expect(svcLatinText(tester), isEmpty);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('another order handed to the same screen shows its own button, whatever the last was told',
+        (WidgetTester tester) async {
+      final DeliveryOrder first = svcOrder();
+      final DeliveryOrder second = svcOrder(id: '22222222-0000');
+      final FakeServiceOrders api = FakeServiceOrders(<DeliveryOrder>[first, second]);
+      final FakeShopChat chat = FakeShopChat()
+        ..failOpen = const ShopOrderChatClosedException(null);
+      await pumpSvc(tester, ServiceOrderDetailScreen(api: api, order: first, shopChat: chat));
+      await svcSettle(tester);
+      final State<StatefulWidget> screen = tester.state(find.byType(ServiceOrderDetailScreen));
+
+      await tester.tap(find.text(en.svcChatWithCustomer));
+      await svcSettle(tester);
+      expect(find.text(en.svcChatClosed), findsOneWidget);
+
+      await pumpSvc(tester, ServiceOrderDetailScreen(api: api, order: second, shopChat: chat));
+      await svcSettle(tester);
+      expect(tester.state(find.byType(ServiceOrderDetailScreen)), same(screen),
+          reason: 'handed over, not built afresh');
+      expect(find.text(en.svcOrderTitle('22222222')), findsOneWidget);
+      expect(find.text(en.svcChatClosed), findsNothing);
+
+      // Nor an outage told about the order before.
+      chat.failOpen = svcHttpError(503);
+      await tester.tap(find.text(en.svcChatWithCustomer));
+      await svcSettle(tester);
+      expect(find.text(en.svcChatUnavailable), findsOneWidget);
+
+      await pumpSvc(tester, ServiceOrderDetailScreen(api: api, order: first, shopChat: chat));
+      await svcSettle(tester);
+      expect(find.text(en.svcChatUnavailable), findsNothing);
+      expect(find.text(en.svcChatWithCustomer), findsOneWidget);
+      expect(chat.opened, <String>['11111111-0000', '22222222-0000']);
     });
   });
 

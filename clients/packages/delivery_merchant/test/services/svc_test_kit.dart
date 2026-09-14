@@ -102,6 +102,9 @@ class FakeServiceOrders extends OrderApi {
   /// Answers every state whatever was asked, as an Order Manager from before the status filter does.
   bool ignoresStatus = false;
 
+  /// Thrown by the order read while set.
+  Object? failRead;
+
   /// Holds the order read, and the order's actions, until completed.
   Completer<void>? holdRead;
   Completer<void>? holdAct;
@@ -188,6 +191,8 @@ class FakeServiceOrders extends OrderApi {
   Future<DeliveryOrder> read(String orderId) async {
     calls.add('read $orderId');
     await holdRead?.future;
+    final Object? failure = failRead;
+    if (failure != null) throw failure;
     return orders.firstWhere((DeliveryOrder o) => o.id == orderId);
   }
 
