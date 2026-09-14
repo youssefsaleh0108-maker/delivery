@@ -78,7 +78,7 @@ public class OrderEventListener {
             // other order, and for any event from before order-manager said what kind an order was.
             java.util.Optional<ServiceOrderWording.Fulfilment> service = ServiceOrderWording.of(event);
             if (service.isPresent()) {
-                ServiceOrderWording.addPlaceholders(event, values);
+                ServiceOrderWording.addPlaceholders(event, service.get(), values);
             }
 
             switch (eventType) {
@@ -147,17 +147,21 @@ public class OrderEventListener {
                             values, correlationId);
                 }
                 case "order.cancelled" -> {
-                    String shopsOwn = service.isPresent()
-                            ? ServiceOrderWording.cancelledType(event.path("cancelReason").asText(""))
-                            : null;
+                    String shopsOwn = service
+                            .map(fulfilment -> ServiceOrderWording.cancelledType(event, fulfilment))
+                            .orElse(null);
                     if (shopsOwn != null) {
                         // A service order's shop declined it, or gave up on a pickup nobody came
-                        // for. The customer hears why, in words. The shop hears nothing: it made
-                        // this cancellation itself, and the basket's copy would read its own tap
-                        // back to it as "Stop preparing order #X. PROVIDER_DECLINED: TOO_BUSY".
+                        // for, as far as the snapshot can show (ServiceOrderWording.cancelledType).
+                        // The customer hears why, in words. The shop hears nothing: it made this
+                        // cancellation itself, and the basket's copy would read its own tap back to
+                        // it as "Stop preparing order #X. PROVIDER_DECLINED: TOO_BUSY".
                         notify(shopsOwn, orderId, event.path("customerId").asText(null),
                                 values, correlationId);
                     } else {
+                        // Anybody else's cancellation, and any the snapshot cannot pin on the shop:
+                        // both sides hear it, as for a basket, because a shop that did not cancel
+                        // has to be told to stop.
                         notify(eventType, orderId, event.path("customerId").asText(null),
                                 values, correlationId);
                         notify("order.cancelled.merchant", orderId,

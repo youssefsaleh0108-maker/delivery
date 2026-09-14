@@ -6,6 +6,8 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,6 +17,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +59,11 @@ import static org.mockito.Mockito.when;
  * rendered through the real {@link NotificationTemplate} against the rows the migrations insert,
  * read from the migration files themselves. So a placeholder the listener fills under one name and a
  * row reads under another fails here, not on somebody's phone.
+ *
+ * <p>Two more things are pinned because they cost money or trust when they drift: which moments send
+ * a paid text, and that each English text stays one GSM-7 segment by the SMS worker's own alphabet;
+ * and that a cancellation is told as the shop's own decision only where the snapshot shows the shop
+ * could have made it.
  */
 @DisplayName("service order notifications, and basket ones unchanged")
 class OrderEventListenerTest {
@@ -237,20 +245,54 @@ class OrderEventListenerTest {
     @Test
     @DisplayName("a pickup nobody came for says so plainly, with the shop's own words when it gave any")
     void uncollectedPickup() {
-        List<Sent> bare = deliver("order.cancelled",
-                serviceOrder("PICKUP", "CANCELLED").put("cancelReason", "NOT_COLLECTED"));
+        List<Sent> bare = deliver("order.cancelled", cancelledAfterAccept("PICKUP", "NOT_COLLECTED"));
         assertThat(routes(bare))
                 .as("the shop cancelled it itself, so only the customer hears about it")
                 .containsExactly("order.cancelled.service.not_collected -> " + CUSTOMER);
         assertThat(push(bare.get(0)))
                 .isEqualTo("Print Hub cancelled your order because it wasn't collected in time.");
 
-        List<Sent> worded = deliver("order.cancelled", serviceOrder("PICKUP", "CANCELLED")
-                .put("cancelReason", "NOT_COLLECTED: We kept it for a week"));
+        List<Sent> worded = deliver("order.cancelled",
+                cancelledAfterAccept("PICKUP", "NOT_COLLECTED: We kept it for a week"));
         assertThat(push(worded.get(0))).isEqualTo("Print Hub cancelled your order because it wasn't "
                 + "collected in time. We kept it for a week");
         assertThat(body("order.cancelled.service.not_collected", "PUSH", "ar", worded.get(0).values()))
                 .isEqualTo("ألغى Print Hub طلبك لأنه لم يُستلم في الوقت المحدد. We kept it for a week");
+    }
+
+    @Test
+    @DisplayName("a code the snapshot cannot pin on the shop's own decision goes out as a basket's "
+            + "cancellation, to the customer and the shop, in the words it was given")
+    void cancelCodesNotPinnedOnTheShop() {
+        Map<String, ObjectNode> cancels = new LinkedHashMap<>();
+        // Back office stopping work the shop had accepted, in words that begin with the decline code.
+        // The shop took the job on, so it did not decline it, and it has to be told to stop.
+        cancels.put("a decline code after the shop accepted",
+                cancelledAfterAccept("DELIVERY", "PROVIDER_DECLINED: TOO_BUSY"));
+        // A shop's own words on an order a rider was bringing: nothing was waiting to be collected.
+        cancels.put("not collected on a delivery",
+                cancelledAfterAccept("DELIVERY", "NOT_COLLECTED: the customer never answered"));
+        // Never accepted, so never ready at the counter, so never left uncollected.
+        cancels.put("not collected before the shop accepted",
+                cancelledBeforeAccept("PICKUP", "NOT_COLLECTED"));
+        // Typed by a person: order-manager writes both codes in capitals, at the very start.
+        cancels.put("a decline code in lower case",
+                cancelledBeforeAccept("PICKUP", "provider_declined: too_busy"));
+        cancels.put("not collected in mixed case",
+                cancelledAfterAccept("PICKUP", "Not_Collected: we closed early"));
+
+        cancels.forEach((why, event) -> {
+            List<Sent> sent = deliver("order.cancelled", event);
+
+            assertThat(routes(sent)).as(why).containsExactly(
+                    "order.cancelled -> " + CUSTOMER,
+                    "order.cancelled.merchant -> " + MERCHANT);
+            assertThat(push(sent.get(0))).as(why)
+                    .isEqualTo("Your order was cancelled. " + event.path("cancelReason").asText());
+            assertThat(sent.get(0).values()).as(why)
+                    .containsEntry("reasonWords", "")
+                    .containsEntry("reasonWordsAr", "");
+        });
     }
 
     @Test
@@ -372,8 +414,7 @@ class OrderEventListenerTest {
                     deliver("order.status_changed", accepted("PICKUP")),
                     deliver("order.status_changed", serviceOrder("PICKUP", "READY")),
                     deliver("order.delivered", serviceOrder("PICKUP", "DELIVERED")),
-                    deliver("order.cancelled", serviceOrder("PICKUP", "CANCELLED")
-                            .put("cancelReason", "NOT_COLLECTED")),
+                    deliver("order.cancelled", cancelledAfterAccept("PICKUP", "NOT_COLLECTED")),
                     deliver("order.cancelled", serviceOrder("PICKUP", "CANCELLED")
                             .put("cancelReason", "PROVIDER_DECLINED: TOO_BUSY")));
 
@@ -441,7 +482,8 @@ class OrderEventListenerTest {
             + "fills from a real event")
     void serviceRowsAndListenerAgree() {
         List<List<String>> v19 = rows(migration(V19));
-        assertThat(v19).as("seven moments, three channels each, in two languages").hasSize(42);
+        assertThat(v19).as("seven moments on three channels each in two languages, less the texts for "
+                + "ready-for-a-rider and collected").hasSize(38);
         assertThat(v19).as("no basket row is added or replaced")
                 .allSatisfy(row -> assertThat(row.get(1)).contains(".service"));
         assertThat(v19.stream().map(row -> row.get(1) + "|" + row.get(2) + "|" + row.get(3)))
@@ -456,8 +498,7 @@ class OrderEventListenerTest {
                 deliver("order.delivered", serviceOrder("PICKUP", "DELIVERED")),
                 deliver("order.cancelled", serviceOrder("PICKUP", "CANCELLED")
                         .put("cancelReason", "PROVIDER_DECLINED: FILE_PROBLEM")),
-                deliver("order.cancelled", serviceOrder("PICKUP", "CANCELLED")
-                        .put("cancelReason", "NOT_COLLECTED")))
+                deliver("order.cancelled", cancelledAfterAccept("PICKUP", "NOT_COLLECTED")))
                 .forEach(step -> step.stream()
                         .filter(sent -> sent.eventType().contains(".service"))
                         .forEach(sent -> byMoment.put(sent.eventType(), sent.values())));
@@ -470,7 +511,7 @@ class OrderEventListenerTest {
         byMoment.forEach((moment, values) -> {
             assertThat(channels(moment, "ar")).as(moment)
                     .isEqualTo(channels(moment, "en"))
-                    .hasSize(3);
+                    .isNotEmpty();
             assertThat(NotificationCategory.forEventType(moment))
                     .as("%s is governed by the customer's order-updates switch", moment)
                     .isEqualTo(NotificationCategory.ORDER_UPDATES);
@@ -486,6 +527,100 @@ class OrderEventListenerTest {
         assertThat(body(ServiceOrderWording.DECLINED, "PUSH", "ar",
                 byMoment.get(ServiceOrderWording.DECLINED)))
                 .isEqualTo("رفض Print Hub طلبك: هناك مشكلة في ملفك");
+    }
+
+    @Test
+    @DisplayName("texts are paid for: a delivery service order sends three (accepted, picked up, "
+            + "delivered) and a pickup two (accepted, ready to collect), and Arabic texts the same moments")
+    void textsPerServiceOrder() {
+        List<Sent> delivery = new ArrayList<>();
+        delivery.addAll(deliver("order.placed", serviceOrder("DELIVERY", "PLACED")));
+        delivery.addAll(deliver("order.status_changed", accepted("DELIVERY")));
+        delivery.addAll(deliver("order.status_changed", accepted("DELIVERY").put("status", "PREPARING")));
+        delivery.addAll(deliver("order.status_changed", accepted("DELIVERY").put("status", "READY")));
+        delivery.addAll(deliver("order.rider_assigned",
+                accepted("DELIVERY").put("status", "READY").put("riderId", RIDER)));
+        delivery.addAll(deliver("order.status_changed",
+                accepted("DELIVERY").put("status", "PICKED_UP").put("riderId", RIDER)));
+        delivery.addAll(deliver("order.delivered",
+                accepted("DELIVERY").put("status", "DELIVERED").put("riderId", RIDER)));
+        assertThat(texted(delivery))
+                .as("ready-for-a-rider is not texted: the picked-up and delivered texts say somebody is coming")
+                .containsExactly(
+                        "order.status_changed.service.accepted -> " + CUSTOMER,
+                        "order.status_changed -> " + CUSTOMER,
+                        "order.delivered -> " + CUSTOMER);
+
+        List<Sent> pickup = new ArrayList<>();
+        pickup.addAll(deliver("order.placed", serviceOrder("PICKUP", "PLACED")));
+        pickup.addAll(deliver("order.status_changed", accepted("PICKUP")));
+        pickup.addAll(deliver("order.status_changed", accepted("PICKUP").put("status", "PREPARING")));
+        pickup.addAll(deliver("order.status_changed", accepted("PICKUP").put("status", "READY")));
+        pickup.addAll(deliver("order.delivered", accepted("PICKUP").put("status", "DELIVERED")));
+        assertThat(texted(pickup))
+                .as("collected is not texted: its customer is standing at the counter")
+                .containsExactly(
+                        "order.status_changed.service.accepted -> " + CUSTOMER,
+                        "order.status_changed.service.ready_to_collect -> " + CUSTOMER);
+
+        List<String> moments = rows(migration(V19)).stream().map(row -> row.get(1)).distinct().toList();
+        assertThat(moments).allSatisfy(moment -> assertThat(channels(moment, "ar"))
+                .as("%s in Arabic", moment)
+                .isEqualTo(channels(moment, "en")));
+        assertThat(moments.stream().filter(moment -> channels(moment, "en").contains("SMS")).toList())
+                .containsExactlyInAnyOrder(ServiceOrderWording.ACCEPTED, ServiceOrderWording.READY_TO_COLLECT);
+    }
+
+    @Test
+    @DisplayName("every English text is one GSM-7 segment by the SMS worker's own alphabet, with a "
+            + "16-character shop name and the longest ready-by the formatter writes")
+    void englishTextsAreOneGsmSegment() {
+        Gsm gsm = Gsm.ofSmsPreparer();
+        assertThat(gsm.encodes("Delivery: Print Hub accepted order #5E7A1C2D - ready by Fri 18 Sep, "
+                + "4:30 PM.")).isTrue();
+        assertThat(gsm.encodes("Delivery: Print Hub accepted order #5E7A1C2D — ready by Fri 18 Sep, "
+                + "4:30 PM."))
+                .as("the em dash V19's accept text had, which sent it as UCS-2 in two segments")
+                .isFalse();
+
+        // The longest value each placeholder takes over a delivery's life, from real events: a
+        // 16-character shop name, the 8-character order number, and a ready-by with a two-digit day
+        // and a two-digit hour.
+        Map<String, String> longest = new HashMap<>();
+        for (String[] step : new String[][] {
+                {"order.placed", "PLACED"}, {"order.status_changed", "ACCEPTED"},
+                {"order.status_changed", "READY"}, {"order.rider_assigned", "READY"},
+                {"order.status_changed", "PICKED_UP"}, {"order.delivered", "DELIVERED"}}) {
+            ObjectNode event = serviceOrder("DELIVERY", step[1])
+                    .put("storeName", "Print Hub Beirut")
+                    .put("estimatedReadyAt", "2026-09-30T09:59:00Z")
+                    .put("riderId", RIDER);
+            deliver(step[0], event).forEach(sent -> sent.values().forEach((key, value) ->
+                    longest.merge(key, value, (kept, other) -> kept.length() >= other.length() ? kept : other)));
+        }
+        assertThat(longest)
+                .containsEntry("store", "Print Hub Beirut")
+                .containsEntry("shortId", SHORT_ID)
+                .containsEntry("readyBy", "Wed 30 Sep, 12:59 PM");
+
+        List<NotificationTemplate> englishTexts = TEMPLATES.values().stream()
+                .filter(row -> "SMS".equals(row.getChannel()) && "en".equals(row.getLocale()))
+                .toList();
+        assertThat(englishTexts).extracting(NotificationTemplate::getEventType)
+                .as("the service texts are among those checked")
+                .contains(ServiceOrderWording.ACCEPTED, ServiceOrderWording.READY_TO_COLLECT);
+
+        for (NotificationTemplate row : englishTexts) {
+            String text = row.renderBody(longest);
+            assertThat(text).as(row.getEventType()).doesNotContain("{{");
+            assertThat(text.chars().filter(c -> !gsm.encodes(Character.toString(c)))
+                    .mapToObj(Character::toString).toList())
+                    .as("%s: characters outside GSM-7 in \"%s\"", row.getEventType(), text)
+                    .isEmpty();
+            assertThat(gsm.units(text))
+                    .as("%s: \"%s\" in one segment", row.getEventType(), text)
+                    .isLessThanOrEqualTo(gsm.singleSegment());
+        }
     }
 
     // ------------------------------------------------------------------------------------- events
@@ -539,6 +674,16 @@ class OrderEventListenerTest {
         return serviceOrder(fulfilment, "ACCEPTED").put("estimatedReadyAt", READY_AT);
     }
 
+    /** Cancelled after its shop accepted it: the estimate set then stays on the order. */
+    private static ObjectNode cancelledAfterAccept(String fulfilment, String reason) {
+        return accepted(fulfilment).put("status", "CANCELLED").put("cancelReason", reason);
+    }
+
+    /** Cancelled before anybody accepted it, so no estimate was ever set. */
+    private static ObjectNode cancelledBeforeAccept(String fulfilment, String reason) {
+        return serviceOrder(fulfilment, "CANCELLED").put("cancelReason", reason);
+    }
+
     /** A basket's snapshot, as it was before service orders and as it still is. */
     private static ObjectNode basket(String status) {
         ObjectNode event = JSON.createObjectNode()
@@ -590,6 +735,14 @@ class OrderEventListenerTest {
 
     private static List<String> keys(List<Sent> sent) {
         return sent.stream().map(Sent::dedupeKey).toList();
+    }
+
+    /** The dispatches that go out as a text: those whose event type has an English SMS row. */
+    private static List<String> texted(List<Sent> sent) {
+        return sent.stream()
+                .filter(one -> TEMPLATES.containsKey(one.eventType() + "|SMS|en"))
+                .map(Sent::route)
+                .toList();
     }
 
     // ----------------------------------------------------------------------------------- templates
@@ -728,5 +881,91 @@ class OrderEventListenerTest {
         Field field = NotificationTemplate.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    // -------------------------------------------------------------------------------------- texts
+
+    /**
+     * The SMS worker's alphabet and single-segment limit, read out of SmsPreparer's source.
+     *
+     * <p>Read rather than copied: a copy here would agree with these templates forever, whatever the
+     * worker counts and the vendor bills. Read from the file because sms-connector is a Spring Boot
+     * application beside this one in the repository, not a library on its classpath.
+     */
+    private record Gsm(String alphabet, String extension, int singleSegment) {
+
+        static Gsm ofSmsPreparer() {
+            String source;
+            try {
+                source = Files.readString(smsPreparer(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            Matcher single = Pattern.compile("\\bGSM_SINGLE\\s*=\\s*(\\d+)\\s*;").matcher(source);
+            assertThat(single.find()).as("SmsPreparer declares GSM_SINGLE").isTrue();
+
+            Gsm gsm = new Gsm(stringConstant(source, "GSM_ALPHABET"),
+                    stringConstant(source, "GSM_EXTENDED"), Integer.parseInt(single.group(1)));
+            assertThat(gsm.alphabet()).as("GSM_ALPHABET as read from SmsPreparer")
+                    .contains("@", "£", "A", "z", "0", "#", "-", ":", "€");
+            return gsm;
+        }
+
+        boolean encodes(String text) {
+            return text.chars().allMatch(c -> alphabet.indexOf(c) >= 0);
+        }
+
+        /** Billable units: a character from the extension table goes as an escape and itself. */
+        int units(String text) {
+            return text.chars().map(c -> extension.indexOf(c) >= 0 ? 2 : 1).sum();
+        }
+
+        /** SmsPreparer.java, found from wherever the build runs: this module or the repository root. */
+        private static Path smsPreparer() {
+            Path file = Path.of("sms-connector", "src", "main", "java", "com", "delivery", "connector",
+                    "sms", "SmsPreparer.java");
+            for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+                for (Path candidate : List.of(dir.resolve(file), dir.resolve("services").resolve(file))) {
+                    if (Files.isRegularFile(candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+            throw new AssertionError("No SmsPreparer.java beside this module or under services/, "
+                    + "looking up from " + Path.of("").toAbsolutePath());
+        }
+
+        /**
+         * A String constant's value: its literals with their escapes, joined to any constant it adds.
+         * Scanned rather than matched with a pattern, because the alphabet itself contains a ';'.
+         */
+        private static String stringConstant(String source, String name) {
+            Matcher declared = Pattern.compile("\\b" + name + "\\s*=").matcher(source);
+            assertThat(declared.find()).as("SmsPreparer declares %s", name).isTrue();
+
+            StringBuilder value = new StringBuilder();
+            for (int i = declared.end(); source.charAt(i) != ';'; i++) {
+                char c = source.charAt(i);
+                if (c == '"') {
+                    for (i++; source.charAt(i) != '"'; i++) {
+                        char d = source.charAt(i);
+                        if (d == '\\') {
+                            char escaped = source.charAt(++i);
+                            value.append(escaped == 'n' ? '\n' : escaped == 'r' ? '\r' : escaped);
+                        } else {
+                            value.append(d);
+                        }
+                    }
+                } else if (Character.isJavaIdentifierStart(c)) {
+                    int end = i;
+                    while (Character.isJavaIdentifierPart(source.charAt(end))) {
+                        end++;
+                    }
+                    value.append(stringConstant(source, source.substring(i, end)));
+                    i = end - 1;
+                }
+            }
+            return value.toString();
+        }
     }
 }

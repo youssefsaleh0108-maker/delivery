@@ -14,10 +14,34 @@
 -- may turn off. And the app's inbox picks its icon from order.cancelled / order.delivered /
 -- order.placed, so a decline still draws a cancel mark rather than a bell.
 --
--- WHICH CHANNELS. Each moment has the channels of the basket event it stands in for, and no others:
--- IN_APP, SMS and PUSH for a status change or a delivery; IN_APP, EMAIL and PUSH for a cancellation
--- or a merchant's new order. Whether a service order deserves fewer texts than a basket is a product
--- decision, and a migration is the wrong place to make it by accident.
+-- WHICH CHANNELS. A shop's new order and a cancellation go out on IN_APP, EMAIL and PUSH, as the
+-- basket events they stand in for do. The status moments are where a service order parts from a
+-- basket, because every text is paid for, and with a text for each of them a delivery service order
+-- sent four and a pickup three:
+--   * accepted, with its ready-by time: IN_APP, SMS and PUSH. Hours or days can pass before anything
+--     else happens, and the time is what somebody plans the trip to the counter around.
+--   * ready to collect (a pickup): IN_APP, SMS and PUSH. It is the message that sends somebody out of
+--     the house.
+--   * ready, a rider is being assigned (a delivery): IN_APP and PUSH, no text. The basket's picked-up
+--     and delivered texts follow it, and they are the ones that say somebody is on the way.
+--   * collected (a pickup): IN_APP and PUSH, no text. Its customer is standing at the counter with the
+--     work in their hands, and a paid text asking them to rate the shop is read later if at all.
+-- So a delivery service order sends three texts (accepted, then the basket's picked up and delivered)
+-- and a pickup two (accepted, ready to collect). That split is the owner's default and may change;
+-- a text is a row, so putting one back is an insert in a later migration.
+--
+-- SMS ENCODING. Every English text keeps to the GSM 03.38 alphabet, which is why they say "-" where
+-- the push and in-app copy say "—". One character outside it sends the whole message as UCS-2, 70
+-- characters a segment instead of 160, and vendors bill per segment: the accept text cost two.
+-- OrderEventListenerTest renders every English SMS row with a 16-character shop name and checks it
+-- against the SMS worker's own alphabet (SmsPreparer) and a single segment. Arabic texts are UCS-2
+-- whatever they say, so they are kept short rather than kept to an alphabet.
+--
+-- WHO A TEXT IS FROM. Every text opens with its sender, as V10's do: "Delivery:" in English, and the
+-- same word in Arabic, "توصيل:", in Arabic. The Arabic word rather than the Latin one, because a
+-- message whose first letter is Latin is laid out left to right by phones that take its direction
+-- from that letter, and the Arabic sentence after it comes out with its punctuation in the wrong
+-- places.
 --
 -- WHAT HAS NO ROW, ON PURPOSE.
 --   * PREPARING. A service order's shop accepts straight into production, so PREPARING follows
@@ -27,8 +51,8 @@
 --     cancellation. All three are the shop's own taps, and V18's rule stands: telling the merchant
 --     about its own actions is how people learn to turn notifications off.
 --   * Everything else a service order does (a rider claiming it, the rider collecting it, a
---     delivery arriving, a cancellation in somebody's own words) reads correctly in the basket's
---     wording and uses the basket's rows.
+--     delivery arriving, a cancellation the snapshot cannot pin on the shop's own decision) reads
+--     correctly in the basket's wording and uses the basket's rows.
 --
 -- PLACEHOLDERS the listener fills for service orders only: {{store}} the shop's name; {{offer}} the
 -- job as the provider's card reads it ("500 Business Cards"); {{readyBy}} the estimate in Beirut
@@ -37,11 +61,13 @@
 -- shop's own words after NOT_COLLECTED. The stored "PROVIDER_DECLINED: TOO_BUSY" never reaches a
 -- customer.
 --
--- ARABIC. These are the first Arabic rows in this table, and nothing reads them yet: dispatch looks
--- every template up in delivery.notifications.default-locale (en), whoever the recipient is. They
--- are written now so the copy exists once a recipient's locale is resolved. The listener fills
--- {{readyByAr}} (Lebanese month names) and {{reasonWordsAr}} beside the English values, so an
--- Arabic message does not end in an English date or reason.
+-- ARABIC. These are the first Arabic rows in this table, and nothing sends them yet: dispatch looks
+-- every template up in delivery.notifications.default-locale (en), whoever the recipient is, and
+-- sends the English row for any channel that locale has none for. They are written now so the copy
+-- exists once a recipient's own locale is resolved. Until then the default must stay en: set to ar,
+-- every customer and shop would be sent these moments in Arabic and everything else in English. The
+-- listener fills {{readyByAr}} (Lebanese month names) and {{reasonWordsAr}} beside the English
+-- values, so an Arabic message does not end in an English date or reason.
 
 INSERT INTO notification_templates (id, event_type, channel, locale, subject_template, body_template) VALUES
     -- Merchant: a new service order to accept or decline, naming the job rather than counting items.
@@ -59,11 +85,12 @@ INSERT INTO notification_templates (id, event_type, channel, locale, subject_tem
     ('a0000000-0000-4000-8000-000000000104', 'order.status_changed.service.accepted', 'IN_APP', 'en',
      'Order accepted', '{{store}} accepted your order — ready by {{readyBy}}'),
     ('a0000000-0000-4000-8000-000000000105', 'order.status_changed.service.accepted', 'SMS', 'en',
-     null, 'Delivery: {{store}} accepted order #{{shortId}} — ready by {{readyBy}}.'),
+     null, 'Delivery: {{store}} accepted order #{{shortId}} - ready by {{readyBy}}.'),
     ('a0000000-0000-4000-8000-000000000106', 'order.status_changed.service.accepted', 'PUSH', 'en',
      'Order #{{shortId}}', '{{store}} accepted your order — ready by {{readyBy}}'),
 
-    -- Customer: ready, said differently for the two ways the work reaches them.
+    -- Customer: ready, said differently for the two ways the work reaches them. Only the pickup is
+    -- texted (WHICH CHANNELS).
     ('a0000000-0000-4000-8000-000000000107', 'order.status_changed.service.ready_to_collect', 'IN_APP', 'en',
      'Ready to collect', 'Ready to collect at {{store}}'),
     ('a0000000-0000-4000-8000-000000000108', 'order.status_changed.service.ready_to_collect', 'SMS', 'en',
@@ -72,16 +99,13 @@ INSERT INTO notification_templates (id, event_type, channel, locale, subject_tem
      'Order #{{shortId}}', 'Ready to collect at {{store}}'),
     ('a0000000-0000-4000-8000-00000000010a', 'order.status_changed.service.ready_for_rider', 'IN_APP', 'en',
      'Order ready', 'Ready — a rider is being assigned'),
-    ('a0000000-0000-4000-8000-00000000010b', 'order.status_changed.service.ready_for_rider', 'SMS', 'en',
-     null, 'Delivery: order #{{shortId}} is ready — a rider is being assigned.'),
     ('a0000000-0000-4000-8000-00000000010c', 'order.status_changed.service.ready_for_rider', 'PUSH', 'en',
      'Order #{{shortId}}', 'Ready — a rider is being assigned'),
 
-    -- Customer: a pickup collected at the counter, which is the moment to ask for a rating.
+    -- Customer: a pickup collected at the counter, which is the moment to ask for a rating. Not
+    -- texted: they are standing at the counter (WHICH CHANNELS).
     ('a0000000-0000-4000-8000-00000000010d', 'order.delivered.service.collected', 'IN_APP', 'en',
      'Collected', 'Collected — rate {{store}}'),
-    ('a0000000-0000-4000-8000-00000000010e', 'order.delivered.service.collected', 'SMS', 'en',
-     null, 'Delivery: order #{{shortId}} collected — rate {{store}} in the app.'),
     ('a0000000-0000-4000-8000-00000000010f', 'order.delivered.service.collected', 'PUSH', 'en',
      'Order #{{shortId}}', 'Collected — rate {{store}}'),
 
@@ -118,27 +142,23 @@ INSERT INTO notification_templates (id, event_type, channel, locale, subject_tem
     ('a0000000-0000-4000-8000-000000000124', 'order.status_changed.service.accepted', 'IN_APP', 'ar',
      'تم قبول الطلب', 'قبِل {{store}} طلبك — سيكون جاهزًا بحلول {{readyByAr}}'),
     ('a0000000-0000-4000-8000-000000000125', 'order.status_changed.service.accepted', 'SMS', 'ar',
-     null, 'قبِل {{store}} الطلب #{{shortId}} — سيكون جاهزًا بحلول {{readyByAr}}.'),
+     null, 'توصيل: قبِل {{store}} الطلب #{{shortId}} — سيكون جاهزًا بحلول {{readyByAr}}.'),
     ('a0000000-0000-4000-8000-000000000126', 'order.status_changed.service.accepted', 'PUSH', 'ar',
      'الطلب #{{shortId}}', 'قبِل {{store}} طلبك — سيكون جاهزًا بحلول {{readyByAr}}'),
 
     ('a0000000-0000-4000-8000-000000000127', 'order.status_changed.service.ready_to_collect', 'IN_APP', 'ar',
      'جاهز للاستلام', 'طلبك جاهز للاستلام من {{store}}'),
     ('a0000000-0000-4000-8000-000000000128', 'order.status_changed.service.ready_to_collect', 'SMS', 'ar',
-     null, 'الطلب #{{shortId}} جاهز للاستلام من {{store}}.'),
+     null, 'توصيل: الطلب #{{shortId}} جاهز للاستلام من {{store}}.'),
     ('a0000000-0000-4000-8000-000000000129', 'order.status_changed.service.ready_to_collect', 'PUSH', 'ar',
      'الطلب #{{shortId}}', 'طلبك جاهز للاستلام من {{store}}'),
     ('a0000000-0000-4000-8000-00000000012a', 'order.status_changed.service.ready_for_rider', 'IN_APP', 'ar',
      'الطلب جاهز', 'طلبك جاهز — جارٍ تعيين سائق لتوصيله'),
-    ('a0000000-0000-4000-8000-00000000012b', 'order.status_changed.service.ready_for_rider', 'SMS', 'ar',
-     null, 'الطلب #{{shortId}} جاهز — جارٍ تعيين سائق لتوصيله.'),
     ('a0000000-0000-4000-8000-00000000012c', 'order.status_changed.service.ready_for_rider', 'PUSH', 'ar',
      'الطلب #{{shortId}}', 'طلبك جاهز — جارٍ تعيين سائق لتوصيله'),
 
     ('a0000000-0000-4000-8000-00000000012d', 'order.delivered.service.collected', 'IN_APP', 'ar',
      'تم الاستلام', 'تم استلام طلبك — قيّم {{store}}'),
-    ('a0000000-0000-4000-8000-00000000012e', 'order.delivered.service.collected', 'SMS', 'ar',
-     null, 'تم استلام الطلب #{{shortId}} — قيّم {{store}} في التطبيق.'),
     ('a0000000-0000-4000-8000-00000000012f', 'order.delivered.service.collected', 'PUSH', 'ar',
      'الطلب #{{shortId}}', 'تم استلام طلبك — قيّم {{store}}'),
 

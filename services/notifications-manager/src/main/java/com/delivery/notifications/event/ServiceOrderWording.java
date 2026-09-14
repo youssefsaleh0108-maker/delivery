@@ -98,7 +98,7 @@ final class ServiceOrderWording {
      * Adds the values V19's rows read to the basket's. Every one is a string and never null, so an
      * absent field renders as nothing rather than as "null" in somebody's text message.
      */
-    static void addPlaceholders(JsonNode event, Map<String, String> values) {
+    static void addPlaceholders(JsonNode event, Fulfilment fulfilment, Map<String, String> values) {
         values.put("store", event.path("storeName").asText("").strip());
         values.put("offer", offer(event.path("items").path(0), values.getOrDefault("shortId", "")));
 
@@ -106,9 +106,12 @@ final class ServiceOrderWording {
         values.put("readyBy", readyAt == null ? "" : READY_BY.format(readyAt));
         values.put("readyByAr", readyAt == null ? "" : READY_BY_AR.format(readyAt));
 
+        // Words only for a cancellation told as the shop's own decision. Any other goes out on the
+        // basket's rows, which read the reason as it was given.
         String reason = event.path("cancelReason").asText("");
-        values.put("reasonWords", reasonWords(reason, false));
-        values.put("reasonWordsAr", reasonWords(reason, true));
+        String cancelled = cancelledType(event, fulfilment);
+        values.put("reasonWords", reasonWords(cancelled, reason, false));
+        values.put("reasonWordsAr", reasonWords(cancelled, reason, true));
 
         if ("ACCEPTED".equals(event.path("status").asText(""))) {
             // The basket's sentence for ACCEPTED names a restaurant. A service order only reaches
@@ -151,15 +154,42 @@ final class ServiceOrderWording {
     }
 
     /**
-     * The moment a service order's cancellation goes out as when its own shop made it for a reason
-     * on the list: a decline, or a pickup nobody collected. Null for every other cancellation, which
-     * is in somebody's own words and reads right in the basket's rows.
+     * The moment a service order's cancellation goes out as when the snapshot shows it was its own
+     * shop's decision on the list: a decline, or a pickup nobody collected. Null for every other
+     * cancellation, which goes out on the basket's rows, to the customer and the shop both, in the
+     * words it was given.
+     *
+     * <p><strong>A code in the reason is not proof of who cancelled.</strong> The snapshot names no
+     * canceller and carries no status history, only the reason order-manager stored, and a reason is
+     * somebody's own words wherever it is not one of a provider's two codes. Believed from the text
+     * alone, a back-office cancel that began "PROVIDER_DECLINED" told the customer the shop had
+     * declined and never told the shop, and a shop's own words beginning "NOT_COLLECTED" on an order
+     * a rider was bringing said it had not been collected in time. order-manager is meant to keep both
+     * codes to a provider's own two decisions; this does not lean on that alone. Each code is believed
+     * only where order-manager itself could have written it:
+     * <ul>
+     *   <li><b>A decline</b> only on an order its shop never accepted. A provider declines a new
+     *       order, and order-manager sets {@code estimatedReadyAt} in the same step as ACCEPTED and
+     *       never clears it, so any estimate on the snapshot, readable or not, means the shop took the
+     *       work on and whoever cancelled it afterwards did not decline it.</li>
+     *   <li><b>Not collected</b> only on a PICKUP its shop accepted. Nothing a rider carries waits at
+     *       a counter, and nothing waits there before it has been accepted.</li>
+     *   <li>Either code only exactly as order-manager writes it: in capitals, at the very start.
+     *       "Provider declined: closed today" is somebody's sentence.</li>
+     * </ul>
+     * Falling back is the cheap mistake. The customer reads the reason as it was given, and a shop
+     * that did make the cancellation is told about it, as a basket's shop always is.
      */
-    static String cancelledType(String reason) {
-        if (after(reason, DECLINED_PREFIX) != null) {
+    static String cancelledType(JsonNode event, Fulfilment fulfilment) {
+        String reason = event.path("cancelReason").asText("");
+        boolean accepted = !event.path("estimatedReadyAt").asText("").isBlank();
+        if (!accepted && after(reason, DECLINED_PREFIX) != null) {
             return DECLINED;
         }
-        return after(reason, NOT_COLLECTED_PREFIX) != null ? NOT_COLLECTED : null;
+        if (accepted && fulfilment == Fulfilment.PICKUP && after(reason, NOT_COLLECTED_PREFIX) != null) {
+            return NOT_COLLECTED;
+        }
+        return null;
     }
 
     /**
@@ -192,29 +222,27 @@ final class ServiceOrderWording {
     }
 
     /**
-     * A cancellation's reason in words: a decline's code as its customer should read it, the shop's
-     * own words after NOT_COLLECTED, or nothing.
+     * A cancellation's reason in words, for the moment {@link #cancelledType} made of it: a decline's
+     * code as its customer should read it, the shop's own words after NOT_COLLECTED, or nothing.
      */
-    private static String reasonWords(String reason, boolean arabic) {
-        String code = after(reason, DECLINED_PREFIX);
-        if (code != null) {
-            Decline decline = Decline.of(code);
+    private static String reasonWords(String cancelled, String reason, boolean arabic) {
+        if (DECLINED.equals(cancelled)) {
+            Decline decline = Decline.of(after(reason, DECLINED_PREFIX));
             return arabic ? decline.arabic : decline.english;
         }
-        String words = after(reason, NOT_COLLECTED_PREFIX);
-        return words == null ? "" : words;
+        return NOT_COLLECTED.equals(cancelled) ? after(reason, NOT_COLLECTED_PREFIX) : "";
     }
 
     /**
-     * What follows a stored prefix: "" after the bare prefix, the text after "PREFIX:" otherwise, or
-     * null when the reason is not that prefix at all. "NOT_COLLECTEDX" is not NOT_COLLECTED.
+     * What follows a stored code: "" after the bare code, the text after "CODE:" otherwise, or null
+     * when the reason does not begin with the code exactly as order-manager writes it. Case and place
+     * both count: "NOT_COLLECTEDX", "Not_Collected" and " NOT_COLLECTED" are not NOT_COLLECTED.
      */
     private static String after(String reason, String prefix) {
-        String text = reason == null ? "" : reason.strip();
-        if (!text.regionMatches(true, 0, prefix, 0, prefix.length())) {
+        if (reason == null || !reason.startsWith(prefix)) {
             return null;
         }
-        String rest = text.substring(prefix.length()).strip();
+        String rest = reason.substring(prefix.length()).strip();
         if (rest.isEmpty()) {
             return "";
         }
