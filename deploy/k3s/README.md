@@ -77,6 +77,26 @@ invent is the onboarding client secret, which must match what the realm import c
   changes nothing a merchant can see: CLAUDE without a key still answers with labelled samples, and
   a key without CLAUDE is never used. Each scan is a paid call once both are done; the per-merchant
   caps live under `delivery.catalog.scan` in product-service's `application.yml`.
+- **Service-order attachments need their bucket once per environment.** The files customers attach
+  to service orders live in the private `order-attachments` bucket. `minio/bootstrap.sh` creates it,
+  but in dev and qa the `minio-init` Job has already completed, and `kubectl apply` never re-runs a
+  finished Job (the generated ConfigMaps keep their names). Re-run it by hand, per environment —
+  the script is idempotent, so the existing buckets and rules are left as they are:
+
+  ```sh
+  kubectl -n delivery-dev delete job minio-init
+  kubectl apply -k /opt/delivery/k3s/overlays/dev
+  kubectl -n delivery-dev logs job/minio-init | grep order-attachments
+  # and the same with delivery-qa / overlays/qa
+  ```
+
+  The same apply routes `/order-attachments` on the API hostname (presigned requests only; MinIO
+  refuses unsigned ones) behind `order-attachment-upload-limit`, which answers 413 to a body over
+  10 MiB before MinIO stores a byte — keep it in step with order-manager's
+  `delivery.attachments.max-size-bytes` — and hands order-manager its MinIO credentials from
+  `platform-secrets`, as onboarding-service gets them; the Vault seed carries them too from the next
+  vault pod start. order-manager's image must be built against platform-storage 0.1.3, published to
+  GitHub Packages.
 - **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.

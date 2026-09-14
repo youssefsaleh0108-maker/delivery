@@ -115,3 +115,7 @@ export 'src/models/report_models.dart';
 // screens in delivery_merchant name every one of these types.
 export 'src/api/catalog_scan_api.dart';
 export 'src/models/catalog_scan_models.dart';
+// Service orders: the customer's design file, uploaded before the order is placed and read by the
+// order's provider and back office.
+export 'src/api/order_attachment_api.dart';
+export 'src/models/order_attachment_models.dart';
