@@ -14,10 +14,17 @@
 --
 -- Sticky: the hold is on the product row. Product refuses publish, resume and pause while taken_down_at
 -- is set, and only a restore clears it. chk_product_takedown keeps the three columns together and the
--- offer archived while they are set. It is also what stops a provider's save that read the offer just
--- before it was taken down from putting it back on sale: the entity writes only the columns a save
--- changed (@DynamicUpdate), so that save sets the status and not the hold, and the database refuses the
--- pair.
+-- offer archived while they are set.
+--
+-- A save that read a product before another save changed it is refused (version). Back office's acts lock
+-- the row, but a provider's saves and back office's gift-hub switch read without a lock, and every save
+-- judges the product's rules on what it read. Writing every column, a provider's save that read an offer
+-- just before it was taken down would put back the hold-less row it read. Writing only the columns it
+-- changed, two saves from one read leave a row neither of them made: an archive that keeps ACTIVE as the
+-- status to restore, a publish that goes live after the last photo was removed, a gift-hub pick left on an
+-- archived product. So each save writes only where the row still has the version it read, and moves the
+-- version on. The second of two saves from one read matches no row, Hibernate refuses it, and the API
+-- answers 409 PRODUCT_CHANGED for its caller to reload.
 --
 -- Explained: takedown_reason is what the provider reads on their offer, in back office's words.
 --
@@ -30,13 +37,15 @@
 -- resumes it, and resuming runs the publish rules again, which a photo removed or a pin cleared during
 -- the hold may now fail.
 --
--- Existing rows need nothing. The new columns start null, which means "not taken down", and every row
--- passes the CHECK.
+-- Existing rows need nothing. The hold columns start null, which means "not taken down", and every row
+-- passes the CHECK. version starts at 0, where Hibernate starts a product it creates, and a column with a
+-- constant default is added without rewriting the table.
 
 ALTER TABLE products
     ADD COLUMN taken_down_at          timestamptz,
     ADD COLUMN takedown_reason        varchar(500),
-    ADD COLUMN status_before_takedown varchar(16);
+    ADD COLUMN status_before_takedown varchar(16),
+    ADD COLUMN version                bigint NOT NULL DEFAULT 0;
 
 ALTER TABLE products ADD CONSTRAINT chk_product_takedown CHECK (
     (taken_down_at IS NULL AND takedown_reason IS NULL AND status_before_takedown IS NULL)

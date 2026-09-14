@@ -37,32 +37,48 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
+import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.SharedEntityManagerCreator;
+import org.springframework.orm.jpa.vendor.HibernateJpaDialect;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.delivery.platform.outbox.OutboxRecorder;
+import com.delivery.platform.storage.FileMetadataRepository;
+import com.delivery.platform.storage.StorageService;
+import com.delivery.product.api.ApiExceptionHandler;
 import com.delivery.product.api.dto.CatalogDtos.ProductRequest;
 import com.delivery.product.api.dto.CatalogDtos.ServiceTermsRequest;
 import com.delivery.product.service.CatalogService;
 import com.delivery.product.service.CatalogService.CatalogRuleViolationException;
 import com.delivery.product.service.CatalogService.ProductNotFoundException;
+import com.delivery.product.service.GiftBundleService;
 import com.delivery.product.service.OfferModerationService;
 import com.delivery.product.service.OfferModerationService.ModeratedOffer;
 import com.delivery.product.service.OfferModerationService.Moderator;
 import com.delivery.product.service.OfferModerationService.StatusFilter;
 import com.delivery.product.service.OnboardingApplicationClient;
+import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ServiceCategories;
 import com.delivery.product.service.ServiceOfferSearch;
 import com.delivery.product.service.StoreService;
+import com.delivery.product.service.ThumbnailService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
 
@@ -73,8 +89,9 @@ import static org.mockito.Mockito.mock;
  * prove the rest:
  * <ul>
  *   <li>the hold and its trail commit together or not at all;
- *   <li>{@code chk_product_takedown} refuses a held offer on sale, even when a stale save tries to put it
- *       back;
+ *   <li>{@code chk_product_takedown} refuses a held offer on sale, and is answered as the take-down;
+ *   <li>of two saves from one read of a product, the one that commits second is refused, whichever it is
+ *       (Product's version), as the exception the API answers 409 PRODUCT_CHANGED;
  *   <li>every customer read leaves a taken-down offer out;
  *   <li>the back office list's optional filters answer what they claim.
  * </ul>
@@ -118,6 +135,9 @@ class OfferModerationDatabaseTest {
     /** A service shop's offers on the schema before V36, by status. */
     private final Map<String, UUID> offersBeforeV36 = new HashMap<>();
 
+    /** Whose the raw shops are, the Hamra Grill's included. */
+    private static final String GRILL_OWNER = "merchant-it";
+
     private UUID grill;
     private UUID oldPress;
 
@@ -129,6 +149,18 @@ class OfferModerationDatabaseTest {
     private StoreService storeService;
     private ServiceOfferSearch search;
     private OfferModerationService moderation;
+
+    /**
+     * The services over the entity manager a transaction manager binds, as the service runs them, for the
+     * races: each request in its own transaction, and a refusal thrown as it reaches the API.
+     */
+    private Wiring shared;
+
+    /** A request's transaction, through the transaction manager the service commits with. */
+    private TransactionTemplate transactions;
+
+    /** A second request's transaction, begun and committed while the first is still open. */
+    private TransactionTemplate meanwhile;
 
     /** Listed, pinned, open all week, in an open category. */
     private Store press;
@@ -179,6 +211,12 @@ class OfferModerationDatabaseTest {
         search = wiring.search();
         moderation = wiring.moderation();
 
+        JpaTransactionManager transactionManager = new JpaTransactionManager(entityManagerFactory);
+        transactions = new TransactionTemplate(transactionManager);
+        meanwhile = new TransactionTemplate(transactionManager);
+        meanwhile.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        shared = wire(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+
         press = transaction(em, () -> {
             Store shop = listed(new Store("merchant-press", "Al Fakhry Press", Store.Vertical.SERVICES,
                     Store.ServiceCategory.PRINTING));
@@ -222,8 +260,9 @@ class OfferModerationDatabaseTest {
             UUID id = row.getValue();
             assertThat(text("SELECT status FROM products WHERE id = '" + id + "'")).as(row.getKey())
                     .isEqualTo(status);
+            // At version 0, where Hibernate starts a product it creates, so a save of this row matches it.
             assertThat(count("SELECT count(*) FROM products WHERE id = '" + id + "' AND taken_down_at IS NULL "
-                    + "AND takedown_reason IS NULL AND status_before_takedown IS NULL"))
+                    + "AND takedown_reason IS NULL AND status_before_takedown IS NULL AND version = 0"))
                     .as(row.getKey()).isEqualTo(1);
             Product read = products.findById(id).orElseThrow();
             assertThat(read.isTakenDown()).as(row.getKey()).isFalse();
@@ -439,51 +478,139 @@ class OfferModerationDatabaseTest {
         em.clear();
     }
 
+    // ------------------------------------------------------------------------------------ saves from one read
+
     /**
-     * Why Product writes only the columns a save changed. Both saves here read the offer before back
-     * office took it down. Writing every column, the rename would have written the hold-less row it read
-     * back over the hold, and the resume would then have put the offer on sale.
+     * The provider's side of back office's acts. Back office locks the row and reads it fresh, but a
+     * provider's save reads without a lock: it can read an offer just before back office takes it down or
+     * restores it, and commit just after. Each such save is refused whole. When Product wrote only the
+     * columns a save changed, a rename wrote its name under the hold, a resume met chk_product_takedown and
+     * was answered as a uniqueness clash, and an archive left ACTIVE as the status to restore, so the
+     * restore brought back paused an offer its provider had archived.
      */
     @Test
-    @DisplayName("a provider's save that read the offer before it was taken down keeps the hold, and cannot put it back on sale")
-    void a_save_read_before_the_take_down_cannot_undo_it() throws SQLException {
-        String provider = press.getMerchantId();
-        UUID canvas = transaction(em, () -> {
-            Product offer = liveOffer(press, "Canvas printing");
-            catalog.pause(offer.getId(), provider);
-            return offer.getId();
+    @DisplayName("a provider's save that read the offer before back office took it down or restored it is refused, and the offer is as back office left it")
+    void a_save_read_before_back_office_acted_is_refused() throws SQLException {
+        Store studio = printShopOfItsOwn("Mina Print Studio");
+        String provider = studio.getMerchantId();
+        String reason = "Reproduces a museum painting without permission.";
+        UUID canvas = transactions.execute(status -> liveOffer(shared.catalog(), studio, "Canvas printing").getId());
+        UUID leaflets = transactions.execute(status -> liveOffer(shared.catalog(), studio, "Leaflet folding").getId());
+        UUID brochures = transactions.execute(status -> {
+            UUID id = liveOffer(shared.catalog(), studio, "Brochure binding").getId();
+            shared.catalog().pause(id, provider);
+            return id;
         });
-        em.clear();
 
-        EntityManager renaming = entityManagerFactory.createEntityManager();
-        EntityManager resuming = entityManagerFactory.createEntityManager();
-        try {
-            renaming.getTransaction().begin();
-            Product toRename = renaming.find(Product.class, canvas);
-            resuming.getTransaction().begin();
-            Product toResume = resuming.find(Product.class, canvas);
-
+        Map<UUID, Runnable> providerSaves = Map.of(
+                canvas, () -> shared.catalog().update(canvas, provider, request(studio, "Canvas prints, framed")),
+                brochures, () -> shared.catalog().resume(brochures, provider),
+                leaflets, () -> shared.catalog().archive(leaflets, provider));
+        for (Map.Entry<UUID, Runnable> save : providerSaves.entrySet()) {
+            UUID offer = save.getKey();
+            String before = row(offer, "status");
             moderationClock.advance();
-            transaction(em, () -> moderation.takeDown(canvas, OPS, "Reproduces a museum painting without permission."));
-            em.clear();
-
-            // A rename writes the name alone, so the hold it never saw stays.
-            toRename.update("Canvas prints, framed", toRename.getDescription(), toRename.getPrice(),
-                    toRename.getCategoryId(), toRename.getSku(), toRename.getBarcode());
-            renaming.getTransaction().commit();
-
-            // A resume writes the status, and the database refuses a held offer on sale.
-            toResume.resume();
-            assertThatThrownBy(() -> resuming.getTransaction().commit())
-                    .hasStackTraceContaining("chk_product_takedown");
-        } finally {
-            close(renaming);
-            close(resuming);
+            assertThatThrownBy(() -> staleSave(save.getValue(),
+                    () -> shared.moderation().takeDown(offer, OPS, reason)))
+                    .satisfies(OfferModerationDatabaseTest::isAnsweredProductChanged);
+            // As the take-down left it: off sale, held, and keeping the status it had to go back to.
+            assertThat(row(offer, "status || '|' || status_before_takedown || '|' || takedown_reason"))
+                    .isEqualTo("ARCHIVED|" + before + "|" + reason);
         }
+        assertThat(row(canvas, "name")).isEqualTo("Canvas printing");
 
-        assertThat(text("SELECT name || '|' || status || '|' || takedown_reason FROM products WHERE id = '"
-                + canvas + "'"))
-                .isEqualTo("Canvas prints, framed|ARCHIVED|Reproduces a museum painting without permission.");
+        // Reading the leaflets again, their provider finds them taken down and archives them for good, and
+        // the restore leaves them archived.
+        transactions.executeWithoutResult(status -> shared.catalog().archive(leaflets, provider));
+        moderationClock.advance();
+        transactions.executeWithoutResult(status ->
+                shared.moderation().restore(leaflets, OPS, "Withdrawn by their provider."));
+        assertThat(row(leaflets, "status || '|' || (taken_down_at IS NULL)")).isEqualTo("ARCHIVED|true");
+
+        // A rename read while the canvas offer was held, and committed after back office restored it.
+        moderationClock.advance();
+        assertThatThrownBy(() -> staleSave(
+                () -> shared.catalog().update(canvas, provider, request(studio, "Canvas prints, framed")),
+                () -> shared.moderation().restore(canvas, OPS, "The provider removed the painting.")))
+                .satisfies(OfferModerationDatabaseTest::isAnsweredProductChanged);
+        assertThat(row(canvas, "name || '|' || status || '|' || (taken_down_at IS NULL)"))
+                .isEqualTo("Canvas printing|PAUSED|true");
+    }
+
+    /**
+     * Two requests on one goods product, each judging its rules on its own read. When Product wrote only
+     * the columns a save changed, the one that committed second left a row neither request made: here, a
+     * product on sale with no photo. Now it is refused, whichever order they commit in.
+     */
+    @Test
+    @DisplayName("a publish and the removal of the only photo from one read: the second to commit is refused, so nothing goes on sale without a photo")
+    void a_publish_and_a_photo_removal_from_one_read() throws SQLException {
+        // The removal commits first, and the publish had read the photo.
+        UUID platter = draftGoods("Mixed grill platter");
+        assertThatThrownBy(() -> staleSave(
+                () -> shared.catalog().publish(platter, GRILL_OWNER),
+                () -> shared.images().removeImage(platter, GRILL_OWNER, photoOf(platter))))
+                .satisfies(OfferModerationDatabaseTest::isAnsweredProductChanged);
+        assertThat(row(platter, "status || '|' || image_refs::text")).isEqualTo("DRAFT|[]");
+
+        // The publish commits first, and the removal had read a draft, which it does not take off sale.
+        UUID halloumi = draftGoods("Grilled halloumi");
+        assertThatThrownBy(() -> staleSave(
+                () -> shared.images().removeImage(halloumi, GRILL_OWNER, photoOf(halloumi)),
+                () -> shared.catalog().publish(halloumi, GRILL_OWNER)))
+                .satisfies(OfferModerationDatabaseTest::isAnsweredProductChanged);
+        assertThat(row(halloumi, "status || '|' || image_refs::text"))
+                .isEqualTo("ACTIVE|[\"" + photoOf(halloumi) + "\"]");
+    }
+
+    /** The same race between back office's gift-hub switch and the merchant's archive. */
+    @Test
+    @DisplayName("a gift-hub pick and an archive from one read: the second to commit is refused, so an archived product never stays on the hub")
+    void a_gift_hub_pick_and_an_archive_from_one_read() throws SQLException {
+        // The archive commits first, and the pick had read a live product.
+        UUID kebab = liveGoods("Kebab platter");
+        assertThatThrownBy(() -> staleSave(
+                () -> shared.gifts().setFeatured(kebab, true, "keycloak-sub-ops", NOW),
+                () -> shared.catalog().archive(kebab, GRILL_OWNER)))
+                .satisfies(OfferModerationDatabaseTest::isAnsweredProductChanged);
+        assertThat(row(kebab, "status || '|' || gift_featured")).isEqualTo("ARCHIVED|false");
+
+        // The pick commits first, and the archive had read a product that was not on the hub.
+        UUID mezze = liveGoods("Mezze tray");
+        assertThatThrownBy(() -> staleSave(
+                () -> shared.catalog().archive(mezze, GRILL_OWNER),
+                () -> shared.gifts().setFeatured(mezze, true, "keycloak-sub-ops", NOW)))
+                .satisfies(OfferModerationDatabaseTest::isAnsweredProductChanged);
+        assertThat(row(mezze, "status || '|' || gift_featured")).isEqualTo("ACTIVE|true");
+    }
+
+    /**
+     * What is left for chk_product_takedown to refuse once the version refuses every save read before a
+     * take-down: a write that goes around Product. Hibernate reads the constraint's name out of PostgreSQL's
+     * own error, and the API answers it as the take-down rather than as a uniqueness clash.
+     */
+    @Test
+    @DisplayName("a write around Product that meets the take-down CHECK is answered as the take-down")
+    void a_write_the_take_down_check_refuses_is_answered_as_the_take_down() throws SQLException {
+        Store studio = printShopOfItsOwn("Sahat Banner Works");
+        UUID banners = transactions.execute(status -> liveOffer(shared.catalog(), studio, "Banner printing").getId());
+        moderationClock.advance();
+        transactions.executeWithoutResult(status ->
+                shared.moderation().takeDown(banners, OPS, "Prints counterfeit brand banners."));
+
+        Throwable refused = catchThrowable(() -> transactions.executeWithoutResult(status -> shared.em()
+                .createNativeQuery("UPDATE products SET status = 'ACTIVE' WHERE id = :id")
+                .setParameter("id", banners)
+                .executeUpdate()));
+
+        // Translated as a repository or the transaction manager translates it on its way to the API.
+        assertThat(refused).isInstanceOf(RuntimeException.class);
+        DataAccessException translated = new HibernateJpaDialect().translateExceptionIfPossible((RuntimeException) refused);
+        assertThat(translated).isInstanceOf(DataIntegrityViolationException.class);
+        ProblemDetail answer = new ApiExceptionHandler().onConflict((DataIntegrityViolationException) translated);
+        assertThat(answer.getStatus()).isEqualTo(409);
+        assertThat(answer.getProperties()).containsEntry("code", "OFFER_TAKEN_DOWN");
+        assertThat(row(banners, "status")).isEqualTo("ARCHIVED");
     }
 
     // ------------------------------------------------------------------------------------ the list
@@ -592,7 +719,76 @@ class OfferModerationDatabaseTest {
     /** The catalogue's services over one entity manager, wired as the service wires them. */
     private record Wiring(EntityManager em, ProductRepository products, StoreRepository stores,
                           CatalogService catalog, StoreService storeService, ServiceOfferSearch search,
-                          OfferModerationService moderation) {
+                          OfferModerationService moderation, ProductImageService images,
+                          GiftBundleService gifts) {
+    }
+
+    /**
+     * Runs {@code stale} on its own read, and commits it only after {@code meanwhileAct} has read, written and
+     * committed: two requests on one product, the second reading before the first writes. Both go through the
+     * transaction manager the service commits with, so a refusal is thrown as it reaches the API.
+     */
+    private void staleSave(Runnable stale, Runnable meanwhileAct) {
+        transactions.executeWithoutResult(status -> {
+            stale.run();
+            meanwhile.executeWithoutResult(inner -> meanwhileAct.run());
+        });
+    }
+
+    /**
+     * What the API answers a refused stale save with, routed by type as the service's exception handler is:
+     * 409 PRODUCT_CHANGED. Hibernate 6.6 on PostgreSQL reports the refusal as a {@code JpaSystemException}
+     * ({@link ApiExceptionHandler#onPersistenceFailure}), and a Hibernate that counts the rows first would
+     * report the optimistic-lock failure. Either is answered the same, so either passes.
+     */
+    private static void isAnsweredProductChanged(Throwable refused) {
+        ApiExceptionHandler handler = new ApiExceptionHandler();
+        ProblemDetail answer;
+        if (refused instanceof ObjectOptimisticLockingFailureException stale) {
+            answer = handler.onProductChanged(stale);
+        } else if (refused instanceof org.springframework.orm.jpa.JpaSystemException failure) {
+            answer = handler.onPersistenceFailure(failure);
+        } else {
+            throw new AssertionError("Not a refusal the API answers as a changed product", refused);
+        }
+        assertThat(answer.getStatus()).as(String.valueOf(refused)).isEqualTo(409);
+        assertThat(answer.getProperties()).containsEntry("code", "PRODUCT_CHANGED");
+    }
+
+    /** A listed print shop of its own, so a test's offers are on no other test's shelf or list. */
+    private Store printShopOfItsOwn(String name) {
+        return transactions.execute(status -> {
+            Store shop = listed(new Store("merchant-" + UUID.randomUUID(), name, Store.Vertical.SERVICES,
+                    Store.ServiceCategory.PRINTING));
+            shared.em().persist(shop);
+            return shop;
+        });
+    }
+
+    /** A goods draft in the Hamra Grill, with one photo, at {@link #photoOf}. */
+    private UUID draftGoods(String name) {
+        return transactions.execute(status -> {
+            Product product = shared.catalog().create(GRILL_OWNER, new ProductRequest(name, null,
+                    new BigDecimal("9.00"), null, grill, null, null, null), StoreService.FirstShop.ALREADY_OPEN);
+            product.addImage(photoOf(product.getId()));
+            return product.getId();
+        });
+    }
+
+    /** A goods product on sale in the Hamra Grill, with one photo. */
+    private UUID liveGoods(String name) {
+        UUID id = draftGoods(name);
+        transactions.executeWithoutResult(status -> shared.catalog().publish(id, GRILL_OWNER));
+        return id;
+    }
+
+    private static String photoOf(UUID productId) {
+        return "products/" + productId + ".jpg";
+    }
+
+    /** One expression over one product's row, as text. */
+    private String row(UUID productId, String expression) throws SQLException {
+        return text("SELECT " + expression + " FROM products WHERE id = '" + productId + "'");
     }
 
     private Wiring wire(EntityManager manager) {
@@ -616,7 +812,12 @@ class OfferModerationDatabaseTest {
                 new ServiceOfferSearch(productRepository, new ServiceCategories(new MockEnvironment())),
                 new OfferModerationService(productRepository, storeRepository, serviceTerms,
                         repositories.getRepository(OfferModerationActionRepository.class), catalogService,
-                        mock(OutboxRecorder.class), moderationClock));
+                        mock(OutboxRecorder.class), moderationClock),
+                // No storage behind it: these tests are about a photo's key on the row, not its file.
+                new ProductImageService(productRepository, mock(StorageService.class),
+                        mock(FileMetadataRepository.class), mock(OutboxRecorder.class),
+                        mock(ThumbnailService.class), serviceTerms, 8),
+                new GiftBundleService(productRepository, storeRepository));
     }
 
     /** A clock the tests move on, one minute before each act. */
@@ -652,10 +853,15 @@ class OfferModerationDatabaseTest {
 
     /** Created, given a photo and published through the catalogue, as a pickup print offer. */
     private Product liveOffer(Store shop, String name) {
-        Product offer = catalog.create(shop.getMerchantId(), request(shop, name),
+        return liveOffer(catalog, shop, name);
+    }
+
+    /** {@link #liveOffer(Store, String)}, through the catalogue of another wiring. */
+    private static Product liveOffer(CatalogService catalogService, Store shop, String name) {
+        Product offer = catalogService.create(shop.getMerchantId(), request(shop, name),
                 StoreService.FirstShop.ALREADY_OPEN);
         offer.addImage("products/" + UUID.randomUUID() + ".jpg");
-        return catalog.publish(offer.getId(), shop.getMerchantId());
+        return catalogService.publish(offer.getId(), shop.getMerchantId());
     }
 
     private static ProductRequest request(Store shop, String name) {
@@ -744,8 +950,14 @@ class OfferModerationDatabaseTest {
         return factory.getObject();
     }
 
+    /**
+     * The test database, in this class's schema. A lock waited on for longer than lock_timeout fails the
+     * test instead of hanging the build: the races hold two transactions open on one thread, and one that
+     * waited on the other's row would wait for ever.
+     */
     private String urlInSchema() {
-        return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+        return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema
+                + "&options=-c%20lock_timeout%3D20s";
     }
 
     private Connection connection() throws SQLException {

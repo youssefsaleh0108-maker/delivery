@@ -13,8 +13,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
-import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
@@ -22,11 +22,6 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "products")
-// Only the columns a save changed are written (V36). Suppose a provider's save read an offer just before
-// back office took it down. With this, the save writes the status it moved and never the hold, and
-// chk_product_takedown refuses a held offer that is on sale. If every column were written, the save would
-// silently put back the hold-less row it read, and the offer with it.
-@DynamicUpdate
 public class Product {
 
     public enum Status {
@@ -158,6 +153,28 @@ public class Product {
     private Status statusBeforeTakedown;
 
     /**
+     * Moved on by every save, which writes only where the row still holds the version it read (V36).
+     *
+     * <p>Every save judges the product's rules on what it read, and most saves read without a lock: a
+     * provider's edit, publish, pause, resume, archive or photo change, and back office's gift-hub switch.
+     * Two saves from one read would each apply their rules to a product the other had already changed. A
+     * publish after the last photo was removed would put a blank card on sale, a gift-hub pick after an
+     * archive would send the product back to the hub when it is next published, and an archive read just
+     * before a take-down would come back from the restore paused. The second save now matches no row and is
+     * refused, the API answers 409 PRODUCT_CHANGED, and its caller reloads.
+     *
+     * <p>So a save writes every column from what it read, which the version guarantees is still the row as
+     * it stands. Writing only the changed columns protected nothing more, and it mixed two saves' reads into
+     * a row neither of them made.
+     *
+     * <p>Null until the product is first saved, which is how Spring Data tells a new product from one to
+     * merge.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
+    /**
      * Written by the column default, and read straight back.
      *
      * <p>{@code @Generated} is what makes the 201 on a create honest. Without it the entity is
@@ -254,7 +271,9 @@ public class Product {
      * later is picked for the hub again on purpose, not returned to it by accident.
      *
      * <p>Allowed while the offer is taken down, when it is the provider withdrawing it for good. The
-     * hold stays, and restoring it then brings back an archived offer rather than a paused one.
+     * hold stays, and restoring it then brings back an archived offer rather than a paused one. An archive
+     * that read the offer before it was taken down is refused as stale ({@link #version}), so a take-down
+     * never keeps, as the status to restore, one its provider had already withdrawn.
      */
     public void archive() {
         this.status = Status.ARCHIVED;
