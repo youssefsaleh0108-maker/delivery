@@ -11421,4 +11421,12 @@ class DeliveryStringsEn extends DeliveryStrings {
   String svcBoReasonLength(int used, int max) {
     return '$used/$max';
   }
+
+  @override
+  String get svcBoOfferNotListed =>
+      'Nothing was recorded, and this offer is no longer among the service offers, so there is nothing left to act on.';
+
+  @override
+  String get svcBoOfferUnreadable =>
+      'Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.';
 }

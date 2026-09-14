@@ -25,7 +25,8 @@ const int _maxReason = 500;
 /// Every act asks for a reason first and cannot be sent without one: the server records the reason with
 /// the staff member in the same transaction as the act, and a take-down's reason is what the provider
 /// reads on their offer. A refusal is said as what it is — already down, changed under the act, gone —
-/// and the list is read again, so what stays on screen is the server's.
+/// and the list is read again, and the offer with it on its own, whatever the filters, so what stays
+/// on screen is the server's.
 class ServiceOffersScreen extends StatefulWidget {
   const ServiceOffersScreen({super.key, required this.api, this.notificationApi});
 
@@ -89,9 +90,8 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
     super.dispose();
   }
 
-  /// Reads the page the filters describe. Answers it too, for a drawer that wants its offer as the
-  /// server now has it; null when the read failed or was overtaken.
-  Future<Paged<BackofficeServiceOffer>?> _load() async {
+  /// Reads the page the filters describe.
+  Future<void> _load() async {
     final int asked = ++_asked;
     if (!_loading) setState(() => _loading = true);
     final String text = _search.text.trim();
@@ -104,7 +104,7 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
         page: _page,
         size: _pageSize,
       );
-      if (!mounted || asked != _asked) return null;
+      if (!mounted || asked != _asked) return;
       setState(() {
         _result = page;
         _error = null;
@@ -115,14 +115,12 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
           }
         }
       });
-      return page;
     } catch (e) {
-      if (!mounted || asked != _asked) return null;
+      if (!mounted || asked != _asked) return;
       setState(() {
         _error = e;
         _loading = false;
       });
-      return null;
     }
   }
 
@@ -144,11 +142,6 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
     unawaited(_load());
   }
 
-  Future<BackofficeServiceOffer?> _reloadOne(String productId) async {
-    final Paged<BackofficeServiceOffer>? page = await _load();
-    return page?.content.where((BackofficeServiceOffer r) => r.offer.id == productId).firstOrNull;
-  }
-
   Future<void> _open(BackofficeServiceOffer row) async {
     final DeliveryStrings t = DeliveryStrings.of(context);
     await showConsoleDrawer<void>(
@@ -163,7 +156,6 @@ class _ServiceOffersScreenState extends State<ServiceOffersScreen> {
         row: row,
         api: widget.api,
         onChanged: () => unawaited(_load()),
-        reload: _reloadOne,
       ),
     );
   }
@@ -383,23 +375,51 @@ String offerPrice(DeliveryStrings t, Product offer) {
 
 String _short(String id) => id.length <= 8 ? id : id.substring(0, 8);
 
+/// How many offers each read of [_findOffer] asks for: as a rule, a whole shop's list in one read.
+const int _findPageSize = 100;
+
+/// [row]'s offer as the server lists it now, in any status and whatever the page's filters, or null
+/// when the server no longer lists it among the service offers.
+///
+/// The client has no read by id. The list is asked for the offer's shop and name, with no other filter,
+/// and the offer is picked out by id. When that finds nothing (its provider may have renamed it), the
+/// shop's offers are read through instead. Each read goes page by page, until the offer turns up or
+/// the pages run out.
+Future<BackofficeServiceOffer?> _findOffer(
+    BackofficeCatalogApi api, BackofficeServiceOffer row) async {
+  final String? storeId = row.storeId.isEmpty ? null : row.storeId;
+  final String name = row.offer.name.trim();
+  for (final String? search in <String?>[if (name.isNotEmpty) name, if (storeId != null) null]) {
+    for (int page = 0;; page++) {
+      final Paged<BackofficeServiceOffer> found = await api.serviceOffers(
+        storeId: storeId,
+        search: search,
+        page: page,
+        size: _findPageSize,
+      );
+      for (final BackofficeServiceOffer candidate in found.content) {
+        if (candidate.offer.id == row.offer.id) return candidate;
+      }
+      if (found.content.isEmpty || page + 1 >= found.totalPages) break;
+    }
+  }
+  return null;
+}
+
 /// One offer beside the list: what it is, whose it is, what it promises, and the act on it.
 class _OfferDetail extends StatefulWidget {
   const _OfferDetail({
     required this.row,
     required this.api,
     required this.onChanged,
-    required this.reload,
   });
 
   final BackofficeServiceOffer row;
   final BackofficeCatalogApi api;
 
-  /// The act went through: the list behind should be read again.
+  /// The list behind is out of date, because an act went through or a refusal said the offer moved or
+  /// went, and should be read again.
   final VoidCallback onChanged;
-
-  /// Reads the list again and answers this offer as it now stands, or null when it is not on the page.
-  final Future<BackofficeServiceOffer?> Function(String productId) reload;
 
   @override
   State<_OfferDetail> createState() => _OfferDetailState();
@@ -413,6 +433,10 @@ class _OfferDetailState extends State<_OfferDetail> {
 
   /// The server said the offer does not exist: nothing is left to act on.
   bool _gone = false;
+
+  /// After a refusal the offer could not be found again, or not read at all: the drawer can no longer
+  /// vouch for what it shows, so it offers no act on it.
+  bool _lost = false;
 
   /// What the last act came to, said inside the drawer, where the reader is looking.
   ({String text, bool good})? _outcome;
@@ -453,8 +477,11 @@ class _OfferDetailState extends State<_OfferDetail> {
     } catch (e) {
       if (!mounted) return;
       final int? status = refusalStatus(e);
+      // A 422 or a 409 says the offer on screen is not the offer the server has now.
+      final bool outdated = status == 422 || status == 409;
       setState(() {
-        _busy = false;
+        // Kept busy while an outdated offer is read again, so nothing is pressed on what was refused.
+        _busy = outdated;
         _outcome = (
           text: switch (status) {
             // The server's own no to this act: already down (or not a service offer), or not down.
@@ -470,16 +497,42 @@ class _OfferDetailState extends State<_OfferDetail> {
         );
         _gone = status == 404;
       });
-      // Each of these says the list behind is out of date; read it again, and this offer with it.
-      if (status == 422 || status == 409 || status == 404) {
-        final BackofficeServiceOffer? fresh = await widget.reload(_row.offer.id);
-        if (!mounted) return;
-        setState(() {
-          if (fresh != null) _row = fresh;
-          if (!_gone) _history = widget.api.moderationHistory(_row.offer.id);
-        });
-      }
+      // Each of these also says the list behind is out of date.
+      if (outdated || _gone) widget.onChanged();
+      if (outdated) await _readAgain(t);
     }
+  }
+
+  /// Shows this offer as the server has it now, after a refusal said the one on screen is out of date.
+  ///
+  /// Read on its own rather than picked out of the list behind: that list keeps its filters, and a
+  /// refusal often means the offer has left them, as when Take down is refused on a list of active
+  /// offers because someone else already took the offer down. When the server no longer lists the
+  /// offer, or it cannot be read, the drawer says so and offers no act on what it can no longer vouch
+  /// for.
+  Future<void> _readAgain(DeliveryStrings t) async {
+    BackofficeServiceOffer? fresh;
+    bool unreadable = false;
+    try {
+      fresh = await _findOffer(widget.api, _row);
+    } catch (_) {
+      unreadable = true;
+    }
+    if (!mounted) return;
+    final BackofficeServiceOffer? found = fresh;
+    setState(() {
+      _busy = false;
+      if (found != null) {
+        _row = found;
+        _history = widget.api.moderationHistory(found.offer.id);
+      } else {
+        _lost = true;
+        _outcome = (
+          text: unreadable ? t.svcBoOfferUnreadable : t.svcBoOfferNotListed,
+          good: false,
+        );
+      }
+    });
   }
 
   @override
@@ -497,7 +550,7 @@ class _OfferDetailState extends State<_OfferDetail> {
         ConsoleDrawerSection(
           title: t.svcBoSectionOffer,
           first: true,
-          trailing: _gone
+          trailing: _gone || _lost
               ? null
               : hold == null
                   ? ConsoleButton(

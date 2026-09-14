@@ -11570,4 +11570,12 @@ class DeliveryStringsAr extends DeliveryStrings {
   String svcBoReasonLength(int used, int max) {
     return '$used من $max';
   }
+
+  @override
+  String get svcBoOfferNotListed =>
+      'لم يُسجَّل شيء، وهذا العرض لم يعد ضمن عروض الخدمات، لذلك لم يبقَ ما يُتخذ بشأنه إجراء.';
+
+  @override
+  String get svcBoOfferUnreadable =>
+      'لم يُسجَّل شيء، لكن تعذّرت إعادة قراءة هذا العرض، لذلك قد لا يكون المعروض محدَّثًا. أغلقه ثم افتحه مجددًا من القائمة.';
 }

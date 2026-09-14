@@ -15,8 +15,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// category; shop; text; page); an offer's detail shows its shop, terms, price, photos, status and
 /// trail; no take-down and no restore is sent without a reason, and the reason cannot outgrow the
 /// server's 500, counted in UTF-16 units as the server counts; a refusal is said as what it is and the
-/// list is read again; and the page is honest in every state — loading, empty, failed, refused — at
-/// 1440, 1280 and a narrow window, and in Arabic.
+/// list and the offer are read again, the offer on its own and whatever the filters; and the page is
+/// honest in every state — loading, empty, failed, refused — at 1440, 1280 and a narrow window, and in
+/// Arabic.
 ///
 /// The fake stands in for delivery_core's `BackofficeCatalogApi` and builds every row and trail entry
 /// with `fromJson`, so what the page reads is what the client parses from the server's JSON.
@@ -464,9 +465,15 @@ void main() {
   });
 
   group('refusals', () {
-    Future<void> takeDownRefusedWith(WidgetTester tester, DioException refusal) async {
+    Future<void> takeDownRefusedWith(WidgetTester tester, DioException refusal,
+        {String? filter}) async {
       api.onTakeDown = (String _, String __) async => throw refusal;
       await pump(tester);
+      if (filter != null) {
+        // `.first` is the pill: the row below carries a status pill of its own.
+        await tester.tap(find.text(filter).first);
+        await tester.pumpAndSettle();
+      }
       await openOffer(tester, 'Business cards');
       await tester.tap(find.widgetWithText(ConsoleButton, en.svcBoTakeDown));
       await tester.pumpAndSettle();
@@ -475,12 +482,21 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('a 422 says the offer is already down, and the list is read again',
+    testWidgets('a 422 says the offer is already down, and the list and the offer are read again',
         (WidgetTester tester) async {
       await takeDownRefusedWith(tester, _refused(422));
 
       expect(find.text(en.svcBoTakeDownRefused), findsOneWidget);
-      expect(api.lists, hasLength(2));
+      // The page as filtered, and then the offer on its own: its shop and name, nothing else.
+      expect(api.lists, hasLength(3));
+      expect(api.lists.last, (
+        status: null,
+        category: null,
+        storeId: 'store-print-1',
+        search: 'Business cards',
+        page: 0,
+        size: 100,
+      ));
       expect(find.text(en.svcBoTakenDownDone('Business cards')), findsNothing);
     });
 
@@ -489,7 +505,87 @@ void main() {
       await takeDownRefusedWith(tester, _refused(409, code: 'PRODUCT_CHANGED'));
 
       expect(find.text(en.svcBoOfferChanged), findsOneWidget);
-      expect(api.lists, hasLength(2));
+      expect(api.lists, hasLength(3));
+    });
+
+    testWidgets('on a filtered list, a refused offer shows as it now is, though it left the filter',
+        (WidgetTester tester) async {
+      final Map<String, dynamic> takenDown = _row(status: 'ARCHIVED', moderation: <String, dynamic>{
+        'state': 'TAKEN_DOWN',
+        'reason': 'Counterfeit logo',
+        'takenDownAt': '2026-09-14T08:00:00Z',
+      });
+      api.onList = (_ListCall call) async {
+        // Someone else took the offer down first, so it is no longer among the active offers.
+        if (api.takeDowns.isEmpty) return _page(<Map<String, dynamic>>[_row()]);
+        if (call.status == ServiceOfferStatusFilter.active) return _page(<Map<String, dynamic>>[]);
+        return _page(<Map<String, dynamic>>[takenDown]);
+      };
+      await takeDownRefusedWith(tester, _refused(422), filter: en.svcBoOfferActive);
+
+      expect(find.text(en.svcBoTakeDownRefused), findsOneWidget);
+      // Down, with its reason, and Restore offered instead of a Take down that could not work.
+      expect(find.text('Counterfeit logo'), findsOneWidget);
+      expect(find.widgetWithText(ConsoleButton, en.svcBoRestore), findsOneWidget);
+      expect(find.widgetWithText(ConsoleButton, en.svcBoTakeDown), findsNothing);
+      expect(api.histories, hasLength(2));
+      expect(api.lists.where((_ListCall c) => c.status == ServiceOfferStatusFilter.active),
+          hasLength(2));
+    });
+
+    testWidgets('an offer renamed meanwhile is still found, through its shop',
+        (WidgetTester tester) async {
+      api.onList = (_ListCall call) async {
+        if (api.takeDowns.isEmpty) return _page(<Map<String, dynamic>>[_row()]);
+        // Its old name finds nothing now; its shop still lists it.
+        if (call.search != null) return _page(<Map<String, dynamic>>[]);
+        return _page(<Map<String, dynamic>>[
+          _row(id: 'offer-9', name: 'Flyers'),
+          _row(name: 'Business cards, matte'),
+        ]);
+      };
+      await takeDownRefusedWith(tester, _refused(409, code: 'PRODUCT_CHANGED'));
+
+      expect(find.text(en.svcBoOfferChanged), findsOneWidget);
+      expect(find.text(en.svcBoOfferNotListed), findsNothing);
+      expect(api.histories, hasLength(2));
+      expect(find.widgetWithText(ConsoleButton, en.svcBoTakeDown), findsOneWidget);
+    });
+
+    testWidgets('an offer the server no longer lists says so and leaves nothing to press',
+        (WidgetTester tester) async {
+      api.onList = (_ListCall call) async => api.takeDowns.isEmpty
+          ? _page(<Map<String, dynamic>>[_row()])
+          : _page(<Map<String, dynamic>>[]);
+      await takeDownRefusedWith(tester, _refused(409, code: 'PRODUCT_CHANGED'));
+
+      expect(find.text(en.svcBoOfferNotListed), findsOneWidget);
+      expect(find.widgetWithText(ConsoleButton, en.svcBoTakeDown), findsNothing);
+      expect(find.widgetWithText(ConsoleButton, en.svcBoRestore), findsNothing);
+      // Looked for by name in its shop, then through the whole shop, before saying so.
+      expect(
+        api.lists
+            .where((_ListCall c) => c.storeId == 'store-print-1')
+            .map((_ListCall c) => c.search)
+            .toList(),
+        <String?>['Business cards', null],
+      );
+    });
+
+    testWidgets('an offer that cannot be read again says so and leaves nothing to press',
+        (WidgetTester tester) async {
+      api.onList = (_ListCall call) async {
+        if (api.takeDowns.isEmpty || call.search == null) {
+          return _page(<Map<String, dynamic>>[_row()]);
+        }
+        throw _refused(503);
+      };
+      await takeDownRefusedWith(tester, _refused(422));
+
+      expect(find.text(en.svcBoOfferUnreadable), findsOneWidget);
+      expect(find.text(en.svcBoTakeDownRefused), findsNothing);
+      expect(find.widgetWithText(ConsoleButton, en.svcBoTakeDown), findsNothing);
+      expect(find.widgetWithText(ConsoleButton, en.svcBoRestore), findsNothing);
     });
 
     testWidgets('a 404 says the offer is gone and leaves nothing to press',
@@ -522,7 +618,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(en.svcBoRestoreRefused), findsOneWidget);
-      expect(api.lists, hasLength(2));
+      expect(api.lists, hasLength(3));
     });
   });
 

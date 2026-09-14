@@ -3548,5 +3548,7 @@
   "svcBoVerifiedToggle": "شارة «محل موثوق» لـ {shop}",
   "@svcBoVerifiedToggle": {"placeholders":{"shop":{"type":"String"}}},
   "svcBoReasonLength": "{used} من {max}",
-  "@svcBoReasonLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}}
+  "@svcBoReasonLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}},
+  "svcBoOfferNotListed": "لم يُسجَّل شيء، وهذا العرض لم يعد ضمن عروض الخدمات، لذلك لم يبقَ ما يُتخذ بشأنه إجراء.",
+  "svcBoOfferUnreadable": "لم يُسجَّل شيء، لكن تعذّرت إعادة قراءة هذا العرض، لذلك قد لا يكون المعروض محدَّثًا. أغلقه ثم افتحه مجددًا من القائمة."
 }

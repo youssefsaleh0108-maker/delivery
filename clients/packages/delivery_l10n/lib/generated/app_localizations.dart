@@ -19376,6 +19376,18 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'{used}/{max}'**
   String svcBoReasonLength(int used, int max);
+
+  /// No description provided for @svcBoOfferNotListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded, and this offer is no longer among the service offers, so there is nothing left to act on.'**
+  String get svcBoOfferNotListed;
+
+  /// No description provided for @svcBoOfferUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.'**
+  String get svcBoOfferUnreadable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
