@@ -1,11 +1,15 @@
 package com.delivery.onboarding.service;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.delivery.onboarding.client.PlatformClient;
@@ -28,7 +32,15 @@ import com.delivery.onboarding.domain.OnboardingApplication.Kind;
  * read per call) and refuses to open a shop in a closed category. A copy of that list here would
  * drift the first time somebody opened a category on one side only — and the applicant who fell in
  * the gap would be approved into a category their shop could never be opened in. So there is no
- * copy: every services application asks, and so does the form, through {@link #options()}.
+ * copy: every services application asks, at the moment it is judged. The form asks too, through
+ * {@link #options()}, but may be answered from the last half minute's lists — see
+ * {@link #OPTIONS_FRESH_FOR} for why that is safe for an offer when it would not be for a judgement.
+ *
+ * <p><strong>Asked before the intake's transaction, never inside it.</strong> {@link #checked} waits
+ * on Product Service, so the two front doors — {@link OnboardingService#submit} and
+ * {@link AccountApplicationService#apply} — call it with no transaction open and hand
+ * {@link ApplicationIntake} the {@link Checked} result, the only form it records. See
+ * {@link ApplicationIntake} for the connection pool that used to be held across that wait.
  *
  * <p><strong>The area must be a live delivery zone</strong>, and it is recorded under the zone's own
  * name rather than whatever label the client sent, because the back office shows it and the
@@ -43,6 +55,21 @@ public class ServiceProviderAnswers {
     /** The businessType that makes a shop's application a services provider's. */
     public static final String SERVICES = "SERVICES";
 
+    /**
+     * How long the signup form's two lists are served from memory after a read.
+     *
+     * <p>{@code GET /api/onboarding/service-options} is open to anybody, and each answer used to be
+     * two reads of Product Service with the platform's own token: every anonymous request cost two
+     * remote calls, and with Product Service slow, an onboarding request thread for up to ten
+     * seconds. Half a minute makes that one pair of reads per half minute, however many people ask.
+     *
+     * <p>It is safe because the form only offers. The application is judged by {@link #checked},
+     * which is never answered from memory: a category closed a moment ago can still be picked, and is
+     * then refused with {@code service-category-closed}, which takes the applicant back to the form
+     * to choose again. A category opened a moment ago is on the form within the half minute.
+     */
+    public static final Duration OPTIONS_FRESH_FOR = Duration.ofSeconds(30);
+
     static final String BUSINESS_TYPE = "businessType";
     static final String SERVICE_CATEGORY = "serviceCategory";
     static final String AREA = "area";
@@ -50,9 +77,23 @@ public class ServiceProviderAnswers {
     static final String LABEL = "label";
 
     private final PlatformClient platform;
+    private final Clock clock;
 
+    /** The form's lists and when they were read; null until the first read. Replaced whole. */
+    private volatile CachedOptions cachedOptions;
+
+    private record CachedOptions(Options options, Instant readAt) {
+    }
+
+    @Autowired
     public ServiceProviderAnswers(PlatformClient platform) {
+        this(platform, Clock.systemUTC());
+    }
+
+    /** With a clock the test moves, for the form's lists. */
+    ServiceProviderAnswers(PlatformClient platform, Clock clock) {
         this.platform = platform;
+        this.clock = clock;
     }
 
     /**
@@ -95,6 +136,29 @@ public class ServiceProviderAnswers {
     public record Options(List<String> categories, List<ServiceArea> areas) {
     }
 
+    /**
+     * Details that have been through {@link #checked} — the only form {@link ApplicationIntake}
+     * records.
+     *
+     * <p>A type rather than a map because the check moved out of the intake, to before its
+     * transaction, and a check its callers make could have become a rule each front door has to
+     * remember. It cannot: nothing but {@link #checked} makes one of these, so a front door that
+     * skipped the check would not compile.
+     */
+    public static final class Checked {
+
+        private final Map<String, Object> details;
+
+        private Checked(Map<String, Object> details) {
+            this.details = details;
+        }
+
+        /** Any other application's details exactly as sent; a services one's in canonical form. */
+        public Map<String, Object> details() {
+            return details;
+        }
+    }
+
     /** Whether these details say the application is to offer services. */
     public static boolean isServices(Map<String, Object> details) {
         return details != null && details.get(BUSINESS_TYPE) instanceof String type
@@ -102,13 +166,35 @@ public class ServiceProviderAnswers {
     }
 
     /**
+     * Whether these details say which business the application is for at all — SERVICES or a goods
+     * type. The shop wizard and the services signup always do. A request that only resumes the
+     * application already on file, as the Google sign-in's does, sends no details.
+     */
+    public static boolean namesBusinessType(Map<String, Object> details) {
+        return details != null && details.get(BUSINESS_TYPE) instanceof String type
+                && !type.isBlank();
+    }
+
+    /**
      * The open categories and the areas, for the signup form — the same two lists
-     * {@link #checked} judges against, so the form never offers an answer the intake would refuse.
+     * {@link #checked} judges against, so the form offers what the intake would accept.
+     *
+     * <p>Served from memory for {@link #OPTIONS_FRESH_FOR} after a read. A failed read is not
+     * remembered, so the next request asks again. Two requests arriving as the lists expire may both
+     * read them; that only costs a duplicate read, so nothing is locked to prevent it — a lock would
+     * have every request queue behind a slow Product Service instead.
      *
      * @throws PlatformClient.CatalogUnavailableException when Product Service cannot answer
      */
     public Options options() {
-        return new Options(platform.openServiceCategories(), platform.serviceAreas());
+        Instant now = clock.instant();
+        CachedOptions cached = cachedOptions;
+        if (cached != null && now.isBefore(cached.readAt().plus(OPTIONS_FRESH_FOR))) {
+            return cached.options();
+        }
+        Options fresh = new Options(platform.openServiceCategories(), platform.serviceAreas());
+        cachedOptions = new CachedOptions(fresh, now);
+        return fresh;
     }
 
     /**
@@ -119,13 +205,17 @@ public class ServiceProviderAnswers {
      * that need nothing from Product Service come first, and the zones are only read once the
      * category is known to be open.
      *
+     * <p>Never answered from memory, unlike {@link #options()}: this is the judgement, and it has to
+     * be the one Product Service would give now. It waits on Product Service, so call it with no
+     * transaction open.
+     *
      * @throws ServiceAnswerException for an answer the applicant has to change
      * @throws PlatformClient.CatalogUnavailableException when Product Service cannot answer — nothing
      *         was judged, so the applicant retries rather than changes an answer
      */
-    public Map<String, Object> checked(Kind kind, Map<String, Object> details) {
+    public Checked checked(Kind kind, Map<String, Object> details) {
         if (!isServices(details)) {
-            return details;
+            return new Checked(details);
         }
         if (kind != Kind.MERCHANT) {
             throw new ServiceAnswerException(ServiceAnswerException.NOT_A_SHOP,
@@ -157,7 +247,7 @@ public class ServiceProviderAnswers {
         canonical.put(BUSINESS_TYPE, SERVICES);
         canonical.put(SERVICE_CATEGORY, category);
         canonical.put(AREA, Map.of(ZONE_ID, area.zoneId().toString(), LABEL, area.name()));
-        return canonical;
+        return new Checked(canonical);
     }
 
     /** The services answers as the applicant's own receipt shows them; null for any other application. */

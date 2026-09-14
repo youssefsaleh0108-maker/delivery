@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.onboarding.client.KeycloakAdminClient;
+import com.delivery.onboarding.domain.ContactVerification.Channel;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplicationRepository;
 
@@ -33,6 +34,8 @@ public class OnboardingService {
 
     private final OnboardingApplicationRepository applications;
     private final ApplicationIntake intake;
+    private final VerificationService verifications;
+    private final ServiceProviderAnswers services;
     private final RuntimeService runtime;
     private final TaskService tasks;
     private final KeycloakAdminClient keycloak;
@@ -41,12 +44,16 @@ public class OnboardingService {
 
     public OnboardingService(OnboardingApplicationRepository applications,
                              ApplicationIntake intake,
+                             VerificationService verifications,
+                             ServiceProviderAnswers services,
                              RuntimeService runtime, TaskService tasks,
                              KeycloakAdminClient keycloak,
                              ApplicantDocumentService documents,
                              AutoApprovalPolicy autoApproval) {
         this.applications = applications;
         this.intake = intake;
+        this.verifications = verifications;
+        this.services = services;
         this.runtime = runtime;
         this.tasks = tasks;
         this.keycloak = keycloak;
@@ -111,6 +118,14 @@ public class OnboardingService {
      * has to keep meaning. Holding both in one transaction looked like it did that and did the
      * opposite: the engine's failure marks the transaction rollback-only, and catching it merely
      * moves the error to commit time, where it takes the application with it.
+     *
+     * <p>Not transactional for a second reason as well: an application to offer services is checked
+     * against Product Service here, before the intake's transaction takes a connection from the pool
+     * (see {@link ApplicationIntake} for what holding one across that wait could do). This door is
+     * open to anybody, so before Product Service hears about a services application its proofs are
+     * looked at without being spent ({@code requireProofs}): a made-up token is refused on one read
+     * of this service's own table and costs no call to another service. Nothing is spent until the
+     * intake, together with the insert, after every check has passed.
      */
     public OnboardingApplication submit(OnboardingApplication.Kind kind, String businessName,
                                         String contactName, String contactEmail,
@@ -119,13 +134,18 @@ public class OnboardingService {
                                         Map<String, Object> details,
                                         UUID targetProviderId) {
 
+        if (ServiceProviderAnswers.isServices(details)) {
+            requireProofs(contactEmail, emailVerificationToken, contactPhone, phoneVerificationToken);
+        }
+        // details is applicant-supplied and holds bank details — it goes into the record and
+        // nowhere else: not into a log line, not into a process variable.
+        ServiceProviderAnswers.Checked checked = services.checked(kind, details);
+
         OnboardingApplication application;
         try {
-            // details is applicant-supplied and holds bank details — it goes into the record and
-            // nowhere else: not into a log line, not into a process variable.
             application = intake.record(
                     kind, businessName, contactName, contactEmail, emailVerificationToken,
-                    contactPhone, phoneVerificationToken, notes, details, targetProviderId);
+                    contactPhone, phoneVerificationToken, notes, checked, targetProviderId);
         } catch (IllegalArgumentException e) {
             // "Choose the delivery company you want to ride for" is something the applicant can act
             // on; an unhandled 500 is not.
@@ -137,6 +157,35 @@ public class OnboardingService {
         log.info("Application {} submitted: {} as {}",
                 application.getReference(), application.getBusinessName(), kind);
         return application;
+    }
+
+    /**
+     * A services application's proofs, looked at without spending them — before Product Service is
+     * asked anything about it.
+     *
+     * <p>Only for a services application, the one whose checks leave this service. Any other
+     * application is judged on its own fields alone before the intake, where spending the proof says
+     * precisely what is wrong with one. The reason given here is plainer, "verify again", because
+     * what matters is that a caller with no valid proof is answered from this service's own table.
+     *
+     * <p>A blank token is refused without a lookup: it proves nothing.
+     */
+    private void requireProofs(String contactEmail, String emailToken,
+                               String contactPhone, String phoneToken) {
+        if (!proved(emailToken, Channel.EMAIL, contactEmail)) {
+            throw new VerificationService.VerificationException(
+                    "That email has not been verified. Please verify it again.");
+        }
+        if (contactPhone != null && !contactPhone.isBlank()
+                && !proved(phoneToken, Channel.PHONE, contactPhone)) {
+            throw new VerificationService.VerificationException(
+                    "That phone number has not been verified. Please verify it again.");
+        }
+    }
+
+    private boolean proved(String token, Channel channel, String destination) {
+        return token != null && !token.isBlank()
+                && verifications.isVerified(token, channel, destination);
     }
 
     /**

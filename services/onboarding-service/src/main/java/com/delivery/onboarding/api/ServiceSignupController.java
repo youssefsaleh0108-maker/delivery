@@ -49,8 +49,10 @@ public class ServiceSignupController {
      * <p><strong>Open to anybody</strong> (it is on {@code delivery.security.permit-all}), and it has
      * to be: the open application form runs before the applicant has an account. It names no shop
      * and no person — a list of category names, and the zone names a customer's address picker
-     * already shows. Product Service is asked on every call rather than cached here, because a
-     * category opened there should be on the form at once, the way it is accepted at once.
+     * already shows. Being open to anybody is also why the lists are served from memory for half a
+     * minute at a time ({@code ServiceProviderAnswers.OPTIONS_FRESH_FOR}): each call used to be two
+     * reads of Product Service, so every anonymous request cost two remote calls. The application
+     * itself is still judged against what is open at the moment it is sent.
      */
     @GetMapping("/service-options")
     public ServiceOptions options() {

@@ -321,10 +321,11 @@ public class PlatformClient {
     /**
      * Timeouts for the two Product Service reads, which the provisioning calls above do without.
      *
-     * <p>These sit on the application path itself — ApplicationIntake asks them inside its own short
-     * transaction, and an applicant is waiting — and the default request factory has no timeout at
-     * all, so a Product Service that stopped answering would hold a request thread and a database
-     * connection for as long as it liked.
+     * <p>These sit on the application path itself — an applicant is waiting, and the open signup form
+     * asks them too — and the default request factory has no timeout at all, so a Product Service
+     * that stopped answering would hold a request thread for as long as it liked. They are asked
+     * before the application's transaction opens (see ApplicationIntake), so the wait holds no
+     * database connection.
      */
     private static SimpleClientHttpRequestFactory boundedWait() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

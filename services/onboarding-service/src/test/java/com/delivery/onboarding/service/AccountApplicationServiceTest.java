@@ -1,9 +1,11 @@
 package com.delivery.onboarding.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
 import com.delivery.onboarding.client.KeycloakAdminClient;
+import com.delivery.onboarding.client.PlatformClient;
 import com.delivery.onboarding.domain.AutoApprovalAuditRepository;
 import com.delivery.onboarding.domain.AutoApprovalDecisionRepository;
 import com.delivery.onboarding.domain.OnboardingApplication;
@@ -26,11 +29,13 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -48,11 +53,16 @@ class AccountApplicationServiceTest {
 
     private static final String SAM = "keycloak-sub-sam";
 
+    private static final UUID HAMRA = UUID.fromString("0f6f0b1e-3c1d-4a7e-8c8b-2f5d6e7a9b10");
+
     private OnboardingApplicationRepository applications;
     private ApplicationIntake intake;
     private OnboardingService onboarding;
     private KeycloakAdminClient keycloak;
     private AutoApprovalDecisionRepository decisions;
+
+    /** Product Service as the services check reads it: the launch categories, and Hamra. */
+    private PlatformClient platform;
 
     private AccountApplicationService service;
 
@@ -63,6 +73,11 @@ class AccountApplicationServiceTest {
         onboarding = mock(OnboardingService.class);
         keycloak = mock(KeycloakAdminClient.class);
         decisions = mock(AutoApprovalDecisionRepository.class);
+        platform = mock(PlatformClient.class);
+        when(platform.openServiceCategories())
+                .thenReturn(List.of("PRINTING", "TAILORING", "REPAIRS", "PHOTOGRAPHY"));
+        when(platform.serviceAreas())
+                .thenReturn(List.of(new PlatformClient.ServiceArea(HAMRA, "Hamra")));
         service = serviceWith(false, false);
 
         when(applications.findByApplicantUserRef(anyString())).thenReturn(Optional.empty());
@@ -72,10 +87,12 @@ class AccountApplicationServiceTest {
 
     /**
      * A real policy over an empty settings store, so the configured default is what answers — the
-     * same arrangement {@code ApplicationDecisionOverDocumentsTest} uses for "manual".
+     * same arrangement {@code ApplicationDecisionOverDocumentsTest} uses for "manual". The services
+     * check is real too, over the stand-in Product Service above.
      */
     private AccountApplicationService serviceWith(boolean riderAutomatic, boolean merchantAutomatic) {
-        return new AccountApplicationService(applications, intake, onboarding, keycloak,
+        return new AccountApplicationService(applications, intake,
+                new ServiceProviderAnswers(platform), onboarding, keycloak,
                 new AutoApprovalPolicy(riderAutomatic, merchantAutomatic, false, decisions,
                         mock(AutoApprovalAuditRepository.class)));
     }
@@ -91,13 +108,36 @@ class AccountApplicationServiceTest {
                 Map.of("vehicleType", "MOTORCYCLE"), null);
     }
 
+    /** A shop's answers that say nothing about the business — what the Google sign-in's resume sends. */
     private static Answers shop(String name) {
         return new Answers(Kind.MERCHANT, name, "Sam Salem", null, null, null, null, null);
+    }
+
+    /** The shop wizard's answers, which always name the kind of shop. */
+    private static Answers shopSelling(String name, String businessType) {
+        return new Answers(Kind.MERCHANT, name, "Sam Salem", null, null, null,
+                Map.of("businessType", businessType), null);
+    }
+
+    /** The services signup's answers. */
+    private static Answers printShop(String category) {
+        return new Answers(Kind.MERCHANT, "Al Fakhry Press", "Sam Salem", null, null, null,
+                Map.of("businessType", "SERVICES", "serviceCategory", category,
+                        "area", Map.of("zoneId", HAMRA.toString(), "label", "Hamra")),
+                null);
     }
 
     private static OnboardingApplication recorded(Kind kind) {
         OnboardingApplication application = new OnboardingApplication(kind, "Sam Salem", "Sam Salem",
                 "sam@gmail.example", Instant.now(), null, null, null, null, null);
+        application.applicantAccountCreated(SAM);
+        return application;
+    }
+
+    /** An undecided MERCHANT application on this account, with these details on file. */
+    private static OnboardingApplication merchantOnFile(Map<String, Object> details) {
+        OnboardingApplication application = new OnboardingApplication(Kind.MERCHANT, "Sam's Shop",
+                "Sam Salem", "sam@gmail.example", Instant.now(), null, null, null, details, null);
         application.applicantAccountCreated(SAM);
         return application;
     }
@@ -138,8 +178,12 @@ class AccountApplicationServiceTest {
             // their own, as the open form sends it.
             verify(intake).recordForAccount(eq(SAM), eq(Kind.RIDER), eq("Sam Salem"),
                     eq("Sam Salem"), eq("sam@gmail.example"), any(Instant.class), any(), any(),
-                    any(), eq(Map.of("vehicleType", "MOTORCYCLE")), any());
+                    any(), argThat((ServiceProviderAnswers.Checked checked) ->
+                            Map.of("vehicleType", "MOTORCYCLE").equals(checked.details())),
+                    any());
             verify(onboarding).startReview(application);
+            // Nothing about a rider is Product Service's business.
+            verifyNoInteractions(platform);
         }
 
         @Test
@@ -296,6 +340,54 @@ class AccountApplicationServiceTest {
             verifyNoInteractions(intake, keycloak);
         }
 
+        /**
+         * The services signup, reached from the profile menu by an account whose shop application
+         * lost its roles half way. Resuming the shop's application here granted MERCHANT, and the
+         * app told the applicant a reviewer reads "every application to sell services" — about an
+         * application that opens a restaurant when approved.
+         */
+        @Test
+        @DisplayName("refuses services asked of an account whose application is to sell goods, granting nothing")
+        void services_are_not_resumed_onto_a_shops_application() {
+            when(applications.findByApplicantUserRef(SAM)).thenReturn(Optional.of(
+                    merchantOnFile(Map.of("businessType", "RESTAURANT"))));
+
+            assertThat(codeOf(() -> service.apply(sam(), printShop("PRINTING"))))
+                    .isEqualTo(AccountApplicationService.AccountRuleException.OTHER_APPLICATION);
+            assertThatExceptionOfType(OnboardingService.ApplicationRuleException.class)
+                    .isThrownBy(() -> service.apply(sam(), printShop("PRINTING")))
+                    .withMessageContaining("sell goods");
+
+            verifyNoInteractions(intake, keycloak, platform);
+        }
+
+        @Test
+        @DisplayName("refuses a shop's answers sent against an application to offer services")
+        void a_shop_is_not_resumed_onto_a_services_application() {
+            when(applications.findByApplicantUserRef(SAM)).thenReturn(Optional.of(merchantOnFile(
+                    printShop("PRINTING").details())));
+
+            assertThat(codeOf(() -> service.apply(sam(), shopSelling("Sam's Shakes", "RESTAURANT"))))
+                    .isEqualTo(AccountApplicationService.AccountRuleException.OTHER_APPLICATION);
+
+            verifyNoInteractions(intake, keycloak);
+        }
+
+        @Test
+        @DisplayName("resumes an application to offer services for the signup's retry, and for a resume that names no business")
+        void a_services_application_is_resumed() {
+            OnboardingApplication onFile = merchantOnFile(printShop("PRINTING").details());
+            when(applications.findByApplicantUserRef(SAM)).thenReturn(Optional.of(onFile));
+
+            // The services signup trying again after the roles were lost half way.
+            assertThat(service.apply(sam(), printShop("PRINTING")).application()).isSameAs(onFile);
+            // The Google sign-in's resume, which sends no answers at all.
+            assertThat(service.apply(sam(), shop("Al Fakhry Press")).application()).isSameAs(onFile);
+
+            verify(keycloak, times(2)).grantRealmRole(SAM, "MERCHANT");
+            verifyNoInteractions(intake);
+        }
+
         @Test
         @DisplayName("hands back the winner when two taps race to the insert")
         void a_lost_race_returns_the_winners_application() {
@@ -420,16 +512,6 @@ class AccountApplicationServiceTest {
     @DisplayName("a services provider")
     class ServicesProvider {
 
-        private final java.util.UUID hamra =
-                java.util.UUID.fromString("0f6f0b1e-3c1d-4a7e-8c8b-2f5d6e7a9b10");
-
-        private Answers printShop(String category) {
-            return new Answers(Kind.MERCHANT, "Al Fakhry Press", "Sam Salem", null, null, null,
-                    Map.of("businessType", "SERVICES", "serviceCategory", category,
-                            "area", Map.of("zoneId", hamra.toString(), "label", "Hamra")),
-                    null);
-        }
-
         @Test
         @DisplayName("is approved automatically exactly when shops are: the merchant switch")
         void auto_approval_follows_the_merchant_switch() {
@@ -461,29 +543,39 @@ class AccountApplicationServiceTest {
         }
 
         @Test
-        @DisplayName("in a closed category is refused before anything is recorded, reviewed or granted")
+        @DisplayName("in a closed category is refused before the intake is entered, and nothing is reviewed or granted")
         void a_closed_category_is_refused() {
-            com.delivery.onboarding.client.PlatformClient platform =
-                    mock(com.delivery.onboarding.client.PlatformClient.class);
-            when(platform.openServiceCategories())
-                    .thenReturn(java.util.List.of("PRINTING", "TAILORING", "REPAIRS", "PHOTOGRAPHY"));
-            when(platform.serviceAreas()).thenReturn(java.util.List.of(
-                    new com.delivery.onboarding.client.PlatformClient.ServiceArea(hamra, "Hamra")));
-            // A real intake, so the refusal is the one the intake enforces rather than a stub's —
-            // and with shops automatic, so a refusal that leaked through would be approved too.
-            ApplicationIntake realIntake = new ApplicationIntake(applications,
-                    mock(VerificationService.class), new ServiceProviderAnswers(platform));
-            service = new AccountApplicationService(applications, realIntake, onboarding, keycloak,
-                    new AutoApprovalPolicy(false, true, false, decisions,
-                            mock(AutoApprovalAuditRepository.class)));
+            // With shops automatic, so a refusal that leaked through would be approved too.
+            service = serviceWith(false, true);
 
             assertThat(codeOf(() -> service.apply(sam(), printShop("CLEANING"))))
                     .isEqualTo(ServiceProviderAnswers.ServiceAnswerException.CATEGORY_CLOSED);
 
-            verify(applications, never()).saveAndFlush(any());
+            verifyNoInteractions(intake);
             verify(onboarding, never()).startReview(any());
             verify(onboarding, never()).approve(any(), anyString(), anyBoolean());
             verifyNoInteractions(keycloak);
+        }
+
+        /**
+         * The intake's transaction holds a pooled connection from the moment it begins, so Product
+         * Service is asked before it is entered, and what the intake records is what that check made.
+         */
+        @Test
+        @DisplayName("is checked against Product Service before the intake is entered, which records the checked answers")
+        void is_checked_before_the_intake() {
+            intakeReturns(recorded(Kind.MERCHANT));
+
+            service.apply(sam(), printShop("printing"));
+
+            InOrder order = inOrder(platform, intake);
+            order.verify(platform).openServiceCategories();
+            order.verify(platform).serviceAreas();
+            order.verify(intake).recordForAccount(eq(SAM), eq(Kind.MERCHANT), any(), any(), any(),
+                    any(), any(), any(), any(),
+                    argThat((ServiceProviderAnswers.Checked checked) ->
+                            "PRINTING".equals(checked.details().get("serviceCategory"))),
+                    any());
         }
     }
 
