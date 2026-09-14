@@ -6090,5 +6090,5 @@
   "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
   "svcChatClosed": "Chat about this order has closed",
   "svcChatUnavailable": "Chat is unavailable right now.",
-  "svcChatOrderNotFound": "Couldn't open this order's chat, so the order has been reloaded."
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
 }

@@ -21204,7 +21204,7 @@ abstract class DeliveryStrings {
   /// No description provided for @svcChatOrderNotFound.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t open this order\'s chat, so the order has been reloaded.'**
+  /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
 }
 

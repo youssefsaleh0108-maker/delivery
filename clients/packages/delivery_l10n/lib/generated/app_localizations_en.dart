@@ -12499,5 +12499,5 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcChatOrderNotFound =>
-      'Couldn\'t open this order\'s chat, so the order has been reloaded.';
+      'Couldn\'t open this order\'s chat. Reloading the order.';
 }

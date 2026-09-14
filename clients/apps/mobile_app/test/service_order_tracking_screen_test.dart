@@ -490,6 +490,31 @@ void main() {
         expect(find.text(en.svcChatUnavailable), findsNothing);
       });
 
+      testWidgets(
+          'an order not found there whose read again fails too still says so, and leaves the page as '
+          'it was and working', (WidgetTester tester) async {
+        int reads = 0;
+        final FakeServer server =
+            serve(order: () => ++reads == 1 ? serviceOrderJson() : const FakeReply(503));
+        final _ShopChat chat = _ShopChat()..fail = _refused(404);
+        await pump(tester, server, chat: chat);
+
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pumpAndSettle();
+
+        expect(server.sent('GET', '/api/orders/$svcOrderId'), hasLength(2),
+            reason: 'read again, and refused');
+        expect(find.text(en.svcChatOrderNotFound), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        expect(find.text(en.svcOrderNumber('abcd1234')), findsOneWidget);
+        expect(find.text(en.couldNotLoadOrder), findsNothing);
+
+        chat.fail = null;
+        await tester.tap(find.byIcon(Icons.chat_bubble_outline_rounded));
+        await tester.pumpAndSettle();
+        expect(find.byType(ShopThreadScreen), findsOneWidget);
+      });
+
       testWidgets('a chat that cannot be opened right now says so under the shop, and Try again opens it',
           (WidgetTester tester) async {
         final _ShopChat chat = _ShopChat()..fail = _refused(503);

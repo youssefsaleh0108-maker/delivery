@@ -12645,6 +12645,5 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get svcChatUnavailable => 'المحادثة غير متاحة حاليًا.';
 
   @override
-  String get svcChatOrderNotFound =>
-      'تعذّر فتح محادثة هذا الطلب، فأعدنا تحميله.';
+  String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
 }
