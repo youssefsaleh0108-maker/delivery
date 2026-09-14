@@ -14,8 +14,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// Pinned: the list asks the server for exactly the filters on screen (status, taken down included;
 /// category; shop; text; page); an offer's detail shows its shop, terms, price, photos, status and
 /// trail; no take-down and no restore is sent without a reason, and the reason cannot outgrow the
-/// server's 500; a refusal is said as what it is and the list is read again; and the page is honest in
-/// every state — loading, empty, failed, refused — at 1440, 1280 and a narrow window, and in Arabic.
+/// server's 500, counted in UTF-16 units as the server counts; a refusal is said as what it is and the
+/// list is read again; and the page is honest in every state — loading, empty, failed, refused — at
+/// 1440, 1280 and a narrow window, and in Arabic.
 ///
 /// The fake stands in for delivery_core's `BackofficeCatalogApi` and builds every row and trail entry
 /// with `fromJson`, so what the page reads is what the client parses from the server's JSON.
@@ -360,7 +361,7 @@ void main() {
     await tester.tap(find.widgetWithText(ConsoleButton, en.svcBoTakeDown));
     await tester.pumpAndSettle();
     expect(find.text(en.svcBoTakeDownTitle('Business cards')), findsOneWidget);
-    expect(tester.widget<TextField>(dialogField()).maxLength, 500);
+    expect(find.text(en.svcBoReasonLength(0, 500)), findsOneWidget);
 
     await tester.tap(dialogButton(en.svcBoTakeDown));
     await tester.pumpAndSettle();
@@ -375,6 +376,7 @@ void main() {
     await tester.enterText(dialogField(), 'x' * 600);
     await tester.pump();
     expect(tester.widget<TextField>(dialogField()).controller!.text.length, 500);
+    expect(find.text(en.svcBoReasonLength(500, 500)), findsOneWidget);
 
     await tester.enterText(dialogField(), '  Printing a trademarked logo ');
     await tester.tap(dialogButton(en.svcBoTakeDown));
@@ -387,6 +389,32 @@ void main() {
     expect(find.widgetWithText(ConsoleButton, en.svcBoRestore), findsOneWidget);
     expect(api.histories, hasLength(2));
     expect(api.lists, hasLength(2));
+  });
+
+  testWidgets('the reason is held to the 500 units the server counts, where an emoji counts twice',
+      (WidgetTester tester) async {
+    await pump(tester);
+    await openOffer(tester, 'Business cards');
+    await tester.tap(find.widgetWithText(ConsoleButton, en.svcBoTakeDown));
+    await tester.pumpAndSettle();
+    String kept() => tester.widget<TextField>(dialogField()).controller!.text;
+
+    // One unit of room is no room for an emoji, and the cut never splits one in two.
+    await tester.enterText(dialogField(), '${'x' * 499}😀');
+    await tester.pump();
+    expect(kept(), 'x' * 499);
+
+    // 300 emoji: 300 characters, which a maxLength of 500 lets through, and 600 UTF-16 units, which
+    // the server's @Size(max = 500) refuses with a 400.
+    await tester.enterText(dialogField(), '😀' * 300);
+    await tester.pump();
+    expect(kept(), '😀' * 250);
+    expect(kept().length, 500);
+    expect(find.text(en.svcBoReasonLength(500, 500)), findsOneWidget);
+
+    await tester.tap(dialogButton(en.svcBoTakeDown));
+    await tester.pumpAndSettle();
+    expect(api.takeDowns.single, (id: 'offer-1', reason: '😀' * 250));
   });
 
   testWidgets('restore is never sent without a reason either', (WidgetTester tester) async {
@@ -406,7 +434,7 @@ void main() {
     await tester.tap(find.widgetWithText(ConsoleButton, en.svcBoRestore));
     await tester.pumpAndSettle();
     expect(find.text(en.svcBoRestoreTitle('Business cards')), findsOneWidget);
-    expect(tester.widget<TextField>(dialogField()).maxLength, 500);
+    expect(find.text(en.svcBoReasonLength(0, 500)), findsOneWidget);
 
     await tester.tap(dialogButton(en.svcBoRestore));
     await tester.pumpAndSettle();

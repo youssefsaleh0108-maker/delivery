@@ -19370,6 +19370,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Verified Local for {shop}'**
   String svcBoVerifiedToggle(String shop);
+
+  /// No description provided for @svcBoReasonLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String svcBoReasonLength(int used, int max);
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

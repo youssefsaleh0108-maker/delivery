@@ -11565,4 +11565,9 @@ class DeliveryStringsAr extends DeliveryStrings {
   String svcBoVerifiedToggle(String shop) {
     return 'شارة «محل موثوق» لـ $shop';
   }
+
+  @override
+  String svcBoReasonLength(int used, int max) {
+    return '$used من $max';
+  }
 }

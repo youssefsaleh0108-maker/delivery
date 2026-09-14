@@ -9,8 +9,10 @@ import 'package:flutter/services.dart';
 import '../shell/shell.dart';
 import 'services_admin_parts.dart';
 
-/// The longest reason the server keeps: product-service `Product.MAX_TAKEDOWN_REASON_LENGTH`. The
-/// field stops there, so a reason is never refused for its length after it was typed.
+/// The longest reason the server keeps: product-service `Product.MAX_TAKEDOWN_REASON_LENGTH`, checked
+/// with `@Size` and Java's `String.length()`, which count UTF-16 code units, not the characters a
+/// person sees: an emoji is one character and two units. The reason field counts and stops in those
+/// units ([_Utf16LengthLimit]), so a reason is never refused for its length after it was typed.
 const int _maxReason = 500;
 
 /// Back office's Service offers page: every service shop's offers, in every status, and the one thing
@@ -759,8 +761,8 @@ class _HistoryEntry extends StatelessWidget {
   }
 }
 
-/// Asks for the reason the trail keeps, and will not answer without one. The field stops at the
-/// server's limit, so a typed reason is never refused for its length.
+/// Asks for the reason the trail keeps, and will not answer without one. The field counts and stops in
+/// the units the server counts (see [_maxReason]), so a typed reason is never refused for its length.
 class _ReasonDialog extends StatefulWidget {
   const _ReasonDialog({
     required this.title,
@@ -800,6 +802,8 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    // In UTF-16 units, as the server counts. Every edit rebuilds the dialog, so this stays current.
+    final int used = _reason.text.length;
     return AlertDialog(
       backgroundColor: DeliveryColors.white,
       title: Text(widget.title, style: ConsoleText.cardTitle),
@@ -816,17 +820,17 @@ class _ReasonDialogState extends State<_ReasonDialog> {
               autofocus: true,
               minLines: 2,
               maxLines: 4,
-              maxLength: _maxReason,
-              maxLengthEnforcement: MaxLengthEnforcement.enforced,
+              // Not `maxLength`, which counts characters (see [_maxReason]).
+              inputFormatters: const <TextInputFormatter>[_Utf16LengthLimit(_maxReason)],
               style: ConsoleText.control,
               cursorColor: DeliveryColors.brand,
               decoration: InputDecoration(
                 labelText: t.svcBoReasonLabel,
                 errorText: _missing ? t.svcBoReasonRequired : null,
+                counterText: t.svcBoReasonLength(used, _maxReason),
               ),
-              onChanged: (_) {
-                if (_missing) setState(() => _missing = false);
-              },
+              // Redraws the counter, and clears a "reason required" the edit answers.
+              onChanged: (_) => setState(() => _missing = false),
             ),
           ],
         ),
@@ -843,6 +847,38 @@ class _ReasonDialogState extends State<_ReasonDialog> {
           onPressed: _confirm,
         ),
       ],
+    );
+  }
+}
+
+/// Holds a field to [max] UTF-16 code units, which is what Java's `String.length()` and `@Size` count,
+/// and cuts only between whole characters. The customer app holds a gift card's text the same way.
+///
+/// Not Flutter's `maxLength`, which counts characters as a person sees them: an emoji is one there and
+/// two here, so a reason that field let through could come back from the server as a 400.
+class _Utf16LengthLimit extends TextInputFormatter {
+  const _Utf16LengthLimit(this.max);
+
+  final int max;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.length <= max) return newValue;
+    // Already full and typed at a caret: the keystroke is refused, not the end of the reason trimmed.
+    if (oldValue.text.length == max && oldValue.selection.isCollapsed) return oldValue;
+    final StringBuffer kept = StringBuffer();
+    for (final String character in newValue.text.characters) {
+      if (kept.length + character.length > max) break;
+      kept.write(character);
+    }
+    final String text = kept.toString();
+    int within(int offset) => offset > text.length ? text.length : offset;
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection(
+        baseOffset: within(newValue.selection.baseOffset),
+        extentOffset: within(newValue.selection.extentOffset),
+      ),
     );
   }
 }

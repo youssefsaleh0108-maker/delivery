@@ -11416,4 +11416,9 @@ class DeliveryStringsEn extends DeliveryStrings {
   String svcBoVerifiedToggle(String shop) {
     return 'Verified Local for $shop';
   }
+
+  @override
+  String svcBoReasonLength(int used, int max) {
+    return '$used/$max';
+  }
 }
