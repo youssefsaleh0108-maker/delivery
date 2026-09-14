@@ -14,7 +14,7 @@ import 'service_order_tracking_screen.dart';
 /// and silently drops its button, so the shell builds this one value and every screen takes it.
 ///
 /// The optional members are optional for the reason the shell's own are: tests. main.dart wires every
-/// one that exists; [files] waits for the order attachment client to merge (see [ServiceOrderFiles]).
+/// one of them.
 @immutable
 class ServicesKit {
   const ServicesKit({
@@ -52,8 +52,10 @@ class ServicesKit {
   /// the order screen offers no placement at all.
   final ValueListenable<bool> connectivity;
 
-  /// Sends a customer's design file with an order. Null until the attachment client merges; an offer
-  /// that needs a file is then not offered for ordering.
+  /// Sends a customer's design file with an order, and reads a placed order's files back. Null only
+  /// in tests that need none: an offer that needs a file is then not offered for ordering, because a
+  /// picker that cannot send anything would be a dead control, and the placement it led to would be
+  /// refused anyway.
   final ServiceOrderFiles? files;
 
   /// Opens the file picker. Replaced in tests, which have no platform picker.

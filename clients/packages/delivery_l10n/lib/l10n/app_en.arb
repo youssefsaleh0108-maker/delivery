@@ -5696,5 +5696,6 @@
   "@svcDeliveringTo": {"placeholders":{"address":{"type":"String"}}},
   "svcYourInstructions": "Your instructions",
   "svcSummary": "Summary",
-  "svcServiceChip": "Service"
+  "svcServiceChip": "Service",
+  "svcRefusedTooManyUploads": "You've sent several files in the last few minutes. Wait a few minutes, then add this one again."
 }

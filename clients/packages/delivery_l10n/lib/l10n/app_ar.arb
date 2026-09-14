@@ -3513,5 +3513,6 @@
   "@svcDeliveringTo": {"placeholders":{"address":{"type":"String"}}},
   "svcYourInstructions": "تعليماتك",
   "svcSummary": "الملخص",
-  "svcServiceChip": "خدمة"
+  "svcServiceChip": "خدمة",
+  "svcRefusedTooManyUploads": "أرسلت عدة ملفات خلال الدقائق الأخيرة. انتظر بضع دقائق، ثم أضف هذا الملف من جديد."
 }

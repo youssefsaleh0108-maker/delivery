@@ -209,3 +209,31 @@ String serviceRefusalMessage(ServiceOrderRefusal refusal, DeliveryStrings t) => 
       ServiceOrderRefusal.unknown =>
         t.svcRefusedGeneric,
     };
+
+/// Why the attachment client refused a customer's file, in the customer's words.
+///
+/// Every code a placement can also answer for a file reads exactly as [serviceRefusalMessage] reads
+/// it, so one file refused at upload and at placement is one sentence, whichever step said so. Too
+/// many uploads in a few minutes is an upload's alone; it frees up by itself within minutes, so it
+/// says to wait rather than to change anything. A code this build does not know is a plain refusal.
+///
+/// Listed in full rather than with a catch-all, so a code added to [AttachmentRefusal] does not
+/// compile until somebody decides what it says.
+String attachmentRefusalMessage(AttachmentRefusal refusal, DeliveryStrings t) => switch (refusal) {
+      AttachmentRefusal.tooManyUploads => t.svcRefusedTooManyUploads,
+      AttachmentRefusal.wrongType ||
+      AttachmentRefusal.empty ||
+      AttachmentRefusal.tooLarge ||
+      AttachmentRefusal.tooManyWaiting ||
+      AttachmentRefusal.notUploaded ||
+      AttachmentRefusal.expired ||
+      AttachmentRefusal.alreadyAttached ||
+      AttachmentRefusal.tooManyFiles ||
+      AttachmentRefusal.duplicateFile ||
+      AttachmentRefusal.notAccepted ||
+      AttachmentRefusal.fileRequired ||
+      AttachmentRefusal.unknownFile ||
+      AttachmentRefusal.unknown =>
+        serviceRefusalMessage(
+            ServiceOrderRefusal.maybeFromWire(refusal.wire) ?? ServiceOrderRefusal.unknown, t),
+    };

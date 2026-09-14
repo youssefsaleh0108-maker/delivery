@@ -12,6 +12,7 @@ import 'package:mobile_app/src/delivery_address.dart';
 import 'package:mobile_app/src/service_order_files.dart';
 import 'package:mobile_app/src/service_order_screen.dart';
 import 'package:mobile_app/src/service_order_tracking_screen.dart';
+import 'package:mobile_app/src/service_order_words.dart';
 import 'package:mobile_app/src/services_kit.dart';
 
 import 'service_fixtures.dart';
@@ -333,7 +334,7 @@ void main() {
     testWidgets('an upload the server refuses says why, and a removed file is taken back',
         (WidgetTester tester) async {
       final _FakeFiles files = _FakeFiles()
-        ..failWith = const ServiceFileRefused(ServiceOrderRefusal.tooManyFilesWaiting);
+        ..failWith = const ServiceFileRefused(AttachmentRefusal.tooManyWaiting);
       final FakeServer server = serve();
       await pump(tester, server,
           with_: kit(server, files: files, pick: () async => _picked('design.png')),
@@ -353,6 +354,42 @@ void main() {
       await tester.pumpAndSettle();
       expect(files.removed, <String>['file-1']);
       expect(find.text(en.svcFileRequired), findsOneWidget);
+    });
+
+    testWidgets('too many uploads in a few minutes says to wait, and nothing blames the file',
+        (WidgetTester tester) async {
+      final _FakeFiles files = _FakeFiles()
+        ..failWith = const ServiceFileRefused(AttachmentRefusal.tooManyUploads);
+      final FakeServer server = serve();
+      await pump(tester, server,
+          with_: kit(server, files: files, pick: () async => _picked('design.pdf')),
+          offer: offerJson(attachmentPolicy: 'OPTIONAL'));
+
+      await tester.tap(find.text(en.svcUploadHint));
+      await tester.pumpAndSettle();
+
+      expect(find.text(en.svcRefusedTooManyUploads), findsOneWidget);
+      expect(find.text(en.svcRefusedGeneric), findsNothing);
+      expect(find.text(en.svcUploadFailed), findsNothing);
+    });
+
+    test('an upload refusal reads as the same file\'s placement refusal, in both languages', () {
+      for (final DeliveryStrings t in <DeliveryStrings>[en, ar]) {
+        expect(attachmentRefusalMessage(AttachmentRefusal.tooManyUploads, t),
+            t.svcRefusedTooManyUploads);
+        expect(attachmentRefusalMessage(AttachmentRefusal.unknown, t), t.svcRefusedGeneric);
+        for (final AttachmentRefusal refusal in AttachmentRefusal.values) {
+          if (refusal == AttachmentRefusal.tooManyUploads || refusal == AttachmentRefusal.unknown) {
+            continue;
+          }
+          final ServiceOrderRefusal? placement = ServiceOrderRefusal.maybeFromWire(refusal.wire);
+          expect(placement, isNotNull, reason: refusal.wire);
+          expect(attachmentRefusalMessage(refusal, t), serviceRefusalMessage(placement!, t),
+              reason: refusal.wire);
+          expect(attachmentRefusalMessage(refusal, t), isNot(t.svcRefusedGeneric),
+              reason: '${refusal.wire} has words of its own');
+        }
+      }
     });
 
     testWidgets('without the attachment client, an offer that needs a file cannot be placed',
@@ -567,4 +604,7 @@ class _FakeFiles implements ServiceOrderFiles {
 
   @override
   Future<void> remove(String fileId) async => removed.add(fileId);
+
+  @override
+  Future<List<OrderAttachment>> forOrder(String orderId) async => const <OrderAttachment>[];
 }

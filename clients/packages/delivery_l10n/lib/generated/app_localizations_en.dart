@@ -11315,4 +11315,8 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get svcServiceChip => 'Service';
+
+  @override
+  String get svcRefusedTooManyUploads =>
+      'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.';
 }

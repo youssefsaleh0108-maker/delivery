@@ -118,9 +118,9 @@ class CustomerShell extends StatefulWidget {
   /// providers only.
   final CatalogApi? catalogApi;
 
-  /// Sends a customer's design file with a service order. Null until the order attachment client
-  /// merges (see [ServiceOrderFiles] for the adapter main.dart then passes); an offer that needs a
-  /// file is not offered for ordering meanwhile.
+  /// Sends a customer's design file with a service order, and reads a placed one's files back:
+  /// main.dart passes `OrderAttachmentFiles`. Null only in tests; an offer that needs a file is then
+  /// not offered for ordering.
   final ServiceOrderFiles? serviceFiles;
   final AuthSession session;
 

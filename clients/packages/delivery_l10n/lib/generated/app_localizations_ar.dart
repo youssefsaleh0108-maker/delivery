@@ -11460,4 +11460,8 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcServiceChip => 'خدمة';
+
+  @override
+  String get svcRefusedTooManyUploads =>
+      'أرسلت عدة ملفات خلال الدقائق الأخيرة. انتظر بضع دقائق، ثم أضف هذا الملف من جديد.';
 }

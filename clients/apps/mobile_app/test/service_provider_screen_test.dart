@@ -338,4 +338,7 @@ class _NoFiles implements ServiceOrderFiles {
 
   @override
   Future<void> remove(String fileId) async {}
+
+  @override
+  Future<List<OrderAttachment>> forOrder(String orderId) async => const <OrderAttachment>[];
 }

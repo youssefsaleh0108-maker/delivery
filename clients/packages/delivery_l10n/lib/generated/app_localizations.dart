@@ -19166,6 +19166,12 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Service'**
   String get svcServiceChip;
+
+  /// No description provided for @svcRefusedTooManyUploads.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.'**
+  String get svcRefusedTooManyUploads;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

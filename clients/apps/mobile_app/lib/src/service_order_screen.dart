@@ -68,7 +68,7 @@ class _FileSlot {
   String? fileId;
 
   /// Why it was refused; null for a failure that was not a refusal (the connection).
-  ServiceOrderRefusal? refusal;
+  AttachmentRefusal? refusal;
 }
 
 class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
@@ -454,11 +454,11 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
     if (picked == null || !mounted) return;
 
     final String? contentType = serviceFileContentType(picked.name, reported: picked.mimeType);
-    final ServiceOrderRefusal? refused =
+    final AttachmentRefusal? refused =
         precheckServiceFile(contentType: contentType, sizeBytes: picked.sizeBytes);
     if (refused != null || contentType == null) {
-      setState(() => _fileNotice =
-          serviceRefusalMessage(refused ?? ServiceOrderRefusal.fileWrongType, t));
+      setState(() =>
+          _fileNotice = attachmentRefusalMessage(refused ?? AttachmentRefusal.wrongType, t));
       return;
     }
 
@@ -806,7 +806,7 @@ class _ServiceOrderScreenState extends State<ServiceOrderScreen> {
       _Upload.sending => t.svcUploading,
       _Upload.sent => t.svcUploaded,
       _Upload.failed =>
-        slot.refusal == null ? t.svcUploadFailed : serviceRefusalMessage(slot.refusal!, t),
+        slot.refusal == null ? t.svcUploadFailed : attachmentRefusalMessage(slot.refusal!, t),
     };
     return YdCard.bordered(
       padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),

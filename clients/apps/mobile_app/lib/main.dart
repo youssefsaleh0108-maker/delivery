@@ -14,6 +14,7 @@ import 'src/carrier_shell.dart';
 import 'src/customer_shell.dart';
 import 'src/google_sign_in.dart';
 import 'src/home_route.dart';
+import 'src/order_attachment_files.dart';
 import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
 import 'src/partner_intro_screen.dart';
@@ -136,6 +137,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The shop owner's own catalogue — a different endpoint from the storefront a customer browses,
   /// because a merchant sees their unpublished and archived products too.
   late final CatalogApi _catalogApi = CatalogApi(_dio);
+
+  /// A customer's design files on service orders, over order-manager's attachment endpoints: sent
+  /// before the order is placed, taken back with Remove, and listed again on its tracking page.
+  late final OrderAttachmentFiles _serviceFiles = OrderAttachmentFiles(OrderAttachmentApi(_dio));
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
 
@@ -580,9 +585,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       storeApi: _storeApi,
       orderApi: _orderApi,
       offerApi: _offerApi,
-      // The Services tab's offer search. Its design files arrive with `serviceFiles`, wired once the
-      // order attachment client merges (see ServiceOrderFiles).
+      // The Services tab's offer search, and a service order's design files. Without the files an
+      // offer that needs one could not be ordered at all.
       catalogApi: _catalogApi,
+      serviceFiles: _serviceFiles,
       notificationApi: _notificationApi,
       butlerApi: _butlerApi,
       zoneApi: _zoneApi,
