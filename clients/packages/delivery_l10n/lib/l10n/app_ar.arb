@@ -3355,5 +3355,13 @@
   "svcDocsSent": "مستنداتك لدى فريق المراجعة.",
   "svcDocsSkipped": "لم تُرسل أي مستندات، لذا سيرى فريق المراجعة أن بطاقة هويتك وسجلّك التجاري غير مرفقين.",
   "svcShopCategoryClosedTitle": "خدمتك غير متاحة حالياً",
-  "svcShopCategoryClosedBody": "تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم."
+  "svcShopCategoryClosedBody": "تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم.",
+  "svcCashShopName": "المتجر {id}",
+  "@svcCashShopName": {"placeholders":{"id":{"type":"String"}}},
+  "svcCashShopTakenAtCounter": "{amount} دفعها الزبائن على صندوقه",
+  "@svcCashShopTakenAtCounter": {"placeholders":{"amount":{"type":"String"}}},
+  "svcCashShopConfirmBody": "أكّد أنّ {shop} دفع للمنصة {owed}: عمولتها من {held} دفعها زبائنه على صندوقه، عن {orders}. يحتفظ المتجر بالباقي حصةً له. لا يمكن التراجع عن ذلك.",
+  "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
+  "svcCashShopAmountChanged": "{shop} مدين الآن بـ {amount}، وليس بالمبلغ الذي أكّدته. لم يُسجَّل شيء.",
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}}
 }

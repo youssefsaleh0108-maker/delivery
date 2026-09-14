@@ -5537,5 +5537,13 @@
   "svcDocsSent": "Your documents are with the reviewer.",
   "svcDocsSkipped": "No documents were sent, so the reviewer will see your ID and commercial registration as missing.",
   "svcShopCategoryClosedTitle": "Your service isn't offered right now",
-  "svcShopCategoryClosedBody": "Your application was approved, but YouDrop isn't offering this service at the moment, so your shop can't be opened. Please contact support."
+  "svcShopCategoryClosedBody": "Your application was approved, but YouDrop isn't offering this service at the moment, so your shop can't be opened. Please contact support.",
+  "svcCashShopName": "Shop {id}",
+  "@svcCashShopName": {"placeholders":{"id":{"type":"String"}}},
+  "svcCashShopTakenAtCounter": "{amount} paid at its counter",
+  "@svcCashShopTakenAtCounter": {"placeholders":{"amount":{"type":"String"}}},
+  "svcCashShopConfirmBody": "Confirm {shop} has paid the platform {owed}: its commission on the {held} its customers paid at its counter, covering {orders}. The shop keeps the rest as its own share. This cannot be undone.",
+  "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
+  "svcCashShopAmountChanged": "{shop} now owes {amount}, not the amount you confirmed. Nothing was recorded.",
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}}
 }

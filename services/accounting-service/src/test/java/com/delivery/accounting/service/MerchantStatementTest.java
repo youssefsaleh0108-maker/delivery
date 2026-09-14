@@ -3,6 +3,7 @@ package com.delivery.accounting.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,6 +11,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
+import com.delivery.accounting.domain.CashFloatEntry;
 import com.delivery.accounting.domain.CashFloatRepository;
 import com.delivery.accounting.domain.CounterpartyKind;
 import com.delivery.accounting.domain.RiderLedgerRepository;
@@ -75,9 +80,15 @@ class MerchantStatementTest {
                 .thenReturn(own);
         // Lenient: a range with no orders never asks this, which is the engine skipping a query it
         // does not need rather than a stub nobody meant to write.
-        org.mockito.Mockito.lenient()
-                .when(transactions.findByOrderIdIn(anyCollection())).thenReturn(all);
+        lenient().when(transactions.findByOrderIdIn(anyCollection())).thenReturn(all);
         when(directory.nameOf(CounterpartyKind.MERCHANT, SHOP)).thenReturn("Rose & Crust Pizzeria");
+    }
+
+    private static BigDecimal summed(Statement statement) {
+        return statement.lines().stream()
+                .map(line -> line.direction() == Statement.Sign.CREDIT
+                        ? line.amount() : line.amount().negate())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     @Nested
@@ -118,6 +129,8 @@ class MerchantStatementTest {
         void linesSumToTheNet() {
             Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
 
+            // Two lines and no more: riders carried these orders and took their cash, so the shop's
+            // counter lines never appear, and a delivery reads exactly as it did before pickups.
             assertThat(statement.lines()).hasSize(2);
             assertThat(statement.lines().get(0).label()).isEqualTo("Goods sold");
             assertThat(statement.lines().get(0).amount()).isEqualByComparingTo("119.50");
@@ -128,11 +141,7 @@ class MerchantStatementTest {
 
             // The balance property, asserted rather than assumed. Statement.of would have thrown,
             // but stating it here is what stops somebody "fixing" that check away.
-            BigDecimal summed = statement.lines().stream()
-                    .map(line -> line.direction() == Statement.Sign.CREDIT
-                            ? line.amount() : line.amount().negate())
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            assertThat(summed).isEqualByComparingTo(statement.net().amount());
+            assertThat(summed(statement)).isEqualByComparingTo(statement.net().amount());
         }
 
         @Test
@@ -297,6 +306,232 @@ class MerchantStatementTest {
             assertThat(entry.gross()).isEqualByComparingTo("48.00");
             assertThat(entry.commission()).isEqualByComparingTo("5.63");
             assertThat(entry.net()).isEqualByComparingTo("42.37");
+        }
+    }
+
+    /**
+     * A shop paid at its own counter for pickups (V52). It keeps its share of that cash and pays the
+     * platform its commission, so the statement shows the share as paid to it in cash and asks for
+     * the commission on everything still in the till, whenever it was taken — and once that is paid,
+     * the shop is square: no statement says the platform owes it the share it kept.
+     */
+    @Nested
+    @DisplayName("paid at its counter for pickups")
+    class PickupCash {
+
+        private final UUID pickup = UUID.randomUUID();
+
+        /** 40.00 of printing at 12.5%: 35.00 the shop's, 5.00 commission, all 40.00 in its till. */
+        private final List<AccountingTransaction> pickupLegs = List.of(
+                Legs.cashHeldByShop(pickup, "40.00", SHOP),
+                Legs.merchantCredit(pickup, "35.00", SHOP),
+                Legs.commission(pickup, "5.00"));
+
+        /** The shop's own legs on the pickup, as a statement query returns them. */
+        private List<AccountingTransaction> shopsOwn() {
+            return List.of(pickupLegs.get(0), pickupLegs.get(1));
+        }
+
+        private CashFloatEntry tillRow(UUID order, String cash) {
+            return CashFloatEntry.collected(SHOP, CashFloatEntry.HolderKind.MERCHANT, order,
+                    new BigDecimal(cash), "USD");
+        }
+
+        /** What the till holds now, read as a shop's. */
+        private void tillHolds(CashFloatEntry... rows) {
+            when(floatEntries.heldBy(SHOP, CashFloatEntry.HolderKind.MERCHANT))
+                    .thenReturn(List.of(rows));
+        }
+
+        @Test
+        @DisplayName("before paying, shows the share it kept and owes the platform the commission")
+        void beforePaying() {
+            ledgerHolds(shopsOwn(), pickupLegs);
+            tillHolds(tillRow(pickup, "40.00"));
+
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.lines()).extracting(Statement.Line::label).containsExactly(
+                    "Goods sold", "Platform commission (12.5%)",
+                    "Your share, kept at your counter", "Commission to pay from your counter");
+            assertThat(statement.lines()).extracting(Statement.Line::amount)
+                    .usingElementComparator(BigDecimal::compareTo)
+                    .containsExactly(new BigDecimal("40.00"), new BigDecimal("5.00"),
+                            new BigDecimal("35.00"), new BigDecimal("5.00"));
+            assertThat(statement.lines().get(2).direction()).isEqualTo(Statement.Sign.DEBIT);
+            assertThat(statement.lines().get(3).direction()).isEqualTo(Statement.Sign.DEBIT);
+            assertThat(statement.net().amount()).isEqualByComparingTo("5.00");
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.THEY_OWE);
+            assertThat(summed(statement)).isEqualByComparingTo("-5.00");
+        }
+
+        @Test
+        @DisplayName("once it has paid the commission, is square, and is never owed the share it "
+                + "kept")
+        void afterPaying() {
+            ledgerHolds(shopsOwn(), pickupLegs);
+            // The payment took the pickup out of the till, in this period.
+            when(floatEntries.totalForHolderBetween(eq(SHOP),
+                    eq(CashFloatEntry.HolderKind.MERCHANT), eq(CashFloatEntry.Kind.REMITTED),
+                    any(), any())).thenReturn(new BigDecimal("5.00"));
+
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.SETTLED);
+            assertThat(statement.net().amount()).isEqualByComparingTo("0.00");
+            assertThat(statement.lines()).extracting(Statement.Line::label).containsExactly(
+                    "Goods sold", "Platform commission (12.5%)", "Your share, kept at your counter");
+            assertThat(summed(statement)).isEqualByComparingTo("0.00");
+            assertThat(statement.note()).contains("You paid the platform 5.00 USD from your counter");
+        }
+
+        @Test
+        @DisplayName("on a till of several pickups, asks for exactly what the Back Office records")
+        void severalPickups() {
+            UUID copies = UUID.randomUUID();
+            List<AccountingTransaction> all = new ArrayList<>(pickupLegs);
+            all.addAll(List.of(
+                    Legs.cashHeldByShop(copies, "12.50", SHOP),
+                    Legs.merchantCredit(copies, "10.94", SHOP),
+                    Legs.commission(copies, "1.56")));
+            ledgerHolds(List.of(all.get(0), all.get(1), all.get(3), all.get(4)), all);
+            List<CashFloatEntry> till = List.of(tillRow(pickup, "40.00"), tillRow(copies, "12.50"));
+            tillHolds(till.toArray(CashFloatEntry[]::new));
+
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.net().amount()).isEqualByComparingTo("6.56");
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.THEY_OWE);
+            // One rule over the same rows as the remittance the operator records.
+            assertThat(statement.net().amount())
+                    .isEqualByComparingTo(ShopTill.of(SHOP, till, all).owed());
+            assertThat(summed(statement)).isEqualByComparingTo("-6.56");
+        }
+
+        @Test
+        @DisplayName("asks for the commission still in the till from an earlier period")
+        void anEarlierPeriodsTill() {
+            // Nothing sold in August; July's pickup is still in the till.
+            ledgerHolds(List.of(), pickupLegs);
+            tillHolds(tillRow(pickup, "40.00"));
+
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.lines()).singleElement().satisfies(line -> {
+                assertThat(line.label()).isEqualTo("Commission to pay from your counter");
+                assertThat(line.amount()).isEqualByComparingTo("5.00");
+                assertThat(line.direction()).isEqualTo(Statement.Sign.DEBIT);
+            });
+            assertThat(statement.net().amount()).isEqualByComparingTo("5.00");
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.THEY_OWE);
+        }
+
+        @Test
+        @DisplayName("still itemises the order by its goods, paid in cash")
+        void theRowIsTheGoods() {
+            ledgerHolds(shopsOwn(), pickupLegs);
+            tillHolds(tillRow(pickup, "40.00"));
+
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            assertThat(statement.entries()).singleElement().satisfies(entry -> {
+                assertThat(entry.gross()).isEqualByComparingTo("40.00");
+                assertThat(entry.commission()).isEqualByComparingTo("5.00");
+                assertThat(entry.net()).isEqualByComparingTo("35.00");
+                assertThat(entry.paymentMethod()).isEqualTo("CASH");
+            });
+            assertThat(statement.orders()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("says the shop keeps its share and pays the commission, in the words it is sent")
+        void theRenderedLinesSayWhoseCashItIs() {
+            ledgerHolds(shopsOwn(), pickupLegs);
+            tillHolds(tillRow(pickup, "40.00"));
+
+            String body = new StatementRenderer()
+                    .body(service.build(CounterpartyKind.MERCHANT, SHOP, august));
+
+            assertThat(body)
+                    .contains("-35.00  Your share, kept at your counter (paid to you in cash by "
+                            + "your customers on pickup orders)")
+                    .contains("-5.00  Commission to pay from your counter (cash your customers "
+                            + "paid at your counter — you keep your share and pay the platform its "
+                            + "commission, including any not yet paid from earlier periods)")
+                    .contains("You owe the platform 5.00 USD.")
+                    // The whole till was never the platform's money: most of it is the shop's.
+                    .doesNotContain("platform's money");
+        }
+    }
+
+    /**
+     * One account that is a shop and a rider at once — a shop that also delivers. Its till and its
+     * bag belong to one Keycloak subject, and each statement counts only its own.
+     */
+    @Nested
+    @DisplayName("of an account that also rides")
+    class AlsoARider {
+
+        private final UUID pickup = UUID.randomUUID();
+        private final UUID delivery = UUID.randomUUID();
+
+        @BeforeEach
+        void bothKindsOfCash() {
+            // 40.00 of a pickup in the shop's till, and 13.25 the same account took at a door.
+            CashFloatEntry till = CashFloatEntry.collected(SHOP, CashFloatEntry.HolderKind.MERCHANT,
+                    pickup, new BigDecimal("40.00"), "USD");
+            CashFloatEntry bag = CashFloatEntry.collected(SHOP, CashFloatEntry.HolderKind.RIDER,
+                    delivery, new BigDecimal("13.25"), "USD");
+            lenient().when(floatEntries.heldBy(SHOP, CashFloatEntry.HolderKind.MERCHANT))
+                    .thenReturn(List.of(till));
+            lenient().when(floatEntries.heldBy(SHOP, CashFloatEntry.HolderKind.RIDER))
+                    .thenReturn(List.of(bag));
+            lenient().when(floatEntries.forHolderBetween(eq(SHOP),
+                    eq(CashFloatEntry.HolderKind.MERCHANT), eq(CashFloatEntry.Kind.COLLECTED),
+                    any(), any())).thenReturn(List.of(till));
+            lenient().when(floatEntries.forHolderBetween(eq(SHOP),
+                    eq(CashFloatEntry.HolderKind.RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+                    any(), any())).thenReturn(List.of(bag));
+            lenient().when(floatEntries.outstandingTotalFor(SHOP, CashFloatEntry.HolderKind.MERCHANT))
+                    .thenReturn(new BigDecimal("40.00"));
+            lenient().when(floatEntries.outstandingTotalFor(SHOP, CashFloatEntry.HolderKind.RIDER))
+                    .thenReturn(new BigDecimal("13.25"));
+        }
+
+        @Test
+        @DisplayName("the shop's statement counts its till and never the bag")
+        void theShopCountsItsTill() {
+            List<AccountingTransaction> legs = List.of(
+                    Legs.cashHeldByShop(pickup, "40.00", SHOP),
+                    Legs.merchantCredit(pickup, "35.00", SHOP),
+                    Legs.commission(pickup, "5.00"));
+            ledgerHolds(List.of(legs.get(0), legs.get(1)), legs);
+
+            Statement statement = service.build(CounterpartyKind.MERCHANT, SHOP, august);
+
+            // The commission on the till alone; the bag is not the shop's to pay in.
+            assertThat(statement.net().amount()).isEqualByComparingTo("5.00");
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.THEY_OWE);
+            verify(floatEntries, never()).heldBy(eq(SHOP), eq(CashFloatEntry.HolderKind.RIDER));
+        }
+
+        @Test
+        @DisplayName("the rider's statement counts the bag and never the till")
+        void theRiderCountsTheBag() {
+            when(transactions.legsForCounterparty(eq(CounterpartyKind.RIDER), eq(SHOP), any(),
+                    any())).thenReturn(List.of());
+            when(riderLedger.between(eq(SHOP), any(), any())).thenReturn(List.of());
+            when(floatEntries.totalForHolderBetween(eq(SHOP), eq(CashFloatEntry.HolderKind.RIDER),
+                    eq(CashFloatEntry.Kind.REMITTED), any(), any())).thenReturn(BigDecimal.ZERO);
+            when(directory.nameOf(CounterpartyKind.RIDER, SHOP)).thenReturn("Rose & Crust Pizzeria");
+
+            Statement statement = service.build(CounterpartyKind.RIDER, SHOP, august);
+
+            // The 13.25 taken at a door; the till's 40.00 is the shop's business.
+            assertThat(statement.net().amount()).isEqualByComparingTo("13.25");
+            assertThat(statement.net().direction()).isEqualTo(Statement.Direction.THEY_OWE);
+            // Nor does the till creep into the "currently holding" note.
+            assertThat(statement.note()).isNull();
         }
     }
 

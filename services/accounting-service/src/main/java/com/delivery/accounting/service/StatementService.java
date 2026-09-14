@@ -39,8 +39,9 @@ import com.delivery.accounting.domain.StatementDispatchRepository;
  * Builds a counterparty's statement out of the ledger.
  *
  * <p><strong>The four kinds are not one query with a filter.</strong> A merchant is owed the goods
- * they sold less commission and nothing else. A rider is owed their earnings AND owes the platform
- * every note they took at the door — one party, two directions, and a net that can point either way.
+ * they sold less commission, less what they owe the platform out of the cash their own counter took
+ * for pickups. A rider is owed their earnings AND owes the platform every note they took at the door
+ * — one party, two directions, and a net that can point either way.
  * A carrier is owed delivery fees on jobs whose goods it never touched. The platform's own statement
  * runs the other way round from all three. Writing that as one generic aggregation over
  * {@code transactions} was the tempting shape and it is wrong: it would silently give a rider a
@@ -148,7 +149,7 @@ public class StatementService {
 
     /**
      * Goods sold, less the platform's commission, plus any gift wrapping, equals what the platform
-     * owes the shop.
+     * owes the shop — less what the shop owes the platform out of the cash its counter took.
      *
      * <p>The goods net is the {@code MERCHANT_CREDIT} legs and nothing else, so it is exact whatever
      * else happened on the order. The two gross lines are derived FROM it — goods sold is the net
@@ -157,6 +158,19 @@ public class StatementService {
      *
      * <p>Gift wrapping is a line of its own, read off the {@code GIFT_WRAP_CREDIT} legs. No
      * commission is taken on it, so it is never grossed up with the goods.
+     *
+     * <p><strong>Cash at the counter (V52).</strong> A pickup is paid in full at the shop that did the
+     * work, and the shop keeps its share of that cash and pays the platform only the platform's part
+     * ({@link ShopTill}). That is two debits against the goods above. First, the share of this
+     * period's pickups the shop kept at its counter: its credits on those orders, paid to it in cash
+     * the moment the customer paid, so the platform owes it nothing more on them whether or not the
+     * commission has been paid yet. Second, what the shop still owes the platform out of its till:
+     * the platform's part of every pickup not yet paid in, from this period or any earlier one, as a
+     * rider's cash-out nets their whole bag and not a week of it. A payment is not a line: it takes
+     * its pickups out of the till, and that is the whole of its effect. So a shop that pays what
+     * this says is square, no later statement asks for it again, and no statement tells the shop the
+     * platform owes it the share it kept. A shop that never took cash at its counter gets neither
+     * line and reads exactly as it always did.
      */
     private Statement merchantStatement(String ref, String name, StatementRange range,
                                         Ledger ledger) {
@@ -168,10 +182,50 @@ public class StatementService {
                 ledger.orderCount() + " orders"));
         addIfAny(lines, Statement.Line.credit("Gift wrapping", wrapping, null));
 
+        BigDecimal kept = ledger.keptAtTheCounter(ref);
+        // The till as the float holds it now, whenever each pickup was paid for — and as a shop,
+        // never as the rider the same account may also be.
+        List<CashFloatEntry> till = floatEntries.heldBy(ref, CashFloatEntry.HolderKind.MERCHANT);
+        BigDecimal owed = ShopTill.of(ref, till,
+                till.isEmpty() ? List.of() : transactions.findByOrderIdIn(orderIdsOf(till))).owed();
+        addIfAny(lines, Statement.Line.debit("Your share, kept at your counter", kept,
+                "paid to you in cash by your customers on pickup orders"));
+        addIfAny(lines, Statement.Line.debit("Commission to pay from your counter", owed,
+                "cash your customers paid at your counter — you keep your share and pay the "
+                        + "platform its commission, including any not yet paid from earlier "
+                        + "periods"));
+
+        // Independently of the lines, as on every statement: the shop's credits, less the share it
+        // kept and what it still owes out of its till.
+        BigDecimal control = goods.add(wrapping).subtract(kept).subtract(owed);
+
         List<Statement.Entry> entries = ledger.entriesFor(Leg.MERCHANT_CREDIT, take);
         return Statement.of(CounterpartyKind.MERCHANT, ref, name, range, currency,
-                lines, goods.add(wrapping), entries, ledger.orderCount(),
-                note(range, ledger, take, "goods"));
+                lines, control, entries, ledger.orderCount(),
+                withCounterNote(note(range, ledger, take, "goods"), ref, range));
+    }
+
+    /**
+     * Says what the shop paid the platform out of its till in this period, when it paid anything.
+     *
+     * <p>Not a line, because the commission line already counts only what is unpaid: the payment
+     * as a line would count the same money twice. But a shop that paid last Tuesday should be able
+     * to see that it did.
+     */
+    private String withCounterNote(String note, String ref, StatementRange range) {
+        BigDecimal paid = orZero(floatEntries.totalForHolderBetween(ref,
+                CashFloatEntry.HolderKind.MERCHANT, CashFloatEntry.Kind.REMITTED,
+                range.fromInstant(), range.toExclusive()));
+        if (paid.signum() == 0) {
+            return note;
+        }
+        String counter = "You paid the platform " + Statement.money(paid) + " " + currency
+                + " from your counter in this period.";
+        return note == null ? counter : note + " " + counter;
+    }
+
+    private static List<UUID> orderIdsOf(List<CashFloatEntry> rows) {
+        return rows.stream().map(CashFloatEntry::getOrderId).distinct().toList();
     }
 
     // -------------------------------------------------------------------------------- carrier
@@ -224,7 +278,8 @@ public class StatementService {
      * differs from what this period alone would suggest, so a quiet company's note stays quiet.
      */
     private String withCustodyNote(String note, String ref, BigDecimal received, BigDecimal paid) {
-        BigDecimal held = orZero(floatEntries.outstandingTotalFor(ref));
+        BigDecimal held = orZero(floatEntries.outstandingTotalFor(ref,
+                CashFloatEntry.HolderKind.PROVIDER));
         if (held.signum() == 0 || held.compareTo(received.subtract(paid)) == 0) {
             return note;
         }
@@ -279,12 +334,14 @@ public class StatementService {
         // rather than queried twice so the figure on the statement and the rows underneath it are
         // the same data and cannot disagree.
         List<CashFloatEntry> collections = floatEntries.forHolderBetween(
-                ref, CashFloatEntry.Kind.COLLECTED, range.fromInstant(), range.toExclusive());
+                ref, CashFloatEntry.HolderKind.RIDER, CashFloatEntry.Kind.COLLECTED,
+                range.fromInstant(), range.toExclusive());
         BigDecimal collected = collections.stream()
                 .map(CashFloatEntry::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal remitted = floatEntries.totalForHolderBetween(
-                ref, CashFloatEntry.Kind.REMITTED, range.fromInstant(), range.toExclusive());
+                ref, CashFloatEntry.HolderKind.RIDER, CashFloatEntry.Kind.REMITTED,
+                range.fromInstant(), range.toExclusive());
         // Cash a delivery company's rider handed to their company (V50). It left their pocket as
         // surely as banked cash did, so it balances the collection the same way; it is its own line
         // because "banked with the platform" is exactly what it is not.
@@ -446,7 +503,7 @@ public class StatementService {
                     + " were handed to you directly and are not paid again here.");
         }
 
-        BigDecimal stillHeld = floatEntries.outstandingTotalFor(ref);
+        BigDecimal stillHeld = floatEntries.outstandingTotalFor(ref, CashFloatEntry.HolderKind.RIDER);
         if (stillHeld != null && stillHeld.signum() != 0
                 && stillHeld.compareTo(collected.subtract(remitted)) != 0) {
             // Deliberately outside the range: cash taken in July and still not banked in August is a
@@ -512,10 +569,17 @@ public class StatementService {
         BigDecimal banked = floatEntries.totalBetween(
                 CashFloatEntry.Kind.REMITTED, range.fromInstant(), range.toExclusive());
         BigDecimal outstanding = floatEntries.outstandingTotal();
+        // What shops kept of their tills as their own share of pickups (V52): collected, never
+        // banked and no longer held by anybody, so without it the figures below would not add up.
+        BigDecimal kept = orZero(floatEntries.totalBetween(
+                CashFloatEntry.Kind.RETAINED, range.fromInstant(), range.toExclusive()));
 
         List<String> notes = new ArrayList<>();
-        notes.add("Riders collected " + Statement.money(collected) + " " + currency
+        // Riders at the door and shops at their counters (V52): the float counts both.
+        notes.add("Riders and shops collected " + Statement.money(collected) + " " + currency
                 + " in cash in this period and banked " + Statement.money(banked)
+                + (kept.signum() == 0 ? "" : " and shops kept " + Statement.money(kept)
+                        + " as their own share of pickups paid at their counters")
                 + "; " + Statement.money(outstanding)
                 + " is still held across all holders. That cash already contains the commission "
                 + "above, so it is reported here rather than added to the total, which would count "
@@ -790,6 +854,26 @@ public class StatementService {
 
         boolean truncated() {
             return orderIds.size() > MAX_ENTRIES;
+        }
+
+        /**
+         * The share of these orders a shop kept from the cash its own counter took for them (V52):
+         * on each pickup whose cash the shop holds, its credits on the order, never more than that
+         * cash ({@link ShopTill#keptOf}). Nothing on an order a rider carried, whose cash the shop
+         * never saw.
+         */
+        BigDecimal keptAtTheCounter(String shopRef) {
+            Map<UUID, BigDecimal> shares = ShopTill.sharesOf(shopRef, own);
+            BigDecimal kept = BigDecimal.ZERO;
+            for (AccountingTransaction leg : own) {
+                if (leg.getLeg() == Leg.CASH_COLLECTED
+                        && leg.getCounterpartyKind() == CounterpartyKind.MERCHANT
+                        && shopRef.equals(leg.getCounterpartyRef())) {
+                    kept = kept.add(ShopTill.keptOf(leg.getAmount(),
+                            shares.getOrDefault(leg.getOrderId(), BigDecimal.ZERO)));
+                }
+            }
+            return kept;
         }
 
         Set<UUID> orderIdsWith(Leg leg) {

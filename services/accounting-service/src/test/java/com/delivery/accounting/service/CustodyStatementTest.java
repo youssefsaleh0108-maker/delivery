@@ -78,15 +78,18 @@ class CustodyStatementTest {
                     any(), any())).thenReturn(List.of());
             lenient().when(riderLedger.between(eq(RIDER), any(), any())).thenReturn(List.of());
             // 485.00 on the company's jobs, 20.00 on a platform-fleet shift.
-            when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+            when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                    eq(CashFloatEntry.Kind.COLLECTED),
                     any(), any())).thenReturn(List.of(
                     CashFloatEntry.collected(RIDER, CashFloatEntry.HolderKind.RIDER,
                             UUID.randomUUID(), new BigDecimal("485.00"), "USD", COMPANY),
                     CashFloatEntry.collected(RIDER, CashFloatEntry.HolderKind.RIDER,
                             UUID.randomUUID(), new BigDecimal("20.00"), "USD")));
-            when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.REMITTED),
+            when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                    eq(CashFloatEntry.Kind.REMITTED),
                     any(), any())).thenReturn(new BigDecimal("20.00"));
-            lenient().when(floatEntries.outstandingTotalFor(RIDER)).thenReturn(BigDecimal.ZERO);
+            lenient().when(floatEntries.outstandingTotalFor(RIDER, CashFloatEntry.HolderKind.RIDER))
+                    .thenReturn(BigDecimal.ZERO);
         }
 
         @Test
@@ -142,15 +145,18 @@ class CustodyStatementTest {
             when(transactions.legsForCounterparty(eq(CounterpartyKind.RIDER), eq(RIDER), any(),
                     any())).thenReturn(List.of());
             when(riderLedger.between(eq(RIDER), any(), any())).thenReturn(List.of());
-            when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+            when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                    eq(CashFloatEntry.Kind.COLLECTED),
                     any(), any())).thenReturn(List.of(
                     CashFloatEntry.collected(RIDER, CashFloatEntry.HolderKind.RIDER,
                             UUID.randomUUID(), new BigDecimal("20.00"), "USD")));
-            when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.REMITTED),
+            when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                    eq(CashFloatEntry.Kind.REMITTED),
                     any(), any())).thenReturn(new BigDecimal("20.00"));
             when(floatEntries.handedOverBetween(eq(RIDER), any(), any()))
                     .thenReturn(BigDecimal.ZERO);
-            when(floatEntries.outstandingTotalFor(RIDER)).thenReturn(BigDecimal.ZERO);
+            when(floatEntries.outstandingTotalFor(RIDER, CashFloatEntry.HolderKind.RIDER))
+                    .thenReturn(BigDecimal.ZERO);
 
             Statement statement = service.build(CounterpartyKind.RIDER, RIDER, october);
 
@@ -179,7 +185,8 @@ class CustodyStatementTest {
                     .thenReturn(new BigDecimal("485.00"));
             when(floatEntries.carrierPaidBetween(eq(COMPANY), any(), any()))
                     .thenReturn(new BigDecimal("400.00"));
-            when(floatEntries.outstandingTotalFor(COMPANY)).thenReturn(new BigDecimal("85.00"));
+            when(floatEntries.outstandingTotalFor(COMPANY, CashFloatEntry.HolderKind.PROVIDER))
+                    .thenReturn(new BigDecimal("85.00"));
 
             Statement statement = service.build(CounterpartyKind.CARRIER, COMPANY, october);
 
@@ -201,7 +208,8 @@ class CustodyStatementTest {
                     .thenReturn(new BigDecimal("485.00"));
             when(floatEntries.carrierPaidBetween(eq(COMPANY), any(), any()))
                     .thenReturn(new BigDecimal("485.00"));
-            when(floatEntries.outstandingTotalFor(COMPANY)).thenReturn(new BigDecimal("120.00"));
+            when(floatEntries.outstandingTotalFor(COMPANY, CashFloatEntry.HolderKind.PROVIDER))
+                    .thenReturn(new BigDecimal("120.00"));
 
             Statement statement = service.build(CounterpartyKind.CARRIER, COMPANY, october);
 

@@ -10986,4 +10986,25 @@ class DeliveryStringsAr extends DeliveryStrings {
   @override
   String get svcShopCategoryClosedBody =>
       'تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم.';
+
+  @override
+  String svcCashShopName(String id) {
+    return 'المتجر $id';
+  }
+
+  @override
+  String svcCashShopTakenAtCounter(String amount) {
+    return '$amount دفعها الزبائن على صندوقه';
+  }
+
+  @override
+  String svcCashShopConfirmBody(
+      String shop, String owed, String held, String orders) {
+    return 'أكّد أنّ $shop دفع للمنصة $owed: عمولتها من $held دفعها زبائنه على صندوقه، عن $orders. يحتفظ المتجر بالباقي حصةً له. لا يمكن التراجع عن ذلك.';
+  }
+
+  @override
+  String svcCashShopAmountChanged(String shop, String amount) {
+    return '$shop مدين الآن بـ $amount، وليس بالمبلغ الذي أكّدته. لم يُسجَّل شيء.';
+  }
 }

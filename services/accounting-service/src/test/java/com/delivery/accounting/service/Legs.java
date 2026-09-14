@@ -63,6 +63,13 @@ final class Legs {
                 .attributedTo(CounterpartyKind.RIDER, riderRef);
     }
 
+    /** A pickup's cash, held by the shop that took it at its counter (V52). */
+    static AccountingTransaction cashHeldByShop(UUID orderId, String amount, String merchantRef) {
+        return AccountingTransaction.obligation(orderId, Leg.CASH_COLLECTED, merchantRef,
+                        new BigDecimal(amount), "USD", Direction.DEBIT, "corr")
+                .attributedTo(CounterpartyKind.MERCHANT, merchantRef);
+    }
+
     /** A merchant credit from before attribution existed — the 45 rows already in the database. */
     static AccountingTransaction unattributedMerchantCredit(UUID orderId, String amount) {
         return of(orderId, Leg.MERCHANT_CREDIT, amount, Direction.CREDIT, null, null);

@@ -139,7 +139,8 @@ public class SettlementService {
      *                   platform's own fleet. It decides who the rider owes the notes to: their
      *                   company, which then owes the platform, or the platform directly. Stamped on
      *                   the float row at collection so the cash stays that company's responsibility
-     *                   even if the rider later moves fleet
+     *                   even if the rider later moves fleet. Always null for a shop holding a
+     *                   pickup's cash: nobody carried it, so it is owed to the platform directly
      */
     public record CashHolder(String ref, CashFloatEntry.HolderKind kind, String carrierRef) {
 
@@ -535,6 +536,12 @@ public class SettlementService {
                     .attributedTo(CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF));
         }
 
+        // A pickup paid at the shop's counter: the shop's share never leaves its till, so no bank is
+        // ever asked to pay it. See keptAtTheCounter.
+        if (cashHolder != null && cashHolder.kind() == CashFloatEntry.HolderKind.MERCHANT) {
+            keptAtTheCounter(legs);
+        }
+
         transactions.saveAll(legs);
         log.info("Settling order {}: total {} (goods {} + delivery {}) "
                         + "= merchant {} + wrapping {} + carrier {} + rider {} + platform {}",
@@ -818,16 +825,46 @@ public class SettlementService {
     }
 
     /**
+     * Marks the shop's own legs on a pickup it was paid for at its counter as discharged there.
+     *
+     * <p>The shop took the customer's notes, and its share of them — the goods less commission, and
+     * any wrapping — never leaves its hands: it keeps that from the till and pays the platform only
+     * the platform's part ({@link ShopTill}). So there is nothing for a bank to pay it, and asking a
+     * bank to would pay the shop a second time for money already in its till. Under
+     * {@code LEDGER_ONLY} this changes nothing, every leg being discharged outside a bank anyway;
+     * under {@code BANK} it is what keeps the shop's credits off the postings queue, and the
+     * sequence goes straight to the platform's own leg.
+     *
+     * <p>Where a promotion left the shop's share above what the customer paid, the difference is
+     * still the platform's debt to the shop, shown on its statement. It is not posted either: paying
+     * it by bank would mean splitting one leg in two, and the only mode that posts anything is not
+     * deployed.
+     */
+    private static void keptAtTheCounter(List<AccountingTransaction> legs) {
+        legs.stream()
+                .filter(leg -> leg.getLeg() == Leg.MERCHANT_CREDIT
+                        || leg.getLeg() == Leg.GIFT_WRAP_CREDIT)
+                .forEach(AccountingTransaction::recordWithoutBank);
+    }
+
+    /**
      * A cash holder as a counterparty.
      *
      * <p>{@code PROVIDER} on the float becomes {@code CARRIER} on the ledger: the two enums were
      * named at different times for the same thing, and mapping them here — once — is better than
      * renaming a column with rows in it or letting a statement query look for the wrong word.
+     *
+     * <p>A shop holding a pickup's cash is the {@code MERCHANT} it already is on the ledger, so its
+     * collection lands on the statement its goods are on. Spelt out for every kind rather than
+     * defaulting to a rider: a default is how a shop's till would have been booked to a rider who
+     * does not exist, and a new holder kind now fails to compile here instead.
      */
     private static CounterpartyKind kindOf(CashFloatEntry.HolderKind holderKind) {
-        return holderKind == CashFloatEntry.HolderKind.PROVIDER
-                ? CounterpartyKind.CARRIER
-                : CounterpartyKind.RIDER;
+        return switch (holderKind) {
+            case PROVIDER -> CounterpartyKind.CARRIER;
+            case MERCHANT -> CounterpartyKind.MERCHANT;
+            case RIDER -> CounterpartyKind.RIDER;
+        };
     }
 
     /**
@@ -878,7 +915,10 @@ public class SettlementService {
                 publishAfterCommit(leg);
                 return;
             }
-            if (leg.getStatus() != AccountingTransaction.Status.POSTED) {
+            // Done however it was discharged. A shop's share of a pickup it was paid for at its
+            // counter is discharged there and never posted (keptAtTheCounter), and the sequence moves
+            // past it exactly as past a posted leg.
+            if (!leg.isSettled()) {
                 // Failed or abandoned: the saga is unwinding, not progressing.
                 return;
             }

@@ -463,4 +463,110 @@ void main() {
       expect(adapter.calls.any((String c) => c.contains('delivery-providers')), isFalse);
     });
   });
+
+  /// A shop holding cash its counter took for pickup orders (services V52). It keeps its own share
+  /// and pays the platform its commission, so its line names it as a shop and asks for what it
+  /// owes — never the till, and never through a rider's "Banked" button, which would clear the whole
+  /// till with no figure confirmed.
+  group('a shop holding pickup cash', () {
+    const String shopRef = 'ffffffff-6666-4666-8666-666666666666';
+
+    setUp(() {
+      final String at =
+          DateTime.now().toUtc().subtract(const Duration(hours: 3)).toIso8601String();
+      floatJson = '''
+[{"holderRef":"$shopRef","holderKind":"MERCHANT","amount":40.00,"orders":1,"oldest":"$at",
+  "overdue":false,"owed":"5.00","retained":"35.00"},
+ {"holderRef":"dddddddd-4444-4444-8444-444444444444","holderKind":"RIDER",
+  "amount":42.75,"orders":3,"oldest":"$at","overdue":false}]''';
+    });
+
+    Finder shopRow() =>
+        find.ancestor(of: find.text('Shop FFFFFFFF'), matching: find.byType(Row)).first;
+
+    Finder recordShopPayment() =>
+        find.descendant(of: shopRow(), matching: find.text('Record payment'));
+
+    testWidgets('is labelled as a shop, asking for what it owes beside what its counter took',
+        (WidgetTester tester) async {
+      await pump(tester);
+
+      expect(find.text('Shop FFFFFFFF'), findsOneWidget);
+      expect(find.descendant(of: shopRow(), matching: find.byIcon(Icons.storefront_outlined)),
+          findsOneWidget);
+      expect(find.descendant(of: shopRow(), matching: find.text('\$5.00')), findsOneWidget);
+      expect(
+          find.descendant(
+              of: shopRow(), matching: find.textContaining('\$40.00 paid at its counter')),
+          findsOneWidget);
+      // Not a rider: no bike, and no "Banked" clearing the whole till with nothing confirmed.
+      expect(find.descendant(of: shopRow(), matching: find.byIcon(Icons.pedal_bike_outlined)),
+          findsNothing);
+      expect(find.descendant(of: shopRow(), matching: find.text('Banked')), findsNothing);
+      expect(recordShopPayment(), findsOneWidget);
+      // The rider beside it is still a rider.
+      expect(find.widgetWithText(OutlinedButton, 'Banked'), findsOneWidget);
+    });
+
+    testWidgets('records the shop\'s payment against what it owes, as the shop, once',
+        (WidgetTester tester) async {
+      remit = (RequestOptions options) => _json(
+          '{"remittanceId":"r3","holderRef":"$shopRef","amount":5.00,"collections":1,'
+          '"replayed":false,"retained":35.00}');
+      await pump(tester);
+
+      await tester.tap(recordShopPayment());
+      await tester.pumpAndSettle();
+
+      // What the operator is confirming: the commission, out of what the counter took.
+      final Finder dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.textContaining('\$5.00')),
+          findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.textContaining('\$40.00')),
+          findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Yes, they paid'));
+      await tester.pumpAndSettle();
+
+      final RequestOptions post =
+          adapter.requests.singleWhere((RequestOptions o) => o.method == 'POST');
+      expect(post.path, '/api/accounting/float/$shopRef/remit');
+      final Map<String, dynamic> body = post.data as Map<String, dynamic>;
+      expect(body['expectedAmount'], '5.00');
+      expect(body['holderKind'], 'MERCHANT');
+      expect(body['requestKey'], matches(RegExp(r'^[0-9a-f]{32}$')));
+      expect(find.text('Recorded \$5.00 from Shop FFFFFFFF.'), findsOneWidget);
+    });
+
+    testWidgets('a payment refused because a pickup was paid meanwhile says what the shop owes now',
+        (WidgetTester tester) async {
+      remit = (RequestOptions options) => _json(
+          '{"error":"The shop owes 6.56 now.","code":"AMOUNT_CHANGED","current":"6.56"}',
+          status: 409);
+      await pump(tester);
+
+      await tester.tap(recordShopPayment());
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Yes, they paid'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Shop FFFFFFFF now owes \$6.56, not the amount you confirmed. '
+            'Nothing was recorded.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('cannot be recorded when the server did not say what the shop owes',
+        (WidgetTester tester) async {
+      floatJson = floatJson.replaceAll(',"owed":"5.00","retained":"35.00"', '');
+      await pump(tester);
+
+      final ButtonStyleButton button = tester.widget<ButtonStyleButton>(find.ancestor(
+          of: recordShopPayment(),
+          matching: find.byWidgetPredicate((Widget w) => w is ButtonStyleButton)));
+      expect(button.enabled, isFalse);
+      // A dash, never a zero, where the figure would be.
+      expect(find.descendant(of: shopRow(), matching: find.text('—')), findsOneWidget);
+    });
+  });
 }

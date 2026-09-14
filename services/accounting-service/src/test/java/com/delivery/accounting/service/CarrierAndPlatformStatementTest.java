@@ -184,6 +184,8 @@ class CarrierAndPlatformStatementTest {
                 .thenReturn(new BigDecimal("2425.00"));
         when(floatEntries.totalBetween(eq(CashFloatEntry.Kind.REMITTED), any(), any()))
                 .thenReturn(BigDecimal.ZERO);
+        when(floatEntries.totalBetween(eq(CashFloatEntry.Kind.RETAINED), any(), any()))
+                .thenReturn(BigDecimal.ZERO);
         when(floatEntries.outstandingTotal()).thenReturn(new BigDecimal("2425.00"));
 
         Statement statement = service.build(
@@ -193,5 +195,36 @@ class CarrierAndPlatformStatementTest {
         // what the platform is owed by its own commission on every unbanked order.
         assertThat(statement.net().amount()).isEqualByComparingTo("12.50");
         assertThat(statement.note()).contains("2425.00").contains("count the same money twice");
+        // No shop kept anything, so the sentence reads as it always did.
+        assertThat(statement.note()).doesNotContain("shops kept");
+    }
+
+    /**
+     * A shop keeps its share of the cash its counter took for a pickup (V52): collected, never
+     * banked, and no longer held by anybody. Said, so that what was collected, banked and is still
+     * held account for every note between them.
+     */
+    @Test
+    @DisplayName("says what shops kept of their tills as their own share")
+    void sharesKeptAtCountersAreStated() {
+        UUID one = UUID.randomUUID();
+        own(CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF,
+                List.of(Legs.commission(one, "5.00")));
+        when(floatEntries.totalBetween(eq(CashFloatEntry.Kind.COLLECTED), any(), any()))
+                .thenReturn(new BigDecimal("40.00"));
+        when(floatEntries.totalBetween(eq(CashFloatEntry.Kind.REMITTED), any(), any()))
+                .thenReturn(new BigDecimal("5.00"));
+        when(floatEntries.totalBetween(eq(CashFloatEntry.Kind.RETAINED), any(), any()))
+                .thenReturn(new BigDecimal("35.00"));
+        when(floatEntries.outstandingTotal()).thenReturn(BigDecimal.ZERO);
+
+        Statement statement = service.build(
+                CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF, august);
+
+        assertThat(statement.note()).contains("collected 40.00 USD in cash in this period and "
+                + "banked 5.00 and shops kept 35.00 as their own share of pickups paid at their "
+                + "counters; 0.00 is still held");
+        // Kept is not earned: the platform is owed its commission, exactly as before.
+        assertThat(statement.net().amount()).isEqualByComparingTo("5.00");
     }
 }

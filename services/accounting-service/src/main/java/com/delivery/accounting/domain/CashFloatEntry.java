@@ -55,7 +55,18 @@ public class CashFloatEntry {
          */
         TRANSFERRED,
         /** Written off by an operator — theft, loss, a dispute settled the other way. */
-        WRITTEN_OFF
+        WRITTEN_OFF,
+        /**
+         * A shop keeping its own share of the cash its counter took for pickup orders (V52).
+         *
+         * <p>Written beside the {@link #REMITTED} row that pays the platform its part, and the two
+         * together discharge the shop's collections: a shop keeps its share of a pickup and pays the
+         * platform only what is the platform's (see {@code ShopTill}). Its own kind rather than a
+         * REMITTED row with a flag, for the reason {@link #TRANSFERRED} is: none of this money reached
+         * the platform, and "paid" is exactly the claim it must never be mistaken for — a statement
+         * that counted it would tell the shop the platform owes it the share it already kept.
+         */
+        RETAINED
     }
 
     /**
@@ -65,8 +76,14 @@ public class CashFloatEntry {
      * here from the start for exactly that, because adding a discriminator to a table that already
      * has rows means deciding what every existing row meant; it maps to
      * {@code CounterpartyKind.CARRIER} on the ledger.
+     *
+     * <p>{@code MERCHANT} is a shop holding the cash for a pickup order, paid at its own counter
+     * (V52): nobody carried the order, so no rider took the notes. Keyed on the shop's Keycloak
+     * subject — the order's {@code merchantId}, as a rider is keyed on theirs — and owed to the
+     * platform directly, so a shop's row never names a delivery company. It maps to
+     * {@code CounterpartyKind.MERCHANT} on the ledger, the party the shop already is there.
      */
-    public enum HolderKind { RIDER, PROVIDER }
+    public enum HolderKind { RIDER, PROVIDER, MERCHANT }
 
     /**
      * How a hand-over or a remittance was made. Recorded, never acted on: nothing in this service
@@ -194,8 +211,13 @@ public class CashFloatEntry {
         this.amount = amount;
         this.currency = currency;
         this.entryKind = entryKind;
-        // A company's own rows always name the company: see chk_float_provider_carrier.
-        this.carrierRef = holderKind == HolderKind.PROVIDER ? holderRef : carrierRef;
+        // A company's own rows always name the company (chk_float_provider_carrier), and a shop's
+        // never name one (chk_float_merchant_carrier): nobody carried a pickup.
+        this.carrierRef = switch (holderKind) {
+            case PROVIDER -> holderRef;
+            case MERCHANT -> null;
+            case RIDER -> carrierRef;
+        };
     }
 
     /** Notes taken at the door for one order, on the platform's own fleet. */
@@ -229,6 +251,22 @@ public class CashFloatEntry {
         CashFloatEntry entry = new CashFloatEntry(holderRef, holderKind, null, amount, currency,
                 Kind.REMITTED, null);
         entry.record(recorded);
+        return entry;
+    }
+
+    /**
+     * A shop keeping its own share of its till (V52), written beside the payment of the platform's
+     * part. Belongs to no single order. It records who confirmed it and no method, because nothing
+     * was handed over.
+     *
+     * @param requestKey the confirmation's key — only when nothing of the till was the platform's,
+     *                   so that this is the one row the payment wrote; null otherwise
+     */
+    public static CashFloatEntry retained(String shopRef, BigDecimal amount, String currency,
+                                          String recordedBy, String requestKey) {
+        CashFloatEntry entry = new CashFloatEntry(shopRef, HolderKind.MERCHANT, null, amount,
+                currency, Kind.RETAINED, null);
+        entry.record(new Recorded(recordedBy, null, null, requestKey));
         return entry;
     }
 

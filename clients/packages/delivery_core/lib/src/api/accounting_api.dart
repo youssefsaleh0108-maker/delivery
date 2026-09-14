@@ -79,16 +79,23 @@ class AccountingApi {
   /// every hand-over at its hub, so when it is given and the balance has moved, nothing is recorded
   /// and this throws [CashAmountChanged]. [requestKey] makes a double press answer with the first
   /// remittance. Called with neither, it banks everything exactly as it always did.
+  ///
+  /// [holderKind] is which of the account's cash is being paid in: the [CashHolder.holderKind] of
+  /// the line. One account can be a shop and a rider at once, and the server will not guess between
+  /// its till and its bag. A shop's payment must give [expected], and that is what the shop owes
+  /// ([CashHolder.owed]), never its till.
   Future<Remittance> remit(
     String holderRef, {
     Money? expected,
     CashMethod? method,
     String? requestKey,
+    String? holderKind,
   }) async {
     final Map<String, dynamic> body = <String, dynamic>{
       if (expected != null) 'expectedAmount': expected.amount,
       if (method != null) 'method': method.wire,
       if (requestKey != null) 'requestKey': requestKey,
+      if (holderKind != null) 'holderKind': holderKind,
     };
     try {
       final Response<dynamic> response = await _dio.post<dynamic>(

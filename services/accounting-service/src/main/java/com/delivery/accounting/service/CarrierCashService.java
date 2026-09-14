@@ -87,6 +87,7 @@ public class CarrierCashService {
     private final AccountDirectory accounts;
     private final int overdueAfterHours;
     private final int platformOverdueAfterHours;
+    private final int merchantOverdueAfterHours;
     private final ZoneId zone;
     private final String currency;
     private final Clock clock;
@@ -105,23 +106,43 @@ public class CarrierCashService {
                               // them to. See cashOnHand().
                               @Value("${delivery.accounting.float.platform-overdue-after-hours:24}")
                               int platformOverdueAfterHours,
+                              // How long a shop may hold the cash its counter took for pickup
+                              // orders (V52) before the Back Office flags it. A line of its own
+                              // because nobody has decided how often a shop pays its till in; until
+                              // somebody does it defaults to the carrier line, the rule partner
+                              // custody already has. See cashOnHand().
+                              @Value("${delivery.accounting.float.merchant-overdue-after-hours:48}")
+                              int merchantOverdueAfterHours,
                               // A "day" on this page is a local-calendar day, in the same zone the
                               // statements use.
                               @Value("${delivery.accounting.statements.zone:UTC}") String zone,
                               @Value("${delivery.accounting.currency:USD}") String currency) {
-        this(floats, riderLedger, accounts, overdueAfterHours, platformOverdueAfterHours, zone,
-                currency, Clock.systemUTC());
+        this(floats, riderLedger, accounts, overdueAfterHours, platformOverdueAfterHours,
+                merchantOverdueAfterHours, zone, currency, Clock.systemUTC());
     }
 
-    /** For tests, which need "now" to hold still while they ask how old something is. */
+    /**
+     * For tests, which need "now" to hold still while they ask how old something is. A shop's till
+     * is held to the carrier line, as it is when nothing is configured.
+     */
     CarrierCashService(CashFloatRepository floats, RiderLedgerRepository riderLedger,
                        AccountDirectory accounts, int overdueAfterHours,
                        int platformOverdueAfterHours, String zone, String currency, Clock clock) {
+        this(floats, riderLedger, accounts, overdueAfterHours, platformOverdueAfterHours,
+                overdueAfterHours, zone, currency, clock);
+    }
+
+    /** For tests that give a shop's till a line of its own. */
+    CarrierCashService(CashFloatRepository floats, RiderLedgerRepository riderLedger,
+                       AccountDirectory accounts, int overdueAfterHours,
+                       int platformOverdueAfterHours, int merchantOverdueAfterHours, String zone,
+                       String currency, Clock clock) {
         this.floats = floats;
         this.riderLedger = riderLedger;
         this.accounts = accounts;
         this.overdueAfterHours = overdueAfterHours;
         this.platformOverdueAfterHours = platformOverdueAfterHours;
+        this.merchantOverdueAfterHours = merchantOverdueAfterHours;
         this.zone = ZoneId.of(zone);
         this.currency = currency;
         this.clock = clock;
@@ -162,6 +183,14 @@ public class CarrierCashService {
      */
     public boolean isPlatformOverdue(Instant oldest) {
         return heldPast(oldest, platformOverdueAfterHours);
+    }
+
+    /**
+     * {@link #isOverdue}, by the shop line: cash a shop took at its own counter for pickup orders
+     * (V52), which it owes the platform directly.
+     */
+    public boolean isMerchantOverdue(Instant oldest) {
+        return heldPast(oldest, merchantOverdueAfterHours);
     }
 
     private boolean heldPast(Instant oldest, int hours) {
@@ -530,8 +559,8 @@ public class CarrierCashService {
     }
 
     /**
-     * One line of the Back Office's cash-on-hand list: a rider or a company holding cash that has
-     * not been banked.
+     * One line of the Back Office's cash-on-hand list: a rider, a company or a shop holding cash that
+     * has not been banked.
      *
      * @param overdue judged by the limit for the cash this holder has — see {@link #cashOnHand()}
      */
@@ -553,6 +582,11 @@ public class CarrierCashService {
      * <p>A rider carrying both kinds at once is late when either part is, each by its own line: a
      * day-old platform bag is not excused by a fresh company one beside it, and a company bag inside
      * its limit is not made late by the platform's shorter one.
+     *
+     * <p><strong>A shop's till is a third kind of cash (V52)</strong>: what a shop's counter took
+     * for pickup orders, owed to the platform directly. It is judged by its own line,
+     * {@code merchant-overdue-after-hours}, because neither of the other two was decided for shops;
+     * and it is only ever the shop's own, so its oldest row is the whole answer.
      */
     @Transactional(readOnly = true)
     public List<OnHand> cashOnHand() {
@@ -567,9 +601,13 @@ public class CarrierCashService {
         return floats.outstandingByHolder().stream()
                 .map(row -> new OnHand(row.getHolderRef(), row.getHolderKind(), row.getAmount(),
                         row.getOrders(), row.getOldest(),
-                        row.getHolderKind() == HolderKind.PROVIDER
-                                ? isOverdue(row.getOldest())
-                                : lateRiders.contains(row.getHolderRef())))
+                        // Every kind spelt out: a new holder kind must decide its own line here
+                        // rather than silently inherit a rider's, as a shop's till once would have.
+                        switch (row.getHolderKind()) {
+                            case PROVIDER -> isOverdue(row.getOldest());
+                            case MERCHANT -> isMerchantOverdue(row.getOldest());
+                            case RIDER -> lateRiders.contains(row.getHolderRef());
+                        }))
                 .toList();
     }
 

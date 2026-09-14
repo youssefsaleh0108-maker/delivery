@@ -133,15 +133,27 @@ public class OrderEventListener {
             // order the customer handed notes to whoever turned up — the ledger records that as an
             // obligation against them rather than pretending a bank account moved.
             //
-            // A cash order with no rider on it cannot say who took the money, so it falls back to
-            // the old approximation rather than inventing a holder. That should not happen: nobody
-            // delivered it.
+            // A pickup is the one cash order nobody carries (a service order, V52): the customer pays
+            // at the counter of the shop that did the work, so the SHOP is holding the notes and owes
+            // them to the platform. Its collection is attributed to the shop and never to the
+            // customer. Decided by the order's own fulfilment and never inferred from a missing
+            // rider: a delivery that names no rider is a data problem, and charging its cash to the
+            // shop would bill a merchant for notes a stranger took. Absent on every event published
+            // before service orders — all of them deliveries — which settle exactly as they did.
+            //
+            // Any other cash order with no rider on it cannot say who took the money, so it falls
+            // back to the old approximation rather than inventing a holder. That should not happen:
+            // nobody delivered it.
+            boolean pickup = "PICKUP".equals(event.path("fulfilment").asText(null));
             SettlementService.CashHolder holder = null;
             if ("CASH".equals(event.path("paymentMethod").asText(null))) {
                 if (riderId != null) {
                     holder = new SettlementService.CashHolder(
                             riderId, CashFloatEntry.HolderKind.RIDER,
                             carrierOwningTheCash(event, errand));
+                } else if (pickup) {
+                    holder = new SettlementService.CashHolder(
+                            merchantId, CashFloatEntry.HolderKind.MERCHANT);
                 } else {
                     log.warn("Order {} was paid in cash but names no rider; recording the "
                             + "collection against the customer, which overstates their account.",
