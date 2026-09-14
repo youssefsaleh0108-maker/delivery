@@ -263,6 +263,36 @@ void main() {
     );
   });
 
+  testWidgets('a save that fails says so, and nothing is taken as saved',
+      (WidgetTester tester) async {
+    final FakeOffers api = FakeOffers(<Product>[])..failCreate = svcHttpError(500);
+    await pumpForm(tester, api: api);
+    await fillValidOffer(tester);
+
+    await tester.tap(find.text(en.svcSaveDraft));
+    await svcSettle(tester);
+
+    expect(snack(en.svcOfferSaveFailed), findsOneWidget);
+    expect(find.byTooltip(en.svcMoreActions), findsNothing, reason: 'there is no offer yet');
+    expect(
+      tester.widget<YdPillButton>(find.widgetWithText(YdPillButton, en.svcSaveDraft)).onPressed,
+      isNotNull,
+      reason: 'the provider can try again',
+    );
+  });
+
+  testWidgets('a save the server refuses says to check the offer', (WidgetTester tester) async {
+    final FakeOffers api = FakeOffers(<Product>[])..failCreate = svcHttpError(422);
+    await pumpForm(tester, api: api);
+    await fillValidOffer(tester);
+
+    await tester.tap(find.text(en.svcPublishOffer));
+    await svcSettle(tester);
+
+    expect(snack(en.svcOfferRefused), findsOneWidget);
+    expect(api.calls, <String>['create'], reason: 'nothing is published after a refused save');
+  });
+
   testWidgets('the form fits a 320dp phone', (WidgetTester tester) async {
     await pumpForm(tester, existing: svcOffer(prompt: 'Which names and job titles go on the cards?'),
         size: const Size(320, 3200));

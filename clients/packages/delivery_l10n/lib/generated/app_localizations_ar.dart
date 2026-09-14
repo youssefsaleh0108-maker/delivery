@@ -11542,10 +11542,4 @@ class DeliveryStringsAr extends DeliveryStrings {
   String svcTurnaroundAfterAccept(String range) {
     return 'مدة التنفيذ بعد القبول: $range';
   }
-
-  @override
-  String get svcOrderPrice => 'السعر';
-
-  @override
-  String get svcOrderLoadFailed => 'تعذّر تحميل هذا الطلب';
 }

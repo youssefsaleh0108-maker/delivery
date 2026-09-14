@@ -11401,10 +11401,4 @@ class DeliveryStringsEn extends DeliveryStrings {
   String svcTurnaroundAfterAccept(String range) {
     return 'Turnaround once you accept: $range';
   }
-
-  @override
-  String get svcOrderPrice => 'Price';
-
-  @override
-  String get svcOrderLoadFailed => 'Couldn\'t load this order';
 }

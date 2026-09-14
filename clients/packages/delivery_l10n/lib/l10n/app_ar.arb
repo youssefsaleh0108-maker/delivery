@@ -3523,7 +3523,5 @@
   "svcFulfilmentPickupDetail": "يستلمه الزبون من متجرك",
   "svcFulfilmentDeliveryDetail": "يوصله السائق إلى {address}",
   "svcEstimatedReady": "الجاهزية المتوقعة",
-  "svcTurnaroundAfterAccept": "مدة التنفيذ بعد القبول: {range}",
-  "svcOrderPrice": "السعر",
-  "svcOrderLoadFailed": "تعذّر تحميل هذا الطلب"
+  "svcTurnaroundAfterAccept": "مدة التنفيذ بعد القبول: {range}"
 }

@@ -19388,18 +19388,6 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Turnaround once you accept: {range}'**
   String svcTurnaroundAfterAccept(String range);
-
-  /// No description provided for @svcOrderPrice.
-  ///
-  /// In en, this message translates to:
-  /// **'Price'**
-  String get svcOrderPrice;
-
-  /// No description provided for @svcOrderLoadFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t load this order'**
-  String get svcOrderLoadFailed;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

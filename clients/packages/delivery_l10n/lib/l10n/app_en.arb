@@ -5726,7 +5726,5 @@
   "@svcFulfilmentDeliveryDetail": {"placeholders":{"address":{"type":"String"}}},
   "svcEstimatedReady": "Estimated ready",
   "svcTurnaroundAfterAccept": "Turnaround once you accept: {range}",
-  "@svcTurnaroundAfterAccept": {"placeholders":{"range":{"type":"String"}}},
-  "svcOrderPrice": "Price",
-  "svcOrderLoadFailed": "Couldn't load this order"
+  "@svcTurnaroundAfterAccept": {"placeholders":{"range":{"type":"String"}}}
 }
