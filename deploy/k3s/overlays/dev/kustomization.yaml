@@ -58,7 +58,7 @@ images:
   newTag: sha-14747c95bbb749aff1b8bea44031ed5255931ec9
 - name: ghcr.io/youssefsaleh0108-maker/connector-settings
   newName: ghcr.io/youssefsaleh0108-maker/connector-settings
-  newTag: sha-7c701a6be3361bdb973776c27feb25c720f84d75
+  newTag: sha-14747c95bbb749aff1b8bea44031ed5255931ec9
 - name: ghcr.io/youssefsaleh0108-maker/email-connector
   newName: ghcr.io/youssefsaleh0108-maker/email-connector
   newTag: sha-14747c95bbb749aff1b8bea44031ed5255931ec9
