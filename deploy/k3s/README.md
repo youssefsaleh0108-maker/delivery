@@ -78,16 +78,16 @@ invent is the onboarding client secret, which must match what the realm import c
   a key without CLAUDE is never used. Each scan is a paid call once both are done; the per-merchant
   caps live under `delivery.catalog.scan` in product-service's `application.yml`.
 - **Service-order attachments need their bucket once per environment.** The files customers attach
-  to service orders live in the private `order-attachments` bucket. `minio/bootstrap.sh` creates it,
-  but in dev and qa the `minio-init` Job has already completed, and `kubectl apply` never re-runs a
-  finished Job (the generated ConfigMaps keep their names). Re-run it by hand, per environment —
-  the script is idempotent, so the existing buckets and rules are left as they are:
+  to service orders live in the private `order-attachments` bucket, which `minio/bootstrap.sh`
+  creates. A finished Job never runs again, whether Argo CD or `kubectl apply` applies it (the
+  generated ConfigMaps keep their names). So the bootstrap Job's name carries a suffix:
+  `minio-init-2` since this bucket was added. The next sync creates the renamed Job, and the script
+  runs once more in each environment. It is idempotent, so existing buckets and rules are left as
+  they are. Bump the suffix whenever the script changes. To confirm:
 
   ```sh
-  kubectl -n delivery-dev delete job minio-init
-  kubectl apply -k /opt/delivery/k3s/overlays/dev
-  kubectl -n delivery-dev logs job/minio-init | grep order-attachments
-  # and the same with delivery-qa / overlays/qa
+  kubectl -n delivery-dev logs job/minio-init-2 | grep order-attachments
+  # and the same with delivery-qa
   ```
 
   The same apply routes `/order-attachments` on the API hostname (presigned requests only; MinIO

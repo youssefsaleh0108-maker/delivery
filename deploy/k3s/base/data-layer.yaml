@@ -298,11 +298,15 @@ spec:
       port: 9001
       targetPort: 9001
 ---
-# Creates the buckets with their access policies, then exits. Idempotent; re-run on every apply.
+# Creates the buckets with their access policies, then exits. Idempotent, so running it again is
+# always safe, but nothing runs it again on its own: a finished Job is immutable, Argo CD applies it
+# once and never re-runs it, and prune is off. So the name carries a suffix. Bump it whenever
+# assets/minio/bootstrap.sh changes, and each environment runs the script once more on its next
+# sync. -2 added the order-attachments bucket for service orders.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: minio-init
+  name: minio-init-2
 spec:
   backoffLimit: 10
   template:
