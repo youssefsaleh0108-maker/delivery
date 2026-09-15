@@ -40,6 +40,17 @@ patches:
   target:
     kind: Deployment
     name: portal
+# order-manager lives in its own repository, and dev runs its moving `:develop` tag, so a new
+# order-manager build changes nothing Argo CD can see. Changing this value rolls the pods, and
+# imagePullPolicy: Always makes them pull the new build. Set it to the order-manager commit that
+# should be running.
+- patch: |-
+    - op: add
+      path: /spec/template/metadata/annotations/youdrop.shop~1order-manager-build
+      value: "bbc10ce"
+  target:
+    kind: Deployment
+    name: order-manager
 
 # Which build each service runs. CI rewrites these lines after every image build on this
 # environment's branch (see reusable-service-ci.yml, update-environment-manifest) and Argo CD
