@@ -121,19 +121,13 @@ delivery:
       # window in which a leaked URL is worth anything is measured in minutes.
       presign-ttl: 10m
       max-upload-size-bytes: 10485760
-      # The platform's list is named for images and is shared by every purpose, so PDF has to be
-      # added here for the documents step to work at all — a commercial registration arrives as a
-      # PDF far more often than as a photograph.
-      #
-      # Note what is NOT on this list: image/svg+xml. SVG is script, and these objects are served
-      # from the MinIO origin by presigned URL; an SVG "scan of a licence" would run in that origin
-      # with the reviewer's session for it. The list is an allow-list precisely so that adding a
-      # type is a decision somebody makes on purpose.
-      allowed-image-content-types:
-        - image/jpeg
-        - image/png
-        - image/webp
-        - application/pdf
+      # No content-type list here: since platform-storage 0.1.3 each purpose carries its own.
+      # MERCHANT_KYC takes photos and PDF (a commercial registration arrives as a PDF far more often
+      # than as a photograph); avatars and provider logos stay photos only. The old global
+      # allowed-image-content-types list, which this file once widened with PDF for every purpose,
+      # is no longer consulted and only draws a warning at startup. To change one purpose, set
+      # allowed-content-types.<PURPOSE>, and keep image/svg+xml off it: SVG is script, and these
+      # objects are served from the MinIO origin by presigned URL.
 
   security:
     permit-all:
@@ -237,9 +231,9 @@ delivery:
       reset-daily-cap: ${VERIFICATION_RESET_DAILY_CAP:3}
 
     documents:
-      # What the wizard's documents step accepts. Narrower than the storage list above is allowed;
-      # wider is not, because StorageService checks its own list too and would refuse afterwards
-      # with a message the applicant cannot act on.
+      # What the wizard's documents step accepts. Narrower than platform-storage's MERCHANT_KYC list
+      # (photos and PDF) is allowed; wider is not, because StorageService checks that list too and
+      # would refuse afterwards with a message the applicant cannot act on.
       allowed-content-types: image/jpeg,image/png,image/webp,application/pdf
 
     payout:

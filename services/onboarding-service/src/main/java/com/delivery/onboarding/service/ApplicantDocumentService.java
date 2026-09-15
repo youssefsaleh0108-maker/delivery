@@ -112,10 +112,10 @@ public class ApplicantDocumentService {
         }
 
         if (!allowedContentTypes.contains(contentType)) {
-            // Checked here as well as inside StorageService, which has its own list. Two lists is a
-            // wart — the platform's is named for images and is shared by every purpose — but the
+            // Checked here as well as inside StorageService, which applies MERCHANT_KYC's own list
+            // (photos and PDF, since platform-storage 0.1.3). This check stays because it is the
             // one that produces a message an applicant can act on ("we take photos and PDFs")
-            // rather than a storage exception has to be this one.
+            // rather than a storage exception.
             throw new DocumentRuleException(
                     "Documents must be a photo or a PDF, not " + contentType);
         }
