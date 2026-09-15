@@ -74,12 +74,23 @@ public class OrderEventListener {
             UUID orderId = UUID.fromString(event.path("orderId").asText());
             Map<String, String> values = placeholders(event, orderId);
 
+            // A service order is told in its own words (ServiceOrderWording, V19). Empty for every
+            // other order, and for any event from before order-manager said what kind an order was.
+            java.util.Optional<ServiceOrderWording.Fulfilment> service = ServiceOrderWording.of(event);
+            if (service.isPresent()) {
+                ServiceOrderWording.addPlaceholders(event, service.get(), values);
+            }
+
             switch (eventType) {
                 case "order.placed" -> {
                     notify(eventType, orderId, event.path("customerId").asText(null), values, correlationId);
                     // The merchant's copy says something different: it is a work item, not a
-                    // receipt. Same event, different template row, keyed on a distinct type.
-                    notify("order.placed.merchant", orderId, event.path("merchantId").asText(null),
+                    // receipt. Same event, different template row, keyed on a distinct type. A
+                    // service order's copy names the job: "1 items" says nothing about 500 cards.
+                    String merchantType = service.isPresent()
+                            ? ServiceOrderWording.PLACED_MERCHANT
+                            : "order.placed.merchant";
+                    notify(merchantType, orderId, event.path("merchantId").asText(null),
                             values, correlationId);
                 }
                 case "order.status_changed" -> {
@@ -91,8 +102,16 @@ public class OrderEventListener {
                     // notify twice. The raw wire value, not the humanised one: the key must be
                     // stable however the copy is worded.
                     String status = event.path("status").asText("");
-                    notify(eventType, orderId, event.path("customerId").asText(null),
-                            values, correlationId, orderId + ":" + status);
+                    // A service order says its moments in its own words, under the same key: the
+                    // key names the transition, not the copy. Null is a service order's PREPARING,
+                    // which says nothing at all (see ServiceOrderWording.statusChangedType).
+                    String customerType = service.isPresent()
+                            ? ServiceOrderWording.statusChangedType(status, service.get(), values)
+                            : eventType;
+                    if (customerType != null) {
+                        notify(customerType, orderId, event.path("customerId").asText(null),
+                                values, correlationId, orderId + ":" + status);
+                    }
 
                     // The merchant's half, and only for the transition they did not cause.
                     // ACCEPTED, PREPARING and READY are their own three taps; telling them about
@@ -106,12 +125,20 @@ public class OrderEventListener {
                     }
                 }
                 case "order.delivered" -> {
-                    notify(eventType, orderId, event.path("customerId").asText(null),
-                            values, correlationId);
-                    // The shop finds out their order arrived. Without this an order simply goes
-                    // quiet for the merchant the moment they mark it ready.
-                    notify("order.delivered.merchant", orderId,
-                            event.path("merchantId").asText(null), values, correlationId);
+                    if (service.orElse(null) == ServiceOrderWording.Fulfilment.PICKUP) {
+                        // Collected at the counter. The customer is asked to rate the shop while
+                        // the work is in their hands. The shop is told nothing: "collected" was its
+                        // own tap, which is the same reason READY never reaches its phone.
+                        notify(ServiceOrderWording.COLLECTED, orderId,
+                                event.path("customerId").asText(null), values, correlationId);
+                    } else {
+                        notify(eventType, orderId, event.path("customerId").asText(null),
+                                values, correlationId);
+                        // The shop finds out their order arrived. Without this an order simply goes
+                        // quiet for the merchant the moment they mark it ready.
+                        notify("order.delivered.merchant", orderId,
+                                event.path("merchantId").asText(null), values, correlationId);
+                    }
                 }
                 case "order.rider_assigned" -> {
                     notify(eventType, orderId, event.path("customerId").asText(null),
@@ -120,10 +147,26 @@ public class OrderEventListener {
                             values, correlationId);
                 }
                 case "order.cancelled" -> {
-                    notify(eventType, orderId, event.path("customerId").asText(null),
-                            values, correlationId);
-                    notify("order.cancelled.merchant", orderId, event.path("merchantId").asText(null),
-                            values, correlationId);
+                    String shopsOwn = service
+                            .map(fulfilment -> ServiceOrderWording.cancelledType(event, fulfilment))
+                            .orElse(null);
+                    if (shopsOwn != null) {
+                        // A service order's shop declined it, or gave up on a pickup nobody came
+                        // for, as far as the snapshot can show (ServiceOrderWording.cancelledType).
+                        // The customer hears why, in words. The shop hears nothing: it made this
+                        // cancellation itself, and the basket's copy would read its own tap back to
+                        // it as "Stop preparing order #X. PROVIDER_DECLINED: TOO_BUSY".
+                        notify(shopsOwn, orderId, event.path("customerId").asText(null),
+                                values, correlationId);
+                    } else {
+                        // Anybody else's cancellation, and any the snapshot cannot pin on the shop:
+                        // both sides hear it, as for a basket, because a shop that did not cancel
+                        // has to be told to stop.
+                        notify(eventType, orderId, event.path("customerId").asText(null),
+                                values, correlationId);
+                        notify("order.cancelled.merchant", orderId,
+                                event.path("merchantId").asText(null), values, correlationId);
+                    }
                 }
                 default -> log.debug("No audience defined for {}", eventType);
             }

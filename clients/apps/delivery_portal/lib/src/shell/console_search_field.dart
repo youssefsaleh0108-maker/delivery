@@ -135,9 +135,16 @@ class ConsoleFilterButton extends StatelessWidget {
             children: <Widget>[
               Icon(icon, size: 16, color: foreground),
               const SizedBox(width: DeliverySpacing.sm),
-              Text(
-                label,
-                style: ConsoleText.controlLabel.copyWith(color: foreground),
+              // Flexible and one line, as ConsolePrimaryButton's label is: a dropdown showing a
+              // user-named choice (a shift is up to 80 characters) must shorten inside a dialog
+              // rather than overflow it. Loose, so a button in an unbounded row sizes as before.
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ConsoleText.controlLabel.copyWith(color: foreground),
+                ),
               ),
               if (trailing != null) ...<Widget>[
                 const SizedBox(width: DeliverySpacing.sm),

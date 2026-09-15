@@ -101,7 +101,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Future<void> _refresh({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
     try {
-      final Paged<DeliveryOrder> page = await widget.api.forMerchant(size: 50);
+      // Goods orders only. An owner who also runs a services shop gets its orders here too otherwise,
+      // and this queue cannot work one: a service order is declined with a reason, collected at the
+      // counter, or cancelled once its customer has not come — steps the services queue offers and
+      // this one does not, so the order would sit here with no button that moves it.
+      final Paged<DeliveryOrder> page =
+          await widget.api.forMerchant(kind: OrderKind.catalog, size: 50);
       if (!mounted) return;
       setState(() {
         _orders = page.content;

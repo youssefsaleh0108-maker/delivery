@@ -9,13 +9,32 @@ enum StoreVertical {
   convenience('CONVENIENCE', 'Convenience'),
   pharmacy('PHARMACY', 'Pharmacy'),
   electronics('ELECTRONICS', 'Electronics'),
-  flowersGifts('FLOWERS_GIFTS', 'Flowers & Gifts');
+  flowersGifts('FLOWERS_GIFTS', 'Flowers & Gifts'),
+
+  /// A shop that makes something to order — a print shop, a tailor, a repairer — rather than selling
+  /// stock. It has a [ServiceCategory] and is listed on the Services tab, never among the goods
+  /// verticals: the server leaves it out of every storefront read that does not ask for it, and no
+  /// goods picker offers it ([pickerVerticals]). A shop never moves into or out of it.
+  services('SERVICES', 'Services');
 
   const StoreVertical(this.wireValue, this.label);
 
   final String wireValue;
   final String label;
 
+  /// The verticals a goods picker may offer: every vertical but [services].
+  ///
+  /// What the Home strip, the shop lists, the category counts, the merchant's shop form and the back
+  /// office's chip editor iterate. They iterated [values], which would have put a Services chip on
+  /// Home the moment this enum learned the word — a chip filtering a storefront that never lists a
+  /// service shop — and offered a goods merchant a vertical the server refuses to move them into.
+  /// Derived from [values], so a new goods vertical joins it without anyone remembering to add it.
+  static final List<StoreVertical> pickerVerticals = List<StoreVertical>.unmodifiable(
+      values.where((StoreVertical vertical) => vertical != services));
+
+  /// An unknown value reads as [restaurant]. That fallback is why the server never lists a service
+  /// shop to a read that did not ask for one: an app built before [services] existed reads SERVICES
+  /// as a restaurant.
   static StoreVertical fromWire(String? value) {
     return maybeFromWire(value) ?? StoreVertical.restaurant;
   }
@@ -26,6 +45,41 @@ enum StoreVertical {
     for (final StoreVertical vertical in StoreVertical.values) {
       if (vertical.wireValue == value) {
         return vertical;
+      }
+    }
+    return null;
+  }
+}
+
+/// What a [StoreVertical.services] shop does. The wire values mirror product-service's
+/// `Store.ServiceCategory`.
+///
+/// The whole taxonomy is here, including categories the server has not opened. Which ones are open is
+/// the server's setting, read with `StoreApi.serviceCategories`: a closed category is never offered
+/// to a provider and never shown to a customer, so a screen asks the server rather than iterating
+/// [values].
+enum ServiceCategory {
+  printing('PRINTING'),
+
+  /// Tailoring and alterations.
+  tailoring('TAILORING'),
+  repairs('REPAIRS'),
+  photography('PHOTOGRAPHY'),
+  cleaning('CLEANING'),
+  beauty('BEAUTY'),
+  tutoring('TUTORING');
+
+  const ServiceCategory(this.wireValue);
+
+  final String wireValue;
+
+  /// Null for a value this app does not know, such as a category a newer server added. There is no
+  /// safe stand-in — filing an unknown service under Printing would repeat the mistake that reads an
+  /// unknown vertical as a restaurant — so a screen hides what it cannot name.
+  static ServiceCategory? maybeFromWire(String? value) {
+    for (final ServiceCategory category in ServiceCategory.values) {
+      if (category.wireValue == value) {
+        return category;
       }
     }
     return null;
@@ -180,15 +234,22 @@ class StoreCard {
     this.verifiedLocal = false,
     this.powerStatus = StorePowerStatus.unknown,
     this.powerNote,
+    this.powerUpdatedAt,
+    this.powerCurrent = false,
     this.latitude,
     this.longitude,
     this.deliveryRadiusMetres,
+    this.serviceCategory,
   });
 
   final String id;
   final String slug;
   final String name;
   final StoreVertical vertical;
+
+  /// What a [StoreVertical.services] shop does, for the Services tab's "Printing • 0.5 km" line.
+  /// Null on every goods card, and on a service card whose category this app does not know.
+  final ServiceCategory? serviceCategory;
   final String? tagline;
   final List<String> tags;
   final double? rating;
@@ -222,6 +283,19 @@ class StoreCard {
 
   /// The merchant's one-liner under the chip: "Ovens fully hot", "Cold storage active".
   final String? powerNote;
+
+  /// When the merchant declared [powerStatus], or null if they never have — for the "updated 20 min
+  /// ago" under a power badge.
+  final DateTime? powerUpdatedAt;
+
+  /// Whether that declaration is recent enough to present as what the lights are doing NOW.
+  ///
+  /// The server decides, with its configured window (`delivery.product.power-declaration-fresh-for`,
+  /// four hours by default), and its "on generator now" filter uses the same answer, so a card and
+  /// the filter cannot disagree about a shop. False draws no power badge and dims nothing: an old
+  /// declaration is history, not the state of the shop. A server that does not send it reads as
+  /// false for the same reason.
+  final bool powerCurrent;
 
   /// The pin, carried on the card so checkout can measure the door against the circle below.
   final double? latitude;
@@ -264,9 +338,12 @@ class StoreCard {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        powerUpdatedAt: powerUpdatedAt,
+        powerCurrent: powerCurrent,
         latitude: latitude,
         longitude: longitude,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        serviceCategory: serviceCategory,
       );
 
   factory StoreCard.fromJson(Map<String, dynamic> json) => StoreCard(
@@ -295,9 +372,14 @@ class StoreCard {
         verifiedLocal: json['verifiedLocal'] as bool? ?? false,
         powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
         powerNote: json['powerNote'] as String?,
+        powerUpdatedAt: json['powerUpdatedAt'] == null
+            ? null
+            : DateTime.parse(json['powerUpdatedAt'] as String),
+        powerCurrent: json['powerCurrent'] as bool? ?? false,
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
+        serviceCategory: ServiceCategory.maybeFromWire(json['serviceCategory'] as String?),
       );
 }
 
@@ -353,13 +435,20 @@ class Store {
     this.verifiedLocal = false,
     this.powerStatus = StorePowerStatus.unknown,
     this.powerNote,
+    this.powerUpdatedAt,
+    this.powerCurrent = false,
     this.deliveryRadiusMetres,
+    this.serviceCategory,
   });
 
   final String id;
   final String slug;
   final String name;
   final StoreVertical vertical;
+
+  /// What a [StoreVertical.services] shop does; null for a goods shop. See
+  /// [StoreCard.serviceCategory].
+  final ServiceCategory? serviceCategory;
 
   /// Listed, delisted, or not yet published. What the merchant dashboard's Active switch reflects.
   /// Defaults to active because the customer storefront only ever returns listed shops — a customer
@@ -413,6 +502,13 @@ class Store {
   /// The one-liner the storefront prints under the power chip.
   final String? powerNote;
 
+  /// When the merchant last declared. See [StoreCard.powerUpdatedAt].
+  final DateTime? powerUpdatedAt;
+
+  /// Whether the declaration still counts as now. See [StoreCard.powerCurrent] — customer surfaces
+  /// draw nothing from a declaration that does not. The merchant's own screens show it regardless.
+  final bool powerCurrent;
+
   /// The merchant's delivery circle in metres, or null for zones-only.
   final int? deliveryRadiusMetres;
 
@@ -460,9 +556,12 @@ class Store {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        powerUpdatedAt: powerUpdatedAt,
+        powerCurrent: powerCurrent,
         latitude: latitude,
         longitude: longitude,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        serviceCategory: serviceCategory,
       );
 
   Store copyWith({bool? favorite}) => Store(
@@ -496,7 +595,10 @@ class Store {
         verifiedLocal: verifiedLocal,
         powerStatus: powerStatus,
         powerNote: powerNote,
+        powerUpdatedAt: powerUpdatedAt,
+        powerCurrent: powerCurrent,
         deliveryRadiusMetres: deliveryRadiusMetres,
+        serviceCategory: serviceCategory,
       );
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -531,7 +633,12 @@ class Store {
         verifiedLocal: json['verifiedLocal'] as bool? ?? false,
         powerStatus: StorePowerStatus.fromWire(json['powerStatus'] as String?),
         powerNote: json['powerNote'] as String?,
+        powerUpdatedAt: json['powerUpdatedAt'] == null
+            ? null
+            : DateTime.parse(json['powerUpdatedAt'] as String),
+        powerCurrent: json['powerCurrent'] as bool? ?? false,
         deliveryRadiusMetres: (json['deliveryRadiusMetres'] as num?)?.toInt(),
+        serviceCategory: ServiceCategory.maybeFromWire(json['serviceCategory'] as String?),
       );
 }
 
@@ -608,6 +715,7 @@ class Aisle {
 class StoreFilters {
   const StoreFilters({
     this.vertical,
+    this.serviceCategory,
     this.search,
     this.maxDeliveryFee,
     this.maxEtaMinutes,
@@ -617,6 +725,10 @@ class StoreFilters {
   });
 
   final StoreVertical? vertical;
+
+  /// Service shops in one open category; asking for a category is asking for service shops. Null on
+  /// every goods screen — with it and [vertical] both null the server lists goods shops only.
+  final ServiceCategory? serviceCategory;
   final String? search;
   final double? maxDeliveryFee;
   final int? maxEtaMinutes;
@@ -641,6 +753,7 @@ class StoreFilters {
 
   StoreFilters copyWith({
     StoreVertical? vertical,
+    ServiceCategory? serviceCategory,
     String? search,
     double? maxDeliveryFee,
     int? maxEtaMinutes,
@@ -648,6 +761,7 @@ class StoreFilters {
     String? neighborhood,
     bool? offersOnly,
     bool clearVertical = false,
+    bool clearServiceCategory = false,
     bool clearSearch = false,
     bool clearFee = false,
     bool clearEta = false,
@@ -656,6 +770,8 @@ class StoreFilters {
   }) =>
       StoreFilters(
         vertical: clearVertical ? null : (vertical ?? this.vertical),
+        serviceCategory:
+            clearServiceCategory ? null : (serviceCategory ?? this.serviceCategory),
         search: clearSearch ? null : (search ?? this.search),
         maxDeliveryFee: clearFee ? null : (maxDeliveryFee ?? this.maxDeliveryFee),
         maxEtaMinutes: clearEta ? null : (maxEtaMinutes ?? this.maxEtaMinutes),
@@ -664,8 +780,14 @@ class StoreFilters {
         offersOnly: offersOnly ?? this.offersOnly,
       );
 
-  StoreFilters cleared() =>
-      StoreFilters(vertical: vertical, search: search, neighborhood: neighborhood);
+  /// Drops the refinements and keeps what the screen is ABOUT: the vertical or service category,
+  /// the search and the district.
+  StoreFilters cleared() => StoreFilters(
+        vertical: vertical,
+        serviceCategory: serviceCategory,
+        search: search,
+        neighborhood: neighborhood,
+      );
 }
 
 // ---------------------------------------------------------------------------- product options
@@ -948,4 +1070,61 @@ class OptionDraft {
         'priceDelta': priceDelta,
         'isDefault': isDefault,
       };
+}
+
+/// A customer's review of a shop — product-service's `ReviewResponse`, as `StoreApi.reviews` lists
+/// them, newest first.
+class StoreReview {
+  const StoreReview({
+    required this.id,
+    required this.rating,
+    this.storeId,
+    this.orderId,
+    this.comment,
+    this.createdAt,
+    this.mine = false,
+  });
+
+  final String id;
+  final String? storeId;
+
+  /// The order the review is about: a shop is reviewed once per order.
+  final String? orderId;
+
+  /// One to five stars.
+  final int rating;
+
+  /// What the customer wrote; null when they wrote nothing.
+  final String? comment;
+
+  final DateTime? createdAt;
+
+  /// Whether the review is the caller's own, so the app can offer Edit.
+  final bool mine;
+
+  /// The review, or null when [json] is not one this build can show: no id, or no rating from one to
+  /// five — stars nobody gave are not drawn.
+  static StoreReview? maybeFromJson(Object? json) {
+    if (json is! Map) {
+      return null;
+    }
+    final Object? id = json['id'];
+    final Object? rating = json['rating'];
+    if (id is! String || rating is! num || rating < 1 || rating > 5) {
+      return null;
+    }
+    final Object? storeId = json['storeId'];
+    final Object? orderId = json['orderId'];
+    final Object? comment = json['comment'];
+    final Object? createdAt = json['createdAt'];
+    return StoreReview(
+      id: id,
+      rating: rating.toInt(),
+      storeId: storeId is String ? storeId : null,
+      orderId: orderId is String ? orderId : null,
+      comment: comment is String && comment.trim().isNotEmpty ? comment : null,
+      createdAt: createdAt is String ? DateTime.tryParse(createdAt)?.toLocal() : null,
+      mine: json['mine'] == true,
+    );
+  }
 }

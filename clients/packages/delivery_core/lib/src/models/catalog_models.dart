@@ -8,6 +8,11 @@ import 'store_models.dart';
 enum ProductStatus {
   draft('DRAFT'),
   active('ACTIVE'),
+
+  /// A service offer its provider has taken off sale for now. Customers never see it and it cannot be
+  /// ordered, but it keeps its photos, options and terms, so resuming it puts it back as it was. Only
+  /// service offers are paused; a goods product is archived instead.
+  paused('PAUSED'),
   archived('ARCHIVED');
 
   const ProductStatus(this.wireValue);
@@ -40,6 +45,10 @@ class Product {
     this.sku,
     this.barcode,
     this.inStock = true,
+    this.giftFeatured = false,
+    this.service,
+    this.fromPrice,
+    this.moderation,
   });
 
   final String id;
@@ -97,6 +106,36 @@ class Product {
   /// fallback repeated here catches the other case — the field absent from the response
   /// altogether, which is what an older service returns — so an app built against this model
   /// cannot end up with a row that has no picture at all.
+  /// Whether the back office has put this product on the customer gift hub. Public curation: the
+  /// hub itself shows every featured product.
+  final bool giftFeatured;
+
+  /// What a service offer promises: how it is priced, the pack, the turnaround, how the customer gets
+  /// the work, and whether they send a file. Null for a goods product, and for every product from a
+  /// server that predates services.
+  final ServiceTerms? service;
+
+  /// The least a customer can pay for one pack of a service offer, as the server worked it out: the
+  /// price plus the cheapest choice each option group allows. What "From $15.00" shows.
+  ///
+  /// Null for a goods product. A screen without it shows [price], and never adds option deltas up
+  /// itself: the catalogue owns that sum, and a second copy is a second thing that can disagree with
+  /// what an order is charged.
+  final double? fromPrice;
+
+  /// YouDrop's hold on this offer, with back office's reason, or null when there is none
+  /// (product-service V36). Only the offer's provider and back office ever receive one: a customer
+  /// cannot read an offer that is not on sale at all.
+  final ProductModeration? moderation;
+
+  /// Whether this is a service offer. Only a service shop's products are, and all of them are.
+  bool get isServiceOffer => service != null;
+
+  /// Whether YouDrop holds this offer off sale. While it does, the server refuses to publish, resume
+  /// or pause it, so a screen offers none of those and shows [ProductModeration.reason] instead. A hold
+  /// in a state this build does not know is still a hold.
+  bool get isTakenDown => moderation != null;
+
   String? get listImageUrl {
     if (imageThumbUrls.isNotEmpty) {
       return imageThumbUrls.first;
@@ -123,6 +162,10 @@ class Product {
         sku: json['sku'] as String?,
         barcode: json['barcode'] as String?,
         inStock: json['inStock'] as bool? ?? true,
+        giftFeatured: json['giftFeatured'] as bool? ?? false,
+        service: ServiceTerms.maybeFromJson(json['service']),
+        fromPrice: _doubleOrNull(json['fromPrice']),
+        moderation: ProductModeration.maybeFromJson(json['moderation']),
       );
 
   /// Note the absence of `merchantId` and `status`: the service derives the first from the token
@@ -141,7 +184,239 @@ class Product {
         if (barcode != null) 'barcode': barcode,
         // `inStock` is deliberately absent — it belongs to inventory-service, and a product form
         // that could write it would let a merchant mark a sold-out shelf as full.
+        // Required for a product in a service shop and refused for any other, so a goods form that
+        // never set it sends nothing and keeps working unchanged.
+        if (service != null) 'service': service!.toRequestJson(),
       };
+}
+
+/// How a service offer is priced. See [ServiceTerms].
+enum ServicePricingType {
+  /// One price for one pack of [ServiceTerms.unitSize] units: "500 cards, $15.00".
+  fixed('FIXED'),
+
+  /// One price for one unit, such as a square metre: "$8.00 per sqm". Always a pack of one.
+  perUnit('PER_UNIT'),
+
+  /// A starting price that required options add to: "From $15.00".
+  from('FROM'),
+
+  /// A pricing type this build does not know. Never read as one of the others, and never sent back
+  /// (see [ServiceTerms.toRequestJson]).
+  unknown(null);
+
+  const ServicePricingType(this.wireValue);
+
+  final String? wireValue;
+
+  static ServicePricingType fromWire(Object? value) {
+    for (final ServicePricingType type in values) {
+      if (type.wireValue != null && type.wireValue == value) {
+        return type;
+      }
+    }
+    return ServicePricingType.unknown;
+  }
+}
+
+/// How the customer gets a service offer's finished work.
+enum ServiceFulfilment {
+  /// Collected at the provider's shop.
+  pickup('PICKUP'),
+
+  /// Carried to the customer by YouDrop, on the shop's delivery terms.
+  delivery('DELIVERY'),
+
+  /// Either, chosen by the customer when ordering.
+  both('BOTH'),
+
+  /// A fulfilment this build does not know. It includes neither pickup nor delivery, so no screen
+  /// offers the customer a way of getting the work that it cannot describe.
+  unknown(null);
+
+  const ServiceFulfilment(this.wireValue);
+
+  final String? wireValue;
+
+  bool get includesPickup => this == pickup || this == both;
+
+  bool get includesDelivery => this == delivery || this == both;
+
+  static ServiceFulfilment fromWire(Object? value) {
+    for (final ServiceFulfilment fulfilment in values) {
+      if (fulfilment.wireValue != null && fulfilment.wireValue == value) {
+        return fulfilment;
+      }
+    }
+    return ServiceFulfilment.unknown;
+  }
+}
+
+/// Whether the customer sends a file with a service order: a design to print, a photo to enlarge.
+enum ServiceAttachmentPolicy {
+  none('NONE'),
+  optional('OPTIONAL'),
+  required('REQUIRED'),
+
+  /// A policy this build does not know. Never read as one of the others, and never sent back.
+  unknown(null);
+
+  const ServiceAttachmentPolicy(this.wireValue);
+
+  final String? wireValue;
+
+  static ServiceAttachmentPolicy fromWire(Object? value) {
+    for (final ServiceAttachmentPolicy policy in values) {
+      if (policy.wireValue != null && policy.wireValue == value) {
+        return policy;
+      }
+    }
+    return ServiceAttachmentPolicy.unknown;
+  }
+}
+
+/// What a service offer promises, as product-service's `service` block carries it.
+///
+/// Parsed tolerantly: a term this build does not know reads as `unknown` rather than as a guess, and
+/// a block that is not a block is no block at all. A number the server did not send stays null, so a
+/// screen shows a dash rather than a turnaround nobody promised.
+class ServiceTerms {
+  const ServiceTerms({
+    required this.pricingType,
+    required this.fulfilmentModes,
+    this.unitLabel,
+    this.unitSize = 1,
+    this.turnaroundMinHours,
+    this.turnaroundMaxHours,
+    this.attachmentPolicy = ServiceAttachmentPolicy.none,
+    this.instructionsPrompt,
+  });
+
+  final ServicePricingType pricingType;
+
+  /// What one unit is called: "cards", "sqm". Null for a single unit sold at a fixed price.
+  final String? unitLabel;
+
+  /// Units in one step of the quantity stepper. An order counts packs of this many, 1 to 99 packs.
+  final int unitSize;
+
+  /// How long the provider needs once they accept, in whole hours. The customer's estimated
+  /// completion is the accept time plus [turnaroundMaxHours].
+  final int? turnaroundMinHours;
+  final int? turnaroundMaxHours;
+
+  final ServiceFulfilment fulfilmentModes;
+  final ServiceAttachmentPolicy attachmentPolicy;
+
+  /// The question the provider puts to the customer beside the order's instructions.
+  final String? instructionsPrompt;
+
+  /// Whether every term is one this build knows, and so can be edited and saved back.
+  bool get isEditable =>
+      pricingType != ServicePricingType.unknown &&
+      fulfilmentModes != ServiceFulfilment.unknown &&
+      attachmentPolicy != ServiceAttachmentPolicy.unknown;
+
+  /// The block, or null when [json] is not one: a goods product sends none.
+  static ServiceTerms? maybeFromJson(Object? json) {
+    if (json is! Map) {
+      return null;
+    }
+    final int? size = _intOrNull(json['unitSize']);
+    return ServiceTerms(
+      pricingType: ServicePricingType.fromWire(json['pricingType']),
+      unitLabel: _textOrNull(json['unitLabel']),
+      unitSize: size == null || size < 1 ? 1 : size,
+      turnaroundMinHours: _intOrNull(json['turnaroundMinHours']),
+      turnaroundMaxHours: _intOrNull(json['turnaroundMaxHours']),
+      fulfilmentModes: ServiceFulfilment.fromWire(json['fulfilmentModes']),
+      attachmentPolicy: ServiceAttachmentPolicy.fromWire(json['attachmentPolicy']),
+      instructionsPrompt: _textOrNull(json['instructionsPrompt']),
+    );
+  }
+
+  /// The block as product-service's ProductRequest takes it, replacing the offer's terms whole.
+  ///
+  /// Throws a [StateError] when a term is one this build does not know. There is nothing true to send
+  /// for it: an absent file policy would be saved as "no file", quietly rewriting what the provider
+  /// set with a newer app. A form checks [isEditable] first.
+  Map<String, dynamic> toRequestJson() {
+    if (!isEditable) {
+      throw StateError('These service terms hold a value this app does not know, and saving them '
+          'would overwrite it.');
+    }
+    return <String, dynamic>{
+      'pricingType': pricingType.wireValue,
+      'unitLabel': unitLabel,
+      'unitSize': unitSize,
+      'turnaroundMinHours': turnaroundMinHours,
+      'turnaroundMaxHours': turnaroundMaxHours,
+      'fulfilmentModes': fulfilmentModes.wireValue,
+      'attachmentPolicy': attachmentPolicy.wireValue,
+      'instructionsPrompt': instructionsPrompt,
+    };
+  }
+}
+
+int? _intOrNull(Object? value) => value is num ? value.toInt() : null;
+
+double? _doubleOrNull(Object? value) => value is num ? value.toDouble() : null;
+
+String? _textOrNull(Object? value) => value is String && value.trim().isNotEmpty ? value : null;
+
+/// The kind of hold YouDrop has on a service offer. See [ProductModeration].
+enum ProductModerationState {
+  /// Back office took the offer down. It stays off sale until back office restores it.
+  takenDown('TAKEN_DOWN'),
+
+  /// A hold this build does not know. Still a hold ([Product.isTakenDown]), never read as another.
+  unknown(null);
+
+  const ProductModerationState(this.wireValue);
+
+  final String? wireValue;
+
+  static ProductModerationState fromWire(Object? value) {
+    for (final ProductModerationState state in values) {
+      if (state.wireValue != null && state.wireValue == value) {
+        return state;
+      }
+    }
+    return ProductModerationState.unknown;
+  }
+}
+
+/// YouDrop's back office holding a service offer off sale (product-service V36), as the offer's
+/// provider reads it on their own offer.
+///
+/// While it is present, the server refuses to publish, resume or pause the offer, and only back office
+/// can lift it (`BackofficeCatalogApi.restore`). It is never on anything a customer reads: a customer
+/// cannot read an offer that is not on sale.
+class ProductModeration {
+  const ProductModeration({required this.state, this.reason, this.takenDownAt});
+
+  final ProductModerationState state;
+
+  /// Back office's reason, in its own words: what the provider has to fix. Null only when the server
+  /// sent none.
+  final String? reason;
+
+  /// When the offer was taken down, in local time. Null when the server sent no time this build can
+  /// read.
+  final DateTime? takenDownAt;
+
+  /// The block, or null when [json] is not one: an offer nobody took down has none.
+  static ProductModeration? maybeFromJson(Object? json) {
+    if (json is! Map) {
+      return null;
+    }
+    final Object? at = json['takenDownAt'];
+    return ProductModeration(
+      state: ProductModerationState.fromWire(json['state']),
+      reason: _textOrNull(json['reason']),
+      takenDownAt: at is String ? DateTime.tryParse(at)?.toLocal() : null,
+    );
+  }
 }
 
 class Category {

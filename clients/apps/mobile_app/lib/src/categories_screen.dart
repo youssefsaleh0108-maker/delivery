@@ -39,9 +39,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   bool _loading = true;
 
+  /// The goods verticals only. Counting Services here would ask the server for service shops by
+  /// name, and it would answer — putting the Services tab's shops behind a goods category.
   late final List<StoreVertical> _verticals = widget.chips.isEmpty
-      ? StoreVertical.values
-      : <StoreVertical>{...widget.chips.map((CategoryChip c) => c.vertical)}.toList();
+      ? StoreVertical.pickerVerticals
+      : <StoreVertical>{
+          ...widget.chips
+              .map((CategoryChip c) => c.vertical)
+              .where(StoreVertical.pickerVerticals.contains),
+        }.toList();
 
   @override
   void initState() {

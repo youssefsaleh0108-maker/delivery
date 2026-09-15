@@ -593,6 +593,106 @@
   "butlerStatusYourCall": "Your call",
   "butlerStatusAgreed": "Agreed",
   "butlerStatusExpired": "Expired",
+  "butlerDetailsTitle": "Errand details",
+  "@butlerDetailsTitle": {
+    "description": "Header of the page a customer's Butler errand opens onto from the recent-tasks list."
+  },
+  "butlerViewDetails": "View details",
+  "@butlerViewDetails": {
+    "description": "Accessibility label for the chevron on a Butler errand row that opens its details."
+  },
+  "butlerCancelErrand": "Cancel errand",
+  "butlerCancelConfirmTitle": "Cancel this errand?",
+  "butlerCancelConfirmBody": "It is withdrawn straight away and nobody will go for it. You can always ask again.",
+  "butlerCancelConfirmYes": "Yes, cancel",
+  "butlerTrackOrder": "Track order",
+  "@butlerTrackOrder": {
+    "description": "Opens the order an agreed Butler errand became, where its delivery is tracked."
+  },
+  "butlerDetailProgress": "Progress",
+  "butlerDetailTheErrand": "The errand",
+  "butlerDetailWhereFrom": "Where from",
+  "butlerDetailRecipient": "Who receives it",
+  "butlerDetailContactPhone": "Contact phone",
+  "butlerDetailPrice": "Price",
+  "butlerDetailBudgetCap": "Your budget cap",
+  "butlerDetailGoods": "Goods",
+  "butlerDetailGoodsPending": "Known once the shopper has paid",
+  "@butlerDetailGoodsPending": {
+    "description": "Shown in place of the goods price of a purchase errand before the shopper has bought it."
+  },
+  "butlerDetailErrandFee": "Errand fee",
+  "butlerDetailTotal": "Total to pay",
+  "butlerDetailReceipt": "Receipt reference",
+  "butlerDeclineReason": "Reason: {reason}",
+  "@butlerDeclineReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "butlerStepRequested": "Request sent",
+  "butlerStepClaimedBuy": "A shopper took it",
+  "butlerStepClaimedSend": "A rider took it",
+  "butlerStepQuoted": "Price quoted",
+  "butlerStepAgreed": "Price agreed",
+  "butlerStepConfirmed": "Confirmed",
+  "@butlerStepConfirmed": {
+    "description": "Last step of a send errand, which has no price to agree — the rider is booked to carry it."
+  },
+  "butlerStepClaimBuyPending": "Waiting for a shopper",
+  "@butlerStepClaimBuyPending": {
+    "description": "Timeline step of a purchase errand nobody has taken yet. Worded as not-yet-happened on purpose: its finished form is butlerStepClaimedBuy."
+  },
+  "butlerStepClaimSendPending": "Waiting for a rider",
+  "butlerStepQuotePending": "The shopper tells you the price",
+  "butlerStepAgreePending": "You agree the price",
+  "butlerStepConfirmPending": "You confirm the fee",
+  "@butlerStepConfirmPending": {
+    "description": "Timeline step of a send errand still waiting for the customer to confirm the errand fee."
+  },
+  "butlerStepStateDone": "Done",
+  "@butlerStepStateDone": {
+    "description": "Read by a screen reader before a finished step of an errand's timeline."
+  },
+  "butlerStepStateNow": "Now",
+  "@butlerStepStateNow": {
+    "description": "Read by a screen reader before the timeline step the errand is currently waiting on."
+  },
+  "butlerStepStateNext": "Still to come",
+  "@butlerStepStateNext": {
+    "description": "Read by a screen reader before a timeline step the errand has not reached yet."
+  },
+  "butlerStepStateEnded": "Ended",
+  "@butlerStepStateEnded": {
+    "description": "Read by a screen reader before the step that ended an errand without an agreement (declined, cancelled, expired)."
+  },
+  "butlerDetailQuotedTotal": "Quoted total",
+  "@butlerDetailQuotedTotal": {
+    "description": "The total a declined errand was quoted at — shown so the customer sees what they turned down, without saying it is owed."
+  },
+  "butlerConfirmFee": "Confirm {amount}",
+  "@butlerConfirmFee": {
+    "description": "Button: the customer confirms a send errand a rider has taken, at this fee. This is what turns it into an order.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "butlerSendConfirmed": "Confirmed. The rider will collect it.",
+  "butlerSendAwaitingConfirm": "A rider took it. Confirm the fee of {fee} and they will collect it.",
+  "@butlerSendAwaitingConfirm": {
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "butlerDeclineConfirmTitle": "Turn down this price?",
+  "butlerDeclineConfirmBody": "The errand ends here and cannot be reopened. The shopper has already paid for the goods.",
+  "butlerDeclineConfirmYes": "Yes, decline",
   "somebodyElseClaimed": "Somebody else claimed that one",
   "whatYouPaidBeforeFee": "What you paid, before the errand fee",
   "sentForApproval": "Sent. They will approve the price before you deliver.",
@@ -1852,17 +1952,12 @@
   "custDistricts": "Districts",
   "custSearchArabiziHint": "Search: 2ahwe, man'oushe, knefe...",
   "custAllDistricts": "All districts",
-  "custDiasporaTitle": "Send to Lebanon",
   "custDiasporaSub": "Diaspora Gifting Portal",
-  "custDiasporaBanner": "Remittance made real",
-  "custDiasporaBlurb": "Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.",
-  "custFamilyRecipient": "Family recipient",
-  "custPersonalNote": "Attach a personal note (delivered with the order)",
   "custPersonalNoteHint": "Habibti Mom, wishing you a beautiful week — some food and groceries with love!",
   "custWhatToSend": "What would you like to send?",
   "custRecentDeliveriesTo": "Recent deliveries to {name}",
   "@custRecentDeliveriesTo": { "placeholders": { "name": { "type": "String" } } },
-  "custStartOrder": "Select Items 0026 Start Order",
+  "custStartOrder": "Select Items & Start Order",
   "custPickRecipient": "Choose who receives it",
   "custNoRecipientYet": "Save their address first — add it from the address book with their name as the label.",
   "custGiftNoteRides": "Your note travels with the order and is read out at the door.",
@@ -3338,5 +3433,2662 @@
   },
   "close": "Close",
   "previous": "Previous",
-  "next": "Next"
+  "next": "Next",
+  "accountIntentSheetTitle": "How will you use YouDrop?",
+  "accountIntentSheetSubtitle": "Pick one, then continue with Google. Riding and selling are reviewed before you start, and an account can apply for only one of them.",
+  "accountIntentCustomer": "Customer",
+  "accountIntentCustomerBlurb": "I want to order",
+  "accountIntentRider": "Rider",
+  "accountIntentRiderBlurb": "I want to deliver",
+  "accountIntentSeller": "Seller",
+  "accountIntentSellerBlurb": "I want to sell",
+  "continueWithGoogle": "Continue with Google",
+  "googleSignInCancelled": "Google sign-in was cancelled. Nothing was changed.",
+  "googleSignInUnavailable": "Google sign-in isn't available yet. Please use your email or phone for now.",
+  "googleRoleNotAdded": "You're signed in, but we couldn't finish setting up your account. Please choose again.",
+  "googleExistingApplication": "This account already has an application, so we've opened that instead of starting another.",
+  "accountSetupTitle": "One more step",
+  "accountSetupSubtitle": "Tell us how you'll use YouDrop to finish setting up your account.",
+  "wizAccountEmailNote": "We'll use the email on the account you signed in with.",
+  "wizAccountRefreshFailed": "Your application is in, but we couldn't refresh your sign-in. Try again.",
+  "accountApplicationClosed": "The partner application on this account has already been decided, so it can't be reopened here. Please contact support.",
+  "accountAlreadyPartner": "This account is already a YouDrop partner, and an account can hold only one partner role.",
+  "accountOtherApplication": "This account already has an application for another role, and an account can apply for only one.",
+  "accountEmailUnverified": "Your account's email address hasn't been verified, so we can't take an application on it yet.",
+  "wizAccountRolesRetry": "Your application is in, but we couldn't finish setting up your account. Please try again.",
+  "offlinePill": "OFFLINE",
+  "offlineBanner": "You're offline. Orders you queue will be sent when you're back online.",
+  "offlineBackOnline": "Back online",
+  "offlineSavedItems": "Saved items",
+  "offlineModeBadge": "Offline Mode",
+  "offlineCachedCatalogTitle": "Cached Catalog",
+  "offlineLastPurchases": "Your Last Cached Purchases",
+  "offlinePricesAsOf": "Prices as of {when}. They may have changed since.",
+  "@offlinePricesAsOf": {"placeholders":{"when":{"type":"String"}}},
+  "offlineQuickAdd": "Quick Add",
+  "offlineNeedsOptions": "Choose options when you're online",
+  "offlineNothingSaved": "Nothing saved for offline yet",
+  "offlineNothingSavedHint": "What you order while online is saved here, so you can order it again when the connection drops.",
+  "offlineOutboxTitle": "Waiting to send",
+  "offlineQueuedTitle": "{store} — Queued",
+  "@offlineQueuedTitle": {"placeholders":{"store":{"type":"String"}}},
+  "offlineWillSend": "Will send as soon as you're back online",
+  "offlineSending": "Sending…",
+  "offlinePriceChanged": "The total is now {total}. Confirm to send it at this price.",
+  "@offlinePriceChanged": {"placeholders":{"total":{"type":"String"}}},
+  "offlineSendAt": "Send at {total}",
+  "@offlineSendAt": {"placeholders":{"total":{"type":"String"}}},
+  "offlineStale": "This has been waiting a while. Do you still want it?",
+  "offlineSendNow": "Send now",
+  "offlineFailed": "Couldn't place this order: {reason}",
+  "@offlineFailed": {"placeholders":{"reason":{"type":"String"}}},
+  "offlineDiscard": "Discard",
+  "offlineDiscardTitle": "Discard this order?",
+  "offlineDiscardBody": "It hasn't been placed, and it won't be sent.",
+  "offlineQueueTitle": "Couldn't reach YouDrop",
+  "offlineQueueBody": "Your order hasn't gone through. We can keep it on this phone and send it automatically when you're back online — and if the price changes, we'll ask you first.",
+  "offlineQueueAction": "Place when back online",
+  "offlineQueueCashOnly": "Only cash orders can wait for the connection. Choose cash, or try again when you're back online.",
+  "offlineQueued": "Order saved on this phone. It will be sent when you're back online.",
+  "offlineQueueSaveFailed": "Couldn't save the order on this phone, so nothing was queued.",
+  "offlineAlreadyPlaced": "Your earlier try already went through, so that's the order we placed.",
+  "offlineSent": "Your queued order from {store} was placed.",
+  "@offlineSent": {"placeholders":{"store":{"type":"String"}}},
+  "offlineQueueUnavailable": "Orders split with friends can't wait for the connection: each friend's share is linked to the order the moment it's placed. Try again when you're back online.",
+  "offlineQueuedWhenAmount": "Queued {when} • {amount}",
+  "@offlineQueuedWhenAmount": {"placeholders":{"when":{"type":"String"},"amount":{"type":"String"}}},
+  "offlineMaybePlaced": "We couldn't confirm this went through. We'll check again automatically — it won't be placed twice.",
+  "offlineStaleMaybePlaced": "We couldn't confirm this went through, and it has been waiting a while. Send it again to find out: if it already went through, you'll get that order, not a second one.",
+  "offlineSendAgain": "Send again",
+  "offlineDiscardMaybePlacedBody": "It may already have been placed — we couldn't confirm it. Discarding only removes it from this phone, so check Orders to see whether it went through.",
+  "offlineUnconfirmedTitle": "We couldn't confirm your order",
+  "offlineUnconfirmedLead": "It may have gone through before the connection dropped — check Orders once you're back online.",
+  "offlineQueueResendBody": "We can keep it on this phone and send it again when you're back online. If it already went through, you'll get that order, not a second one — and if the price changes, we'll ask you first.",
+  "offlineUnconfirmedRetry": "We couldn't confirm your order — it may have gone through. Trying again is safe: it won't be placed twice.",
+  "offlineQueueStandardOnly": "Express orders can't wait for the connection: the express price is only set when the order is placed. Choose Standard, or try again when you're back online.",
+  "offlineQueueTotalUnknown": "We couldn't confirm this order's total for this address, so it can't wait for the connection. Try again when you're back online.",
+  "carrCashNavLabel": "Reconciliation",
+  "carrCashTitle": "Rider Cash Reconciliation",
+  "carrCashSubtitle": "Match the cash your riders collected against what they hand over",
+  "carrCashTodayChip": "Today: {date}",
+  "@carrCashTodayChip": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashDayChip": "Day: {date}",
+  "@carrCashDayChip": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashPickDay": "Which day?",
+  "carrCashKpiWithRiders": "With your riders",
+  "carrCashKpiWithRidersNote": "{count, plural, =0{Nobody is holding cash} =1{Held by 1 rider} other{Held by {count} riders}}",
+  "@carrCashKpiWithRidersNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashKpiHandedOver": "Handed over",
+  "carrCashKpiHandedOverNote": "{count, plural, =0{No hand-overs on this day} =1{1 hand-over on this day} other{{count} hand-overs on this day}}",
+  "@carrCashKpiHandedOverNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashKpiOwed": "Owed to YouDrop",
+  "carrCashKpiOwedNote": "{count, plural, =0{Your company holds no cash} =1{Held by your company · 1 order} other{Held by your company · {count} orders}}",
+  "@carrCashKpiOwedNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashKpiOverdue": "Overdue",
+  "carrCashKpiOverdueNote": "{count, plural, =0{Nobody past the {hours}h limit} =1{1 rider past the {hours}h limit} other{{count} riders past the {hours}h limit}}",
+  "@carrCashKpiOverdueNote": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashOverdueSoftNote": "Some cash has been held for longer than {hours} hours. Ask those riders to hand it over.",
+  "@carrCashOverdueSoftNote": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashBalancesTitle": "Rider balances",
+  "carrCashColRider": "Rider",
+  "carrCashColCollected": "Collected",
+  "carrCashColEarned": "Fees earned for you",
+  "carrCashColHolding": "Cash to hand over",
+  "carrCashColLastHandover": "Last hand-over",
+  "carrCashColStatus": "Status",
+  "carrCashColActions": "Actions",
+  "carrCashStatusHolding": "Holding cash",
+  "carrCashStatusOverdue": "Overdue {hours}h",
+  "@carrCashStatusOverdue": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashStatusSettled": "Settled",
+  "carrCashActionSettle": "Settle",
+  "carrCashActionView": "View",
+  "carrCashNever": "Never",
+  "carrCashToday": "Today",
+  "carrCashYesterday": "Yesterday",
+  "carrCashDaysAgo": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "@carrCashDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashNobodyYet": "None of your riders has carried cash for your company yet.",
+  "carrCashTableNote": "Collected and fees are for the day chosen. Cash to hand over is everything still held, whenever it was collected. What your company pays its riders is agreed between you and is not shown here.",
+  "carrCashSelectRider": "Select {name}",
+  "@carrCashSelectRider": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashSelectAll": "Select every rider holding cash",
+  "carrCashSettleSelected": "Settle selected",
+  "carrCashSelectedCount": "{count, plural, =0{None selected} =1{1 selected} other{{count} selected}}",
+  "@carrCashSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashExportCsv": "Export CSV",
+  "carrCashExported": "Saved {file}",
+  "@carrCashExported": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashCsvRiderId": "Rider ID",
+  "carrCashCsvOrdersHeld": "Orders held",
+  "carrCashCsvOldest": "Oldest collection",
+  "carrCashOrderCount": "{count, plural, =1{1 order} other{{count} orders}}",
+  "@carrCashOrderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashConfirmTitle": "Record a hand-over",
+  "carrCashConfirmBody": "Confirm {name} has handed your company {amount} in cash, for {orders}. This clears their whole balance with you and cannot be undone.",
+  "@carrCashConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashConfirmBulkTitle": "{count, plural, =1{Record 1 hand-over} other{Record {count} hand-overs}}",
+  "@carrCashConfirmBulkTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashConfirmBulkBody": "Confirm each of these riders has handed your company the cash shown. Every balance is cleared in full and none of it can be undone.",
+  "carrCashConfirmBulkTotal": "Total {amount}",
+  "@carrCashConfirmBulkTotal": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashConfirmYes": "Yes, record it",
+  "carrCashMethodLabel": "How it was handed over",
+  "carrCashMethodCash": "Cash hand-over",
+  "carrCashMethodBank": "Bank deposit",
+  "carrCashMethodWallet": "Money transfer app",
+  "carrCashNoteLabel": "Note (optional)",
+  "carrCashNoteHint": "Anything the hub should remember, like a bag number",
+  "carrCashRecorded": "Recorded {amount} from {name}.",
+  "@carrCashRecorded": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashReplayed": "That hand-over was already recorded, so nothing was recorded twice.",
+  "carrCashAmountChanged": "{name} is now holding {amount}, not the amount you confirmed. Nothing was recorded; count it again.",
+  "@carrCashAmountChanged": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashAmountChangedUnknown": "{name}'s balance changed since you opened the page. Nothing was recorded; reload and count it again.",
+  "@carrCashAmountChangedUnknown": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashRecordFailed": "Could not record it. Nothing was changed; try again.",
+  "carrCashBulkDone": "Recorded {done} of {total}.",
+  "@carrCashBulkDone": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashLoadFailed": "Your company's cash could not be loaded just now. Nothing is wrong with your records; try again.",
+  "carrCashTryAgain": "Try again",
+  "carrCashRiderTitle": "Rider Settlement Detail",
+  "carrCashRiderSubtitle": "Reconcile the cash bag with {name}",
+  "@carrCashRiderSubtitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBack": "Back to reconciliation",
+  "carrCashBadgeUnsettled": "Unsettled balance",
+  "carrCashRiderSince": "Carrying cash for you since {date}",
+  "@carrCashRiderSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashRatings": "{count, plural, =1{(1 rating)} other{({count} ratings)}}",
+  "@carrCashRatings": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrCashRatingNew": "New rider",
+  "carrCashHeldTitle": "Unsettled deliveries",
+  "carrCashColOrder": "Order #",
+  "carrCashColCash": "Total cash",
+  "carrCashColFee": "Fee earned for you",
+  "carrCashHeldEmpty": "Nothing to settle: this rider is holding none of your company's cash.",
+  "carrCashSummaryTitle": "Reconciliation summary",
+  "carrCashSummaryCollected": "Cash collected, not yet handed over",
+  "carrCashSummaryFees": "Fees earned for your company",
+  "carrCashSummaryDue": "Cash due to your company",
+  "carrCashSummaryKeeps": "The rider keeps none of this cash. What your company pays them is agreed between you, and the fees above are paid to your company by YouDrop, not taken from the cash.",
+  "carrCashConfirmSettlement": "Confirm settlement",
+  "carrCashNothingToSettle": "Nothing to settle",
+  "carrCashHistoryTitle": "Hand-over history",
+  "carrCashHistoryItem": "Hand-over · {date}",
+  "@carrCashHistoryItem": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashHistoryDetail": "{amount} for {orders}, recorded by {name}",
+  "@carrCashHistoryDetail": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashHistoryDetailAnon": "{amount} for {orders}",
+  "@carrCashHistoryDetailAnon": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashHistoryEmpty": "No hand-overs recorded yet.",
+  "carrCashRiderNotFound": "This rider has never worked for your company.",
+  "carrCashBoTitle": "Held by delivery companies",
+  "carrCashBoOwes": "Owes the platform",
+  "carrCashBoWithRiders": "With its riders: {amount}",
+  "@carrCashBoWithRiders": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoLastPaid": "Last paid {when}",
+  "@carrCashBoLastPaid": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoNeverPaid": "Never paid",
+  "carrCashBoHoldsNothing": "Holds nothing itself yet",
+  "carrCashBoRecordPayment": "Record payment",
+  "carrCashBoConfirmTitle": "Record a payment",
+  "carrCashBoConfirmBody": "Confirm {company} has paid the platform {amount}, covering {orders}. This clears everything the company holds and cannot be undone.",
+  "@carrCashBoConfirmBody": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "orders": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoConfirmYes": "Yes, they paid",
+  "carrCashBoRecorded": "Recorded {amount} from {company}.",
+  "@carrCashBoRecorded": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "company": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoNothing": "Nothing was outstanding; somebody may have recorded this already.",
+  "carrCashBoAmountChanged": "{company} now holds {amount}, not the amount you confirmed. Nothing was recorded.",
+  "@carrCashBoAmountChanged": {
+    "placeholders": {
+      "company": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoFailed": "Could not record it: {error}",
+  "@carrCashBoFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "carrCashBoOverdueNote": "Some cash has been out longer than the platform's limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.",
+  "carrCashBoLoadFailed": "What delivery companies hold could not be loaded just now. The rest of this page is unaffected.",
+  "carrCashBoMethodLabel": "How it was paid (optional)",
+  "dekkaneBrowseTitle": "Your Neighborhood",
+  "dekkaneBrowseSubRegion": "Local {region} dekkanes",
+  "@dekkaneBrowseSubRegion": {
+    "placeholders": {
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneAreaInRegion": "{area}, {region}",
+  "@dekkaneAreaInRegion": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      },
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneEntrySub": "The dekkanes and small shops around your address",
+  "dekkaneFilterOpenNow": "Open now",
+  "dekkaneFilterOnGenerator": "On generator now",
+  "dekkaneFilterNew": "New on YouDrop",
+  "dekkaneExpandMap": "Expand interactive map",
+  "dekkaneNearbyShops": "Shops near you",
+  "dekkaneLocalShops": "Local shops",
+  "dekkaneDistanceMetres": "{metres} m away",
+  "@dekkaneDistanceMetres": {
+    "placeholders": {
+      "metres": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "dekkaneDistanceKm": "{km} km away",
+  "@dekkaneDistanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "double",
+        "format": "decimalPatternDigits",
+        "optionalParameters": {
+          "decimalDigits": 1
+        }
+      }
+    }
+  },
+  "dekkaneGeneratorActive": "Generator active",
+  "dekkaneTrustedLocal": "Trusted local",
+  "dekkaneCouldNotLoadShops": "Could not load the shops around you",
+  "dekkanePinAddressPrompt": "Pin your address on the map to see the shops nearest you, and how far each one is.",
+  "dekkaneNoShopsNearby": "No shops near this address yet",
+  "dekkaneMapTitle": "Shops on the map",
+  "dekkaneOpenClosesAt": "Open · Closes {time}",
+  "@dekkaneOpenClosesAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "dekkaneShopInventory": "Shop inventory",
+  "dekkaneLbpAmount": "LBP {amount}",
+  "@dekkaneLbpAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "dekkaneAddOneMore": "Add one more",
+  "dekkaneMerchNeighborhood": "Neighborhood",
+  "dekkaneMerchNeighborhoodHint": "e.g. Mar Mikhael",
+  "dekkaneMerchNeighborhoodHelp": "Shown under your shop's name when customers open your shop from their neighborhood list.",
+  "dekkaneMerchNeighborhoodTooLong": "Keep it to 80 characters or fewer",
+  "dekkaneCouldNotLoadShelf": "Could not load this shop's shelves",
+  "dekkaneBrowseTitleAll": "Shops on YouDrop",
+  "dekkaneBrowseSubAll": "Every shop, best rated first",
+  "dekkaneAllShops": "All shops",
+  "dekkanePowerUpdatedMinutes": "{minutes, plural, =0{Updated just now} =1{Updated 1 min ago} other{Updated {minutes} min ago}}",
+  "@dekkanePowerUpdatedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "dekkanePowerUpdatedHours": "{hours, plural, =1{Updated 1 hr ago} other{Updated {hours} hrs ago}}",
+  "@dekkanePowerUpdatedHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "dekkaneSearchedNearest": "{count, plural, =1{Only the nearest shop was searched} other{Only the nearest {count} shops were searched}}",
+  "@dekkaneSearchedNearest": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceNavShifts": "Shifts & attendance",
+  "attendanceTitle": "Rider Attendance & Shift Logs",
+  "attendanceSubtitle": "Track daily check-ins, lates, absences, and shift overrides",
+  "attendanceForMonth": "Attendance & clock logs for {month}",
+  "@attendanceForMonth": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceBackToRiders": "Back to riders",
+  "attendanceManualLog": "Manual Attendance Log",
+  "attendancePrevMonth": "Previous month",
+  "attendanceNextMonth": "Next month",
+  "attendanceLegendPresent": "Present",
+  "attendanceLegendLate": "Late",
+  "attendanceLegendAbsent": "Absent",
+  "attendanceLegendOff": "Day off",
+  "attendanceLegendOnDuty": "On duty",
+  "attendanceWeekMon": "MON",
+  "attendanceWeekTue": "TUE",
+  "attendanceWeekWed": "WED",
+  "attendanceWeekThu": "THU",
+  "attendanceWeekFri": "FRI",
+  "attendanceWeekSat": "SAT",
+  "attendanceWeekSun": "SUN",
+  "attendanceAggregatesTitle": "Attendance Aggregates",
+  "attendanceDaysWorked": "Days worked",
+  "attendanceAbsences": "Absences",
+  "attendanceTimesLate": "Times late",
+  "attendanceOvertime": "Overtime accumulated",
+  "attendanceHoursOnDuty": "Hours on duty",
+  "attendanceManualHours": "Hours logged by hand",
+  "attendanceExcusedDays": "Excused, sick or on leave",
+  "attendanceDaysCount": "{count, plural, =1{1 day} other{{count} days}}",
+  "@attendanceDaysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceHoursValue": "{hours} hours",
+  "@attendanceHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceHoursShort": "{hours} hrs",
+  "@attendanceHoursShort": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceLogsTitle": "Recent Clock-In / Clock-Out Logs",
+  "attendanceColDate": "Date",
+  "attendanceColShift": "Scheduled shift",
+  "attendanceColClockIn": "Clock in",
+  "attendanceColClockOut": "Clock out",
+  "attendanceColHours": "Hours",
+  "attendanceColStatus": "Status",
+  "attendanceColNotes": "Notes",
+  "attendanceShiftLabel": "{name} ({start} - {end})",
+  "@attendanceShiftLabel": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceStatusOnTime": "On time",
+  "attendanceStatusLate": "Late check-in",
+  "attendanceStatusAbsent": "Absent",
+  "attendanceStatusPending": "Not in yet",
+  "attendanceStatusDayOff": "Day off",
+  "attendanceStatusExtra": "Worked a day off",
+  "attendanceStatusWorked": "On duty",
+  "attendanceStatusLateExcused": "Late (excused)",
+  "attendanceStatusExcused": "Excused",
+  "attendanceStatusSick": "Sick leave",
+  "attendanceStatusLeave": "Leave",
+  "attendanceOnShiftNow": "On shift now",
+  "attendanceAutoClosed": "Auto-closed: signal lost",
+  "attendanceLateBy": "{minutes} min late",
+  "@attendanceLateBy": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceOvertimeNote": "{minutes} min overtime",
+  "@attendanceOvertimeNote": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceLoggedByHand": "Logged by hand",
+  "attendanceNoSchedule": "No shift schedule is set for this rider, so only time on duty is shown.",
+  "attendanceEmptyMonth": "No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.",
+  "attendanceZoneNote": "Days are split in the {zone} time zone.",
+  "@attendanceZoneNote": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceNotOnFleet": "This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.",
+  "attendanceLoadFailed": "Attendance could not be loaded just now.",
+  "attendanceLogTitle": "Log attendance for {name}",
+  "@attendanceLogTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceLogStatus": "What happened",
+  "attendanceLogChooseStatus": "Choose a status",
+  "attendanceKindPresent": "Present (not shown by the app)",
+  "attendanceKindLateExcused": "Late, excused",
+  "attendanceKindAbsentExcused": "Absent, excused",
+  "attendanceKindSick": "Sick",
+  "attendanceKindLeave": "On leave",
+  "attendanceLogClockIn": "Clock in (optional)",
+  "attendanceLogClockOut": "Clock out (optional)",
+  "attendanceLogNote": "Note (optional)",
+  "attendanceLogSave": "Save entry",
+  "attendanceLogWithdraw": "Remove entry",
+  "attendanceLogSaved": "Attendance entry saved.",
+  "attendanceLogRemoved": "Entry removed. The day shows what the app recorded.",
+  "attendanceLogTimesRule": "Times go only on a present day, and need both a clock-in and a clock-out.",
+  "attendanceLogManualNote": "Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.",
+  "attendanceLogFutureRule": "A day that has not happened yet can only be marked as leave, sick or excused.",
+  "attendanceTimeInvalid": "Use a 24-hour time such as 08:00.",
+  "attendanceShiftsTitle": "Shift schedules",
+  "attendanceShiftsSubtitle": "Set the shifts your riders work, then open anyone’s monthly attendance.",
+  "attendanceShiftsCard": "Shifts",
+  "attendanceAddShift": "Add shift",
+  "attendanceNoShifts": "No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.",
+  "attendanceShiftGrace": "{minutes} min grace",
+  "@attendanceShiftGrace": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceShiftRiders": "{count, plural, =0{No riders} =1{1 rider} other{{count} riders}}",
+  "@attendanceShiftRiders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceShiftOvernight": "Ends next day",
+  "attendanceRetireShift": "Retire shift",
+  "attendanceRetireBlocked": "Move the riders on this shift to another one first.",
+  "attendanceShiftRetired": "Shift retired.",
+  "attendanceRidersCard": "Riders",
+  "attendanceColRider": "Rider",
+  "attendanceColCurrentShift": "Shift",
+  "attendanceColActions": "Actions",
+  "attendanceFreelancer": "No schedule (freelancer)",
+  "attendanceChangeShift": "Change shift",
+  "attendanceOpenAttendance": "Attendance",
+  "attendanceUpcomingShift": "{name} from {date}",
+  "@attendanceUpcomingShift": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceNoRiders": "No riders on your fleet yet.",
+  "attendanceNewShiftTitle": "New shift",
+  "attendanceShiftName": "Name",
+  "attendanceShiftStart": "Starts (HH:mm)",
+  "attendanceShiftEnd": "Ends (HH:mm)",
+  "attendanceShiftDays": "Days",
+  "attendanceShiftGraceField": "Grace before late (minutes)",
+  "attendanceShiftImmutable": "Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.",
+  "attendanceCreateShift": "Create shift",
+  "attendanceShiftCreated": "Shift created.",
+  "attendanceShiftNeedsName": "Give the shift a name.",
+  "attendanceShiftNeedsDays": "Choose at least one day.",
+  "attendanceShiftSameTimes": "A shift cannot start and end at the same time.",
+  "attendanceGraceInvalid": "Use a number of minutes from 0 to 120.",
+  "attendanceAssignTitle": "Shift for {name}",
+  "@attendanceAssignTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "attendanceAssignFrom": "Starting",
+  "attendanceAssignNote": "Schedules start today or later. Once today's shift has begun, or once the rider has worked today, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.",
+  "attendanceAssignSave": "Save schedule",
+  "attendanceAssignSaved": "Schedule updated.",
+  "attendanceHistoryLimit": "This month is older than the duty history the platform keeps, so it can no longer be shown.",
+  "attendanceManualTag": "Manual",
+  "attendanceTypedByHand": "Typed by hand in the Manual Attendance Log, not recorded by the app",
+  "attendanceLogPresentKeepsLate": "Present does not clear a late check-in. To excuse one, choose “Late, excused”.",
+  "attendanceLogChecking": "Checking this day for an existing entry…",
+  "attendanceLogCheckFailed": "This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.",
+  "attendanceRetiredShifts": "Retired shifts ({count})",
+  "@attendanceRetiredShifts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "attendanceRetireKeepsHistory": "Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.",
+  "attendanceLiveOnDuty": "{count, plural, =0{Live: no riders on duty} =1{Live: 1 rider on duty} other{Live: {count} riders on duty}}",
+  "@attendanceLiveOnDuty": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNavReconciliation": "Reconciliation",
+  "carrRidersNavRidersHr": "Riders HR",
+  "carrRidersNavDirectory": "Directory",
+  "carrRidersNavStatement": "Statement",
+  "carrRidersTitle": "Riders HR Directory",
+  "carrRidersSubtitle": "Manage rider profiles, status and regions",
+  "carrRidersStatTotal": "Total onboarded riders",
+  "carrRidersStatTotalNote": "Registered company fleet",
+  "carrRidersStatOnDuty": "Active on duty",
+  "carrRidersStatOnDutyNote": "Available or on a job",
+  "carrRidersStatSignalLost": "Signal lost",
+  "carrRidersStatSignalLostNote": "On duty, but their phone has gone quiet",
+  "carrRidersStatOffline": "Offline / inactive",
+  "carrRidersStatOfflineNote": "Declared themselves off duty",
+  "carrRidersPresenceUnknown": "Presence could not be read just now",
+  "carrRidersSearchHint": "Search riders by name, ID...",
+  "carrRidersZoneAll": "Zone: All",
+  "carrRidersZoneValue": "Zone: {zone}",
+  "@carrRidersZoneValue": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersZoneTooltip": "A zone here is the region each rider wrote on their application",
+  "carrRidersVehicleAll": "Vehicle: All",
+  "carrRidersVehicleValue": "Vehicle: {vehicle}",
+  "@carrRidersVehicleValue": {
+    "placeholders": {
+      "vehicle": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersVehicleMotorcycle": "Motorcycle",
+  "carrRidersVehicleCar": "Car",
+  "carrRidersVehicleBicycle": "Bicycle",
+  "carrRidersVehicleVan": "Van",
+  "carrRidersVehicleTruck": "Truck",
+  "carrRidersAddRider": "Add Rider",
+  "carrRidersAddRiderTooltip": "Approve somebody who has applied to ride for you",
+  "carrRidersAddRiderUnavailable": "Applications could not be read just now, so nobody can be approved from here",
+  "carrRidersManageProfile": "Manage Profile",
+  "carrRidersDeliveredToday": "({count} today)",
+  "@carrRidersDeliveredToday": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersRatingNew": "New",
+  "carrRidersStatusActive": "Active",
+  "carrRidersStatusSignalLost": "Signal lost",
+  "carrRidersStatusOffline": "Offline",
+  "carrRidersStatusSuspended": "Suspended",
+  "carrRidersStatusOnAJob": "On a job",
+  "carrRidersNoMatch": "No rider matches that.",
+  "carrRidersShowingOnly": "Showing only: {filter}",
+  "@carrRidersShowingOnly": {
+    "placeholders": {
+      "filter": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersShowEveryone": "Show everyone",
+  "carrRidersDirectoryFootnote": "Zone is the region each rider gave on their application — the platform does not assign riders to your coverage zones. Rating is what customers left across all of a rider's deliveries. Presence reaches this page once a rider has carried your work, so a rider who has not yet shows none.",
+  "carrRidersWaitingTitle": "Add a rider",
+  "carrRidersWaitingCount": "{count, plural, =0{Nobody is waiting to ride for you} =1{1 person waiting to ride for you} other{{count} people waiting to ride for you}}",
+  "@carrRidersWaitingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersWaitingEmpty": "Nobody has applied to ride for you. Riders reach a fleet by applying — there is no way to create one directly.",
+  "carrRidersApprove": "Approve",
+  "carrRidersOnYourFleet": "On your fleet",
+  "carrRidersSuspendTitle": "Suspend {name}",
+  "@carrRidersSuspendTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReinstateTitle": "Reinstate {name}",
+  "@carrRidersReinstateTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersSuspendBody": "They keep their sign-in and their history, and stop being offered work. You can reinstate them at any time.",
+  "carrRidersReinstateBody": "They can be offered work again from the moment this is saved.",
+  "carrRidersChooseReason": "Choose a reason",
+  "carrRidersNoteHint": "A note for the record (optional)",
+  "carrRidersSuspendRider": "Suspend Rider",
+  "carrRidersReinstateRider": "Reinstate Rider",
+  "carrRidersSuspendedToast": "{name} is suspended and will not be offered work.",
+  "@carrRidersSuspendedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReinstatedToast": "{name} can take work again.",
+  "@carrRidersReinstatedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersReasonFraud": "Fraud",
+  "carrRidersReasonAbuse": "Abuse",
+  "carrRidersReasonNonPayment": "Non-payment",
+  "carrRidersReasonPolicyViolation": "Policy violation",
+  "carrRidersReasonPartnerRequest": "Partner request",
+  "carrRidersReasonOther": "Other",
+  "carrRidersProfileTitle": "Rider HR Profile",
+  "carrRidersProfileSubtitle": "Documents, employment details and performance",
+  "carrRidersBackToDirectory": "Back to riders",
+  "carrRidersBadgeId": "Badge ID: {code}",
+  "@carrRidersBadgeId": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersPhone": "Phone",
+  "carrRidersEmail": "Email",
+  "carrRidersLastSeen": "Last seen",
+  "carrRidersNoPresenceYet": "No duty or location yet",
+  "carrRidersStaleNote": "Declared on duty, but the last location is too old to dispatch on.",
+  "carrRidersNoApplication": "The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.",
+  "carrRidersDocumentsTitle": "Documents Verification",
+  "carrRidersDocNationalId": "National ID",
+  "carrRidersDocDrivingLicence": "Driving licence",
+  "carrRidersDocVehicleRegistration": "Vehicle registration",
+  "carrRidersDocVerified": "Verified",
+  "carrRidersDocWaiting": "Waiting",
+  "carrRidersDocRefused": "Refused",
+  "carrRidersDocNotUploaded": "Not uploaded",
+  "carrRidersDocOpen": "Open the document",
+  "carrRidersCouldNotRead": "Could not be read just now.",
+  "carrRidersAvgRating": "Avg rating",
+  "carrRidersHappyCustomers": "{percent}% happy customers",
+  "@carrRidersHappyCustomers": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNoRatingsYet": "No ratings yet",
+  "carrRidersDeliveriesWindow": "Deliveries, last {days} days",
+  "@carrRidersDeliveriesWindow": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersClaimedCaption": "{claimed} claimed, {cancelled} cancelled after claiming",
+  "@carrRidersClaimedCaption": {
+    "placeholders": {
+      "claimed": {
+        "type": "int"
+      },
+      "cancelled": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersCompletionRate": "Completion rate",
+  "carrRidersCompletionCaption": "Delivered out of claimed, for your company",
+  "carrRidersNothingClaimed": "Nothing claimed in this window",
+  "carrRidersDeliveredTodayLabel": "Delivered today",
+  "carrRidersDeliveredTodayCaption": "For your company, since midnight",
+  "carrRidersOutputTitle": "Delivery output, last {days} days",
+  "@carrRidersOutputTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersOutputEmpty": "No deliveries in this period",
+  "carrRidersOutputNote": "Days are split in the {zone} time zone, and only deliveries made for your company are counted.",
+  "@carrRidersOutputNote": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersHoursTitle": "Hours online, last {days} days",
+  "@carrRidersHoursTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersHoursValue": "{hours} h",
+  "@carrRidersHoursValue": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersHoursTotal": "{hours} h in total",
+  "@carrRidersHoursTotal": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersShifts": "{count, plural, =1{1 shift} other{{count} shifts}}",
+  "@carrRidersShifts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersHoursNone": "No hours online to show for your company.",
+  "carrRidersHoursZone": "Days are split in the {zone} time zone, as the server reports them.",
+  "@carrRidersHoursZone": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersEmploymentTitle": "Employment Details",
+  "carrRidersStartDate": "Start date",
+  "carrRidersApplied": "Applied",
+  "carrRidersRegion": "Region (from their application)",
+  "carrRidersVehicle": "Vehicle",
+  "carrRidersEmploymentNote": "Contract type, pay rate and zone assignment are not recorded on this platform.",
+  "carrRidersSuspendUnavailable": "Suspending works through a rider's application to you. The platform attached this rider directly, so ask YouDrop to suspend them.",
+  "carrRidersTerminate": "Terminate Contract",
+  "carrRidersTerminateTitle": "End {name}'s contract?",
+  "@carrRidersTerminateTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateBody": "{name} comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop's own riders: they can take no work at all until another company hires them or YouDrop takes them on.",
+  "@carrRidersTerminateBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateJobs": "Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.",
+  "carrRidersTerminateMoney": "Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.",
+  "carrRidersTerminateUndo": "Taking them back later means hiring them again.",
+  "carrRidersTerminateConfirm": "Terminate contract",
+  "carrRidersTerminated": "{name} is no longer on your fleet.",
+  "@carrRidersTerminated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "carrRidersTerminateCarrying": "{count, plural, =1{They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.} other{They are carrying {count} of your jobs right now. Their contract can end once those are delivered or cancelled.}}",
+  "@carrRidersTerminateCarrying": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNotOnFleet": "This rider is no longer on your fleet.",
+  "carrRidersNoPresenceCount": "{count, plural, =1{1 more has no duty or location yet} other{{count} more have no duty or location yet}}",
+  "@carrRidersNoPresenceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "carrRidersNoPresenceNote": "Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.",
+  "carrRidersVehicleModel": "Vehicle model",
+  "carrRidersPlateNumber": "Plate number",
+  "carrRidersDateOfBirth": "Date of birth",
+  "carrRidersNationalIdNumber": "National ID number",
+  "carrRidersDutyChanged": "Duty last changed",
+  "carrRidersVehicleYear": "Vehicle year",
+  "carrRidersTerminateReason": "Reason, kept on record",
+  "carrRidersTerminateReasonHint": "Why is this contract ending?",
+  "carrRidersStatusStandingUnknown": "Standing unknown",
+  "carrRidersStandingUnknownNote": "Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.",
+  "attendanceBackToProfile": "Back to profile",
+  "blitzTitle": "Merchant Blitz",
+  "blitzSubtitle": "Your catalogue from shelf photos",
+  "blitzFastSetup": "Fast setup",
+  "blitzStepScan": "Scan shop",
+  "blitzStepCheck": "Check items",
+  "blitzStepSave": "Save drafts",
+  "blitzStepDone": "{step}, done",
+  "@blitzStepDone": { "placeholders": { "step": { "type": "String" } } },
+  "blitzStepCurrent": "{step}, current step",
+  "@blitzStepCurrent": { "placeholders": { "step": { "type": "String" } } },
+  "blitzIntroTitle": "Photograph your shelves, skip the typing",
+  "blitzIntroBody": "Take a photo of each shelf. We read the product names and sizes and suggest a section and a price, and you check every item before anything is saved.",
+  "blitzTakePhoto": "Take photo",
+  "blitzChoosePhotos": "Choose photos",
+  "blitzPhotoCount": "Photos: {count} of {max}",
+  "@blitzPhotoCount": { "placeholders": { "count": { "type": "int" }, "max": { "type": "int" } } },
+  "blitzPhotoLabel": "Shelf photo {number}",
+  "@blitzPhotoLabel": { "placeholders": { "number": { "type": "int" } } },
+  "blitzUploading": "Uploading photo {current} of {total}…",
+  "@blitzUploading": { "placeholders": { "current": { "type": "int" }, "total": { "type": "int" } } },
+  "blitzScanPhotos": "{count, plural, =1{Scan 1 photo} other{Scan {count} photos}}",
+  "@blitzScanPhotos": { "placeholders": { "count": { "type": "int" } } },
+  "blitzAnalyzing": "Reading your shelves…",
+  "blitzAnalyzingHint": "This can take a minute or two. Keep this screen open.",
+  "blitzScanComplete": "Scan complete",
+  "blitzItemsFound": "{count, plural, =0{No items} =1{1 item} other{{count} items}}",
+  "@blitzItemsFound": { "placeholders": { "count": { "type": "int" } } },
+  "blitzSampleTitle": "Sample items",
+  "blitzSampleBody": "The photo reader isn't switched on yet, so these are example items, not what's on your shelves. Skip any you don't sell.",
+  "blitzNoneFound": "We couldn't recognise any products in these photos.",
+  "blitzNoneFoundHint": "Try closer photos with the labels facing the camera.",
+  "blitzNewScan": "Start a new scan",
+  "blitzReviewCta": "Review and save as drafts",
+  "blitzFooter": "Nothing reaches customers until you publish it.",
+  "blitzScansLeft": "{count, plural, =0{No scans left today} =1{1 scan left today} other{{count} scans left today}}",
+  "@blitzScansLeft": { "placeholders": { "count": { "type": "int" } } },
+  "blitzQuotaReached": "You've used today's {limit} scans. Try again tomorrow.",
+  "@blitzQuotaReached": { "placeholders": { "limit": { "type": "int" } } },
+  "blitzFailedRefused": "These photos couldn't be read. Try clear photos of your shop's shelves.",
+  "blitzFailedUnreadable": "One of the photos couldn't be opened. Try taking it again.",
+  "blitzFailedProvider": "The photo reader didn't answer.",
+  "blitzFailedBusy": "Many shops are scanning right now. Try again in a minute.",
+  "blitzFailedInterrupted": "The scan was interrupted before it finished.",
+  "blitzFailedOther": "The scan didn't finish.",
+  "blitzNoRetriesLeft": "This scan can't be tried again. Start a new one.",
+  "blitzCameraFailed": "The camera didn't open. Choose a photo instead.",
+  "blitzUploadFailed": "A photo didn't upload. Check your connection and try again.",
+  "blitzCouldNotStart": "The scan couldn't start.",
+  "blitzConnectionLost": "We couldn't check on the scan. Check your connection.",
+  "blitzTag": "{name} · about {price}",
+  "@blitzTag": { "placeholders": { "name": { "type": "String" }, "price": { "type": "String" } } },
+  "blitzReviewTitle": "Check items",
+  "blitzReviewSubtitle": "What you keep is saved as a draft",
+  "blitzKeep": "Keep",
+  "blitzKeepItem": "Keep {name}",
+  "@blitzKeepItem": { "placeholders": { "name": { "type": "String" } } },
+  "blitzName": "Name",
+  "blitzPriceUsd": "Price (USD)",
+  "blitzSection": "Section",
+  "blitzNoSection": "No section",
+  "blitzGuess": "Guess: {price}",
+  "@blitzGuess": { "placeholders": { "price": { "type": "String" } } },
+  "blitzUseGuess": "Use this price",
+  "blitzCheckThis": "Not sure of this one — check it",
+  "blitzNeedName": "Enter a name",
+  "blitzNeedPrice": "Enter a price above 0",
+  "blitzPriceDecimals": "Use at most two decimals",
+  "blitzSaveDrafts": "{count, plural, =0{Nothing to save} =1{Save 1 draft} other{Save {count} drafts}}",
+  "@blitzSaveDrafts": { "placeholders": { "count": { "type": "int" } } },
+  "blitzSkipAll": "Skip all items",
+  "blitzFixItems": "Fix the marked items first.",
+  "blitzSavedTitle": "Saved as drafts",
+  "blitzSavedCount": "{count, plural, =0{No products were added.} =1{1 product was added to your catalogue as a draft.} other{{count} products were added to your catalogue as drafts.}}",
+  "@blitzSavedCount": { "placeholders": { "count": { "type": "int" } } },
+  "blitzSavedHint": "Drafts stay hidden from customers. Add a photo to each one, then publish it from Inventory.",
+  "blitzDone": "Done",
+  "blitzAlreadySaved": "Saved",
+  "blitzTooManyPhotos": "A scan takes {max} photos at most, so the extra ones weren't added.",
+  "@blitzTooManyPhotos": { "placeholders": { "max": { "type": "int" } } },
+  "blitzSectionsUnavailable": "Sections couldn't load, so each item keeps the section we suggested.",
+  "blitzEntryAction": "Scan shelves",
+  "blitzSettingsRow": "Build catalogue from photos",
+  "blitzSaveFailed": "Couldn't save. Check your connection and try again.",
+  "blitzSavedEarlier": "These items had already been saved.",
+  "blitzListChanged": "Some items were already decided elsewhere, so they've left the list. Check the rest and save again.",
+  "giftHubTitle": "Send a Gift",
+  "giftHubBannerTitle": "Remittance Made Real",
+  "giftHubBannerBody": "Support your loved ones in Lebanon. Choose real essentials, groceries or hot meals, delivered to their door — often the same day.",
+  "giftHowItWorks": "How it works",
+  "giftStep1Title": "Choose from local shops",
+  "giftStep1Body": "Pick groceries, sweets, pharmacy items or a ready-made care bundle.",
+  "giftStep2Title": "Enter their address in Lebanon",
+  "giftStep2Body": "We deliver wherever the shop you choose delivers.",
+  "giftStep3Title": "Same-day delivery",
+  "giftStep3Body": "A rider hands it over with your personal note — the same day, while the shop is open.",
+  "giftCategories": "Gift categories",
+  "giftCatCarePackage": "Care Package",
+  "giftCatGroceries": "Groceries",
+  "giftCatMedicine": "Medicine & Health",
+  "giftRecentRecipients": "Recent recipients",
+  "giftAddRecipient": "Add a recipient",
+  "giftFeaturedBundles": "Featured care bundles",
+  "giftSameDayDeliverable": "Same-day deliverable",
+  "giftHomeEntryTitle": "Send a gift to Lebanon",
+  "giftHomeEntrySub": "Groceries, sweets and care bundles for family, delivered to their door",
+  "giftDetailsTitle": "Gift Details",
+  "giftCheckoutSub": "Diaspora Checkout",
+  "giftRecipientInfo": "Recipient information",
+  "giftRecipientName": "Recipient name",
+  "giftRecipientNameRequired": "Who is receiving it?",
+  "giftRecipientPhone": "Phone number (Lebanon)",
+  "giftPhoneInvalid": "Enter a Lebanese number, e.g. 71 234 567",
+  "giftDeliveryDate": "Delivery date",
+  "giftNoteTitle": "Attach a personal note",
+  "giftNoteHelper": "The shop sends your note with the gift.",
+  "giftWrapTitle": "Premium gift wrapping",
+  "giftWrapSubtitle": "Festive wrapping, with your note on a card (+{amount})",
+  "@giftWrapSubtitle": {"placeholders":{"amount":{"type":"String"}}},
+  "giftPaymentTitle": "Payment",
+  "giftCashNotAllowed": "Gifts are paid online — the person receiving it is never asked to pay.",
+  "giftNoPaymentMethods": "Gifts are paid online, and online payment isn't switched on yet — so a gift can't be sent right now.",
+  "giftTermsFailed": "We couldn't load the gift's payment options.",
+  "giftOfflineCannotWait": "A gift can't wait for the connection the way a cash order can — it's paid online. Send it once you're back online.",
+  "giftOrderSummary": "Order summary",
+  "giftLineQty": "{qty}× {name}",
+  "@giftLineQty": {"placeholders":{"qty":{"type":"int"},"name":{"type":"String"}}},
+  "giftWrapLine": "Gift wrapping",
+  "giftDeliveryFee": "Delivery fee",
+  "giftTotalUsd": "Total USD",
+  "giftApproxLbp": "≈ {amount}",
+  "@giftApproxLbp": {"placeholders":{"amount":{"type":"String"}}},
+  "giftTotalConfirmed": "The final total is confirmed when your gift is placed.",
+  "giftSendAndPay": "Send Gift & Pay",
+  "giftForName": "Gift for {name}",
+  "@giftForName": {"placeholders":{"name":{"type":"String"}}},
+  "giftWrapRequested": "Gift wrapping requested",
+  "giftCardMessage": "Card message",
+  "giftRecipientPhoneLabel": "Recipient's phone",
+  "giftBasketBanner": "Sending this basket as a gift",
+  "giftBasketNotGift": "Not a gift",
+  "giftDeliveredToday": "Today, while the shop is open",
+  "giftNoteLength": "{used}/{max}",
+  "@giftNoteLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}},
+  "giftUnnamed": "A gift — who it's for shows once it's yours to carry",
+  "heatmapTitle": "Demand Radar",
+  "heatmapSubtitle": "Real-time neighborhood pulses",
+  "heatmapActiveOrderDensities": "Active Order Densities",
+  "heatmapLiveSyncing": "Live Syncing",
+  "heatmapCantRefresh": "Can't refresh right now",
+  "heatmapLevelHigh": "High",
+  "heatmapLevelMedium": "Med",
+  "heatmapLevelLow": "Low",
+  "heatmapZoneWithLevel": "{zone} ({level})",
+  "@heatmapZoneWithLevel": {
+    "description": "A map label: an area name and how busy it is, e.g. \"Hamra (High)\".",
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      },
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "heatmapWindowHour": "Last hour",
+  "heatmapWindowDay": "Last 24 hours",
+  "heatmapWindowWeek": "Last 7 days",
+  "heatmapAreasTitle": "Areas around your shop",
+  "heatmapNotOnMap": "Not on the map yet",
+  "heatmapNoneOnMap": "These areas aren't on the map yet",
+  "heatmapMapUnavailable": "The map can't load right now",
+  "heatmapNoAreaTitle": "We don't know your neighbourhood yet",
+  "heatmapNoAreaMessage": "Demand shows for the mapped areas near your shop's pin. Drop your pin if you haven't yet, and nearby areas will appear here once they're on the map.",
+  "heatmapNotEnoughTitle": "Not enough orders nearby yet",
+  "heatmapNotEnoughMessage": "{count, plural, other{An area appears once {count} different customers have ordered there in this period, so no single customer can be picked out.}}",
+  "@heatmapNotEnoughMessage": {
+    "description": "The privacy floor: how many different customers an area needs before it is shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "heatmapCouldNotLoad": "Couldn't load demand right now",
+  "heatmapNoShopMessage": "Demand around your shop shows here once your shop is set up.",
+  "heatmapEntryBlurb": "See which neighbourhoods around your shop are ordering",
+  "heatmapZoneCentreLatitude": "Centre latitude (optional)",
+  "heatmapZoneCentreLongitude": "Centre longitude (optional)",
+  "heatmapZoneCentreHelp": "Roughly the middle of the area. It places the area on merchants' demand map; pricing never uses it.",
+  "heatmapZoneCentreBoth": "Enter both, or leave both empty",
+  "heatmapZoneCentreLatRange": "A latitude between -90 and 90",
+  "heatmapZoneCentreLngRange": "A longitude between -180 and 180",
+  "heatmapZoneOnMap": "On the demand map",
+  "heatmapZoneNotOnMap": "Not on the demand map",
+  "heatmapSubtitleDay": "Neighborhood pulses over the last 24 hours",
+  "heatmapSubtitleWeek": "Neighborhood pulses over the last 7 days",
+  "heatmapUpdatedHourly": "Updated every hour",
+  "heatmapUpdatedDaily": "Updated once a day",
+  "heatmapLegendRelative": "Compared with the busiest area around you",
+  "heatmapNotLiveTitle": "Your shop isn't live yet",
+  "heatmapNotLiveMessage": "Demand around your shop shows here once your shop is published.",
+  "payrollNavLabel": "Payroll",
+  "payrollTitle": "Rider Payroll & Earnings Management",
+  "payrollSubtitle": "Approve payouts, calculate bonuses, and track payouts history",
+  "payrollPeriodLabel": "Pay Period: {from} – {to}",
+  "@payrollPeriodLabel": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollPeriodTooltip": "Choose a pay period",
+  "payrollPeriodOption": "{from} – {to} · {state}",
+  "@payrollPeriodOption": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRulesButton": "Pay rules",
+  "payrollExport": "Export Payslips",
+  "payrollExported": "Saved {file}.",
+  "@payrollExported": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollStart": "Start pay run",
+  "payrollRecompute": "Recompute",
+  "payrollApprove": "Approve pay run",
+  "payrollPayAll": "Record All Payments",
+  "payrollDiscard": "Discard draft",
+  "payrollKpiPool": "Total Payroll Pool",
+  "payrollKpiPoolNote": "To pay for {from} – {to}",
+  "@payrollKpiPoolNote": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollKpiRiders": "Riders on Payroll",
+  "payrollKpiRidersValue": "{count, plural, =0{No riders} =1{1 Rider} other{{count} Riders}}",
+  "@payrollKpiRidersValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollKpiRidersNote": "With a payslip this period",
+  "payrollKpiAverage": "Average Rider Earnings",
+  "payrollKpiAverageNote": "Per {days}-day period",
+  "@payrollKpiAverageNote": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollKpiBonuses": "Bonuses",
+  "payrollKpiBonusesNote": "Named bonuses and corrections",
+  "payrollLedgerTitle": "Rider Payroll Ledger",
+  "payrollColRider": "Rider name",
+  "payrollColBase": "Base pay",
+  "payrollColDelivery": "Delivery pay",
+  "payrollColTips": "Tips",
+  "payrollColDeductions": "Deductions",
+  "payrollColGross": "Gross pay",
+  "payrollColNet": "Net pay",
+  "payrollColStatus": "Status",
+  "payrollColActions": "Actions",
+  "payrollPayslip": "Payslip",
+  "payrollTipsNote": "Tips are the rider's own money and never part of their pay.",
+  "payrollHoursUnknown": "Hours for this rider could not be read.",
+  "payrollNobody": "Nobody on your fleet has pay in this period.",
+  "payrollTableNote": "This is your company's payroll, worked out from your pay rules. YouDrop does not pay your riders.",
+  "payrollStatusDraft": "Draft",
+  "payrollStatusDue": "Awaiting payment",
+  "payrollStatusNothingDue": "Nothing to pay",
+  "payrollStatusPaid": "Paid ✓",
+  "payrollStatusFailed": "Failed",
+  "payrollRunApproved": "Approved",
+  "payrollRunPaid": "Paid",
+  "payrollNotStarted": "Not started",
+  "payrollRunMeta": "{state} · figures computed {time}",
+  "@payrollRunMeta": {
+    "placeholders": {
+      "state": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRunRevision": "Draft, revision {revision}",
+  "@payrollRunRevision": {
+    "placeholders": {
+      "revision": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollHoursAsOf": "Hours as read on {time}",
+  "@payrollHoursAsOf": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollNoRulesTitle": "Set your pay rules first",
+  "payrollNoRulesBody": "Payroll works out each rider's pay from your company's own rules: what a delivery pays, whether hours are paid, and any deductions. Nothing is assumed for you.",
+  "payrollNoRunTitle": "No pay run for this period yet",
+  "payrollNoRunBody": "Starting one computes a draft from the deliveries and hours on record. Nothing is final until you approve it.",
+  "payrollPeriodOpen": "This period runs until {date}. It can be approved once it is over.",
+  "@payrollPeriodOpen": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollHoursMissing": "Attendance hours could not be read, so these figures leave hours out.",
+  "payrollHoursNotDeployed": "Attendance hours are not available on this platform yet, so these figures leave hours out.",
+  "payrollHoursNotRead": "Your pay rules now use hours. Recompute to read them.",
+  "payrollJobsLateDraft": "{count, plural, =1{1 delivery reached the ledger after these figures were computed. Recompute to include it.} other{{count} deliveries reached the ledger after these figures were computed. Recompute to include them.}}",
+  "@payrollJobsLateDraft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollJobsLateApproved": "{count, plural, =1{1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.} other{{count} deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.}}",
+  "@payrollJobsLateApproved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollPeriodChanged": "Your pay rules now pay these days in a different period. Discard this draft and start that period.",
+  "payrollLoadFailed": "Payroll could not be loaded just now.",
+  "payrollTryAgain": "Try again",
+  "payrollPayslipSubtitle": "Payslip for {from} – {to}",
+  "@payrollPayslipSubtitle": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollSectionPay": "Pay",
+  "payrollSectionSummary": "Summary",
+  "payrollSectionAttendance": "Hours and attendance",
+  "payrollSectionPayment": "Payment",
+  "payrollLineDeliveries": "{count, plural, =1{1 delivery × {rate}} other{{count} deliveries × {rate}}}",
+  "@payrollLineDeliveries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineHours": "{hours} h recorded × {rate}",
+  "@payrollLineHours": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineOvertime": "{hours} h overtime × {rate}",
+  "@payrollLineOvertime": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineTyped": "{hours} h typed by the office × {rate}",
+  "@payrollLineTyped": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineTypedUnpaid": "{hours} h typed by the office, not paid under your rules",
+  "@payrollLineTypedUnpaid": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineLate": "{days, plural, =1{1 late day × {rate}} other{{days} late days × {rate}}}",
+  "@payrollLineLate": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineAbsence": "{days, plural, =1{1 absence × {rate}} other{{days} absences × {rate}}}",
+  "@payrollLineAbsence": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineCash": "Company cash the rider held, kept from pay",
+  "payrollLineBonus": "Bonus: {label}",
+  "@payrollLineBonus": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineDeduction": "Deduction: {label}",
+  "@payrollLineDeduction": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineCorrection": "Correction: {label}",
+  "@payrollLineCorrection": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineOther": "Other",
+  "payrollOwes": "Owes the company {amount}. Nothing is paid.",
+  "@payrollOwes": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollTipsInfo": "Tips {amount}: the rider's own money, not part of this pay.",
+  "@payrollTipsInfo": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollCashKept": "Holds {amount} of the company's cash collected by {date}, more than this pay covers. It stays for the hub to collect.",
+  "@payrollCashKept": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollHoursFacts": "Recorded {recorded} h · typed {typed} h · overtime {overtime} h",
+  "@payrollHoursFacts": {
+    "placeholders": {
+      "recorded": {
+        "type": "String"
+      },
+      "typed": {
+        "type": "String"
+      },
+      "overtime": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollDaysFacts": "Late days {lates} · absences {absences}",
+  "@payrollDaysFacts": {
+    "placeholders": {
+      "lates": {
+        "type": "int"
+      },
+      "absences": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollAddBonus": "Add bonus",
+  "payrollAddDeduction": "Add deduction",
+  "payrollRemove": "Remove",
+  "payrollMarkPaid": "Mark paid",
+  "payrollMarkFailed": "Mark failed",
+  "payrollAddCorrection": "Add correction",
+  "payrollPaidOn": "Paid on {date} · {method}",
+  "@payrollPaidOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRecordedBy": "Recorded by {name}",
+  "@payrollRecordedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollFailedBecause": "Payment failed: {reason}",
+  "@payrollFailedBecause": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollCorrections": "Corrections",
+  "payrollCorrectionWaiting": "Paid in the rider's next pay run",
+  "payrollCorrectionPaid": "Paid in a later pay run",
+  "payrollLineDialogBonus": "Add a bonus for {name}",
+  "@payrollLineDialogBonus": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLineDialogDeduction": "Add a deduction for {name}",
+  "@payrollLineDialogDeduction": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollLabelField": "What it is for",
+  "payrollAmountField": "Amount",
+  "payrollAmountInvalid": "An amount to the cent, like 25.00",
+  "payrollRequired": "Required",
+  "payrollReasonField": "Reason",
+  "payrollReferenceField": "Reference (optional)",
+  "payrollSave": "Save",
+  "payrollCorrectionTitle": "Correct {name}'s pay",
+  "@payrollCorrectionTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollCorrectionBody": "The approved payslip stays as it is. The correction is paid in the rider's next pay run.",
+  "payrollCorrectionMore": "Pay more",
+  "payrollCorrectionLess": "Take back",
+  "payrollFailedTitle": "Payment to {name} did not go through?",
+  "@payrollFailedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollFailedBody": "The pay stays owed and can be recorded as paid later.",
+  "payrollPaidTitle": "Record paying {name} {amount}?",
+  "@payrollPaidTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollPaidBody": "This records that your company paid the rider. YouDrop moves no money.",
+  "payrollApproveTitle": "Approve pay for {from} – {to}?",
+  "@payrollApproveTitle": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollApproveBody": "{count, plural, =1{1 rider, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.} other{{count} riders, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.}}",
+  "@payrollApproveBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollApproveCash": "{amount} of company cash your riders collected by {date} and still hold is kept from their pay and recorded as handed to your company.",
+  "@payrollApproveCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollApproveYes": "Approve",
+  "payrollPayAllTitle": "{count, plural, =1{Record 1 payment of {total}?} other{Record {count} payments totalling {total}?}}",
+  "@payrollPayAllTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollPayAllBody": "This records that your company paid these riders, and cannot be undone. Failed payments are left to record one by one.",
+  "payrollRecordYes": "Record",
+  "payrollDiscardTitle": "Discard this draft?",
+  "payrollDiscardBody": "Its figures are thrown away and its history is kept. You can start the period again.",
+  "payrollDiscardYes": "Discard",
+  "payrollDone": "Saved.",
+  "payrollApproved": "Pay run approved.",
+  "payrollErrFiguresChanged": "The figures changed since you looked. Check the new ones, then approve again.",
+  "payrollErrCashChanged": "A rider's cash changed a moment ago. Nothing was approved; approve again to see the new figures.",
+  "payrollErrTotalChanged": "The total waiting for payment is now {amount}. Nothing was recorded.",
+  "@payrollErrTotalChanged": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollErrRefused": "That could not be done: the pay run has changed or no longer allows it. Reload and try again.",
+  "payrollErrFailed": "That could not be done just now. Please try again.",
+  "payrollErrRulesStart": "New rules cannot start on that day. Pick one of the days offered.",
+  "payrollRulesNow": "In force since {from}",
+  "@payrollRulesNow": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRulesNone": "No pay rules yet.",
+  "payrollRulesNext": "New rules start on {date}",
+  "@payrollRulesNext": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollRulesCycle": "Pay riders",
+  "payrollCycleSemiMonthly": "Twice a month (1st–15th, 16th–end)",
+  "payrollCycleMonthly": "Monthly",
+  "payrollRulesStart": "Starting on",
+  "payrollRulesPerDelivery": "Pay per delivery",
+  "payrollRulesHourly": "Hourly base (optional)",
+  "payrollRulesHourlyHint": "Empty for no hourly pay",
+  "payrollRulesTyped": "Pay hours the office typed",
+  "payrollRulesOvertime": "Overtime multiplier",
+  "payrollRulesLate": "Deduction per late day",
+  "payrollRulesAbsence": "Deduction per absence",
+  "payrollRulesSave": "Save rules",
+  "payrollRulesNote": "Rules take effect from the first day of a pay period and never change a pay run already approved.",
+  "payrollMultiplierInvalid": "Between 1.00 and 5.00",
+  "payrollRulesNoStart": "No day is open for new rules right now.",
+  "payrollCashMethodKeptFromPay": "Kept from pay",
+  "payrollReadBeforeEnd": "These figures were read on {time}, before the period ended. Recompute to count the whole period before approving.",
+  "@payrollReadBeforeEnd": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollDeliveriesNotDeployed": "Deliveries cannot be counted from orders on this platform yet, so these figures count only deliveries that earned a fee: free deliveries are missing from them.",
+  "payrollDeliveriesMissing": "Deliveries could not be counted from orders just now, so these figures count only deliveries that earned a fee. Recompute to count every delivery.",
+  "payrollHoursMissingFor": "{count, plural, =1{Hours could not be read for {names}, so their pay leaves hours out.} other{Hours could not be read for {names}, so their pay leaves hours out.}}",
+  "@payrollHoursMissingFor": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "payrollNamesMore": "{count, plural, =1{{names} and 1 other} other{{names} and {count} others}}",
+  "@payrollNamesMore": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "payrollListSeparator": ", ",
+  "payrollApproveDeliveriesLedger": "Deliveries were counted only from jobs that earned a fee, so free deliveries are missing from this pay.",
+  "payrollApproveWithoutMissing": "Approve without what is missing",
+  "payrollErrNeedsAcknowledgement": "Something is missing from these figures. Tick the box to approve without it.",
+  "payrollErrRecomputeNeeded": "These figures were read before the period ended. Recompute, check them and approve again.",
+  "payrollHoursNotListed": "Attendance shows no time this rider worked for your company in this period, so their hours are not known.",
+  "chatRoomEntryTitle": "Neighbourhood chat",
+  "chatRoomEntrySub": "Talk with the people who live around you",
+  "chatRoomTitle": "{area} chat",
+  "@chatRoomTitle": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomLive": "LIVE",
+  "chatRoomMembers": "{count, plural, =1{1 neighbour} other{{count} neighbours}}",
+  "@chatRoomMembers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatRoomCommunity": "Community",
+  "chatRoomComposerHint": "Type a message or ask a neighbour…",
+  "chatRoomEmpty": "No messages yet. Say hello to your neighbours.",
+  "chatRoomCouldNotLoad": "Could not load your neighbourhood chat",
+  "chatRoomPickAreaTitle": "Choose your area to join its chat",
+  "chatRoomPickAreaBody": "Neighbourhood chat follows the area of your delivery address.",
+  "chatRoomChooseArea": "Choose area",
+  "chatRoomUnknownAreaTitle": "Your area has no neighbourhood chat",
+  "chatRoomUnknownAreaBody": "Pick one of the delivery areas for your address to join its chat.",
+  "chatRoomMoveBlocked": "You can move to your new area's chat from {date}.",
+  "@chatRoomMoveBlocked": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomMuted": "A moderator has paused your messages here until {date}.",
+  "@chatRoomMuted": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomHidden": "This message was removed",
+  "chatRoomNeighbour": "Neighbour",
+  "chatRoomReport": "Report",
+  "chatRoomReportTitle": "Why are you reporting this message?",
+  "chatRoomReasonSpam": "Spam or advertising",
+  "chatRoomReasonAbuse": "Abuse or harassment",
+  "chatRoomReasonPersonalInfo": "Someone's personal details",
+  "chatRoomReasonOther": "Something else",
+  "chatRoomReportSent": "Thanks. A moderator will review it.",
+  "chatRoomBlock": "Block",
+  "chatRoomBlockTitle": "Block {name}?",
+  "@chatRoomBlockTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRoomBlockBody": "You won't see their messages in neighbourhood chat. They won't be told.",
+  "chatRoomBlockedToast": "Blocked. You won't see their messages.",
+  "chatRoomCopy": "Copy",
+  "chatRoomCopied": "Copied",
+  "chatRoomRulesTitle": "Community rules",
+  "chatRoomRulesBody": "Be kind to your neighbours. No spam or advertising, no harassment, and never post anyone's phone number or address. Moderators remove messages that break these rules.",
+  "chatRoomBlockedPeople": "People you blocked",
+  "chatRoomNoBlocks": "You haven't blocked anyone.",
+  "chatRoomUnblock": "Unblock",
+  "chatSlowDown": "You're sending messages too fast. Wait a moment and try again.",
+  "chatTooLong": "That message is too long.",
+  "chatActionFailed": "That didn't work. Try again.",
+  "chatShopWith": "Chat with {shop}",
+  "@chatShopWith": {
+    "placeholders": {
+      "shop": {
+        "type": "String"
+      }
+    }
+  },
+  "chatShopHintCustomer": "Message the shop…",
+  "chatShopHintMerchant": "Reply to the customer…",
+  "chatShopEmptyCustomer": "Ask the shop anything: what's in stock, prices, opening hours.",
+  "chatShopEmptyMerchant": "No messages in this conversation yet.",
+  "chatShopCouldNotLoad": "Could not load this conversation",
+  "chatShopQuietCustomer": "This chat has gone quiet.",
+  "chatShopReopen": "Reopen",
+  "chatShopQuietMerchant": "This conversation has gone quiet. The customer can start it again from your shop's page.",
+  "chatShopInboxTitle": "Customer messages",
+  "chatShopInboxEmpty": "No customer messages yet",
+  "chatShopInboxEmptySub": "Customers can message your shop from its page in the app.",
+  "chatShopInboxCouldNotLoad": "Could not load customer messages",
+  "chatShopCustomer": "Customer",
+  "chatShopYouPrefix": "You: {text}",
+  "@chatShopYouPrefix": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "chatShopQuietBadge": "Quiet",
+  "chatModerationTitle": "Moderation",
+  "chatModerationSub": "Reported neighbourhood chat messages, oldest first.",
+  "chatModerationEmpty": "No reports waiting",
+  "chatModerationCouldNotLoad": "Could not load the moderation queue",
+  "chatModerationReports": "{count, plural, =1{1 report} other{{count} reports}}",
+  "@chatModerationReports": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatModerationHide": "Hide message",
+  "chatModerationDismiss": "Dismiss",
+  "chatModerationMute": "Mute author",
+  "chatModerationUnmute": "Unmute author",
+  "chatModerationMute24h": "For 24 hours",
+  "chatModerationMute7d": "For 7 days",
+  "chatModerationMute30d": "For 30 days",
+  "chatModerationReasonLabel": "Reason (kept in the audit trail)",
+  "chatModerationReasonTooShort": "Write at least 3 characters",
+  "chatModerationConfirm": "Confirm",
+  "chatModerationRemoved": "Removed",
+  "chatModerationMutedUntil": "Author muted until {date}",
+  "@chatModerationMutedUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "chatModerationDone": "Done",
+  "chatModerationRefresh": "Refresh",
+  "chatRoomOlderFailed": "Couldn't load earlier messages. Tap to try again.",
+  "chatRoomPostAfterDelivery": "You can post here after your first delivery to this area.",
+  "chatRoomPostingUnavailable": "Posting is paused while we check your deliveries. Try again shortly.",
+  "chatShopUnreadCount": "{count, plural, =1{1 unread message} other{{count} unread messages}}",
+  "@chatShopUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiCartTitle": "Smart Basket",
+  "multiCartSubtitle": "One checkout, every shop",
+  "multiCartShopCount": "{count, plural, =1{1 shop} other{{count} shops}}",
+  "@multiCartShopCount": {"placeholders":{"count":{"type":"int"}}},
+  "multiCartFromShop": "{count, plural, =1{From {store} (1 item)} other{From {store} ({count} items)}}",
+  "@multiCartFromShop": {"placeholders":{"count":{"type":"int"},"store":{"type":"String"}}},
+  "multiCartShopDelivery": "Delivery from this shop",
+  "multiCartDeliveryFromShops": "{count, plural, =1{Delivery from 1 shop} other{Delivery from {count} shops}}",
+  "@multiCartDeliveryFromShops": {"placeholders":{"count":{"type":"int"}}},
+  "multiCartCheckoutAmount": "Checkout — {amount}",
+  "@multiCartCheckoutAmount": {"placeholders":{"amount":{"type":"String"}}},
+  "multiCartBelowMinimum": "Add {amount} more from {store} to reach its minimum order",
+  "@multiCartBelowMinimum": {"placeholders":{"amount":{"type":"String"},"store":{"type":"String"}}},
+  "multiCartShopClosed": "{store} is closed right now. Remove its items to check out.",
+  "@multiCartShopClosed": {"placeholders":{"store":{"type":"String"}}},
+  "multiCartShopNotServing": "{store} doesn't deliver to your address. Remove its items to check out.",
+  "@multiCartShopNotServing": {"placeholders":{"store":{"type":"String"}}},
+  "multiCartShopUnavailable": "{store} can't take this order right now.",
+  "@multiCartShopUnavailable": {"placeholders":{"store":{"type":"String"}}},
+  "multiCartRemoveShop": "Remove {store}",
+  "@multiCartRemoveShop": {"placeholders":{"store":{"type":"String"}}},
+  "multiCartShopLimitTitle": "{max, plural, =1{One shop per basket} other{Up to {max} shops per basket}}",
+  "@multiCartShopLimitTitle": {"placeholders":{"max":{"type":"int"}}},
+  "multiCartShopLimitBody": "Check out, or remove a shop from your basket, before adding items from another.",
+  "multiCartPartOfOrder": "{count, plural, other{Part of a {count}-shop order}}",
+  "@multiCartPartOfOrder": {"placeholders":{"count":{"type":"int"}}},
+  "multiCartCannotWait": "A basket from several shops can't wait for the connection: its shops' orders are placed together, while you're online. Check out once you're back.",
+  "multiCartGiftOneShop": "A gift is sent from one shop at a time. Remove the other shops' items, or send this basket as an ordinary order.",
+  "multiCartPlaced": "{count, plural, =1{1 order placed · {amount}} other{{count} orders placed · {amount}}}",
+  "@multiCartPlaced": {"placeholders":{"count":{"type":"int"},"amount":{"type":"String"}}},
+  "multiCartPricesUpdating": "Updating prices…",
+  "multiCartPricesFailed": "We couldn't confirm the latest prices.",
+  "multiCartPriceChangedTitle": "The total has changed",
+  "multiCartPriceChangedBody": "Your basket now comes to {total}, not the {agreed} you saw. Place its orders at the new total?",
+  "@multiCartPriceChangedBody": {"placeholders":{"total":{"type":"String"},"agreed":{"type":"String"}}},
+  "multiCartEarlierCheckoutPlaced": "{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}",
+  "@multiCartEarlierCheckoutPlaced": {"placeholders":{"count":{"type":"int"}}},
+  "svcVerticalServices": "Services",
+  "svcCategoryPrinting": "Printing",
+  "svcCategoryTailoring": "Tailoring & alterations",
+  "svcCategoryRepairs": "Repairs",
+  "svcCategoryPhotography": "Photography",
+  "svcCategoryCleaning": "Cleaning",
+  "svcCategoryBeauty": "Beauty",
+  "svcCategoryTutoring": "Tutoring",
+  "svcSignupTitle": "Grow your business on YouDrop",
+  "svcSignupSubtitle": "Reach customers in your neighbourhood.",
+  "svcSignupBannerTitle": "Lebanese services",
+  "svcSignupBannerBody": "Printing, tailoring, repairs, photography and more — collected at your shop or delivered by YouDrop.",
+  "svcBusinessName": "Business name",
+  "svcBusinessNameHint": "e.g. Al Fakhry Press",
+  "svcServiceCategory": "Service category",
+  "svcServiceCategoryHint": "Choose what you offer",
+  "svcPhoneHint": "71 234 567",
+  "svcPhoneInvalid": "Enter a Lebanese number, e.g. 71 234 567",
+  "svcArea": "Location / area",
+  "svcAreaHint": "Choose your area",
+  "svcApplyCta": "Apply to sell services",
+  "svcOptionsFailed": "We couldn't load the services on offer. Check your connection and try again.",
+  "svcNoCategoriesOpen": "YouDrop isn't taking applications to sell services right now.",
+  "svcPendingTitle": "Application sent",
+  "svcPendingBody": "A YouDrop reviewer reads every application to sell services. We'll email {email} once it's decided.",
+  "@svcPendingBody": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "svcPendingBodyNoEmail": "A YouDrop reviewer reads every application to sell services, and we'll let you know once it's decided.",
+  "svcReference": "Reference: {reference}",
+  "@svcReference": {
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  },
+  "svcApprovedTitle": "You're approved",
+  "svcApprovedBody": "We open your services shop the first time you go to it.",
+  "svcErrCategoryClosed": "YouDrop isn't taking applications for that service yet. Choose another.",
+  "svcErrCategoryMissing": "Choose the service you offer.",
+  "svcErrAreaUnknown": "That area is no longer on the list. Choose your area again.",
+  "svcErrAreaMissing": "Choose the area your business is in.",
+  "svcErrCatalogUnavailable": "We couldn't check the services on offer just now. Try again in a moment.",
+  "svcOfferYourServices": "Offer your services",
+  "svcOfferYourServicesSub": "Printing, tailoring, repairs or photography",
+  "svcSwitchToShop": "Switch to your shop",
+  "svcSwitchToShopping": "Switch to shopping",
+  "svcChoiceCard": "Offer services",
+  "svcChoiceCardBlurb": "Print, tailor, repair or take photos for your neighbourhood, from your own shop.",
+  "svcIntent": "Services",
+  "svcIntentBlurb": "I print, tailor, repair or take photos",
+  "svcOpeningShop": "Opening your services shop…",
+  "svcOpeningShopFailed": "We couldn't open your services shop.",
+  "svcDocsTitle": "Add your documents",
+  "svcDocsIntro": "Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.",
+  "svcDocsFootnote": "They go to the reviewer when you tap Send documents.",
+  "svcDocsSend": "Send documents",
+  "svcDocsSent": "Your documents are with the reviewer.",
+  "svcDocsSkipped": "No documents were sent, so the reviewer will see your ID and commercial registration as missing.",
+  "svcShopCategoryClosedTitle": "Your service isn't offered right now",
+  "svcShopCategoryClosedBody": "Your application was approved, but YouDrop isn't offering this service at the moment, so your shop can't be opened. Please contact support.",
+  "svcCashShopName": "Shop {id}",
+  "@svcCashShopName": {"placeholders":{"id":{"type":"String"}}},
+  "svcCashShopTakenAtCounter": "{amount} paid at its counter",
+  "@svcCashShopTakenAtCounter": {"placeholders":{"amount":{"type":"String"}}},
+  "svcCashShopConfirmBody": "Confirm {shop} has paid the platform {owed}: its commission on the {held} its customers paid at its counter, covering {orders}. The shop keeps the rest as its own share. This cannot be undone.",
+  "@svcCashShopConfirmBody": {"placeholders":{"shop":{"type":"String"},"owed":{"type":"String"},"held":{"type":"String"},"orders":{"type":"String"}}},
+  "svcCashShopAmountChanged": "{shop} now owes {amount}, not the amount you confirmed. Nothing was recorded.",
+  "@svcCashShopAmountChanged": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}},
+  "svcActionCollected": "Customer collected",
+  "svcDeclineTooBusy": "Too busy right now",
+  "svcDeclineCannotDo": "We can't do this job",
+  "svcDeclineFileProblem": "Problem with the file",
+  "svcDeclineOther": "Other reason",
+  "svcNavServices": "Services",
+  "svcBrandPill": "YOUDROP SERVICES",
+  "svcSearchHint": "Search for a service…",
+  "svcCategoriesTitle": "Service categories",
+  "svcPopularNearYou": "Popular services near you",
+  "svcNearYou": "Services near you",
+  "svcAllProviders": "Service providers",
+  "svcNoServicesNearby": "No services near you yet",
+  "svcNoServicesNearbyHint": "Try a category, or search for what you need.",
+  "svcServicesNotOffered": "YouDrop isn't offering services here yet",
+  "svcCouldNotLoadServices": "Could not load services",
+  "svcDistanceAway": "{distance} away",
+  "@svcDistanceAway": {"placeholders":{"distance":{"type":"String"}}},
+  "svcOffers": "Offers",
+  "svcSearchProviders": "Providers",
+  "svcSearchTitle": "Results for “{query}”",
+  "@svcSearchTitle": {"placeholders":{"query":{"type":"String"}}},
+  "svcNoResults": "Nothing found for “{query}”",
+  "@svcNoResults": {"placeholders":{"query":{"type":"String"}}},
+  "svcCategoryEmpty": "No {category} providers yet",
+  "@svcCategoryEmpty": {"placeholders":{"category":{"type":"String"}}},
+  "svcReviewsCount": "{count, plural, =1{1 review} other{{count} reviews}}",
+  "@svcReviewsCount": {"placeholders":{"count":{"type":"int"}}},
+  "svcOpenUntil": "Open until {time}",
+  "@svcOpenUntil": {"placeholders":{"time":{"type":"String"}}},
+  "svcTabAbout": "About",
+  "svcFromPrice": "From {price}",
+  "@svcFromPrice": {"placeholders":{"price":{"type":"String"}}},
+  "svcOrderCta": "Order",
+  "svcNoOffers": "This provider has no offers right now",
+  "svcAboutHours": "Opening hours",
+  "svcAboutAddress": "Address",
+  "svcAboutGetIt": "How you get your order",
+  "svcPickupAtShop": "Pickup at the shop",
+  "svcYouDropDelivery": "YouDrop delivery",
+  "svcClosedNoOrders": "Closed now — you can order when the shop opens",
+  "svcNeedsFileUnavailable": "This offer needs a file, and files can't be sent with orders yet",
+  "svcPackOf": "Pack of {count} {unit}",
+  "@svcPackOf": {"placeholders":{"count":{"type":"String"},"unit":{"type":"String"}}},
+  "svcPerUnit": "Per {unit}",
+  "@svcPerUnit": {"placeholders":{"unit":{"type":"String"}}},
+  "svcLoadMore": "Load more",
+  "svcCouldNotLoadOffer": "Could not load this offer",
+  "svcCouldNotLoadReviews": "Could not load reviews",
+  "svcOrderServiceTitle": "Order service",
+  "svcProviderLine": "Provider: {name}",
+  "@svcProviderLine": {"placeholders":{"name":{"type":"String"}}},
+  "svcQuantity": "Quantity",
+  "svcUnitsLine": "{units} {unit}",
+  "@svcUnitsLine": {"placeholders":{"units":{"type":"String"},"unit":{"type":"String"}}},
+  "svcPacksCount": "{count, plural, =1{1 pack} other{{count} packs}}",
+  "@svcPacksCount": {"placeholders":{"count":{"type":"int"}}},
+  "svcChooseOption": "Choose one",
+  "svcOptionRequired": "Required",
+  "svcOptionOptional": "Optional",
+  "svcUploadDesign": "Upload design file",
+  "svcUploadHint": "Tap to choose a PDF, JPG or PNG, up to 10 MB",
+  "svcUploading": "Uploading…",
+  "svcUploaded": "Uploaded",
+  "svcRemoveFile": "Remove",
+  "svcUploadFailed": "Couldn't upload this file. Try again.",
+  "svcAddAnotherFile": "Add another file",
+  "svcFileRequired": "This provider needs your file to start",
+  "svcSpecialInstructions": "Special instructions",
+  "svcInstructionsHint": "e.g. Leave a white border around the card edges",
+  "svcHowYouGetIt": "How you get it",
+  "svcDeliveryFeePlus": "+{amount}",
+  "@svcDeliveryFeePlus": {"placeholders":{"amount":{"type":"String"}}},
+  "svcPayCashPickup": "Cash — pay when you collect",
+  "svcPayCashDelivery": "Cash — pay on delivery",
+  "svcDeliveryFee": "Delivery fee",
+  "svcDiscount": "Discount",
+  "svcPlaceOrderTotal": "Place order — {amount}",
+  "@svcPlaceOrderTotal": {"placeholders":{"amount":{"type":"String"}}},
+  "svcOfflineNoQueue": "Service orders need a connection — they can't wait on this phone to be sent later.",
+  "svcChooseDeliveryAddress": "Choose where to deliver",
+  "svcQuoteFailed": "Couldn't get the price. Try again.",
+  "svcPriceChangedBody": "This order now comes to {total}, not the {agreed} you saw. Place it at the new total?",
+  "@svcPriceChangedBody": {"placeholders":{"total":{"type":"String"},"agreed":{"type":"String"}}},
+  "svcDirectoryUnavailable": "Services are briefly unavailable. Try again in a moment.",
+  "svcNotServed": "{shop} doesn't deliver to this address",
+  "@svcNotServed": {"placeholders":{"shop":{"type":"String"}}},
+  "svcShopClosed": "{shop} is closed and isn't taking orders right now",
+  "@svcShopClosed": {"placeholders":{"shop":{"type":"String"}}},
+  "svcBelowMinimum": "{shop} delivers orders of {amount} or more",
+  "@svcBelowMinimum": {"placeholders":{"shop":{"type":"String"},"amount":{"type":"String"}}},
+  "svcRefusedCategoryClosed": "This service isn't offered right now",
+  "svcRefusedOfferNotOrderable": "This offer can't be ordered right now",
+  "svcRefusedFulfilment": "The provider doesn't offer that way of getting it",
+  "svcRefusedAttachmentsUnavailable": "Files can't be sent with orders yet, so this offer can't be ordered",
+  "svcRefusedWrongType": "Only PDF, JPG or PNG files",
+  "svcRefusedEmpty": "That file is empty",
+  "svcRefusedTooLarge": "Files must be 10 MB or smaller",
+  "svcRefusedTooManyWaiting": "You have too many files waiting for an order. Remove one first.",
+  "svcRefusedNotUploaded": "That file didn't finish uploading. Upload it again.",
+  "svcRefusedExpired": "That file has expired. Upload it again.",
+  "svcRefusedAlreadyAttached": "That file is already on another order. Upload it again.",
+  "svcRefusedTooManyFiles": "Up to 3 files per order",
+  "svcRefusedDuplicate": "That file is already added",
+  "svcRefusedNotAccepted": "This offer doesn't take files",
+  "svcRefusedUnknownFile": "That file couldn't be found. Upload it again.",
+  "svcRefusedPacks": "Choose between 1 and 99 packs",
+  "svcRefusedGeneric": "This order can't be placed as it stands",
+  "svcTrackTitle": "Track service order",
+  "svcOrderNumber": "Order #{ref}",
+  "@svcOrderNumber": {"placeholders":{"ref":{"type":"String"}}},
+  "svcStatusWaiting": "Waiting for provider",
+  "svcStatusInProgress": "In progress",
+  "svcStatusReadyPickup": "Ready for pickup",
+  "svcStatusReadyDelivery": "Ready for delivery",
+  "svcStatusOnTheWay": "On the way",
+  "svcStatusCompleted": "Completed",
+  "svcStatusCollected": "Collected",
+  "svcStatusDeclined": "Declined",
+  "svcStatusNotCollected": "Not collected",
+  "svcEstimatedCompletion": "Estimated completion",
+  "svcReadyByCaption": "Ready by",
+  "svcEstimateAfterAccept": "{range}, confirmed once the provider accepts",
+  "@svcEstimateAfterAccept": {"placeholders":{"range":{"type":"String"}}},
+  "svcTurnaroundRange": "{min}–{max} hours",
+  "@svcTurnaroundRange": {"placeholders":{"min":{"type":"String"},"max":{"type":"String"}}},
+  "svcTurnaroundUpTo": "Up to {max} hours",
+  "@svcTurnaroundUpTo": {"placeholders":{"max":{"type":"String"}}},
+  "svcTodayAt": "Today, {time}",
+  "@svcTodayAt": {"placeholders":{"time":{"type":"String"}}},
+  "svcTomorrowAt": "Tomorrow, {time}",
+  "@svcTomorrowAt": {"placeholders":{"time":{"type":"String"}}},
+  "svcDateAt": "{date}, {time}",
+  "@svcDateAt": {"placeholders":{"date":{"type":"String"},"time":{"type":"String"}}},
+  "svcOrderStatusTitle": "Order status",
+  "svcTimelinePlaced": "Order placed",
+  "svcTimelineAccepted": "Provider accepted",
+  "svcTimelineInProduction": "In production",
+  "svcTimelineOutForDelivery": "Out for delivery",
+  "svcDeclinedReason": "Declined by the provider: {reason}",
+  "@svcDeclinedReason": {"placeholders":{"reason":{"type":"String"}}},
+  "svcTimelineNotCollected": "Cancelled — not collected in time",
+  "svcProviderRole": "Service provider",
+  "svcShowNumberAtPickup": "Show this order number when you collect",
+  "svcPickupFrom": "Pickup from {shop}",
+  "@svcPickupFrom": {"placeholders":{"shop":{"type":"String"}}},
+  "svcDeliveringTo": "Delivering to {address}",
+  "@svcDeliveringTo": {"placeholders":{"address":{"type":"String"}}},
+  "svcYourInstructions": "Your instructions",
+  "svcSummary": "Summary",
+  "svcServiceChip": "Service",
+  "svcRefusedTooManyUploads": "You've sent several files in the last few minutes. Wait a few minutes, then add this one again.",
+  "svcInstructionsLength": "{used}/{max}",
+  "@svcInstructionsLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}},
+  "svcOrderNotAccepted": "This order couldn't be sent as it is. Check what you wrote in it, then try again.",
+  "svcOrderChangedRequote": "Your order changed while it was being sent, so nothing was placed. Its total is being checked again.",
+  "svcUnconfirmedLeaveTitle": "Your order may have gone through",
+  "svcUnconfirmedLeaveBody": "We didn't hear back after you tapped Place. Check Orders before ordering this again, so you don't order it twice.",
+  "svcCheckOrders": "Check Orders",
+  "svcLeaveAnyway": "Leave anyway",
+  "svcStayHere": "Stay",
+  "svcYourFiles": "Your files",
+  "svcYourFileNumber": "File {n}",
+  "@svcYourFileNumber": {"placeholders":{"n":{"type":"int"}}},
+  "svcYourFilesFailed": "Couldn't load your files",
+  "svcFileGone": "This file is no longer available.",
+  "svcRateProvider": "Rate {shop}",
+  "@svcRateProvider": {"placeholders":{"shop":{"type":"String"}}},
+  "svcRateProviderPrompt": "How was the work?",
+  "svcRatedProvider": "You rated {shop}",
+  "@svcRatedProvider": {"placeholders":{"shop":{"type":"String"}}},
+  "svcReviewNotYet": "This order isn't on record as completed yet, so it can't be rated. Try again in a minute.",
+  "svcBoOffersTitle": "Service offers",
+  "svcBoOffersSubtitle": "Every service shop's offers, in any status — take one down or restore it, with a reason",
+  "svcBoShopsTitle": "Shops",
+  "svcBoShopsSubtitle": "Listed shops, and which of them carry the Verified Local badge",
+  "svcBoFilterAll": "All",
+  "svcBoOfferDraft": "Draft",
+  "svcBoOfferActive": "Active",
+  "svcBoOfferPaused": "Paused",
+  "svcBoOfferArchived": "Archived",
+  "svcBoOfferTakenDown": "Taken down",
+  "svcBoAllCategories": "All categories",
+  "svcBoAllShops": "All shops",
+  "svcBoShopFilterTooltip": "Shops seen in the results so far",
+  "svcBoOffersSearchHint": "Search offer or shop name",
+  "svcBoColOffer": "Offer",
+  "svcBoColShop": "Shop",
+  "svcBoColCategory": "Category",
+  "svcBoColPrice": "Price",
+  "svcBoColStatus": "Status",
+  "svcBoOffersEmpty": "No service offers match these filters.",
+  "svcBoOffersLoadFailed": "Could not load service offers.",
+  "svcBoOffersRefused": "This account may not read service offers — only back office staff can.",
+  "svcBoPageOf": "Page {page} of {pages}",
+  "@svcBoPageOf": {"placeholders":{"page":{"type":"int"},"pages":{"type":"int"}}},
+  "svcBoOffersCount": "{count, plural, =1{1 offer} other{{count} offers}}",
+  "@svcBoOffersCount": {"placeholders":{"count":{"type":"int"}}},
+  "svcBoPriceFrom": "From {price}",
+  "@svcBoPriceFrom": {"placeholders":{"price":{"type":"String"}}},
+  "svcBoPricePer": "{price} per {unit}",
+  "@svcBoPricePer": {"placeholders":{"price":{"type":"String"},"unit":{"type":"String"}}},
+  "svcBoPricePerPack": "{price} per {count} {unit}",
+  "@svcBoPricePerPack": {"placeholders":{"price":{"type":"String"},"count":{"type":"int"},"unit":{"type":"String"}}},
+  "svcBoSectionOffer": "Offer",
+  "svcBoSectionShop": "Provider shop",
+  "svcBoSectionTerms": "Terms",
+  "svcBoSectionPhotos": "Photos",
+  "svcBoSectionHold": "Held off sale",
+  "svcBoSectionModerationHistory": "Moderation history",
+  "svcBoFactDescription": "Description",
+  "svcBoFactName": "Name",
+  "svcBoFactListing": "Listing",
+  "svcBoShopListed": "Listed",
+  "svcBoShopDraft": "Not yet listed",
+  "svcBoShopSuspended": "Suspended",
+  "svcBoTermPricing": "Pricing",
+  "svcBoPricingFixed": "Fixed price",
+  "svcBoPricingPerUnit": "Per unit",
+  "svcBoPricingFrom": "Starting price",
+  "svcBoTermUnknown": "Not known to this version",
+  "svcBoTermPack": "One pack",
+  "svcBoPackOf": "{count} {unit}",
+  "@svcBoPackOf": {"placeholders":{"count":{"type":"int"},"unit":{"type":"String"}}},
+  "svcBoPackUnits": "{count, plural, =1{1 unit} other{{count} units}}",
+  "@svcBoPackUnits": {"placeholders":{"count":{"type":"int"}}},
+  "svcBoTermTurnaround": "Turnaround",
+  "svcBoTurnaroundRange": "{min}–{max} hours",
+  "@svcBoTurnaroundRange": {"placeholders":{"min":{"type":"int"},"max":{"type":"int"}}},
+  "svcBoTurnaroundUpTo": "Up to {max} hours",
+  "@svcBoTurnaroundUpTo": {"placeholders":{"max":{"type":"int"}}},
+  "svcBoTermFulfilment": "Fulfilment",
+  "svcBoFulfilPickup": "Pickup at the shop",
+  "svcBoFulfilDelivery": "YouDrop delivery",
+  "svcBoFulfilBoth": "Pickup or delivery",
+  "svcBoTermFiles": "Customer files",
+  "svcBoFilesPolicyNone": "No files",
+  "svcBoFilesPolicyOptional": "Optional",
+  "svcBoFilesPolicyRequired": "Required",
+  "svcBoTermPrompt": "Question to the customer",
+  "svcBoNoPhotos": "No photos",
+  "svcBoPhotoUnavailable": "Image unavailable",
+  "svcBoOpenPhoto": "Open full-size photo",
+  "svcBoPhoto": "Photo",
+  "svcBoPhotoPosition": "{index} of {count}",
+  "@svcBoPhotoPosition": {"placeholders":{"index":{"type":"int"},"count":{"type":"int"}}},
+  "svcBoHoldReason": "Reason given",
+  "svcBoHoldSince": "Since",
+  "svcBoTakeDown": "Take down",
+  "svcBoRestore": "Restore",
+  "svcBoTakeDownTitle": "Take down {offer}?",
+  "@svcBoTakeDownTitle": {"placeholders":{"offer":{"type":"String"}}},
+  "svcBoTakeDownBody": "It goes off sale for every customer at once. Its provider reads your reason, and cannot put it back on sale until back office restores it.",
+  "svcBoRestoreTitle": "Restore {offer}?",
+  "@svcBoRestoreTitle": {"placeholders":{"offer":{"type":"String"}}},
+  "svcBoRestoreBody": "The hold is lifted. An offer that was on sale comes back paused, for its provider to resume.",
+  "svcBoReasonLabel": "Reason — required, kept in the history",
+  "svcBoReasonRequired": "Say why: the reason is required.",
+  "svcBoTakenDownDone": "{offer} was taken down. Its provider can read your reason.",
+  "@svcBoTakenDownDone": {"placeholders":{"offer":{"type":"String"}}},
+  "svcBoRestoredDone": "{offer} was restored. If it was on sale, it waits paused for its provider to resume it.",
+  "@svcBoRestoredDone": {"placeholders":{"offer":{"type":"String"}}},
+  "svcBoTakeDownRefused": "Not taken down: the server says this offer is already down, or is not a service offer. Nothing changed, and the list was reloaded.",
+  "svcBoRestoreRefused": "Not restored: the server says this offer is not taken down any more. Nothing changed, and the list was reloaded.",
+  "svcBoOfferChanged": "This offer changed while you were acting, so nothing was recorded. It has been reloaded; try again.",
+  "svcBoOfferGone": "This offer no longer exists.",
+  "svcBoModerateRefused": "This account may not moderate offers.",
+  "svcBoReasonRejected": "The server did not accept that reason. Write one of at most {max} characters.",
+  "@svcBoReasonRejected": {"placeholders":{"max":{"type":"int"}}},
+  "svcBoActionFailed": "That did not go through, and nothing changed. Try again.",
+  "svcBoHistoryNever": "Back office has never acted on this offer.",
+  "svcBoHistoryLoadFailed": "Could not load the history.",
+  "svcBoActTakeDown": "Taken down",
+  "svcBoActRestore": "Restored",
+  "svcBoActUnknown": "An action this version does not know",
+  "svcBoActBy": "by {actor}",
+  "@svcBoActBy": {"placeholders":{"actor":{"type":"String"}}},
+  "svcBoKindAll": "All kinds",
+  "svcBoKindService": "Service orders",
+  "svcBoFulfilmentAll": "Pickup and delivery",
+  "svcBoFulfilmentPickup": "Pickup",
+  "svcBoFulfilmentDelivery": "Delivery",
+  "svcBoServiceTag": "Service",
+  "svcBoStatusPlaced": "Placed",
+  "svcBoStatusAccepted": "Accepted",
+  "svcBoStatusInProduction": "In production",
+  "svcBoStatusReadyPickup": "Ready for pickup",
+  "svcBoStatusReadyDelivery": "Ready for delivery",
+  "svcBoStatusOnTheWay": "On the way",
+  "svcBoStatusCollected": "Collected",
+  "svcBoStatusDelivered": "Delivered",
+  "svcBoStatusDeclined": "Declined by the provider",
+  "svcBoStatusNotCollected": "Cancelled: never collected",
+  "svcBoStatusCancelled": "Cancelled",
+  "svcBoDetailKind": "Kind",
+  "svcBoKindServiceIn": "Service · {category}",
+  "@svcBoKindServiceIn": {"placeholders":{"category":{"type":"String"}}},
+  "svcBoDetailService": "Service",
+  "svcBoPacksOfUnits": "{packs} × {size} {unit}",
+  "@svcBoPacksOfUnits": {"placeholders":{"packs":{"type":"int"},"size":{"type":"int"},"unit":{"type":"String"}}},
+  "svcBoPacksOf": "{packs} × {size}",
+  "@svcBoPacksOf": {"placeholders":{"packs":{"type":"int"},"size":{"type":"int"}}},
+  "svcBoDetailOptions": "Options",
+  "svcBoDetailInstructions": "Instructions",
+  "svcBoNoInstructions": "None written",
+  "svcBoDetailReadyBy": "Estimated ready",
+  "svcBoHistoryTitle": "Status history",
+  "svcBoHistoryNone": "No steps recorded yet.",
+  "svcBoHistoryFailed": "Could not load the status history.",
+  "svcBoFilesTitle": "Customer's files",
+  "svcBoFilesAuditNotice": "Back office reads of a customer's files are recorded: showing them logs your account against each file.",
+  "svcBoFilesShow": "Show the files",
+  "svcBoFilesNotTaken": "This offer takes no files.",
+  "svcBoFilesEmpty": "No files on this order. Files are deleted 90 days after the order is completed.",
+  "svcBoFileOpen": "Open",
+  "svcBoFileOpened": "Opened in a new tab. Your access to this file is recorded.",
+  "svcBoFilePdf": "PDF",
+  "svcBoFileImage": "Image",
+  "svcBoFileOther": "File",
+  "svcBoSizeMb": "{size} MB",
+  "@svcBoSizeMb": {"placeholders":{"size":{"type":"String"}}},
+  "svcBoSizeKb": "{size} KB",
+  "@svcBoSizeKb": {"placeholders":{"size":{"type":"String"}}},
+  "svcBoFilesRefused": "The server refused to show this order's files.",
+  "svcBoFilesUnavailable": "The files cannot be reached right now. Try again shortly.",
+  "svcBoFilesFailed": "Could not load the files.",
+  "svcBoLedgerRefused": "This account may not read the orders ledger.",
+  "svcBoShopsGoods": "Goods shops",
+  "svcBoShopsServices": "Service shops",
+  "svcBoShopsSearchHint": "Search shop name",
+  "svcBoShopsListedOnly": "Only shops listed on the storefront appear here.",
+  "svcBoShopsEmpty": "No listed shops match.",
+  "svcBoShopsLoadFailed": "Could not load shops.",
+  "svcBoVerifyGrantTitle": "Mark {shop} as Verified Local?",
+  "@svcBoVerifyGrantTitle": {"placeholders":{"shop":{"type":"String"}}},
+  "svcBoVerifyGrantBody": "Customers see the badge on this shop wherever it appears. It is YouDrop's own claim to the shop's neighbours, so grant it only to a shop that has been checked.",
+  "svcBoVerifyRevokeTitle": "Remove Verified Local from {shop}?",
+  "@svcBoVerifyRevokeTitle": {"placeholders":{"shop":{"type":"String"}}},
+  "svcBoVerifyRevokeBody": "The badge disappears from this shop for every customer.",
+  "svcBoVerifyGrant": "Grant the badge",
+  "svcBoVerifyRevoke": "Remove the badge",
+  "svcBoVerifyGranted": "{shop} is now Verified Local.",
+  "@svcBoVerifyGranted": {"placeholders":{"shop":{"type":"String"}}},
+  "svcBoVerifyRevoked": "{shop} is no longer Verified Local.",
+  "@svcBoVerifyRevoked": {"placeholders":{"shop":{"type":"String"}}},
+  "svcBoVerifyRefused": "Only back office can change this badge.",
+  "svcBoVerifyGone": "This shop no longer exists.",
+  "svcBoVerifyFailed": "The badge was not changed. Try again.",
+  "svcBoVerifiedToggle": "Verified Local for {shop}",
+  "@svcBoVerifiedToggle": {"placeholders":{"shop":{"type":"String"}}},
+  "svcBoReasonLength": "{used}/{max}",
+  "@svcBoReasonLength": {"placeholders":{"used":{"type":"int"},"max":{"type":"int"}}},
+  "svcBoOfferNotListed": "Nothing was recorded, and this offer is no longer among the service offers, so there is nothing left to act on.",
+  "svcBoOfferUnreadable": "Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.",
+  "svcNavOffers": "Offers",
+  "svcDashboardActiveOffers": "Active offers",
+  "svcDashboardThisWeek": "This week",
+  "svcDashboardThisWeekCaption": "Orders, last 7 days",
+  "svcDashboardRating": "Rating",
+  "svcQuickActions": "Quick actions",
+  "svcAddOffer": "Add offer",
+  "svcViewOrders": "View orders",
+  "svcCurrentOffers": "Current offers",
+  "svcSeeAllOffers": "See all",
+  "svcOfferActive": "ACTIVE",
+  "svcOfferPaused": "PAUSED",
+  "svcOfferDraft": "DRAFT",
+  "svcPauseOffer": "Pause",
+  "svcResumeOffer": "Resume",
+  "svcOfferPausedDone": "Offer paused. Customers can't order it until you resume it.",
+  "svcOfferResumedDone": "Offer is live again.",
+  "svcNoOffersYet": "No offers yet",
+  "svcNoOffersYetBody": "Add your first service so customers can order it.",
+  "svcDashboardLoadFailed": "Couldn't load your dashboard",
+  "svcOffersLoadFailed": "Couldn't load your offers",
+  "svcNoShopYet": "Your services shop isn't open yet",
+  "svcNoShopYetBody": "It opens as soon as your application is approved.",
+  "svcPublishAfterApproval": "You can publish offers once your application is approved.",
+  "svcOffersTitle": "Your offers",
+  "svcOffersSubtitle": "What customers can order from you",
+  "svcUnitPack": "{count} {unit}",
+  "@svcUnitPack": {"placeholders":{"count":{"type":"String"},"unit":{"type":"String"}}},
+  "svcUnitPer": "Per {unit}",
+  "@svcUnitPer": {"placeholders":{"unit":{"type":"String"}}},
+  "svcPriceUsd": "${amount}",
+  "@svcPriceUsd": {"placeholders":{"amount":{"type":"String"}}},
+  "svcPriceLbp": "{amount} LBP",
+  "@svcPriceLbp": {"placeholders":{"amount":{"type":"String"}}},
+  "svcLbpPreview": "≈ {amount} at today's rate",
+  "@svcLbpPreview": {"placeholders":{"amount":{"type":"String"}}},
+  "svcNewOffer": "New service offer",
+  "svcEditOffer": "Edit offer",
+  "svcOfferTitle": "Offer title",
+  "svcOfferTitleRequired": "Give the offer a title",
+  "svcTooLong": "At most {max} characters",
+  "@svcTooLong": {"placeholders":{"max":{"type":"String"}}},
+  "svcDescription": "Description",
+  "svcCategory": "Category",
+  "svcCategoryOfShop": "Offers take your shop's category",
+  "svcPriceLabel": "Price (USD)",
+  "svcPriceInvalid": "Enter a price above zero, with at most two decimals",
+  "svcPricingType": "Pricing type",
+  "svcPricingFixed": "Fixed price",
+  "svcPricingPerUnit": "Price per unit",
+  "svcPricingFrom": "Starting price (options add to it)",
+  "svcUnitLabel": "Unit (e.g. cards, sqm)",
+  "svcPackSize": "Units per step",
+  "svcUnitRequired": "Name the unit, such as cards or sqm",
+  "svcPackSizeRange": "Between {min} and {max}",
+  "@svcPackSizeRange": {"placeholders":{"min":{"type":"String"},"max":{"type":"String"}}},
+  "svcPerUnitIsOne": "A price per unit is for one unit",
+  "svcPackPreview": "Customers order in steps of {pack}",
+  "@svcPackPreview": {"placeholders":{"pack":{"type":"String"}}},
+  "svcPhotos": "Photos",
+  "svcPhotoRequired": "Add at least one photo to publish",
+  "svcAddPhoto": "Add photo",
+  "svcTurnaround": "Turnaround",
+  "svcTurnaroundSameDay": "Same day",
+  "svcTurnaround1to2": "1–2 days",
+  "svcTurnaround3to5": "3–5 days",
+  "svcTurnaroundWeek": "About a week",
+  "svcTurnaroundHours": "{min}–{max} hours",
+  "@svcTurnaroundHours": {"placeholders":{"min":{"type":"String"},"max":{"type":"String"}}},
+  "svcTurnaroundRequired": "Choose a turnaround",
+  "svcFulfilment": "How customers get it",
+  "svcFulfilmentPickup": "Pickup at your shop",
+  "svcFulfilmentDelivery": "YouDrop delivery",
+  "svcFulfilmentBoth": "Both",
+  "svcFulfilmentRequired": "Choose how customers get it",
+  "svcDeliveryNeedsAreas": "Set your delivery areas or drop your shop's pin before offering YouDrop delivery",
+  "svcCustomerFile": "Customer file",
+  "svcCustomerFileNone": "Not needed",
+  "svcCustomerFileOptional": "Optional",
+  "svcCustomerFileRequired": "Required",
+  "svcInstructionsPrompt": "What should customers tell you?",
+  "svcInstructionsPromptHint": "e.g. Names and job titles to print",
+  "svcOptions": "Options",
+  "svcOptionsAfterSave": "Save the offer first, then add options such as paper type",
+  "svcEditOptions": "Edit options",
+  "svcNoOptions": "No options",
+  "svcPublishOffer": "Publish offer",
+  "svcSaveDraft": "Save draft",
+  "svcSaveChanges": "Save changes",
+  "svcOfferPublished": "Offer published",
+  "svcDraftSaved": "Draft saved",
+  "svcOfferSaveFailed": "Couldn't save this offer",
+  "svcOfferRefused": "This offer wasn't accepted as it stands. Check its details and try again.",
+  "svcArchiveOffer": "Archive offer",
+  "svcArchiveConfirm": "Archive this offer? Customers won't see it again.",
+  "svcOfferArchived": "Offer archived",
+  "svcOfferNotEditable": "This offer uses settings this version of the app can't edit. Update the app to change it.",
+  "svcMoreActions": "More actions",
+  "svcIncomingOrders": "Incoming orders",
+  "svcTabNew": "New",
+  "svcTabInProgress": "In progress",
+  "svcTabCompleted": "Completed",
+  "svcChipNew": "NEW",
+  "svcChipAccepted": "ACCEPTED",
+  "svcChipInProduction": "IN PRODUCTION",
+  "svcChipReady": "READY",
+  "svcChipOnTheWay": "ON THE WAY",
+  "svcChipCollected": "COLLECTED",
+  "svcChipDelivered": "DELIVERED",
+  "svcChipDeclined": "DECLINED",
+  "svcChipNotCollected": "NOT COLLECTED",
+  "svcChipCancelled": "CANCELLED",
+  "svcChipPickup": "Pickup",
+  "svcChipDelivery": "Delivery",
+  "svcAcceptOrder": "Accept order",
+  "svcDecline": "Decline",
+  "svcDeclineTitle": "Why are you declining?",
+  "svcDeclineBody": "The customer sees the reason you choose.",
+  "svcDeclineConfirm": "Decline order",
+  "svcWaitingForPickup": "Waiting for the customer to collect",
+  "svcWaitingForRider": "Waiting for a rider",
+  "svcReadyBy": "Ready by {time}",
+  "@svcReadyBy": {"placeholders":{"time":{"type":"String"}}},
+  "svcAcceptedReadyBy": "Accepted. Promised ready by {time}.",
+  "@svcAcceptedReadyBy": {"placeholders":{"time":{"type":"String"}}},
+  "svcAccepted": "Order accepted",
+  "svcMarkedReady": "Marked ready",
+  "svcNoNewOrders": "No new orders",
+  "svcNoOrdersInProgress": "Nothing in production",
+  "svcNoCompletedOrders": "No completed orders yet",
+  "svcOrdersEmptyBody": "Orders appear here as customers place them.",
+  "svcCancelNotCollected": "Cancel as not collected",
+  "svcCancelNotCollectedIn": "You can cancel it as not collected in {time}",
+  "@svcCancelNotCollectedIn": {"placeholders":{"time":{"type":"String"}}},
+  "svcCancelNotCollectedTitle": "Cancel this uncollected order?",
+  "svcCancelNotCollectedBody": "The customer is told it was cancelled because it wasn't collected.",
+  "svcCancelNotCollectedNote": "Note for the customer (optional)",
+  "svcKeepOrder": "Keep order",
+  "svcDurationDaysHours": "{days}d {hours}h",
+  "@svcDurationDaysHours": {"placeholders":{"days":{"type":"String"},"hours":{"type":"String"}}},
+  "svcDurationHoursMinutes": "{hours}h {minutes}m",
+  "@svcDurationHoursMinutes": {"placeholders":{"hours":{"type":"String"},"minutes":{"type":"String"}}},
+  "svcDurationMinutes": "{minutes}m",
+  "@svcDurationMinutes": {"placeholders":{"minutes":{"type":"String"}}},
+  "svcRefusedNotDeclinable": "This order was accepted meanwhile, so it can't be declined. Refreshing.",
+  "svcRefusedNotCollectable": "This order isn't waiting at your counter any more. Refreshing.",
+  "svcRefusedTooSoon": "It's too soon: the customer still has time to collect. Refreshing.",
+  "svcRefusedOther": "The order couldn't be changed. Refreshing.",
+  "svcOrderDeclined": "Order declined",
+  "svcOrderCollected": "Marked as collected",
+  "svcOrderCancelledNotCollected": "Cancelled as not collected",
+  "svcOrderTitle": "Order {id}",
+  "@svcOrderTitle": {"placeholders":{"id":{"type":"String"}}},
+  "svcChatWithCustomer": "Chat with customer",
+  "svcTheJob": "The job",
+  "svcInstructions": "Special instructions",
+  "svcNoInstructions": "No instructions given",
+  "svcCustomerFiles": "Customer's files",
+  "svcNoFiles": "No files sent",
+  "svcFilesLoadFailed": "Couldn't load the files",
+  "svcOpenFile": "Open",
+  "svcFileCouldNotOpen": "Couldn't open this file",
+  "svcFileDocument": "Document",
+  "svcFileImage": "Image",
+  "svcFileSizeKb": "{size} KB",
+  "@svcFileSizeKb": {"placeholders":{"size":{"type":"String"}}},
+  "svcFileSizeMb": "{size} MB",
+  "@svcFileSizeMb": {"placeholders":{"size":{"type":"String"}}},
+  "svcFulfilmentPickupDetail": "The customer collects it at your shop",
+  "svcFulfilmentDeliveryDetail": "A rider delivers it to {address}",
+  "@svcFulfilmentDeliveryDetail": {"placeholders":{"address":{"type":"String"}}},
+  "svcEstimatedReady": "Estimated ready",
+  "svcTurnaroundAfterAccept": "Turnaround once you accept: {range}",
+  "@svcTurnaroundAfterAccept": {"placeholders":{"range":{"type":"String"}}},
+  "svcRiderOnTheWay": "A rider is on the way to collect it",
+  "svcFileLinkRefreshFailed": "Couldn't get a fresh link to this file. Try again.",
+  "svcOfferTakenDown": "Taken down by YouDrop",
+  "svcOfferTakenDownReason": "YouDrop's reason: {reason}",
+  "@svcOfferTakenDownReason": {"placeholders":{"reason":{"type":"String"}}},
+  "svcOfferTakenDownBody": "Customers can't order it, and it can't be published, paused or resumed until YouDrop restores it. You can still edit it.",
+  "svcOfferChangedElsewhere": "This offer was just changed somewhere else, so it has been read again. Check it and try again.",
+  "svcShopReadFailed": "We couldn't load your shop",
+  "svcServiceOrdersRow": "Service orders",
+  "svcServiceOffersRow": "Service offers",
+  "svcChatOrderLabel": "Order {ref}",
+  "@svcChatOrderLabel": {"placeholders":{"ref":{"type":"String"}}},
+  "svcChatClosedOn": "Chat about this order closed on {date}",
+  "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
+  "svcChatClosed": "Chat about this order has closed",
+  "svcChatUnavailable": "Chat is unavailable right now.",
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
 }

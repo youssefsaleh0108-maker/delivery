@@ -233,7 +233,8 @@ services:
       retries: 10
     networks: [delivery]
 
-  # Creates the five buckets from Section 5 with their access policies, then exits.
+  # Creates the five buckets from Section 5, and order-attachments for service orders, with their
+  # access policies, then exits.
   minio-init:
     image: minio/mc:latest
     container_name: delivery-minio-init
@@ -471,6 +472,9 @@ services:
       # Nominatim's usage policy requires a User-Agent identifying the application; the geocoder
       # refuses to call at all while this is empty rather than borrow an identity. Set in .env.
       NOMINATIM_USER_AGENT: ${NOMINATIM_USER_AGENT:-}
+      # Asked whether a merchant with no shop applied to offer services, so a first product never
+      # opens a restaurant for a print shop. Without it the default is this container's localhost.
+      ONBOARDING_SERVICE_URL: http://onboarding-service:8117
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
@@ -524,6 +528,17 @@ services:
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
       KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
       PRODUCT_SERVICE_URL: http://product-service:8103
+      # MinIO, for the files a customer attaches to a service order (the order-attachments bucket),
+      # mapped as deploy/k3s maps them. Presigned upload and download URLs are signed for the PUBLIC
+      # endpoint, because the signature covers the host the phone, emulator or browser resolves — so
+      # it is the same .env address product-service signs images for. The INTERNAL one is where this
+      # service stats, reads and deletes objects. Unset, both fall to application.yml's localhost:9010:
+      # nothing listens there inside this container, and a phone would be handed URLs for its own
+      # localhost. The keys are MinIO's root credentials, from the same variables the minio service reads.
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9010}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-delivery}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-delivery123}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
@@ -549,6 +564,9 @@ services:
         condition: service_healthy
       product-service:
         condition: service_healthy
+      # The bucket its upload URLs name must exist before the first customer is handed one.
+      minio-init:
+        condition: service_completed_successfully
     networks: [delivery]
 
   order-tracking:
@@ -754,6 +772,13 @@ services:
       CONFIG_SERVER_PASSWORD: ${CONFIG_SERVER_PASSWORD:-local-config-secret}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}/realms/delivery-platform
       KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/delivery-platform/protocol/openid-connect/certs
+      # Chat asks both, always with the caller's own token: Product Service whether a delivery area is
+      # real and which shops a merchant owns, Order Manager where the caller's orders were delivered and
+      # the one order a shop's thread carries. Unset, both fall to application.yml's localhost, where
+      # nothing listens inside this container: rooms stay readable while nobody can post, and a thread
+      # opened from an order waits on an answer that never comes.
+      ORDER_MANAGER_URL: http://order-manager:8101
+      PRODUCT_SERVICE_URL: http://product-service:8103
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-delivery}
@@ -971,6 +996,9 @@ services:
       # somebody presses Send on a statement.
       NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104
       ORDER_MANAGER_URL: http://order-manager:8101
+      # Asked for a delivery company's attendance, for its pay run. The same localhost fallback, and a
+      # quieter failure: a pay run that cannot reach order-tracking still computes, without hours.
+      ORDER_TRACKING_URL: http://order-tracking:8102
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-delivery}
       # Jaeger is not deployed here. Left enabled, the OTLP exporter retries against a host that
       # does not resolve on every span and floods the log with export failures.
@@ -1079,6 +1107,9 @@ services:
       KEYCLOAK_CLIENT_ID: onboarding-service
       KEYCLOAK_CLIENT_SECRET: ${ONBOARDING_CLIENT_SECRET:?set it in infra/.env — see infra/rotate-onboarding-secret.sh to mint one}
       ORDER_MANAGER_URL: http://order-manager:8101
+      # Asked which service categories are open and which delivery zones exist when somebody
+      # applies to offer services.
+      PRODUCT_SERVICE_URL: http://product-service:8103
       # Where one-time codes and decision emails are handed off. Without it the default is
       # localhost, which inside a container is this service talking to itself.
       NOTIFICATIONS_MANAGER_URL: http://notifications-manager:8104

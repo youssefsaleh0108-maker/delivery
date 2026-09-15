@@ -62,10 +62,12 @@ public class CarrierMembership {
         /**
          * Told to us directly by a {@code carrier.member_*} event.
          *
-         * <p>Authoritative, including departures the moment they happen. This event does not exist
-         * yet — the contract is requested of Order Manager, which owns delivery-company
-         * membership. {@link #DIRECTORY} is what serves the console until it lands; when it does,
-         * it outranks both of the others and needs no re-validation window.
+         * <p>Authoritative, including departures the moment they happen. Order Manager, which owns
+         * delivery-company membership, publishes {@code carrier.member_joined} and
+         * {@code carrier.member_left}; {@code MembershipPeriodRecorder} gives a rider's row this
+         * source on a join and removes the row on a leave. It outranks both of the others, so a
+         * late order event cannot move a rider back to a company they left, and it needs no
+         * re-validation window.
          */
         MEMBERSHIP;
 

@@ -77,7 +77,7 @@ class RiderCounterpartyStatementTest {
                         any(), any()))
                 .thenReturn(List.of());
         Mockito.lenient().when(transactions.findByOrderIdIn(anyCollection())).thenReturn(List.of());
-        Mockito.lenient().when(floatEntries.outstandingTotalFor(anyString()))
+        Mockito.lenient().when(floatEntries.outstandingTotalFor(anyString(), any()))
                 .thenReturn(BigDecimal.ZERO);
     }
 
@@ -94,12 +94,14 @@ class RiderCounterpartyStatementTest {
      */
     private void cash(String collected, String remitted) {
         BigDecimal amount = new BigDecimal(collected);
-        when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+        when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                eq(CashFloatEntry.Kind.COLLECTED),
                 any(), any()))
                 .thenReturn(amount.signum() == 0
                         ? List.of()
                         : List.of(collection(amount, UUID.randomUUID())));
-        when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.REMITTED),
+        when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                eq(CashFloatEntry.Kind.REMITTED),
                 any(), any())).thenReturn(new BigDecimal(remitted));
     }
 
@@ -277,11 +279,13 @@ class RiderCounterpartyStatementTest {
         ledgerHolds(List.of());
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
-        when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.COLLECTED),
+        when(floatEntries.forHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                eq(CashFloatEntry.Kind.COLLECTED),
                 any(), any()))
                 .thenReturn(List.of(collection(new BigDecimal("19.50"), first),
                         collection(new BigDecimal("24.00"), second)));
-        when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.Kind.REMITTED),
+        when(floatEntries.totalForHolderBetween(eq(RIDER), eq(CashFloatEntry.HolderKind.RIDER),
+                eq(CashFloatEntry.Kind.REMITTED),
                 any(), any())).thenReturn(BigDecimal.ZERO);
 
         Statement statement = service.build(CounterpartyKind.RIDER, RIDER, august);

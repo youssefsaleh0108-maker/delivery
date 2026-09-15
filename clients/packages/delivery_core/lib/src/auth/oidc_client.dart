@@ -29,7 +29,10 @@ abstract interface class OidcClient {
   /// via [completeRedirect].
   /// [extraParams] rides along on the authorization request.
   ///
-  /// Used for Keycloak's , which skips its own login page and sends the user
+  /// Returns null, rather than throwing, when the person backs out of the browser: no session is
+  /// the answer, and "they changed their mind" is not an error worth a message.
+  ///
+  /// Used for Keycloak's `kc_idp_hint`, which skips its own login page and sends the user
   /// straight to a broker. That matters for more than a click saved: with the hint the browser
   /// opens on accounts.google.com, and without it the first thing a user sees is this platform's
   /// own login page at whatever address it happens to be served from.

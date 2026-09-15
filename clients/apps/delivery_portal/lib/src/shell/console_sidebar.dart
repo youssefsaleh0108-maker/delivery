@@ -5,10 +5,31 @@ import 'console_chrome.dart';
 
 /// One row in the console's dark rail.
 class ConsoleNavEntry {
-  const ConsoleNavEntry({required this.icon, required this.label});
+  const ConsoleNavEntry({
+    required this.icon,
+    required this.label,
+    this.children = const <String>[],
+    this.badgeCount,
+    this.badgeLabel,
+  });
 
   final IconData icon;
   final String label;
+
+  /// The pages under this entry, drawn as an indented list beneath it. Fewer than two draws the
+  /// plain row every other entry is: one page under a heading is just that heading's page.
+  ///
+  /// Always drawn, not only when the entry is open. A page under a heading that has to be opened to
+  /// be found is a page nobody finds — and the first one to live here is the applicant queue,
+  /// where somebody is waiting to be told yes or no.
+  final List<String> children;
+
+  /// A count at the row's end — unread customer messages — drawn while non-null and above zero. An
+  /// unknown count draws nothing rather than a zero the rail does not have.
+  final int? badgeCount;
+
+  /// What a screen reader says for [badgeCount]; the digits alone do not say what they count.
+  final String? badgeLabel;
 }
 
 /// One console a signed-in account can switch to, as it appears under the wordmark.
@@ -50,6 +71,8 @@ class ConsoleSidebar extends StatelessWidget {
     this.areaIndex = 0,
     this.onAreaSelected,
     this.accountMenu,
+    this.selectedChild = 0,
+    this.onChildSelected,
   });
 
   /// The console currently being shown — its wordmark and its logo glyph.
@@ -58,6 +81,13 @@ class ConsoleSidebar extends StatelessWidget {
   final List<ConsoleNavEntry> entries;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+
+  /// Which of the selected entry's [ConsoleNavEntry.children] is open.
+  final int selectedChild;
+
+  /// A child row was tapped: the entry it sits under, and its place in that entry's children.
+  /// Null falls back to [onSelected] for the parent, which opens its first page.
+  final void Function(int entry, int child)? onChildSelected;
 
   /// The footer card's two lines.
   final String userName;
@@ -110,6 +140,15 @@ class ConsoleSidebar extends StatelessWidget {
                       selected: i == selectedIndex,
                       onTap: () => onSelected(i),
                     ),
+                    if (entries[i].children.length > 1)
+                      for (int c = 0; c < entries[i].children.length; c++)
+                        _NavChild(
+                          label: entries[i].children[c],
+                          selected: i == selectedIndex && c == selectedChild,
+                          onTap: () => onChildSelected == null
+                              ? onSelected(i)
+                              : onChildSelected!(i, c),
+                        ),
                   ],
                 ],
               ),
@@ -262,6 +301,10 @@ class _NavItem extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if ((entry.badgeCount ?? 0) > 0) ...<Widget>[
+                    const SizedBox(width: DeliverySpacing.sm),
+                    _CountBadge(count: entry.badgeCount!, label: entry.badgeLabel),
+                  ],
                 ],
               ),
             ),
@@ -272,6 +315,97 @@ class _NavItem extends StatelessWidget {
                 child: _ActiveBar(),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A page under a nav entry: indented past the entry's glyph, 13px, with a dot that turns crimson
+/// on the open page. Quieter than its parent on purpose — the parent names the part of the
+/// business, the children are the pages within it.
+class _NavChild extends StatelessWidget {
+  const _NavChild({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 30, top: 2),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(DeliveryRadius.sm),
+          hoverColor: DeliveryColors.shellRaised.withValues(alpha: 0.6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DeliverySpacing.md - DeliverySpacing.xs,
+              vertical: DeliverySpacing.sm,
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected
+                        ? DeliveryColors.brand
+                        : DeliveryColors.onShellMuted.withValues(alpha: 0.4),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: selected ? DeliveryColors.white : DeliveryColors.onShellMuted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A count on a rail row, in the brand red the platform's other count badges use.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, this.label});
+
+  final int count;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: label,
+      child: ExcludeSemantics(
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 20),
+          height: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: DeliveryColors.brand,
+            borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: DeliveryColors.white),
+          ),
         ),
       ),
     );

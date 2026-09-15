@@ -38,6 +38,9 @@ class ProfileDrawer extends StatefulWidget {
     this.inbox,
     this.onOpenOrders,
     this.profileApi,
+    this.onOpenGiftHub,
+    this.onOfferServices,
+    this.onSwitchToShop,
   });
 
   final AuthSession session;
@@ -48,6 +51,16 @@ class ProfileDrawer extends StatefulWidget {
   final NotificationInbox? inbox;
   final VoidCallback? onOpenOrders;
   final ProfileApi? profileApi;
+
+  /// Opens the gift hub over the shell. Null hides the row.
+  final VoidCallback? onOpenGiftHub;
+
+  /// Opens the services signup for this account (Figma 126:11). Null hides the row.
+  final VoidCallback? onOfferServices;
+
+  /// Switches to the shop this account runs. Null hides the row. When both are wired this one wins:
+  /// an account that already runs a shop has nothing to apply for.
+  final VoidCallback? onSwitchToShop;
 
   @override
   State<ProfileDrawer> createState() => _ProfileDrawerState();
@@ -206,6 +219,15 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
                         ? null
                         : () => _go((NavigatorState _) => widget.onOpenOrders!()),
                   ),
+                  if (widget.onOpenGiftHub != null) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.sm),
+                    YdListRow(
+                      icon: Icons.card_giftcard_rounded,
+                      title: t.giftHubTitle,
+                      subtitle: t.giftHomeEntrySub,
+                      onTap: () => _go((NavigatorState _) => widget.onOpenGiftHub!()),
+                    ),
+                  ],
                   const SizedBox(height: DeliverySpacing.sm),
                   YdListRow(
                     icon: Icons.place_outlined,
@@ -235,6 +257,25 @@ class _ProfileDrawerState extends State<ProfileDrawer> {
                       trailing: const SizedBox.shrink(),
                     ),
                   ),
+                  // The way between shopping and running a shop. An account that runs one switches
+                  // to it; an account that holds no partner role may apply to offer services. Absent,
+                  // not disabled, when the host does not wire them.
+                  if (widget.onSwitchToShop != null) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.sm),
+                    YdListRow(
+                      icon: Icons.storefront_outlined,
+                      title: t.svcSwitchToShop,
+                      onTap: () => _go((NavigatorState _) => widget.onSwitchToShop!()),
+                    ),
+                  ] else if (widget.onOfferServices != null) ...<Widget>[
+                    const SizedBox(height: DeliverySpacing.sm),
+                    YdListRow(
+                      icon: Icons.design_services_outlined,
+                      title: t.svcOfferYourServices,
+                      subtitle: t.svcOfferYourServicesSub,
+                      onTap: () => _go((NavigatorState _) => widget.onOfferServices!()),
+                    ),
+                  ],
                   const SizedBox(height: DeliverySpacing.lg),
                   _sectionLabel(t.custPreferences),
                   const SizedBox(height: DeliverySpacing.sm),

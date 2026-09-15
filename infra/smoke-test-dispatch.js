@@ -81,6 +81,24 @@ const chosen = send('PUT', '/api/delivery-providers/policy',
 check('the merchant chooses it', chosen.code === '200', `HTTP ${chosen.code}`);
 check('and the policy remembers', JSON.parse(chosen.body).preferredProviderId === company.id);
 
+// THE UNDO, REGISTERED THE MOMENT THE DAMAGE BECOMES POSSIBLE — not written at the bottom of the
+// file, where only the happy path reaches it.
+//
+// What is at stake is not this suite's next run. A rider left inside an external company while
+// dispatch keeps routing in-house makes EVERY order on this environment reach READY and stop,
+// invisible to the only rider who can sign in. That is a platform nobody can use, produced by a
+// test that happened to fail thirty lines below here — and it is the state dev was found in.
+//
+// `exit` fires on a normal end, on process.exit(), and after an uncaught throw. Every call in
+// here is synchronous execSync, so it completes before the process goes. The tail of the file
+// still does this and still checks it; this is the copy that runs when the tail is not reached.
+process.on('exit', () => {
+  try {
+    send('PUT', '/api/delivery-providers/policy', { preferredProviderId: null }, merchant);
+    send('DELETE', `/api/delivery-providers/riders/${riderSub}`, null);
+  } catch { /* the environment may already be unreachable; there is nothing better to do here */ }
+});
+
 const pinnedOrder = readyOrder();
 check('the next order is dispatched there', pinnedOrder.deliveryProviderId === company.id,
   `${pinnedOrder.deliveryProviderId?.slice(0, 8)} vs ${company.id.slice(0, 8)}`);

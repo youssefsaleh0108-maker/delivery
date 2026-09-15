@@ -99,8 +99,16 @@ public final class StoreDtos {
             String powerNote,
             /** When the merchant last declared — what "auto-updated" honestly means. */
             Instant powerUpdatedAt,
+            /**
+             * Whether that declaration is recent enough to present as what the lights are doing NOW
+             * ({@code delivery.product.power-declaration-fresh-for}). False for a shop that never
+             * declared. A customer surface draws no power badge when it is false.
+             */
+            boolean powerCurrent,
             /** The merchant's delivery circle, or null for zones-only. */
-            Integer deliveryRadiusMetres) {
+            Integer deliveryRadiusMetres,
+            /** What a SERVICES shop does. Always set for a service shop and null for every other. */
+            Store.ServiceCategory serviceCategory) {
     }
 
     /** The card shape: everything a storefront grid needs and nothing it does not. */
@@ -142,11 +150,23 @@ public final class StoreDtos {
             boolean verifiedLocal,
             Store.PowerStatus powerStatus,
             String powerNote,
+            /** When the merchant last declared, so a card can say how fresh the badge is. */
+            Instant powerUpdatedAt,
+            /**
+             * Whether the declaration is recent enough to present as happening NOW. False draws no
+             * badge: an old declaration is history, not the state of the shop.
+             */
+            boolean powerCurrent,
             /** The pin, so checkout can measure the customer's door against the circle below. */
             BigDecimal latitude,
             BigDecimal longitude,
             /** The merchant's delivery circle, or null for zones-only. */
-            Integer deliveryRadiusMetres) {
+            Integer deliveryRadiusMetres,
+            /**
+             * What a SERVICES shop does, for the Services tab's "Printing • 0.5 km" line. Null on
+             * every goods card, which is every card a read that does not ask for services returns.
+             */
+            Store.ServiceCategory serviceCategory) {
     }
 
     public record OfferResponse(
@@ -201,7 +221,21 @@ public final class StoreDtos {
             @Size(max = 64) String timezone,
             @Size(max = 400) String address,
             /** District identity for the hyperlocal browse. Free text; the chips are distinct values. */
-            @Size(max = 80) String neighborhood) {
+            @Size(max = 80) String neighborhood,
+            /**
+             * What a SERVICES shop does. Required when creating one, and refused with any other
+             * vertical. On a save, null leaves the shop's category as it is — the rule the district
+             * follows — so a client that predates the field cannot clear it. Any other value re-files
+             * the shop, and only under a category that is open.
+             */
+            Store.ServiceCategory serviceCategory) {
+    }
+
+    /**
+     * Backoffice's decision on the dekkane trust badge. A Boolean rather than a boolean so a body
+     * that does not say is refused as a 400, not read as a withdrawal.
+     */
+    public record VerifiedLocalRequest(@NotNull Boolean verified) {
     }
 
     /** The merchant's power declaration — what the lights are doing, and the one-liner under it. */

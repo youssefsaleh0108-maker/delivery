@@ -1,6 +1,10 @@
 import 'package:dio/dio.dart';
 
 import '../models/accounting_models.dart';
+import '../models/carrier_cash_models.dart';
+import '../models/statement_models.dart' show Money;
+import 'carrier_cash_api.dart';
+import 'carrier_payroll_api.dart';
 
 /// Client for the reconciliation API — BACKOFFICE only (Phase 4).
 ///
@@ -12,6 +16,30 @@ class AccountingApi {
   AccountingApi(this._dio);
 
   final Dio _dio;
+
+  /// A delivery company's own cash routes, over the same connection.
+  ///
+  /// CARRIER only on the server, and a separate client so nothing about this class's BACKOFFICE
+  /// routes can be reached through it by mistake. Offered here so the portal shell can hand a
+  /// carrier page its client without growing its API bundle.
+  CarrierCashApi get carrierCash => CarrierCashApi(_dio);
+
+  /// A delivery company's payroll for its own riders, over the same connection — CARRIER only on
+  /// the server, and offered here for the same reason as [carrierCash].
+  CarrierPayrollApi get carrierPayroll => CarrierPayrollApi(_dio);
+
+  /// Cash held by delivery companies, and by their riders for them. BACKOFFICE only.
+  ///
+  /// A company's [CarrierCashHolding.held] is what a payment is recorded against with [remit]; its
+  /// riders' [CarrierCashHolding.withRiders] is owed to the company until it records a hand-over,
+  /// and is shown beside the company's figure, never added to it.
+  Future<List<CarrierCashHolding>> carriersFloat() async {
+    final Response<dynamic> response = await _dio.get<dynamic>('/api/accounting/float/carriers');
+    final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+    return (body['carriers'] as List<dynamic>? ?? <dynamic>[])
+        .map((dynamic c) => CarrierCashHolding.fromJson(c as Map<String, dynamic>))
+        .toList(growable: false);
+  }
 
   Future<ReconciliationSummary> summary() async {
     final Response<dynamic> response = await _dio.get<dynamic>('/api/accounting/summary');
@@ -46,10 +74,38 @@ class AccountingApi {
   ///
   /// Everything, not an amount: a partial hand-over would need a collection to be half-discharged,
   /// which the ledger cannot express yet. Returns what the remittance covered.
-  Future<Remittance> remit(String holderRef) async {
-    final Response<dynamic> response =
-        await _dio.post<dynamic>('/api/accounting/float/$holderRef/remit');
-    return Remittance.fromJson(response.data as Map<String, dynamic>);
+  ///
+  /// [expected] is the figure the operator counted against. A delivery company's balance grows with
+  /// every hand-over at its hub, so when it is given and the balance has moved, nothing is recorded
+  /// and this throws [CashAmountChanged]. [requestKey] makes a double press answer with the first
+  /// remittance. Called with neither, it banks everything exactly as it always did.
+  ///
+  /// [holderKind] is which of the account's cash is being paid in: the [CashHolder.holderKind] of
+  /// the line. One account can be a shop and a rider at once, and the server will not guess between
+  /// its till and its bag. A shop's payment must give [expected], and that is what the shop owes
+  /// ([CashHolder.owed]), never its till.
+  Future<Remittance> remit(
+    String holderRef, {
+    Money? expected,
+    CashMethod? method,
+    String? requestKey,
+    String? holderKind,
+  }) async {
+    final Map<String, dynamic> body = <String, dynamic>{
+      if (expected != null) 'expectedAmount': expected.amount,
+      if (method != null) 'method': method.wire,
+      if (requestKey != null) 'requestKey': requestKey,
+      if (holderKind != null) 'holderKind': holderKind,
+    };
+    try {
+      final Response<dynamic> response = await _dio.post<dynamic>(
+        '/api/accounting/float/${Uri.encodeComponent(holderRef)}/remit',
+        data: body.isEmpty ? null : body,
+      );
+      return Remittance.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw CarrierCashApi.amountChangedOr(e);
+    }
   }
 
   Future<List<SyncLogEntry>> syncLog(String transactionId) async {

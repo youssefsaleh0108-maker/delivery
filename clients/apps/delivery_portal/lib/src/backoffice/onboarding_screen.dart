@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -303,8 +304,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ///
   /// The applicant's own answer where the signup wizard asked for one, and what they applied to be
   /// otherwise. Never a guess: a shop that did not say what it sells is "Shop", not "Restaurant".
-  static String _categoryOf(OnboardingApplication a) =>
-      a.details['businessType'] ?? a.details['vehicleType'] ?? a.kind.label;
+  ///
+  /// A services provider applies as a shop whose businessType is SERVICES, and reads "Services ·
+  /// Printing" — the category they offer, which the server checked is open. A category this build
+  /// cannot name shows as the server spelled it rather than being dropped or guessed.
+  static String _categoryOf(OnboardingApplication a) {
+    if (a.details['businessType'] == StoreVertical.services.wireValue) {
+      final String? wire = a.details['serviceCategory'];
+      final String? label =
+          ServiceCategory.maybeFromWire(wire)?.labelIn(_englishLabels) ?? wire;
+      return label == null || label.isEmpty
+          ? StoreVertical.services.label
+          : '${StoreVertical.services.label} · $label';
+    }
+    return a.details['businessType'] ?? a.details['vehicleType'] ?? a.kind.label;
+  }
+
+  /// This console is written in English — the column's other values are English enum labels — so
+  /// the category is named from the English table rather than the operator's device language.
+  static final DeliveryStrings _englishLabels = lookupDeliveryStrings(const Locale('en'));
 
   /// The categories actually present in what is loaded, so the filter can only offer real answers.
   List<String> get _categories {

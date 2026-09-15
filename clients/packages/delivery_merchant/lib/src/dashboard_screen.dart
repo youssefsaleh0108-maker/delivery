@@ -31,6 +31,7 @@ class MerchantDashboardScreen extends StatefulWidget {
     this.aggregates,
     this.pendingApproval = false,
     this.onShowOrders,
+    this.onDemandRadar,
   });
 
   final OrderApi api;
@@ -58,6 +59,13 @@ class MerchantDashboardScreen extends StatefulWidget {
 
   /// Tapping the queue goes to the orders list. Numbers you cannot act on are decoration.
   final VoidCallback? onShowOrders;
+
+  /// Opens the Demand Radar — which neighbourhoods around the shop are ordering.
+  ///
+  /// Null draws no card at all rather than a "Soon" one: the dashboard frame does not draw this
+  /// entry, and the host only wires it for the shop's owner, since the density behind it is an
+  /// order-backed number like everything else on this page.
+  final VoidCallback? onDemandRadar;
 
   @override
   State<MerchantDashboardScreen> createState() => _MerchantDashboardScreenState();
@@ -174,8 +182,10 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
 
   Future<void> _refreshRecent() async {
     try {
+      // Goods orders only, as the queue these rows open lists them: a service order is the services
+      // queue's to work.
       final Paged<DeliveryOrder> page =
-          await widget.api.forMerchant(size: _recentCount);
+          await widget.api.forMerchant(kind: OrderKind.catalog, size: _recentCount);
       if (!mounted) return;
       setState(() {
         _recent = page.content;
@@ -324,9 +334,74 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
               _summarySection(s, t),
               _queueSection(s, t),
               _recentSection(t),
+              if (widget.onDemandRadar != null) _demandRadarEntry(t),
               _extras(s, t),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The door to the Demand Radar: which neighbourhoods around the shop are ordering.
+  ///
+  /// After the recent orders and before the charts. It answers a question about the street outside
+  /// rather than about this shop's own till, so it sits between the two instead of inside either.
+  Widget _demandRadarEntry(DeliveryStrings t) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        DeliverySpacing.lg,
+        0,
+        DeliverySpacing.lg,
+        DeliverySpacing.lg,
+      ),
+      child: YdCard.bordered(
+        onTap: widget.onDemandRadar,
+        padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              ),
+              child: const Icon(Icons.radar, size: 22, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    t.heatmapTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.heatmapEntryBlurb,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: DeliveryColors.muted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: DeliverySpacing.sm),
+            const Icon(Icons.chevron_right, color: DeliveryColors.faint),
+          ],
         ),
       ),
     );

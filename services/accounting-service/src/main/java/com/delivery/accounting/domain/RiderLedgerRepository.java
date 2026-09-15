@@ -96,4 +96,79 @@ public interface RiderLedgerRepository extends JpaRepository<RiderLedgerEntry, U
      */
     boolean existsByOrderIdAndRiderRefAndEntryType(UUID orderId, String riderRef,
                                                    EntryType entryType);
+
+    /**
+     * Every job a delivery company's riders did for it in a window, by when the work happened.
+     *
+     * <p>The amount on each row is what the platform credited the COMPANY for that job (see
+     * {@code SettlementService.creditRider}), so this is "what your riders earned for you", which is
+     * the one per-rider figure the platform can state truthfully about a carrier's fleet. What the
+     * company pays the rider is its own employment contract and is nowhere in this ledger.
+     *
+     * <p>Uses {@code idx_rider_ledger_carrier}, which V46 created for exactly this and nothing read.
+     */
+    @Query("""
+            SELECT e FROM RiderLedgerEntry e
+             WHERE e.carrierRef = :carrier
+               AND e.fleet = com.delivery.accounting.domain.RiderLedgerEntry$Fleet.CARRIER
+               AND e.entryType = com.delivery.accounting.domain.RiderLedgerEntry$EntryType.JOB_EARNING
+               AND e.earnedAt >= :from AND e.earnedAt < :to
+             ORDER BY e.earnedAt ASC
+            """)
+    List<RiderLedgerEntry> jobsForCarrierBetween(@Param("carrier") String carrier,
+                                                 @Param("from") Instant from,
+                                                 @Param("to") Instant to);
+
+    /**
+     * Whether this rider has ever done a job for this delivery company.
+     *
+     * <p>The other half of "is this rider one of ours" on the company's cash pages. A rider whose
+     * shifts for the company were all card orders never produced a float row, yet the company's
+     * reconciliation list shows their day's jobs — so their settlement page must open too, showing
+     * nothing held, rather than calling them a stranger.
+     */
+    boolean existsByRiderRefAndCarrierRefAndFleet(String riderRef, String carrierRef,
+                                                  RiderLedgerEntry.Fleet fleet);
+
+    /**
+     * Every tip a delivery company's riders were given on its jobs in a window, by when the work
+     * happened.
+     *
+     * <p>For payroll's information column and nothing else. A tip is the rider's own money — paid to
+     * them by the platform when it came online, already in their pocket when it came as cash — and
+     * never the company's to pay. A payslip that added it to what the company owes would pay it a
+     * second time, which is the one mistake this ledger was built to make impossible.
+     */
+    @Query("""
+            SELECT e FROM RiderLedgerEntry e
+             WHERE e.carrierRef = :carrier
+               AND e.fleet = com.delivery.accounting.domain.RiderLedgerEntry$Fleet.CARRIER
+               AND e.entryType = com.delivery.accounting.domain.RiderLedgerEntry$EntryType.TIP
+               AND e.earnedAt >= :from AND e.earnedAt < :to
+             ORDER BY e.earnedAt ASC
+            """)
+    List<RiderLedgerEntry> tipsForCarrierBetween(@Param("carrier") String carrier,
+                                                 @Param("from") Instant from,
+                                                 @Param("to") Instant to);
+
+    /**
+     * How many of a company's jobs in a window reached this ledger after a moment.
+     *
+     * <p>The bus is at-least-once and can be late, and a job is dated by when it was delivered, not
+     * when its row was written. So a pay run computed at {@code after} can have missed jobs that
+     * belong to its period: on a draft that means "recompute", on an approved run it means "add a
+     * correction", and either way the page has to be able to say so.
+     */
+    @Query("""
+            SELECT COUNT(e) FROM RiderLedgerEntry e
+             WHERE e.carrierRef = :carrier
+               AND e.fleet = com.delivery.accounting.domain.RiderLedgerEntry$Fleet.CARRIER
+               AND e.entryType = com.delivery.accounting.domain.RiderLedgerEntry$EntryType.JOB_EARNING
+               AND e.earnedAt >= :from AND e.earnedAt < :to
+               AND e.createdAt > :after
+            """)
+    long countJobsForCarrierRecordedAfter(@Param("carrier") String carrier,
+                                          @Param("from") Instant from,
+                                          @Param("to") Instant to,
+                                          @Param("after") Instant after);
 }

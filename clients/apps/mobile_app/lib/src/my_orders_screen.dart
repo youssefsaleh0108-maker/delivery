@@ -8,6 +8,11 @@ import 'package:flutter/material.dart';
 
 import 'cart.dart';
 import 'order_details_screen.dart';
+import 'order_outbox.dart';
+import 'outbox_card.dart';
+import 'service_order_files.dart';
+import 'service_order_tracking_screen.dart';
+import 'service_order_words.dart';
 import 'store_page_screen.dart';
 
 /// The customer's orders, and live tracking for the one currently out for delivery.
@@ -24,10 +29,19 @@ class MyOrdersScreen extends StatefulWidget {
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
+    this.shopChatApi,
+    this.chatSocket,
+    this.serviceFiles,
     required this.cart,
+    required this.onOpenBasket,
+    this.outbox,
   });
 
   final OrderApi api;
+
+  /// Checkouts queued while offline, drawn above the live orders (Figma 121:279's outbox). Null
+  /// draws none — a test that is not about them.
+  final OrderOutbox? outbox;
 
   /// Both are handed to the details page, which resolves the shop and can rebuild the basket.
   final StoreApi storeApi;
@@ -39,7 +53,20 @@ class MyOrdersScreen extends StatefulWidget {
   /// The tracking service socket, threaded to the tracking panel for pushed positions.
   final UserQueueSocket? trackingSocket;
   final ChatApi? chatApi;
+
+  /// Handed to a service order's tracking page, for "Chat with …" its shop; null draws no button.
+  final ShopChatApi? shopChatApi;
+
+  /// App Notification's socket, for that thread's liveness.
+  final UserQueueSocket? chatSocket;
+
+  /// Handed to a service order's tracking page, for the customer's own files; null lists none.
+  final ServiceOrderFiles? serviceFiles;
   final Cart cart;
+
+  /// The shell's way to its Basket tab. Reorder opens a shop page, and so does the shop card on an
+  /// order's own page — both basket bars need to reach the basket, not pop back to this list.
+  final VoidCallback onOpenBasket;
 
   @override
   State<MyOrdersScreen> createState() => _MyOrdersScreenState();
@@ -54,17 +81,29 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   bool _loading = true;
   Object? _error;
 
+  StreamSubscription<OutboxPlaced>? _placedFromOutbox;
+
   @override
   void initState() {
     super.initState();
     _refresh();
     _poll = Timer.periodic(_pollInterval, (_) => _refresh(silent: true));
+    widget.outbox?.addListener(_onOutbox);
+    // A queued checkout just became an order: fetch it now rather than on the next poll, so its
+    // card leaves the queue and the order appears in the same moment.
+    _placedFromOutbox = widget.outbox?.placed.listen((_) => _refresh(silent: true));
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    widget.outbox?.removeListener(_onOutbox);
+    _placedFromOutbox?.cancel();
     super.dispose();
+  }
+
+  void _onOutbox() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _refresh({bool silent = false}) async {
@@ -87,7 +126,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        if (!silent) _error = e;
+        // Only when there is nothing to show. The list loaded a minute ago is still the best
+        // answer the phone has once the connection drops, and swapping it for an error would take
+        // away the one thing a customer offline can still read. The banner says why it is not
+        // updating.
+        if (!silent && _orders.isEmpty) _error = e;
         _loading = false;
       });
     }
@@ -105,7 +148,27 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
   /// Opens the full order. The tapped row is passed through so the page renders straight away
   /// instead of flashing a spinner over data the list already has.
+  ///
+  /// A service order opens its own tracking page instead (Figma 126:507): a basket's page would draw a
+  /// print run as a delivery being cooked, with a rider stepper a pickup never passes through.
   void _openDetails(DeliveryOrder order) {
+    if (order.isService) {
+      Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => ServiceOrderTrackingScreen(
+          orderApi: widget.api,
+          storeApi: widget.storeApi,
+          orderId: order.id,
+          preview: order,
+          shopChatApi: widget.shopChatApi,
+          chatSocket: widget.chatSocket,
+          trackingApi: widget.trackingApi,
+          trackingSocket: widget.trackingSocket,
+          chatApi: widget.chatApi,
+          files: widget.serviceFiles,
+        ),
+      )).then((_) => _refresh());
+      return;
+    }
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => OrderDetailsScreen(
         orderApi: widget.api,
@@ -114,6 +177,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         trackingSocket: widget.trackingSocket,
         chatApi: widget.chatApi,
         cart: widget.cart,
+        onOpenBasket: widget.onOpenBasket,
         orderId: order.id,
         preview: order,
       ),
@@ -173,6 +237,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         orderApi: widget.api,
         cart: widget.cart,
         storeId: storeId,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }
@@ -180,6 +245,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final OrderOutbox? outbox = widget.outbox;
+    // On Active only: a queued checkout is the most "active" order there is, and it has no place
+    // among the finished ones.
+    final bool showQueued = !_past && outbox != null && !outbox.isEmpty;
 
     return Container(
       color: DeliveryColors.background,
@@ -188,7 +257,17 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         children: <Widget>[
           SafeArea(bottom: false, child: YdScreenHeader(title: t.custYourOrders)),
           _tabBar(t),
-          Expanded(child: _body(t)),
+          if (showQueued)
+            ConstrainedBox(
+              constraints:
+                  BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.45),
+              child: SingleChildScrollView(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    DeliverySpacing.lg, DeliverySpacing.lg, DeliverySpacing.lg, 0),
+                child: OutboxSection(outbox: outbox),
+              ),
+            ),
+          Expanded(child: _body(t, hasQueued: showQueued)),
         ],
       ),
     );
@@ -243,8 +322,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     );
   }
 
-  Widget _body(DeliveryStrings t) {
-    if (_error != null) {
+  Widget _body(DeliveryStrings t, {required bool hasQueued}) {
+    if (_error != null && _orders.isEmpty) {
       return YdEmptyState(
         icon: Icons.cloud_off_rounded,
         title: t.couldNotLoadOrders,
@@ -262,6 +341,8 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     }
     final List<DeliveryOrder> showing = _past ? _pastOrders : _active;
     if (showing.isEmpty) {
+      // "No orders yet" under a queued order would be untrue in the way that matters most.
+      if (hasQueued) return const SizedBox.shrink();
       return YdEmptyState(
         icon: Icons.receipt_long_outlined,
         title: t.noOrdersYet,
@@ -286,8 +367,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             onCancel: order.availableActions.contains(OrderAction.cancel)
                 ? () => _cancel(order)
                 : null,
-            onReorder:
-                order.status.isTerminal ? () => _reorder(order) : null,
+            // Reorder rebuilds a basket in a goods shop's page; a service is ordered again from its
+            // provider's page, which a basket cannot reach — so a service order offers none.
+            onReorder: order.status.isTerminal && !order.isService
+                ? () => _reorder(order)
+                : null,
           );
         },
       ),
@@ -362,13 +446,42 @@ class _OrderCard extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
+                    // One of several shops' orders placed in one checkout, said on every one of
+                    // them — so the cards a multi-shop basket became read as one purchase, not as
+                    // orders the customer does not remember making.
+                    if (order.isPartOfCheckout) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.xs),
+                      YdBadge(
+                        label: t.multiCartPartOfOrder(order.checkoutSize!),
+                        color: DeliveryColors.brand,
+                        background: DeliveryColors.brandSoft,
+                        uppercase: false,
+                      ),
+                    ],
+                    if (order.isService) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.xs),
+                      YdBadge(
+                        label: t.svcServiceChip,
+                        color: DeliveryColors.brand,
+                        background: DeliveryColors.brandSoft,
+                        uppercase: false,
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: DeliverySpacing.sm),
-              CustomerStatusPill(
-                statusWire: order.status.wire,
-                label: order.status.labelIn(t),
+              // Capped, so a long status ellipsises inside its pill rather than squeezing the shop's
+              // name and its chips out of the card: a service's words ("Waiting for provider") run
+              // longer than a basket's.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.4),
+                child: CustomerStatusPill(
+                  statusWire: order.status.wire,
+                  // A service order in its own words: "Ready for pickup" at a counter, "Declined"
+                  // when the provider declined — not a restaurant's "Preparing" or a bare "Cancelled".
+                  label: order.isService ? serviceStatusLabel(order, t) : order.status.labelIn(t),
+                ),
               ),
             ],
           ),
@@ -386,7 +499,13 @@ class _OrderCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Text(
-                      t.custItemsCountLine(order.items.length),
+                      // A service order is one piece of work, named by its offer; "1 item" would say
+                      // nothing about it.
+                      order.isService && order.items.isNotEmpty
+                          ? order.items.first.productName
+                          : t.custItemsCountLine(order.items.length),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
                         color: DeliveryColors.muted,

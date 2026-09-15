@@ -1,6 +1,8 @@
 /// Accounting models mirroring the reconciliation API (Phase 4).
 library;
 
+import 'statement_models.dart' show Money;
+
 /// Which part of a settlement a transaction row is.
 ///
 /// Mirrors `AccountingTransaction.Leg`. Kept as an enum with a label rather than a raw string so
@@ -188,11 +190,14 @@ class CashHolder {
     required this.amount,
     required this.orders,
     required this.oldest,
+    this.overdue,
+    this.owed,
   });
 
   final String holderRef;
 
-  /// RIDER today; PROVIDER once a delivery company collects its own COD.
+  /// RIDER; PROVIDER for a delivery company holding what its riders handed it; or MERCHANT for a
+  /// shop holding what its counter took for pickup orders.
   final String holderKind;
   final double amount;
   final int orders;
@@ -203,6 +208,22 @@ class CashHolder {
   /// and the same balance collected three weeks ago is a problem.
   final DateTime oldest;
 
+  /// Whether the server's own limit calls this late. Null from a server that predates the field,
+  /// in which case the screen falls back to its own rule.
+  final bool? overdue;
+
+  /// What a shop owes the platform out of its till: the platform's commission. The rest of the
+  /// till is the shop's own share, which it keeps, so this — never [amount] — is the figure a
+  /// shop's payment is recorded against. Exactly as the ledger wrote it; null for riders and
+  /// companies, and when the server did not say, never a zero.
+  final Money? owed;
+
+  /// A delivery company rather than a rider.
+  bool get isCarrier => holderKind == 'PROVIDER';
+
+  /// A shop holding cash its counter took for pickup orders, rather than a rider.
+  bool get isShop => holderKind == 'MERCHANT';
+
   /// How long the oldest cash has been out.
   Duration get age => DateTime.now().difference(oldest);
 
@@ -212,6 +233,8 @@ class CashHolder {
         amount: (json['amount'] as num).toDouble(),
         orders: (json['orders'] as num).toInt(),
         oldest: DateTime.parse(json['oldest'] as String),
+        overdue: json['overdue'] is bool ? json['overdue'] as bool : null,
+        owed: Money.parse(json['owed']),
       );
 }
 

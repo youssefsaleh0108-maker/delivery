@@ -15,6 +15,18 @@ public interface OnboardingApplicationRepository
     /** The application belonging to a signed-in applicant, for the "how is mine going" screen. */
     Optional<OnboardingApplication> findByApplicantUserRef(String applicantUserRef);
 
+    /**
+     * The newest application that was provisioned onto this account.
+     *
+     * <p>Asked by the signed-in application path, beside {@link #findByApplicantUserRef}, because
+     * a partner provisioned the old way — approved before applicants chose a passcode — has their
+     * account on this column and nothing on the applicant one. Without it a suspended partner of
+     * that vintage, whose live role was taken away, would look like somebody who had never applied
+     * and could apply again to get the role back.
+     */
+    Optional<OnboardingApplication> findFirstByProvisionedUserRefOrderByCreatedAtDesc(
+            String provisionedUserRef);
+
     /** The reviewer's queue: oldest first, because waiting three days should not lose to today. */
     List<OnboardingApplication> findByStatusInOrderByCreatedAtAsc(
             List<OnboardingApplication.Status> statuses);

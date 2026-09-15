@@ -22,6 +22,7 @@ class ShopsListingScreen extends StatefulWidget {
     required this.storeApi,
     required this.orderApi,
     required this.cart,
+    required this.onOpenBasket,
     this.initialVertical,
     this.chips = const <CategoryChip>[],
   });
@@ -29,6 +30,11 @@ class ShopsListingScreen extends StatefulWidget {
   final StoreApi storeApi;
   final OrderApi orderApi;
   final Cart cart;
+
+  /// Handed to every shop opened from this list, for its basket bar. See
+  /// [StorePageScreen.onOpenBasket] — and note that this screen sits between the shop and the
+  /// shell, so a bare pop from the shop used to land HERE, on the listing, not on the basket.
+  final VoidCallback onOpenBasket;
 
   /// The category tapped on home. Null lists everything.
   final StoreVertical? initialVertical;
@@ -83,13 +89,19 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
         cart: widget.cart,
         storeId: store.id,
         preview: store,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }
 
+  /// The goods verticals only: this storefront never lists a service shop, so a Services chip here
+  /// would filter it down to nothing.
   List<StoreVertical> get _verticals => widget.chips.isEmpty
-      ? StoreVertical.values
-      : widget.chips.map((CategoryChip c) => c.vertical).toList();
+      ? StoreVertical.pickerVerticals
+      : widget.chips
+          .map((CategoryChip c) => c.vertical)
+          .where(StoreVertical.pickerVerticals.contains)
+          .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -287,10 +299,11 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
 
   /// One shop as the frame's tall card: the cover, then name against the rating, the vertical's
   /// own line, and the delivery time in positive green against the minimum order. A shop that
-  /// declared itself DARK dims — visible, honest, and not pretending to cook.
+  /// currently declares itself DARK dims — visible, honest, and not pretending to cook. A
+  /// declaration too old to count as now dims nothing and draws no chip (StoreCard.powerCurrent).
   Widget _shopCard(DeliveryStrings t, StoreCard store) {
     final Widget card = _shopCardBody(t, store);
-    return store.powerStatus == StorePowerStatus.dark
+    return store.powerCurrent && store.powerStatus == StorePowerStatus.dark
         ? Opacity(opacity: 0.55, child: card)
         : card;
   }
@@ -331,7 +344,8 @@ class _ShopsListingScreenState extends State<ShopsListingScreen> {
                         ),
                       ),
                     ),
-                    if (store.powerStatus != StorePowerStatus.unknown) ...<Widget>[
+                    if (store.powerCurrent &&
+                        store.powerStatus != StorePowerStatus.unknown) ...<Widget>[
                       const SizedBox(width: DeliverySpacing.sm),
                       StorePowerChip(status: store.powerStatus, compact: true),
                     ],

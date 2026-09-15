@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' as intl;
 import 'cart.dart';
 import 'order_tracking_panel.dart';
 import 'rate_rider_sheet.dart';
+import 'shop_limit_dialog.dart';
 import 'store_page_screen.dart';
 
 /// One order, in full — the 2026-08 Figma redesign's `customer-order-details` (node 3:542).
@@ -30,6 +31,7 @@ class OrderDetailsScreen extends StatefulWidget {
     required this.storeApi,
     required this.cart,
     required this.orderId,
+    required this.onOpenBasket,
     this.trackingApi,
     this.trackingSocket,
     this.chatApi,
@@ -40,6 +42,11 @@ class OrderDetailsScreen extends StatefulWidget {
   final StoreApi storeApi;
   final Cart cart;
   final String orderId;
+
+  /// The shell's way to its Basket tab, for the basket bar on the shop page this page's shop card
+  /// opens. That shop sits two routes above the shell — list, this page, shop — so the bar's old
+  /// bare pop came back HERE, to an order, rather than to the basket the customer had just filled.
+  final VoidCallback onOpenBasket;
 
   /// The ETA endpoint, handed through to the tracking panel. Optional so call sites that have
   /// not been wired yet keep compiling; the panel then shows what it always showed.
@@ -197,20 +204,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return;
       }
 
-      // Starting a fresh basket is the honest behaviour: the one-store rule means we would
-      // otherwise have to silently discard whatever was already in it.
-      if (widget.cart.isNotEmpty && widget.cart.storeId != storeId) {
-        final bool? replace = await _confirmReplaceBasket();
-        if (replace != true || !mounted) return;
-      }
-      widget.cart.switchTo(_store?.toCard() ??
+      // Added beside whatever is already in the basket, as this shop's group: a basket holds
+      // several shops now, so reordering never throws anything away. The one refusal is the shop
+      // limit, said before anything is added.
+      final StoreCard card = _store?.toCard() ??
           StoreCard(
             id: storeId,
             slug: '',
             name: order.storeName ?? DeliveryStrings.of(context).tabShop,
             vertical: StoreVertical.restaurant,
             availability: StoreAvailability.open,
-          ));
+          );
+      if (widget.cart.exceedsShopLimit(byId.values.first, from: card)) {
+        // Said as the shop page says it: that nothing was added, what to do about it, and the way to
+        // the basket, where the customer makes room. Nothing is in hand while they read it.
+        setState(() => _reordering = false);
+        if (await explainShopLimit(context) && mounted) widget.onOpenBasket();
+        return;
+      }
 
       int added = 0;
       int missing = 0;
@@ -221,7 +232,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           continue;
         }
         for (int i = 0; i < line.qty; i++) {
-          widget.cart.add(product);
+          widget.cart.add(product, from: card);
         }
         added++;
       }
@@ -236,28 +247,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     } finally {
       if (mounted) setState(() => _reordering = false);
     }
-  }
-
-  Future<bool?> _confirmReplaceBasket() {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(DeliveryStrings.of(context).replaceYourBasket),
-        content: Text(
-            '${DeliveryStrings.of(context).basketFromShopReplace(widget.cart.store?.name ?? '')} '
-            '${DeliveryStrings.of(context).reorderWillReplace}'),
-        actions: <Widget>[
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(DeliveryStrings.of(context).keepIt)),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: DeliveryColors.brand),
-            child: Text(DeliveryStrings.of(context).replace),
-          ),
-        ],
-      ),
-    );
   }
 
   void _say(String message) {
@@ -318,6 +307,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
+                        if (order.gift != null) ...<Widget>[
+                          _giftCard(t, order.gift!),
+                          const SizedBox(height: DeliverySpacing.md),
+                        ],
                         _receiptCard(t, order),
                         const SizedBox(height: DeliverySpacing.md),
                         YdPillButton(
@@ -415,6 +408,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         height: 1.3,
                       ),
                     ),
+                    // Checked out together with other shops' orders: said here as on the Orders
+                    // list, so this order is never mistaken for the whole purchase.
+                    if (order.isPartOfCheckout) ...<Widget>[
+                      const SizedBox(height: DeliverySpacing.xs),
+                      YdBadge(
+                        label: t.multiCartPartOfOrder(order.checkoutSize!),
+                        color: DeliveryColors.brand,
+                        background: DeliveryColors.brandSoft,
+                        uppercase: false,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -761,6 +765,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   cart: widget.cart,
                   storeId: order.storeId!,
                   preview: _store?.toCard(),
+                  onOpenBasket: widget.onOpenBasket,
                 ),
               )),
             ),
@@ -796,6 +801,66 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   // ------------------------------------------------------------------ what it cost (kept)
 
+  /// The gift as the customer sent it. Before gifts had their own fields the sender could not see
+  /// their own card on the receipt at all; only the rider and the shop could.
+  Widget _giftCard(DeliveryStrings t, OrderGift gift) {
+    final String? message = gift.message?.trim();
+    return YdCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.card_giftcard_rounded, size: 18, color: DeliveryColors.brand),
+              const SizedBox(width: DeliverySpacing.sm),
+              Expanded(
+                child: Text(
+                  // Always named for the customer who sent it; the fallback is the model's rule.
+                  gift.recipientName == null
+                      ? t.giftUnnamed
+                      : t.giftForName(gift.recipientName!),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: DeliveryColors.ink,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (gift.recipientPhone != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.xs),
+            Text(
+              gift.recipientPhone!,
+              textDirection: TextDirection.ltr,
+              style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+            ),
+          ],
+          if (message != null && message.isNotEmpty) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              '“$message”',
+              style: const TextStyle(fontSize: 13, color: DeliveryColors.muted, height: 1.45),
+            ),
+          ],
+          if (gift.wrap) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            Text(
+              t.giftWrapRequested,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: DeliveryColors.brand,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _receiptCard(DeliveryStrings t, DeliveryOrder order) {
     return YdCard(
       child: Column(
@@ -821,6 +886,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 : t.setByStoreCharged(order.storeName ?? ''),
             override: order.deliveryFeeCharged == 0 ? t.free : null,
           ),
+          // The wrap, itemised like the express premium: inside the total, so shown for the total
+          // to add up.
+          if (order.gift != null && order.gift!.wrapFee > 0) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.sm),
+            _money(t.giftWrapLine, order.gift!.wrapFee),
+          ],
           // The promo code's line, only on orders that carried one — null means no code, which
           // is not the same receipt as a code worth zero.
           if (order.discountAmount != null) ...<Widget>[

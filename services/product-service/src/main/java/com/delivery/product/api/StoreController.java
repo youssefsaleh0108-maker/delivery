@@ -33,6 +33,7 @@ import com.delivery.product.api.dto.CatalogDtos.PresignUploadRequest;
 import com.delivery.product.api.dto.CatalogDtos.PresignUploadResponse;
 import com.delivery.product.api.dto.CatalogDtos.ProductResponse;
 import com.delivery.product.api.dto.GeoDtos.LocationRequest;
+import com.delivery.product.api.dto.GeoDtos.NearbyPageResponse;
 import com.delivery.product.api.dto.GeoDtos.NearbyStoreResponse;
 import com.delivery.product.api.dto.StoreDtos.AisleResponse;
 import com.delivery.product.api.dto.StoreDtos.BusyRequest;
@@ -48,17 +49,21 @@ import com.delivery.product.api.dto.StoreDtos.StoreRequest;
 import com.delivery.product.api.dto.StoreDtos.PowerRequest;
 import com.delivery.product.api.dto.StoreDtos.RadiusRequest;
 import com.delivery.product.api.dto.StoreDtos.StoreResponse;
+import com.delivery.product.api.dto.StoreDtos.VerifiedLocalRequest;
 import com.delivery.product.domain.GeoPoint;
 import com.delivery.product.domain.Product;
 import com.delivery.product.domain.Store;
 import com.delivery.product.domain.StoreOffer;
 import com.delivery.product.domain.StoreReview;
 import com.delivery.product.service.CatalogService;
+import com.delivery.product.service.CatalogService.ProductView;
+import com.delivery.product.service.PopularServiceShops;
 import com.delivery.product.service.ProductImageService;
 import com.delivery.product.service.ProductImageService.ImageUrl;
 import com.delivery.product.service.ReviewService;
 import com.delivery.product.service.StoreImageService;
 import com.delivery.product.service.StoreService;
+import com.delivery.product.service.StoreService.NearbyStoreView;
 import com.delivery.product.service.StoreService.StoreView;
 
 /**
@@ -97,24 +102,35 @@ public class StoreController {
      *
      * <p>The radius alone is not a bound: in a dense city a 50 km circle is every shop on the
      * platform. This caps what a single request can pull into memory to sort, and a caller who hits
-     * it gets the nearest 500 — which is the right subset to lose the rest from.
+     * it gets the nearest 500 shops that match the search — the right subset to lose the rest from —
+     * with {@code truncated} set, so that answer is never passed off as the whole radius.
      */
     static final int MAX_NEARBY_CANDIDATES = 500;
+
+    /**
+     * The widest "new on the platform" window the nearby search will apply: a year.
+     *
+     * <p>Past that "new" has stopped meaning anything, and a client asking for more is asking for
+     * every shop, which a year's window already very nearly is.
+     */
+    static final int MAX_NEW_SINCE_DAYS = 365;
 
     private final StoreService storeService;
     private final CatalogService catalog;
     private final ProductImageService images;
     private final StoreImageService storeImages;
     private final ReviewService reviewService;
+    private final PopularServiceShops popularServiceShops;
 
     public StoreController(StoreService storeService, CatalogService catalog,
                            ProductImageService images, StoreImageService storeImages,
-                           ReviewService reviewService) {
+                           ReviewService reviewService, PopularServiceShops popularServiceShops) {
         this.storeService = storeService;
         this.catalog = catalog;
         this.images = images;
         this.storeImages = storeImages;
         this.reviewService = reviewService;
+        this.popularServiceShops = popularServiceShops;
     }
 
     // ---------------------------------------------------------------- storefront
@@ -127,7 +143,11 @@ public class StoreController {
      */
     @GetMapping
     public PageResponse<StoreCardResponse> browse(
+            // No vertical is every goods vertical and no service shop: what Home and every installed
+            // app ask for. SERVICES, or a serviceCategory on its own, lists service shops in the open
+            // categories only. The rule lives in StoreService.ShopScope.
             @RequestParam(required = false) Store.Vertical vertical,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) BigDecimal maxDeliveryFee,
             @RequestParam(required = false) Integer maxEtaMinutes,
@@ -136,8 +156,8 @@ public class StoreController {
             @PageableDefault(size = 20, sort = "rating", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        Page<StoreView> page = storeService.storefront(vertical, search, maxDeliveryFee,
-                maxEtaMinutes, minRating, neighborhood, pageable);
+        Page<StoreView> page = storeService.storefront(vertical, serviceCategory, search,
+                maxDeliveryFee, maxEtaMinutes, minRating, neighborhood, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
@@ -145,10 +165,26 @@ public class StoreController {
         return PageResponse.of(page.map(v -> toCard(v, starred, offersByStore)));
     }
 
-    /** The district chips for the hyperlocal browse — the distinct declared neighborhoods. */
+    /**
+     * The district chips for the hyperlocal browse — the distinct declared neighborhoods, of goods
+     * shops only.
+     */
     @GetMapping("/neighborhoods")
     public List<String> neighborhoods() {
         return storeService.neighborhoods();
+    }
+
+    /**
+     * The service categories open right now, in taxonomy order: what a provider may file a shop
+     * under, and what the Services tab may show. A closed category is in neither place.
+     *
+     * <p>Any signed-in caller, like the storefront it describes. The list is the same for everyone
+     * and names no shop.
+     */
+    @GetMapping("/service-categories")
+    @PreAuthorize("isAuthenticated()")
+    public List<Store.ServiceCategory> serviceCategories() {
+        return storeService.openServiceCategories();
     }
 
     /**
@@ -173,12 +209,28 @@ public class StoreController {
      *                     widest circle this endpoint supports genuinely answers that. Nothing
      *                     returned is untrue either way — every shop in the response really is
      *                     within the radius it was measured against.
+     * @return the storefront's page shape plus {@code truncated}: true when more shops matched inside
+     *         the radius than one search reads ({@link #MAX_NEARBY_CANDIDATES}), so the page and its
+     *         total cover the nearest of them only. See {@link NearbyPageResponse}.
      */
     @GetMapping("/nearby")
-    public PageResponse<NearbyStoreResponse> nearby(
+    public NearbyPageResponse nearby(
             @RequestParam BigDecimal latitude,
             @RequestParam BigDecimal longitude,
             @RequestParam(defaultValue = "5000") int radiusMetres,
+            // The neighbourhood browse's chips. Each is documented where it is applied — see
+            // StoreService.NearbyFilters — because what a filter MEANS is a service rule, and the
+            // one worth reading is powerStatus: what the lights are doing now, not what the shop
+            // owns.
+            @RequestParam(defaultValue = "false") boolean openNow,
+            @RequestParam(required = false) Store.PowerStatus powerStatus,
+            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) Integer newSinceDays,
+            @RequestParam(defaultValue = "false") boolean verifiedLocal,
+            // As on the storefront: no vertical is every goods shop and no service shop; SERVICES
+            // or a serviceCategory is service shops in open categories. See StoreService.ShopScope.
+            @RequestParam(required = false) Store.Vertical vertical,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
             @PageableDefault(size = 20) Pageable pageable) {
 
         // Built here rather than passed on as two loose numbers, so an out-of-range or (0, 0)
@@ -189,26 +241,94 @@ public class StoreController {
         int radius = Math.min(Math.max(radiusMetres, MIN_NEARBY_RADIUS_METRES),
                 MAX_NEARBY_RADIUS_METRES);
 
-        Page<StoreService.NearbyStoreView> page =
-                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, pageable);
+        StoreService.NearbyFilters filters = new StoreService.NearbyFilters(
+                openNow,
+                powerStatus,
+                neighborhood,
+                // Clamped like the radius, and for the same reason: zero or a negative number of
+                // days is a client bug with no sensible answer, and ten thousand days is a client
+                // asking for "every shop", which the widest window genuinely answers.
+                newSinceDays == null ? null
+                        : Math.min(Math.max(newSinceDays, 1), MAX_NEW_SINCE_DAYS),
+                verifiedLocal,
+                vertical,
+                serviceCategory);
+
+        StoreService.NearbyResult result =
+                storeService.nearby(centre, radius, MAX_NEARBY_CANDIDATES, filters, pageable);
 
         Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
         Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
 
-        return PageResponse.of(page.map(near -> new NearbyStoreResponse(
-                toCard(near.store(), starred, offersByStore),
-                near.store().store().getLatitude(),
-                near.store().store().getLongitude(),
-                // Whole metres. The pin this is measured from was dropped by hand on a map, so a
-                // decimal place would be precision the number does not have.
-                Math.round(near.distanceMetres()))));
+        return NearbyPageResponse.of(result.page().map(near -> new NearbyStoreResponse(
+                        toCard(near.store(), starred, offersByStore),
+                        near.store().store().getLatitude(),
+                        near.store().store().getLongitude(),
+                        // Whole metres. The pin this is measured from was dropped by hand on a map,
+                        // so a decimal place would be precision the number does not have.
+                        Math.round(near.distanceMetres()))),
+                result.truncated(), MAX_NEARBY_CANDIDATES);
     }
 
     /**
-     * The starred row at the top of the home screen.
+     * The Services tab's "Popular near you" row: service shops near a point, ranked by the orders they
+     * delivered in the last 30 days, most first ({@link PopularServiceShops}).
+     *
+     * <p>The answer is the cards in rank order, each with its pin and distance exactly as
+     * {@link #nearby} draws them, and nothing more: no count, and no bucket standing in for one. The
+     * counts rank the row on the server and stop there, because a competitor's order volume is not a
+     * customer's to read. An empty list means no shop nearby has enough delivered orders yet, and the
+     * app shows "Services near you" instead ({@code /nearby?vertical=SERVICES}).
+     *
+     * <p>The radius, the window and the floor are the server's settings
+     * ({@code delivery.catalog.services.popular-*}), not parameters: a client that could widen the
+     * circle could turn "near you" back into a nationwide ranking.
+     *
+     * <p>Any signed-in caller, like {@link #nearby} and for its reason: a point is where somebody is
+     * standing, so no signed-out caller gets a proximity oracle, while a customer, a provider and back
+     * office all read the same public cards. A literal path, never taken for {@code /{idOrSlug}}.
+     *
+     * @param serviceCategory one open category, or none for every open one; a closed one answers empty
+     * @param limit           the most cards wanted, held to {@code PopularServiceShops.MAX_SHOPS}
+     */
+    @GetMapping("/services/popular")
+    @PreAuthorize("isAuthenticated()")
+    public List<NearbyStoreResponse> popularServices(
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude,
+            @RequestParam(required = false) Store.ServiceCategory serviceCategory,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        // Refused before the database, with the message "near me" gives: see nearby.
+        GeoPoint centre = new GeoPoint(latitude, longitude);
+        List<NearbyStoreView> popular = popularServiceShops.near(centre, serviceCategory, limit);
+        if (popular.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> starred = storeService.favoriteIdsOf(CurrentUser.id().orElse(null));
+        Map<UUID, List<StoreOffer>> offersByStore = storeService.liveOffersByStore();
+
+        return popular.stream()
+                .map(near -> new NearbyStoreResponse(
+                        toCard(near.store(), starred, offersByStore),
+                        near.store().store().getLatitude(),
+                        near.store().store().getLongitude(),
+                        Math.round(near.distanceMetres())))
+                .toList();
+    }
+
+    /**
+     * The starred row at the top of the home screen: goods shops only.
      *
      * <p>Paged like everything else. A customer who has starred two hundred shops should not send
      * two hundred cards down the wire to fill a rail that shows four.
+     *
+     * <p>A starred service shop is kept but not listed here. This is Home, where service shops never
+     * appear, and every installed app would draw one as a restaurant; see
+     * {@code StoreRepository#findFavoritesOfWithStatus}. No Services screen draws favourites yet, so
+     * there is no services read of them. One would take a vertical and a category exactly as
+     * {@link #browse} does, and be scoped by {@code StoreService.ShopScope} to open categories.
      */
     @GetMapping("/favorites")
     public PageResponse<StoreCardResponse> favorites(
@@ -247,7 +367,13 @@ public class StoreController {
                 storeService.favoriteIdsOf(viewerId));
     }
 
-    /** A store's shelf. */
+    /**
+     * A store's shelf.
+     *
+     * <p>Read as the caller: a service shop that is a draft, suspended or in a closed category shows
+     * its shelf to its provider only, and anybody else is told the shop is not found
+     * ({@link CatalogService#browseStore}). A goods shop's shelf is served as it always was.
+     */
     @GetMapping("/{id}/products")
     public PageResponse<ProductResponse> products(
             @PathVariable UUID id,
@@ -262,10 +388,11 @@ public class StoreController {
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC)
             Pageable pageable) {
 
+        String viewerId = CurrentUser.id().orElse(null);
         Page<Product> page = ids == null || ids.isEmpty()
-                ? catalog.browseStore(id, categoryId, search, pageable)
-                : catalog.browseStoreByIds(id, ids, pageable);
-        return PageResponse.of(page.map(this::toProduct));
+                ? catalog.browseStore(id, viewerId, categoryId, search, pageable)
+                : catalog.browseStoreByIds(id, viewerId, ids, pageable);
+        return PageResponse.of(catalog.views(page).map(this::toProduct));
     }
 
     /** The Aisles tab: only the categories this store actually stocks. */
@@ -309,11 +436,20 @@ public class StoreController {
 
     // ---------------------------------------------------------------- administration
 
+    /**
+     * Opens a shop for the calling merchant.
+     *
+     * <p>201 with the new shop. 200 with the merchant's existing services shop when they ask for a
+     * SERVICES shop and already have one: the provider app opens that shop on its first entry after
+     * approval, and a retry or a second phone has to land on the same shop rather than open another.
+     * See {@link StoreService#open}.
+     */
     @PostMapping
     @PreAuthorize("hasRole('MERCHANT')")
     public ResponseEntity<StoreResponse> create(@Valid @RequestBody StoreRequest request) {
-        StoreView created = storeService.create(CurrentUser.requireId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created, Set.of()));
+        StoreService.Opened opened = storeService.open(CurrentUser.requireId(), request);
+        return ResponseEntity.status(opened.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(toResponse(opened.view(), Set.of()));
     }
 
     @PutMapping("/{id}")
@@ -392,6 +528,25 @@ public class StoreController {
         // exactly as /nearby's does. As two loose doubles an impossible coordinate was answered
         // rather than refused.
         return Map.of("canDeliver", storeService.deliversTo(id, latitude, longitude));
+    }
+
+    /**
+     * Backoffice grants or withdraws the dekkane "Trusted Local" badge.
+     *
+     * <p>BACKOFFICE and nobody else — not even the shop's own merchant, and that is the point of the
+     * badge: it is a claim the platform makes to the shop's neighbours, and one the shop could award
+     * itself would certify nothing. V23 made the column deliberately not merchant-writable and this
+     * is the only road to it; it is not on {@link #update}'s form, so no profile save can touch it.
+     *
+     * <p>Any store, in any status. Vetting a shop before it is listed is exactly when Backoffice
+     * would do it, and granting a badge to a draft shows it to nobody until the shop publishes.
+     */
+    @PutMapping("/{id}/verified-local")
+    @PreAuthorize("hasRole('BACKOFFICE')")
+    public StoreResponse setVerifiedLocal(@PathVariable UUID id,
+                                          @Valid @RequestBody VerifiedLocalRequest request) {
+        return toResponse(storeService.setVerifiedLocal(
+                id, CurrentUser.requireId(), request.verified()), Set.of());
     }
 
     /** The merchant declares what the lights are doing — the power chip's one source of truth. */
@@ -581,9 +736,12 @@ public class StoreController {
                 store.isVerifiedLocal(),
                 store.getPowerStatus(),
                 store.getPowerNote(),
+                store.getPowerUpdatedAt(),
+                v.powerCurrent(),
                 store.getLatitude(),
                 store.getLongitude(),
-                store.getDeliveryRadiusMetres());
+                store.getDeliveryRadiusMetres(),
+                store.getServiceCategory());
     }
 
     private StoreResponse toResponse(StoreView v, Set<UUID> starred) {
@@ -623,7 +781,9 @@ public class StoreController {
                 store.getPowerStatus(),
                 store.getPowerNote(),
                 store.getPowerUpdatedAt(),
-                store.getDeliveryRadiusMetres());
+                v.powerCurrent(),
+                store.getDeliveryRadiusMetres(),
+                store.getServiceCategory());
     }
 
     private static OfferResponse toOffer(StoreOffer offer) {
@@ -638,26 +798,11 @@ public class StoreController {
                 offer.getEndsAt());
     }
 
-    private ProductResponse toProduct(Product product) {
-        List<String> refs = product.getImageRefs();
-        // This is the shop page's product list — the screen the whole derivative exists for.
-        List<ImageUrl> resolved = images.resolveImages(refs);
-        return new ProductResponse(
-                product.getId(),
-                product.getMerchantId(),
-                product.getStoreId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getCategoryId(),
-                refs,
-                resolved.stream().map(ImageUrl::full).toList(),
-                resolved.stream().map(ImageUrl::thumb).toList(),
-                product.getStatus(),
-                product.getSku(),
-                product.getBarcode(),
-                product.isInStock(),
-                product.getCreatedAt(),
-                product.getUpdatedAt());
+    /**
+     * The shop page's product list, the screen the list-sized derivative exists for, and a service
+     * shop's offer cards with their terms and "From" price. Mapped where every product endpoint maps.
+     */
+    private ProductResponse toProduct(ProductView view) {
+        return ProductResponses.of(view, images);
     }
 }

@@ -1,6 +1,7 @@
 package com.delivery.product.domain;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +22,24 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
 
     Page<Store> findByMerchantIdOrderByCreatedAtDesc(String merchantId, Pageable pageable);
 
+    /** The first key of {@link #lockMerchantStores}, naming that lock among the database's others. */
+    int MERCHANT_STORE_LOCK = 33_001;
+
+    /**
+     * Serialises the decisions that open a merchant's shop for them: a first product finding no shop
+     * ({@code StoreService.requireStoreFor}) and the provider app opening its one services shop
+     * ({@code StoreService.open}).
+     *
+     * <p>Both are "look, then insert", and with nothing to lock yet two of them — a double tap, a
+     * retry racing its original, a first product racing the app's own bootstrap — could each see no
+     * shop and open one apiece. A transaction-scoped advisory lock on the merchant's id, released at
+     * commit or rollback, closes that window without a row to lock. The two-key form with a fixed
+     * first key, for the reasons {@code CatalogScanRepository#lockMerchant} gives.
+     */
+    @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(" + MERCHANT_STORE_LOCK
+            + ", hashtext(:merchantId))", nativeQuery = true)
+    int lockMerchantStores(@Param("merchantId") String merchantId);
+
     boolean existsByMerchantId(String merchantId);
 
     /**
@@ -33,10 +52,18 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
      *
      * <p>Prefer {@link #findStorefront} — the status is a parameter here only because a nested enum
      * constant is awkward to write as a JPQL literal, not because callers should choose it.
+     *
+     * <p><strong>Never a service shop, whatever the parameters say.</strong> This is the goods
+     * storefront: Home, its search, the shop lists and the category counts. Every installed app asks
+     * it for "all verticals" by sending none, and reads an unknown vertical as RESTAURANT, so a print
+     * shop listed here would be drawn as a restaurant. The exclusion is a literal rather than a
+     * default a caller could switch off. Service shops are listed by
+     * {@link #findServicesStorefront}, which exists so that this query never has to.
      */
     @Query("""
             SELECT s FROM Store s
             WHERE s.status = :status
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
               AND (:vertical IS NULL OR s.vertical = :vertical)
               AND (LOWER(s.name) LIKE :search)
               AND (:maxDeliveryFee IS NULL OR s.deliveryFee <= :maxDeliveryFee)
@@ -54,12 +81,48 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                          Pageable pageable);
 
     /**
+     * The Services tab's list: live service shops in the given categories, with the storefront's
+     * other filters.
+     *
+     * <p>Its own query rather than a switch inside {@link #findStorefrontWithStatus}, so that one can
+     * refuse service shops unconditionally. {@code categories} is never empty: {@code StoreService}
+     * answers an empty page itself when no category may be shown, rather than bind an empty
+     * {@code IN} list, which databases and Hibernate versions do not agree how to render.
+     *
+     * @param categories the open categories the read may show — the one it named, or all of them
+     */
+    @Query("""
+            SELECT s FROM Store s
+            WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.vertical = com.delivery.product.domain.Store$Vertical.SERVICES
+              AND s.serviceCategory IN :categories
+              AND (LOWER(s.name) LIKE :search)
+              AND (:maxDeliveryFee IS NULL OR s.deliveryFee <= :maxDeliveryFee)
+              AND (:maxEtaMinutes IS NULL OR s.etaMaxMinutes <= :maxEtaMinutes)
+              AND (:minRating IS NULL OR s.rating >= :minRating)
+              AND (:neighborhood IS NULL OR s.neighborhood = :neighborhood)
+            """)
+    Page<Store> findServicesStorefront(
+            @Param("categories") java.util.Collection<Store.ServiceCategory> categories,
+            @Param("search") String search,
+            @Param("maxDeliveryFee") BigDecimal maxDeliveryFee,
+            @Param("maxEtaMinutes") Integer maxEtaMinutes,
+            @Param("minRating") BigDecimal minRating,
+            @Param("neighborhood") String neighborhood,
+            Pageable pageable);
+
+    /**
      * The district chips, from the shops that actually declared one. Live shops only, so a draft
      * in a district nobody serves cannot conjure an empty chip.
+     *
+     * <p>Goods shops only. The chips narrow the goods browse, so a district where only a tailor
+     * trades would be a chip that opens onto nothing — or, on an app built before services existed,
+     * onto a tailor drawn as a restaurant.
      */
     @Query("""
             SELECT DISTINCT s.neighborhood FROM Store s
             WHERE s.status = com.delivery.product.domain.Store$Status.ACTIVE
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
               AND s.neighborhood IS NOT NULL
             ORDER BY s.neighborhood
             """)
@@ -78,18 +141,34 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                 maxDeliveryFee, maxEtaMinutes, minRating, neighborhood, pageable);
     }
 
+    /**
+     * A customer's starred stores in one status, most recently starred first.
+     *
+     * <p>Prefer {@link #findFavoritesOf}, for the same reason as {@link #findStorefront}.
+     *
+     * <p><strong>Never a service shop, whatever the parameters say.</strong> This is Home's "Your
+     * favourites" rail, and service shops are never on Home (owner default 14). Every installed app
+     * reads an unknown vertical as RESTAURANT, so a print shop starred here would be drawn on Home as
+     * a restaurant; and a shop in a category that has since closed would be shown, which a closed
+     * category never is (owner default 1). The star itself is kept. This decides only where it is
+     * listed, so a later Services read can list it without the customer starring it again.
+     */
     @Query("""
             SELECT s FROM Store s
             JOIN StoreFavorite f ON f.id.storeId = s.id
             WHERE f.id.userId = :userId
               AND s.status = :status
+              AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
             ORDER BY f.createdAt DESC
             """)
     Page<Store> findFavoritesOfWithStatus(@Param("userId") String userId,
                                           @Param("status") Store.Status status,
                                           Pageable pageable);
 
-    /** A customer's starred stores, most recently starred first. The home screen's top row. */
+    /**
+     * A customer's starred goods shops, most recently starred first. The home screen's top row; see
+     * {@link #findFavoritesOfWithStatus} for why a service shop is never in it.
+     */
     default Page<Store> findFavoritesOf(String userId, Pageable pageable) {
         return findFavoritesOfWithStatus(userId, Store.Status.ACTIVE, pageable);
     }
@@ -136,6 +215,33 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
      * operator would need the {@code OPERATOR(public.<->)} spelling to resolve at all, and the
      * ordering here only exists to make {@code LIMIT} pick the right candidates — the index has
      * already done the narrowing in the {@code WHERE}, and Java does the ordering that ships.
+     *
+     * <p><strong>The neighbourhood browse's filters are in the {@code WHERE} too, ahead of the
+     * {@code LIMIT}.</strong> Applied only afterwards, in Java, they narrowed the nearest
+     * {@code maxCandidates} shops instead of the radius: a matching shop just past the ceiling went
+     * missing and the answer said nothing matched. Each predicate here mirrors
+     * {@code StoreService.NearbyFilters#admits}, which still judges the rows as read and decides.
+     * "Open now" is not here at all: availability is walked out of opening hours in Java, and a SQL
+     * twin of that walk would be a second answer to "is it open", free to disagree with the card.
+     *
+     * <p>No parameter is ever bound null. An untyped null in native SQL is one PostgreSQL cannot
+     * infer a type for, and how a driver binds it varies — so each optional filter arrives as a value
+     * with a switch ({@code ''} meaning "no status" or "no district", a boolean for the others), and
+     * every parameter is {@code CAST} to its column's type so the planner never has to guess.
+     *
+     * @param powerStatus        {@code ''} for no power filter, else a {@link Store.PowerStatus} name
+     * @param powerDeclaredSince the oldest declaration that still counts as now; used only with a
+     *                           power filter
+     * @param neighborhood       {@code ''} for no district filter, else the exact district
+     * @param newOnly            whether {@code listedSince} applies
+     * @param listedSince        the earliest first listing that counts as new
+     * @param vertical           {@code ''} for every goods vertical and no service shop, else one
+     *                           {@link Store.Vertical} name — see {@code StoreService.ShopScope}
+     * @param serviceCategories  the open service categories a SERVICES read may show, comma-separated;
+     *                           {@code ''} shows no service shop. A string rather than a list so an
+     *                           empty set is still a typed, non-null value, and so no service shop can
+     *                           slip through a list the driver bound oddly.
+     * @param maxCandidates      the {@code LIMIT}; the service asks for one more than it will use
      */
     @Query(value = """
             SELECT s.id
@@ -146,6 +252,21 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                        s.location,
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography,
                        :radiusMetres)
+               AND (CAST(:powerStatus AS varchar) = ''
+                    OR (s.power_status = CAST(:powerStatus AS varchar)
+                        AND s.power_updated_at >= CAST(:powerDeclaredSince AS timestamptz)))
+               AND (CAST(:neighborhood AS varchar) = ''
+                    OR s.neighborhood = CAST(:neighborhood AS varchar))
+               AND (NOT CAST(:verifiedLocalOnly AS boolean) OR s.verified_local)
+               AND (NOT CAST(:newOnly AS boolean)
+                    OR s.published_at >= CAST(:listedSince AS timestamptz))
+               AND (CASE WHEN CAST(:vertical AS varchar) = ''
+                         THEN s.vertical <> 'SERVICES'
+                         ELSE s.vertical = CAST(:vertical AS varchar)
+                    END)
+               AND (s.vertical <> 'SERVICES'
+                    OR s.service_category = ANY (
+                           string_to_array(CAST(:serviceCategories AS varchar), ',')))
              ORDER BY public.ST_Distance(
                        s.location,
                        public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography)
@@ -154,7 +275,72 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     List<UUID> findActiveIdsNear(@Param("latitude") double latitude,
                                  @Param("longitude") double longitude,
                                  @Param("radiusMetres") double radiusMetres,
+                                 @Param("powerStatus") String powerStatus,
+                                 @Param("powerDeclaredSince") Instant powerDeclaredSince,
+                                 @Param("neighborhood") String neighborhood,
+                                 @Param("verifiedLocalOnly") boolean verifiedLocalOnly,
+                                 @Param("newOnly") boolean newOnly,
+                                 @Param("listedSince") Instant listedSince,
+                                 @Param("vertical") String vertical,
+                                 @Param("serviceCategories") String serviceCategories,
                                  @Param("maxCandidates") int maxCandidates);
+
+    /**
+     * The Services tab's "Popular near you" row: live service shops pinned inside a radius, in open
+     * categories, ranked by the distinct orders they delivered since a moment, most first.
+     *
+     * <p>Only ids leave the database, in rank order, and no count. The counts rank the row and stay
+     * here: a competitor's order volume is not something a customer's app should be handed, so
+     * {@code PopularServiceShops} is given nothing it could pass on.
+     *
+     * <p>Each clause, and why:
+     * <ul>
+     *   <li>{@code COUNT(DISTINCT l.order_id)}: orders, not lines or units, so one order of three
+     *       offers, or of 5,000 flyers, is one order.
+     *   <li>{@code l.delivered_at >= :deliveredSince}: recent orders only. The table is the projection
+     *       of {@code order.delivered}, so an order placed and then cancelled never counts at all.
+     *   <li>{@code HAVING}: below the floor a shop is left out, never padded.
+     *   <li>ACTIVE, SERVICES, an open category and a pin inside the radius: the scope and circle "near
+     *       me" uses ({@link #findActiveIdsNear}), ahead of the {@code LIMIT}, so a busy shop across the
+     *       country cannot take a place a nearby one should have had.
+     *   <li>A tie goes to the better rated shop, unrated last, then to the id, so the row does not
+     *       reshuffle on every refresh.
+     * </ul>
+     *
+     * <p>Native for {@code ST_DWithin}, with {@link #findActiveIdsNear}'s {@code public.}
+     * qualification, typed casts and never-null parameters, and its slack: the caller widens the radius
+     * a little and judges every row again on the sphere, as the card measures it.
+     *
+     * @param serviceCategories the open categories the row may show, comma-separated; never empty
+     * @param deliveredSince    the oldest delivery that still counts
+     * @param maxShops          the {@code LIMIT}
+     */
+    @Query(value = """
+            SELECT s.id
+              FROM stores s
+              JOIN delivered_order_lines l ON l.store_id = s.id
+             WHERE s.status = 'ACTIVE'
+               AND s.vertical = 'SERVICES'
+               AND s.service_category = ANY (
+                       string_to_array(CAST(:serviceCategories AS varchar), ','))
+               AND s.location IS NOT NULL
+               AND public.ST_DWithin(
+                       s.location,
+                       public.ST_SetSRID(public.ST_MakePoint(:longitude, :latitude), 4326)::public.geography,
+                       :radiusMetres)
+               AND l.delivered_at >= CAST(:deliveredSince AS timestamptz)
+             GROUP BY s.id, s.rating
+            HAVING COUNT(DISTINCT l.order_id) >= :minDeliveredOrders
+             ORDER BY COUNT(DISTINCT l.order_id) DESC, s.rating DESC NULLS LAST, s.id
+             LIMIT :maxShops
+            """, nativeQuery = true)
+    List<UUID> findPopularServiceShopIdsNear(@Param("latitude") double latitude,
+                                             @Param("longitude") double longitude,
+                                             @Param("radiusMetres") double radiusMetres,
+                                             @Param("serviceCategories") String serviceCategories,
+                                             @Param("deliveredSince") Instant deliveredSince,
+                                             @Param("minDeliveredOrders") long minDeliveredOrders,
+                                             @Param("maxShops") int maxShops);
 
     /**
      * Whether this shop's delivery circle covers the point. Three honest answers folded into

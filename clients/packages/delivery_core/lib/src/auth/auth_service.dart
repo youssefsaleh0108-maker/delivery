@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'auth_config.dart';
 import 'delivery_role.dart';
 import 'oidc_client.dart';
+import 'pkce.dart';
 
 export 'auth_config.dart';
 
@@ -56,6 +57,11 @@ class AuthSession {
 
   String? get email => _claim('email');
 
+  /// The person's full name as their identity provider gave it (`name`), or null when there is
+  /// none. Unlike [displayName] there is no fallback: a partner application prefills its name field
+  /// from this, and prefilling somebody's email address as their name would be worse than empty.
+  String? get name => _claim('name');
+
   String? get username => _claim('preferred_username');
 
   /// Reads one claim out of the JWT payload.
@@ -91,15 +97,21 @@ class AuthService {
     required AuthConfig config,
     OidcClient? oidcClient,
     FlutterSecureStorage? storage,
+    http.Client? httpClient,
   })  : _config = config,
         _oidc = oidcClient ?? createOidcClient(),
-        _storage = storage ?? const FlutterSecureStorage();
+        _storage = storage ?? const FlutterSecureStorage(),
+        _httpClient = httpClient;
 
   static const String _refreshTokenKey = 'delivery.refresh_token';
 
   final AuthConfig _config;
   final OidcClient _oidc;
   final FlutterSecureStorage _storage;
+
+  /// Used by [brokerAvailable] only, and injectable so a test can answer as Keycloak would. Null
+  /// means a fresh client per call, closed afterwards.
+  final http.Client? _httpClient;
 
   AuthSession? _session;
 
@@ -135,6 +147,66 @@ class AuthService {
 
   /// The alias the Keycloak identity provider is registered under. Must match the realm.
   static const String googleBroker = 'google';
+
+  /// Whether Keycloak will hand a sign-in to the broker [alias] — asked BEFORE any browser opens.
+  ///
+  /// <p>`kc_idp_hint` fails open. A hint naming a provider that is not registered, or is registered
+  /// but disabled — which is where the realm file leaves Google until somebody gives it real
+  /// credentials — is ignored, and Keycloak shows its own login page instead. So a Google button
+  /// pressed before the provider is switched on would open a browser on this platform's password
+  /// form, the one page this flow exists to spare people, and leave them to work out that the
+  /// button had not done what it said.
+  ///
+  /// <p>So this asks the question the browser would, without a browser: the authorization endpoint
+  /// with the hint, redirects NOT followed. Keycloak's "Identity Provider Redirector" (in the
+  /// built-in browser flow this realm uses) answers an enabled provider with a redirect to its own
+  /// `/broker/{alias}/login`; a missing or disabled provider falls through to the login form, a
+  /// 200. The request is shaped like a real one, PKCE challenge included, because the `mobile-app`
+  /// client requires S256 and would otherwise refuse before it ever looked at the hint. Nothing is
+  /// signed in and nothing is stored: Keycloak keeps a short-lived auth session exactly as it does
+  /// for anybody who opens the login page and walks away.
+  ///
+  /// <p>True: go ahead. False: the provider is not available, so say that. Null: the question could
+  /// not be answered — offline, Keycloak down, an answer this does not recognise — so go ahead and
+  /// let the round trip report whatever is actually wrong. Failing open there is deliberate: a
+  /// probe that could only ever block would turn a flaky network into "Google is not available".
+  ///
+  /// <p>Mobile only in practice. A browser build cannot switch off redirect following, and CORS
+  /// would hide the answer anyway; nothing on the web calls this.
+  Future<bool?> brokerAvailable(String alias) async {
+    final Uri probe = Uri.parse(_config.authorizationEndpoint).replace(
+      queryParameters: <String, String>{
+        'client_id': _config.clientId,
+        'redirect_uri': _config.redirectUrl,
+        'response_type': 'code',
+        'scope': _config.scopes.join(' '),
+        'state': Pkce.generateState(),
+        'code_challenge': Pkce.challengeFor(Pkce.generateVerifier()),
+        'code_challenge_method': 'S256',
+        'kc_idp_hint': alias,
+      },
+    );
+    final http.Client client = _httpClient ?? http.Client();
+    try {
+      final http.Request request = http.Request('GET', probe)..followRedirects = false;
+      final http.StreamedResponse response =
+          await client.send(request).timeout(const Duration(seconds: 8));
+      // A login page or nothing; either way the body is not the answer.
+      await response.stream.drain<void>();
+      final int status = response.statusCode;
+      if (status >= 300 && status < 400) {
+        // Only a redirect onto the broker is a yes. Any other redirect — back to the app with an
+        // error, say — is not this question's to answer; the round trip will say it properly.
+        return (response.headers['location'] ?? '').contains('/broker/$alias/') ? true : null;
+      }
+      // Keycloak's own login form: the hint was ignored, so the provider is not there.
+      return status == 200 ? false : null;
+    } catch (_) {
+      return null;
+    } finally {
+      if (_httpClient == null) client.close();
+    }
+  }
 
   /// Signs in from a form inside the app, with no browser.
   ///

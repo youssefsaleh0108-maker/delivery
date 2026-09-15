@@ -1,6 +1,7 @@
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
 import 'package:delivery_l10n/delivery_l10n.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'merchant_analytics_screen.dart';
@@ -45,13 +46,20 @@ class MerchantSettingsScreen extends StatelessWidget {
     this.accountContact,
     this.onEditAccount,
     this.onShopProfile,
+    this.onShopMessages,
+    this.shopMessagesUnread,
+    this.onServiceOrders,
+    this.onServiceOffers,
     this.onCategories,
     this.onStaff,
     this.onStockCount,
+    this.onCatalogScan,
     this.onNotificationSettings,
     this.aggregates,
     this.documents,
     this.statements,
+    this.onDemandRadar,
+    this.onSwitchToShopping,
     this.onSignOut,
   });
 
@@ -71,6 +79,22 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// Opens the shop's own configuration — `StoreScreen` in this package.
   final VoidCallback? onShopProfile;
 
+  /// Opens the shop's conversations with customers ([ShopInboxScreen]). Right under the shop's own
+  /// profile, because both are the shop as customers meet it. Absent, not disabled, when the host has
+  /// no chat client — the same contract as the management rows below.
+  final VoidCallback? onShopMessages;
+
+  /// How many customer messages are unread, drawn on the messages row while above zero — the one
+  /// sign on this screen that a customer wrote. The host keeps it current (`ShopUnreadCount`); null
+  /// draws no number, because an unknown count is not a zero.
+  final ValueListenable<int?>? shopMessagesUnread;
+
+  /// A services shop's queue and its offers, for an owner who also runs a goods shop and so works in
+  /// the goods shell. Under the shop's own rows, because a service order is a customer waiting. Null
+  /// hides each row: an owner of one kind of shop has nowhere else to go.
+  final VoidCallback? onServiceOrders;
+  final VoidCallback? onServiceOffers;
+
   /// The merchant suite's three management pages, hung off Settings rather than given a tab
   /// each: a shop reorganises its shelves and its roster a few times a year, not a few times a
   /// day, and the nav is for the few-times-a-day things. Each row is absent, not disabled, when
@@ -79,6 +103,10 @@ class MerchantSettingsScreen extends StatelessWidget {
   final VoidCallback? onCategories;
   final VoidCallback? onStaff;
   final VoidCallback? onStockCount;
+
+  /// Merchant Blitz: builds the catalogue from shelf photos. Absent, not disabled, when unwired —
+  /// the host leaves it null for anyone the server would refuse, which is everyone but the owner.
+  final VoidCallback? onCatalogScan;
 
   /// Opens the host's notification preferences. Null marks the row as not yet available rather
   /// than hiding it, because the frame draws it.
@@ -102,6 +130,18 @@ class MerchantSettingsScreen extends StatelessWidget {
   /// all, so a host that has not wired it is simply a host that does not offer the page. A "Soon"
   /// chip on a row the design never drew would promise a shop something no roadmap has agreed.
   final StatementsApi? statements;
+
+  /// Opens the Demand Radar, beside Shop Analytics.
+  ///
+  /// A host callback rather than a client, because the radar needs the shop's id and only the host
+  /// knows it. Null hides the row, like the statement row and for the same reason: the settings
+  /// frame does not draw it, so an unwired host simply does not offer it. The host wires it for the
+  /// owner only.
+  final VoidCallback? onDemandRadar;
+
+  /// Takes an owner who is also a customer to the customer app — the shop's half of the role switch.
+  /// Null hides the row: an account with no customer role has nowhere to switch to.
+  final VoidCallback? onSwitchToShopping;
 
   /// Ends the session. Null hides the button entirely — a sign-out that does nothing is worse
   /// than no sign-out at all.
@@ -254,6 +294,31 @@ class MerchantSettingsScreen extends StatelessWidget {
             title: t.merchbShopProfile,
             onTap: onShopProfile,
           ),
+          if (onShopMessages != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.forum_outlined,
+              title: t.chatShopInboxTitle,
+              onTap: onShopMessages,
+              count: shopMessagesUnread,
+            ),
+          ],
+          if (onServiceOrders != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.assignment_outlined,
+              title: t.svcServiceOrdersRow,
+              onTap: onServiceOrders,
+            ),
+          ],
+          if (onServiceOffers != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.design_services_outlined,
+              title: t.svcServiceOffersRow,
+              onTap: onServiceOffers,
+            ),
+          ],
           if (onCategories != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             _MenuRow(
@@ -268,6 +333,14 @@ class MerchantSettingsScreen extends StatelessWidget {
               icon: Icons.fact_check_outlined,
               title: t.invCountTitle,
               onTap: onStockCount,
+            ),
+          ],
+          if (onCatalogScan != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.document_scanner_outlined,
+              title: t.blitzSettingsRow,
+              onTap: onCatalogScan,
             ),
           ],
           if (onStaff != null) ...<Widget>[
@@ -315,6 +388,24 @@ class MerchantSettingsScreen extends StatelessWidget {
             onTap: aggregates == null ? null : () => _openAnalytics(context),
             soonLabel: aggregates == null ? t.merchbSoon : null,
           ),
+          // Beside Shop Analytics because it is the other half of the same question: that row is
+          // how this shop is trading, this one is where around it people are ordering.
+          if (onDemandRadar != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.radar,
+              title: t.heatmapTitle,
+              onTap: onDemandRadar,
+            ),
+          ],
+          if (onSwitchToShopping != null) ...<Widget>[
+            const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
+            _MenuRow(
+              icon: Icons.shopping_bag_outlined,
+              title: t.svcSwitchToShopping,
+              onTap: onSwitchToShopping,
+            ),
+          ],
           if (onSignOut != null) ...<Widget>[
             const SizedBox(height: DeliverySpacing.md - DeliverySpacing.xs),
             _LogOutButton(
@@ -530,6 +621,7 @@ class _MenuRow extends StatelessWidget {
     required this.title,
     this.onTap,
     this.soonLabel,
+    this.count,
   });
 
   final IconData icon;
@@ -542,9 +634,22 @@ class _MenuRow extends StatelessWidget {
   /// Non-null marks the row as drawn-but-not-yet-working: no chevron, no tap, a chip instead.
   final String? soonLabel;
 
+  /// A live count drawn before the chevron while it is above zero.
+  final ValueListenable<int?>? count;
+
   @override
   Widget build(BuildContext context) {
+    final ValueListenable<int?>? count = this.count;
+    if (count == null) return _card(null);
+    return ValueListenableBuilder<int?>(
+      valueListenable: count,
+      builder: (BuildContext context, int? value, _) => _card(value),
+    );
+  }
+
+  Widget _card(int? countValue) {
     final bool inert = soonLabel != null;
+    final int shown = countValue ?? 0;
 
     return YdCard.bordered(
       onTap: inert ? null : onTap,
@@ -555,8 +660,52 @@ class _MenuRow extends StatelessWidget {
         titleColor: inert ? DeliveryColors.muted : DeliveryColors.ink,
         iconColor: inert ? DeliveryColors.faint : DeliveryColors.ink,
         onTap: inert ? null : onTap,
-        trailing: inert ? YdComingSoon(label: soonLabel!) : null,
+        trailing: inert
+            ? YdComingSoon(label: soonLabel!)
+            : shown > 0
+                ? _CountThenChevron(count: shown)
+                : null,
       ),
+    );
+  }
+}
+
+/// A count pill, then the chevron [YdListRow] draws only when it has no trailing widget of its own —
+/// so a row carrying a count still reads as a row that opens.
+class _CountThenChevron extends StatelessWidget {
+  const _CountThenChevron({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Semantics(
+          label: DeliveryStrings.of(context).chatShopUnreadCount(count),
+          child: ExcludeSemantics(
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 22),
+              height: 22,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brand,
+                borderRadius: BorderRadius.circular(DeliveryRadius.pill),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: DeliveryColors.white),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: DeliverySpacing.sm),
+        Icon(rtl ? Icons.chevron_left : Icons.chevron_right, size: 14, color: DeliveryColors.faint),
+      ],
     );
   }
 }

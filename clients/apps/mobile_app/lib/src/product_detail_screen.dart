@@ -566,12 +566,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(
-                          _missingRequired ? t.selectRequiredOptions : t.custAddToBasket,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: DeliveryColors.white,
+                        // Flexible and ellipsised, so the label gives way before the total does.
+                        // Unconstrained, it overflowed the button from about 1.1× system text on a
+                        // 360px phone.
+                        Flexible(
+                          child: Text(
+                            _missingRequired ? t.selectRequiredOptions : t.custAddToBasket,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: DeliveryColors.white,
+                            ),
                           ),
                         ),
                         if (!_missingRequired) ...<Widget>[

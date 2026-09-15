@@ -122,6 +122,20 @@ public class RiderPresence {
     }
 
     /**
+     * Unlinks this rider from a fleet they have left, as Order Manager announced it.
+     *
+     * <p>The one clearing path, and only for the fleet named. An order event cannot say a rider left
+     * (see {@link #attachCarrier}); a {@code carrier.member_left} event can, and keeping the link
+     * kept the rider on the former company's roster until they happened to carry for somebody else.
+     */
+    public void detachCarrier(UUID carrierId, Instant now) {
+        if (carrierId != null && carrierId.equals(this.carrierId)) {
+            this.carrierId = null;
+            this.updatedAt = now;
+        }
+    }
+
+    /**
      * Whether this rider is genuinely reachable, judged against a presence window.
      *
      * <p>The stale case is the reason this method exists. Trusting {@code duty_state} alone would

@@ -1610,6 +1610,258 @@ abstract class DeliveryStrings {
   /// **'Expired'**
   String get butlerStatusExpired;
 
+  /// Header of the page a customer's Butler errand opens onto from the recent-tasks list.
+  ///
+  /// In en, this message translates to:
+  /// **'Errand details'**
+  String get butlerDetailsTitle;
+
+  /// Accessibility label for the chevron on a Butler errand row that opens its details.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get butlerViewDetails;
+
+  /// No description provided for @butlerCancelErrand.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel errand'**
+  String get butlerCancelErrand;
+
+  /// No description provided for @butlerCancelConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this errand?'**
+  String get butlerCancelConfirmTitle;
+
+  /// No description provided for @butlerCancelConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It is withdrawn straight away and nobody will go for it. You can always ask again.'**
+  String get butlerCancelConfirmBody;
+
+  /// No description provided for @butlerCancelConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, cancel'**
+  String get butlerCancelConfirmYes;
+
+  /// Opens the order an agreed Butler errand became, where its delivery is tracked.
+  ///
+  /// In en, this message translates to:
+  /// **'Track order'**
+  String get butlerTrackOrder;
+
+  /// No description provided for @butlerDetailProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get butlerDetailProgress;
+
+  /// No description provided for @butlerDetailTheErrand.
+  ///
+  /// In en, this message translates to:
+  /// **'The errand'**
+  String get butlerDetailTheErrand;
+
+  /// No description provided for @butlerDetailWhereFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Where from'**
+  String get butlerDetailWhereFrom;
+
+  /// No description provided for @butlerDetailRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Who receives it'**
+  String get butlerDetailRecipient;
+
+  /// No description provided for @butlerDetailContactPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact phone'**
+  String get butlerDetailContactPhone;
+
+  /// No description provided for @butlerDetailPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get butlerDetailPrice;
+
+  /// No description provided for @butlerDetailBudgetCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Your budget cap'**
+  String get butlerDetailBudgetCap;
+
+  /// No description provided for @butlerDetailGoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods'**
+  String get butlerDetailGoods;
+
+  /// Shown in place of the goods price of a purchase errand before the shopper has bought it.
+  ///
+  /// In en, this message translates to:
+  /// **'Known once the shopper has paid'**
+  String get butlerDetailGoodsPending;
+
+  /// No description provided for @butlerDetailErrandFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Errand fee'**
+  String get butlerDetailErrandFee;
+
+  /// No description provided for @butlerDetailTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total to pay'**
+  String get butlerDetailTotal;
+
+  /// No description provided for @butlerDetailReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt reference'**
+  String get butlerDetailReceipt;
+
+  /// No description provided for @butlerDeclineReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}'**
+  String butlerDeclineReason(String reason);
+
+  /// No description provided for @butlerStepRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Request sent'**
+  String get butlerStepRequested;
+
+  /// No description provided for @butlerStepClaimedBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'A shopper took it'**
+  String get butlerStepClaimedBuy;
+
+  /// No description provided for @butlerStepClaimedSend.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider took it'**
+  String get butlerStepClaimedSend;
+
+  /// No description provided for @butlerStepQuoted.
+  ///
+  /// In en, this message translates to:
+  /// **'Price quoted'**
+  String get butlerStepQuoted;
+
+  /// No description provided for @butlerStepAgreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Price agreed'**
+  String get butlerStepAgreed;
+
+  /// Last step of a send errand, which has no price to agree — the rider is booked to carry it.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get butlerStepConfirmed;
+
+  /// Timeline step of a purchase errand nobody has taken yet. Worded as not-yet-happened on purpose: its finished form is butlerStepClaimedBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a shopper'**
+  String get butlerStepClaimBuyPending;
+
+  /// No description provided for @butlerStepClaimSendPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a rider'**
+  String get butlerStepClaimSendPending;
+
+  /// No description provided for @butlerStepQuotePending.
+  ///
+  /// In en, this message translates to:
+  /// **'The shopper tells you the price'**
+  String get butlerStepQuotePending;
+
+  /// No description provided for @butlerStepAgreePending.
+  ///
+  /// In en, this message translates to:
+  /// **'You agree the price'**
+  String get butlerStepAgreePending;
+
+  /// Timeline step of a send errand still waiting for the customer to confirm the errand fee.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirm the fee'**
+  String get butlerStepConfirmPending;
+
+  /// Read by a screen reader before a finished step of an errand's timeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get butlerStepStateDone;
+
+  /// Read by a screen reader before the timeline step the errand is currently waiting on.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get butlerStepStateNow;
+
+  /// Read by a screen reader before a timeline step the errand has not reached yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Still to come'**
+  String get butlerStepStateNext;
+
+  /// Read by a screen reader before the step that ended an errand without an agreement (declined, cancelled, expired).
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get butlerStepStateEnded;
+
+  /// The total a declined errand was quoted at — shown so the customer sees what they turned down, without saying it is owed.
+  ///
+  /// In en, this message translates to:
+  /// **'Quoted total'**
+  String get butlerDetailQuotedTotal;
+
+  /// Button: the customer confirms a send errand a rider has taken, at this fee. This is what turns it into an order.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {amount}'**
+  String butlerConfirmFee(String amount);
+
+  /// No description provided for @butlerSendConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed. The rider will collect it.'**
+  String get butlerSendConfirmed;
+
+  /// No description provided for @butlerSendAwaitingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider took it. Confirm the fee of {fee} and they will collect it.'**
+  String butlerSendAwaitingConfirm(String fee);
+
+  /// No description provided for @butlerDeclineConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn down this price?'**
+  String get butlerDeclineConfirmTitle;
+
+  /// No description provided for @butlerDeclineConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The errand ends here and cannot be reopened. The shopper has already paid for the goods.'**
+  String get butlerDeclineConfirmBody;
+
+  /// No description provided for @butlerDeclineConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, decline'**
+  String get butlerDeclineConfirmYes;
+
   /// No description provided for @somebodyElseClaimed.
   ///
   /// In en, this message translates to:
@@ -6854,41 +7106,11 @@ abstract class DeliveryStrings {
   /// **'All districts'**
   String get custAllDistricts;
 
-  /// No description provided for @custDiasporaTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Send to Lebanon'**
-  String get custDiasporaTitle;
-
   /// No description provided for @custDiasporaSub.
   ///
   /// In en, this message translates to:
   /// **'Diaspora Gifting Portal'**
   String get custDiasporaSub;
-
-  /// No description provided for @custDiasporaBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Remittance made real'**
-  String get custDiasporaBanner;
-
-  /// No description provided for @custDiasporaBlurb.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.'**
-  String get custDiasporaBlurb;
-
-  /// No description provided for @custFamilyRecipient.
-  ///
-  /// In en, this message translates to:
-  /// **'Family recipient'**
-  String get custFamilyRecipient;
-
-  /// No description provided for @custPersonalNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Attach a personal note (delivered with the order)'**
-  String get custPersonalNote;
 
   /// No description provided for @custPersonalNoteHint.
   ///
@@ -6911,7 +7133,7 @@ abstract class DeliveryStrings {
   /// No description provided for @custStartOrder.
   ///
   /// In en, this message translates to:
-  /// **'Select Items 0026 Start Order'**
+  /// **'Select Items & Start Order'**
   String get custStartOrder;
 
   /// No description provided for @custPickRecipient.
@@ -12553,6 +12775,8437 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Next'**
   String get next;
+
+  /// No description provided for @accountIntentSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How will you use YouDrop?'**
+  String get accountIntentSheetTitle;
+
+  /// No description provided for @accountIntentSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one, then continue with Google. Riding and selling are reviewed before you start, and an account can apply for only one of them.'**
+  String get accountIntentSheetSubtitle;
+
+  /// No description provided for @accountIntentCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get accountIntentCustomer;
+
+  /// No description provided for @accountIntentCustomerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to order'**
+  String get accountIntentCustomerBlurb;
+
+  /// No description provided for @accountIntentRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get accountIntentRider;
+
+  /// No description provided for @accountIntentRiderBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to deliver'**
+  String get accountIntentRiderBlurb;
+
+  /// No description provided for @accountIntentSeller.
+  ///
+  /// In en, this message translates to:
+  /// **'Seller'**
+  String get accountIntentSeller;
+
+  /// No description provided for @accountIntentSellerBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to sell'**
+  String get accountIntentSellerBlurb;
+
+  /// No description provided for @googleSignInCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in was cancelled. Nothing was changed.'**
+  String get googleSignInCancelled;
+
+  /// No description provided for @googleSignInUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in isn\'t available yet. Please use your email or phone for now.'**
+  String get googleSignInUnavailable;
+
+  /// No description provided for @googleRoleNotAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re signed in, but we couldn\'t finish setting up your account. Please choose again.'**
+  String get googleRoleNotAdded;
+
+  /// No description provided for @googleExistingApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'This account already has an application, so we\'ve opened that instead of starting another.'**
+  String get googleExistingApplication;
+
+  /// No description provided for @accountSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One more step'**
+  String get accountSetupTitle;
+
+  /// No description provided for @accountSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us how you\'ll use YouDrop to finish setting up your account.'**
+  String get accountSetupSubtitle;
+
+  /// No description provided for @wizAccountEmailNote.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll use the email on the account you signed in with.'**
+  String get wizAccountEmailNote;
+
+  /// No description provided for @wizAccountRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is in, but we couldn\'t refresh your sign-in. Try again.'**
+  String get wizAccountRefreshFailed;
+
+  /// No description provided for @accountApplicationClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The partner application on this account has already been decided, so it can\'t be reopened here. Please contact support.'**
+  String get accountApplicationClosed;
+
+  /// No description provided for @accountAlreadyPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is already a YouDrop partner, and an account can hold only one partner role.'**
+  String get accountAlreadyPartner;
+
+  /// No description provided for @accountOtherApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'This account already has an application for another role, and an account can apply for only one.'**
+  String get accountOtherApplication;
+
+  /// No description provided for @accountEmailUnverified.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account\'s email address hasn\'t been verified, so we can\'t take an application on it yet.'**
+  String get accountEmailUnverified;
+
+  /// No description provided for @wizAccountRolesRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application is in, but we couldn\'t finish setting up your account. Please try again.'**
+  String get wizAccountRolesRetry;
+
+  /// No description provided for @offlinePill.
+  ///
+  /// In en, this message translates to:
+  /// **'OFFLINE'**
+  String get offlinePill;
+
+  /// No description provided for @offlineBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re offline. Orders you queue will be sent when you\'re back online.'**
+  String get offlineBanner;
+
+  /// No description provided for @offlineBackOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Back online'**
+  String get offlineBackOnline;
+
+  /// No description provided for @offlineSavedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved items'**
+  String get offlineSavedItems;
+
+  /// No description provided for @offlineModeBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Mode'**
+  String get offlineModeBadge;
+
+  /// No description provided for @offlineCachedCatalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached Catalog'**
+  String get offlineCachedCatalogTitle;
+
+  /// No description provided for @offlineLastPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Last Cached Purchases'**
+  String get offlineLastPurchases;
+
+  /// No description provided for @offlinePricesAsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Prices as of {when}. They may have changed since.'**
+  String offlinePricesAsOf(String when);
+
+  /// No description provided for @offlineQuickAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Add'**
+  String get offlineQuickAdd;
+
+  /// No description provided for @offlineNeedsOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose options when you\'re online'**
+  String get offlineNeedsOptions;
+
+  /// No description provided for @offlineNothingSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing saved for offline yet'**
+  String get offlineNothingSaved;
+
+  /// No description provided for @offlineNothingSavedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What you order while online is saved here, so you can order it again when the connection drops.'**
+  String get offlineNothingSavedHint;
+
+  /// No description provided for @offlineOutboxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to send'**
+  String get offlineOutboxTitle;
+
+  /// No description provided for @offlineQueuedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} — Queued'**
+  String offlineQueuedTitle(String store);
+
+  /// No description provided for @offlineWillSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Will send as soon as you\'re back online'**
+  String get offlineWillSend;
+
+  /// No description provided for @offlineSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get offlineSending;
+
+  /// No description provided for @offlinePriceChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The total is now {total}. Confirm to send it at this price.'**
+  String offlinePriceChanged(String total);
+
+  /// No description provided for @offlineSendAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Send at {total}'**
+  String offlineSendAt(String total);
+
+  /// No description provided for @offlineStale.
+  ///
+  /// In en, this message translates to:
+  /// **'This has been waiting a while. Do you still want it?'**
+  String get offlineStale;
+
+  /// No description provided for @offlineSendNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Send now'**
+  String get offlineSendNow;
+
+  /// No description provided for @offlineFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t place this order: {reason}'**
+  String offlineFailed(String reason);
+
+  /// No description provided for @offlineDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get offlineDiscard;
+
+  /// No description provided for @offlineDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this order?'**
+  String get offlineDiscardTitle;
+
+  /// No description provided for @offlineDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It hasn\'t been placed, and it won\'t be sent.'**
+  String get offlineDiscardBody;
+
+  /// No description provided for @offlineQueueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach YouDrop'**
+  String get offlineQueueTitle;
+
+  /// No description provided for @offlineQueueBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order hasn\'t gone through. We can keep it on this phone and send it automatically when you\'re back online — and if the price changes, we\'ll ask you first.'**
+  String get offlineQueueBody;
+
+  /// No description provided for @offlineQueueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Place when back online'**
+  String get offlineQueueAction;
+
+  /// No description provided for @offlineQueueCashOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only cash orders can wait for the connection. Choose cash, or try again when you\'re back online.'**
+  String get offlineQueueCashOnly;
+
+  /// No description provided for @offlineQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Order saved on this phone. It will be sent when you\'re back online.'**
+  String get offlineQueued;
+
+  /// No description provided for @offlineQueueSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the order on this phone, so nothing was queued.'**
+  String get offlineQueueSaveFailed;
+
+  /// No description provided for @offlineAlreadyPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Your earlier try already went through, so that\'s the order we placed.'**
+  String get offlineAlreadyPlaced;
+
+  /// No description provided for @offlineSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your queued order from {store} was placed.'**
+  String offlineSent(String store);
+
+  /// No description provided for @offlineQueueUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders split with friends can\'t wait for the connection: each friend\'s share is linked to the order the moment it\'s placed. Try again when you\'re back online.'**
+  String get offlineQueueUnavailable;
+
+  /// No description provided for @offlineQueuedWhenAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued {when} • {amount}'**
+  String offlineQueuedWhenAmount(String when, String amount);
+
+  /// No description provided for @offlineMaybePlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm this went through. We\'ll check again automatically — it won\'t be placed twice.'**
+  String get offlineMaybePlaced;
+
+  /// No description provided for @offlineStaleMaybePlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm this went through, and it has been waiting a while. Send it again to find out: if it already went through, you\'ll get that order, not a second one.'**
+  String get offlineStaleMaybePlaced;
+
+  /// No description provided for @offlineSendAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Send again'**
+  String get offlineSendAgain;
+
+  /// No description provided for @offlineDiscardMaybePlacedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It may already have been placed — we couldn\'t confirm it. Discarding only removes it from this phone, so check Orders to see whether it went through.'**
+  String get offlineDiscardMaybePlacedBody;
+
+  /// No description provided for @offlineUnconfirmedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm your order'**
+  String get offlineUnconfirmedTitle;
+
+  /// No description provided for @offlineUnconfirmedLead.
+  ///
+  /// In en, this message translates to:
+  /// **'It may have gone through before the connection dropped — check Orders once you\'re back online.'**
+  String get offlineUnconfirmedLead;
+
+  /// No description provided for @offlineQueueResendBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We can keep it on this phone and send it again when you\'re back online. If it already went through, you\'ll get that order, not a second one — and if the price changes, we\'ll ask you first.'**
+  String get offlineQueueResendBody;
+
+  /// No description provided for @offlineUnconfirmedRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm your order — it may have gone through. Trying again is safe: it won\'t be placed twice.'**
+  String get offlineUnconfirmedRetry;
+
+  /// No description provided for @offlineQueueStandardOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Express orders can\'t wait for the connection: the express price is only set when the order is placed. Choose Standard, or try again when you\'re back online.'**
+  String get offlineQueueStandardOnly;
+
+  /// No description provided for @offlineQueueTotalUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm this order\'s total for this address, so it can\'t wait for the connection. Try again when you\'re back online.'**
+  String get offlineQueueTotalUnknown;
+
+  /// No description provided for @carrCashNavLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation'**
+  String get carrCashNavLabel;
+
+  /// No description provided for @carrCashTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Cash Reconciliation'**
+  String get carrCashTitle;
+
+  /// No description provided for @carrCashSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Match the cash your riders collected against what they hand over'**
+  String get carrCashSubtitle;
+
+  /// No description provided for @carrCashTodayChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Today: {date}'**
+  String carrCashTodayChip(String date);
+
+  /// No description provided for @carrCashDayChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Day: {date}'**
+  String carrCashDayChip(String date);
+
+  /// No description provided for @carrCashPickDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Which day?'**
+  String get carrCashPickDay;
+
+  /// No description provided for @carrCashKpiWithRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'With your riders'**
+  String get carrCashKpiWithRiders;
+
+  /// No description provided for @carrCashKpiWithRidersNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nobody is holding cash} =1{Held by 1 rider} other{Held by {count} riders}}'**
+  String carrCashKpiWithRidersNote(int count);
+
+  /// No description provided for @carrCashKpiHandedOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Handed over'**
+  String get carrCashKpiHandedOver;
+
+  /// No description provided for @carrCashKpiHandedOverNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No hand-overs on this day} =1{1 hand-over on this day} other{{count} hand-overs on this day}}'**
+  String carrCashKpiHandedOverNote(int count);
+
+  /// No description provided for @carrCashKpiOwed.
+  ///
+  /// In en, this message translates to:
+  /// **'Owed to YouDrop'**
+  String get carrCashKpiOwed;
+
+  /// No description provided for @carrCashKpiOwedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Your company holds no cash} =1{Held by your company · 1 order} other{Held by your company · {count} orders}}'**
+  String carrCashKpiOwedNote(int count);
+
+  /// No description provided for @carrCashKpiOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get carrCashKpiOverdue;
+
+  /// No description provided for @carrCashKpiOverdueNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nobody past the {hours}h limit} =1{1 rider past the {hours}h limit} other{{count} riders past the {hours}h limit}}'**
+  String carrCashKpiOverdueNote(int count, int hours);
+
+  /// No description provided for @carrCashOverdueSoftNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Some cash has been held for longer than {hours} hours. Ask those riders to hand it over.'**
+  String carrCashOverdueSoftNote(int hours);
+
+  /// No description provided for @carrCashBalancesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider balances'**
+  String get carrCashBalancesTitle;
+
+  /// No description provided for @carrCashColRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get carrCashColRider;
+
+  /// No description provided for @carrCashColCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected'**
+  String get carrCashColCollected;
+
+  /// No description provided for @carrCashColEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'Fees earned for you'**
+  String get carrCashColEarned;
+
+  /// No description provided for @carrCashColHolding.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash to hand over'**
+  String get carrCashColHolding;
+
+  /// No description provided for @carrCashColLastHandover.
+  ///
+  /// In en, this message translates to:
+  /// **'Last hand-over'**
+  String get carrCashColLastHandover;
+
+  /// No description provided for @carrCashColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get carrCashColStatus;
+
+  /// No description provided for @carrCashColActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get carrCashColActions;
+
+  /// No description provided for @carrCashStatusHolding.
+  ///
+  /// In en, this message translates to:
+  /// **'Holding cash'**
+  String get carrCashStatusHolding;
+
+  /// No description provided for @carrCashStatusOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue {hours}h'**
+  String carrCashStatusOverdue(int hours);
+
+  /// No description provided for @carrCashStatusSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled'**
+  String get carrCashStatusSettled;
+
+  /// No description provided for @carrCashActionSettle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle'**
+  String get carrCashActionSettle;
+
+  /// No description provided for @carrCashActionView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get carrCashActionView;
+
+  /// No description provided for @carrCashNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get carrCashNever;
+
+  /// No description provided for @carrCashToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get carrCashToday;
+
+  /// No description provided for @carrCashYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get carrCashYesterday;
+
+  /// No description provided for @carrCashDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day ago} other{{count} days ago}}'**
+  String carrCashDaysAgo(int count);
+
+  /// No description provided for @carrCashNobodyYet.
+  ///
+  /// In en, this message translates to:
+  /// **'None of your riders has carried cash for your company yet.'**
+  String get carrCashNobodyYet;
+
+  /// No description provided for @carrCashTableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected and fees are for the day chosen. Cash to hand over is everything still held, whenever it was collected. What your company pays its riders is agreed between you and is not shown here.'**
+  String get carrCashTableNote;
+
+  /// No description provided for @carrCashSelectRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Select {name}'**
+  String carrCashSelectRider(String name);
+
+  /// No description provided for @carrCashSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select every rider holding cash'**
+  String get carrCashSelectAll;
+
+  /// No description provided for @carrCashSettleSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle selected'**
+  String get carrCashSettleSelected;
+
+  /// No description provided for @carrCashSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{None selected} =1{1 selected} other{{count} selected}}'**
+  String carrCashSelectedCount(int count);
+
+  /// No description provided for @carrCashExportCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get carrCashExportCsv;
+
+  /// No description provided for @carrCashExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {file}'**
+  String carrCashExported(String file);
+
+  /// No description provided for @carrCashCsvRiderId.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider ID'**
+  String get carrCashCsvRiderId;
+
+  /// No description provided for @carrCashCsvOrdersHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders held'**
+  String get carrCashCsvOrdersHeld;
+
+  /// No description provided for @carrCashCsvOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest collection'**
+  String get carrCashCsvOldest;
+
+  /// No description provided for @carrCashOrderCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 order} other{{count} orders}}'**
+  String carrCashOrderCount(int count);
+
+  /// No description provided for @carrCashConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a hand-over'**
+  String get carrCashConfirmTitle;
+
+  /// No description provided for @carrCashConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {name} has handed your company {amount} in cash, for {orders}. This clears their whole balance with you and cannot be undone.'**
+  String carrCashConfirmBody(String name, String amount, String orders);
+
+  /// No description provided for @carrCashConfirmBulkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Record 1 hand-over} other{Record {count} hand-overs}}'**
+  String carrCashConfirmBulkTitle(int count);
+
+  /// No description provided for @carrCashConfirmBulkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm each of these riders has handed your company the cash shown. Every balance is cleared in full and none of it can be undone.'**
+  String get carrCashConfirmBulkBody;
+
+  /// No description provided for @carrCashConfirmBulkTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total {amount}'**
+  String carrCashConfirmBulkTotal(String amount);
+
+  /// No description provided for @carrCashConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, record it'**
+  String get carrCashConfirmYes;
+
+  /// No description provided for @carrCashMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How it was handed over'**
+  String get carrCashMethodLabel;
+
+  /// No description provided for @carrCashMethodCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash hand-over'**
+  String get carrCashMethodCash;
+
+  /// No description provided for @carrCashMethodBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank deposit'**
+  String get carrCashMethodBank;
+
+  /// No description provided for @carrCashMethodWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Money transfer app'**
+  String get carrCashMethodWallet;
+
+  /// No description provided for @carrCashNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get carrCashNoteLabel;
+
+  /// No description provided for @carrCashNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything the hub should remember, like a bag number'**
+  String get carrCashNoteHint;
+
+  /// No description provided for @carrCashRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {amount} from {name}.'**
+  String carrCashRecorded(String amount, String name);
+
+  /// No description provided for @carrCashReplayed.
+  ///
+  /// In en, this message translates to:
+  /// **'That hand-over was already recorded, so nothing was recorded twice.'**
+  String get carrCashReplayed;
+
+  /// No description provided for @carrCashAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now holding {amount}, not the amount you confirmed. Nothing was recorded; count it again.'**
+  String carrCashAmountChanged(String name, String amount);
+
+  /// No description provided for @carrCashAmountChangedUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}\'s balance changed since you opened the page. Nothing was recorded; reload and count it again.'**
+  String carrCashAmountChangedUnknown(String name);
+
+  /// No description provided for @carrCashRecordFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not record it. Nothing was changed; try again.'**
+  String get carrCashRecordFailed;
+
+  /// No description provided for @carrCashBulkDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {done} of {total}.'**
+  String carrCashBulkDone(int done, int total);
+
+  /// No description provided for @carrCashLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your company\'s cash could not be loaded just now. Nothing is wrong with your records; try again.'**
+  String get carrCashLoadFailed;
+
+  /// No description provided for @carrCashTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get carrCashTryAgain;
+
+  /// No description provided for @carrCashRiderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Settlement Detail'**
+  String get carrCashRiderTitle;
+
+  /// No description provided for @carrCashRiderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconcile the cash bag with {name}'**
+  String carrCashRiderSubtitle(String name);
+
+  /// No description provided for @carrCashBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to reconciliation'**
+  String get carrCashBack;
+
+  /// No description provided for @carrCashBadgeUnsettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsettled balance'**
+  String get carrCashBadgeUnsettled;
+
+  /// No description provided for @carrCashRiderSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrying cash for you since {date}'**
+  String carrCashRiderSince(String date);
+
+  /// No description provided for @carrCashRatings.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{(1 rating)} other{({count} ratings)}}'**
+  String carrCashRatings(int count);
+
+  /// No description provided for @carrCashRatingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New rider'**
+  String get carrCashRatingNew;
+
+  /// No description provided for @carrCashHeldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsettled deliveries'**
+  String get carrCashHeldTitle;
+
+  /// No description provided for @carrCashColOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order #'**
+  String get carrCashColOrder;
+
+  /// No description provided for @carrCashColCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Total cash'**
+  String get carrCashColCash;
+
+  /// No description provided for @carrCashColFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee earned for you'**
+  String get carrCashColFee;
+
+  /// No description provided for @carrCashHeldEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to settle: this rider is holding none of your company\'s cash.'**
+  String get carrCashHeldEmpty;
+
+  /// No description provided for @carrCashSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation summary'**
+  String get carrCashSummaryTitle;
+
+  /// No description provided for @carrCashSummaryCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected, not yet handed over'**
+  String get carrCashSummaryCollected;
+
+  /// No description provided for @carrCashSummaryFees.
+  ///
+  /// In en, this message translates to:
+  /// **'Fees earned for your company'**
+  String get carrCashSummaryFees;
+
+  /// No description provided for @carrCashSummaryDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash due to your company'**
+  String get carrCashSummaryDue;
+
+  /// No description provided for @carrCashSummaryKeeps.
+  ///
+  /// In en, this message translates to:
+  /// **'The rider keeps none of this cash. What your company pays them is agreed between you, and the fees above are paid to your company by YouDrop, not taken from the cash.'**
+  String get carrCashSummaryKeeps;
+
+  /// No description provided for @carrCashConfirmSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm settlement'**
+  String get carrCashConfirmSettlement;
+
+  /// No description provided for @carrCashNothingToSettle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to settle'**
+  String get carrCashNothingToSettle;
+
+  /// No description provided for @carrCashHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand-over history'**
+  String get carrCashHistoryTitle;
+
+  /// No description provided for @carrCashHistoryItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand-over · {date}'**
+  String carrCashHistoryItem(String date);
+
+  /// No description provided for @carrCashHistoryDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} for {orders}, recorded by {name}'**
+  String carrCashHistoryDetail(String amount, String orders, String name);
+
+  /// No description provided for @carrCashHistoryDetailAnon.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} for {orders}'**
+  String carrCashHistoryDetailAnon(String amount, String orders);
+
+  /// No description provided for @carrCashHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No hand-overs recorded yet.'**
+  String get carrCashHistoryEmpty;
+
+  /// No description provided for @carrCashRiderNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This rider has never worked for your company.'**
+  String get carrCashRiderNotFound;
+
+  /// No description provided for @carrCashBoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Held by delivery companies'**
+  String get carrCashBoTitle;
+
+  /// No description provided for @carrCashBoOwes.
+  ///
+  /// In en, this message translates to:
+  /// **'Owes the platform'**
+  String get carrCashBoOwes;
+
+  /// No description provided for @carrCashBoWithRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'With its riders: {amount}'**
+  String carrCashBoWithRiders(String amount);
+
+  /// No description provided for @carrCashBoLastPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Last paid {when}'**
+  String carrCashBoLastPaid(String when);
+
+  /// No description provided for @carrCashBoNeverPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Never paid'**
+  String get carrCashBoNeverPaid;
+
+  /// No description provided for @carrCashBoHoldsNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Holds nothing itself yet'**
+  String get carrCashBoHoldsNothing;
+
+  /// No description provided for @carrCashBoRecordPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record payment'**
+  String get carrCashBoRecordPayment;
+
+  /// No description provided for @carrCashBoConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a payment'**
+  String get carrCashBoConfirmTitle;
+
+  /// No description provided for @carrCashBoConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {company} has paid the platform {amount}, covering {orders}. This clears everything the company holds and cannot be undone.'**
+  String carrCashBoConfirmBody(String company, String amount, String orders);
+
+  /// No description provided for @carrCashBoConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, they paid'**
+  String get carrCashBoConfirmYes;
+
+  /// No description provided for @carrCashBoRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {amount} from {company}.'**
+  String carrCashBoRecorded(String amount, String company);
+
+  /// No description provided for @carrCashBoNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was outstanding; somebody may have recorded this already.'**
+  String get carrCashBoNothing;
+
+  /// No description provided for @carrCashBoAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{company} now holds {amount}, not the amount you confirmed. Nothing was recorded.'**
+  String carrCashBoAmountChanged(String company, String amount);
+
+  /// No description provided for @carrCashBoFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not record it: {error}'**
+  String carrCashBoFailed(String error);
+
+  /// No description provided for @carrCashBoOverdueNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Some cash has been out longer than the platform\'s limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.'**
+  String get carrCashBoOverdueNote;
+
+  /// No description provided for @carrCashBoLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'What delivery companies hold could not be loaded just now. The rest of this page is unaffected.'**
+  String get carrCashBoLoadFailed;
+
+  /// No description provided for @carrCashBoMethodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How it was paid (optional)'**
+  String get carrCashBoMethodLabel;
+
+  /// No description provided for @dekkaneBrowseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Neighborhood'**
+  String get dekkaneBrowseTitle;
+
+  /// No description provided for @dekkaneBrowseSubRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Local {region} dekkanes'**
+  String dekkaneBrowseSubRegion(String region);
+
+  /// No description provided for @dekkaneAreaInRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'{area}, {region}'**
+  String dekkaneAreaInRegion(String area, String region);
+
+  /// No description provided for @dekkaneEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'The dekkanes and small shops around your address'**
+  String get dekkaneEntrySub;
+
+  /// No description provided for @dekkaneFilterOpenNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open now'**
+  String get dekkaneFilterOpenNow;
+
+  /// No description provided for @dekkaneFilterOnGenerator.
+  ///
+  /// In en, this message translates to:
+  /// **'On generator now'**
+  String get dekkaneFilterOnGenerator;
+
+  /// No description provided for @dekkaneFilterNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New on YouDrop'**
+  String get dekkaneFilterNew;
+
+  /// No description provided for @dekkaneExpandMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand interactive map'**
+  String get dekkaneExpandMap;
+
+  /// No description provided for @dekkaneNearbyShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops near you'**
+  String get dekkaneNearbyShops;
+
+  /// No description provided for @dekkaneLocalShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Local shops'**
+  String get dekkaneLocalShops;
+
+  /// No description provided for @dekkaneDistanceMetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{metres} m away'**
+  String dekkaneDistanceMetres(int metres);
+
+  /// No description provided for @dekkaneDistanceKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km away'**
+  String dekkaneDistanceKm(double km);
+
+  /// No description provided for @dekkaneGeneratorActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Generator active'**
+  String get dekkaneGeneratorActive;
+
+  /// No description provided for @dekkaneTrustedLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted local'**
+  String get dekkaneTrustedLocal;
+
+  /// No description provided for @dekkaneCouldNotLoadShops.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the shops around you'**
+  String get dekkaneCouldNotLoadShops;
+
+  /// No description provided for @dekkanePinAddressPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin your address on the map to see the shops nearest you, and how far each one is.'**
+  String get dekkanePinAddressPrompt;
+
+  /// No description provided for @dekkaneNoShopsNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'No shops near this address yet'**
+  String get dekkaneNoShopsNearby;
+
+  /// No description provided for @dekkaneMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops on the map'**
+  String get dekkaneMapTitle;
+
+  /// No description provided for @dekkaneOpenClosesAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Open · Closes {time}'**
+  String dekkaneOpenClosesAt(String time);
+
+  /// No description provided for @dekkaneShopInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop inventory'**
+  String get dekkaneShopInventory;
+
+  /// No description provided for @dekkaneLbpAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'LBP {amount}'**
+  String dekkaneLbpAmount(int amount);
+
+  /// No description provided for @dekkaneAddOneMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Add one more'**
+  String get dekkaneAddOneMore;
+
+  /// No description provided for @dekkaneMerchNeighborhood.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood'**
+  String get dekkaneMerchNeighborhood;
+
+  /// No description provided for @dekkaneMerchNeighborhoodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Mar Mikhael'**
+  String get dekkaneMerchNeighborhoodHint;
+
+  /// No description provided for @dekkaneMerchNeighborhoodHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown under your shop\'s name when customers open your shop from their neighborhood list.'**
+  String get dekkaneMerchNeighborhoodHelp;
+
+  /// No description provided for @dekkaneMerchNeighborhoodTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it to 80 characters or fewer'**
+  String get dekkaneMerchNeighborhoodTooLong;
+
+  /// No description provided for @dekkaneCouldNotLoadShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this shop\'s shelves'**
+  String get dekkaneCouldNotLoadShelf;
+
+  /// No description provided for @dekkaneBrowseTitleAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops on YouDrop'**
+  String get dekkaneBrowseTitleAll;
+
+  /// No description provided for @dekkaneBrowseSubAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Every shop, best rated first'**
+  String get dekkaneBrowseSubAll;
+
+  /// No description provided for @dekkaneAllShops.
+  ///
+  /// In en, this message translates to:
+  /// **'All shops'**
+  String get dekkaneAllShops;
+
+  /// No description provided for @dekkanePowerUpdatedMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =0{Updated just now} =1{Updated 1 min ago} other{Updated {minutes} min ago}}'**
+  String dekkanePowerUpdatedMinutes(int minutes);
+
+  /// No description provided for @dekkanePowerUpdatedHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{Updated 1 hr ago} other{Updated {hours} hrs ago}}'**
+  String dekkanePowerUpdatedHours(int hours);
+
+  /// No description provided for @dekkaneSearchedNearest.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Only the nearest shop was searched} other{Only the nearest {count} shops were searched}}'**
+  String dekkaneSearchedNearest(int count);
+
+  /// No description provided for @attendanceNavShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shifts & attendance'**
+  String get attendanceNavShifts;
+
+  /// No description provided for @attendanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Attendance & Shift Logs'**
+  String get attendanceTitle;
+
+  /// No description provided for @attendanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track daily check-ins, lates, absences, and shift overrides'**
+  String get attendanceSubtitle;
+
+  /// No description provided for @attendanceForMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance & clock logs for {month}'**
+  String attendanceForMonth(String month);
+
+  /// No description provided for @attendanceBackToRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to riders'**
+  String get attendanceBackToRiders;
+
+  /// No description provided for @attendanceManualLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Attendance Log'**
+  String get attendanceManualLog;
+
+  /// No description provided for @attendancePrevMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get attendancePrevMonth;
+
+  /// No description provided for @attendanceNextMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get attendanceNextMonth;
+
+  /// No description provided for @attendanceLegendPresent.
+  ///
+  /// In en, this message translates to:
+  /// **'Present'**
+  String get attendanceLegendPresent;
+
+  /// No description provided for @attendanceLegendLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get attendanceLegendLate;
+
+  /// No description provided for @attendanceLegendAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get attendanceLegendAbsent;
+
+  /// No description provided for @attendanceLegendOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Day off'**
+  String get attendanceLegendOff;
+
+  /// No description provided for @attendanceLegendOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'On duty'**
+  String get attendanceLegendOnDuty;
+
+  /// No description provided for @attendanceWeekMon.
+  ///
+  /// In en, this message translates to:
+  /// **'MON'**
+  String get attendanceWeekMon;
+
+  /// No description provided for @attendanceWeekTue.
+  ///
+  /// In en, this message translates to:
+  /// **'TUE'**
+  String get attendanceWeekTue;
+
+  /// No description provided for @attendanceWeekWed.
+  ///
+  /// In en, this message translates to:
+  /// **'WED'**
+  String get attendanceWeekWed;
+
+  /// No description provided for @attendanceWeekThu.
+  ///
+  /// In en, this message translates to:
+  /// **'THU'**
+  String get attendanceWeekThu;
+
+  /// No description provided for @attendanceWeekFri.
+  ///
+  /// In en, this message translates to:
+  /// **'FRI'**
+  String get attendanceWeekFri;
+
+  /// No description provided for @attendanceWeekSat.
+  ///
+  /// In en, this message translates to:
+  /// **'SAT'**
+  String get attendanceWeekSat;
+
+  /// No description provided for @attendanceWeekSun.
+  ///
+  /// In en, this message translates to:
+  /// **'SUN'**
+  String get attendanceWeekSun;
+
+  /// No description provided for @attendanceAggregatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance Aggregates'**
+  String get attendanceAggregatesTitle;
+
+  /// No description provided for @attendanceDaysWorked.
+  ///
+  /// In en, this message translates to:
+  /// **'Days worked'**
+  String get attendanceDaysWorked;
+
+  /// No description provided for @attendanceAbsences.
+  ///
+  /// In en, this message translates to:
+  /// **'Absences'**
+  String get attendanceAbsences;
+
+  /// No description provided for @attendanceTimesLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Times late'**
+  String get attendanceTimesLate;
+
+  /// No description provided for @attendanceOvertime.
+  ///
+  /// In en, this message translates to:
+  /// **'Overtime accumulated'**
+  String get attendanceOvertime;
+
+  /// No description provided for @attendanceHoursOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours on duty'**
+  String get attendanceHoursOnDuty;
+
+  /// No description provided for @attendanceManualHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours logged by hand'**
+  String get attendanceManualHours;
+
+  /// No description provided for @attendanceExcusedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused, sick or on leave'**
+  String get attendanceExcusedDays;
+
+  /// No description provided for @attendanceDaysCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String attendanceDaysCount(int count);
+
+  /// No description provided for @attendanceHoursValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hours'**
+  String attendanceHoursValue(String hours);
+
+  /// No description provided for @attendanceHoursShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hrs'**
+  String attendanceHoursShort(String hours);
+
+  /// No description provided for @attendanceLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Clock-In / Clock-Out Logs'**
+  String get attendanceLogsTitle;
+
+  /// No description provided for @attendanceColDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get attendanceColDate;
+
+  /// No description provided for @attendanceColShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled shift'**
+  String get attendanceColShift;
+
+  /// No description provided for @attendanceColClockIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock in'**
+  String get attendanceColClockIn;
+
+  /// No description provided for @attendanceColClockOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock out'**
+  String get attendanceColClockOut;
+
+  /// No description provided for @attendanceColHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get attendanceColHours;
+
+  /// No description provided for @attendanceColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get attendanceColStatus;
+
+  /// No description provided for @attendanceColNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get attendanceColNotes;
+
+  /// No description provided for @attendanceShiftLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} ({start} - {end})'**
+  String attendanceShiftLabel(String name, String start, String end);
+
+  /// No description provided for @attendanceStatusOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get attendanceStatusOnTime;
+
+  /// No description provided for @attendanceStatusLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late check-in'**
+  String get attendanceStatusLate;
+
+  /// No description provided for @attendanceStatusAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get attendanceStatusAbsent;
+
+  /// No description provided for @attendanceStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in yet'**
+  String get attendanceStatusPending;
+
+  /// No description provided for @attendanceStatusDayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Day off'**
+  String get attendanceStatusDayOff;
+
+  /// No description provided for @attendanceStatusExtra.
+  ///
+  /// In en, this message translates to:
+  /// **'Worked a day off'**
+  String get attendanceStatusExtra;
+
+  /// No description provided for @attendanceStatusWorked.
+  ///
+  /// In en, this message translates to:
+  /// **'On duty'**
+  String get attendanceStatusWorked;
+
+  /// No description provided for @attendanceStatusLateExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Late (excused)'**
+  String get attendanceStatusLateExcused;
+
+  /// No description provided for @attendanceStatusExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused'**
+  String get attendanceStatusExcused;
+
+  /// No description provided for @attendanceStatusSick.
+  ///
+  /// In en, this message translates to:
+  /// **'Sick leave'**
+  String get attendanceStatusSick;
+
+  /// No description provided for @attendanceStatusLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get attendanceStatusLeave;
+
+  /// No description provided for @attendanceOnShiftNow.
+  ///
+  /// In en, this message translates to:
+  /// **'On shift now'**
+  String get attendanceOnShiftNow;
+
+  /// No description provided for @attendanceAutoClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-closed: signal lost'**
+  String get attendanceAutoClosed;
+
+  /// No description provided for @attendanceLateBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min late'**
+  String attendanceLateBy(int minutes);
+
+  /// No description provided for @attendanceOvertimeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min overtime'**
+  String attendanceOvertimeNote(int minutes);
+
+  /// No description provided for @attendanceLoggedByHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged by hand'**
+  String get attendanceLoggedByHand;
+
+  /// No description provided for @attendanceNoSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'No shift schedule is set for this rider, so only time on duty is shown.'**
+  String get attendanceNoSchedule;
+
+  /// No description provided for @attendanceEmptyMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.'**
+  String get attendanceEmptyMonth;
+
+  /// No description provided for @attendanceZoneNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Days are split in the {zone} time zone.'**
+  String attendanceZoneNote(String zone);
+
+  /// No description provided for @attendanceNotOnFleet.
+  ///
+  /// In en, this message translates to:
+  /// **'This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.'**
+  String get attendanceNotOnFleet;
+
+  /// No description provided for @attendanceLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance could not be loaded just now.'**
+  String get attendanceLoadFailed;
+
+  /// No description provided for @attendanceLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log attendance for {name}'**
+  String attendanceLogTitle(String name);
+
+  /// No description provided for @attendanceLogStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened'**
+  String get attendanceLogStatus;
+
+  /// No description provided for @attendanceLogChooseStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a status'**
+  String get attendanceLogChooseStatus;
+
+  /// No description provided for @attendanceKindPresent.
+  ///
+  /// In en, this message translates to:
+  /// **'Present (not shown by the app)'**
+  String get attendanceKindPresent;
+
+  /// No description provided for @attendanceKindLateExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Late, excused'**
+  String get attendanceKindLateExcused;
+
+  /// No description provided for @attendanceKindAbsentExcused.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent, excused'**
+  String get attendanceKindAbsentExcused;
+
+  /// No description provided for @attendanceKindSick.
+  ///
+  /// In en, this message translates to:
+  /// **'Sick'**
+  String get attendanceKindSick;
+
+  /// No description provided for @attendanceKindLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'On leave'**
+  String get attendanceKindLeave;
+
+  /// No description provided for @attendanceLogClockIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock in (optional)'**
+  String get attendanceLogClockIn;
+
+  /// No description provided for @attendanceLogClockOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock out (optional)'**
+  String get attendanceLogClockOut;
+
+  /// No description provided for @attendanceLogNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get attendanceLogNote;
+
+  /// No description provided for @attendanceLogSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save entry'**
+  String get attendanceLogSave;
+
+  /// No description provided for @attendanceLogWithdraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove entry'**
+  String get attendanceLogWithdraw;
+
+  /// No description provided for @attendanceLogSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance entry saved.'**
+  String get attendanceLogSaved;
+
+  /// No description provided for @attendanceLogRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry removed. The day shows what the app recorded.'**
+  String get attendanceLogRemoved;
+
+  /// No description provided for @attendanceLogTimesRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Times go only on a present day, and need both a clock-in and a clock-out.'**
+  String get attendanceLogTimesRule;
+
+  /// No description provided for @attendanceLogManualNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.'**
+  String get attendanceLogManualNote;
+
+  /// No description provided for @attendanceLogFutureRule.
+  ///
+  /// In en, this message translates to:
+  /// **'A day that has not happened yet can only be marked as leave, sick or excused.'**
+  String get attendanceLogFutureRule;
+
+  /// No description provided for @attendanceTimeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a 24-hour time such as 08:00.'**
+  String get attendanceTimeInvalid;
+
+  /// No description provided for @attendanceShiftsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift schedules'**
+  String get attendanceShiftsTitle;
+
+  /// No description provided for @attendanceShiftsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the shifts your riders work, then open anyone’s monthly attendance.'**
+  String get attendanceShiftsSubtitle;
+
+  /// No description provided for @attendanceShiftsCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Shifts'**
+  String get attendanceShiftsCard;
+
+  /// No description provided for @attendanceAddShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Add shift'**
+  String get attendanceAddShift;
+
+  /// No description provided for @attendanceNoShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.'**
+  String get attendanceNoShifts;
+
+  /// No description provided for @attendanceShiftGrace.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min grace'**
+  String attendanceShiftGrace(int minutes);
+
+  /// No description provided for @attendanceShiftRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No riders} =1{1 rider} other{{count} riders}}'**
+  String attendanceShiftRiders(int count);
+
+  /// No description provided for @attendanceShiftOvernight.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends next day'**
+  String get attendanceShiftOvernight;
+
+  /// No description provided for @attendanceRetireShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Retire shift'**
+  String get attendanceRetireShift;
+
+  /// No description provided for @attendanceRetireBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the riders on this shift to another one first.'**
+  String get attendanceRetireBlocked;
+
+  /// No description provided for @attendanceShiftRetired.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift retired.'**
+  String get attendanceShiftRetired;
+
+  /// No description provided for @attendanceRidersCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders'**
+  String get attendanceRidersCard;
+
+  /// No description provided for @attendanceColRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider'**
+  String get attendanceColRider;
+
+  /// No description provided for @attendanceColCurrentShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get attendanceColCurrentShift;
+
+  /// No description provided for @attendanceColActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get attendanceColActions;
+
+  /// No description provided for @attendanceFreelancer.
+  ///
+  /// In en, this message translates to:
+  /// **'No schedule (freelancer)'**
+  String get attendanceFreelancer;
+
+  /// No description provided for @attendanceChangeShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Change shift'**
+  String get attendanceChangeShift;
+
+  /// No description provided for @attendanceOpenAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance'**
+  String get attendanceOpenAttendance;
+
+  /// No description provided for @attendanceUpcomingShift.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} from {date}'**
+  String attendanceUpcomingShift(String name, String date);
+
+  /// No description provided for @attendanceNoRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'No riders on your fleet yet.'**
+  String get attendanceNoRiders;
+
+  /// No description provided for @attendanceNewShiftTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New shift'**
+  String get attendanceNewShiftTitle;
+
+  /// No description provided for @attendanceShiftName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get attendanceShiftName;
+
+  /// No description provided for @attendanceShiftStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts (HH:mm)'**
+  String get attendanceShiftStart;
+
+  /// No description provided for @attendanceShiftEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends (HH:mm)'**
+  String get attendanceShiftEnd;
+
+  /// No description provided for @attendanceShiftDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get attendanceShiftDays;
+
+  /// No description provided for @attendanceShiftGraceField.
+  ///
+  /// In en, this message translates to:
+  /// **'Grace before late (minutes)'**
+  String get attendanceShiftGraceField;
+
+  /// No description provided for @attendanceShiftImmutable.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.'**
+  String get attendanceShiftImmutable;
+
+  /// No description provided for @attendanceCreateShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Create shift'**
+  String get attendanceCreateShift;
+
+  /// No description provided for @attendanceShiftCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift created.'**
+  String get attendanceShiftCreated;
+
+  /// No description provided for @attendanceShiftNeedsName.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the shift a name.'**
+  String get attendanceShiftNeedsName;
+
+  /// No description provided for @attendanceShiftNeedsDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at least one day.'**
+  String get attendanceShiftNeedsDays;
+
+  /// No description provided for @attendanceShiftSameTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'A shift cannot start and end at the same time.'**
+  String get attendanceShiftSameTimes;
+
+  /// No description provided for @attendanceGraceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a number of minutes from 0 to 120.'**
+  String get attendanceGraceInvalid;
+
+  /// No description provided for @attendanceAssignTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift for {name}'**
+  String attendanceAssignTitle(String name);
+
+  /// No description provided for @attendanceAssignFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting'**
+  String get attendanceAssignFrom;
+
+  /// No description provided for @attendanceAssignNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedules start today or later. Once today\'s shift has begun, or once the rider has worked today, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.'**
+  String get attendanceAssignNote;
+
+  /// No description provided for @attendanceAssignSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save schedule'**
+  String get attendanceAssignSave;
+
+  /// No description provided for @attendanceAssignSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule updated.'**
+  String get attendanceAssignSaved;
+
+  /// No description provided for @attendanceHistoryLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This month is older than the duty history the platform keeps, so it can no longer be shown.'**
+  String get attendanceHistoryLimit;
+
+  /// No description provided for @attendanceManualTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get attendanceManualTag;
+
+  /// No description provided for @attendanceTypedByHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Typed by hand in the Manual Attendance Log, not recorded by the app'**
+  String get attendanceTypedByHand;
+
+  /// No description provided for @attendanceLogPresentKeepsLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Present does not clear a late check-in. To excuse one, choose “Late, excused”.'**
+  String get attendanceLogPresentKeepsLate;
+
+  /// No description provided for @attendanceLogChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking this day for an existing entry…'**
+  String get attendanceLogChecking;
+
+  /// No description provided for @attendanceLogCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.'**
+  String get attendanceLogCheckFailed;
+
+  /// No description provided for @attendanceRetiredShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'Retired shifts ({count})'**
+  String attendanceRetiredShifts(int count);
+
+  /// No description provided for @attendanceRetireKeepsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.'**
+  String get attendanceRetireKeepsHistory;
+
+  /// No description provided for @attendanceLiveOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Live: no riders on duty} =1{Live: 1 rider on duty} other{Live: {count} riders on duty}}'**
+  String attendanceLiveOnDuty(int count);
+
+  /// No description provided for @carrRidersNavReconciliation.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation'**
+  String get carrRidersNavReconciliation;
+
+  /// No description provided for @carrRidersNavRidersHr.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders HR'**
+  String get carrRidersNavRidersHr;
+
+  /// No description provided for @carrRidersNavDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'Directory'**
+  String get carrRidersNavDirectory;
+
+  /// No description provided for @carrRidersNavStatement.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement'**
+  String get carrRidersNavStatement;
+
+  /// No description provided for @carrRidersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders HR Directory'**
+  String get carrRidersTitle;
+
+  /// No description provided for @carrRidersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage rider profiles, status and regions'**
+  String get carrRidersSubtitle;
+
+  /// No description provided for @carrRidersStatTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total onboarded riders'**
+  String get carrRidersStatTotal;
+
+  /// No description provided for @carrRidersStatTotalNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered company fleet'**
+  String get carrRidersStatTotalNote;
+
+  /// No description provided for @carrRidersStatOnDuty.
+  ///
+  /// In en, this message translates to:
+  /// **'Active on duty'**
+  String get carrRidersStatOnDuty;
+
+  /// No description provided for @carrRidersStatOnDutyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Available or on a job'**
+  String get carrRidersStatOnDutyNote;
+
+  /// No description provided for @carrRidersStatSignalLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal lost'**
+  String get carrRidersStatSignalLost;
+
+  /// No description provided for @carrRidersStatSignalLostNote.
+  ///
+  /// In en, this message translates to:
+  /// **'On duty, but their phone has gone quiet'**
+  String get carrRidersStatSignalLostNote;
+
+  /// No description provided for @carrRidersStatOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline / inactive'**
+  String get carrRidersStatOffline;
+
+  /// No description provided for @carrRidersStatOfflineNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Declared themselves off duty'**
+  String get carrRidersStatOfflineNote;
+
+  /// No description provided for @carrRidersPresenceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Presence could not be read just now'**
+  String get carrRidersPresenceUnknown;
+
+  /// No description provided for @carrRidersSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search riders by name, ID...'**
+  String get carrRidersSearchHint;
+
+  /// No description provided for @carrRidersZoneAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone: All'**
+  String get carrRidersZoneAll;
+
+  /// No description provided for @carrRidersZoneValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone: {zone}'**
+  String carrRidersZoneValue(String zone);
+
+  /// No description provided for @carrRidersZoneTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'A zone here is the region each rider wrote on their application'**
+  String get carrRidersZoneTooltip;
+
+  /// No description provided for @carrRidersVehicleAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle: All'**
+  String get carrRidersVehicleAll;
+
+  /// No description provided for @carrRidersVehicleValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle: {vehicle}'**
+  String carrRidersVehicleValue(String vehicle);
+
+  /// No description provided for @carrRidersVehicleMotorcycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorcycle'**
+  String get carrRidersVehicleMotorcycle;
+
+  /// No description provided for @carrRidersVehicleCar.
+  ///
+  /// In en, this message translates to:
+  /// **'Car'**
+  String get carrRidersVehicleCar;
+
+  /// No description provided for @carrRidersVehicleBicycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bicycle'**
+  String get carrRidersVehicleBicycle;
+
+  /// No description provided for @carrRidersVehicleVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van'**
+  String get carrRidersVehicleVan;
+
+  /// No description provided for @carrRidersVehicleTruck.
+  ///
+  /// In en, this message translates to:
+  /// **'Truck'**
+  String get carrRidersVehicleTruck;
+
+  /// No description provided for @carrRidersAddRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Rider'**
+  String get carrRidersAddRider;
+
+  /// No description provided for @carrRidersAddRiderTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve somebody who has applied to ride for you'**
+  String get carrRidersAddRiderTooltip;
+
+  /// No description provided for @carrRidersAddRiderUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Applications could not be read just now, so nobody can be approved from here'**
+  String get carrRidersAddRiderUnavailable;
+
+  /// No description provided for @carrRidersManageProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Profile'**
+  String get carrRidersManageProfile;
+
+  /// No description provided for @carrRidersDeliveredToday.
+  ///
+  /// In en, this message translates to:
+  /// **'({count} today)'**
+  String carrRidersDeliveredToday(int count);
+
+  /// No description provided for @carrRidersRatingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get carrRidersRatingNew;
+
+  /// No description provided for @carrRidersStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get carrRidersStatusActive;
+
+  /// No description provided for @carrRidersStatusSignalLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal lost'**
+  String get carrRidersStatusSignalLost;
+
+  /// No description provided for @carrRidersStatusOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get carrRidersStatusOffline;
+
+  /// No description provided for @carrRidersStatusSuspended.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended'**
+  String get carrRidersStatusSuspended;
+
+  /// No description provided for @carrRidersStatusOnAJob.
+  ///
+  /// In en, this message translates to:
+  /// **'On a job'**
+  String get carrRidersStatusOnAJob;
+
+  /// No description provided for @carrRidersNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No rider matches that.'**
+  String get carrRidersNoMatch;
+
+  /// No description provided for @carrRidersShowingOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing only: {filter}'**
+  String carrRidersShowingOnly(String filter);
+
+  /// No description provided for @carrRidersShowEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Show everyone'**
+  String get carrRidersShowEveryone;
+
+  /// No description provided for @carrRidersDirectoryFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone is the region each rider gave on their application — the platform does not assign riders to your coverage zones. Rating is what customers left across all of a rider\'s deliveries. Presence reaches this page once a rider has carried your work, so a rider who has not yet shows none.'**
+  String get carrRidersDirectoryFootnote;
+
+  /// No description provided for @carrRidersWaitingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a rider'**
+  String get carrRidersWaitingTitle;
+
+  /// No description provided for @carrRidersWaitingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nobody is waiting to ride for you} =1{1 person waiting to ride for you} other{{count} people waiting to ride for you}}'**
+  String carrRidersWaitingCount(int count);
+
+  /// No description provided for @carrRidersWaitingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody has applied to ride for you. Riders reach a fleet by applying — there is no way to create one directly.'**
+  String get carrRidersWaitingEmpty;
+
+  /// No description provided for @carrRidersApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get carrRidersApprove;
+
+  /// No description provided for @carrRidersOnYourFleet.
+  ///
+  /// In en, this message translates to:
+  /// **'On your fleet'**
+  String get carrRidersOnYourFleet;
+
+  /// No description provided for @carrRidersSuspendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend {name}'**
+  String carrRidersSuspendTitle(String name);
+
+  /// No description provided for @carrRidersReinstateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinstate {name}'**
+  String carrRidersReinstateTitle(String name);
+
+  /// No description provided for @carrRidersSuspendBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They keep their sign-in and their history, and stop being offered work. You can reinstate them at any time.'**
+  String get carrRidersSuspendBody;
+
+  /// No description provided for @carrRidersReinstateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They can be offered work again from the moment this is saved.'**
+  String get carrRidersReinstateBody;
+
+  /// No description provided for @carrRidersChooseReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason'**
+  String get carrRidersChooseReason;
+
+  /// No description provided for @carrRidersNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A note for the record (optional)'**
+  String get carrRidersNoteHint;
+
+  /// No description provided for @carrRidersSuspendRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspend Rider'**
+  String get carrRidersSuspendRider;
+
+  /// No description provided for @carrRidersReinstateRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinstate Rider'**
+  String get carrRidersReinstateRider;
+
+  /// No description provided for @carrRidersSuspendedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is suspended and will not be offered work.'**
+  String carrRidersSuspendedToast(String name);
+
+  /// No description provided for @carrRidersReinstatedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} can take work again.'**
+  String carrRidersReinstatedToast(String name);
+
+  /// No description provided for @carrRidersReasonFraud.
+  ///
+  /// In en, this message translates to:
+  /// **'Fraud'**
+  String get carrRidersReasonFraud;
+
+  /// No description provided for @carrRidersReasonAbuse.
+  ///
+  /// In en, this message translates to:
+  /// **'Abuse'**
+  String get carrRidersReasonAbuse;
+
+  /// No description provided for @carrRidersReasonNonPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-payment'**
+  String get carrRidersReasonNonPayment;
+
+  /// No description provided for @carrRidersReasonPolicyViolation.
+  ///
+  /// In en, this message translates to:
+  /// **'Policy violation'**
+  String get carrRidersReasonPolicyViolation;
+
+  /// No description provided for @carrRidersReasonPartnerRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner request'**
+  String get carrRidersReasonPartnerRequest;
+
+  /// No description provided for @carrRidersReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get carrRidersReasonOther;
+
+  /// No description provided for @carrRidersProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider HR Profile'**
+  String get carrRidersProfileTitle;
+
+  /// No description provided for @carrRidersProfileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents, employment details and performance'**
+  String get carrRidersProfileSubtitle;
+
+  /// No description provided for @carrRidersBackToDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to riders'**
+  String get carrRidersBackToDirectory;
+
+  /// No description provided for @carrRidersBadgeId.
+  ///
+  /// In en, this message translates to:
+  /// **'Badge ID: {code}'**
+  String carrRidersBadgeId(String code);
+
+  /// No description provided for @carrRidersPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get carrRidersPhone;
+
+  /// No description provided for @carrRidersEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get carrRidersEmail;
+
+  /// No description provided for @carrRidersLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen'**
+  String get carrRidersLastSeen;
+
+  /// No description provided for @carrRidersNoPresenceYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No duty or location yet'**
+  String get carrRidersNoPresenceYet;
+
+  /// No description provided for @carrRidersStaleNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Declared on duty, but the last location is too old to dispatch on.'**
+  String get carrRidersStaleNote;
+
+  /// No description provided for @carrRidersNoApplication.
+  ///
+  /// In en, this message translates to:
+  /// **'The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.'**
+  String get carrRidersNoApplication;
+
+  /// No description provided for @carrRidersDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents Verification'**
+  String get carrRidersDocumentsTitle;
+
+  /// No description provided for @carrRidersDocNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get carrRidersDocNationalId;
+
+  /// No description provided for @carrRidersDocDrivingLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence'**
+  String get carrRidersDocDrivingLicence;
+
+  /// No description provided for @carrRidersDocVehicleRegistration.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle registration'**
+  String get carrRidersDocVehicleRegistration;
+
+  /// No description provided for @carrRidersDocVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get carrRidersDocVerified;
+
+  /// No description provided for @carrRidersDocWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get carrRidersDocWaiting;
+
+  /// No description provided for @carrRidersDocRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get carrRidersDocRefused;
+
+  /// No description provided for @carrRidersDocNotUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not uploaded'**
+  String get carrRidersDocNotUploaded;
+
+  /// No description provided for @carrRidersDocOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the document'**
+  String get carrRidersDocOpen;
+
+  /// No description provided for @carrRidersCouldNotRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not be read just now.'**
+  String get carrRidersCouldNotRead;
+
+  /// No description provided for @carrRidersAvgRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg rating'**
+  String get carrRidersAvgRating;
+
+  /// No description provided for @carrRidersHappyCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% happy customers'**
+  String carrRidersHappyCustomers(int percent);
+
+  /// No description provided for @carrRidersNoRatingsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No ratings yet'**
+  String get carrRidersNoRatingsYet;
+
+  /// No description provided for @carrRidersDeliveriesWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries, last {days} days'**
+  String carrRidersDeliveriesWindow(int days);
+
+  /// No description provided for @carrRidersClaimedCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'{claimed} claimed, {cancelled} cancelled after claiming'**
+  String carrRidersClaimedCaption(int claimed, int cancelled);
+
+  /// No description provided for @carrRidersCompletionRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion rate'**
+  String get carrRidersCompletionRate;
+
+  /// No description provided for @carrRidersCompletionCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered out of claimed, for your company'**
+  String get carrRidersCompletionCaption;
+
+  /// No description provided for @carrRidersNothingClaimed.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing claimed in this window'**
+  String get carrRidersNothingClaimed;
+
+  /// No description provided for @carrRidersDeliveredTodayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered today'**
+  String get carrRidersDeliveredTodayLabel;
+
+  /// No description provided for @carrRidersDeliveredTodayCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'For your company, since midnight'**
+  String get carrRidersDeliveredTodayCaption;
+
+  /// No description provided for @carrRidersOutputTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery output, last {days} days'**
+  String carrRidersOutputTitle(int days);
+
+  /// No description provided for @carrRidersOutputEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No deliveries in this period'**
+  String get carrRidersOutputEmpty;
+
+  /// No description provided for @carrRidersOutputNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Days are split in the {zone} time zone, and only deliveries made for your company are counted.'**
+  String carrRidersOutputNote(String zone);
+
+  /// No description provided for @carrRidersHoursTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours online, last {days} days'**
+  String carrRidersHoursTitle(int days);
+
+  /// No description provided for @carrRidersHoursValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h'**
+  String carrRidersHoursValue(String hours);
+
+  /// No description provided for @carrRidersHoursTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h in total'**
+  String carrRidersHoursTotal(String hours);
+
+  /// No description provided for @carrRidersShifts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 shift} other{{count} shifts}}'**
+  String carrRidersShifts(int count);
+
+  /// No description provided for @carrRidersHoursNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No hours online to show for your company.'**
+  String get carrRidersHoursNone;
+
+  /// No description provided for @carrRidersHoursZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Days are split in the {zone} time zone, as the server reports them.'**
+  String carrRidersHoursZone(String zone);
+
+  /// No description provided for @carrRidersEmploymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Employment Details'**
+  String get carrRidersEmploymentTitle;
+
+  /// No description provided for @carrRidersStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get carrRidersStartDate;
+
+  /// No description provided for @carrRidersApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get carrRidersApplied;
+
+  /// No description provided for @carrRidersRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Region (from their application)'**
+  String get carrRidersRegion;
+
+  /// No description provided for @carrRidersVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle'**
+  String get carrRidersVehicle;
+
+  /// No description provided for @carrRidersEmploymentNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract type, pay rate and zone assignment are not recorded on this platform.'**
+  String get carrRidersEmploymentNote;
+
+  /// No description provided for @carrRidersSuspendUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspending works through a rider\'s application to you. The platform attached this rider directly, so ask YouDrop to suspend them.'**
+  String get carrRidersSuspendUnavailable;
+
+  /// No description provided for @carrRidersTerminate.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminate Contract'**
+  String get carrRidersTerminate;
+
+  /// No description provided for @carrRidersTerminateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'End {name}\'s contract?'**
+  String carrRidersTerminateTitle(String name);
+
+  /// No description provided for @carrRidersTerminateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop\'s own riders: they can take no work at all until another company hires them or YouDrop takes them on.'**
+  String carrRidersTerminateBody(String name);
+
+  /// No description provided for @carrRidersTerminateJobs.
+  ///
+  /// In en, this message translates to:
+  /// **'Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.'**
+  String get carrRidersTerminateJobs;
+
+  /// No description provided for @carrRidersTerminateMoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.'**
+  String get carrRidersTerminateMoney;
+
+  /// No description provided for @carrRidersTerminateUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking them back later means hiring them again.'**
+  String get carrRidersTerminateUndo;
+
+  /// No description provided for @carrRidersTerminateConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminate contract'**
+  String get carrRidersTerminateConfirm;
+
+  /// No description provided for @carrRidersTerminated.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is no longer on your fleet.'**
+  String carrRidersTerminated(String name);
+
+  /// No description provided for @carrRidersTerminateCarrying.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.} other{They are carrying {count} of your jobs right now. Their contract can end once those are delivered or cancelled.}}'**
+  String carrRidersTerminateCarrying(int count);
+
+  /// No description provided for @carrRidersNotOnFleet.
+  ///
+  /// In en, this message translates to:
+  /// **'This rider is no longer on your fleet.'**
+  String get carrRidersNotOnFleet;
+
+  /// No description provided for @carrRidersNoPresenceCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more has no duty or location yet} other{{count} more have no duty or location yet}}'**
+  String carrRidersNoPresenceCount(int count);
+
+  /// No description provided for @carrRidersNoPresenceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.'**
+  String get carrRidersNoPresenceNote;
+
+  /// No description provided for @carrRidersVehicleModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle model'**
+  String get carrRidersVehicleModel;
+
+  /// No description provided for @carrRidersPlateNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate number'**
+  String get carrRidersPlateNumber;
+
+  /// No description provided for @carrRidersDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth'**
+  String get carrRidersDateOfBirth;
+
+  /// No description provided for @carrRidersNationalIdNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID number'**
+  String get carrRidersNationalIdNumber;
+
+  /// No description provided for @carrRidersDutyChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Duty last changed'**
+  String get carrRidersDutyChanged;
+
+  /// No description provided for @carrRidersVehicleYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle year'**
+  String get carrRidersVehicleYear;
+
+  /// No description provided for @carrRidersTerminateReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason, kept on record'**
+  String get carrRidersTerminateReason;
+
+  /// No description provided for @carrRidersTerminateReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Why is this contract ending?'**
+  String get carrRidersTerminateReasonHint;
+
+  /// No description provided for @carrRidersStatusStandingUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing unknown'**
+  String get carrRidersStatusStandingUnknown;
+
+  /// No description provided for @carrRidersStandingUnknownNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.'**
+  String get carrRidersStandingUnknownNote;
+
+  /// No description provided for @attendanceBackToProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to profile'**
+  String get attendanceBackToProfile;
+
+  /// No description provided for @blitzTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant Blitz'**
+  String get blitzTitle;
+
+  /// No description provided for @blitzSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your catalogue from shelf photos'**
+  String get blitzSubtitle;
+
+  /// No description provided for @blitzFastSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast setup'**
+  String get blitzFastSetup;
+
+  /// No description provided for @blitzStepScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan shop'**
+  String get blitzStepScan;
+
+  /// No description provided for @blitzStepCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check items'**
+  String get blitzStepCheck;
+
+  /// No description provided for @blitzStepSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save drafts'**
+  String get blitzStepSave;
+
+  /// No description provided for @blitzStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, done'**
+  String blitzStepDone(String step);
+
+  /// No description provided for @blitzStepCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, current step'**
+  String blitzStepCurrent(String step);
+
+  /// No description provided for @blitzIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph your shelves, skip the typing'**
+  String get blitzIntroTitle;
+
+  /// No description provided for @blitzIntroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo of each shelf. We read the product names and sizes and suggest a section and a price, and you check every item before anything is saved.'**
+  String get blitzIntroBody;
+
+  /// No description provided for @blitzTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get blitzTakePhoto;
+
+  /// No description provided for @blitzChoosePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose photos'**
+  String get blitzChoosePhotos;
+
+  /// No description provided for @blitzPhotoCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos: {count} of {max}'**
+  String blitzPhotoCount(int count, int max);
+
+  /// No description provided for @blitzPhotoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf photo {number}'**
+  String blitzPhotoLabel(int number);
+
+  /// No description provided for @blitzUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading photo {current} of {total}…'**
+  String blitzUploading(int current, int total);
+
+  /// No description provided for @blitzScanPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Scan 1 photo} other{Scan {count} photos}}'**
+  String blitzScanPhotos(int count);
+
+  /// No description provided for @blitzAnalyzing.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading your shelves…'**
+  String get blitzAnalyzing;
+
+  /// No description provided for @blitzAnalyzingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This can take a minute or two. Keep this screen open.'**
+  String get blitzAnalyzingHint;
+
+  /// No description provided for @blitzScanComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete'**
+  String get blitzScanComplete;
+
+  /// No description provided for @blitzItemsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No items} =1{1 item} other{{count} items}}'**
+  String blitzItemsFound(int count);
+
+  /// No description provided for @blitzSampleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample items'**
+  String get blitzSampleTitle;
+
+  /// No description provided for @blitzSampleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo reader isn\'t switched on yet, so these are example items, not what\'s on your shelves. Skip any you don\'t sell.'**
+  String get blitzSampleBody;
+
+  /// No description provided for @blitzNoneFound.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t recognise any products in these photos.'**
+  String get blitzNoneFound;
+
+  /// No description provided for @blitzNoneFoundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try closer photos with the labels facing the camera.'**
+  String get blitzNoneFoundHint;
+
+  /// No description provided for @blitzNewScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new scan'**
+  String get blitzNewScan;
+
+  /// No description provided for @blitzReviewCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and save as drafts'**
+  String get blitzReviewCta;
+
+  /// No description provided for @blitzFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing reaches customers until you publish it.'**
+  String get blitzFooter;
+
+  /// No description provided for @blitzScansLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No scans left today} =1{1 scan left today} other{{count} scans left today}}'**
+  String blitzScansLeft(int count);
+
+  /// No description provided for @blitzQuotaReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve used today\'s {limit} scans. Try again tomorrow.'**
+  String blitzQuotaReached(int limit);
+
+  /// No description provided for @blitzFailedRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'These photos couldn\'t be read. Try clear photos of your shop\'s shelves.'**
+  String get blitzFailedRefused;
+
+  /// No description provided for @blitzFailedUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the photos couldn\'t be opened. Try taking it again.'**
+  String get blitzFailedUnreadable;
+
+  /// No description provided for @blitzFailedProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo reader didn\'t answer.'**
+  String get blitzFailedProvider;
+
+  /// No description provided for @blitzFailedBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Many shops are scanning right now. Try again in a minute.'**
+  String get blitzFailedBusy;
+
+  /// No description provided for @blitzFailedInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'The scan was interrupted before it finished.'**
+  String get blitzFailedInterrupted;
+
+  /// No description provided for @blitzFailedOther.
+  ///
+  /// In en, this message translates to:
+  /// **'The scan didn\'t finish.'**
+  String get blitzFailedOther;
+
+  /// No description provided for @blitzNoRetriesLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'This scan can\'t be tried again. Start a new one.'**
+  String get blitzNoRetriesLeft;
+
+  /// No description provided for @blitzCameraFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera didn\'t open. Choose a photo instead.'**
+  String get blitzCameraFailed;
+
+  /// No description provided for @blitzUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'A photo didn\'t upload. Check your connection and try again.'**
+  String get blitzUploadFailed;
+
+  /// No description provided for @blitzCouldNotStart.
+  ///
+  /// In en, this message translates to:
+  /// **'The scan couldn\'t start.'**
+  String get blitzCouldNotStart;
+
+  /// No description provided for @blitzConnectionLost.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check on the scan. Check your connection.'**
+  String get blitzConnectionLost;
+
+  /// No description provided for @blitzTag.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · about {price}'**
+  String blitzTag(String name, String price);
+
+  /// No description provided for @blitzReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check items'**
+  String get blitzReviewTitle;
+
+  /// No description provided for @blitzReviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What you keep is saved as a draft'**
+  String get blitzReviewSubtitle;
+
+  /// No description provided for @blitzKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get blitzKeep;
+
+  /// No description provided for @blitzKeepItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep {name}'**
+  String blitzKeepItem(String name);
+
+  /// No description provided for @blitzName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get blitzName;
+
+  /// No description provided for @blitzPriceUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'Price (USD)'**
+  String get blitzPriceUsd;
+
+  /// No description provided for @blitzSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Section'**
+  String get blitzSection;
+
+  /// No description provided for @blitzNoSection.
+  ///
+  /// In en, this message translates to:
+  /// **'No section'**
+  String get blitzNoSection;
+
+  /// No description provided for @blitzGuess.
+  ///
+  /// In en, this message translates to:
+  /// **'Guess: {price}'**
+  String blitzGuess(String price);
+
+  /// No description provided for @blitzUseGuess.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this price'**
+  String get blitzUseGuess;
+
+  /// No description provided for @blitzCheckThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sure of this one — check it'**
+  String get blitzCheckThis;
+
+  /// No description provided for @blitzNeedName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name'**
+  String get blitzNeedName;
+
+  /// No description provided for @blitzNeedPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a price above 0'**
+  String get blitzNeedPrice;
+
+  /// No description provided for @blitzPriceDecimals.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at most two decimals'**
+  String get blitzPriceDecimals;
+
+  /// No description provided for @blitzSaveDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nothing to save} =1{Save 1 draft} other{Save {count} drafts}}'**
+  String blitzSaveDrafts(int count);
+
+  /// No description provided for @blitzSkipAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip all items'**
+  String get blitzSkipAll;
+
+  /// No description provided for @blitzFixItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the marked items first.'**
+  String get blitzFixItems;
+
+  /// No description provided for @blitzSavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved as drafts'**
+  String get blitzSavedTitle;
+
+  /// No description provided for @blitzSavedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No products were added.} =1{1 product was added to your catalogue as a draft.} other{{count} products were added to your catalogue as drafts.}}'**
+  String blitzSavedCount(int count);
+
+  /// No description provided for @blitzSavedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafts stay hidden from customers. Add a photo to each one, then publish it from Inventory.'**
+  String get blitzSavedHint;
+
+  /// No description provided for @blitzDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get blitzDone;
+
+  /// No description provided for @blitzAlreadySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get blitzAlreadySaved;
+
+  /// No description provided for @blitzTooManyPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'A scan takes {max} photos at most, so the extra ones weren\'t added.'**
+  String blitzTooManyPhotos(int max);
+
+  /// No description provided for @blitzSectionsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sections couldn\'t load, so each item keeps the section we suggested.'**
+  String get blitzSectionsUnavailable;
+
+  /// No description provided for @blitzEntryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan shelves'**
+  String get blitzEntryAction;
+
+  /// No description provided for @blitzSettingsRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Build catalogue from photos'**
+  String get blitzSettingsRow;
+
+  /// No description provided for @blitzSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save. Check your connection and try again.'**
+  String get blitzSaveFailed;
+
+  /// No description provided for @blitzSavedEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'These items had already been saved.'**
+  String get blitzSavedEarlier;
+
+  /// No description provided for @blitzListChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items were already decided elsewhere, so they\'ve left the list. Check the rest and save again.'**
+  String get blitzListChanged;
+
+  /// No description provided for @giftHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a Gift'**
+  String get giftHubTitle;
+
+  /// No description provided for @giftHubBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remittance Made Real'**
+  String get giftHubBannerTitle;
+
+  /// No description provided for @giftHubBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Support your loved ones in Lebanon. Choose real essentials, groceries or hot meals, delivered to their door — often the same day.'**
+  String get giftHubBannerBody;
+
+  /// No description provided for @giftHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get giftHowItWorks;
+
+  /// No description provided for @giftStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from local shops'**
+  String get giftStep1Title;
+
+  /// No description provided for @giftStep1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick groceries, sweets, pharmacy items or a ready-made care bundle.'**
+  String get giftStep1Body;
+
+  /// No description provided for @giftStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter their address in Lebanon'**
+  String get giftStep2Title;
+
+  /// No description provided for @giftStep2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'We deliver wherever the shop you choose delivers.'**
+  String get giftStep2Body;
+
+  /// No description provided for @giftStep3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Same-day delivery'**
+  String get giftStep3Title;
+
+  /// No description provided for @giftStep3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider hands it over with your personal note — the same day, while the shop is open.'**
+  String get giftStep3Body;
+
+  /// No description provided for @giftCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift categories'**
+  String get giftCategories;
+
+  /// No description provided for @giftCatCarePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Care Package'**
+  String get giftCatCarePackage;
+
+  /// No description provided for @giftCatGroceries.
+  ///
+  /// In en, this message translates to:
+  /// **'Groceries'**
+  String get giftCatGroceries;
+
+  /// No description provided for @giftCatMedicine.
+  ///
+  /// In en, this message translates to:
+  /// **'Medicine & Health'**
+  String get giftCatMedicine;
+
+  /// No description provided for @giftRecentRecipients.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent recipients'**
+  String get giftRecentRecipients;
+
+  /// No description provided for @giftAddRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a recipient'**
+  String get giftAddRecipient;
+
+  /// No description provided for @giftFeaturedBundles.
+  ///
+  /// In en, this message translates to:
+  /// **'Featured care bundles'**
+  String get giftFeaturedBundles;
+
+  /// No description provided for @giftSameDayDeliverable.
+  ///
+  /// In en, this message translates to:
+  /// **'Same-day deliverable'**
+  String get giftSameDayDeliverable;
+
+  /// No description provided for @giftHomeEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a gift to Lebanon'**
+  String get giftHomeEntryTitle;
+
+  /// No description provided for @giftHomeEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Groceries, sweets and care bundles for family, delivered to their door'**
+  String get giftHomeEntrySub;
+
+  /// No description provided for @giftDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift Details'**
+  String get giftDetailsTitle;
+
+  /// No description provided for @giftCheckoutSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Diaspora Checkout'**
+  String get giftCheckoutSub;
+
+  /// No description provided for @giftRecipientInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient information'**
+  String get giftRecipientInfo;
+
+  /// No description provided for @giftRecipientName.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient name'**
+  String get giftRecipientName;
+
+  /// No description provided for @giftRecipientNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Who is receiving it?'**
+  String get giftRecipientNameRequired;
+
+  /// No description provided for @giftRecipientPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number (Lebanon)'**
+  String get giftRecipientPhone;
+
+  /// No description provided for @giftPhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a Lebanese number, e.g. 71 234 567'**
+  String get giftPhoneInvalid;
+
+  /// No description provided for @giftDeliveryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery date'**
+  String get giftDeliveryDate;
+
+  /// No description provided for @giftNoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach a personal note'**
+  String get giftNoteTitle;
+
+  /// No description provided for @giftNoteHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'The shop sends your note with the gift.'**
+  String get giftNoteHelper;
+
+  /// No description provided for @giftWrapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium gift wrapping'**
+  String get giftWrapTitle;
+
+  /// No description provided for @giftWrapSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Festive wrapping, with your note on a card (+{amount})'**
+  String giftWrapSubtitle(String amount);
+
+  /// No description provided for @giftPaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get giftPaymentTitle;
+
+  /// No description provided for @giftCashNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Gifts are paid online — the person receiving it is never asked to pay.'**
+  String get giftCashNotAllowed;
+
+  /// No description provided for @giftNoPaymentMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Gifts are paid online, and online payment isn\'t switched on yet — so a gift can\'t be sent right now.'**
+  String get giftNoPaymentMethods;
+
+  /// No description provided for @giftTermsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load the gift\'s payment options.'**
+  String get giftTermsFailed;
+
+  /// No description provided for @giftOfflineCannotWait.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift can\'t wait for the connection the way a cash order can — it\'s paid online. Send it once you\'re back online.'**
+  String get giftOfflineCannotWait;
+
+  /// No description provided for @giftOrderSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Order summary'**
+  String get giftOrderSummary;
+
+  /// No description provided for @giftLineQty.
+  ///
+  /// In en, this message translates to:
+  /// **'{qty}× {name}'**
+  String giftLineQty(int qty, String name);
+
+  /// No description provided for @giftWrapLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift wrapping'**
+  String get giftWrapLine;
+
+  /// No description provided for @giftDeliveryFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery fee'**
+  String get giftDeliveryFee;
+
+  /// No description provided for @giftTotalUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'Total USD'**
+  String get giftTotalUsd;
+
+  /// No description provided for @giftApproxLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {amount}'**
+  String giftApproxLbp(String amount);
+
+  /// No description provided for @giftTotalConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'The final total is confirmed when your gift is placed.'**
+  String get giftTotalConfirmed;
+
+  /// No description provided for @giftSendAndPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Gift & Pay'**
+  String get giftSendAndPay;
+
+  /// No description provided for @giftForName.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift for {name}'**
+  String giftForName(String name);
+
+  /// No description provided for @giftWrapRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift wrapping requested'**
+  String get giftWrapRequested;
+
+  /// No description provided for @giftCardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Card message'**
+  String get giftCardMessage;
+
+  /// No description provided for @giftRecipientPhoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient\'s phone'**
+  String get giftRecipientPhoneLabel;
+
+  /// No description provided for @giftBasketBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending this basket as a gift'**
+  String get giftBasketBanner;
+
+  /// No description provided for @giftBasketNotGift.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a gift'**
+  String get giftBasketNotGift;
+
+  /// No description provided for @giftDeliveredToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today, while the shop is open'**
+  String get giftDeliveredToday;
+
+  /// No description provided for @giftNoteLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String giftNoteLength(int used, int max);
+
+  /// No description provided for @giftUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift — who it\'s for shows once it\'s yours to carry'**
+  String get giftUnnamed;
+
+  /// No description provided for @heatmapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand Radar'**
+  String get heatmapTitle;
+
+  /// No description provided for @heatmapSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time neighborhood pulses'**
+  String get heatmapSubtitle;
+
+  /// No description provided for @heatmapActiveOrderDensities.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Order Densities'**
+  String get heatmapActiveOrderDensities;
+
+  /// No description provided for @heatmapLiveSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Syncing'**
+  String get heatmapLiveSyncing;
+
+  /// No description provided for @heatmapCantRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t refresh right now'**
+  String get heatmapCantRefresh;
+
+  /// No description provided for @heatmapLevelHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get heatmapLevelHigh;
+
+  /// No description provided for @heatmapLevelMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Med'**
+  String get heatmapLevelMedium;
+
+  /// No description provided for @heatmapLevelLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get heatmapLevelLow;
+
+  /// A map label: an area name and how busy it is, e.g. "Hamra (High)".
+  ///
+  /// In en, this message translates to:
+  /// **'{zone} ({level})'**
+  String heatmapZoneWithLevel(String zone, String level);
+
+  /// No description provided for @heatmapWindowHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Last hour'**
+  String get heatmapWindowHour;
+
+  /// No description provided for @heatmapWindowDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 24 hours'**
+  String get heatmapWindowDay;
+
+  /// No description provided for @heatmapWindowWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get heatmapWindowWeek;
+
+  /// No description provided for @heatmapAreasTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas around your shop'**
+  String get heatmapAreasTitle;
+
+  /// No description provided for @heatmapNotOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on the map yet'**
+  String get heatmapNotOnMap;
+
+  /// No description provided for @heatmapNoneOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'These areas aren\'t on the map yet'**
+  String get heatmapNoneOnMap;
+
+  /// No description provided for @heatmapMapUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The map can\'t load right now'**
+  String get heatmapMapUnavailable;
+
+  /// No description provided for @heatmapNoAreaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t know your neighbourhood yet'**
+  String get heatmapNoAreaTitle;
+
+  /// No description provided for @heatmapNoAreaMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand shows for the mapped areas near your shop\'s pin. Drop your pin if you haven\'t yet, and nearby areas will appear here once they\'re on the map.'**
+  String get heatmapNoAreaMessage;
+
+  /// No description provided for @heatmapNotEnoughTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough orders nearby yet'**
+  String get heatmapNotEnoughTitle;
+
+  /// The privacy floor: how many different customers an area needs before it is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{An area appears once {count} different customers have ordered there in this period, so no single customer can be picked out.}}'**
+  String heatmapNotEnoughMessage(int count);
+
+  /// No description provided for @heatmapCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load demand right now'**
+  String get heatmapCouldNotLoad;
+
+  /// No description provided for @heatmapNoShopMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand around your shop shows here once your shop is set up.'**
+  String get heatmapNoShopMessage;
+
+  /// No description provided for @heatmapEntryBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'See which neighbourhoods around your shop are ordering'**
+  String get heatmapEntryBlurb;
+
+  /// No description provided for @heatmapZoneCentreLatitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Centre latitude (optional)'**
+  String get heatmapZoneCentreLatitude;
+
+  /// No description provided for @heatmapZoneCentreLongitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Centre longitude (optional)'**
+  String get heatmapZoneCentreLongitude;
+
+  /// No description provided for @heatmapZoneCentreHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Roughly the middle of the area. It places the area on merchants\' demand map; pricing never uses it.'**
+  String get heatmapZoneCentreHelp;
+
+  /// No description provided for @heatmapZoneCentreBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter both, or leave both empty'**
+  String get heatmapZoneCentreBoth;
+
+  /// No description provided for @heatmapZoneCentreLatRange.
+  ///
+  /// In en, this message translates to:
+  /// **'A latitude between -90 and 90'**
+  String get heatmapZoneCentreLatRange;
+
+  /// No description provided for @heatmapZoneCentreLngRange.
+  ///
+  /// In en, this message translates to:
+  /// **'A longitude between -180 and 180'**
+  String get heatmapZoneCentreLngRange;
+
+  /// No description provided for @heatmapZoneOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'On the demand map'**
+  String get heatmapZoneOnMap;
+
+  /// No description provided for @heatmapZoneNotOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on the demand map'**
+  String get heatmapZoneNotOnMap;
+
+  /// No description provided for @heatmapSubtitleDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood pulses over the last 24 hours'**
+  String get heatmapSubtitleDay;
+
+  /// No description provided for @heatmapSubtitleWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighborhood pulses over the last 7 days'**
+  String get heatmapSubtitleWeek;
+
+  /// No description provided for @heatmapUpdatedHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated every hour'**
+  String get heatmapUpdatedHourly;
+
+  /// No description provided for @heatmapUpdatedDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated once a day'**
+  String get heatmapUpdatedDaily;
+
+  /// No description provided for @heatmapLegendRelative.
+  ///
+  /// In en, this message translates to:
+  /// **'Compared with the busiest area around you'**
+  String get heatmapLegendRelative;
+
+  /// No description provided for @heatmapNotLiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shop isn\'t live yet'**
+  String get heatmapNotLiveTitle;
+
+  /// No description provided for @heatmapNotLiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Demand around your shop shows here once your shop is published.'**
+  String get heatmapNotLiveMessage;
+
+  /// No description provided for @payrollNavLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get payrollNavLabel;
+
+  /// No description provided for @payrollTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Payroll & Earnings Management'**
+  String get payrollTitle;
+
+  /// No description provided for @payrollSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve payouts, calculate bonuses, and track payouts history'**
+  String get payrollSubtitle;
+
+  /// No description provided for @payrollPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay Period: {from} – {to}'**
+  String payrollPeriodLabel(String from, String to);
+
+  /// No description provided for @payrollPeriodTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a pay period'**
+  String get payrollPeriodTooltip;
+
+  /// No description provided for @payrollPeriodOption.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} – {to} · {state}'**
+  String payrollPeriodOption(String from, String to, String state);
+
+  /// No description provided for @payrollRulesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay rules'**
+  String get payrollRulesButton;
+
+  /// No description provided for @payrollExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Payslips'**
+  String get payrollExport;
+
+  /// No description provided for @payrollExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {file}.'**
+  String payrollExported(String file);
+
+  /// No description provided for @payrollStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start pay run'**
+  String get payrollStart;
+
+  /// No description provided for @payrollRecompute.
+  ///
+  /// In en, this message translates to:
+  /// **'Recompute'**
+  String get payrollRecompute;
+
+  /// No description provided for @payrollApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve pay run'**
+  String get payrollApprove;
+
+  /// No description provided for @payrollPayAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Record All Payments'**
+  String get payrollPayAll;
+
+  /// No description provided for @payrollDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard draft'**
+  String get payrollDiscard;
+
+  /// No description provided for @payrollKpiPool.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Payroll Pool'**
+  String get payrollKpiPool;
+
+  /// No description provided for @payrollKpiPoolNote.
+  ///
+  /// In en, this message translates to:
+  /// **'To pay for {from} – {to}'**
+  String payrollKpiPoolNote(String from, String to);
+
+  /// No description provided for @payrollKpiRiders.
+  ///
+  /// In en, this message translates to:
+  /// **'Riders on Payroll'**
+  String get payrollKpiRiders;
+
+  /// No description provided for @payrollKpiRidersValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No riders} =1{1 Rider} other{{count} Riders}}'**
+  String payrollKpiRidersValue(int count);
+
+  /// No description provided for @payrollKpiRidersNote.
+  ///
+  /// In en, this message translates to:
+  /// **'With a payslip this period'**
+  String get payrollKpiRidersNote;
+
+  /// No description provided for @payrollKpiAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average Rider Earnings'**
+  String get payrollKpiAverage;
+
+  /// No description provided for @payrollKpiAverageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Per {days}-day period'**
+  String payrollKpiAverageNote(int days);
+
+  /// No description provided for @payrollKpiBonuses.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonuses'**
+  String get payrollKpiBonuses;
+
+  /// No description provided for @payrollKpiBonusesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Named bonuses and corrections'**
+  String get payrollKpiBonusesNote;
+
+  /// No description provided for @payrollLedgerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider Payroll Ledger'**
+  String get payrollLedgerTitle;
+
+  /// No description provided for @payrollColRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider name'**
+  String get payrollColRider;
+
+  /// No description provided for @payrollColBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base pay'**
+  String get payrollColBase;
+
+  /// No description provided for @payrollColDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery pay'**
+  String get payrollColDelivery;
+
+  /// No description provided for @payrollColTips.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get payrollColTips;
+
+  /// No description provided for @payrollColDeductions.
+  ///
+  /// In en, this message translates to:
+  /// **'Deductions'**
+  String get payrollColDeductions;
+
+  /// No description provided for @payrollColGross.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross pay'**
+  String get payrollColGross;
+
+  /// No description provided for @payrollColNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net pay'**
+  String get payrollColNet;
+
+  /// No description provided for @payrollColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get payrollColStatus;
+
+  /// No description provided for @payrollColActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get payrollColActions;
+
+  /// No description provided for @payrollPayslip.
+  ///
+  /// In en, this message translates to:
+  /// **'Payslip'**
+  String get payrollPayslip;
+
+  /// No description provided for @payrollTipsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips are the rider\'s own money and never part of their pay.'**
+  String get payrollTipsNote;
+
+  /// No description provided for @payrollHoursUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours for this rider could not be read.'**
+  String get payrollHoursUnknown;
+
+  /// No description provided for @payrollNobody.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody on your fleet has pay in this period.'**
+  String get payrollNobody;
+
+  /// No description provided for @payrollTableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your company\'s payroll, worked out from your pay rules. YouDrop does not pay your riders.'**
+  String get payrollTableNote;
+
+  /// No description provided for @payrollStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get payrollStatusDraft;
+
+  /// No description provided for @payrollStatusDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting payment'**
+  String get payrollStatusDue;
+
+  /// No description provided for @payrollStatusNothingDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to pay'**
+  String get payrollStatusNothingDue;
+
+  /// No description provided for @payrollStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid ✓'**
+  String get payrollStatusPaid;
+
+  /// No description provided for @payrollStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get payrollStatusFailed;
+
+  /// No description provided for @payrollRunApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get payrollRunApproved;
+
+  /// No description provided for @payrollRunPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get payrollRunPaid;
+
+  /// No description provided for @payrollNotStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get payrollNotStarted;
+
+  /// No description provided for @payrollRunMeta.
+  ///
+  /// In en, this message translates to:
+  /// **'{state} · figures computed {time}'**
+  String payrollRunMeta(String state, String time);
+
+  /// No description provided for @payrollRunRevision.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft, revision {revision}'**
+  String payrollRunRevision(int revision);
+
+  /// No description provided for @payrollHoursAsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours as read on {time}'**
+  String payrollHoursAsOf(String time);
+
+  /// No description provided for @payrollNoRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your pay rules first'**
+  String get payrollNoRulesTitle;
+
+  /// No description provided for @payrollNoRulesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll works out each rider\'s pay from your company\'s own rules: what a delivery pays, whether hours are paid, and any deductions. Nothing is assumed for you.'**
+  String get payrollNoRulesBody;
+
+  /// No description provided for @payrollNoRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No pay run for this period yet'**
+  String get payrollNoRunTitle;
+
+  /// No description provided for @payrollNoRunBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting one computes a draft from the deliveries and hours on record. Nothing is final until you approve it.'**
+  String get payrollNoRunBody;
+
+  /// No description provided for @payrollPeriodOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This period runs until {date}. It can be approved once it is over.'**
+  String payrollPeriodOpen(String date);
+
+  /// No description provided for @payrollHoursMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance hours could not be read, so these figures leave hours out.'**
+  String get payrollHoursMissing;
+
+  /// No description provided for @payrollHoursNotDeployed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance hours are not available on this platform yet, so these figures leave hours out.'**
+  String get payrollHoursNotDeployed;
+
+  /// No description provided for @payrollHoursNotRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pay rules now use hours. Recompute to read them.'**
+  String get payrollHoursNotRead;
+
+  /// No description provided for @payrollJobsLateDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 delivery reached the ledger after these figures were computed. Recompute to include it.} other{{count} deliveries reached the ledger after these figures were computed. Recompute to include them.}}'**
+  String payrollJobsLateDraft(int count);
+
+  /// No description provided for @payrollJobsLateApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.} other{{count} deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.}}'**
+  String payrollJobsLateApproved(int count);
+
+  /// No description provided for @payrollPeriodChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pay rules now pay these days in a different period. Discard this draft and start that period.'**
+  String get payrollPeriodChanged;
+
+  /// No description provided for @payrollLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll could not be loaded just now.'**
+  String get payrollLoadFailed;
+
+  /// No description provided for @payrollTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get payrollTryAgain;
+
+  /// No description provided for @payrollPayslipSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payslip for {from} – {to}'**
+  String payrollPayslipSubtitle(String from, String to);
+
+  /// No description provided for @payrollSectionPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get payrollSectionPay;
+
+  /// No description provided for @payrollSectionSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get payrollSectionSummary;
+
+  /// No description provided for @payrollSectionAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours and attendance'**
+  String get payrollSectionAttendance;
+
+  /// No description provided for @payrollSectionPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get payrollSectionPayment;
+
+  /// No description provided for @payrollLineDeliveries.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 delivery × {rate}} other{{count} deliveries × {rate}}}'**
+  String payrollLineDeliveries(int count, String rate);
+
+  /// No description provided for @payrollLineHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h recorded × {rate}'**
+  String payrollLineHours(String hours, String rate);
+
+  /// No description provided for @payrollLineOvertime.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h overtime × {rate}'**
+  String payrollLineOvertime(String hours, String rate);
+
+  /// No description provided for @payrollLineTyped.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h typed by the office × {rate}'**
+  String payrollLineTyped(String hours, String rate);
+
+  /// No description provided for @payrollLineTypedUnpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h typed by the office, not paid under your rules'**
+  String payrollLineTypedUnpaid(String hours);
+
+  /// No description provided for @payrollLineLate.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 late day × {rate}} other{{days} late days × {rate}}}'**
+  String payrollLineLate(int days, String rate);
+
+  /// No description provided for @payrollLineAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 absence × {rate}} other{{days} absences × {rate}}}'**
+  String payrollLineAbsence(int days, String rate);
+
+  /// No description provided for @payrollLineCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Company cash the rider held, kept from pay'**
+  String get payrollLineCash;
+
+  /// No description provided for @payrollLineBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus: {label}'**
+  String payrollLineBonus(String label);
+
+  /// No description provided for @payrollLineDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduction: {label}'**
+  String payrollLineDeduction(String label);
+
+  /// No description provided for @payrollLineCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction: {label}'**
+  String payrollLineCorrection(String label);
+
+  /// No description provided for @payrollLineOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get payrollLineOther;
+
+  /// No description provided for @payrollOwes.
+  ///
+  /// In en, this message translates to:
+  /// **'Owes the company {amount}. Nothing is paid.'**
+  String payrollOwes(String amount);
+
+  /// No description provided for @payrollTipsInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips {amount}: the rider\'s own money, not part of this pay.'**
+  String payrollTipsInfo(String amount);
+
+  /// No description provided for @payrollCashKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Holds {amount} of the company\'s cash collected by {date}, more than this pay covers. It stays for the hub to collect.'**
+  String payrollCashKept(String amount, String date);
+
+  /// No description provided for @payrollHoursFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded {recorded} h · typed {typed} h · overtime {overtime} h'**
+  String payrollHoursFacts(String recorded, String typed, String overtime);
+
+  /// No description provided for @payrollDaysFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Late days {lates} · absences {absences}'**
+  String payrollDaysFacts(int lates, int absences);
+
+  /// No description provided for @payrollAddBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bonus'**
+  String get payrollAddBonus;
+
+  /// No description provided for @payrollAddDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add deduction'**
+  String get payrollAddDeduction;
+
+  /// No description provided for @payrollRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get payrollRemove;
+
+  /// No description provided for @payrollMarkPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark paid'**
+  String get payrollMarkPaid;
+
+  /// No description provided for @payrollMarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark failed'**
+  String get payrollMarkFailed;
+
+  /// No description provided for @payrollAddCorrection.
+  ///
+  /// In en, this message translates to:
+  /// **'Add correction'**
+  String get payrollAddCorrection;
+
+  /// No description provided for @payrollPaidOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid on {date} · {method}'**
+  String payrollPaidOn(String date, String method);
+
+  /// No description provided for @payrollRecordedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded by {name}'**
+  String payrollRecordedBy(String name);
+
+  /// No description provided for @payrollFailedBecause.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed: {reason}'**
+  String payrollFailedBecause(String reason);
+
+  /// No description provided for @payrollCorrections.
+  ///
+  /// In en, this message translates to:
+  /// **'Corrections'**
+  String get payrollCorrections;
+
+  /// No description provided for @payrollCorrectionWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid in the rider\'s next pay run'**
+  String get payrollCorrectionWaiting;
+
+  /// No description provided for @payrollCorrectionPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid in a later pay run'**
+  String get payrollCorrectionPaid;
+
+  /// No description provided for @payrollLineDialogBonus.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a bonus for {name}'**
+  String payrollLineDialogBonus(String name);
+
+  /// No description provided for @payrollLineDialogDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a deduction for {name}'**
+  String payrollLineDialogDeduction(String name);
+
+  /// No description provided for @payrollLabelField.
+  ///
+  /// In en, this message translates to:
+  /// **'What it is for'**
+  String get payrollLabelField;
+
+  /// No description provided for @payrollAmountField.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get payrollAmountField;
+
+  /// No description provided for @payrollAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'An amount to the cent, like 25.00'**
+  String get payrollAmountInvalid;
+
+  /// No description provided for @payrollRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get payrollRequired;
+
+  /// No description provided for @payrollReasonField.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get payrollReasonField;
+
+  /// No description provided for @payrollReferenceField.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference (optional)'**
+  String get payrollReferenceField;
+
+  /// No description provided for @payrollSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get payrollSave;
+
+  /// No description provided for @payrollCorrectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct {name}\'s pay'**
+  String payrollCorrectionTitle(String name);
+
+  /// No description provided for @payrollCorrectionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The approved payslip stays as it is. The correction is paid in the rider\'s next pay run.'**
+  String get payrollCorrectionBody;
+
+  /// No description provided for @payrollCorrectionMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay more'**
+  String get payrollCorrectionMore;
+
+  /// No description provided for @payrollCorrectionLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Take back'**
+  String get payrollCorrectionLess;
+
+  /// No description provided for @payrollFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment to {name} did not go through?'**
+  String payrollFailedTitle(String name);
+
+  /// No description provided for @payrollFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The pay stays owed and can be recorded as paid later.'**
+  String get payrollFailedBody;
+
+  /// No description provided for @payrollPaidTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record paying {name} {amount}?'**
+  String payrollPaidTitle(String name, String amount);
+
+  /// No description provided for @payrollPaidBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This records that your company paid the rider. YouDrop moves no money.'**
+  String get payrollPaidBody;
+
+  /// No description provided for @payrollApproveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve pay for {from} – {to}?'**
+  String payrollApproveTitle(String from, String to);
+
+  /// No description provided for @payrollApproveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 rider, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.} other{{count} riders, {total} to pay. Payslips are final once approved; a mistake is corrected in a later pay run.}}'**
+  String payrollApproveBody(int count, String total);
+
+  /// No description provided for @payrollApproveCash.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} of company cash your riders collected by {date} and still hold is kept from their pay and recorded as handed to your company.'**
+  String payrollApproveCash(String amount, String date);
+
+  /// No description provided for @payrollApproveYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get payrollApproveYes;
+
+  /// No description provided for @payrollPayAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Record 1 payment of {total}?} other{Record {count} payments totalling {total}?}}'**
+  String payrollPayAllTitle(int count, String total);
+
+  /// No description provided for @payrollPayAllBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This records that your company paid these riders, and cannot be undone. Failed payments are left to record one by one.'**
+  String get payrollPayAllBody;
+
+  /// No description provided for @payrollRecordYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get payrollRecordYes;
+
+  /// No description provided for @payrollDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this draft?'**
+  String get payrollDiscardTitle;
+
+  /// No description provided for @payrollDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its figures are thrown away and its history is kept. You can start the period again.'**
+  String get payrollDiscardBody;
+
+  /// No description provided for @payrollDiscardYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get payrollDiscardYes;
+
+  /// No description provided for @payrollDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get payrollDone;
+
+  /// No description provided for @payrollApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay run approved.'**
+  String get payrollApproved;
+
+  /// No description provided for @payrollErrFiguresChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The figures changed since you looked. Check the new ones, then approve again.'**
+  String get payrollErrFiguresChanged;
+
+  /// No description provided for @payrollErrCashChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider\'s cash changed a moment ago. Nothing was approved; approve again to see the new figures.'**
+  String get payrollErrCashChanged;
+
+  /// No description provided for @payrollErrTotalChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The total waiting for payment is now {amount}. Nothing was recorded.'**
+  String payrollErrTotalChanged(String amount);
+
+  /// No description provided for @payrollErrRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'That could not be done: the pay run has changed or no longer allows it. Reload and try again.'**
+  String get payrollErrRefused;
+
+  /// No description provided for @payrollErrFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That could not be done just now. Please try again.'**
+  String get payrollErrFailed;
+
+  /// No description provided for @payrollErrRulesStart.
+  ///
+  /// In en, this message translates to:
+  /// **'New rules cannot start on that day. Pick one of the days offered.'**
+  String get payrollErrRulesStart;
+
+  /// No description provided for @payrollRulesNow.
+  ///
+  /// In en, this message translates to:
+  /// **'In force since {from}'**
+  String payrollRulesNow(String from);
+
+  /// No description provided for @payrollRulesNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No pay rules yet.'**
+  String get payrollRulesNone;
+
+  /// No description provided for @payrollRulesNext.
+  ///
+  /// In en, this message translates to:
+  /// **'New rules start on {date}'**
+  String payrollRulesNext(String date);
+
+  /// No description provided for @payrollRulesCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay riders'**
+  String get payrollRulesCycle;
+
+  /// No description provided for @payrollCycleSemiMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Twice a month (1st–15th, 16th–end)'**
+  String get payrollCycleSemiMonthly;
+
+  /// No description provided for @payrollCycleMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get payrollCycleMonthly;
+
+  /// No description provided for @payrollRulesStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting on'**
+  String get payrollRulesStart;
+
+  /// No description provided for @payrollRulesPerDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay per delivery'**
+  String get payrollRulesPerDelivery;
+
+  /// No description provided for @payrollRulesHourly.
+  ///
+  /// In en, this message translates to:
+  /// **'Hourly base (optional)'**
+  String get payrollRulesHourly;
+
+  /// No description provided for @payrollRulesHourlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty for no hourly pay'**
+  String get payrollRulesHourlyHint;
+
+  /// No description provided for @payrollRulesTyped.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay hours the office typed'**
+  String get payrollRulesTyped;
+
+  /// No description provided for @payrollRulesOvertime.
+  ///
+  /// In en, this message translates to:
+  /// **'Overtime multiplier'**
+  String get payrollRulesOvertime;
+
+  /// No description provided for @payrollRulesLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduction per late day'**
+  String get payrollRulesLate;
+
+  /// No description provided for @payrollRulesAbsence.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduction per absence'**
+  String get payrollRulesAbsence;
+
+  /// No description provided for @payrollRulesSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save rules'**
+  String get payrollRulesSave;
+
+  /// No description provided for @payrollRulesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules take effect from the first day of a pay period and never change a pay run already approved.'**
+  String get payrollRulesNote;
+
+  /// No description provided for @payrollMultiplierInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Between 1.00 and 5.00'**
+  String get payrollMultiplierInvalid;
+
+  /// No description provided for @payrollRulesNoStart.
+  ///
+  /// In en, this message translates to:
+  /// **'No day is open for new rules right now.'**
+  String get payrollRulesNoStart;
+
+  /// No description provided for @payrollCashMethodKeptFromPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept from pay'**
+  String get payrollCashMethodKeptFromPay;
+
+  /// No description provided for @payrollReadBeforeEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'These figures were read on {time}, before the period ended. Recompute to count the whole period before approving.'**
+  String payrollReadBeforeEnd(String time);
+
+  /// No description provided for @payrollDeliveriesNotDeployed.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries cannot be counted from orders on this platform yet, so these figures count only deliveries that earned a fee: free deliveries are missing from them.'**
+  String get payrollDeliveriesNotDeployed;
+
+  /// No description provided for @payrollDeliveriesMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries could not be counted from orders just now, so these figures count only deliveries that earned a fee. Recompute to count every delivery.'**
+  String get payrollDeliveriesMissing;
+
+  /// No description provided for @payrollHoursMissingFor.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Hours could not be read for {names}, so their pay leaves hours out.} other{Hours could not be read for {names}, so their pay leaves hours out.}}'**
+  String payrollHoursMissingFor(int count, String names);
+
+  /// No description provided for @payrollNamesMore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{names} and 1 other} other{{names} and {count} others}}'**
+  String payrollNamesMore(String names, int count);
+
+  /// No description provided for @payrollListSeparator.
+  ///
+  /// In en, this message translates to:
+  /// **', '**
+  String get payrollListSeparator;
+
+  /// No description provided for @payrollApproveDeliveriesLedger.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliveries were counted only from jobs that earned a fee, so free deliveries are missing from this pay.'**
+  String get payrollApproveDeliveriesLedger;
+
+  /// No description provided for @payrollApproveWithoutMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve without what is missing'**
+  String get payrollApproveWithoutMissing;
+
+  /// No description provided for @payrollErrNeedsAcknowledgement.
+  ///
+  /// In en, this message translates to:
+  /// **'Something is missing from these figures. Tick the box to approve without it.'**
+  String get payrollErrNeedsAcknowledgement;
+
+  /// No description provided for @payrollErrRecomputeNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'These figures were read before the period ended. Recompute, check them and approve again.'**
+  String get payrollErrRecomputeNeeded;
+
+  /// No description provided for @payrollHoursNotListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance shows no time this rider worked for your company in this period, so their hours are not known.'**
+  String get payrollHoursNotListed;
+
+  /// No description provided for @chatRoomEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbourhood chat'**
+  String get chatRoomEntryTitle;
+
+  /// No description provided for @chatRoomEntrySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk with the people who live around you'**
+  String get chatRoomEntrySub;
+
+  /// No description provided for @chatRoomTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{area} chat'**
+  String chatRoomTitle(String area);
+
+  /// No description provided for @chatRoomLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get chatRoomLive;
+
+  /// No description provided for @chatRoomMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 neighbour} other{{count} neighbours}}'**
+  String chatRoomMembers(int count);
+
+  /// No description provided for @chatRoomCommunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get chatRoomCommunity;
+
+  /// No description provided for @chatRoomComposerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message or ask a neighbour…'**
+  String get chatRoomComposerHint;
+
+  /// No description provided for @chatRoomEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet. Say hello to your neighbours.'**
+  String get chatRoomEmpty;
+
+  /// No description provided for @chatRoomCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your neighbourhood chat'**
+  String get chatRoomCouldNotLoad;
+
+  /// No description provided for @chatRoomPickAreaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your area to join its chat'**
+  String get chatRoomPickAreaTitle;
+
+  /// No description provided for @chatRoomPickAreaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbourhood chat follows the area of your delivery address.'**
+  String get chatRoomPickAreaBody;
+
+  /// No description provided for @chatRoomChooseArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose area'**
+  String get chatRoomChooseArea;
+
+  /// No description provided for @chatRoomUnknownAreaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your area has no neighbourhood chat'**
+  String get chatRoomUnknownAreaTitle;
+
+  /// No description provided for @chatRoomUnknownAreaBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one of the delivery areas for your address to join its chat.'**
+  String get chatRoomUnknownAreaBody;
+
+  /// No description provided for @chatRoomMoveBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'You can move to your new area\'s chat from {date}.'**
+  String chatRoomMoveBlocked(String date);
+
+  /// No description provided for @chatRoomMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'A moderator has paused your messages here until {date}.'**
+  String chatRoomMuted(String date);
+
+  /// No description provided for @chatRoomHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'This message was removed'**
+  String get chatRoomHidden;
+
+  /// No description provided for @chatRoomNeighbour.
+  ///
+  /// In en, this message translates to:
+  /// **'Neighbour'**
+  String get chatRoomNeighbour;
+
+  /// No description provided for @chatRoomReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get chatRoomReport;
+
+  /// No description provided for @chatRoomReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you reporting this message?'**
+  String get chatRoomReportTitle;
+
+  /// No description provided for @chatRoomReasonSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam or advertising'**
+  String get chatRoomReasonSpam;
+
+  /// No description provided for @chatRoomReasonAbuse.
+  ///
+  /// In en, this message translates to:
+  /// **'Abuse or harassment'**
+  String get chatRoomReasonAbuse;
+
+  /// No description provided for @chatRoomReasonPersonalInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone\'s personal details'**
+  String get chatRoomReasonPersonalInfo;
+
+  /// No description provided for @chatRoomReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get chatRoomReasonOther;
+
+  /// No description provided for @chatRoomReportSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks. A moderator will review it.'**
+  String get chatRoomReportSent;
+
+  /// No description provided for @chatRoomBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get chatRoomBlock;
+
+  /// No description provided for @chatRoomBlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {name}?'**
+  String chatRoomBlockTitle(String name);
+
+  /// No description provided for @chatRoomBlockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You won\'t see their messages in neighbourhood chat. They won\'t be told.'**
+  String get chatRoomBlockBody;
+
+  /// No description provided for @chatRoomBlockedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked. You won\'t see their messages.'**
+  String get chatRoomBlockedToast;
+
+  /// No description provided for @chatRoomCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatRoomCopy;
+
+  /// No description provided for @chatRoomCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get chatRoomCopied;
+
+  /// No description provided for @chatRoomRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Community rules'**
+  String get chatRoomRulesTitle;
+
+  /// No description provided for @chatRoomRulesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Be kind to your neighbours. No spam or advertising, no harassment, and never post anyone\'s phone number or address. Moderators remove messages that break these rules.'**
+  String get chatRoomRulesBody;
+
+  /// No description provided for @chatRoomBlockedPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'People you blocked'**
+  String get chatRoomBlockedPeople;
+
+  /// No description provided for @chatRoomNoBlocks.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t blocked anyone.'**
+  String get chatRoomNoBlocks;
+
+  /// No description provided for @chatRoomUnblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get chatRoomUnblock;
+
+  /// No description provided for @chatSlowDown.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re sending messages too fast. Wait a moment and try again.'**
+  String get chatSlowDown;
+
+  /// No description provided for @chatTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'That message is too long.'**
+  String get chatTooLong;
+
+  /// No description provided for @chatActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That didn\'t work. Try again.'**
+  String get chatActionFailed;
+
+  /// No description provided for @chatShopWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with {shop}'**
+  String chatShopWith(String shop);
+
+  /// No description provided for @chatShopHintCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the shop…'**
+  String get chatShopHintCustomer;
+
+  /// No description provided for @chatShopHintMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to the customer…'**
+  String get chatShopHintMerchant;
+
+  /// No description provided for @chatShopEmptyCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the shop anything: what\'s in stock, prices, opening hours.'**
+  String get chatShopEmptyCustomer;
+
+  /// No description provided for @chatShopEmptyMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages in this conversation yet.'**
+  String get chatShopEmptyMerchant;
+
+  /// No description provided for @chatShopCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this conversation'**
+  String get chatShopCouldNotLoad;
+
+  /// No description provided for @chatShopQuietCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'This chat has gone quiet.'**
+  String get chatShopQuietCustomer;
+
+  /// No description provided for @chatShopReopen.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get chatShopReopen;
+
+  /// No description provided for @chatShopQuietMerchant.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation has gone quiet. The customer can start it again from your shop\'s page.'**
+  String get chatShopQuietMerchant;
+
+  /// No description provided for @chatShopInboxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer messages'**
+  String get chatShopInboxTitle;
+
+  /// No description provided for @chatShopInboxEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No customer messages yet'**
+  String get chatShopInboxEmpty;
+
+  /// No description provided for @chatShopInboxEmptySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can message your shop from its page in the app.'**
+  String get chatShopInboxEmptySub;
+
+  /// No description provided for @chatShopInboxCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load customer messages'**
+  String get chatShopInboxCouldNotLoad;
+
+  /// No description provided for @chatShopCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get chatShopCustomer;
+
+  /// No description provided for @chatShopYouPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'You: {text}'**
+  String chatShopYouPrefix(String text);
+
+  /// No description provided for @chatShopQuietBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet'**
+  String get chatShopQuietBadge;
+
+  /// No description provided for @chatModerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderation'**
+  String get chatModerationTitle;
+
+  /// No description provided for @chatModerationSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported neighbourhood chat messages, oldest first.'**
+  String get chatModerationSub;
+
+  /// No description provided for @chatModerationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reports waiting'**
+  String get chatModerationEmpty;
+
+  /// No description provided for @chatModerationCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the moderation queue'**
+  String get chatModerationCouldNotLoad;
+
+  /// No description provided for @chatModerationReports.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 report} other{{count} reports}}'**
+  String chatModerationReports(int count);
+
+  /// No description provided for @chatModerationHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide message'**
+  String get chatModerationHide;
+
+  /// No description provided for @chatModerationDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get chatModerationDismiss;
+
+  /// No description provided for @chatModerationMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute author'**
+  String get chatModerationMute;
+
+  /// No description provided for @chatModerationUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute author'**
+  String get chatModerationUnmute;
+
+  /// No description provided for @chatModerationMute24h.
+  ///
+  /// In en, this message translates to:
+  /// **'For 24 hours'**
+  String get chatModerationMute24h;
+
+  /// No description provided for @chatModerationMute7d.
+  ///
+  /// In en, this message translates to:
+  /// **'For 7 days'**
+  String get chatModerationMute7d;
+
+  /// No description provided for @chatModerationMute30d.
+  ///
+  /// In en, this message translates to:
+  /// **'For 30 days'**
+  String get chatModerationMute30d;
+
+  /// No description provided for @chatModerationReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (kept in the audit trail)'**
+  String get chatModerationReasonLabel;
+
+  /// No description provided for @chatModerationReasonTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Write at least 3 characters'**
+  String get chatModerationReasonTooShort;
+
+  /// No description provided for @chatModerationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get chatModerationConfirm;
+
+  /// No description provided for @chatModerationRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get chatModerationRemoved;
+
+  /// No description provided for @chatModerationMutedUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Author muted until {date}'**
+  String chatModerationMutedUntil(String date);
+
+  /// No description provided for @chatModerationDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get chatModerationDone;
+
+  /// No description provided for @chatModerationRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get chatModerationRefresh;
+
+  /// No description provided for @chatRoomOlderFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load earlier messages. Tap to try again.'**
+  String get chatRoomOlderFailed;
+
+  /// No description provided for @chatRoomPostAfterDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'You can post here after your first delivery to this area.'**
+  String get chatRoomPostAfterDelivery;
+
+  /// No description provided for @chatRoomPostingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Posting is paused while we check your deliveries. Try again shortly.'**
+  String get chatRoomPostingUnavailable;
+
+  /// No description provided for @chatShopUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread message} other{{count} unread messages}}'**
+  String chatShopUnreadCount(int count);
+
+  /// No description provided for @multiCartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Basket'**
+  String get multiCartTitle;
+
+  /// No description provided for @multiCartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One checkout, every shop'**
+  String get multiCartSubtitle;
+
+  /// No description provided for @multiCartShopCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 shop} other{{count} shops}}'**
+  String multiCartShopCount(int count);
+
+  /// No description provided for @multiCartFromShop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{From {store} (1 item)} other{From {store} ({count} items)}}'**
+  String multiCartFromShop(int count, String store);
+
+  /// No description provided for @multiCartShopDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery from this shop'**
+  String get multiCartShopDelivery;
+
+  /// No description provided for @multiCartDeliveryFromShops.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Delivery from 1 shop} other{Delivery from {count} shops}}'**
+  String multiCartDeliveryFromShops(int count);
+
+  /// No description provided for @multiCartCheckoutAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout — {amount}'**
+  String multiCartCheckoutAmount(String amount);
+
+  /// No description provided for @multiCartBelowMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {amount} more from {store} to reach its minimum order'**
+  String multiCartBelowMinimum(String amount, String store);
+
+  /// No description provided for @multiCartShopClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} is closed right now. Remove its items to check out.'**
+  String multiCartShopClosed(String store);
+
+  /// No description provided for @multiCartShopNotServing.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} doesn\'t deliver to your address. Remove its items to check out.'**
+  String multiCartShopNotServing(String store);
+
+  /// No description provided for @multiCartShopUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} can\'t take this order right now.'**
+  String multiCartShopUnavailable(String store);
+
+  /// No description provided for @multiCartRemoveShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {store}'**
+  String multiCartRemoveShop(String store);
+
+  /// No description provided for @multiCartShopLimitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{max, plural, =1{One shop per basket} other{Up to {max} shops per basket}}'**
+  String multiCartShopLimitTitle(int max);
+
+  /// No description provided for @multiCartShopLimitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Check out, or remove a shop from your basket, before adding items from another.'**
+  String get multiCartShopLimitBody;
+
+  /// No description provided for @multiCartPartOfOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Part of a {count}-shop order}}'**
+  String multiCartPartOfOrder(int count);
+
+  /// No description provided for @multiCartCannotWait.
+  ///
+  /// In en, this message translates to:
+  /// **'A basket from several shops can\'t wait for the connection: its shops\' orders are placed together, while you\'re online. Check out once you\'re back.'**
+  String get multiCartCannotWait;
+
+  /// No description provided for @multiCartGiftOneShop.
+  ///
+  /// In en, this message translates to:
+  /// **'A gift is sent from one shop at a time. Remove the other shops\' items, or send this basket as an ordinary order.'**
+  String get multiCartGiftOneShop;
+
+  /// No description provided for @multiCartPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 order placed · {amount}} other{{count} orders placed · {amount}}}'**
+  String multiCartPlaced(int count, String amount);
+
+  /// No description provided for @multiCartPricesUpdating.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating prices…'**
+  String get multiCartPricesUpdating;
+
+  /// No description provided for @multiCartPricesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm the latest prices.'**
+  String get multiCartPricesFailed;
+
+  /// No description provided for @multiCartPriceChangedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The total has changed'**
+  String get multiCartPriceChangedTitle;
+
+  /// No description provided for @multiCartPriceChangedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your basket now comes to {total}, not the {agreed} you saw. Place its orders at the new total?'**
+  String multiCartPriceChangedBody(String total, String agreed);
+
+  /// No description provided for @multiCartEarlierCheckoutPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Your earlier checkout already went through: all {count} of its orders are in Orders.}}'**
+  String multiCartEarlierCheckoutPlaced(int count);
+
+  /// No description provided for @svcVerticalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get svcVerticalServices;
+
+  /// No description provided for @svcCategoryPrinting.
+  ///
+  /// In en, this message translates to:
+  /// **'Printing'**
+  String get svcCategoryPrinting;
+
+  /// No description provided for @svcCategoryTailoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Tailoring & alterations'**
+  String get svcCategoryTailoring;
+
+  /// No description provided for @svcCategoryRepairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairs'**
+  String get svcCategoryRepairs;
+
+  /// No description provided for @svcCategoryPhotography.
+  ///
+  /// In en, this message translates to:
+  /// **'Photography'**
+  String get svcCategoryPhotography;
+
+  /// No description provided for @svcCategoryCleaning.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaning'**
+  String get svcCategoryCleaning;
+
+  /// No description provided for @svcCategoryBeauty.
+  ///
+  /// In en, this message translates to:
+  /// **'Beauty'**
+  String get svcCategoryBeauty;
+
+  /// No description provided for @svcCategoryTutoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Tutoring'**
+  String get svcCategoryTutoring;
+
+  /// No description provided for @svcSignupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grow your business on YouDrop'**
+  String get svcSignupTitle;
+
+  /// No description provided for @svcSignupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach customers in your neighbourhood.'**
+  String get svcSignupSubtitle;
+
+  /// No description provided for @svcSignupBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lebanese services'**
+  String get svcSignupBannerTitle;
+
+  /// No description provided for @svcSignupBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Printing, tailoring, repairs, photography and more — collected at your shop or delivered by YouDrop.'**
+  String get svcSignupBannerBody;
+
+  /// No description provided for @svcBusinessName.
+  ///
+  /// In en, this message translates to:
+  /// **'Business name'**
+  String get svcBusinessName;
+
+  /// No description provided for @svcBusinessNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Al Fakhry Press'**
+  String get svcBusinessNameHint;
+
+  /// No description provided for @svcServiceCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Service category'**
+  String get svcServiceCategory;
+
+  /// No description provided for @svcServiceCategoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what you offer'**
+  String get svcServiceCategoryHint;
+
+  /// No description provided for @svcPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'71 234 567'**
+  String get svcPhoneHint;
+
+  /// No description provided for @svcPhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a Lebanese number, e.g. 71 234 567'**
+  String get svcPhoneInvalid;
+
+  /// No description provided for @svcArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Location / area'**
+  String get svcArea;
+
+  /// No description provided for @svcAreaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your area'**
+  String get svcAreaHint;
+
+  /// No description provided for @svcApplyCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to sell services'**
+  String get svcApplyCta;
+
+  /// No description provided for @svcOptionsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load the services on offer. Check your connection and try again.'**
+  String get svcOptionsFailed;
+
+  /// No description provided for @svcNoCategoriesOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop isn\'t taking applications to sell services right now.'**
+  String get svcNoCategoriesOpen;
+
+  /// No description provided for @svcPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Application sent'**
+  String get svcPendingTitle;
+
+  /// No description provided for @svcPendingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A YouDrop reviewer reads every application to sell services. We\'ll email {email} once it\'s decided.'**
+  String svcPendingBody(String email);
+
+  /// No description provided for @svcPendingBodyNoEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'A YouDrop reviewer reads every application to sell services, and we\'ll let you know once it\'s decided.'**
+  String get svcPendingBodyNoEmail;
+
+  /// No description provided for @svcReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference: {reference}'**
+  String svcReference(String reference);
+
+  /// No description provided for @svcApprovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re approved'**
+  String get svcApprovedTitle;
+
+  /// No description provided for @svcApprovedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We open your services shop the first time you go to it.'**
+  String get svcApprovedBody;
+
+  /// No description provided for @svcErrCategoryClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop isn\'t taking applications for that service yet. Choose another.'**
+  String get svcErrCategoryClosed;
+
+  /// No description provided for @svcErrCategoryMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the service you offer.'**
+  String get svcErrCategoryMissing;
+
+  /// No description provided for @svcErrAreaUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'That area is no longer on the list. Choose your area again.'**
+  String get svcErrAreaUnknown;
+
+  /// No description provided for @svcErrAreaMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the area your business is in.'**
+  String get svcErrAreaMissing;
+
+  /// No description provided for @svcErrCatalogUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check the services on offer just now. Try again in a moment.'**
+  String get svcErrCatalogUnavailable;
+
+  /// No description provided for @svcOfferYourServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer your services'**
+  String get svcOfferYourServices;
+
+  /// No description provided for @svcOfferYourServicesSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Printing, tailoring, repairs or photography'**
+  String get svcOfferYourServicesSub;
+
+  /// No description provided for @svcSwitchToShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to your shop'**
+  String get svcSwitchToShop;
+
+  /// No description provided for @svcSwitchToShopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to shopping'**
+  String get svcSwitchToShopping;
+
+  /// No description provided for @svcChoiceCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer services'**
+  String get svcChoiceCard;
+
+  /// No description provided for @svcChoiceCardBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Print, tailor, repair or take photos for your neighbourhood, from your own shop.'**
+  String get svcChoiceCardBlurb;
+
+  /// No description provided for @svcIntent.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get svcIntent;
+
+  /// No description provided for @svcIntentBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'I print, tailor, repair or take photos'**
+  String get svcIntentBlurb;
+
+  /// No description provided for @svcOpeningShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening your services shop…'**
+  String get svcOpeningShop;
+
+  /// No description provided for @svcOpeningShopFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open your services shop.'**
+  String get svcOpeningShopFailed;
+
+  /// No description provided for @svcDocsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your documents'**
+  String get svcDocsTitle;
+
+  /// No description provided for @svcDocsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.'**
+  String get svcDocsIntro;
+
+  /// No description provided for @svcDocsFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'They go to the reviewer when you tap Send documents.'**
+  String get svcDocsFootnote;
+
+  /// No description provided for @svcDocsSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send documents'**
+  String get svcDocsSend;
+
+  /// No description provided for @svcDocsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your documents are with the reviewer.'**
+  String get svcDocsSent;
+
+  /// No description provided for @svcDocsSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents were sent, so the reviewer will see your ID and commercial registration as missing.'**
+  String get svcDocsSkipped;
+
+  /// No description provided for @svcShopCategoryClosedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your service isn\'t offered right now'**
+  String get svcShopCategoryClosedTitle;
+
+  /// No description provided for @svcShopCategoryClosedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your application was approved, but YouDrop isn\'t offering this service at the moment, so your shop can\'t be opened. Please contact support.'**
+  String get svcShopCategoryClosedBody;
+
+  /// No description provided for @svcCashShopName.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop {id}'**
+  String svcCashShopName(String id);
+
+  /// No description provided for @svcCashShopTakenAtCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} paid at its counter'**
+  String svcCashShopTakenAtCounter(String amount);
+
+  /// No description provided for @svcCashShopConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm {shop} has paid the platform {owed}: its commission on the {held} its customers paid at its counter, covering {orders}. The shop keeps the rest as its own share. This cannot be undone.'**
+  String svcCashShopConfirmBody(
+      String shop, String owed, String held, String orders);
+
+  /// No description provided for @svcCashShopAmountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} now owes {amount}, not the amount you confirmed. Nothing was recorded.'**
+  String svcCashShopAmountChanged(String shop, String amount);
+
+  /// No description provided for @svcActionCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer collected'**
+  String get svcActionCollected;
+
+  /// No description provided for @svcDeclineTooBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Too busy right now'**
+  String get svcDeclineTooBusy;
+
+  /// No description provided for @svcDeclineCannotDo.
+  ///
+  /// In en, this message translates to:
+  /// **'We can\'t do this job'**
+  String get svcDeclineCannotDo;
+
+  /// No description provided for @svcDeclineFileProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem with the file'**
+  String get svcDeclineFileProblem;
+
+  /// No description provided for @svcDeclineOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get svcDeclineOther;
+
+  /// No description provided for @svcNavServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get svcNavServices;
+
+  /// No description provided for @svcBrandPill.
+  ///
+  /// In en, this message translates to:
+  /// **'YOUDROP SERVICES'**
+  String get svcBrandPill;
+
+  /// No description provided for @svcSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for a service…'**
+  String get svcSearchHint;
+
+  /// No description provided for @svcCategoriesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service categories'**
+  String get svcCategoriesTitle;
+
+  /// No description provided for @svcPopularNearYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular services near you'**
+  String get svcPopularNearYou;
+
+  /// No description provided for @svcNearYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Services near you'**
+  String get svcNearYou;
+
+  /// No description provided for @svcAllProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'Service providers'**
+  String get svcAllProviders;
+
+  /// No description provided for @svcNoServicesNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'No services near you yet'**
+  String get svcNoServicesNearby;
+
+  /// No description provided for @svcNoServicesNearbyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a category, or search for what you need.'**
+  String get svcNoServicesNearbyHint;
+
+  /// No description provided for @svcServicesNotOffered.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop isn\'t offering services here yet'**
+  String get svcServicesNotOffered;
+
+  /// No description provided for @svcCouldNotLoadServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load services'**
+  String get svcCouldNotLoadServices;
+
+  /// No description provided for @svcDistanceAway.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} away'**
+  String svcDistanceAway(String distance);
+
+  /// No description provided for @svcOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers'**
+  String get svcOffers;
+
+  /// No description provided for @svcSearchProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers'**
+  String get svcSearchProviders;
+
+  /// No description provided for @svcSearchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Results for “{query}”'**
+  String svcSearchTitle(String query);
+
+  /// No description provided for @svcNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found for “{query}”'**
+  String svcNoResults(String query);
+
+  /// No description provided for @svcCategoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No {category} providers yet'**
+  String svcCategoryEmpty(String category);
+
+  /// No description provided for @svcReviewsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 review} other{{count} reviews}}'**
+  String svcReviewsCount(int count);
+
+  /// No description provided for @svcOpenUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Open until {time}'**
+  String svcOpenUntil(String time);
+
+  /// No description provided for @svcTabAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get svcTabAbout;
+
+  /// No description provided for @svcFromPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'From {price}'**
+  String svcFromPrice(String price);
+
+  /// No description provided for @svcOrderCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get svcOrderCta;
+
+  /// No description provided for @svcNoOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider has no offers right now'**
+  String get svcNoOffers;
+
+  /// No description provided for @svcAboutHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening hours'**
+  String get svcAboutHours;
+
+  /// No description provided for @svcAboutAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get svcAboutAddress;
+
+  /// No description provided for @svcAboutGetIt.
+  ///
+  /// In en, this message translates to:
+  /// **'How you get your order'**
+  String get svcAboutGetIt;
+
+  /// No description provided for @svcPickupAtShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup at the shop'**
+  String get svcPickupAtShop;
+
+  /// No description provided for @svcYouDropDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop delivery'**
+  String get svcYouDropDelivery;
+
+  /// No description provided for @svcClosedNoOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed now — you can order when the shop opens'**
+  String get svcClosedNoOrders;
+
+  /// No description provided for @svcNeedsFileUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer needs a file, and files can\'t be sent with orders yet'**
+  String get svcNeedsFileUnavailable;
+
+  /// No description provided for @svcPackOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack of {count} {unit}'**
+  String svcPackOf(String count, String unit);
+
+  /// No description provided for @svcPerUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Per {unit}'**
+  String svcPerUnit(String unit);
+
+  /// No description provided for @svcLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get svcLoadMore;
+
+  /// No description provided for @svcCouldNotLoadOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this offer'**
+  String get svcCouldNotLoadOffer;
+
+  /// No description provided for @svcCouldNotLoadReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load reviews'**
+  String get svcCouldNotLoadReviews;
+
+  /// No description provided for @svcOrderServiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order service'**
+  String get svcOrderServiceTitle;
+
+  /// No description provided for @svcProviderLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider: {name}'**
+  String svcProviderLine(String name);
+
+  /// No description provided for @svcQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get svcQuantity;
+
+  /// No description provided for @svcUnitsLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{units} {unit}'**
+  String svcUnitsLine(String units, String unit);
+
+  /// No description provided for @svcPacksCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 pack} other{{count} packs}}'**
+  String svcPacksCount(int count);
+
+  /// No description provided for @svcChooseOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose one'**
+  String get svcChooseOption;
+
+  /// No description provided for @svcOptionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get svcOptionRequired;
+
+  /// No description provided for @svcOptionOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get svcOptionOptional;
+
+  /// No description provided for @svcUploadDesign.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload design file'**
+  String get svcUploadDesign;
+
+  /// No description provided for @svcUploadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to choose a PDF, JPG or PNG, up to 10 MB'**
+  String get svcUploadHint;
+
+  /// No description provided for @svcUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading…'**
+  String get svcUploading;
+
+  /// No description provided for @svcUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get svcUploaded;
+
+  /// No description provided for @svcRemoveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get svcRemoveFile;
+
+  /// No description provided for @svcUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t upload this file. Try again.'**
+  String get svcUploadFailed;
+
+  /// No description provided for @svcAddAnotherFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Add another file'**
+  String get svcAddAnotherFile;
+
+  /// No description provided for @svcFileRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider needs your file to start'**
+  String get svcFileRequired;
+
+  /// No description provided for @svcSpecialInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Special instructions'**
+  String get svcSpecialInstructions;
+
+  /// No description provided for @svcInstructionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Leave a white border around the card edges'**
+  String get svcInstructionsHint;
+
+  /// No description provided for @svcHowYouGetIt.
+  ///
+  /// In en, this message translates to:
+  /// **'How you get it'**
+  String get svcHowYouGetIt;
+
+  /// No description provided for @svcDeliveryFeePlus.
+  ///
+  /// In en, this message translates to:
+  /// **'+{amount}'**
+  String svcDeliveryFeePlus(String amount);
+
+  /// No description provided for @svcPayCashPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash — pay when you collect'**
+  String get svcPayCashPickup;
+
+  /// No description provided for @svcPayCashDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash — pay on delivery'**
+  String get svcPayCashDelivery;
+
+  /// No description provided for @svcDeliveryFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery fee'**
+  String get svcDeliveryFee;
+
+  /// No description provided for @svcDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount'**
+  String get svcDiscount;
+
+  /// No description provided for @svcPlaceOrderTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Place order — {amount}'**
+  String svcPlaceOrderTotal(String amount);
+
+  /// No description provided for @svcOfflineNoQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Service orders need a connection — they can\'t wait on this phone to be sent later.'**
+  String get svcOfflineNoQueue;
+
+  /// No description provided for @svcChooseDeliveryAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where to deliver'**
+  String get svcChooseDeliveryAddress;
+
+  /// No description provided for @svcQuoteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get the price. Try again.'**
+  String get svcQuoteFailed;
+
+  /// No description provided for @svcPriceChangedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This order now comes to {total}, not the {agreed} you saw. Place it at the new total?'**
+  String svcPriceChangedBody(String total, String agreed);
+
+  /// No description provided for @svcDirectoryUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Services are briefly unavailable. Try again in a moment.'**
+  String get svcDirectoryUnavailable;
+
+  /// No description provided for @svcNotServed.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} doesn\'t deliver to this address'**
+  String svcNotServed(String shop);
+
+  /// No description provided for @svcShopClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} is closed and isn\'t taking orders right now'**
+  String svcShopClosed(String shop);
+
+  /// No description provided for @svcBelowMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} delivers orders of {amount} or more'**
+  String svcBelowMinimum(String shop, String amount);
+
+  /// No description provided for @svcRefusedCategoryClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This service isn\'t offered right now'**
+  String get svcRefusedCategoryClosed;
+
+  /// No description provided for @svcRefusedOfferNotOrderable.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer can\'t be ordered right now'**
+  String get svcRefusedOfferNotOrderable;
+
+  /// No description provided for @svcRefusedFulfilment.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider doesn\'t offer that way of getting it'**
+  String get svcRefusedFulfilment;
+
+  /// No description provided for @svcRefusedAttachmentsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Files can\'t be sent with orders yet, so this offer can\'t be ordered'**
+  String get svcRefusedAttachmentsUnavailable;
+
+  /// No description provided for @svcRefusedWrongType.
+  ///
+  /// In en, this message translates to:
+  /// **'Only PDF, JPG or PNG files'**
+  String get svcRefusedWrongType;
+
+  /// No description provided for @svcRefusedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is empty'**
+  String get svcRefusedEmpty;
+
+  /// No description provided for @svcRefusedTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Files must be 10 MB or smaller'**
+  String get svcRefusedTooLarge;
+
+  /// No description provided for @svcRefusedTooManyWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'You have too many files waiting for an order. Remove one first.'**
+  String get svcRefusedTooManyWaiting;
+
+  /// No description provided for @svcRefusedNotUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'That file didn\'t finish uploading. Upload it again.'**
+  String get svcRefusedNotUploaded;
+
+  /// No description provided for @svcRefusedExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'That file has expired. Upload it again.'**
+  String get svcRefusedExpired;
+
+  /// No description provided for @svcRefusedAlreadyAttached.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is already on another order. Upload it again.'**
+  String get svcRefusedAlreadyAttached;
+
+  /// No description provided for @svcRefusedTooManyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 3 files per order'**
+  String get svcRefusedTooManyFiles;
+
+  /// No description provided for @svcRefusedDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is already added'**
+  String get svcRefusedDuplicate;
+
+  /// No description provided for @svcRefusedNotAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer doesn\'t take files'**
+  String get svcRefusedNotAccepted;
+
+  /// No description provided for @svcRefusedUnknownFile.
+  ///
+  /// In en, this message translates to:
+  /// **'That file couldn\'t be found. Upload it again.'**
+  String get svcRefusedUnknownFile;
+
+  /// No description provided for @svcRefusedPacks.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose between 1 and 99 packs'**
+  String get svcRefusedPacks;
+
+  /// No description provided for @svcRefusedGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'This order can\'t be placed as it stands'**
+  String get svcRefusedGeneric;
+
+  /// No description provided for @svcTrackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track service order'**
+  String get svcTrackTitle;
+
+  /// No description provided for @svcOrderNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Order #{ref}'**
+  String svcOrderNumber(String ref);
+
+  /// No description provided for @svcStatusWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for provider'**
+  String get svcStatusWaiting;
+
+  /// No description provided for @svcStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get svcStatusInProgress;
+
+  /// No description provided for @svcStatusReadyPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for pickup'**
+  String get svcStatusReadyPickup;
+
+  /// No description provided for @svcStatusReadyDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for delivery'**
+  String get svcStatusReadyDelivery;
+
+  /// No description provided for @svcStatusOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get svcStatusOnTheWay;
+
+  /// No description provided for @svcStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get svcStatusCompleted;
+
+  /// No description provided for @svcStatusCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected'**
+  String get svcStatusCollected;
+
+  /// No description provided for @svcStatusDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined'**
+  String get svcStatusDeclined;
+
+  /// No description provided for @svcStatusNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not collected'**
+  String get svcStatusNotCollected;
+
+  /// No description provided for @svcEstimatedCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated completion'**
+  String get svcEstimatedCompletion;
+
+  /// No description provided for @svcReadyByCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready by'**
+  String get svcReadyByCaption;
+
+  /// No description provided for @svcEstimateAfterAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'{range}, confirmed once the provider accepts'**
+  String svcEstimateAfterAccept(String range);
+
+  /// No description provided for @svcTurnaroundRange.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}–{max} hours'**
+  String svcTurnaroundRange(String min, String max);
+
+  /// No description provided for @svcTurnaroundUpTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} hours'**
+  String svcTurnaroundUpTo(String max);
+
+  /// No description provided for @svcTodayAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Today, {time}'**
+  String svcTodayAt(String time);
+
+  /// No description provided for @svcTomorrowAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow, {time}'**
+  String svcTomorrowAt(String time);
+
+  /// No description provided for @svcDateAt.
+  ///
+  /// In en, this message translates to:
+  /// **'{date}, {time}'**
+  String svcDateAt(String date, String time);
+
+  /// No description provided for @svcOrderStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order status'**
+  String get svcOrderStatusTitle;
+
+  /// No description provided for @svcTimelinePlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Order placed'**
+  String get svcTimelinePlaced;
+
+  /// No description provided for @svcTimelineAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider accepted'**
+  String get svcTimelineAccepted;
+
+  /// No description provided for @svcTimelineInProduction.
+  ///
+  /// In en, this message translates to:
+  /// **'In production'**
+  String get svcTimelineInProduction;
+
+  /// No description provided for @svcTimelineOutForDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Out for delivery'**
+  String get svcTimelineOutForDelivery;
+
+  /// No description provided for @svcDeclinedReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined by the provider: {reason}'**
+  String svcDeclinedReason(String reason);
+
+  /// No description provided for @svcTimelineNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled — not collected in time'**
+  String get svcTimelineNotCollected;
+
+  /// No description provided for @svcProviderRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Service provider'**
+  String get svcProviderRole;
+
+  /// No description provided for @svcShowNumberAtPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this order number when you collect'**
+  String get svcShowNumberAtPickup;
+
+  /// No description provided for @svcPickupFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup from {shop}'**
+  String svcPickupFrom(String shop);
+
+  /// No description provided for @svcDeliveringTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivering to {address}'**
+  String svcDeliveringTo(String address);
+
+  /// No description provided for @svcYourInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Your instructions'**
+  String get svcYourInstructions;
+
+  /// No description provided for @svcSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get svcSummary;
+
+  /// No description provided for @svcServiceChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get svcServiceChip;
+
+  /// No description provided for @svcRefusedTooManyUploads.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.'**
+  String get svcRefusedTooManyUploads;
+
+  /// No description provided for @svcInstructionsLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String svcInstructionsLength(int used, int max);
+
+  /// No description provided for @svcOrderNotAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This order couldn\'t be sent as it is. Check what you wrote in it, then try again.'**
+  String get svcOrderNotAccepted;
+
+  /// No description provided for @svcOrderChangedRequote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order changed while it was being sent, so nothing was placed. Its total is being checked again.'**
+  String get svcOrderChangedRequote;
+
+  /// No description provided for @svcUnconfirmedLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order may have gone through'**
+  String get svcUnconfirmedLeaveTitle;
+
+  /// No description provided for @svcUnconfirmedLeaveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We didn\'t hear back after you tapped Place. Check Orders before ordering this again, so you don\'t order it twice.'**
+  String get svcUnconfirmedLeaveBody;
+
+  /// No description provided for @svcCheckOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Check Orders'**
+  String get svcCheckOrders;
+
+  /// No description provided for @svcLeaveAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave anyway'**
+  String get svcLeaveAnyway;
+
+  /// No description provided for @svcStayHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay'**
+  String get svcStayHere;
+
+  /// No description provided for @svcYourFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Your files'**
+  String get svcYourFiles;
+
+  /// No description provided for @svcYourFileNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'File {n}'**
+  String svcYourFileNumber(int n);
+
+  /// No description provided for @svcYourFilesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your files'**
+  String get svcYourFilesFailed;
+
+  /// No description provided for @svcFileGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is no longer available.'**
+  String get svcFileGone;
+
+  /// No description provided for @svcRateProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate {shop}'**
+  String svcRateProvider(String shop);
+
+  /// No description provided for @svcRateProviderPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'How was the work?'**
+  String get svcRateProviderPrompt;
+
+  /// No description provided for @svcRatedProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'You rated {shop}'**
+  String svcRatedProvider(String shop);
+
+  /// No description provided for @svcReviewNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'This order isn\'t on record as completed yet, so it can\'t be rated. Try again in a minute.'**
+  String get svcReviewNotYet;
+
+  /// No description provided for @svcBoOffersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service offers'**
+  String get svcBoOffersTitle;
+
+  /// No description provided for @svcBoOffersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every service shop\'s offers, in any status — take one down or restore it, with a reason'**
+  String get svcBoOffersSubtitle;
+
+  /// No description provided for @svcBoShopsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops'**
+  String get svcBoShopsTitle;
+
+  /// No description provided for @svcBoShopsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed shops, and which of them carry the Verified Local badge'**
+  String get svcBoShopsSubtitle;
+
+  /// No description provided for @svcBoFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get svcBoFilterAll;
+
+  /// No description provided for @svcBoOfferDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get svcBoOfferDraft;
+
+  /// No description provided for @svcBoOfferActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get svcBoOfferActive;
+
+  /// No description provided for @svcBoOfferPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get svcBoOfferPaused;
+
+  /// No description provided for @svcBoOfferArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get svcBoOfferArchived;
+
+  /// No description provided for @svcBoOfferTakenDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down'**
+  String get svcBoOfferTakenDown;
+
+  /// No description provided for @svcBoAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All categories'**
+  String get svcBoAllCategories;
+
+  /// No description provided for @svcBoAllShops.
+  ///
+  /// In en, this message translates to:
+  /// **'All shops'**
+  String get svcBoAllShops;
+
+  /// No description provided for @svcBoShopFilterTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Shops seen in the results so far'**
+  String get svcBoShopFilterTooltip;
+
+  /// No description provided for @svcBoOffersSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search offer or shop name'**
+  String get svcBoOffersSearchHint;
+
+  /// No description provided for @svcBoColOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer'**
+  String get svcBoColOffer;
+
+  /// No description provided for @svcBoColShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get svcBoColShop;
+
+  /// No description provided for @svcBoColCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get svcBoColCategory;
+
+  /// No description provided for @svcBoColPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get svcBoColPrice;
+
+  /// No description provided for @svcBoColStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get svcBoColStatus;
+
+  /// No description provided for @svcBoOffersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No service offers match these filters.'**
+  String get svcBoOffersEmpty;
+
+  /// No description provided for @svcBoOffersLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load service offers.'**
+  String get svcBoOffersLoadFailed;
+
+  /// No description provided for @svcBoOffersRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This account may not read service offers — only back office staff can.'**
+  String get svcBoOffersRefused;
+
+  /// No description provided for @svcBoPageOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages}'**
+  String svcBoPageOf(int page, int pages);
+
+  /// No description provided for @svcBoOffersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 offer} other{{count} offers}}'**
+  String svcBoOffersCount(int count);
+
+  /// No description provided for @svcBoPriceFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From {price}'**
+  String svcBoPriceFrom(String price);
+
+  /// No description provided for @svcBoPricePer.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} per {unit}'**
+  String svcBoPricePer(String price, String unit);
+
+  /// No description provided for @svcBoPricePerPack.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} per {count} {unit}'**
+  String svcBoPricePerPack(String price, int count, String unit);
+
+  /// No description provided for @svcBoSectionOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer'**
+  String get svcBoSectionOffer;
+
+  /// No description provided for @svcBoSectionShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider shop'**
+  String get svcBoSectionShop;
+
+  /// No description provided for @svcBoSectionTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get svcBoSectionTerms;
+
+  /// No description provided for @svcBoSectionPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get svcBoSectionPhotos;
+
+  /// No description provided for @svcBoSectionHold.
+  ///
+  /// In en, this message translates to:
+  /// **'Held off sale'**
+  String get svcBoSectionHold;
+
+  /// No description provided for @svcBoSectionModerationHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderation history'**
+  String get svcBoSectionModerationHistory;
+
+  /// No description provided for @svcBoFactDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get svcBoFactDescription;
+
+  /// No description provided for @svcBoFactName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get svcBoFactName;
+
+  /// No description provided for @svcBoFactListing.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing'**
+  String get svcBoFactListing;
+
+  /// No description provided for @svcBoShopListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed'**
+  String get svcBoShopListed;
+
+  /// No description provided for @svcBoShopDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet listed'**
+  String get svcBoShopDraft;
+
+  /// No description provided for @svcBoShopSuspended.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended'**
+  String get svcBoShopSuspended;
+
+  /// No description provided for @svcBoTermPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing'**
+  String get svcBoTermPricing;
+
+  /// No description provided for @svcBoPricingFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed price'**
+  String get svcBoPricingFixed;
+
+  /// No description provided for @svcBoPricingPerUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Per unit'**
+  String get svcBoPricingPerUnit;
+
+  /// No description provided for @svcBoPricingFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting price'**
+  String get svcBoPricingFrom;
+
+  /// No description provided for @svcBoTermUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not known to this version'**
+  String get svcBoTermUnknown;
+
+  /// No description provided for @svcBoTermPack.
+  ///
+  /// In en, this message translates to:
+  /// **'One pack'**
+  String get svcBoTermPack;
+
+  /// No description provided for @svcBoPackOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {unit}'**
+  String svcBoPackOf(int count, String unit);
+
+  /// No description provided for @svcBoPackUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unit} other{{count} units}}'**
+  String svcBoPackUnits(int count);
+
+  /// No description provided for @svcBoTermTurnaround.
+  ///
+  /// In en, this message translates to:
+  /// **'Turnaround'**
+  String get svcBoTermTurnaround;
+
+  /// No description provided for @svcBoTurnaroundRange.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}–{max} hours'**
+  String svcBoTurnaroundRange(int min, int max);
+
+  /// No description provided for @svcBoTurnaroundUpTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} hours'**
+  String svcBoTurnaroundUpTo(int max);
+
+  /// No description provided for @svcBoTermFulfilment.
+  ///
+  /// In en, this message translates to:
+  /// **'Fulfilment'**
+  String get svcBoTermFulfilment;
+
+  /// No description provided for @svcBoFulfilPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup at the shop'**
+  String get svcBoFulfilPickup;
+
+  /// No description provided for @svcBoFulfilDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop delivery'**
+  String get svcBoFulfilDelivery;
+
+  /// No description provided for @svcBoFulfilBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup or delivery'**
+  String get svcBoFulfilBoth;
+
+  /// No description provided for @svcBoTermFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer files'**
+  String get svcBoTermFiles;
+
+  /// No description provided for @svcBoFilesPolicyNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No files'**
+  String get svcBoFilesPolicyNone;
+
+  /// No description provided for @svcBoFilesPolicyOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get svcBoFilesPolicyOptional;
+
+  /// No description provided for @svcBoFilesPolicyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get svcBoFilesPolicyRequired;
+
+  /// No description provided for @svcBoTermPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Question to the customer'**
+  String get svcBoTermPrompt;
+
+  /// No description provided for @svcBoNoPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'No photos'**
+  String get svcBoNoPhotos;
+
+  /// No description provided for @svcBoPhotoUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Image unavailable'**
+  String get svcBoPhotoUnavailable;
+
+  /// No description provided for @svcBoOpenPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Open full-size photo'**
+  String get svcBoOpenPhoto;
+
+  /// No description provided for @svcBoPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get svcBoPhoto;
+
+  /// No description provided for @svcBoPhotoPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {count}'**
+  String svcBoPhotoPosition(int index, int count);
+
+  /// No description provided for @svcBoHoldReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason given'**
+  String get svcBoHoldReason;
+
+  /// No description provided for @svcBoHoldSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Since'**
+  String get svcBoHoldSince;
+
+  /// No description provided for @svcBoTakeDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Take down'**
+  String get svcBoTakeDown;
+
+  /// No description provided for @svcBoRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get svcBoRestore;
+
+  /// No description provided for @svcBoTakeDownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take down {offer}?'**
+  String svcBoTakeDownTitle(String offer);
+
+  /// No description provided for @svcBoTakeDownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It goes off sale for every customer at once. Its provider reads your reason, and cannot put it back on sale until back office restores it.'**
+  String get svcBoTakeDownBody;
+
+  /// No description provided for @svcBoRestoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore {offer}?'**
+  String svcBoRestoreTitle(String offer);
+
+  /// No description provided for @svcBoRestoreBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The hold is lifted. An offer that was on sale comes back paused, for its provider to resume.'**
+  String get svcBoRestoreBody;
+
+  /// No description provided for @svcBoReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason — required, kept in the history'**
+  String get svcBoReasonLabel;
+
+  /// No description provided for @svcBoReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Say why: the reason is required.'**
+  String get svcBoReasonRequired;
+
+  /// No description provided for @svcBoTakenDownDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{offer} was taken down. Its provider can read your reason.'**
+  String svcBoTakenDownDone(String offer);
+
+  /// No description provided for @svcBoRestoredDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{offer} was restored. If it was on sale, it waits paused for its provider to resume it.'**
+  String svcBoRestoredDone(String offer);
+
+  /// No description provided for @svcBoTakeDownRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Not taken down: the server says this offer is already down, or is not a service offer. Nothing changed, and the list was reloaded.'**
+  String get svcBoTakeDownRefused;
+
+  /// No description provided for @svcBoRestoreRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Not restored: the server says this offer is not taken down any more. Nothing changed, and the list was reloaded.'**
+  String get svcBoRestoreRefused;
+
+  /// No description provided for @svcBoOfferChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer changed while you were acting, so nothing was recorded. It has been reloaded; try again.'**
+  String get svcBoOfferChanged;
+
+  /// No description provided for @svcBoOfferGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer no longer exists.'**
+  String get svcBoOfferGone;
+
+  /// No description provided for @svcBoModerateRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This account may not moderate offers.'**
+  String get svcBoModerateRefused;
+
+  /// No description provided for @svcBoReasonRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The server did not accept that reason. Write one of at most {max} characters.'**
+  String svcBoReasonRejected(int max);
+
+  /// No description provided for @svcBoActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not go through, and nothing changed. Try again.'**
+  String get svcBoActionFailed;
+
+  /// No description provided for @svcBoHistoryNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Back office has never acted on this offer.'**
+  String get svcBoHistoryNever;
+
+  /// No description provided for @svcBoHistoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the history.'**
+  String get svcBoHistoryLoadFailed;
+
+  /// No description provided for @svcBoActTakeDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down'**
+  String get svcBoActTakeDown;
+
+  /// No description provided for @svcBoActRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored'**
+  String get svcBoActRestore;
+
+  /// No description provided for @svcBoActUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'An action this version does not know'**
+  String get svcBoActUnknown;
+
+  /// No description provided for @svcBoActBy.
+  ///
+  /// In en, this message translates to:
+  /// **'by {actor}'**
+  String svcBoActBy(String actor);
+
+  /// No description provided for @svcBoKindAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All kinds'**
+  String get svcBoKindAll;
+
+  /// No description provided for @svcBoKindService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service orders'**
+  String get svcBoKindService;
+
+  /// No description provided for @svcBoFulfilmentAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup and delivery'**
+  String get svcBoFulfilmentAll;
+
+  /// No description provided for @svcBoFulfilmentPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup'**
+  String get svcBoFulfilmentPickup;
+
+  /// No description provided for @svcBoFulfilmentDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get svcBoFulfilmentDelivery;
+
+  /// No description provided for @svcBoServiceTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get svcBoServiceTag;
+
+  /// No description provided for @svcBoStatusPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Placed'**
+  String get svcBoStatusPlaced;
+
+  /// No description provided for @svcBoStatusAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get svcBoStatusAccepted;
+
+  /// No description provided for @svcBoStatusInProduction.
+  ///
+  /// In en, this message translates to:
+  /// **'In production'**
+  String get svcBoStatusInProduction;
+
+  /// No description provided for @svcBoStatusReadyPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for pickup'**
+  String get svcBoStatusReadyPickup;
+
+  /// No description provided for @svcBoStatusReadyDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for delivery'**
+  String get svcBoStatusReadyDelivery;
+
+  /// No description provided for @svcBoStatusOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get svcBoStatusOnTheWay;
+
+  /// No description provided for @svcBoStatusCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected'**
+  String get svcBoStatusCollected;
+
+  /// No description provided for @svcBoStatusDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get svcBoStatusDelivered;
+
+  /// No description provided for @svcBoStatusDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined by the provider'**
+  String get svcBoStatusDeclined;
+
+  /// No description provided for @svcBoStatusNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled: never collected'**
+  String get svcBoStatusNotCollected;
+
+  /// No description provided for @svcBoStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get svcBoStatusCancelled;
+
+  /// No description provided for @svcBoDetailKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get svcBoDetailKind;
+
+  /// No description provided for @svcBoKindServiceIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Service · {category}'**
+  String svcBoKindServiceIn(String category);
+
+  /// No description provided for @svcBoDetailService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get svcBoDetailService;
+
+  /// No description provided for @svcBoPacksOfUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'{packs} × {size} {unit}'**
+  String svcBoPacksOfUnits(int packs, int size, String unit);
+
+  /// No description provided for @svcBoPacksOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{packs} × {size}'**
+  String svcBoPacksOf(int packs, int size);
+
+  /// No description provided for @svcBoDetailOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get svcBoDetailOptions;
+
+  /// No description provided for @svcBoDetailInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions'**
+  String get svcBoDetailInstructions;
+
+  /// No description provided for @svcBoNoInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'None written'**
+  String get svcBoNoInstructions;
+
+  /// No description provided for @svcBoDetailReadyBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated ready'**
+  String get svcBoDetailReadyBy;
+
+  /// No description provided for @svcBoHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Status history'**
+  String get svcBoHistoryTitle;
+
+  /// No description provided for @svcBoHistoryNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No steps recorded yet.'**
+  String get svcBoHistoryNone;
+
+  /// No description provided for @svcBoHistoryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the status history.'**
+  String get svcBoHistoryFailed;
+
+  /// No description provided for @svcBoFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer\'s files'**
+  String get svcBoFilesTitle;
+
+  /// No description provided for @svcBoFilesAuditNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Back office reads of a customer\'s files are recorded: showing them logs your account against each file.'**
+  String get svcBoFilesAuditNotice;
+
+  /// No description provided for @svcBoFilesShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the files'**
+  String get svcBoFilesShow;
+
+  /// No description provided for @svcBoFilesNotTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer takes no files.'**
+  String get svcBoFilesNotTaken;
+
+  /// No description provided for @svcBoFilesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No files on this order. Files are deleted 90 days after the order is completed.'**
+  String get svcBoFilesEmpty;
+
+  /// No description provided for @svcBoFileOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get svcBoFileOpen;
+
+  /// No description provided for @svcBoFileOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened in a new tab. Your access to this file is recorded.'**
+  String get svcBoFileOpened;
+
+  /// No description provided for @svcBoFilePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get svcBoFilePdf;
+
+  /// No description provided for @svcBoFileImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get svcBoFileImage;
+
+  /// No description provided for @svcBoFileOther.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get svcBoFileOther;
+
+  /// No description provided for @svcBoSizeMb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String svcBoSizeMb(String size);
+
+  /// No description provided for @svcBoSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String svcBoSizeKb(String size);
+
+  /// No description provided for @svcBoFilesRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'The server refused to show this order\'s files.'**
+  String get svcBoFilesRefused;
+
+  /// No description provided for @svcBoFilesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The files cannot be reached right now. Try again shortly.'**
+  String get svcBoFilesUnavailable;
+
+  /// No description provided for @svcBoFilesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the files.'**
+  String get svcBoFilesFailed;
+
+  /// No description provided for @svcBoLedgerRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This account may not read the orders ledger.'**
+  String get svcBoLedgerRefused;
+
+  /// No description provided for @svcBoShopsGoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods shops'**
+  String get svcBoShopsGoods;
+
+  /// No description provided for @svcBoShopsServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Service shops'**
+  String get svcBoShopsServices;
+
+  /// No description provided for @svcBoShopsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search shop name'**
+  String get svcBoShopsSearchHint;
+
+  /// No description provided for @svcBoShopsListedOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only shops listed on the storefront appear here.'**
+  String get svcBoShopsListedOnly;
+
+  /// No description provided for @svcBoShopsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No listed shops match.'**
+  String get svcBoShopsEmpty;
+
+  /// No description provided for @svcBoShopsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load shops.'**
+  String get svcBoShopsLoadFailed;
+
+  /// No description provided for @svcBoVerifyGrantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark {shop} as Verified Local?'**
+  String svcBoVerifyGrantTitle(String shop);
+
+  /// No description provided for @svcBoVerifyGrantBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers see the badge on this shop wherever it appears. It is YouDrop\'s own claim to the shop\'s neighbours, so grant it only to a shop that has been checked.'**
+  String get svcBoVerifyGrantBody;
+
+  /// No description provided for @svcBoVerifyRevokeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Verified Local from {shop}?'**
+  String svcBoVerifyRevokeTitle(String shop);
+
+  /// No description provided for @svcBoVerifyRevokeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge disappears from this shop for every customer.'**
+  String get svcBoVerifyRevokeBody;
+
+  /// No description provided for @svcBoVerifyGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant the badge'**
+  String get svcBoVerifyGrant;
+
+  /// No description provided for @svcBoVerifyRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the badge'**
+  String get svcBoVerifyRevoke;
+
+  /// No description provided for @svcBoVerifyGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} is now Verified Local.'**
+  String svcBoVerifyGranted(String shop);
+
+  /// No description provided for @svcBoVerifyRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'{shop} is no longer Verified Local.'**
+  String svcBoVerifyRevoked(String shop);
+
+  /// No description provided for @svcBoVerifyRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Only back office can change this badge.'**
+  String get svcBoVerifyRefused;
+
+  /// No description provided for @svcBoVerifyGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This shop no longer exists.'**
+  String get svcBoVerifyGone;
+
+  /// No description provided for @svcBoVerifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge was not changed. Try again.'**
+  String get svcBoVerifyFailed;
+
+  /// No description provided for @svcBoVerifiedToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Local for {shop}'**
+  String svcBoVerifiedToggle(String shop);
+
+  /// No description provided for @svcBoReasonLength.
+  ///
+  /// In en, this message translates to:
+  /// **'{used}/{max}'**
+  String svcBoReasonLength(int used, int max);
+
+  /// No description provided for @svcBoOfferNotListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded, and this offer is no longer among the service offers, so there is nothing left to act on.'**
+  String get svcBoOfferNotListed;
+
+  /// No description provided for @svcBoOfferUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.'**
+  String get svcBoOfferUnreadable;
+
+  /// No description provided for @svcNavOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers'**
+  String get svcNavOffers;
+
+  /// No description provided for @svcDashboardActiveOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Active offers'**
+  String get svcDashboardActiveOffers;
+
+  /// No description provided for @svcDashboardThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get svcDashboardThisWeek;
+
+  /// No description provided for @svcDashboardThisWeekCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders, last 7 days'**
+  String get svcDashboardThisWeekCaption;
+
+  /// No description provided for @svcDashboardRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get svcDashboardRating;
+
+  /// No description provided for @svcQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions'**
+  String get svcQuickActions;
+
+  /// No description provided for @svcAddOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add offer'**
+  String get svcAddOffer;
+
+  /// No description provided for @svcViewOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'View orders'**
+  String get svcViewOrders;
+
+  /// No description provided for @svcCurrentOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Current offers'**
+  String get svcCurrentOffers;
+
+  /// No description provided for @svcSeeAllOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get svcSeeAllOffers;
+
+  /// No description provided for @svcOfferActive.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVE'**
+  String get svcOfferActive;
+
+  /// No description provided for @svcOfferPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'PAUSED'**
+  String get svcOfferPaused;
+
+  /// No description provided for @svcOfferDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'DRAFT'**
+  String get svcOfferDraft;
+
+  /// No description provided for @svcPauseOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get svcPauseOffer;
+
+  /// No description provided for @svcResumeOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get svcResumeOffer;
+
+  /// No description provided for @svcOfferPausedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer paused. Customers can\'t order it until you resume it.'**
+  String get svcOfferPausedDone;
+
+  /// No description provided for @svcOfferResumedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer is live again.'**
+  String get svcOfferResumedDone;
+
+  /// No description provided for @svcNoOffersYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No offers yet'**
+  String get svcNoOffersYet;
+
+  /// No description provided for @svcNoOffersYetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first service so customers can order it.'**
+  String get svcNoOffersYetBody;
+
+  /// No description provided for @svcDashboardLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your dashboard'**
+  String get svcDashboardLoadFailed;
+
+  /// No description provided for @svcOffersLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your offers'**
+  String get svcOffersLoadFailed;
+
+  /// No description provided for @svcNoShopYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your services shop isn\'t open yet'**
+  String get svcNoShopYet;
+
+  /// No description provided for @svcNoShopYetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It opens as soon as your application is approved.'**
+  String get svcNoShopYetBody;
+
+  /// No description provided for @svcPublishAfterApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'You can publish offers once your application is approved.'**
+  String get svcPublishAfterApproval;
+
+  /// No description provided for @svcOffersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your offers'**
+  String get svcOffersTitle;
+
+  /// No description provided for @svcOffersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What customers can order from you'**
+  String get svcOffersSubtitle;
+
+  /// No description provided for @svcUnitPack.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {unit}'**
+  String svcUnitPack(String count, String unit);
+
+  /// No description provided for @svcUnitPer.
+  ///
+  /// In en, this message translates to:
+  /// **'Per {unit}'**
+  String svcUnitPer(String unit);
+
+  /// No description provided for @svcPriceUsd.
+  ///
+  /// In en, this message translates to:
+  /// **'\${amount}'**
+  String svcPriceUsd(String amount);
+
+  /// No description provided for @svcPriceLbp.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} LBP'**
+  String svcPriceLbp(String amount);
+
+  /// No description provided for @svcLbpPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {amount} at today\'s rate'**
+  String svcLbpPreview(String amount);
+
+  /// No description provided for @svcNewOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'New service offer'**
+  String get svcNewOffer;
+
+  /// No description provided for @svcEditOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit offer'**
+  String get svcEditOffer;
+
+  /// No description provided for @svcOfferTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer title'**
+  String get svcOfferTitle;
+
+  /// No description provided for @svcOfferTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the offer a title'**
+  String get svcOfferTitleRequired;
+
+  /// No description provided for @svcTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters'**
+  String svcTooLong(String max);
+
+  /// No description provided for @svcDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get svcDescription;
+
+  /// No description provided for @svcCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get svcCategory;
+
+  /// No description provided for @svcCategoryOfShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers take your shop\'s category'**
+  String get svcCategoryOfShop;
+
+  /// No description provided for @svcPriceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Price (USD)'**
+  String get svcPriceLabel;
+
+  /// No description provided for @svcPriceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a price above zero, with at most two decimals'**
+  String get svcPriceInvalid;
+
+  /// No description provided for @svcPricingType.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing type'**
+  String get svcPricingType;
+
+  /// No description provided for @svcPricingFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed price'**
+  String get svcPricingFixed;
+
+  /// No description provided for @svcPricingPerUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Price per unit'**
+  String get svcPricingPerUnit;
+
+  /// No description provided for @svcPricingFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting price (options add to it)'**
+  String get svcPricingFrom;
+
+  /// No description provided for @svcUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit (e.g. cards, sqm)'**
+  String get svcUnitLabel;
+
+  /// No description provided for @svcPackSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Units per step'**
+  String get svcPackSize;
+
+  /// No description provided for @svcUnitRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Name the unit, such as cards or sqm'**
+  String get svcUnitRequired;
+
+  /// No description provided for @svcPackSizeRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Between {min} and {max}'**
+  String svcPackSizeRange(String min, String max);
+
+  /// No description provided for @svcPerUnitIsOne.
+  ///
+  /// In en, this message translates to:
+  /// **'A price per unit is for one unit'**
+  String get svcPerUnitIsOne;
+
+  /// No description provided for @svcPackPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers order in steps of {pack}'**
+  String svcPackPreview(String pack);
+
+  /// No description provided for @svcPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get svcPhotos;
+
+  /// No description provided for @svcPhotoRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one photo to publish'**
+  String get svcPhotoRequired;
+
+  /// No description provided for @svcAddPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get svcAddPhoto;
+
+  /// No description provided for @svcTurnaround.
+  ///
+  /// In en, this message translates to:
+  /// **'Turnaround'**
+  String get svcTurnaround;
+
+  /// No description provided for @svcTurnaroundSameDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Same day'**
+  String get svcTurnaroundSameDay;
+
+  /// No description provided for @svcTurnaround1to2.
+  ///
+  /// In en, this message translates to:
+  /// **'1–2 days'**
+  String get svcTurnaround1to2;
+
+  /// No description provided for @svcTurnaround3to5.
+  ///
+  /// In en, this message translates to:
+  /// **'3–5 days'**
+  String get svcTurnaround3to5;
+
+  /// No description provided for @svcTurnaroundWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'About a week'**
+  String get svcTurnaroundWeek;
+
+  /// No description provided for @svcTurnaroundHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}–{max} hours'**
+  String svcTurnaroundHours(String min, String max);
+
+  /// No description provided for @svcTurnaroundRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a turnaround'**
+  String get svcTurnaroundRequired;
+
+  /// No description provided for @svcFulfilment.
+  ///
+  /// In en, this message translates to:
+  /// **'How customers get it'**
+  String get svcFulfilment;
+
+  /// No description provided for @svcFulfilmentPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup at your shop'**
+  String get svcFulfilmentPickup;
+
+  /// No description provided for @svcFulfilmentDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop delivery'**
+  String get svcFulfilmentDelivery;
+
+  /// No description provided for @svcFulfilmentBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get svcFulfilmentBoth;
+
+  /// No description provided for @svcFulfilmentRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how customers get it'**
+  String get svcFulfilmentRequired;
+
+  /// No description provided for @svcDeliveryNeedsAreas.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your delivery areas or drop your shop\'s pin before offering YouDrop delivery'**
+  String get svcDeliveryNeedsAreas;
+
+  /// No description provided for @svcCustomerFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer file'**
+  String get svcCustomerFile;
+
+  /// No description provided for @svcCustomerFileNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not needed'**
+  String get svcCustomerFileNone;
+
+  /// No description provided for @svcCustomerFileOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get svcCustomerFileOptional;
+
+  /// No description provided for @svcCustomerFileRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get svcCustomerFileRequired;
+
+  /// No description provided for @svcInstructionsPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'What should customers tell you?'**
+  String get svcInstructionsPrompt;
+
+  /// No description provided for @svcInstructionsPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Names and job titles to print'**
+  String get svcInstructionsPromptHint;
+
+  /// No description provided for @svcOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get svcOptions;
+
+  /// No description provided for @svcOptionsAfterSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the offer first, then add options such as paper type'**
+  String get svcOptionsAfterSave;
+
+  /// No description provided for @svcEditOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit options'**
+  String get svcEditOptions;
+
+  /// No description provided for @svcNoOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'No options'**
+  String get svcNoOptions;
+
+  /// No description provided for @svcPublishOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish offer'**
+  String get svcPublishOffer;
+
+  /// No description provided for @svcSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get svcSaveDraft;
+
+  /// No description provided for @svcSaveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get svcSaveChanges;
+
+  /// No description provided for @svcOfferPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer published'**
+  String get svcOfferPublished;
+
+  /// No description provided for @svcDraftSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft saved'**
+  String get svcDraftSaved;
+
+  /// No description provided for @svcOfferSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save this offer'**
+  String get svcOfferSaveFailed;
+
+  /// No description provided for @svcOfferRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer wasn\'t accepted as it stands. Check its details and try again.'**
+  String get svcOfferRefused;
+
+  /// No description provided for @svcArchiveOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive offer'**
+  String get svcArchiveOffer;
+
+  /// No description provided for @svcArchiveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive this offer? Customers won\'t see it again.'**
+  String get svcArchiveConfirm;
+
+  /// No description provided for @svcOfferArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer archived'**
+  String get svcOfferArchived;
+
+  /// No description provided for @svcOfferNotEditable.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer uses settings this version of the app can\'t edit. Update the app to change it.'**
+  String get svcOfferNotEditable;
+
+  /// No description provided for @svcMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More actions'**
+  String get svcMoreActions;
+
+  /// No description provided for @svcIncomingOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming orders'**
+  String get svcIncomingOrders;
+
+  /// No description provided for @svcTabNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get svcTabNew;
+
+  /// No description provided for @svcTabInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get svcTabInProgress;
+
+  /// No description provided for @svcTabCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get svcTabCompleted;
+
+  /// No description provided for @svcChipNew.
+  ///
+  /// In en, this message translates to:
+  /// **'NEW'**
+  String get svcChipNew;
+
+  /// No description provided for @svcChipAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'ACCEPTED'**
+  String get svcChipAccepted;
+
+  /// No description provided for @svcChipInProduction.
+  ///
+  /// In en, this message translates to:
+  /// **'IN PRODUCTION'**
+  String get svcChipInProduction;
+
+  /// No description provided for @svcChipReady.
+  ///
+  /// In en, this message translates to:
+  /// **'READY'**
+  String get svcChipReady;
+
+  /// No description provided for @svcChipOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'ON THE WAY'**
+  String get svcChipOnTheWay;
+
+  /// No description provided for @svcChipCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'COLLECTED'**
+  String get svcChipCollected;
+
+  /// No description provided for @svcChipDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'DELIVERED'**
+  String get svcChipDelivered;
+
+  /// No description provided for @svcChipDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'DECLINED'**
+  String get svcChipDeclined;
+
+  /// No description provided for @svcChipNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'NOT COLLECTED'**
+  String get svcChipNotCollected;
+
+  /// No description provided for @svcChipCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'CANCELLED'**
+  String get svcChipCancelled;
+
+  /// No description provided for @svcChipPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup'**
+  String get svcChipPickup;
+
+  /// No description provided for @svcChipDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get svcChipDelivery;
+
+  /// No description provided for @svcAcceptOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept order'**
+  String get svcAcceptOrder;
+
+  /// No description provided for @svcDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get svcDecline;
+
+  /// No description provided for @svcDeclineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you declining?'**
+  String get svcDeclineTitle;
+
+  /// No description provided for @svcDeclineBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer sees the reason you choose.'**
+  String get svcDeclineBody;
+
+  /// No description provided for @svcDeclineConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline order'**
+  String get svcDeclineConfirm;
+
+  /// No description provided for @svcWaitingForPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the customer to collect'**
+  String get svcWaitingForPickup;
+
+  /// No description provided for @svcWaitingForRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a rider'**
+  String get svcWaitingForRider;
+
+  /// No description provided for @svcReadyBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready by {time}'**
+  String svcReadyBy(String time);
+
+  /// No description provided for @svcAcceptedReadyBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted. Promised ready by {time}.'**
+  String svcAcceptedReadyBy(String time);
+
+  /// No description provided for @svcAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Order accepted'**
+  String get svcAccepted;
+
+  /// No description provided for @svcMarkedReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked ready'**
+  String get svcMarkedReady;
+
+  /// No description provided for @svcNoNewOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'No new orders'**
+  String get svcNoNewOrders;
+
+  /// No description provided for @svcNoOrdersInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in production'**
+  String get svcNoOrdersInProgress;
+
+  /// No description provided for @svcNoCompletedOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'No completed orders yet'**
+  String get svcNoCompletedOrders;
+
+  /// No description provided for @svcOrdersEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders appear here as customers place them.'**
+  String get svcOrdersEmptyBody;
+
+  /// No description provided for @svcCancelNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel as not collected'**
+  String get svcCancelNotCollected;
+
+  /// No description provided for @svcCancelNotCollectedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'You can cancel it as not collected in {time}'**
+  String svcCancelNotCollectedIn(String time);
+
+  /// No description provided for @svcCancelNotCollectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this uncollected order?'**
+  String get svcCancelNotCollectedTitle;
+
+  /// No description provided for @svcCancelNotCollectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer is told it was cancelled because it wasn\'t collected.'**
+  String get svcCancelNotCollectedBody;
+
+  /// No description provided for @svcCancelNotCollectedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the customer (optional)'**
+  String get svcCancelNotCollectedNote;
+
+  /// No description provided for @svcKeepOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep order'**
+  String get svcKeepOrder;
+
+  /// No description provided for @svcDurationDaysHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d {hours}h'**
+  String svcDurationDaysHours(String days, String hours);
+
+  /// No description provided for @svcDurationHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m'**
+  String svcDurationHoursMinutes(String hours, String minutes);
+
+  /// No description provided for @svcDurationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m'**
+  String svcDurationMinutes(String minutes);
+
+  /// No description provided for @svcRefusedNotDeclinable.
+  ///
+  /// In en, this message translates to:
+  /// **'This order was accepted meanwhile, so it can\'t be declined. Refreshing.'**
+  String get svcRefusedNotDeclinable;
+
+  /// No description provided for @svcRefusedNotCollectable.
+  ///
+  /// In en, this message translates to:
+  /// **'This order isn\'t waiting at your counter any more. Refreshing.'**
+  String get svcRefusedNotCollectable;
+
+  /// No description provided for @svcRefusedTooSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'It\'s too soon: the customer still has time to collect. Refreshing.'**
+  String get svcRefusedTooSoon;
+
+  /// No description provided for @svcRefusedOther.
+  ///
+  /// In en, this message translates to:
+  /// **'The order couldn\'t be changed. Refreshing.'**
+  String get svcRefusedOther;
+
+  /// No description provided for @svcOrderDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Order declined'**
+  String get svcOrderDeclined;
+
+  /// No description provided for @svcOrderCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as collected'**
+  String get svcOrderCollected;
+
+  /// No description provided for @svcOrderCancelledNotCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled as not collected'**
+  String get svcOrderCancelledNotCollected;
+
+  /// No description provided for @svcOrderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {id}'**
+  String svcOrderTitle(String id);
+
+  /// No description provided for @svcChatWithCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with customer'**
+  String get svcChatWithCustomer;
+
+  /// No description provided for @svcTheJob.
+  ///
+  /// In en, this message translates to:
+  /// **'The job'**
+  String get svcTheJob;
+
+  /// No description provided for @svcInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Special instructions'**
+  String get svcInstructions;
+
+  /// No description provided for @svcNoInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'No instructions given'**
+  String get svcNoInstructions;
+
+  /// No description provided for @svcCustomerFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer\'s files'**
+  String get svcCustomerFiles;
+
+  /// No description provided for @svcNoFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No files sent'**
+  String get svcNoFiles;
+
+  /// No description provided for @svcFilesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the files'**
+  String get svcFilesLoadFailed;
+
+  /// No description provided for @svcOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get svcOpenFile;
+
+  /// No description provided for @svcFileCouldNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this file'**
+  String get svcFileCouldNotOpen;
+
+  /// No description provided for @svcFileDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Document'**
+  String get svcFileDocument;
+
+  /// No description provided for @svcFileImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get svcFileImage;
+
+  /// No description provided for @svcFileSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String svcFileSizeKb(String size);
+
+  /// No description provided for @svcFileSizeMb.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String svcFileSizeMb(String size);
+
+  /// No description provided for @svcFulfilmentPickupDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer collects it at your shop'**
+  String get svcFulfilmentPickupDetail;
+
+  /// No description provided for @svcFulfilmentDeliveryDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider delivers it to {address}'**
+  String svcFulfilmentDeliveryDetail(String address);
+
+  /// No description provided for @svcEstimatedReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated ready'**
+  String get svcEstimatedReady;
+
+  /// No description provided for @svcTurnaroundAfterAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Turnaround once you accept: {range}'**
+  String svcTurnaroundAfterAccept(String range);
+
+  /// No description provided for @svcRiderOnTheWay.
+  ///
+  /// In en, this message translates to:
+  /// **'A rider is on the way to collect it'**
+  String get svcRiderOnTheWay;
+
+  /// No description provided for @svcFileLinkRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get a fresh link to this file. Try again.'**
+  String get svcFileLinkRefreshFailed;
+
+  /// No description provided for @svcOfferTakenDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken down by YouDrop'**
+  String get svcOfferTakenDown;
+
+  /// No description provided for @svcOfferTakenDownReason.
+  ///
+  /// In en, this message translates to:
+  /// **'YouDrop\'s reason: {reason}'**
+  String svcOfferTakenDownReason(String reason);
+
+  /// No description provided for @svcOfferTakenDownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers can\'t order it, and it can\'t be published, paused or resumed until YouDrop restores it. You can still edit it.'**
+  String get svcOfferTakenDownBody;
+
+  /// No description provided for @svcOfferChangedElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'This offer was just changed somewhere else, so it has been read again. Check it and try again.'**
+  String get svcOfferChangedElsewhere;
+
+  /// No description provided for @svcShopReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load your shop'**
+  String get svcShopReadFailed;
+
+  /// No description provided for @svcServiceOrdersRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Service orders'**
+  String get svcServiceOrdersRow;
+
+  /// No description provided for @svcServiceOffersRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Service offers'**
+  String get svcServiceOffersRow;
+
+  /// No description provided for @svcChatOrderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {ref}'**
+  String svcChatOrderLabel(String ref);
+
+  /// No description provided for @svcChatClosedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat about this order closed on {date}'**
+  String svcChatClosedOn(String date);
+
+  /// No description provided for @svcChatClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat about this order has closed'**
+  String get svcChatClosed;
+
+  /// No description provided for @svcChatUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat is unavailable right now.'**
+  String get svcChatUnavailable;
+
+  /// No description provided for @svcChatOrderNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
+  String get svcChatOrderNotFound;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

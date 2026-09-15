@@ -50,7 +50,42 @@ public class Store {
     private static final Duration CLOSING_SOON_WINDOW = Duration.ofMinutes(30);
 
     public enum Vertical {
-        RESTAURANT, COFFEE, GROCERY, CONVENIENCE, PHARMACY, ELECTRONICS, FLOWERS_GIFTS
+        RESTAURANT, COFFEE, GROCERY, CONVENIENCE, PHARMACY, ELECTRONICS, FLOWERS_GIFTS,
+
+        /**
+         * A shop that makes something to order instead of selling stock off a shelf: a print shop, a
+         * tailor, a repairer, a photo studio. It carries a {@link ServiceCategory}, and no other
+         * vertical does.
+         *
+         * <p>Left off every goods surface unless a read asks for it by name: the storefront and its
+         * search, "near me", the district chips, the catalogue, the Home strip, banners and the gift
+         * hub. The reason is on the phones: an installed app reads an unknown vertical as RESTAURANT,
+         * so a print shop that reached the Home storefront would be drawn as a restaurant.
+         *
+         * <p>A store never moves into or out of it ({@link Store#updateProfile}). A goods shop and a
+         * service shop are listed, ordered from and fulfilled differently, so a move would strand
+         * whatever was built for the other one. The same rule stops an old merchant app, which reads
+         * SERVICES as RESTAURANT, from rewriting a provider's shop on a profile save.
+         */
+        SERVICES
+    }
+
+    /**
+     * What a {@link Vertical#SERVICES} shop does.
+     *
+     * <p>The whole taxonomy lives here, including categories that are not offered yet. Which ones are
+     * open is configuration ({@code ServiceCategories}), so opening or closing one needs no migration
+     * and orphans no shop.
+     */
+    public enum ServiceCategory {
+        PRINTING,
+        /** Tailoring and alterations. */
+        TAILORING,
+        REPAIRS,
+        PHOTOGRAPHY,
+        CLEANING,
+        BEAUTY,
+        TUTORING
     }
 
     public enum Status {
@@ -101,6 +136,15 @@ public class Store {
     @Enumerated(EnumType.STRING)
     @Column(name = "vertical", nullable = false, length = 24)
     private Vertical vertical;
+
+    /**
+     * What a service shop does, and null for every other shop. V33's CHECKs hold the pair together in
+     * both directions, and so does this class: the constructor refuses a mismatch, and
+     * {@link #changeServiceCategory} only re-files a service shop.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_category", length = 24)
+    private ServiceCategory serviceCategory;
 
     @Column(name = "tagline", length = 240)
     private String tagline;
@@ -193,6 +237,15 @@ public class Store {
     private boolean verifiedLocal;
 
     /**
+     * When the shop first listed — what "New on YouDrop" means. Stamped by the first
+     * {@link #publish}, never moved by a later one: a shop suspended and listed again has not just
+     * joined. Null for a shop that has never listed. V32 backfilled it from {@code created_at} for
+     * shops already past DRAFT, which errs towards "not new" — see the migration.
+     */
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
+    /**
      * How far from the pin this shop delivers, in metres. Null keeps the old behaviour — the
      * platform's zones alone decide. Only meaningful with a pin; the service refuses to set it
      * without one, because a circle needs a centre.
@@ -230,12 +283,31 @@ public class Store {
         // for JPA
     }
 
+    /** A goods shop. A service shop needs its category: see the constructor below. */
     public Store(String merchantId, String name, Vertical vertical) {
+        this(merchantId, name, vertical, null);
+    }
+
+    /**
+     * A shop, with what it does when it is a service shop.
+     *
+     * @throws IllegalArgumentException when the vertical and the category disagree: a service shop
+     *         with no category, or a goods shop with one. V33 refuses both; refusing here first turns
+     *         a constraint name into a sentence the merchant can act on.
+     */
+    public Store(String merchantId, String name, Vertical vertical, ServiceCategory serviceCategory) {
+        if (vertical == Vertical.SERVICES && serviceCategory == null) {
+            throw new IllegalArgumentException("A services shop needs a service category");
+        }
+        if (vertical != Vertical.SERVICES && serviceCategory != null) {
+            throw new IllegalArgumentException("Only a services shop has a service category");
+        }
         this.id = UUID.randomUUID();
         this.merchantId = merchantId;
         this.name = name;
         this.slug = slugify(name) + "-" + this.id.toString().substring(0, 8);
         this.vertical = vertical;
+        this.serviceCategory = serviceCategory;
         this.status = Status.DRAFT;
     }
 
@@ -330,19 +402,52 @@ public class Store {
         return availabilityAt(now) != Availability.CLOSED;
     }
 
+    /**
+     * Whether an order placed now could still arrive before the shop shuts: it is taking orders,
+     * and the slow end of its delivery estimate fits inside the opening window it is in.
+     *
+     * <p>What the gift hub's "Same-day Deliverable" means. Derived from the clock on every read,
+     * like {@link #availabilityAt}, and never stored: a flag that was true in the morning is a lie
+     * by the evening, and the promise is made to somebody paying from abroad for a family's dinner.
+     */
+    public boolean deliversBeforeClosing(Instant now) {
+        if (!isOrderable(now)) {
+            return false;
+        }
+        LocalTime closesAt = closingTimeAt(now);
+        if (closesAt == null) {
+            return false;
+        }
+        long minutesLeft = Duration.between(now.atZone(zone()).toLocalTime(), closesAt).toMinutes();
+        if (minutesLeft < 0) {
+            // A window running past midnight closes earlier on the clock face than it is now.
+            minutesLeft += Duration.ofDays(1).toMinutes();
+        }
+        return minutesLeft >= etaMaxMinutes;
+    }
+
     // ---------------------------------------------------------------- behaviour
 
     public boolean isOwnedBy(String candidateMerchantId) {
         return merchantId.equals(candidateMerchantId);
     }
 
-    public void publish() {
+    /**
+     * Lists the store, stamping {@link #getPublishedAt} the first time.
+     *
+     * <p>Takes the instant rather than reading the clock, for the reason {@link #markBusyUntil}
+     * gives.
+     */
+    public void publish(Instant at) {
         if (hours.isEmpty()) {
             // Publishing without hours would list a store that can never be open, because
             // availability is derived entirely from them.
             throw new IllegalStateException("A store needs opening hours before it can be listed");
         }
         this.status = Status.ACTIVE;
+        if (publishedAt == null) {
+            publishedAt = at;
+        }
     }
 
     public void suspend() {
@@ -376,8 +481,23 @@ public class Store {
         this.hours.addAll(replacement);
     }
 
+    /**
+     * Saves the profile form's fields.
+     *
+     * <p>The vertical may move between goods verticals — a café that turns out to be a bakery — but
+     * never into or out of {@link Vertical#SERVICES}; see there for why. The move is refused before
+     * anything is written, so a refused save leaves the shop exactly as it was.
+     *
+     * @throws IllegalStateException when the save would move the shop into or out of SERVICES
+     */
     public void updateProfile(String name, String tagline, String description, Vertical vertical,
                               List<String> tags, String timezone, String address) {
+        if (isServices() != (vertical == Vertical.SERVICES)) {
+            throw new IllegalStateException(isServices()
+                    ? "A services shop cannot become a goods shop. Open a separate shop to sell goods."
+                    : "A goods shop cannot become a services shop. Open a separate shop to offer "
+                            + "services.");
+        }
         // Note the slug is not touched. Renaming a shop must not break a shared link.
         this.name = name;
         this.tagline = tagline;
@@ -464,6 +584,36 @@ public class Store {
         return vertical;
     }
 
+    /** Whether this is a service shop: {@link Vertical#SERVICES}, with a {@link ServiceCategory}. */
+    public boolean isServices() {
+        return vertical == Vertical.SERVICES;
+    }
+
+    /** What a service shop does; null for a goods shop. */
+    public ServiceCategory getServiceCategory() {
+        return serviceCategory;
+    }
+
+    /**
+     * Re-files a service shop under another category — a print shop that turned out to be mostly a
+     * photo studio. The shop stays a service shop; a goods shop has no category to change.
+     *
+     * <p>Whether the category is open is not this class's to know: {@code StoreService} checks that
+     * first, because it reads configuration.
+     *
+     * @throws IllegalStateException    on a goods shop
+     * @throws IllegalArgumentException for null, because a service shop always has a category
+     */
+    public void changeServiceCategory(ServiceCategory category) {
+        if (!isServices()) {
+            throw new IllegalStateException("Only a services shop has a service category");
+        }
+        if (category == null) {
+            throw new IllegalArgumentException("A services shop needs a service category");
+        }
+        this.serviceCategory = category;
+    }
+
     public String getTagline() {
         return tagline;
     }
@@ -528,23 +678,60 @@ public class Store {
         return powerUpdatedAt;
     }
 
-    /** The merchant's declaration, stamped so the storefront can say how fresh it is. */
-    public void declarePower(PowerStatus status, String note) {
+    /**
+     * The merchant's declaration, stamped so the storefront can say how fresh it is.
+     *
+     * <p>Takes the instant, like {@link #markBusyUntil}. It used to read {@code Instant.now()}, which
+     * left "is this declaration still current" impossible to check at a chosen time.
+     */
+    public void declarePower(PowerStatus status, String note, Instant at) {
         this.powerStatus = status == null ? PowerStatus.UNKNOWN : status;
         this.powerNote = note;
-        this.powerUpdatedAt = Instant.now();
+        this.powerUpdatedAt = at;
+    }
+
+    /**
+     * Whether the merchant declared what the lights are doing at or after {@code since} — recent
+     * enough to be presented as happening now. A shop that never declared has nothing current to
+     * say, and neither does a declaration with no time on it.
+     */
+    public boolean powerDeclaredSince(Instant since) {
+        return powerStatus != PowerStatus.UNKNOWN
+                && powerUpdatedAt != null
+                && !powerUpdatedAt.isBefore(since);
     }
 
     public String getNeighborhood() {
         return neighborhood;
     }
 
+    /**
+     * Declares the shop's district, or clears it.
+     *
+     * <p>Trimmed, and blank stored as null. The district list is the distinct values of this column
+     * and every filter on it is an exact match, so " Hamra" and "Hamra" would otherwise be two
+     * districts in the list and two different answers to one question.
+     */
     public void setNeighborhood(String neighborhood) {
-        this.neighborhood = neighborhood;
+        this.neighborhood = neighborhood == null || neighborhood.isBlank()
+                ? null
+                : neighborhood.trim();
     }
 
     public boolean isVerifiedLocal() {
         return verifiedLocal;
+    }
+
+    /**
+     * Grants or withdraws the dekkane trust badge.
+     *
+     * <p>Only ever called on Backoffice's behalf, and deliberately nowhere near
+     * {@link #updateProfile}: a badge the shop could award itself would certify nothing. V23 made the
+     * column not merchant-writable and, until this existed, nothing could write it at all — so the
+     * badge the customer app draws for it could never appear.
+     */
+    public void setVerifiedLocal(boolean verified) {
+        this.verifiedLocal = verified;
     }
 
     public Integer getDeliveryRadiusMetres() {
@@ -573,6 +760,10 @@ public class Store {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
     }
 
     public Instant getUpdatedAt() {

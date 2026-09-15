@@ -105,6 +105,62 @@ public class ApiExceptionHandler {
     }
 
     /**
+     * A services applicant reaching a path that would open a shop for them — a first product, a
+     * first scan — before their services shop is open.
+     *
+     * <p>A 422 like any catalogue rule, but with its own title, so a client can tell "open your
+     * services shop first" apart from a rule about the product it sent.
+     */
+    @ExceptionHandler(com.delivery.product.service.StoreService.ServicesShopNotOpenedException.class)
+    public ProblemDetail onServicesShopNotOpened(
+            com.delivery.product.service.StoreService.ServicesShopNotOpenedException e) {
+        return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Services shop not opened", e.getMessage());
+    }
+
+    /**
+     * Onboarding could not say whether a merchant with no shop applied to offer services, so no shop
+     * was opened. A 503 rather than a guess: guessing "no" would open a restaurant that can never
+     * become the services shop, and retrying is all it takes.
+     */
+    @ExceptionHandler(com.delivery.product.service.OnboardingApplicationClient
+            .OnboardingUnavailableException.class)
+    public ProblemDetail onOnboardingUnavailable(
+            com.delivery.product.service.OnboardingApplicationClient.OnboardingUnavailableException e) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Onboarding unavailable",
+                "Your shop could not be set up just now. Please try again in a moment.");
+    }
+
+    /**
+     * A Merchant Blitz scan, photo or line the caller does not own, or that does not exist.
+     *
+     * <p>One answer for both, like every other id here: a 403 on another merchant's scan would
+     * confirm the id is real.
+     */
+    @ExceptionHandler(com.delivery.product.service.CatalogScanService.CatalogScanNotFoundException.class)
+    public ProblemDetail onScanNotFound(
+            com.delivery.product.service.CatalogScanService.CatalogScanNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "Scan not found", e.getMessage());
+    }
+
+    /**
+     * The day's scans are spent. 429 with the limit in the body, so the client can say "5 a day"
+     * rather than a bare "try later" — each scan is a paid vision call once a real provider is on.
+     */
+    @ExceptionHandler(com.delivery.product.service.CatalogScanService.ScanQuotaExceededException.class)
+    public ProblemDetail onScanQuota(
+            com.delivery.product.service.CatalogScanService.ScanQuotaExceededException e) {
+        ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Scan limit reached", e.getMessage());
+        detail.setProperty("limit", e.getLimit());
+        return detail;
+    }
+
+    /** The scan is not in a state for that: already analysing, already complete, out of attempts. */
+    @ExceptionHandler(com.delivery.product.service.CatalogScanService.ScanStateException.class)
+    public ProblemDetail onScanState(com.delivery.product.service.CatalogScanService.ScanStateException e) {
+        return problem(HttpStatus.CONFLICT, "Scan not ready for that", e.getMessage());
+    }
+
+    /**
      * A staff member who lacks one permission.
      *
      * <p>The permission is named in the body on purpose: "you cannot do that" sends a cashier to
@@ -297,15 +353,98 @@ public class ApiExceptionHandler {
         return detail;
     }
 
+    /** What a stale product save is answered with, for a client to branch on: the detail is prose. */
+    static final String PRODUCT_CHANGED = "PRODUCT_CHANGED";
+
+    /** What a write refused by V36's take-down CHECK is answered with. */
+    static final String OFFER_TAKEN_DOWN = "OFFER_TAKEN_DOWN";
+
+    /** V36's CHECK that keeps a taken-down offer off sale. */
+    private static final String TAKEDOWN_CHECK = "chk_product_takedown";
+
+    /**
+     * A save that read a product before another save changed it ({@code Product}'s version, V36).
+     *
+     * <p>409 with a code of its own. The save was judged on a product that is no longer there, so it is
+     * refused whole rather than mixed into the change it missed, and only a reload helps: the next try
+     * reads the product as it now is. The provider apps show the detail as it is written, so it says what
+     * to do next rather than naming a lock.
+     *
+     * <p>Spring's translation of Hibernate's refusal at commit, and the persistence API's own exception for
+     * a flush that meets it outside that translation. Product is the only versioned entity here.
+     */
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class})
+    public ProblemDetail onProductChanged(RuntimeException e) {
+        log.info("Refused a save that read a product before it changed: {}", e.getMessage());
+        ProblemDetail detail = problem(HttpStatus.CONFLICT, "Product changed",
+                "This product changed while you were editing it. Reload it and try again.");
+        detail.setProperty("code", PRODUCT_CHANGED);
+        return detail;
+    }
+
+    /**
+     * How Hibernate 6.6 reports a stale product save on PostgreSQL, which is not the optimistic-lock failure
+     * above.
+     *
+     * <p>Product's {@code updated_at} is read back from the UPDATE itself ({@code @Generated}), and Hibernate
+     * reads it before it counts the rows the UPDATE matched. When the version no longer matches there is no
+     * row to read, so Hibernate throws a bare {@code HibernateException} saying the database returned no
+     * generated values, and Spring passes that on as a {@code JpaSystemException}. Products are never
+     * deleted, so for a product an UPDATE that matched no row is exactly a stale save, and it is answered as
+     * one. {@code OfferModerationDatabaseTest} pins this against a real database, and keeps passing if a
+     * later Hibernate throws the optimistic-lock failure instead.
+     *
+     * <p>Every other failure of this kind keeps the catch-all's answer.
+     */
+    @ExceptionHandler(org.springframework.orm.jpa.JpaSystemException.class)
+    public ProblemDetail onPersistenceFailure(org.springframework.orm.jpa.JpaSystemException e) {
+        return isStaleProductUpdate(e) ? onProductChanged(e) : onUnexpected(e);
+    }
+
+    /** Whether Hibernate found no product row to read generated columns back from, as a stale UPDATE leaves. */
+    private static boolean isStaleProductUpdate(Throwable e) {
+        String unread = "returned no natively generated values : "
+                + com.delivery.product.domain.Product.class.getName();
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.HibernateException && cause.getMessage() != null
+                    && cause.getMessage().endsWith(unread)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * A uniqueness clash is the caller's problem, not a server fault — most often re-creating a
      * category that already exists. Returning 500 here would make a retry-safe client give up.
+     *
+     * <p>Except {@code chk_product_takedown} (V36), which refuses to put a taken-down offer back on sale and
+     * is worded as that. The provider apps show the detail as it is written, and "a uniqueness rule" tells
+     * a provider nothing. Product refuses those acts first, and its version refuses a save read before the
+     * take-down, so only a write that goes around Product can meet the CHECK.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail onConflict(DataIntegrityViolationException e) {
         log.debug("Constraint violation", e);
+        if (TAKEDOWN_CHECK.equalsIgnoreCase(violatedConstraint(e))) {
+            ProblemDetail detail = problem(HttpStatus.CONFLICT, "Offer taken down",
+                    "YouDrop has taken this offer down, so it cannot go back on sale until YouDrop restores it.");
+            detail.setProperty("code", OFFER_TAKEN_DOWN);
+            return detail;
+        }
         return problem(HttpStatus.CONFLICT, "Conflict",
                 "That resource already exists or violates a uniqueness rule");
+    }
+
+    /** The constraint the database refused a write on, as Hibernate read it from the error, or null. */
+    private static String violatedConstraint(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+        }
+        return null;
     }
 
     @ExceptionHandler(AccessDeniedException.class)

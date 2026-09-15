@@ -6,6 +6,7 @@ import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'merchant_blitz_screen.dart';
 import 'order_detail_screen.dart';
 import 'product_form_screen.dart';
 
@@ -42,6 +43,7 @@ class InventoryScreen extends StatefulWidget {
     this.storeId,
     this.onOpenAlerts,
     this.onOpenItem,
+    this.catalogScanApi,
   });
 
   /// inventory-service. Null until the service ships, or wherever a host has none to hand — the
@@ -67,6 +69,13 @@ class InventoryScreen extends StatefulWidget {
   /// Opens one item — the adjust sheet and its movement history. Null falls back to the product
   /// form, so a row is never inert.
   final void Function(InventoryItem item)? onOpenItem;
+
+  /// Merchant Blitz — a catalogue from shelf photos. Non-null draws "Scan shelves" in the header
+  /// (and on an empty shelf), which opens the scan; null draws neither. The scan is MERCHANT-only on
+  /// the server, so a host hands this over only to the shop's owner and an employee never sees a
+  /// button that would answer 403. Here, rather than on the catalogue list, because this is the tab
+  /// the phone's nav calls the shelves.
+  final CatalogScanApi? catalogScanApi;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -367,15 +376,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             children: <Widget>[
               MerchantScreenHeader(
                 title: t.invTitle,
-                // The refresh control only exists where there is no pull gesture to replace it.
-                trailing: narrow
-                    ? null
-                    : IconButton(
-                        onPressed: _refresh,
-                        icon: const Icon(Icons.refresh, size: 20),
-                        color: DeliveryColors.muted,
-                        tooltip: t.refresh,
-                      ),
+                trailing: _headerActions(t, narrow: narrow),
               ),
               _summaryBand(t),
               _searchBand(t),
@@ -540,6 +541,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     icon: Icons.inventory_2_outlined,
                     title: t.invEmpty,
                     message: t.invEmptyHint,
+                    action: _scanAction(t),
                   ),
           )
         else
@@ -575,6 +577,56 @@ class _InventoryScreenState extends State<InventoryScreen> {
       color: DeliveryColors.brand,
       child: listener,
     );
+  }
+
+  /// The header's end: "Scan shelves" when the host wired Merchant Blitz, and the refresh control
+  /// — which only exists where there is no pull gesture to replace it.
+  Widget? _headerActions(DeliveryStrings t, {required bool narrow}) {
+    final Widget? scan = widget.catalogScanApi == null
+        ? null
+        : TextButton.icon(
+            onPressed: _openBlitz,
+            icon: const Icon(Icons.document_scanner_outlined, size: 18),
+            label: Text(t.blitzEntryAction),
+          );
+    final Widget? refresh = narrow
+        ? null
+        : IconButton(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh, size: 20),
+            color: DeliveryColors.muted,
+            tooltip: t.refresh,
+          );
+    if (scan == null) return refresh;
+    if (refresh == null) return scan;
+    return Row(mainAxisSize: MainAxisSize.min, children: <Widget>[scan, refresh]);
+  }
+
+  /// The same door on an empty shelf, where a shop with nothing listed yet is looking for one.
+  Widget? _scanAction(DeliveryStrings t) => widget.catalogScanApi == null
+      ? null
+      : YdPillButton.secondary(
+          label: t.blitzEntryAction,
+          icon: Icons.document_scanner_outlined,
+          onPressed: _openBlitz,
+          size: YdPillButtonSize.compact,
+          expand: false,
+        );
+
+  Future<void> _openBlitz() async {
+    final CatalogScanApi? api = widget.catalogScanApi;
+    if (api == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => MerchantBlitzScreen(
+          api: api,
+          catalogApi: widget.catalogApi,
+          storeId: widget.storeId,
+        ),
+      ),
+    );
+    // Whatever the merchant kept is on these shelves now, as drafts.
+    if (mounted) unawaited(_refresh());
   }
 
   /// Whether the empty result is the shop's or the filters'. Only the second offers a "Clear".

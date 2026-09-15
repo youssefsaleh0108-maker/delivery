@@ -881,6 +881,140 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get butlerStatusExpired => 'Expired';
 
   @override
+  String get butlerDetailsTitle => 'Errand details';
+
+  @override
+  String get butlerViewDetails => 'View details';
+
+  @override
+  String get butlerCancelErrand => 'Cancel errand';
+
+  @override
+  String get butlerCancelConfirmTitle => 'Cancel this errand?';
+
+  @override
+  String get butlerCancelConfirmBody =>
+      'It is withdrawn straight away and nobody will go for it. You can always ask again.';
+
+  @override
+  String get butlerCancelConfirmYes => 'Yes, cancel';
+
+  @override
+  String get butlerTrackOrder => 'Track order';
+
+  @override
+  String get butlerDetailProgress => 'Progress';
+
+  @override
+  String get butlerDetailTheErrand => 'The errand';
+
+  @override
+  String get butlerDetailWhereFrom => 'Where from';
+
+  @override
+  String get butlerDetailRecipient => 'Who receives it';
+
+  @override
+  String get butlerDetailContactPhone => 'Contact phone';
+
+  @override
+  String get butlerDetailPrice => 'Price';
+
+  @override
+  String get butlerDetailBudgetCap => 'Your budget cap';
+
+  @override
+  String get butlerDetailGoods => 'Goods';
+
+  @override
+  String get butlerDetailGoodsPending => 'Known once the shopper has paid';
+
+  @override
+  String get butlerDetailErrandFee => 'Errand fee';
+
+  @override
+  String get butlerDetailTotal => 'Total to pay';
+
+  @override
+  String get butlerDetailReceipt => 'Receipt reference';
+
+  @override
+  String butlerDeclineReason(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String get butlerStepRequested => 'Request sent';
+
+  @override
+  String get butlerStepClaimedBuy => 'A shopper took it';
+
+  @override
+  String get butlerStepClaimedSend => 'A rider took it';
+
+  @override
+  String get butlerStepQuoted => 'Price quoted';
+
+  @override
+  String get butlerStepAgreed => 'Price agreed';
+
+  @override
+  String get butlerStepConfirmed => 'Confirmed';
+
+  @override
+  String get butlerStepClaimBuyPending => 'Waiting for a shopper';
+
+  @override
+  String get butlerStepClaimSendPending => 'Waiting for a rider';
+
+  @override
+  String get butlerStepQuotePending => 'The shopper tells you the price';
+
+  @override
+  String get butlerStepAgreePending => 'You agree the price';
+
+  @override
+  String get butlerStepConfirmPending => 'You confirm the fee';
+
+  @override
+  String get butlerStepStateDone => 'Done';
+
+  @override
+  String get butlerStepStateNow => 'Now';
+
+  @override
+  String get butlerStepStateNext => 'Still to come';
+
+  @override
+  String get butlerStepStateEnded => 'Ended';
+
+  @override
+  String get butlerDetailQuotedTotal => 'Quoted total';
+
+  @override
+  String butlerConfirmFee(String amount) {
+    return 'Confirm $amount';
+  }
+
+  @override
+  String get butlerSendConfirmed => 'Confirmed. The rider will collect it.';
+
+  @override
+  String butlerSendAwaitingConfirm(String fee) {
+    return 'A rider took it. Confirm the fee of $fee and they will collect it.';
+  }
+
+  @override
+  String get butlerDeclineConfirmTitle => 'Turn down this price?';
+
+  @override
+  String get butlerDeclineConfirmBody =>
+      'The errand ends here and cannot be reopened. The shopper has already paid for the goods.';
+
+  @override
+  String get butlerDeclineConfirmYes => 'Yes, decline';
+
+  @override
   String get somebodyElseClaimed => 'Somebody else claimed that one';
 
   @override
@@ -3816,24 +3950,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   String get custAllDistricts => 'All districts';
 
   @override
-  String get custDiasporaTitle => 'Send to Lebanon';
-
-  @override
   String get custDiasporaSub => 'Diaspora Gifting Portal';
-
-  @override
-  String get custDiasporaBanner => 'Remittance made real';
-
-  @override
-  String get custDiasporaBlurb =>
-      'Pay in USD from abroad — we deliver fresh groceries, medicine and hot food to their doorstep in Lebanon.';
-
-  @override
-  String get custFamilyRecipient => 'Family recipient';
-
-  @override
-  String get custPersonalNote =>
-      'Attach a personal note (delivered with the order)';
 
   @override
   String get custPersonalNoteHint =>
@@ -3848,7 +3965,7 @@ class DeliveryStringsEn extends DeliveryStrings {
   }
 
   @override
-  String get custStartOrder => 'Select Items 0026 Start Order';
+  String get custStartOrder => 'Select Items & Start Order';
 
   @override
   String get custPickRecipient => 'Choose who receives it';
@@ -7062,4 +7179,5325 @@ class DeliveryStringsEn extends DeliveryStrings {
 
   @override
   String get next => 'Next';
+
+  @override
+  String get accountIntentSheetTitle => 'How will you use YouDrop?';
+
+  @override
+  String get accountIntentSheetSubtitle =>
+      'Pick one, then continue with Google. Riding and selling are reviewed before you start, and an account can apply for only one of them.';
+
+  @override
+  String get accountIntentCustomer => 'Customer';
+
+  @override
+  String get accountIntentCustomerBlurb => 'I want to order';
+
+  @override
+  String get accountIntentRider => 'Rider';
+
+  @override
+  String get accountIntentRiderBlurb => 'I want to deliver';
+
+  @override
+  String get accountIntentSeller => 'Seller';
+
+  @override
+  String get accountIntentSellerBlurb => 'I want to sell';
+
+  @override
+  String get googleSignInCancelled =>
+      'Google sign-in was cancelled. Nothing was changed.';
+
+  @override
+  String get googleSignInUnavailable =>
+      'Google sign-in isn\'t available yet. Please use your email or phone for now.';
+
+  @override
+  String get googleRoleNotAdded =>
+      'You\'re signed in, but we couldn\'t finish setting up your account. Please choose again.';
+
+  @override
+  String get googleExistingApplication =>
+      'This account already has an application, so we\'ve opened that instead of starting another.';
+
+  @override
+  String get accountSetupTitle => 'One more step';
+
+  @override
+  String get accountSetupSubtitle =>
+      'Tell us how you\'ll use YouDrop to finish setting up your account.';
+
+  @override
+  String get wizAccountEmailNote =>
+      'We\'ll use the email on the account you signed in with.';
+
+  @override
+  String get wizAccountRefreshFailed =>
+      'Your application is in, but we couldn\'t refresh your sign-in. Try again.';
+
+  @override
+  String get accountApplicationClosed =>
+      'The partner application on this account has already been decided, so it can\'t be reopened here. Please contact support.';
+
+  @override
+  String get accountAlreadyPartner =>
+      'This account is already a YouDrop partner, and an account can hold only one partner role.';
+
+  @override
+  String get accountOtherApplication =>
+      'This account already has an application for another role, and an account can apply for only one.';
+
+  @override
+  String get accountEmailUnverified =>
+      'Your account\'s email address hasn\'t been verified, so we can\'t take an application on it yet.';
+
+  @override
+  String get wizAccountRolesRetry =>
+      'Your application is in, but we couldn\'t finish setting up your account. Please try again.';
+
+  @override
+  String get offlinePill => 'OFFLINE';
+
+  @override
+  String get offlineBanner =>
+      'You\'re offline. Orders you queue will be sent when you\'re back online.';
+
+  @override
+  String get offlineBackOnline => 'Back online';
+
+  @override
+  String get offlineSavedItems => 'Saved items';
+
+  @override
+  String get offlineModeBadge => 'Offline Mode';
+
+  @override
+  String get offlineCachedCatalogTitle => 'Cached Catalog';
+
+  @override
+  String get offlineLastPurchases => 'Your Last Cached Purchases';
+
+  @override
+  String offlinePricesAsOf(String when) {
+    return 'Prices as of $when. They may have changed since.';
+  }
+
+  @override
+  String get offlineQuickAdd => 'Quick Add';
+
+  @override
+  String get offlineNeedsOptions => 'Choose options when you\'re online';
+
+  @override
+  String get offlineNothingSaved => 'Nothing saved for offline yet';
+
+  @override
+  String get offlineNothingSavedHint =>
+      'What you order while online is saved here, so you can order it again when the connection drops.';
+
+  @override
+  String get offlineOutboxTitle => 'Waiting to send';
+
+  @override
+  String offlineQueuedTitle(String store) {
+    return '$store — Queued';
+  }
+
+  @override
+  String get offlineWillSend => 'Will send as soon as you\'re back online';
+
+  @override
+  String get offlineSending => 'Sending…';
+
+  @override
+  String offlinePriceChanged(String total) {
+    return 'The total is now $total. Confirm to send it at this price.';
+  }
+
+  @override
+  String offlineSendAt(String total) {
+    return 'Send at $total';
+  }
+
+  @override
+  String get offlineStale =>
+      'This has been waiting a while. Do you still want it?';
+
+  @override
+  String get offlineSendNow => 'Send now';
+
+  @override
+  String offlineFailed(String reason) {
+    return 'Couldn\'t place this order: $reason';
+  }
+
+  @override
+  String get offlineDiscard => 'Discard';
+
+  @override
+  String get offlineDiscardTitle => 'Discard this order?';
+
+  @override
+  String get offlineDiscardBody =>
+      'It hasn\'t been placed, and it won\'t be sent.';
+
+  @override
+  String get offlineQueueTitle => 'Couldn\'t reach YouDrop';
+
+  @override
+  String get offlineQueueBody =>
+      'Your order hasn\'t gone through. We can keep it on this phone and send it automatically when you\'re back online — and if the price changes, we\'ll ask you first.';
+
+  @override
+  String get offlineQueueAction => 'Place when back online';
+
+  @override
+  String get offlineQueueCashOnly =>
+      'Only cash orders can wait for the connection. Choose cash, or try again when you\'re back online.';
+
+  @override
+  String get offlineQueued =>
+      'Order saved on this phone. It will be sent when you\'re back online.';
+
+  @override
+  String get offlineQueueSaveFailed =>
+      'Couldn\'t save the order on this phone, so nothing was queued.';
+
+  @override
+  String get offlineAlreadyPlaced =>
+      'Your earlier try already went through, so that\'s the order we placed.';
+
+  @override
+  String offlineSent(String store) {
+    return 'Your queued order from $store was placed.';
+  }
+
+  @override
+  String get offlineQueueUnavailable =>
+      'Orders split with friends can\'t wait for the connection: each friend\'s share is linked to the order the moment it\'s placed. Try again when you\'re back online.';
+
+  @override
+  String offlineQueuedWhenAmount(String when, String amount) {
+    return 'Queued $when • $amount';
+  }
+
+  @override
+  String get offlineMaybePlaced =>
+      'We couldn\'t confirm this went through. We\'ll check again automatically — it won\'t be placed twice.';
+
+  @override
+  String get offlineStaleMaybePlaced =>
+      'We couldn\'t confirm this went through, and it has been waiting a while. Send it again to find out: if it already went through, you\'ll get that order, not a second one.';
+
+  @override
+  String get offlineSendAgain => 'Send again';
+
+  @override
+  String get offlineDiscardMaybePlacedBody =>
+      'It may already have been placed — we couldn\'t confirm it. Discarding only removes it from this phone, so check Orders to see whether it went through.';
+
+  @override
+  String get offlineUnconfirmedTitle => 'We couldn\'t confirm your order';
+
+  @override
+  String get offlineUnconfirmedLead =>
+      'It may have gone through before the connection dropped — check Orders once you\'re back online.';
+
+  @override
+  String get offlineQueueResendBody =>
+      'We can keep it on this phone and send it again when you\'re back online. If it already went through, you\'ll get that order, not a second one — and if the price changes, we\'ll ask you first.';
+
+  @override
+  String get offlineUnconfirmedRetry =>
+      'We couldn\'t confirm your order — it may have gone through. Trying again is safe: it won\'t be placed twice.';
+
+  @override
+  String get offlineQueueStandardOnly =>
+      'Express orders can\'t wait for the connection: the express price is only set when the order is placed. Choose Standard, or try again when you\'re back online.';
+
+  @override
+  String get offlineQueueTotalUnknown =>
+      'We couldn\'t confirm this order\'s total for this address, so it can\'t wait for the connection. Try again when you\'re back online.';
+
+  @override
+  String get carrCashNavLabel => 'Reconciliation';
+
+  @override
+  String get carrCashTitle => 'Rider Cash Reconciliation';
+
+  @override
+  String get carrCashSubtitle =>
+      'Match the cash your riders collected against what they hand over';
+
+  @override
+  String carrCashTodayChip(String date) {
+    return 'Today: $date';
+  }
+
+  @override
+  String carrCashDayChip(String date) {
+    return 'Day: $date';
+  }
+
+  @override
+  String get carrCashPickDay => 'Which day?';
+
+  @override
+  String get carrCashKpiWithRiders => 'With your riders';
+
+  @override
+  String carrCashKpiWithRidersNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Held by $count riders',
+      one: 'Held by 1 rider',
+      zero: 'Nobody is holding cash',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiHandedOver => 'Handed over';
+
+  @override
+  String carrCashKpiHandedOverNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hand-overs on this day',
+      one: '1 hand-over on this day',
+      zero: 'No hand-overs on this day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOwed => 'Owed to YouDrop';
+
+  @override
+  String carrCashKpiOwedNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Held by your company · $count orders',
+      one: 'Held by your company · 1 order',
+      zero: 'Your company holds no cash',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOverdue => 'Overdue';
+
+  @override
+  String carrCashKpiOverdueNote(int count, int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count riders past the ${hours}h limit',
+      one: '1 rider past the ${hours}h limit',
+      zero: 'Nobody past the ${hours}h limit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String carrCashOverdueSoftNote(int hours) {
+    return 'Some cash has been held for longer than $hours hours. Ask those riders to hand it over.';
+  }
+
+  @override
+  String get carrCashBalancesTitle => 'Rider balances';
+
+  @override
+  String get carrCashColRider => 'Rider';
+
+  @override
+  String get carrCashColCollected => 'Collected';
+
+  @override
+  String get carrCashColEarned => 'Fees earned for you';
+
+  @override
+  String get carrCashColHolding => 'Cash to hand over';
+
+  @override
+  String get carrCashColLastHandover => 'Last hand-over';
+
+  @override
+  String get carrCashColStatus => 'Status';
+
+  @override
+  String get carrCashColActions => 'Actions';
+
+  @override
+  String get carrCashStatusHolding => 'Holding cash';
+
+  @override
+  String carrCashStatusOverdue(int hours) {
+    return 'Overdue ${hours}h';
+  }
+
+  @override
+  String get carrCashStatusSettled => 'Settled';
+
+  @override
+  String get carrCashActionSettle => 'Settle';
+
+  @override
+  String get carrCashActionView => 'View';
+
+  @override
+  String get carrCashNever => 'Never';
+
+  @override
+  String get carrCashToday => 'Today';
+
+  @override
+  String get carrCashYesterday => 'Yesterday';
+
+  @override
+  String carrCashDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: '1 day ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashNobodyYet =>
+      'None of your riders has carried cash for your company yet.';
+
+  @override
+  String get carrCashTableNote =>
+      'Collected and fees are for the day chosen. Cash to hand over is everything still held, whenever it was collected. What your company pays its riders is agreed between you and is not shown here.';
+
+  @override
+  String carrCashSelectRider(String name) {
+    return 'Select $name';
+  }
+
+  @override
+  String get carrCashSelectAll => 'Select every rider holding cash';
+
+  @override
+  String get carrCashSettleSelected => 'Settle selected';
+
+  @override
+  String carrCashSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected',
+      one: '1 selected',
+      zero: 'None selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashExportCsv => 'Export CSV';
+
+  @override
+  String carrCashExported(String file) {
+    return 'Saved $file';
+  }
+
+  @override
+  String get carrCashCsvRiderId => 'Rider ID';
+
+  @override
+  String get carrCashCsvOrdersHeld => 'Orders held';
+
+  @override
+  String get carrCashCsvOldest => 'Oldest collection';
+
+  @override
+  String carrCashOrderCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count orders',
+      one: '1 order',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmTitle => 'Record a hand-over';
+
+  @override
+  String carrCashConfirmBody(String name, String amount, String orders) {
+    return 'Confirm $name has handed your company $amount in cash, for $orders. This clears their whole balance with you and cannot be undone.';
+  }
+
+  @override
+  String carrCashConfirmBulkTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Record $count hand-overs',
+      one: 'Record 1 hand-over',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmBulkBody =>
+      'Confirm each of these riders has handed your company the cash shown. Every balance is cleared in full and none of it can be undone.';
+
+  @override
+  String carrCashConfirmBulkTotal(String amount) {
+    return 'Total $amount';
+  }
+
+  @override
+  String get carrCashConfirmYes => 'Yes, record it';
+
+  @override
+  String get carrCashMethodLabel => 'How it was handed over';
+
+  @override
+  String get carrCashMethodCash => 'Cash hand-over';
+
+  @override
+  String get carrCashMethodBank => 'Bank deposit';
+
+  @override
+  String get carrCashMethodWallet => 'Money transfer app';
+
+  @override
+  String get carrCashNoteLabel => 'Note (optional)';
+
+  @override
+  String get carrCashNoteHint =>
+      'Anything the hub should remember, like a bag number';
+
+  @override
+  String carrCashRecorded(String amount, String name) {
+    return 'Recorded $amount from $name.';
+  }
+
+  @override
+  String get carrCashReplayed =>
+      'That hand-over was already recorded, so nothing was recorded twice.';
+
+  @override
+  String carrCashAmountChanged(String name, String amount) {
+    return '$name is now holding $amount, not the amount you confirmed. Nothing was recorded; count it again.';
+  }
+
+  @override
+  String carrCashAmountChangedUnknown(String name) {
+    return '$name\'s balance changed since you opened the page. Nothing was recorded; reload and count it again.';
+  }
+
+  @override
+  String get carrCashRecordFailed =>
+      'Could not record it. Nothing was changed; try again.';
+
+  @override
+  String carrCashBulkDone(int done, int total) {
+    return 'Recorded $done of $total.';
+  }
+
+  @override
+  String get carrCashLoadFailed =>
+      'Your company\'s cash could not be loaded just now. Nothing is wrong with your records; try again.';
+
+  @override
+  String get carrCashTryAgain => 'Try again';
+
+  @override
+  String get carrCashRiderTitle => 'Rider Settlement Detail';
+
+  @override
+  String carrCashRiderSubtitle(String name) {
+    return 'Reconcile the cash bag with $name';
+  }
+
+  @override
+  String get carrCashBack => 'Back to reconciliation';
+
+  @override
+  String get carrCashBadgeUnsettled => 'Unsettled balance';
+
+  @override
+  String carrCashRiderSince(String date) {
+    return 'Carrying cash for you since $date';
+  }
+
+  @override
+  String carrCashRatings(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '($count ratings)',
+      one: '(1 rating)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashRatingNew => 'New rider';
+
+  @override
+  String get carrCashHeldTitle => 'Unsettled deliveries';
+
+  @override
+  String get carrCashColOrder => 'Order #';
+
+  @override
+  String get carrCashColCash => 'Total cash';
+
+  @override
+  String get carrCashColFee => 'Fee earned for you';
+
+  @override
+  String get carrCashHeldEmpty =>
+      'Nothing to settle: this rider is holding none of your company\'s cash.';
+
+  @override
+  String get carrCashSummaryTitle => 'Reconciliation summary';
+
+  @override
+  String get carrCashSummaryCollected => 'Cash collected, not yet handed over';
+
+  @override
+  String get carrCashSummaryFees => 'Fees earned for your company';
+
+  @override
+  String get carrCashSummaryDue => 'Cash due to your company';
+
+  @override
+  String get carrCashSummaryKeeps =>
+      'The rider keeps none of this cash. What your company pays them is agreed between you, and the fees above are paid to your company by YouDrop, not taken from the cash.';
+
+  @override
+  String get carrCashConfirmSettlement => 'Confirm settlement';
+
+  @override
+  String get carrCashNothingToSettle => 'Nothing to settle';
+
+  @override
+  String get carrCashHistoryTitle => 'Hand-over history';
+
+  @override
+  String carrCashHistoryItem(String date) {
+    return 'Hand-over · $date';
+  }
+
+  @override
+  String carrCashHistoryDetail(String amount, String orders, String name) {
+    return '$amount for $orders, recorded by $name';
+  }
+
+  @override
+  String carrCashHistoryDetailAnon(String amount, String orders) {
+    return '$amount for $orders';
+  }
+
+  @override
+  String get carrCashHistoryEmpty => 'No hand-overs recorded yet.';
+
+  @override
+  String get carrCashRiderNotFound =>
+      'This rider has never worked for your company.';
+
+  @override
+  String get carrCashBoTitle => 'Held by delivery companies';
+
+  @override
+  String get carrCashBoOwes => 'Owes the platform';
+
+  @override
+  String carrCashBoWithRiders(String amount) {
+    return 'With its riders: $amount';
+  }
+
+  @override
+  String carrCashBoLastPaid(String when) {
+    return 'Last paid $when';
+  }
+
+  @override
+  String get carrCashBoNeverPaid => 'Never paid';
+
+  @override
+  String get carrCashBoHoldsNothing => 'Holds nothing itself yet';
+
+  @override
+  String get carrCashBoRecordPayment => 'Record payment';
+
+  @override
+  String get carrCashBoConfirmTitle => 'Record a payment';
+
+  @override
+  String carrCashBoConfirmBody(String company, String amount, String orders) {
+    return 'Confirm $company has paid the platform $amount, covering $orders. This clears everything the company holds and cannot be undone.';
+  }
+
+  @override
+  String get carrCashBoConfirmYes => 'Yes, they paid';
+
+  @override
+  String carrCashBoRecorded(String amount, String company) {
+    return 'Recorded $amount from $company.';
+  }
+
+  @override
+  String get carrCashBoNothing =>
+      'Nothing was outstanding; somebody may have recorded this already.';
+
+  @override
+  String carrCashBoAmountChanged(String company, String amount) {
+    return '$company now holds $amount, not the amount you confirmed. Nothing was recorded.';
+  }
+
+  @override
+  String carrCashBoFailed(String error) {
+    return 'Could not record it: $error';
+  }
+
+  @override
+  String get carrCashBoOverdueNote =>
+      'Some cash has been out longer than the platform\'s limit. Nothing is wrong with the ledger: this is money the bank has not seen yet.';
+
+  @override
+  String get carrCashBoLoadFailed =>
+      'What delivery companies hold could not be loaded just now. The rest of this page is unaffected.';
+
+  @override
+  String get carrCashBoMethodLabel => 'How it was paid (optional)';
+
+  @override
+  String get dekkaneBrowseTitle => 'Your Neighborhood';
+
+  @override
+  String dekkaneBrowseSubRegion(String region) {
+    return 'Local $region dekkanes';
+  }
+
+  @override
+  String dekkaneAreaInRegion(String area, String region) {
+    return '$area, $region';
+  }
+
+  @override
+  String get dekkaneEntrySub =>
+      'The dekkanes and small shops around your address';
+
+  @override
+  String get dekkaneFilterOpenNow => 'Open now';
+
+  @override
+  String get dekkaneFilterOnGenerator => 'On generator now';
+
+  @override
+  String get dekkaneFilterNew => 'New on YouDrop';
+
+  @override
+  String get dekkaneExpandMap => 'Expand interactive map';
+
+  @override
+  String get dekkaneNearbyShops => 'Shops near you';
+
+  @override
+  String get dekkaneLocalShops => 'Local shops';
+
+  @override
+  String dekkaneDistanceMetres(int metres) {
+    final intl.NumberFormat metresNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String metresString = metresNumberFormat.format(metres);
+
+    return '$metresString m away';
+  }
+
+  @override
+  String dekkaneDistanceKm(double km) {
+    final intl.NumberFormat kmNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+            locale: localeName, decimalDigits: 1);
+    final String kmString = kmNumberFormat.format(km);
+
+    return '$kmString km away';
+  }
+
+  @override
+  String get dekkaneGeneratorActive => 'Generator active';
+
+  @override
+  String get dekkaneTrustedLocal => 'Trusted local';
+
+  @override
+  String get dekkaneCouldNotLoadShops => 'Could not load the shops around you';
+
+  @override
+  String get dekkanePinAddressPrompt =>
+      'Pin your address on the map to see the shops nearest you, and how far each one is.';
+
+  @override
+  String get dekkaneNoShopsNearby => 'No shops near this address yet';
+
+  @override
+  String get dekkaneMapTitle => 'Shops on the map';
+
+  @override
+  String dekkaneOpenClosesAt(String time) {
+    return 'Open · Closes $time';
+  }
+
+  @override
+  String get dekkaneShopInventory => 'Shop inventory';
+
+  @override
+  String dekkaneLbpAmount(int amount) {
+    final intl.NumberFormat amountNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String amountString = amountNumberFormat.format(amount);
+
+    return 'LBP $amountString';
+  }
+
+  @override
+  String get dekkaneAddOneMore => 'Add one more';
+
+  @override
+  String get dekkaneMerchNeighborhood => 'Neighborhood';
+
+  @override
+  String get dekkaneMerchNeighborhoodHint => 'e.g. Mar Mikhael';
+
+  @override
+  String get dekkaneMerchNeighborhoodHelp =>
+      'Shown under your shop\'s name when customers open your shop from their neighborhood list.';
+
+  @override
+  String get dekkaneMerchNeighborhoodTooLong =>
+      'Keep it to 80 characters or fewer';
+
+  @override
+  String get dekkaneCouldNotLoadShelf => 'Could not load this shop\'s shelves';
+
+  @override
+  String get dekkaneBrowseTitleAll => 'Shops on YouDrop';
+
+  @override
+  String get dekkaneBrowseSubAll => 'Every shop, best rated first';
+
+  @override
+  String get dekkaneAllShops => 'All shops';
+
+  @override
+  String dekkanePowerUpdatedMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Updated $minutes min ago',
+      one: 'Updated 1 min ago',
+      zero: 'Updated just now',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkanePowerUpdatedHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Updated $hours hrs ago',
+      one: 'Updated 1 hr ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkaneSearchedNearest(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Only the nearest $count shops were searched',
+      one: 'Only the nearest shop was searched',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceNavShifts => 'Shifts & attendance';
+
+  @override
+  String get attendanceTitle => 'Rider Attendance & Shift Logs';
+
+  @override
+  String get attendanceSubtitle =>
+      'Track daily check-ins, lates, absences, and shift overrides';
+
+  @override
+  String attendanceForMonth(String month) {
+    return 'Attendance & clock logs for $month';
+  }
+
+  @override
+  String get attendanceBackToRiders => 'Back to riders';
+
+  @override
+  String get attendanceManualLog => 'Manual Attendance Log';
+
+  @override
+  String get attendancePrevMonth => 'Previous month';
+
+  @override
+  String get attendanceNextMonth => 'Next month';
+
+  @override
+  String get attendanceLegendPresent => 'Present';
+
+  @override
+  String get attendanceLegendLate => 'Late';
+
+  @override
+  String get attendanceLegendAbsent => 'Absent';
+
+  @override
+  String get attendanceLegendOff => 'Day off';
+
+  @override
+  String get attendanceLegendOnDuty => 'On duty';
+
+  @override
+  String get attendanceWeekMon => 'MON';
+
+  @override
+  String get attendanceWeekTue => 'TUE';
+
+  @override
+  String get attendanceWeekWed => 'WED';
+
+  @override
+  String get attendanceWeekThu => 'THU';
+
+  @override
+  String get attendanceWeekFri => 'FRI';
+
+  @override
+  String get attendanceWeekSat => 'SAT';
+
+  @override
+  String get attendanceWeekSun => 'SUN';
+
+  @override
+  String get attendanceAggregatesTitle => 'Attendance Aggregates';
+
+  @override
+  String get attendanceDaysWorked => 'Days worked';
+
+  @override
+  String get attendanceAbsences => 'Absences';
+
+  @override
+  String get attendanceTimesLate => 'Times late';
+
+  @override
+  String get attendanceOvertime => 'Overtime accumulated';
+
+  @override
+  String get attendanceHoursOnDuty => 'Hours on duty';
+
+  @override
+  String get attendanceManualHours => 'Hours logged by hand';
+
+  @override
+  String get attendanceExcusedDays => 'Excused, sick or on leave';
+
+  @override
+  String attendanceDaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attendanceHoursValue(String hours) {
+    return '$hours hours';
+  }
+
+  @override
+  String attendanceHoursShort(String hours) {
+    return '$hours hrs';
+  }
+
+  @override
+  String get attendanceLogsTitle => 'Recent Clock-In / Clock-Out Logs';
+
+  @override
+  String get attendanceColDate => 'Date';
+
+  @override
+  String get attendanceColShift => 'Scheduled shift';
+
+  @override
+  String get attendanceColClockIn => 'Clock in';
+
+  @override
+  String get attendanceColClockOut => 'Clock out';
+
+  @override
+  String get attendanceColHours => 'Hours';
+
+  @override
+  String get attendanceColStatus => 'Status';
+
+  @override
+  String get attendanceColNotes => 'Notes';
+
+  @override
+  String attendanceShiftLabel(String name, String start, String end) {
+    return '$name ($start - $end)';
+  }
+
+  @override
+  String get attendanceStatusOnTime => 'On time';
+
+  @override
+  String get attendanceStatusLate => 'Late check-in';
+
+  @override
+  String get attendanceStatusAbsent => 'Absent';
+
+  @override
+  String get attendanceStatusPending => 'Not in yet';
+
+  @override
+  String get attendanceStatusDayOff => 'Day off';
+
+  @override
+  String get attendanceStatusExtra => 'Worked a day off';
+
+  @override
+  String get attendanceStatusWorked => 'On duty';
+
+  @override
+  String get attendanceStatusLateExcused => 'Late (excused)';
+
+  @override
+  String get attendanceStatusExcused => 'Excused';
+
+  @override
+  String get attendanceStatusSick => 'Sick leave';
+
+  @override
+  String get attendanceStatusLeave => 'Leave';
+
+  @override
+  String get attendanceOnShiftNow => 'On shift now';
+
+  @override
+  String get attendanceAutoClosed => 'Auto-closed: signal lost';
+
+  @override
+  String attendanceLateBy(int minutes) {
+    return '$minutes min late';
+  }
+
+  @override
+  String attendanceOvertimeNote(int minutes) {
+    return '$minutes min overtime';
+  }
+
+  @override
+  String get attendanceLoggedByHand => 'Logged by hand';
+
+  @override
+  String get attendanceNoSchedule =>
+      'No shift schedule is set for this rider, so only time on duty is shown.';
+
+  @override
+  String get attendanceEmptyMonth =>
+      'No duty recorded for this month. History starts when duty tracking began; nothing is backfilled.';
+
+  @override
+  String attendanceZoneNote(String zone) {
+    return 'Days are split in the $zone time zone.';
+  }
+
+  @override
+  String get attendanceNotOnFleet =>
+      'This rider is not linked to your fleet in tracking yet, so their attendance cannot be read. That happens when tracking hears of the hire, or when they carry an order for your company.';
+
+  @override
+  String get attendanceLoadFailed => 'Attendance could not be loaded just now.';
+
+  @override
+  String attendanceLogTitle(String name) {
+    return 'Log attendance for $name';
+  }
+
+  @override
+  String get attendanceLogStatus => 'What happened';
+
+  @override
+  String get attendanceLogChooseStatus => 'Choose a status';
+
+  @override
+  String get attendanceKindPresent => 'Present (not shown by the app)';
+
+  @override
+  String get attendanceKindLateExcused => 'Late, excused';
+
+  @override
+  String get attendanceKindAbsentExcused => 'Absent, excused';
+
+  @override
+  String get attendanceKindSick => 'Sick';
+
+  @override
+  String get attendanceKindLeave => 'On leave';
+
+  @override
+  String get attendanceLogClockIn => 'Clock in (optional)';
+
+  @override
+  String get attendanceLogClockOut => 'Clock out (optional)';
+
+  @override
+  String get attendanceLogNote => 'Note (optional)';
+
+  @override
+  String get attendanceLogSave => 'Save entry';
+
+  @override
+  String get attendanceLogWithdraw => 'Remove entry';
+
+  @override
+  String get attendanceLogSaved => 'Attendance entry saved.';
+
+  @override
+  String get attendanceLogRemoved =>
+      'Entry removed. The day shows what the app recorded.';
+
+  @override
+  String get attendanceLogTimesRule =>
+      'Times go only on a present day, and need both a clock-in and a clock-out.';
+
+  @override
+  String get attendanceLogManualNote =>
+      'Hours typed here are reported as manual, never as app evidence, and are ignored on a day the app already shows.';
+
+  @override
+  String get attendanceLogFutureRule =>
+      'A day that has not happened yet can only be marked as leave, sick or excused.';
+
+  @override
+  String get attendanceTimeInvalid => 'Use a 24-hour time such as 08:00.';
+
+  @override
+  String get attendanceShiftsTitle => 'Shift schedules';
+
+  @override
+  String get attendanceShiftsSubtitle =>
+      'Set the shifts your riders work, then open anyone’s monthly attendance.';
+
+  @override
+  String get attendanceShiftsCard => 'Shifts';
+
+  @override
+  String get attendanceAddShift => 'Add shift';
+
+  @override
+  String get attendanceNoShifts =>
+      'No shifts yet. Riders without a shift are treated as freelancers: never late, never absent.';
+
+  @override
+  String attendanceShiftGrace(int minutes) {
+    return '$minutes min grace';
+  }
+
+  @override
+  String attendanceShiftRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count riders',
+      one: '1 rider',
+      zero: 'No riders',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceShiftOvernight => 'Ends next day';
+
+  @override
+  String get attendanceRetireShift => 'Retire shift';
+
+  @override
+  String get attendanceRetireBlocked =>
+      'Move the riders on this shift to another one first.';
+
+  @override
+  String get attendanceShiftRetired => 'Shift retired.';
+
+  @override
+  String get attendanceRidersCard => 'Riders';
+
+  @override
+  String get attendanceColRider => 'Rider';
+
+  @override
+  String get attendanceColCurrentShift => 'Shift';
+
+  @override
+  String get attendanceColActions => 'Actions';
+
+  @override
+  String get attendanceFreelancer => 'No schedule (freelancer)';
+
+  @override
+  String get attendanceChangeShift => 'Change shift';
+
+  @override
+  String get attendanceOpenAttendance => 'Attendance';
+
+  @override
+  String attendanceUpcomingShift(String name, String date) {
+    return '$name from $date';
+  }
+
+  @override
+  String get attendanceNoRiders => 'No riders on your fleet yet.';
+
+  @override
+  String get attendanceNewShiftTitle => 'New shift';
+
+  @override
+  String get attendanceShiftName => 'Name';
+
+  @override
+  String get attendanceShiftStart => 'Starts (HH:mm)';
+
+  @override
+  String get attendanceShiftEnd => 'Ends (HH:mm)';
+
+  @override
+  String get attendanceShiftDays => 'Days';
+
+  @override
+  String get attendanceShiftGraceField => 'Grace before late (minutes)';
+
+  @override
+  String get attendanceShiftImmutable =>
+      'Shift hours cannot be changed later. To change them, add a new shift and move riders onto it, so past days keep the shift they were worked against.';
+
+  @override
+  String get attendanceCreateShift => 'Create shift';
+
+  @override
+  String get attendanceShiftCreated => 'Shift created.';
+
+  @override
+  String get attendanceShiftNeedsName => 'Give the shift a name.';
+
+  @override
+  String get attendanceShiftNeedsDays => 'Choose at least one day.';
+
+  @override
+  String get attendanceShiftSameTimes =>
+      'A shift cannot start and end at the same time.';
+
+  @override
+  String get attendanceGraceInvalid => 'Use a number of minutes from 0 to 120.';
+
+  @override
+  String attendanceAssignTitle(String name) {
+    return 'Shift for $name';
+  }
+
+  @override
+  String get attendanceAssignFrom => 'Starting';
+
+  @override
+  String get attendanceAssignNote =>
+      'Schedules start today or later. Once today\'s shift has begun, or once the rider has worked today, a change for today starts tomorrow, so past days and the day under way keep the schedule they are judged against.';
+
+  @override
+  String get attendanceAssignSave => 'Save schedule';
+
+  @override
+  String get attendanceAssignSaved => 'Schedule updated.';
+
+  @override
+  String get attendanceHistoryLimit =>
+      'This month is older than the duty history the platform keeps, so it can no longer be shown.';
+
+  @override
+  String get attendanceManualTag => 'Manual';
+
+  @override
+  String get attendanceTypedByHand =>
+      'Typed by hand in the Manual Attendance Log, not recorded by the app';
+
+  @override
+  String get attendanceLogPresentKeepsLate =>
+      'Present does not clear a late check-in. To excuse one, choose “Late, excused”.';
+
+  @override
+  String get attendanceLogChecking =>
+      'Checking this day for an existing entry…';
+
+  @override
+  String get attendanceLogCheckFailed =>
+      'This day could not be checked for an existing entry, so nothing can be saved for it yet. Choose the date again to retry.';
+
+  @override
+  String attendanceRetiredShifts(int count) {
+    return 'Retired shifts ($count)';
+  }
+
+  @override
+  String get attendanceRetireKeepsHistory =>
+      'Past days stay judged against this shift. Retiring it only stops it being offered for new schedules.';
+
+  @override
+  String attendanceLiveOnDuty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Live: $count riders on duty',
+      one: 'Live: 1 rider on duty',
+      zero: 'Live: no riders on duty',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNavReconciliation => 'Reconciliation';
+
+  @override
+  String get carrRidersNavRidersHr => 'Riders HR';
+
+  @override
+  String get carrRidersNavDirectory => 'Directory';
+
+  @override
+  String get carrRidersNavStatement => 'Statement';
+
+  @override
+  String get carrRidersTitle => 'Riders HR Directory';
+
+  @override
+  String get carrRidersSubtitle => 'Manage rider profiles, status and regions';
+
+  @override
+  String get carrRidersStatTotal => 'Total onboarded riders';
+
+  @override
+  String get carrRidersStatTotalNote => 'Registered company fleet';
+
+  @override
+  String get carrRidersStatOnDuty => 'Active on duty';
+
+  @override
+  String get carrRidersStatOnDutyNote => 'Available or on a job';
+
+  @override
+  String get carrRidersStatSignalLost => 'Signal lost';
+
+  @override
+  String get carrRidersStatSignalLostNote =>
+      'On duty, but their phone has gone quiet';
+
+  @override
+  String get carrRidersStatOffline => 'Offline / inactive';
+
+  @override
+  String get carrRidersStatOfflineNote => 'Declared themselves off duty';
+
+  @override
+  String get carrRidersPresenceUnknown => 'Presence could not be read just now';
+
+  @override
+  String get carrRidersSearchHint => 'Search riders by name, ID...';
+
+  @override
+  String get carrRidersZoneAll => 'Zone: All';
+
+  @override
+  String carrRidersZoneValue(String zone) {
+    return 'Zone: $zone';
+  }
+
+  @override
+  String get carrRidersZoneTooltip =>
+      'A zone here is the region each rider wrote on their application';
+
+  @override
+  String get carrRidersVehicleAll => 'Vehicle: All';
+
+  @override
+  String carrRidersVehicleValue(String vehicle) {
+    return 'Vehicle: $vehicle';
+  }
+
+  @override
+  String get carrRidersVehicleMotorcycle => 'Motorcycle';
+
+  @override
+  String get carrRidersVehicleCar => 'Car';
+
+  @override
+  String get carrRidersVehicleBicycle => 'Bicycle';
+
+  @override
+  String get carrRidersVehicleVan => 'Van';
+
+  @override
+  String get carrRidersVehicleTruck => 'Truck';
+
+  @override
+  String get carrRidersAddRider => 'Add Rider';
+
+  @override
+  String get carrRidersAddRiderTooltip =>
+      'Approve somebody who has applied to ride for you';
+
+  @override
+  String get carrRidersAddRiderUnavailable =>
+      'Applications could not be read just now, so nobody can be approved from here';
+
+  @override
+  String get carrRidersManageProfile => 'Manage Profile';
+
+  @override
+  String carrRidersDeliveredToday(int count) {
+    return '($count today)';
+  }
+
+  @override
+  String get carrRidersRatingNew => 'New';
+
+  @override
+  String get carrRidersStatusActive => 'Active';
+
+  @override
+  String get carrRidersStatusSignalLost => 'Signal lost';
+
+  @override
+  String get carrRidersStatusOffline => 'Offline';
+
+  @override
+  String get carrRidersStatusSuspended => 'Suspended';
+
+  @override
+  String get carrRidersStatusOnAJob => 'On a job';
+
+  @override
+  String get carrRidersNoMatch => 'No rider matches that.';
+
+  @override
+  String carrRidersShowingOnly(String filter) {
+    return 'Showing only: $filter';
+  }
+
+  @override
+  String get carrRidersShowEveryone => 'Show everyone';
+
+  @override
+  String get carrRidersDirectoryFootnote =>
+      'Zone is the region each rider gave on their application — the platform does not assign riders to your coverage zones. Rating is what customers left across all of a rider\'s deliveries. Presence reaches this page once a rider has carried your work, so a rider who has not yet shows none.';
+
+  @override
+  String get carrRidersWaitingTitle => 'Add a rider';
+
+  @override
+  String carrRidersWaitingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people waiting to ride for you',
+      one: '1 person waiting to ride for you',
+      zero: 'Nobody is waiting to ride for you',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersWaitingEmpty =>
+      'Nobody has applied to ride for you. Riders reach a fleet by applying — there is no way to create one directly.';
+
+  @override
+  String get carrRidersApprove => 'Approve';
+
+  @override
+  String get carrRidersOnYourFleet => 'On your fleet';
+
+  @override
+  String carrRidersSuspendTitle(String name) {
+    return 'Suspend $name';
+  }
+
+  @override
+  String carrRidersReinstateTitle(String name) {
+    return 'Reinstate $name';
+  }
+
+  @override
+  String get carrRidersSuspendBody =>
+      'They keep their sign-in and their history, and stop being offered work. You can reinstate them at any time.';
+
+  @override
+  String get carrRidersReinstateBody =>
+      'They can be offered work again from the moment this is saved.';
+
+  @override
+  String get carrRidersChooseReason => 'Choose a reason';
+
+  @override
+  String get carrRidersNoteHint => 'A note for the record (optional)';
+
+  @override
+  String get carrRidersSuspendRider => 'Suspend Rider';
+
+  @override
+  String get carrRidersReinstateRider => 'Reinstate Rider';
+
+  @override
+  String carrRidersSuspendedToast(String name) {
+    return '$name is suspended and will not be offered work.';
+  }
+
+  @override
+  String carrRidersReinstatedToast(String name) {
+    return '$name can take work again.';
+  }
+
+  @override
+  String get carrRidersReasonFraud => 'Fraud';
+
+  @override
+  String get carrRidersReasonAbuse => 'Abuse';
+
+  @override
+  String get carrRidersReasonNonPayment => 'Non-payment';
+
+  @override
+  String get carrRidersReasonPolicyViolation => 'Policy violation';
+
+  @override
+  String get carrRidersReasonPartnerRequest => 'Partner request';
+
+  @override
+  String get carrRidersReasonOther => 'Other';
+
+  @override
+  String get carrRidersProfileTitle => 'Rider HR Profile';
+
+  @override
+  String get carrRidersProfileSubtitle =>
+      'Documents, employment details and performance';
+
+  @override
+  String get carrRidersBackToDirectory => 'Back to riders';
+
+  @override
+  String carrRidersBadgeId(String code) {
+    return 'Badge ID: $code';
+  }
+
+  @override
+  String get carrRidersPhone => 'Phone';
+
+  @override
+  String get carrRidersEmail => 'Email';
+
+  @override
+  String get carrRidersLastSeen => 'Last seen';
+
+  @override
+  String get carrRidersNoPresenceYet => 'No duty or location yet';
+
+  @override
+  String get carrRidersStaleNote =>
+      'Declared on duty, but the last location is too old to dispatch on.';
+
+  @override
+  String get carrRidersNoApplication =>
+      'The platform attached this rider directly, so there is no application on file — no name, contact details or documents to show.';
+
+  @override
+  String get carrRidersDocumentsTitle => 'Documents Verification';
+
+  @override
+  String get carrRidersDocNationalId => 'National ID';
+
+  @override
+  String get carrRidersDocDrivingLicence => 'Driving licence';
+
+  @override
+  String get carrRidersDocVehicleRegistration => 'Vehicle registration';
+
+  @override
+  String get carrRidersDocVerified => 'Verified';
+
+  @override
+  String get carrRidersDocWaiting => 'Waiting';
+
+  @override
+  String get carrRidersDocRefused => 'Refused';
+
+  @override
+  String get carrRidersDocNotUploaded => 'Not uploaded';
+
+  @override
+  String get carrRidersDocOpen => 'Open the document';
+
+  @override
+  String get carrRidersCouldNotRead => 'Could not be read just now.';
+
+  @override
+  String get carrRidersAvgRating => 'Avg rating';
+
+  @override
+  String carrRidersHappyCustomers(int percent) {
+    return '$percent% happy customers';
+  }
+
+  @override
+  String get carrRidersNoRatingsYet => 'No ratings yet';
+
+  @override
+  String carrRidersDeliveriesWindow(int days) {
+    return 'Deliveries, last $days days';
+  }
+
+  @override
+  String carrRidersClaimedCaption(int claimed, int cancelled) {
+    return '$claimed claimed, $cancelled cancelled after claiming';
+  }
+
+  @override
+  String get carrRidersCompletionRate => 'Completion rate';
+
+  @override
+  String get carrRidersCompletionCaption =>
+      'Delivered out of claimed, for your company';
+
+  @override
+  String get carrRidersNothingClaimed => 'Nothing claimed in this window';
+
+  @override
+  String get carrRidersDeliveredTodayLabel => 'Delivered today';
+
+  @override
+  String get carrRidersDeliveredTodayCaption =>
+      'For your company, since midnight';
+
+  @override
+  String carrRidersOutputTitle(int days) {
+    return 'Delivery output, last $days days';
+  }
+
+  @override
+  String get carrRidersOutputEmpty => 'No deliveries in this period';
+
+  @override
+  String carrRidersOutputNote(String zone) {
+    return 'Days are split in the $zone time zone, and only deliveries made for your company are counted.';
+  }
+
+  @override
+  String carrRidersHoursTitle(int days) {
+    return 'Hours online, last $days days';
+  }
+
+  @override
+  String carrRidersHoursValue(String hours) {
+    return '$hours h';
+  }
+
+  @override
+  String carrRidersHoursTotal(String hours) {
+    return '$hours h in total';
+  }
+
+  @override
+  String carrRidersShifts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shifts',
+      one: '1 shift',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersHoursNone => 'No hours online to show for your company.';
+
+  @override
+  String carrRidersHoursZone(String zone) {
+    return 'Days are split in the $zone time zone, as the server reports them.';
+  }
+
+  @override
+  String get carrRidersEmploymentTitle => 'Employment Details';
+
+  @override
+  String get carrRidersStartDate => 'Start date';
+
+  @override
+  String get carrRidersApplied => 'Applied';
+
+  @override
+  String get carrRidersRegion => 'Region (from their application)';
+
+  @override
+  String get carrRidersVehicle => 'Vehicle';
+
+  @override
+  String get carrRidersEmploymentNote =>
+      'Contract type, pay rate and zone assignment are not recorded on this platform.';
+
+  @override
+  String get carrRidersSuspendUnavailable =>
+      'Suspending works through a rider\'s application to you. The platform attached this rider directly, so ask YouDrop to suspend them.';
+
+  @override
+  String get carrRidersTerminate => 'Terminate Contract';
+
+  @override
+  String carrRidersTerminateTitle(String name) {
+    return 'End $name\'s contract?';
+  }
+
+  @override
+  String carrRidersTerminateBody(String name) {
+    return '$name comes off your fleet straight away and is offered none of your work. They keep their YouDrop sign-in and their history, but they do not become one of YouDrop\'s own riders: they can take no work at all until another company hires them or YouDrop takes them on.';
+  }
+
+  @override
+  String get carrRidersTerminateJobs =>
+      'Jobs in flight: while they are carrying a job for you, this is refused until that job is delivered or cancelled. Nothing they are carrying is dropped or handed to somebody else.';
+
+  @override
+  String get carrRidersTerminateMoney =>
+      'Collect any door cash they are holding for you first. Ending the contract settles nothing: what they have earned and collected stays on record exactly as it is.';
+
+  @override
+  String get carrRidersTerminateUndo =>
+      'Taking them back later means hiring them again.';
+
+  @override
+  String get carrRidersTerminateConfirm => 'Terminate contract';
+
+  @override
+  String carrRidersTerminated(String name) {
+    return '$name is no longer on your fleet.';
+  }
+
+  @override
+  String carrRidersTerminateCarrying(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'They are carrying $count of your jobs right now. Their contract can end once those are delivered or cancelled.',
+      one:
+          'They are carrying one of your jobs right now. Their contract can end once it is delivered or cancelled.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNotOnFleet => 'This rider is no longer on your fleet.';
+
+  @override
+  String carrRidersNoPresenceCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more have no duty or location yet',
+      one: '1 more has no duty or location yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNoPresenceNote =>
+      'Their duty and location show here once YouDrop links them to your fleet — at the latest after their first delivery for you. Until then this page cannot tell whether they are on duty.';
+
+  @override
+  String get carrRidersVehicleModel => 'Vehicle model';
+
+  @override
+  String get carrRidersPlateNumber => 'Plate number';
+
+  @override
+  String get carrRidersDateOfBirth => 'Date of birth';
+
+  @override
+  String get carrRidersNationalIdNumber => 'National ID number';
+
+  @override
+  String get carrRidersDutyChanged => 'Duty last changed';
+
+  @override
+  String get carrRidersVehicleYear => 'Vehicle year';
+
+  @override
+  String get carrRidersTerminateReason => 'Reason, kept on record';
+
+  @override
+  String get carrRidersTerminateReasonHint => 'Why is this contract ending?';
+
+  @override
+  String get carrRidersStatusStandingUnknown => 'Standing unknown';
+
+  @override
+  String get carrRidersStandingUnknownNote =>
+      'Whether this rider is suspended could not be read just now, so suspending and reinstating are not offered. Reload the page to try again.';
+
+  @override
+  String get attendanceBackToProfile => 'Back to profile';
+
+  @override
+  String get blitzTitle => 'Merchant Blitz';
+
+  @override
+  String get blitzSubtitle => 'Your catalogue from shelf photos';
+
+  @override
+  String get blitzFastSetup => 'Fast setup';
+
+  @override
+  String get blitzStepScan => 'Scan shop';
+
+  @override
+  String get blitzStepCheck => 'Check items';
+
+  @override
+  String get blitzStepSave => 'Save drafts';
+
+  @override
+  String blitzStepDone(String step) {
+    return '$step, done';
+  }
+
+  @override
+  String blitzStepCurrent(String step) {
+    return '$step, current step';
+  }
+
+  @override
+  String get blitzIntroTitle => 'Photograph your shelves, skip the typing';
+
+  @override
+  String get blitzIntroBody =>
+      'Take a photo of each shelf. We read the product names and sizes and suggest a section and a price, and you check every item before anything is saved.';
+
+  @override
+  String get blitzTakePhoto => 'Take photo';
+
+  @override
+  String get blitzChoosePhotos => 'Choose photos';
+
+  @override
+  String blitzPhotoCount(int count, int max) {
+    return 'Photos: $count of $max';
+  }
+
+  @override
+  String blitzPhotoLabel(int number) {
+    return 'Shelf photo $number';
+  }
+
+  @override
+  String blitzUploading(int current, int total) {
+    return 'Uploading photo $current of $total…';
+  }
+
+  @override
+  String blitzScanPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Scan $count photos',
+      one: 'Scan 1 photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzAnalyzing => 'Reading your shelves…';
+
+  @override
+  String get blitzAnalyzingHint =>
+      'This can take a minute or two. Keep this screen open.';
+
+  @override
+  String get blitzScanComplete => 'Scan complete';
+
+  @override
+  String blitzItemsFound(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+      zero: 'No items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSampleTitle => 'Sample items';
+
+  @override
+  String get blitzSampleBody =>
+      'The photo reader isn\'t switched on yet, so these are example items, not what\'s on your shelves. Skip any you don\'t sell.';
+
+  @override
+  String get blitzNoneFound =>
+      'We couldn\'t recognise any products in these photos.';
+
+  @override
+  String get blitzNoneFoundHint =>
+      'Try closer photos with the labels facing the camera.';
+
+  @override
+  String get blitzNewScan => 'Start a new scan';
+
+  @override
+  String get blitzReviewCta => 'Review and save as drafts';
+
+  @override
+  String get blitzFooter => 'Nothing reaches customers until you publish it.';
+
+  @override
+  String blitzScansLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count scans left today',
+      one: '1 scan left today',
+      zero: 'No scans left today',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String blitzQuotaReached(int limit) {
+    return 'You\'ve used today\'s $limit scans. Try again tomorrow.';
+  }
+
+  @override
+  String get blitzFailedRefused =>
+      'These photos couldn\'t be read. Try clear photos of your shop\'s shelves.';
+
+  @override
+  String get blitzFailedUnreadable =>
+      'One of the photos couldn\'t be opened. Try taking it again.';
+
+  @override
+  String get blitzFailedProvider => 'The photo reader didn\'t answer.';
+
+  @override
+  String get blitzFailedBusy =>
+      'Many shops are scanning right now. Try again in a minute.';
+
+  @override
+  String get blitzFailedInterrupted =>
+      'The scan was interrupted before it finished.';
+
+  @override
+  String get blitzFailedOther => 'The scan didn\'t finish.';
+
+  @override
+  String get blitzNoRetriesLeft =>
+      'This scan can\'t be tried again. Start a new one.';
+
+  @override
+  String get blitzCameraFailed =>
+      'The camera didn\'t open. Choose a photo instead.';
+
+  @override
+  String get blitzUploadFailed =>
+      'A photo didn\'t upload. Check your connection and try again.';
+
+  @override
+  String get blitzCouldNotStart => 'The scan couldn\'t start.';
+
+  @override
+  String get blitzConnectionLost =>
+      'We couldn\'t check on the scan. Check your connection.';
+
+  @override
+  String blitzTag(String name, String price) {
+    return '$name · about $price';
+  }
+
+  @override
+  String get blitzReviewTitle => 'Check items';
+
+  @override
+  String get blitzReviewSubtitle => 'What you keep is saved as a draft';
+
+  @override
+  String get blitzKeep => 'Keep';
+
+  @override
+  String blitzKeepItem(String name) {
+    return 'Keep $name';
+  }
+
+  @override
+  String get blitzName => 'Name';
+
+  @override
+  String get blitzPriceUsd => 'Price (USD)';
+
+  @override
+  String get blitzSection => 'Section';
+
+  @override
+  String get blitzNoSection => 'No section';
+
+  @override
+  String blitzGuess(String price) {
+    return 'Guess: $price';
+  }
+
+  @override
+  String get blitzUseGuess => 'Use this price';
+
+  @override
+  String get blitzCheckThis => 'Not sure of this one — check it';
+
+  @override
+  String get blitzNeedName => 'Enter a name';
+
+  @override
+  String get blitzNeedPrice => 'Enter a price above 0';
+
+  @override
+  String get blitzPriceDecimals => 'Use at most two decimals';
+
+  @override
+  String blitzSaveDrafts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Save $count drafts',
+      one: 'Save 1 draft',
+      zero: 'Nothing to save',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSkipAll => 'Skip all items';
+
+  @override
+  String get blitzFixItems => 'Fix the marked items first.';
+
+  @override
+  String get blitzSavedTitle => 'Saved as drafts';
+
+  @override
+  String blitzSavedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count products were added to your catalogue as drafts.',
+      one: '1 product was added to your catalogue as a draft.',
+      zero: 'No products were added.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSavedHint =>
+      'Drafts stay hidden from customers. Add a photo to each one, then publish it from Inventory.';
+
+  @override
+  String get blitzDone => 'Done';
+
+  @override
+  String get blitzAlreadySaved => 'Saved';
+
+  @override
+  String blitzTooManyPhotos(int max) {
+    return 'A scan takes $max photos at most, so the extra ones weren\'t added.';
+  }
+
+  @override
+  String get blitzSectionsUnavailable =>
+      'Sections couldn\'t load, so each item keeps the section we suggested.';
+
+  @override
+  String get blitzEntryAction => 'Scan shelves';
+
+  @override
+  String get blitzSettingsRow => 'Build catalogue from photos';
+
+  @override
+  String get blitzSaveFailed =>
+      'Couldn\'t save. Check your connection and try again.';
+
+  @override
+  String get blitzSavedEarlier => 'These items had already been saved.';
+
+  @override
+  String get blitzListChanged =>
+      'Some items were already decided elsewhere, so they\'ve left the list. Check the rest and save again.';
+
+  @override
+  String get giftHubTitle => 'Send a Gift';
+
+  @override
+  String get giftHubBannerTitle => 'Remittance Made Real';
+
+  @override
+  String get giftHubBannerBody =>
+      'Support your loved ones in Lebanon. Choose real essentials, groceries or hot meals, delivered to their door — often the same day.';
+
+  @override
+  String get giftHowItWorks => 'How it works';
+
+  @override
+  String get giftStep1Title => 'Choose from local shops';
+
+  @override
+  String get giftStep1Body =>
+      'Pick groceries, sweets, pharmacy items or a ready-made care bundle.';
+
+  @override
+  String get giftStep2Title => 'Enter their address in Lebanon';
+
+  @override
+  String get giftStep2Body =>
+      'We deliver wherever the shop you choose delivers.';
+
+  @override
+  String get giftStep3Title => 'Same-day delivery';
+
+  @override
+  String get giftStep3Body =>
+      'A rider hands it over with your personal note — the same day, while the shop is open.';
+
+  @override
+  String get giftCategories => 'Gift categories';
+
+  @override
+  String get giftCatCarePackage => 'Care Package';
+
+  @override
+  String get giftCatGroceries => 'Groceries';
+
+  @override
+  String get giftCatMedicine => 'Medicine & Health';
+
+  @override
+  String get giftRecentRecipients => 'Recent recipients';
+
+  @override
+  String get giftAddRecipient => 'Add a recipient';
+
+  @override
+  String get giftFeaturedBundles => 'Featured care bundles';
+
+  @override
+  String get giftSameDayDeliverable => 'Same-day deliverable';
+
+  @override
+  String get giftHomeEntryTitle => 'Send a gift to Lebanon';
+
+  @override
+  String get giftHomeEntrySub =>
+      'Groceries, sweets and care bundles for family, delivered to their door';
+
+  @override
+  String get giftDetailsTitle => 'Gift Details';
+
+  @override
+  String get giftCheckoutSub => 'Diaspora Checkout';
+
+  @override
+  String get giftRecipientInfo => 'Recipient information';
+
+  @override
+  String get giftRecipientName => 'Recipient name';
+
+  @override
+  String get giftRecipientNameRequired => 'Who is receiving it?';
+
+  @override
+  String get giftRecipientPhone => 'Phone number (Lebanon)';
+
+  @override
+  String get giftPhoneInvalid => 'Enter a Lebanese number, e.g. 71 234 567';
+
+  @override
+  String get giftDeliveryDate => 'Delivery date';
+
+  @override
+  String get giftNoteTitle => 'Attach a personal note';
+
+  @override
+  String get giftNoteHelper => 'The shop sends your note with the gift.';
+
+  @override
+  String get giftWrapTitle => 'Premium gift wrapping';
+
+  @override
+  String giftWrapSubtitle(String amount) {
+    return 'Festive wrapping, with your note on a card (+$amount)';
+  }
+
+  @override
+  String get giftPaymentTitle => 'Payment';
+
+  @override
+  String get giftCashNotAllowed =>
+      'Gifts are paid online — the person receiving it is never asked to pay.';
+
+  @override
+  String get giftNoPaymentMethods =>
+      'Gifts are paid online, and online payment isn\'t switched on yet — so a gift can\'t be sent right now.';
+
+  @override
+  String get giftTermsFailed =>
+      'We couldn\'t load the gift\'s payment options.';
+
+  @override
+  String get giftOfflineCannotWait =>
+      'A gift can\'t wait for the connection the way a cash order can — it\'s paid online. Send it once you\'re back online.';
+
+  @override
+  String get giftOrderSummary => 'Order summary';
+
+  @override
+  String giftLineQty(int qty, String name) {
+    return '$qty× $name';
+  }
+
+  @override
+  String get giftWrapLine => 'Gift wrapping';
+
+  @override
+  String get giftDeliveryFee => 'Delivery fee';
+
+  @override
+  String get giftTotalUsd => 'Total USD';
+
+  @override
+  String giftApproxLbp(String amount) {
+    return '≈ $amount';
+  }
+
+  @override
+  String get giftTotalConfirmed =>
+      'The final total is confirmed when your gift is placed.';
+
+  @override
+  String get giftSendAndPay => 'Send Gift & Pay';
+
+  @override
+  String giftForName(String name) {
+    return 'Gift for $name';
+  }
+
+  @override
+  String get giftWrapRequested => 'Gift wrapping requested';
+
+  @override
+  String get giftCardMessage => 'Card message';
+
+  @override
+  String get giftRecipientPhoneLabel => 'Recipient\'s phone';
+
+  @override
+  String get giftBasketBanner => 'Sending this basket as a gift';
+
+  @override
+  String get giftBasketNotGift => 'Not a gift';
+
+  @override
+  String get giftDeliveredToday => 'Today, while the shop is open';
+
+  @override
+  String giftNoteLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get giftUnnamed =>
+      'A gift — who it\'s for shows once it\'s yours to carry';
+
+  @override
+  String get heatmapTitle => 'Demand Radar';
+
+  @override
+  String get heatmapSubtitle => 'Real-time neighborhood pulses';
+
+  @override
+  String get heatmapActiveOrderDensities => 'Active Order Densities';
+
+  @override
+  String get heatmapLiveSyncing => 'Live Syncing';
+
+  @override
+  String get heatmapCantRefresh => 'Can\'t refresh right now';
+
+  @override
+  String get heatmapLevelHigh => 'High';
+
+  @override
+  String get heatmapLevelMedium => 'Med';
+
+  @override
+  String get heatmapLevelLow => 'Low';
+
+  @override
+  String heatmapZoneWithLevel(String zone, String level) {
+    return '$zone ($level)';
+  }
+
+  @override
+  String get heatmapWindowHour => 'Last hour';
+
+  @override
+  String get heatmapWindowDay => 'Last 24 hours';
+
+  @override
+  String get heatmapWindowWeek => 'Last 7 days';
+
+  @override
+  String get heatmapAreasTitle => 'Areas around your shop';
+
+  @override
+  String get heatmapNotOnMap => 'Not on the map yet';
+
+  @override
+  String get heatmapNoneOnMap => 'These areas aren\'t on the map yet';
+
+  @override
+  String get heatmapMapUnavailable => 'The map can\'t load right now';
+
+  @override
+  String get heatmapNoAreaTitle => 'We don\'t know your neighbourhood yet';
+
+  @override
+  String get heatmapNoAreaMessage =>
+      'Demand shows for the mapped areas near your shop\'s pin. Drop your pin if you haven\'t yet, and nearby areas will appear here once they\'re on the map.';
+
+  @override
+  String get heatmapNotEnoughTitle => 'Not enough orders nearby yet';
+
+  @override
+  String heatmapNotEnoughMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'An area appears once $count different customers have ordered there in this period, so no single customer can be picked out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapCouldNotLoad => 'Couldn\'t load demand right now';
+
+  @override
+  String get heatmapNoShopMessage =>
+      'Demand around your shop shows here once your shop is set up.';
+
+  @override
+  String get heatmapEntryBlurb =>
+      'See which neighbourhoods around your shop are ordering';
+
+  @override
+  String get heatmapZoneCentreLatitude => 'Centre latitude (optional)';
+
+  @override
+  String get heatmapZoneCentreLongitude => 'Centre longitude (optional)';
+
+  @override
+  String get heatmapZoneCentreHelp =>
+      'Roughly the middle of the area. It places the area on merchants\' demand map; pricing never uses it.';
+
+  @override
+  String get heatmapZoneCentreBoth => 'Enter both, or leave both empty';
+
+  @override
+  String get heatmapZoneCentreLatRange => 'A latitude between -90 and 90';
+
+  @override
+  String get heatmapZoneCentreLngRange => 'A longitude between -180 and 180';
+
+  @override
+  String get heatmapZoneOnMap => 'On the demand map';
+
+  @override
+  String get heatmapZoneNotOnMap => 'Not on the demand map';
+
+  @override
+  String get heatmapSubtitleDay => 'Neighborhood pulses over the last 24 hours';
+
+  @override
+  String get heatmapSubtitleWeek => 'Neighborhood pulses over the last 7 days';
+
+  @override
+  String get heatmapUpdatedHourly => 'Updated every hour';
+
+  @override
+  String get heatmapUpdatedDaily => 'Updated once a day';
+
+  @override
+  String get heatmapLegendRelative =>
+      'Compared with the busiest area around you';
+
+  @override
+  String get heatmapNotLiveTitle => 'Your shop isn\'t live yet';
+
+  @override
+  String get heatmapNotLiveMessage =>
+      'Demand around your shop shows here once your shop is published.';
+
+  @override
+  String get payrollNavLabel => 'Payroll';
+
+  @override
+  String get payrollTitle => 'Rider Payroll & Earnings Management';
+
+  @override
+  String get payrollSubtitle =>
+      'Approve payouts, calculate bonuses, and track payouts history';
+
+  @override
+  String payrollPeriodLabel(String from, String to) {
+    return 'Pay Period: $from – $to';
+  }
+
+  @override
+  String get payrollPeriodTooltip => 'Choose a pay period';
+
+  @override
+  String payrollPeriodOption(String from, String to, String state) {
+    return '$from – $to · $state';
+  }
+
+  @override
+  String get payrollRulesButton => 'Pay rules';
+
+  @override
+  String get payrollExport => 'Export Payslips';
+
+  @override
+  String payrollExported(String file) {
+    return 'Saved $file.';
+  }
+
+  @override
+  String get payrollStart => 'Start pay run';
+
+  @override
+  String get payrollRecompute => 'Recompute';
+
+  @override
+  String get payrollApprove => 'Approve pay run';
+
+  @override
+  String get payrollPayAll => 'Record All Payments';
+
+  @override
+  String get payrollDiscard => 'Discard draft';
+
+  @override
+  String get payrollKpiPool => 'Total Payroll Pool';
+
+  @override
+  String payrollKpiPoolNote(String from, String to) {
+    return 'To pay for $from – $to';
+  }
+
+  @override
+  String get payrollKpiRiders => 'Riders on Payroll';
+
+  @override
+  String payrollKpiRidersValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Riders',
+      one: '1 Rider',
+      zero: 'No riders',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollKpiRidersNote => 'With a payslip this period';
+
+  @override
+  String get payrollKpiAverage => 'Average Rider Earnings';
+
+  @override
+  String payrollKpiAverageNote(int days) {
+    return 'Per $days-day period';
+  }
+
+  @override
+  String get payrollKpiBonuses => 'Bonuses';
+
+  @override
+  String get payrollKpiBonusesNote => 'Named bonuses and corrections';
+
+  @override
+  String get payrollLedgerTitle => 'Rider Payroll Ledger';
+
+  @override
+  String get payrollColRider => 'Rider name';
+
+  @override
+  String get payrollColBase => 'Base pay';
+
+  @override
+  String get payrollColDelivery => 'Delivery pay';
+
+  @override
+  String get payrollColTips => 'Tips';
+
+  @override
+  String get payrollColDeductions => 'Deductions';
+
+  @override
+  String get payrollColGross => 'Gross pay';
+
+  @override
+  String get payrollColNet => 'Net pay';
+
+  @override
+  String get payrollColStatus => 'Status';
+
+  @override
+  String get payrollColActions => 'Actions';
+
+  @override
+  String get payrollPayslip => 'Payslip';
+
+  @override
+  String get payrollTipsNote =>
+      'Tips are the rider\'s own money and never part of their pay.';
+
+  @override
+  String get payrollHoursUnknown => 'Hours for this rider could not be read.';
+
+  @override
+  String get payrollNobody => 'Nobody on your fleet has pay in this period.';
+
+  @override
+  String get payrollTableNote =>
+      'This is your company\'s payroll, worked out from your pay rules. YouDrop does not pay your riders.';
+
+  @override
+  String get payrollStatusDraft => 'Draft';
+
+  @override
+  String get payrollStatusDue => 'Awaiting payment';
+
+  @override
+  String get payrollStatusNothingDue => 'Nothing to pay';
+
+  @override
+  String get payrollStatusPaid => 'Paid ✓';
+
+  @override
+  String get payrollStatusFailed => 'Failed';
+
+  @override
+  String get payrollRunApproved => 'Approved';
+
+  @override
+  String get payrollRunPaid => 'Paid';
+
+  @override
+  String get payrollNotStarted => 'Not started';
+
+  @override
+  String payrollRunMeta(String state, String time) {
+    return '$state · figures computed $time';
+  }
+
+  @override
+  String payrollRunRevision(int revision) {
+    return 'Draft, revision $revision';
+  }
+
+  @override
+  String payrollHoursAsOf(String time) {
+    return 'Hours as read on $time';
+  }
+
+  @override
+  String get payrollNoRulesTitle => 'Set your pay rules first';
+
+  @override
+  String get payrollNoRulesBody =>
+      'Payroll works out each rider\'s pay from your company\'s own rules: what a delivery pays, whether hours are paid, and any deductions. Nothing is assumed for you.';
+
+  @override
+  String get payrollNoRunTitle => 'No pay run for this period yet';
+
+  @override
+  String get payrollNoRunBody =>
+      'Starting one computes a draft from the deliveries and hours on record. Nothing is final until you approve it.';
+
+  @override
+  String payrollPeriodOpen(String date) {
+    return 'This period runs until $date. It can be approved once it is over.';
+  }
+
+  @override
+  String get payrollHoursMissing =>
+      'Attendance hours could not be read, so these figures leave hours out.';
+
+  @override
+  String get payrollHoursNotDeployed =>
+      'Attendance hours are not available on this platform yet, so these figures leave hours out.';
+
+  @override
+  String get payrollHoursNotRead =>
+      'Your pay rules now use hours. Recompute to read them.';
+
+  @override
+  String payrollJobsLateDraft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count deliveries reached the ledger after these figures were computed. Recompute to include them.',
+      one:
+          '1 delivery reached the ledger after these figures were computed. Recompute to include it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollJobsLateApproved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count deliveries of this period reached the ledger after it was approved. Add corrections for the riders concerned.',
+      one:
+          '1 delivery of this period reached the ledger after it was approved. Add a correction for the rider concerned.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollPeriodChanged =>
+      'Your pay rules now pay these days in a different period. Discard this draft and start that period.';
+
+  @override
+  String get payrollLoadFailed => 'Payroll could not be loaded just now.';
+
+  @override
+  String get payrollTryAgain => 'Try again';
+
+  @override
+  String payrollPayslipSubtitle(String from, String to) {
+    return 'Payslip for $from – $to';
+  }
+
+  @override
+  String get payrollSectionPay => 'Pay';
+
+  @override
+  String get payrollSectionSummary => 'Summary';
+
+  @override
+  String get payrollSectionAttendance => 'Hours and attendance';
+
+  @override
+  String get payrollSectionPayment => 'Payment';
+
+  @override
+  String payrollLineDeliveries(int count, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count deliveries × $rate',
+      one: '1 delivery × $rate',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollLineHours(String hours, String rate) {
+    return '$hours h recorded × $rate';
+  }
+
+  @override
+  String payrollLineOvertime(String hours, String rate) {
+    return '$hours h overtime × $rate';
+  }
+
+  @override
+  String payrollLineTyped(String hours, String rate) {
+    return '$hours h typed by the office × $rate';
+  }
+
+  @override
+  String payrollLineTypedUnpaid(String hours) {
+    return '$hours h typed by the office, not paid under your rules';
+  }
+
+  @override
+  String payrollLineLate(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days late days × $rate',
+      one: '1 late day × $rate',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollLineAbsence(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days absences × $rate',
+      one: '1 absence × $rate',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollLineCash => 'Company cash the rider held, kept from pay';
+
+  @override
+  String payrollLineBonus(String label) {
+    return 'Bonus: $label';
+  }
+
+  @override
+  String payrollLineDeduction(String label) {
+    return 'Deduction: $label';
+  }
+
+  @override
+  String payrollLineCorrection(String label) {
+    return 'Correction: $label';
+  }
+
+  @override
+  String get payrollLineOther => 'Other';
+
+  @override
+  String payrollOwes(String amount) {
+    return 'Owes the company $amount. Nothing is paid.';
+  }
+
+  @override
+  String payrollTipsInfo(String amount) {
+    return 'Tips $amount: the rider\'s own money, not part of this pay.';
+  }
+
+  @override
+  String payrollCashKept(String amount, String date) {
+    return 'Holds $amount of the company\'s cash collected by $date, more than this pay covers. It stays for the hub to collect.';
+  }
+
+  @override
+  String payrollHoursFacts(String recorded, String typed, String overtime) {
+    return 'Recorded $recorded h · typed $typed h · overtime $overtime h';
+  }
+
+  @override
+  String payrollDaysFacts(int lates, int absences) {
+    return 'Late days $lates · absences $absences';
+  }
+
+  @override
+  String get payrollAddBonus => 'Add bonus';
+
+  @override
+  String get payrollAddDeduction => 'Add deduction';
+
+  @override
+  String get payrollRemove => 'Remove';
+
+  @override
+  String get payrollMarkPaid => 'Mark paid';
+
+  @override
+  String get payrollMarkFailed => 'Mark failed';
+
+  @override
+  String get payrollAddCorrection => 'Add correction';
+
+  @override
+  String payrollPaidOn(String date, String method) {
+    return 'Paid on $date · $method';
+  }
+
+  @override
+  String payrollRecordedBy(String name) {
+    return 'Recorded by $name';
+  }
+
+  @override
+  String payrollFailedBecause(String reason) {
+    return 'Payment failed: $reason';
+  }
+
+  @override
+  String get payrollCorrections => 'Corrections';
+
+  @override
+  String get payrollCorrectionWaiting => 'Paid in the rider\'s next pay run';
+
+  @override
+  String get payrollCorrectionPaid => 'Paid in a later pay run';
+
+  @override
+  String payrollLineDialogBonus(String name) {
+    return 'Add a bonus for $name';
+  }
+
+  @override
+  String payrollLineDialogDeduction(String name) {
+    return 'Add a deduction for $name';
+  }
+
+  @override
+  String get payrollLabelField => 'What it is for';
+
+  @override
+  String get payrollAmountField => 'Amount';
+
+  @override
+  String get payrollAmountInvalid => 'An amount to the cent, like 25.00';
+
+  @override
+  String get payrollRequired => 'Required';
+
+  @override
+  String get payrollReasonField => 'Reason';
+
+  @override
+  String get payrollReferenceField => 'Reference (optional)';
+
+  @override
+  String get payrollSave => 'Save';
+
+  @override
+  String payrollCorrectionTitle(String name) {
+    return 'Correct $name\'s pay';
+  }
+
+  @override
+  String get payrollCorrectionBody =>
+      'The approved payslip stays as it is. The correction is paid in the rider\'s next pay run.';
+
+  @override
+  String get payrollCorrectionMore => 'Pay more';
+
+  @override
+  String get payrollCorrectionLess => 'Take back';
+
+  @override
+  String payrollFailedTitle(String name) {
+    return 'Payment to $name did not go through?';
+  }
+
+  @override
+  String get payrollFailedBody =>
+      'The pay stays owed and can be recorded as paid later.';
+
+  @override
+  String payrollPaidTitle(String name, String amount) {
+    return 'Record paying $name $amount?';
+  }
+
+  @override
+  String get payrollPaidBody =>
+      'This records that your company paid the rider. YouDrop moves no money.';
+
+  @override
+  String payrollApproveTitle(String from, String to) {
+    return 'Approve pay for $from – $to?';
+  }
+
+  @override
+  String payrollApproveBody(int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count riders, $total to pay. Payslips are final once approved; a mistake is corrected in a later pay run.',
+      one:
+          '1 rider, $total to pay. Payslips are final once approved; a mistake is corrected in a later pay run.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollApproveCash(String amount, String date) {
+    return '$amount of company cash your riders collected by $date and still hold is kept from their pay and recorded as handed to your company.';
+  }
+
+  @override
+  String get payrollApproveYes => 'Approve';
+
+  @override
+  String payrollPayAllTitle(int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Record $count payments totalling $total?',
+      one: 'Record 1 payment of $total?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollPayAllBody =>
+      'This records that your company paid these riders, and cannot be undone. Failed payments are left to record one by one.';
+
+  @override
+  String get payrollRecordYes => 'Record';
+
+  @override
+  String get payrollDiscardTitle => 'Discard this draft?';
+
+  @override
+  String get payrollDiscardBody =>
+      'Its figures are thrown away and its history is kept. You can start the period again.';
+
+  @override
+  String get payrollDiscardYes => 'Discard';
+
+  @override
+  String get payrollDone => 'Saved.';
+
+  @override
+  String get payrollApproved => 'Pay run approved.';
+
+  @override
+  String get payrollErrFiguresChanged =>
+      'The figures changed since you looked. Check the new ones, then approve again.';
+
+  @override
+  String get payrollErrCashChanged =>
+      'A rider\'s cash changed a moment ago. Nothing was approved; approve again to see the new figures.';
+
+  @override
+  String payrollErrTotalChanged(String amount) {
+    return 'The total waiting for payment is now $amount. Nothing was recorded.';
+  }
+
+  @override
+  String get payrollErrRefused =>
+      'That could not be done: the pay run has changed or no longer allows it. Reload and try again.';
+
+  @override
+  String get payrollErrFailed =>
+      'That could not be done just now. Please try again.';
+
+  @override
+  String get payrollErrRulesStart =>
+      'New rules cannot start on that day. Pick one of the days offered.';
+
+  @override
+  String payrollRulesNow(String from) {
+    return 'In force since $from';
+  }
+
+  @override
+  String get payrollRulesNone => 'No pay rules yet.';
+
+  @override
+  String payrollRulesNext(String date) {
+    return 'New rules start on $date';
+  }
+
+  @override
+  String get payrollRulesCycle => 'Pay riders';
+
+  @override
+  String get payrollCycleSemiMonthly => 'Twice a month (1st–15th, 16th–end)';
+
+  @override
+  String get payrollCycleMonthly => 'Monthly';
+
+  @override
+  String get payrollRulesStart => 'Starting on';
+
+  @override
+  String get payrollRulesPerDelivery => 'Pay per delivery';
+
+  @override
+  String get payrollRulesHourly => 'Hourly base (optional)';
+
+  @override
+  String get payrollRulesHourlyHint => 'Empty for no hourly pay';
+
+  @override
+  String get payrollRulesTyped => 'Pay hours the office typed';
+
+  @override
+  String get payrollRulesOvertime => 'Overtime multiplier';
+
+  @override
+  String get payrollRulesLate => 'Deduction per late day';
+
+  @override
+  String get payrollRulesAbsence => 'Deduction per absence';
+
+  @override
+  String get payrollRulesSave => 'Save rules';
+
+  @override
+  String get payrollRulesNote =>
+      'Rules take effect from the first day of a pay period and never change a pay run already approved.';
+
+  @override
+  String get payrollMultiplierInvalid => 'Between 1.00 and 5.00';
+
+  @override
+  String get payrollRulesNoStart => 'No day is open for new rules right now.';
+
+  @override
+  String get payrollCashMethodKeptFromPay => 'Kept from pay';
+
+  @override
+  String payrollReadBeforeEnd(String time) {
+    return 'These figures were read on $time, before the period ended. Recompute to count the whole period before approving.';
+  }
+
+  @override
+  String get payrollDeliveriesNotDeployed =>
+      'Deliveries cannot be counted from orders on this platform yet, so these figures count only deliveries that earned a fee: free deliveries are missing from them.';
+
+  @override
+  String get payrollDeliveriesMissing =>
+      'Deliveries could not be counted from orders just now, so these figures count only deliveries that earned a fee. Recompute to count every delivery.';
+
+  @override
+  String payrollHoursMissingFor(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Hours could not be read for $names, so their pay leaves hours out.',
+      one: 'Hours could not be read for $names, so their pay leaves hours out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollNamesMore(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$names and $count others',
+      one: '$names and 1 other',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollListSeparator => ', ';
+
+  @override
+  String get payrollApproveDeliveriesLedger =>
+      'Deliveries were counted only from jobs that earned a fee, so free deliveries are missing from this pay.';
+
+  @override
+  String get payrollApproveWithoutMissing => 'Approve without what is missing';
+
+  @override
+  String get payrollErrNeedsAcknowledgement =>
+      'Something is missing from these figures. Tick the box to approve without it.';
+
+  @override
+  String get payrollErrRecomputeNeeded =>
+      'These figures were read before the period ended. Recompute, check them and approve again.';
+
+  @override
+  String get payrollHoursNotListed =>
+      'Attendance shows no time this rider worked for your company in this period, so their hours are not known.';
+
+  @override
+  String get chatRoomEntryTitle => 'Neighbourhood chat';
+
+  @override
+  String get chatRoomEntrySub => 'Talk with the people who live around you';
+
+  @override
+  String chatRoomTitle(String area) {
+    return '$area chat';
+  }
+
+  @override
+  String get chatRoomLive => 'LIVE';
+
+  @override
+  String chatRoomMembers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count neighbours',
+      one: '1 neighbour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatRoomCommunity => 'Community';
+
+  @override
+  String get chatRoomComposerHint => 'Type a message or ask a neighbour…';
+
+  @override
+  String get chatRoomEmpty => 'No messages yet. Say hello to your neighbours.';
+
+  @override
+  String get chatRoomCouldNotLoad => 'Could not load your neighbourhood chat';
+
+  @override
+  String get chatRoomPickAreaTitle => 'Choose your area to join its chat';
+
+  @override
+  String get chatRoomPickAreaBody =>
+      'Neighbourhood chat follows the area of your delivery address.';
+
+  @override
+  String get chatRoomChooseArea => 'Choose area';
+
+  @override
+  String get chatRoomUnknownAreaTitle => 'Your area has no neighbourhood chat';
+
+  @override
+  String get chatRoomUnknownAreaBody =>
+      'Pick one of the delivery areas for your address to join its chat.';
+
+  @override
+  String chatRoomMoveBlocked(String date) {
+    return 'You can move to your new area\'s chat from $date.';
+  }
+
+  @override
+  String chatRoomMuted(String date) {
+    return 'A moderator has paused your messages here until $date.';
+  }
+
+  @override
+  String get chatRoomHidden => 'This message was removed';
+
+  @override
+  String get chatRoomNeighbour => 'Neighbour';
+
+  @override
+  String get chatRoomReport => 'Report';
+
+  @override
+  String get chatRoomReportTitle => 'Why are you reporting this message?';
+
+  @override
+  String get chatRoomReasonSpam => 'Spam or advertising';
+
+  @override
+  String get chatRoomReasonAbuse => 'Abuse or harassment';
+
+  @override
+  String get chatRoomReasonPersonalInfo => 'Someone\'s personal details';
+
+  @override
+  String get chatRoomReasonOther => 'Something else';
+
+  @override
+  String get chatRoomReportSent => 'Thanks. A moderator will review it.';
+
+  @override
+  String get chatRoomBlock => 'Block';
+
+  @override
+  String chatRoomBlockTitle(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String get chatRoomBlockBody =>
+      'You won\'t see their messages in neighbourhood chat. They won\'t be told.';
+
+  @override
+  String get chatRoomBlockedToast => 'Blocked. You won\'t see their messages.';
+
+  @override
+  String get chatRoomCopy => 'Copy';
+
+  @override
+  String get chatRoomCopied => 'Copied';
+
+  @override
+  String get chatRoomRulesTitle => 'Community rules';
+
+  @override
+  String get chatRoomRulesBody =>
+      'Be kind to your neighbours. No spam or advertising, no harassment, and never post anyone\'s phone number or address. Moderators remove messages that break these rules.';
+
+  @override
+  String get chatRoomBlockedPeople => 'People you blocked';
+
+  @override
+  String get chatRoomNoBlocks => 'You haven\'t blocked anyone.';
+
+  @override
+  String get chatRoomUnblock => 'Unblock';
+
+  @override
+  String get chatSlowDown =>
+      'You\'re sending messages too fast. Wait a moment and try again.';
+
+  @override
+  String get chatTooLong => 'That message is too long.';
+
+  @override
+  String get chatActionFailed => 'That didn\'t work. Try again.';
+
+  @override
+  String chatShopWith(String shop) {
+    return 'Chat with $shop';
+  }
+
+  @override
+  String get chatShopHintCustomer => 'Message the shop…';
+
+  @override
+  String get chatShopHintMerchant => 'Reply to the customer…';
+
+  @override
+  String get chatShopEmptyCustomer =>
+      'Ask the shop anything: what\'s in stock, prices, opening hours.';
+
+  @override
+  String get chatShopEmptyMerchant => 'No messages in this conversation yet.';
+
+  @override
+  String get chatShopCouldNotLoad => 'Could not load this conversation';
+
+  @override
+  String get chatShopQuietCustomer => 'This chat has gone quiet.';
+
+  @override
+  String get chatShopReopen => 'Reopen';
+
+  @override
+  String get chatShopQuietMerchant =>
+      'This conversation has gone quiet. The customer can start it again from your shop\'s page.';
+
+  @override
+  String get chatShopInboxTitle => 'Customer messages';
+
+  @override
+  String get chatShopInboxEmpty => 'No customer messages yet';
+
+  @override
+  String get chatShopInboxEmptySub =>
+      'Customers can message your shop from its page in the app.';
+
+  @override
+  String get chatShopInboxCouldNotLoad => 'Could not load customer messages';
+
+  @override
+  String get chatShopCustomer => 'Customer';
+
+  @override
+  String chatShopYouPrefix(String text) {
+    return 'You: $text';
+  }
+
+  @override
+  String get chatShopQuietBadge => 'Quiet';
+
+  @override
+  String get chatModerationTitle => 'Moderation';
+
+  @override
+  String get chatModerationSub =>
+      'Reported neighbourhood chat messages, oldest first.';
+
+  @override
+  String get chatModerationEmpty => 'No reports waiting';
+
+  @override
+  String get chatModerationCouldNotLoad =>
+      'Could not load the moderation queue';
+
+  @override
+  String chatModerationReports(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reports',
+      one: '1 report',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatModerationHide => 'Hide message';
+
+  @override
+  String get chatModerationDismiss => 'Dismiss';
+
+  @override
+  String get chatModerationMute => 'Mute author';
+
+  @override
+  String get chatModerationUnmute => 'Unmute author';
+
+  @override
+  String get chatModerationMute24h => 'For 24 hours';
+
+  @override
+  String get chatModerationMute7d => 'For 7 days';
+
+  @override
+  String get chatModerationMute30d => 'For 30 days';
+
+  @override
+  String get chatModerationReasonLabel => 'Reason (kept in the audit trail)';
+
+  @override
+  String get chatModerationReasonTooShort => 'Write at least 3 characters';
+
+  @override
+  String get chatModerationConfirm => 'Confirm';
+
+  @override
+  String get chatModerationRemoved => 'Removed';
+
+  @override
+  String chatModerationMutedUntil(String date) {
+    return 'Author muted until $date';
+  }
+
+  @override
+  String get chatModerationDone => 'Done';
+
+  @override
+  String get chatModerationRefresh => 'Refresh';
+
+  @override
+  String get chatRoomOlderFailed =>
+      'Couldn\'t load earlier messages. Tap to try again.';
+
+  @override
+  String get chatRoomPostAfterDelivery =>
+      'You can post here after your first delivery to this area.';
+
+  @override
+  String get chatRoomPostingUnavailable =>
+      'Posting is paused while we check your deliveries. Try again shortly.';
+
+  @override
+  String chatShopUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread messages',
+      one: '1 unread message',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartTitle => 'Smart Basket';
+
+  @override
+  String get multiCartSubtitle => 'One checkout, every shop';
+
+  @override
+  String multiCartShopCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shops',
+      one: '1 shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartFromShop(int count, String store) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'From $store ($count items)',
+      one: 'From $store (1 item)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopDelivery => 'Delivery from this shop';
+
+  @override
+  String multiCartDeliveryFromShops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delivery from $count shops',
+      one: 'Delivery from 1 shop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartCheckoutAmount(String amount) {
+    return 'Checkout — $amount';
+  }
+
+  @override
+  String multiCartBelowMinimum(String amount, String store) {
+    return 'Add $amount more from $store to reach its minimum order';
+  }
+
+  @override
+  String multiCartShopClosed(String store) {
+    return '$store is closed right now. Remove its items to check out.';
+  }
+
+  @override
+  String multiCartShopNotServing(String store) {
+    return '$store doesn\'t deliver to your address. Remove its items to check out.';
+  }
+
+  @override
+  String multiCartShopUnavailable(String store) {
+    return '$store can\'t take this order right now.';
+  }
+
+  @override
+  String multiCartRemoveShop(String store) {
+    return 'Remove $store';
+  }
+
+  @override
+  String multiCartShopLimitTitle(int max) {
+    String _temp0 = intl.Intl.pluralLogic(
+      max,
+      locale: localeName,
+      other: 'Up to $max shops per basket',
+      one: 'One shop per basket',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopLimitBody =>
+      'Check out, or remove a shop from your basket, before adding items from another.';
+
+  @override
+  String multiCartPartOfOrder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Part of a $count-shop order',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartCannotWait =>
+      'A basket from several shops can\'t wait for the connection: its shops\' orders are placed together, while you\'re online. Check out once you\'re back.';
+
+  @override
+  String get multiCartGiftOneShop =>
+      'A gift is sent from one shop at a time. Remove the other shops\' items, or send this basket as an ordinary order.';
+
+  @override
+  String multiCartPlaced(int count, String amount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count orders placed · $amount',
+      one: '1 order placed · $amount',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartPricesUpdating => 'Updating prices…';
+
+  @override
+  String get multiCartPricesFailed => 'We couldn\'t confirm the latest prices.';
+
+  @override
+  String get multiCartPriceChangedTitle => 'The total has changed';
+
+  @override
+  String multiCartPriceChangedBody(String total, String agreed) {
+    return 'Your basket now comes to $total, not the $agreed you saw. Place its orders at the new total?';
+  }
+
+  @override
+  String multiCartEarlierCheckoutPlaced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Your earlier checkout already went through: all $count of its orders are in Orders.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcVerticalServices => 'Services';
+
+  @override
+  String get svcCategoryPrinting => 'Printing';
+
+  @override
+  String get svcCategoryTailoring => 'Tailoring & alterations';
+
+  @override
+  String get svcCategoryRepairs => 'Repairs';
+
+  @override
+  String get svcCategoryPhotography => 'Photography';
+
+  @override
+  String get svcCategoryCleaning => 'Cleaning';
+
+  @override
+  String get svcCategoryBeauty => 'Beauty';
+
+  @override
+  String get svcCategoryTutoring => 'Tutoring';
+
+  @override
+  String get svcSignupTitle => 'Grow your business on YouDrop';
+
+  @override
+  String get svcSignupSubtitle => 'Reach customers in your neighbourhood.';
+
+  @override
+  String get svcSignupBannerTitle => 'Lebanese services';
+
+  @override
+  String get svcSignupBannerBody =>
+      'Printing, tailoring, repairs, photography and more — collected at your shop or delivered by YouDrop.';
+
+  @override
+  String get svcBusinessName => 'Business name';
+
+  @override
+  String get svcBusinessNameHint => 'e.g. Al Fakhry Press';
+
+  @override
+  String get svcServiceCategory => 'Service category';
+
+  @override
+  String get svcServiceCategoryHint => 'Choose what you offer';
+
+  @override
+  String get svcPhoneHint => '71 234 567';
+
+  @override
+  String get svcPhoneInvalid => 'Enter a Lebanese number, e.g. 71 234 567';
+
+  @override
+  String get svcArea => 'Location / area';
+
+  @override
+  String get svcAreaHint => 'Choose your area';
+
+  @override
+  String get svcApplyCta => 'Apply to sell services';
+
+  @override
+  String get svcOptionsFailed =>
+      'We couldn\'t load the services on offer. Check your connection and try again.';
+
+  @override
+  String get svcNoCategoriesOpen =>
+      'YouDrop isn\'t taking applications to sell services right now.';
+
+  @override
+  String get svcPendingTitle => 'Application sent';
+
+  @override
+  String svcPendingBody(String email) {
+    return 'A YouDrop reviewer reads every application to sell services. We\'ll email $email once it\'s decided.';
+  }
+
+  @override
+  String get svcPendingBodyNoEmail =>
+      'A YouDrop reviewer reads every application to sell services, and we\'ll let you know once it\'s decided.';
+
+  @override
+  String svcReference(String reference) {
+    return 'Reference: $reference';
+  }
+
+  @override
+  String get svcApprovedTitle => 'You\'re approved';
+
+  @override
+  String get svcApprovedBody =>
+      'We open your services shop the first time you go to it.';
+
+  @override
+  String get svcErrCategoryClosed =>
+      'YouDrop isn\'t taking applications for that service yet. Choose another.';
+
+  @override
+  String get svcErrCategoryMissing => 'Choose the service you offer.';
+
+  @override
+  String get svcErrAreaUnknown =>
+      'That area is no longer on the list. Choose your area again.';
+
+  @override
+  String get svcErrAreaMissing => 'Choose the area your business is in.';
+
+  @override
+  String get svcErrCatalogUnavailable =>
+      'We couldn\'t check the services on offer just now. Try again in a moment.';
+
+  @override
+  String get svcOfferYourServices => 'Offer your services';
+
+  @override
+  String get svcOfferYourServicesSub =>
+      'Printing, tailoring, repairs or photography';
+
+  @override
+  String get svcSwitchToShop => 'Switch to your shop';
+
+  @override
+  String get svcSwitchToShopping => 'Switch to shopping';
+
+  @override
+  String get svcChoiceCard => 'Offer services';
+
+  @override
+  String get svcChoiceCardBlurb =>
+      'Print, tailor, repair or take photos for your neighbourhood, from your own shop.';
+
+  @override
+  String get svcIntent => 'Services';
+
+  @override
+  String get svcIntentBlurb => 'I print, tailor, repair or take photos';
+
+  @override
+  String get svcOpeningShop => 'Opening your services shop…';
+
+  @override
+  String get svcOpeningShopFailed => 'We couldn\'t open your services shop.';
+
+  @override
+  String get svcDocsTitle => 'Add your documents';
+
+  @override
+  String get svcDocsIntro =>
+      'Your national ID and commercial registration help the reviewer decide. Clear photos or PDFs.';
+
+  @override
+  String get svcDocsFootnote =>
+      'They go to the reviewer when you tap Send documents.';
+
+  @override
+  String get svcDocsSend => 'Send documents';
+
+  @override
+  String get svcDocsSent => 'Your documents are with the reviewer.';
+
+  @override
+  String get svcDocsSkipped =>
+      'No documents were sent, so the reviewer will see your ID and commercial registration as missing.';
+
+  @override
+  String get svcShopCategoryClosedTitle =>
+      'Your service isn\'t offered right now';
+
+  @override
+  String get svcShopCategoryClosedBody =>
+      'Your application was approved, but YouDrop isn\'t offering this service at the moment, so your shop can\'t be opened. Please contact support.';
+
+  @override
+  String svcCashShopName(String id) {
+    return 'Shop $id';
+  }
+
+  @override
+  String svcCashShopTakenAtCounter(String amount) {
+    return '$amount paid at its counter';
+  }
+
+  @override
+  String svcCashShopConfirmBody(
+      String shop, String owed, String held, String orders) {
+    return 'Confirm $shop has paid the platform $owed: its commission on the $held its customers paid at its counter, covering $orders. The shop keeps the rest as its own share. This cannot be undone.';
+  }
+
+  @override
+  String svcCashShopAmountChanged(String shop, String amount) {
+    return '$shop now owes $amount, not the amount you confirmed. Nothing was recorded.';
+  }
+
+  @override
+  String get svcActionCollected => 'Customer collected';
+
+  @override
+  String get svcDeclineTooBusy => 'Too busy right now';
+
+  @override
+  String get svcDeclineCannotDo => 'We can\'t do this job';
+
+  @override
+  String get svcDeclineFileProblem => 'Problem with the file';
+
+  @override
+  String get svcDeclineOther => 'Other reason';
+
+  @override
+  String get svcNavServices => 'Services';
+
+  @override
+  String get svcBrandPill => 'YOUDROP SERVICES';
+
+  @override
+  String get svcSearchHint => 'Search for a service…';
+
+  @override
+  String get svcCategoriesTitle => 'Service categories';
+
+  @override
+  String get svcPopularNearYou => 'Popular services near you';
+
+  @override
+  String get svcNearYou => 'Services near you';
+
+  @override
+  String get svcAllProviders => 'Service providers';
+
+  @override
+  String get svcNoServicesNearby => 'No services near you yet';
+
+  @override
+  String get svcNoServicesNearbyHint =>
+      'Try a category, or search for what you need.';
+
+  @override
+  String get svcServicesNotOffered =>
+      'YouDrop isn\'t offering services here yet';
+
+  @override
+  String get svcCouldNotLoadServices => 'Could not load services';
+
+  @override
+  String svcDistanceAway(String distance) {
+    return '$distance away';
+  }
+
+  @override
+  String get svcOffers => 'Offers';
+
+  @override
+  String get svcSearchProviders => 'Providers';
+
+  @override
+  String svcSearchTitle(String query) {
+    return 'Results for “$query”';
+  }
+
+  @override
+  String svcNoResults(String query) {
+    return 'Nothing found for “$query”';
+  }
+
+  @override
+  String svcCategoryEmpty(String category) {
+    return 'No $category providers yet';
+  }
+
+  @override
+  String svcReviewsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count reviews',
+      one: '1 review',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcOpenUntil(String time) {
+    return 'Open until $time';
+  }
+
+  @override
+  String get svcTabAbout => 'About';
+
+  @override
+  String svcFromPrice(String price) {
+    return 'From $price';
+  }
+
+  @override
+  String get svcOrderCta => 'Order';
+
+  @override
+  String get svcNoOffers => 'This provider has no offers right now';
+
+  @override
+  String get svcAboutHours => 'Opening hours';
+
+  @override
+  String get svcAboutAddress => 'Address';
+
+  @override
+  String get svcAboutGetIt => 'How you get your order';
+
+  @override
+  String get svcPickupAtShop => 'Pickup at the shop';
+
+  @override
+  String get svcYouDropDelivery => 'YouDrop delivery';
+
+  @override
+  String get svcClosedNoOrders =>
+      'Closed now — you can order when the shop opens';
+
+  @override
+  String get svcNeedsFileUnavailable =>
+      'This offer needs a file, and files can\'t be sent with orders yet';
+
+  @override
+  String svcPackOf(String count, String unit) {
+    return 'Pack of $count $unit';
+  }
+
+  @override
+  String svcPerUnit(String unit) {
+    return 'Per $unit';
+  }
+
+  @override
+  String get svcLoadMore => 'Load more';
+
+  @override
+  String get svcCouldNotLoadOffer => 'Could not load this offer';
+
+  @override
+  String get svcCouldNotLoadReviews => 'Could not load reviews';
+
+  @override
+  String get svcOrderServiceTitle => 'Order service';
+
+  @override
+  String svcProviderLine(String name) {
+    return 'Provider: $name';
+  }
+
+  @override
+  String get svcQuantity => 'Quantity';
+
+  @override
+  String svcUnitsLine(String units, String unit) {
+    return '$units $unit';
+  }
+
+  @override
+  String svcPacksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count packs',
+      one: '1 pack',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcChooseOption => 'Choose one';
+
+  @override
+  String get svcOptionRequired => 'Required';
+
+  @override
+  String get svcOptionOptional => 'Optional';
+
+  @override
+  String get svcUploadDesign => 'Upload design file';
+
+  @override
+  String get svcUploadHint => 'Tap to choose a PDF, JPG or PNG, up to 10 MB';
+
+  @override
+  String get svcUploading => 'Uploading…';
+
+  @override
+  String get svcUploaded => 'Uploaded';
+
+  @override
+  String get svcRemoveFile => 'Remove';
+
+  @override
+  String get svcUploadFailed => 'Couldn\'t upload this file. Try again.';
+
+  @override
+  String get svcAddAnotherFile => 'Add another file';
+
+  @override
+  String get svcFileRequired => 'This provider needs your file to start';
+
+  @override
+  String get svcSpecialInstructions => 'Special instructions';
+
+  @override
+  String get svcInstructionsHint =>
+      'e.g. Leave a white border around the card edges';
+
+  @override
+  String get svcHowYouGetIt => 'How you get it';
+
+  @override
+  String svcDeliveryFeePlus(String amount) {
+    return '+$amount';
+  }
+
+  @override
+  String get svcPayCashPickup => 'Cash — pay when you collect';
+
+  @override
+  String get svcPayCashDelivery => 'Cash — pay on delivery';
+
+  @override
+  String get svcDeliveryFee => 'Delivery fee';
+
+  @override
+  String get svcDiscount => 'Discount';
+
+  @override
+  String svcPlaceOrderTotal(String amount) {
+    return 'Place order — $amount';
+  }
+
+  @override
+  String get svcOfflineNoQueue =>
+      'Service orders need a connection — they can\'t wait on this phone to be sent later.';
+
+  @override
+  String get svcChooseDeliveryAddress => 'Choose where to deliver';
+
+  @override
+  String get svcQuoteFailed => 'Couldn\'t get the price. Try again.';
+
+  @override
+  String svcPriceChangedBody(String total, String agreed) {
+    return 'This order now comes to $total, not the $agreed you saw. Place it at the new total?';
+  }
+
+  @override
+  String get svcDirectoryUnavailable =>
+      'Services are briefly unavailable. Try again in a moment.';
+
+  @override
+  String svcNotServed(String shop) {
+    return '$shop doesn\'t deliver to this address';
+  }
+
+  @override
+  String svcShopClosed(String shop) {
+    return '$shop is closed and isn\'t taking orders right now';
+  }
+
+  @override
+  String svcBelowMinimum(String shop, String amount) {
+    return '$shop delivers orders of $amount or more';
+  }
+
+  @override
+  String get svcRefusedCategoryClosed =>
+      'This service isn\'t offered right now';
+
+  @override
+  String get svcRefusedOfferNotOrderable =>
+      'This offer can\'t be ordered right now';
+
+  @override
+  String get svcRefusedFulfilment =>
+      'The provider doesn\'t offer that way of getting it';
+
+  @override
+  String get svcRefusedAttachmentsUnavailable =>
+      'Files can\'t be sent with orders yet, so this offer can\'t be ordered';
+
+  @override
+  String get svcRefusedWrongType => 'Only PDF, JPG or PNG files';
+
+  @override
+  String get svcRefusedEmpty => 'That file is empty';
+
+  @override
+  String get svcRefusedTooLarge => 'Files must be 10 MB or smaller';
+
+  @override
+  String get svcRefusedTooManyWaiting =>
+      'You have too many files waiting for an order. Remove one first.';
+
+  @override
+  String get svcRefusedNotUploaded =>
+      'That file didn\'t finish uploading. Upload it again.';
+
+  @override
+  String get svcRefusedExpired => 'That file has expired. Upload it again.';
+
+  @override
+  String get svcRefusedAlreadyAttached =>
+      'That file is already on another order. Upload it again.';
+
+  @override
+  String get svcRefusedTooManyFiles => 'Up to 3 files per order';
+
+  @override
+  String get svcRefusedDuplicate => 'That file is already added';
+
+  @override
+  String get svcRefusedNotAccepted => 'This offer doesn\'t take files';
+
+  @override
+  String get svcRefusedUnknownFile =>
+      'That file couldn\'t be found. Upload it again.';
+
+  @override
+  String get svcRefusedPacks => 'Choose between 1 and 99 packs';
+
+  @override
+  String get svcRefusedGeneric => 'This order can\'t be placed as it stands';
+
+  @override
+  String get svcTrackTitle => 'Track service order';
+
+  @override
+  String svcOrderNumber(String ref) {
+    return 'Order #$ref';
+  }
+
+  @override
+  String get svcStatusWaiting => 'Waiting for provider';
+
+  @override
+  String get svcStatusInProgress => 'In progress';
+
+  @override
+  String get svcStatusReadyPickup => 'Ready for pickup';
+
+  @override
+  String get svcStatusReadyDelivery => 'Ready for delivery';
+
+  @override
+  String get svcStatusOnTheWay => 'On the way';
+
+  @override
+  String get svcStatusCompleted => 'Completed';
+
+  @override
+  String get svcStatusCollected => 'Collected';
+
+  @override
+  String get svcStatusDeclined => 'Declined';
+
+  @override
+  String get svcStatusNotCollected => 'Not collected';
+
+  @override
+  String get svcEstimatedCompletion => 'Estimated completion';
+
+  @override
+  String get svcReadyByCaption => 'Ready by';
+
+  @override
+  String svcEstimateAfterAccept(String range) {
+    return '$range, confirmed once the provider accepts';
+  }
+
+  @override
+  String svcTurnaroundRange(String min, String max) {
+    return '$min–$max hours';
+  }
+
+  @override
+  String svcTurnaroundUpTo(String max) {
+    return 'Up to $max hours';
+  }
+
+  @override
+  String svcTodayAt(String time) {
+    return 'Today, $time';
+  }
+
+  @override
+  String svcTomorrowAt(String time) {
+    return 'Tomorrow, $time';
+  }
+
+  @override
+  String svcDateAt(String date, String time) {
+    return '$date, $time';
+  }
+
+  @override
+  String get svcOrderStatusTitle => 'Order status';
+
+  @override
+  String get svcTimelinePlaced => 'Order placed';
+
+  @override
+  String get svcTimelineAccepted => 'Provider accepted';
+
+  @override
+  String get svcTimelineInProduction => 'In production';
+
+  @override
+  String get svcTimelineOutForDelivery => 'Out for delivery';
+
+  @override
+  String svcDeclinedReason(String reason) {
+    return 'Declined by the provider: $reason';
+  }
+
+  @override
+  String get svcTimelineNotCollected => 'Cancelled — not collected in time';
+
+  @override
+  String get svcProviderRole => 'Service provider';
+
+  @override
+  String get svcShowNumberAtPickup => 'Show this order number when you collect';
+
+  @override
+  String svcPickupFrom(String shop) {
+    return 'Pickup from $shop';
+  }
+
+  @override
+  String svcDeliveringTo(String address) {
+    return 'Delivering to $address';
+  }
+
+  @override
+  String get svcYourInstructions => 'Your instructions';
+
+  @override
+  String get svcSummary => 'Summary';
+
+  @override
+  String get svcServiceChip => 'Service';
+
+  @override
+  String get svcRefusedTooManyUploads =>
+      'You\'ve sent several files in the last few minutes. Wait a few minutes, then add this one again.';
+
+  @override
+  String svcInstructionsLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get svcOrderNotAccepted =>
+      'This order couldn\'t be sent as it is. Check what you wrote in it, then try again.';
+
+  @override
+  String get svcOrderChangedRequote =>
+      'Your order changed while it was being sent, so nothing was placed. Its total is being checked again.';
+
+  @override
+  String get svcUnconfirmedLeaveTitle => 'Your order may have gone through';
+
+  @override
+  String get svcUnconfirmedLeaveBody =>
+      'We didn\'t hear back after you tapped Place. Check Orders before ordering this again, so you don\'t order it twice.';
+
+  @override
+  String get svcCheckOrders => 'Check Orders';
+
+  @override
+  String get svcLeaveAnyway => 'Leave anyway';
+
+  @override
+  String get svcStayHere => 'Stay';
+
+  @override
+  String get svcYourFiles => 'Your files';
+
+  @override
+  String svcYourFileNumber(int n) {
+    return 'File $n';
+  }
+
+  @override
+  String get svcYourFilesFailed => 'Couldn\'t load your files';
+
+  @override
+  String get svcFileGone => 'This file is no longer available.';
+
+  @override
+  String svcRateProvider(String shop) {
+    return 'Rate $shop';
+  }
+
+  @override
+  String get svcRateProviderPrompt => 'How was the work?';
+
+  @override
+  String svcRatedProvider(String shop) {
+    return 'You rated $shop';
+  }
+
+  @override
+  String get svcReviewNotYet =>
+      'This order isn\'t on record as completed yet, so it can\'t be rated. Try again in a minute.';
+
+  @override
+  String get svcBoOffersTitle => 'Service offers';
+
+  @override
+  String get svcBoOffersSubtitle =>
+      'Every service shop\'s offers, in any status — take one down or restore it, with a reason';
+
+  @override
+  String get svcBoShopsTitle => 'Shops';
+
+  @override
+  String get svcBoShopsSubtitle =>
+      'Listed shops, and which of them carry the Verified Local badge';
+
+  @override
+  String get svcBoFilterAll => 'All';
+
+  @override
+  String get svcBoOfferDraft => 'Draft';
+
+  @override
+  String get svcBoOfferActive => 'Active';
+
+  @override
+  String get svcBoOfferPaused => 'Paused';
+
+  @override
+  String get svcBoOfferArchived => 'Archived';
+
+  @override
+  String get svcBoOfferTakenDown => 'Taken down';
+
+  @override
+  String get svcBoAllCategories => 'All categories';
+
+  @override
+  String get svcBoAllShops => 'All shops';
+
+  @override
+  String get svcBoShopFilterTooltip => 'Shops seen in the results so far';
+
+  @override
+  String get svcBoOffersSearchHint => 'Search offer or shop name';
+
+  @override
+  String get svcBoColOffer => 'Offer';
+
+  @override
+  String get svcBoColShop => 'Shop';
+
+  @override
+  String get svcBoColCategory => 'Category';
+
+  @override
+  String get svcBoColPrice => 'Price';
+
+  @override
+  String get svcBoColStatus => 'Status';
+
+  @override
+  String get svcBoOffersEmpty => 'No service offers match these filters.';
+
+  @override
+  String get svcBoOffersLoadFailed => 'Could not load service offers.';
+
+  @override
+  String get svcBoOffersRefused =>
+      'This account may not read service offers — only back office staff can.';
+
+  @override
+  String svcBoPageOf(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
+  String svcBoOffersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count offers',
+      one: '1 offer',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcBoPriceFrom(String price) {
+    return 'From $price';
+  }
+
+  @override
+  String svcBoPricePer(String price, String unit) {
+    return '$price per $unit';
+  }
+
+  @override
+  String svcBoPricePerPack(String price, int count, String unit) {
+    return '$price per $count $unit';
+  }
+
+  @override
+  String get svcBoSectionOffer => 'Offer';
+
+  @override
+  String get svcBoSectionShop => 'Provider shop';
+
+  @override
+  String get svcBoSectionTerms => 'Terms';
+
+  @override
+  String get svcBoSectionPhotos => 'Photos';
+
+  @override
+  String get svcBoSectionHold => 'Held off sale';
+
+  @override
+  String get svcBoSectionModerationHistory => 'Moderation history';
+
+  @override
+  String get svcBoFactDescription => 'Description';
+
+  @override
+  String get svcBoFactName => 'Name';
+
+  @override
+  String get svcBoFactListing => 'Listing';
+
+  @override
+  String get svcBoShopListed => 'Listed';
+
+  @override
+  String get svcBoShopDraft => 'Not yet listed';
+
+  @override
+  String get svcBoShopSuspended => 'Suspended';
+
+  @override
+  String get svcBoTermPricing => 'Pricing';
+
+  @override
+  String get svcBoPricingFixed => 'Fixed price';
+
+  @override
+  String get svcBoPricingPerUnit => 'Per unit';
+
+  @override
+  String get svcBoPricingFrom => 'Starting price';
+
+  @override
+  String get svcBoTermUnknown => 'Not known to this version';
+
+  @override
+  String get svcBoTermPack => 'One pack';
+
+  @override
+  String svcBoPackOf(int count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcBoPackUnits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count units',
+      one: '1 unit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcBoTermTurnaround => 'Turnaround';
+
+  @override
+  String svcBoTurnaroundRange(int min, int max) {
+    return '$min–$max hours';
+  }
+
+  @override
+  String svcBoTurnaroundUpTo(int max) {
+    return 'Up to $max hours';
+  }
+
+  @override
+  String get svcBoTermFulfilment => 'Fulfilment';
+
+  @override
+  String get svcBoFulfilPickup => 'Pickup at the shop';
+
+  @override
+  String get svcBoFulfilDelivery => 'YouDrop delivery';
+
+  @override
+  String get svcBoFulfilBoth => 'Pickup or delivery';
+
+  @override
+  String get svcBoTermFiles => 'Customer files';
+
+  @override
+  String get svcBoFilesPolicyNone => 'No files';
+
+  @override
+  String get svcBoFilesPolicyOptional => 'Optional';
+
+  @override
+  String get svcBoFilesPolicyRequired => 'Required';
+
+  @override
+  String get svcBoTermPrompt => 'Question to the customer';
+
+  @override
+  String get svcBoNoPhotos => 'No photos';
+
+  @override
+  String get svcBoPhotoUnavailable => 'Image unavailable';
+
+  @override
+  String get svcBoOpenPhoto => 'Open full-size photo';
+
+  @override
+  String get svcBoPhoto => 'Photo';
+
+  @override
+  String svcBoPhotoPosition(int index, int count) {
+    return '$index of $count';
+  }
+
+  @override
+  String get svcBoHoldReason => 'Reason given';
+
+  @override
+  String get svcBoHoldSince => 'Since';
+
+  @override
+  String get svcBoTakeDown => 'Take down';
+
+  @override
+  String get svcBoRestore => 'Restore';
+
+  @override
+  String svcBoTakeDownTitle(String offer) {
+    return 'Take down $offer?';
+  }
+
+  @override
+  String get svcBoTakeDownBody =>
+      'It goes off sale for every customer at once. Its provider reads your reason, and cannot put it back on sale until back office restores it.';
+
+  @override
+  String svcBoRestoreTitle(String offer) {
+    return 'Restore $offer?';
+  }
+
+  @override
+  String get svcBoRestoreBody =>
+      'The hold is lifted. An offer that was on sale comes back paused, for its provider to resume.';
+
+  @override
+  String get svcBoReasonLabel => 'Reason — required, kept in the history';
+
+  @override
+  String get svcBoReasonRequired => 'Say why: the reason is required.';
+
+  @override
+  String svcBoTakenDownDone(String offer) {
+    return '$offer was taken down. Its provider can read your reason.';
+  }
+
+  @override
+  String svcBoRestoredDone(String offer) {
+    return '$offer was restored. If it was on sale, it waits paused for its provider to resume it.';
+  }
+
+  @override
+  String get svcBoTakeDownRefused =>
+      'Not taken down: the server says this offer is already down, or is not a service offer. Nothing changed, and the list was reloaded.';
+
+  @override
+  String get svcBoRestoreRefused =>
+      'Not restored: the server says this offer is not taken down any more. Nothing changed, and the list was reloaded.';
+
+  @override
+  String get svcBoOfferChanged =>
+      'This offer changed while you were acting, so nothing was recorded. It has been reloaded; try again.';
+
+  @override
+  String get svcBoOfferGone => 'This offer no longer exists.';
+
+  @override
+  String get svcBoModerateRefused => 'This account may not moderate offers.';
+
+  @override
+  String svcBoReasonRejected(int max) {
+    return 'The server did not accept that reason. Write one of at most $max characters.';
+  }
+
+  @override
+  String get svcBoActionFailed =>
+      'That did not go through, and nothing changed. Try again.';
+
+  @override
+  String get svcBoHistoryNever => 'Back office has never acted on this offer.';
+
+  @override
+  String get svcBoHistoryLoadFailed => 'Could not load the history.';
+
+  @override
+  String get svcBoActTakeDown => 'Taken down';
+
+  @override
+  String get svcBoActRestore => 'Restored';
+
+  @override
+  String get svcBoActUnknown => 'An action this version does not know';
+
+  @override
+  String svcBoActBy(String actor) {
+    return 'by $actor';
+  }
+
+  @override
+  String get svcBoKindAll => 'All kinds';
+
+  @override
+  String get svcBoKindService => 'Service orders';
+
+  @override
+  String get svcBoFulfilmentAll => 'Pickup and delivery';
+
+  @override
+  String get svcBoFulfilmentPickup => 'Pickup';
+
+  @override
+  String get svcBoFulfilmentDelivery => 'Delivery';
+
+  @override
+  String get svcBoServiceTag => 'Service';
+
+  @override
+  String get svcBoStatusPlaced => 'Placed';
+
+  @override
+  String get svcBoStatusAccepted => 'Accepted';
+
+  @override
+  String get svcBoStatusInProduction => 'In production';
+
+  @override
+  String get svcBoStatusReadyPickup => 'Ready for pickup';
+
+  @override
+  String get svcBoStatusReadyDelivery => 'Ready for delivery';
+
+  @override
+  String get svcBoStatusOnTheWay => 'On the way';
+
+  @override
+  String get svcBoStatusCollected => 'Collected';
+
+  @override
+  String get svcBoStatusDelivered => 'Delivered';
+
+  @override
+  String get svcBoStatusDeclined => 'Declined by the provider';
+
+  @override
+  String get svcBoStatusNotCollected => 'Cancelled: never collected';
+
+  @override
+  String get svcBoStatusCancelled => 'Cancelled';
+
+  @override
+  String get svcBoDetailKind => 'Kind';
+
+  @override
+  String svcBoKindServiceIn(String category) {
+    return 'Service · $category';
+  }
+
+  @override
+  String get svcBoDetailService => 'Service';
+
+  @override
+  String svcBoPacksOfUnits(int packs, int size, String unit) {
+    return '$packs × $size $unit';
+  }
+
+  @override
+  String svcBoPacksOf(int packs, int size) {
+    return '$packs × $size';
+  }
+
+  @override
+  String get svcBoDetailOptions => 'Options';
+
+  @override
+  String get svcBoDetailInstructions => 'Instructions';
+
+  @override
+  String get svcBoNoInstructions => 'None written';
+
+  @override
+  String get svcBoDetailReadyBy => 'Estimated ready';
+
+  @override
+  String get svcBoHistoryTitle => 'Status history';
+
+  @override
+  String get svcBoHistoryNone => 'No steps recorded yet.';
+
+  @override
+  String get svcBoHistoryFailed => 'Could not load the status history.';
+
+  @override
+  String get svcBoFilesTitle => 'Customer\'s files';
+
+  @override
+  String get svcBoFilesAuditNotice =>
+      'Back office reads of a customer\'s files are recorded: showing them logs your account against each file.';
+
+  @override
+  String get svcBoFilesShow => 'Show the files';
+
+  @override
+  String get svcBoFilesNotTaken => 'This offer takes no files.';
+
+  @override
+  String get svcBoFilesEmpty =>
+      'No files on this order. Files are deleted 90 days after the order is completed.';
+
+  @override
+  String get svcBoFileOpen => 'Open';
+
+  @override
+  String get svcBoFileOpened =>
+      'Opened in a new tab. Your access to this file is recorded.';
+
+  @override
+  String get svcBoFilePdf => 'PDF';
+
+  @override
+  String get svcBoFileImage => 'Image';
+
+  @override
+  String get svcBoFileOther => 'File';
+
+  @override
+  String svcBoSizeMb(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String svcBoSizeKb(String size) {
+    return '$size KB';
+  }
+
+  @override
+  String get svcBoFilesRefused =>
+      'The server refused to show this order\'s files.';
+
+  @override
+  String get svcBoFilesUnavailable =>
+      'The files cannot be reached right now. Try again shortly.';
+
+  @override
+  String get svcBoFilesFailed => 'Could not load the files.';
+
+  @override
+  String get svcBoLedgerRefused =>
+      'This account may not read the orders ledger.';
+
+  @override
+  String get svcBoShopsGoods => 'Goods shops';
+
+  @override
+  String get svcBoShopsServices => 'Service shops';
+
+  @override
+  String get svcBoShopsSearchHint => 'Search shop name';
+
+  @override
+  String get svcBoShopsListedOnly =>
+      'Only shops listed on the storefront appear here.';
+
+  @override
+  String get svcBoShopsEmpty => 'No listed shops match.';
+
+  @override
+  String get svcBoShopsLoadFailed => 'Could not load shops.';
+
+  @override
+  String svcBoVerifyGrantTitle(String shop) {
+    return 'Mark $shop as Verified Local?';
+  }
+
+  @override
+  String get svcBoVerifyGrantBody =>
+      'Customers see the badge on this shop wherever it appears. It is YouDrop\'s own claim to the shop\'s neighbours, so grant it only to a shop that has been checked.';
+
+  @override
+  String svcBoVerifyRevokeTitle(String shop) {
+    return 'Remove Verified Local from $shop?';
+  }
+
+  @override
+  String get svcBoVerifyRevokeBody =>
+      'The badge disappears from this shop for every customer.';
+
+  @override
+  String get svcBoVerifyGrant => 'Grant the badge';
+
+  @override
+  String get svcBoVerifyRevoke => 'Remove the badge';
+
+  @override
+  String svcBoVerifyGranted(String shop) {
+    return '$shop is now Verified Local.';
+  }
+
+  @override
+  String svcBoVerifyRevoked(String shop) {
+    return '$shop is no longer Verified Local.';
+  }
+
+  @override
+  String get svcBoVerifyRefused => 'Only back office can change this badge.';
+
+  @override
+  String get svcBoVerifyGone => 'This shop no longer exists.';
+
+  @override
+  String get svcBoVerifyFailed => 'The badge was not changed. Try again.';
+
+  @override
+  String svcBoVerifiedToggle(String shop) {
+    return 'Verified Local for $shop';
+  }
+
+  @override
+  String svcBoReasonLength(int used, int max) {
+    return '$used/$max';
+  }
+
+  @override
+  String get svcBoOfferNotListed =>
+      'Nothing was recorded, and this offer is no longer among the service offers, so there is nothing left to act on.';
+
+  @override
+  String get svcBoOfferUnreadable =>
+      'Nothing was recorded, but this offer could not be read again, so what is shown may be out of date. Close it and open it again from the list.';
+
+  @override
+  String get svcNavOffers => 'Offers';
+
+  @override
+  String get svcDashboardActiveOffers => 'Active offers';
+
+  @override
+  String get svcDashboardThisWeek => 'This week';
+
+  @override
+  String get svcDashboardThisWeekCaption => 'Orders, last 7 days';
+
+  @override
+  String get svcDashboardRating => 'Rating';
+
+  @override
+  String get svcQuickActions => 'Quick actions';
+
+  @override
+  String get svcAddOffer => 'Add offer';
+
+  @override
+  String get svcViewOrders => 'View orders';
+
+  @override
+  String get svcCurrentOffers => 'Current offers';
+
+  @override
+  String get svcSeeAllOffers => 'See all';
+
+  @override
+  String get svcOfferActive => 'ACTIVE';
+
+  @override
+  String get svcOfferPaused => 'PAUSED';
+
+  @override
+  String get svcOfferDraft => 'DRAFT';
+
+  @override
+  String get svcPauseOffer => 'Pause';
+
+  @override
+  String get svcResumeOffer => 'Resume';
+
+  @override
+  String get svcOfferPausedDone =>
+      'Offer paused. Customers can\'t order it until you resume it.';
+
+  @override
+  String get svcOfferResumedDone => 'Offer is live again.';
+
+  @override
+  String get svcNoOffersYet => 'No offers yet';
+
+  @override
+  String get svcNoOffersYetBody =>
+      'Add your first service so customers can order it.';
+
+  @override
+  String get svcDashboardLoadFailed => 'Couldn\'t load your dashboard';
+
+  @override
+  String get svcOffersLoadFailed => 'Couldn\'t load your offers';
+
+  @override
+  String get svcNoShopYet => 'Your services shop isn\'t open yet';
+
+  @override
+  String get svcNoShopYetBody =>
+      'It opens as soon as your application is approved.';
+
+  @override
+  String get svcPublishAfterApproval =>
+      'You can publish offers once your application is approved.';
+
+  @override
+  String get svcOffersTitle => 'Your offers';
+
+  @override
+  String get svcOffersSubtitle => 'What customers can order from you';
+
+  @override
+  String svcUnitPack(String count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcUnitPer(String unit) {
+    return 'Per $unit';
+  }
+
+  @override
+  String svcPriceUsd(String amount) {
+    return '\$$amount';
+  }
+
+  @override
+  String svcPriceLbp(String amount) {
+    return '$amount LBP';
+  }
+
+  @override
+  String svcLbpPreview(String amount) {
+    return '≈ $amount at today\'s rate';
+  }
+
+  @override
+  String get svcNewOffer => 'New service offer';
+
+  @override
+  String get svcEditOffer => 'Edit offer';
+
+  @override
+  String get svcOfferTitle => 'Offer title';
+
+  @override
+  String get svcOfferTitleRequired => 'Give the offer a title';
+
+  @override
+  String svcTooLong(String max) {
+    return 'At most $max characters';
+  }
+
+  @override
+  String get svcDescription => 'Description';
+
+  @override
+  String get svcCategory => 'Category';
+
+  @override
+  String get svcCategoryOfShop => 'Offers take your shop\'s category';
+
+  @override
+  String get svcPriceLabel => 'Price (USD)';
+
+  @override
+  String get svcPriceInvalid =>
+      'Enter a price above zero, with at most two decimals';
+
+  @override
+  String get svcPricingType => 'Pricing type';
+
+  @override
+  String get svcPricingFixed => 'Fixed price';
+
+  @override
+  String get svcPricingPerUnit => 'Price per unit';
+
+  @override
+  String get svcPricingFrom => 'Starting price (options add to it)';
+
+  @override
+  String get svcUnitLabel => 'Unit (e.g. cards, sqm)';
+
+  @override
+  String get svcPackSize => 'Units per step';
+
+  @override
+  String get svcUnitRequired => 'Name the unit, such as cards or sqm';
+
+  @override
+  String svcPackSizeRange(String min, String max) {
+    return 'Between $min and $max';
+  }
+
+  @override
+  String get svcPerUnitIsOne => 'A price per unit is for one unit';
+
+  @override
+  String svcPackPreview(String pack) {
+    return 'Customers order in steps of $pack';
+  }
+
+  @override
+  String get svcPhotos => 'Photos';
+
+  @override
+  String get svcPhotoRequired => 'Add at least one photo to publish';
+
+  @override
+  String get svcAddPhoto => 'Add photo';
+
+  @override
+  String get svcTurnaround => 'Turnaround';
+
+  @override
+  String get svcTurnaroundSameDay => 'Same day';
+
+  @override
+  String get svcTurnaround1to2 => '1–2 days';
+
+  @override
+  String get svcTurnaround3to5 => '3–5 days';
+
+  @override
+  String get svcTurnaroundWeek => 'About a week';
+
+  @override
+  String svcTurnaroundHours(String min, String max) {
+    return '$min–$max hours';
+  }
+
+  @override
+  String get svcTurnaroundRequired => 'Choose a turnaround';
+
+  @override
+  String get svcFulfilment => 'How customers get it';
+
+  @override
+  String get svcFulfilmentPickup => 'Pickup at your shop';
+
+  @override
+  String get svcFulfilmentDelivery => 'YouDrop delivery';
+
+  @override
+  String get svcFulfilmentBoth => 'Both';
+
+  @override
+  String get svcFulfilmentRequired => 'Choose how customers get it';
+
+  @override
+  String get svcDeliveryNeedsAreas =>
+      'Set your delivery areas or drop your shop\'s pin before offering YouDrop delivery';
+
+  @override
+  String get svcCustomerFile => 'Customer file';
+
+  @override
+  String get svcCustomerFileNone => 'Not needed';
+
+  @override
+  String get svcCustomerFileOptional => 'Optional';
+
+  @override
+  String get svcCustomerFileRequired => 'Required';
+
+  @override
+  String get svcInstructionsPrompt => 'What should customers tell you?';
+
+  @override
+  String get svcInstructionsPromptHint => 'e.g. Names and job titles to print';
+
+  @override
+  String get svcOptions => 'Options';
+
+  @override
+  String get svcOptionsAfterSave =>
+      'Save the offer first, then add options such as paper type';
+
+  @override
+  String get svcEditOptions => 'Edit options';
+
+  @override
+  String get svcNoOptions => 'No options';
+
+  @override
+  String get svcPublishOffer => 'Publish offer';
+
+  @override
+  String get svcSaveDraft => 'Save draft';
+
+  @override
+  String get svcSaveChanges => 'Save changes';
+
+  @override
+  String get svcOfferPublished => 'Offer published';
+
+  @override
+  String get svcDraftSaved => 'Draft saved';
+
+  @override
+  String get svcOfferSaveFailed => 'Couldn\'t save this offer';
+
+  @override
+  String get svcOfferRefused =>
+      'This offer wasn\'t accepted as it stands. Check its details and try again.';
+
+  @override
+  String get svcArchiveOffer => 'Archive offer';
+
+  @override
+  String get svcArchiveConfirm =>
+      'Archive this offer? Customers won\'t see it again.';
+
+  @override
+  String get svcOfferArchived => 'Offer archived';
+
+  @override
+  String get svcOfferNotEditable =>
+      'This offer uses settings this version of the app can\'t edit. Update the app to change it.';
+
+  @override
+  String get svcMoreActions => 'More actions';
+
+  @override
+  String get svcIncomingOrders => 'Incoming orders';
+
+  @override
+  String get svcTabNew => 'New';
+
+  @override
+  String get svcTabInProgress => 'In progress';
+
+  @override
+  String get svcTabCompleted => 'Completed';
+
+  @override
+  String get svcChipNew => 'NEW';
+
+  @override
+  String get svcChipAccepted => 'ACCEPTED';
+
+  @override
+  String get svcChipInProduction => 'IN PRODUCTION';
+
+  @override
+  String get svcChipReady => 'READY';
+
+  @override
+  String get svcChipOnTheWay => 'ON THE WAY';
+
+  @override
+  String get svcChipCollected => 'COLLECTED';
+
+  @override
+  String get svcChipDelivered => 'DELIVERED';
+
+  @override
+  String get svcChipDeclined => 'DECLINED';
+
+  @override
+  String get svcChipNotCollected => 'NOT COLLECTED';
+
+  @override
+  String get svcChipCancelled => 'CANCELLED';
+
+  @override
+  String get svcChipPickup => 'Pickup';
+
+  @override
+  String get svcChipDelivery => 'Delivery';
+
+  @override
+  String get svcAcceptOrder => 'Accept order';
+
+  @override
+  String get svcDecline => 'Decline';
+
+  @override
+  String get svcDeclineTitle => 'Why are you declining?';
+
+  @override
+  String get svcDeclineBody => 'The customer sees the reason you choose.';
+
+  @override
+  String get svcDeclineConfirm => 'Decline order';
+
+  @override
+  String get svcWaitingForPickup => 'Waiting for the customer to collect';
+
+  @override
+  String get svcWaitingForRider => 'Waiting for a rider';
+
+  @override
+  String svcReadyBy(String time) {
+    return 'Ready by $time';
+  }
+
+  @override
+  String svcAcceptedReadyBy(String time) {
+    return 'Accepted. Promised ready by $time.';
+  }
+
+  @override
+  String get svcAccepted => 'Order accepted';
+
+  @override
+  String get svcMarkedReady => 'Marked ready';
+
+  @override
+  String get svcNoNewOrders => 'No new orders';
+
+  @override
+  String get svcNoOrdersInProgress => 'Nothing in production';
+
+  @override
+  String get svcNoCompletedOrders => 'No completed orders yet';
+
+  @override
+  String get svcOrdersEmptyBody =>
+      'Orders appear here as customers place them.';
+
+  @override
+  String get svcCancelNotCollected => 'Cancel as not collected';
+
+  @override
+  String svcCancelNotCollectedIn(String time) {
+    return 'You can cancel it as not collected in $time';
+  }
+
+  @override
+  String get svcCancelNotCollectedTitle => 'Cancel this uncollected order?';
+
+  @override
+  String get svcCancelNotCollectedBody =>
+      'The customer is told it was cancelled because it wasn\'t collected.';
+
+  @override
+  String get svcCancelNotCollectedNote => 'Note for the customer (optional)';
+
+  @override
+  String get svcKeepOrder => 'Keep order';
+
+  @override
+  String svcDurationDaysHours(String days, String hours) {
+    return '${days}d ${hours}h';
+  }
+
+  @override
+  String svcDurationHoursMinutes(String hours, String minutes) {
+    return '${hours}h ${minutes}m';
+  }
+
+  @override
+  String svcDurationMinutes(String minutes) {
+    return '${minutes}m';
+  }
+
+  @override
+  String get svcRefusedNotDeclinable =>
+      'This order was accepted meanwhile, so it can\'t be declined. Refreshing.';
+
+  @override
+  String get svcRefusedNotCollectable =>
+      'This order isn\'t waiting at your counter any more. Refreshing.';
+
+  @override
+  String get svcRefusedTooSoon =>
+      'It\'s too soon: the customer still has time to collect. Refreshing.';
+
+  @override
+  String get svcRefusedOther => 'The order couldn\'t be changed. Refreshing.';
+
+  @override
+  String get svcOrderDeclined => 'Order declined';
+
+  @override
+  String get svcOrderCollected => 'Marked as collected';
+
+  @override
+  String get svcOrderCancelledNotCollected => 'Cancelled as not collected';
+
+  @override
+  String svcOrderTitle(String id) {
+    return 'Order $id';
+  }
+
+  @override
+  String get svcChatWithCustomer => 'Chat with customer';
+
+  @override
+  String get svcTheJob => 'The job';
+
+  @override
+  String get svcInstructions => 'Special instructions';
+
+  @override
+  String get svcNoInstructions => 'No instructions given';
+
+  @override
+  String get svcCustomerFiles => 'Customer\'s files';
+
+  @override
+  String get svcNoFiles => 'No files sent';
+
+  @override
+  String get svcFilesLoadFailed => 'Couldn\'t load the files';
+
+  @override
+  String get svcOpenFile => 'Open';
+
+  @override
+  String get svcFileCouldNotOpen => 'Couldn\'t open this file';
+
+  @override
+  String get svcFileDocument => 'Document';
+
+  @override
+  String get svcFileImage => 'Image';
+
+  @override
+  String svcFileSizeKb(String size) {
+    return '$size KB';
+  }
+
+  @override
+  String svcFileSizeMb(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String get svcFulfilmentPickupDetail =>
+      'The customer collects it at your shop';
+
+  @override
+  String svcFulfilmentDeliveryDetail(String address) {
+    return 'A rider delivers it to $address';
+  }
+
+  @override
+  String get svcEstimatedReady => 'Estimated ready';
+
+  @override
+  String svcTurnaroundAfterAccept(String range) {
+    return 'Turnaround once you accept: $range';
+  }
+
+  @override
+  String get svcRiderOnTheWay => 'A rider is on the way to collect it';
+
+  @override
+  String get svcFileLinkRefreshFailed =>
+      'Couldn\'t get a fresh link to this file. Try again.';
+
+  @override
+  String get svcOfferTakenDown => 'Taken down by YouDrop';
+
+  @override
+  String svcOfferTakenDownReason(String reason) {
+    return 'YouDrop\'s reason: $reason';
+  }
+
+  @override
+  String get svcOfferTakenDownBody =>
+      'Customers can\'t order it, and it can\'t be published, paused or resumed until YouDrop restores it. You can still edit it.';
+
+  @override
+  String get svcOfferChangedElsewhere =>
+      'This offer was just changed somewhere else, so it has been read again. Check it and try again.';
+
+  @override
+  String get svcShopReadFailed => 'We couldn\'t load your shop';
+
+  @override
+  String get svcServiceOrdersRow => 'Service orders';
+
+  @override
+  String get svcServiceOffersRow => 'Service offers';
+
+  @override
+  String svcChatOrderLabel(String ref) {
+    return 'Order $ref';
+  }
+
+  @override
+  String svcChatClosedOn(String date) {
+    return 'Chat about this order closed on $date';
+  }
+
+  @override
+  String get svcChatClosed => 'Chat about this order has closed';
+
+  @override
+  String get svcChatUnavailable => 'Chat is unavailable right now.';
+
+  @override
+  String get svcChatOrderNotFound =>
+      'Couldn\'t open this order\'s chat. Reloading the order.';
 }

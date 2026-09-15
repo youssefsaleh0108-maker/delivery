@@ -44,7 +44,8 @@ class ImagePrep {
   /// Brings [bytes] under [maxBytes], decoding only if it has to.
   ///
   /// - Already within the cap: returned as-is, with its original [contentType], [wasResized] false.
-  /// - Over the cap: downscaled so its longest edge is at most [maxDimension], then encoded as JPEG
+  /// - Over the cap: downscaled so its longest edge is at most [maxEdge] — [maxDimension] unless the
+  ///   caller needs more of the photo, as a shelf photo's small print does — then encoded as JPEG
   ///   at a quality that steps down until the result fits — or the floor is reached, at which point
   ///   the smallest attempt is returned rather than nothing, because a slightly-too-large image the
   ///   server may still accept beats refusing the upload.
@@ -54,6 +55,7 @@ class ImagePrep {
     Uint8List bytes,
     String contentType, {
     int maxBytes = defaultMaxBytes,
+    int maxEdge = maxDimension,
   }) {
     if (bytes.length <= maxBytes) {
       return PreparedImage(bytes, contentType, wasResized: false);
@@ -72,11 +74,11 @@ class ImagePrep {
     img.Image working = decoded;
     final int longest =
         decoded.width >= decoded.height ? decoded.width : decoded.height;
-    if (longest > maxDimension) {
+    if (longest > maxEdge) {
       if (decoded.width >= decoded.height) {
-        working = img.copyResize(decoded, width: maxDimension);
+        working = img.copyResize(decoded, width: maxEdge);
       } else {
-        working = img.copyResize(decoded, height: maxDimension);
+        working = img.copyResize(decoded, height: maxEdge);
       }
     }
 

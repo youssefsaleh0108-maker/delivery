@@ -2,10 +2,12 @@ import 'dart:convert';
 
 import 'package:delivery_core/delivery_core.dart';
 import 'package:delivery_design_system/delivery_design_system.dart';
+import 'package:delivery_l10n/delivery_l10n.dart';
 import 'package:delivery_portal/src/carrier/statement_screen.dart';
 import 'package:delivery_portal/src/shell/shell.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The carrier's own statement, read-only, off `/statements/mine`.
@@ -97,10 +99,29 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       theme: DeliveryTheme.light(),
+      // The page is titled by the rail heading that opens it, in the reader's language, so it needs
+      // the strings the portal always provides.
+      localizationsDelegates: const <LocalizationsDelegate<Object>>[
+        DeliveryStrings.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: LocaleController.supported,
       home: Scaffold(body: CarrierStatementScreen(api: apiFor(adapter))),
     ));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('is titled as the rail heading that opens it', (WidgetTester tester) async {
+    // "Reconciliation" in the rail opened a page called "Statement", which reads as the wrong page.
+    await pump(tester, _StubAdapter(_statement()));
+
+    expect(
+      find.text(lookupDeliveryStrings(const Locale('en')).carrRidersNavReconciliation),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('asks for its own statement and names nobody', (WidgetTester tester) async {
     final _StubAdapter adapter = _StubAdapter(_statement());

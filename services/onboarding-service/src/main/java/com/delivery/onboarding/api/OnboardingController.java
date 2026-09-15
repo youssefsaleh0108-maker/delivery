@@ -28,6 +28,7 @@ import com.delivery.onboarding.domain.PayoutDetails;
 import com.delivery.onboarding.service.ApplicantDocumentService;
 import com.delivery.onboarding.service.CustomerSignUpService;
 import com.delivery.onboarding.service.OnboardingService;
+import com.delivery.onboarding.service.PartnerManagementService;
 import com.delivery.onboarding.service.PayoutDetailsService;
 import com.delivery.onboarding.service.VerificationService;
 import com.delivery.platform.security.CurrentUser;
@@ -65,16 +66,20 @@ public class OnboardingController {
     private final CustomerSignUpService signUps;
     private final ApplicantDocumentService documents;
     private final PayoutDetailsService payouts;
+    /** Partners' standing, for a company's listing — read for the whole listing at once. */
+    private final PartnerManagementService partners;
 
     public OnboardingController(OnboardingService onboarding, VerificationService verifications,
                                 PlatformClient platform, CustomerSignUpService signUps,
-                                ApplicantDocumentService documents, PayoutDetailsService payouts) {
+                                ApplicantDocumentService documents, PayoutDetailsService payouts,
+                                PartnerManagementService partners) {
         this.onboarding = onboarding;
         this.verifications = verifications;
         this.platform = platform;
         this.signUps = signUps;
         this.documents = documents;
         this.payouts = payouts;
+        this.partners = partners;
     }
 
     // ---------------------------------------------------------------- shapes
@@ -157,14 +162,23 @@ public class OnboardingController {
      * <p>Deliberately thin. It carries no reviewer name, no internal id and no screening flags: the
      * applicant is not authenticated, and everything here is readable by whoever holds the
      * reference — including somebody it was forwarded to.
+     *
+     * <p>{@code service} is the one piece of {@code details} it carries, and only for an application
+     * to offer services: the category and area the applicant chose, which the provider's app opens
+     * their shop from and Product Service reads to know not to open a restaurant instead. Null for
+     * every other application. The rest of {@code details} stays out — it can hold bank details.
      */
     public record ApplicationReceipt(String reference, String status, String businessName,
-                                     String kind, Instant submittedAt, String rejectionReason) {
+                                     String kind, Instant submittedAt, String rejectionReason,
+                                     com.delivery.onboarding.service.ServiceProviderAnswers.Summary
+                                             service) {
 
         static ApplicationReceipt of(OnboardingApplication a) {
             return new ApplicationReceipt(a.getReference(), a.getStatus().name(),
                     a.getBusinessName(), a.getKind().name(), a.getCreatedAt(),
-                    a.getRejectionReason());
+                    a.getRejectionReason(),
+                    com.delivery.onboarding.service.ServiceProviderAnswers.summaryOf(
+                            a.getDetails()));
         }
     }
 
@@ -179,10 +193,25 @@ public class OnboardingController {
                                   String documentIssueOverride,
                                   PayoutSummary payout,
                                   List<ReviewerDocumentView> documents,
-                                  String provisionedUserRef, UUID provisionedEntityId) {
+                                  String provisionedUserRef, UUID provisionedEntityId,
+                                  Boolean suspended) {
 
         static ApplicationView of(OnboardingApplication a) {
             return of(a, null, List.of());
+        }
+
+        /**
+         * This view with the partner's current standing on it.
+         *
+         * <p>Filled only on a delivery company's own listing, where the Riders HR directory needs
+         * it for every rider at once; null everywhere else, which a client reads as "not known
+         * here" — never as "not suspended".
+         */
+        ApplicationView withSuspended(Boolean standing) {
+            return new ApplicationView(id, reference, kind, businessName, contactName, contactEmail,
+                    contactPhone, targetProviderId, emailVerifiedAt, phoneVerifiedAt, notes, details,
+                    status, createdAt, decidedAt, decidedBy, rejectionReason, documentIssueOverride,
+                    payout, documents, provisionedUserRef, provisionedEntityId, standing);
         }
 
         static ApplicationView of(OnboardingApplication a, PayoutSummary payout,
@@ -208,7 +237,10 @@ public class OnboardingController {
                     // fifty applications is fifty IBANs on one screen otherwise. The full number
                     // has its own endpoint, one application at a time.
                     payout, documents,
-                    a.getProvisionedUserRef(), a.getProvisionedEntityId());
+                    a.getProvisionedUserRef(), a.getProvisionedEntityId(),
+                    // Standing is not part of an application's own record; a company's listing
+                    // adds it for the whole page at once (withSuspended).
+                    null);
         }
     }
 
@@ -685,7 +717,17 @@ public class OnboardingController {
     public List<ApplicationView> forCompany(@PathVariable UUID providerId,
                                             @RequestParam(defaultValue = "false") boolean all) {
         requireRuns(providerId);
-        return listing(all ? onboarding.allFor(providerId) : onboarding.queueFor(providerId));
+        List<OnboardingApplication> applications =
+                all ? onboarding.allFor(providerId) : onboarding.queueFor(providerId);
+        // Each partner's standing rides on the listing, read for all of them in one query. The
+        // carrier's Riders HR directory used to follow this call with one standing request per
+        // rider — over eighty for a fleet of forty, straight into the gateway's per-address rate
+        // limit, which the page then drew as nobody being suspended.
+        Map<UUID, Boolean> suspended = partners.suspendedByApplication(
+                applications.stream().map(OnboardingApplication::getId).toList());
+        return listing(applications).stream()
+                .map(view -> view.withSuspended(suspended.get(view.id())))
+                .toList();
     }
 
     @PostMapping("/applications/for-company/{providerId}/{id}/approve")
@@ -830,10 +872,32 @@ public class OnboardingController {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
     }
 
-    /** 422: the application cannot be accepted or decided as asked, and the caller can act on why. */
+    /**
+     * 422: the application cannot be accepted or decided as asked, and the caller can act on why.
+     *
+     * <p>A refusal known by name carries its {@code code} as well, exactly as on the signed-in path.
+     * The services answers are checked on this front door too, and the app translates their codes.
+     */
     @ExceptionHandler(OnboardingService.ApplicationRuleException.class)
     public ResponseEntity<Map<String, String>> rule(OnboardingService.ApplicationRuleException e) {
+        if (e instanceof com.delivery.onboarding.service.AccountApplicationService.AccountRuleException
+                coded) {
+            return ResponseEntity.unprocessableEntity()
+                    .body(Map.of("message", e.getMessage(), "code", coded.code()));
+        }
         return ResponseEntity.unprocessableEntity().body(Map.of("message", e.getMessage()));
+    }
+
+    /**
+     * 503: Product Service could not say which services are open, so a services application was not
+     * judged at all. Retrying is the whole remedy; the code lets the app say so in its own words.
+     */
+    @ExceptionHandler(com.delivery.onboarding.client.PlatformClient.CatalogUnavailableException.class)
+    public ResponseEntity<Map<String, String>> catalogUnavailable(
+            com.delivery.onboarding.client.PlatformClient.CatalogUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", e.getMessage(),
+                "code", com.delivery.onboarding.client.PlatformClient.CatalogUnavailableException.CODE));
     }
 
     /**

@@ -254,6 +254,22 @@ void main() {
     });
   });
 
+  testWidgets('files a services provider under Services and the category they offer',
+      (WidgetTester tester) async {
+    queueJson = '''
+[${_application(id: 'a3', name: 'Al Fakhry Press', details: '{"businessType":"SERVICES","serviceCategory":"PRINTING","area":{"zoneId":"z-1","label":"Mar Mikhael"}}')},
+ ${_application(id: 'a4', name: 'Needle & Thread', details: '{"businessType":"SERVICES","serviceCategory":"KNITTING"}')},
+ ${_application(id: 'a1', name: 'Rose & Crust Pizzeria', details: '{"businessType":"Pizza & Italian"}')}]''';
+
+    await pump(tester);
+
+    expect(find.text('Services · Printing'), findsOneWidget);
+    // A category this build cannot name is shown as the server spelled it, never dropped or guessed.
+    expect(find.text('Services · KNITTING'), findsOneWidget);
+    // A shop's own answer reads exactly as before.
+    expect(find.text('Pizza & Italian'), findsOneWidget);
+  });
+
   group('the drawer a row opens', () {
     testWidgets('shows what the wizard collected, when it collected any',
         (WidgetTester tester) async {

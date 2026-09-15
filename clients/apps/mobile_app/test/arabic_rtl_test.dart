@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:delivery_core/delivery_core.dart';
 import 'package:dio/dio.dart';
 import 'package:mobile_app/src/butler_screen.dart';
@@ -8,6 +10,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/src/address_sheet.dart';
 import 'package:mobile_app/src/delivery_address.dart';
+import 'package:mobile_app/src/lebanese_phone.dart';
+import 'package:mobile_app/src/one_time_code.dart';
+import 'package:mobile_app/src/service_signup_screen.dart';
 
 // Arabic is not a translation file — it is whether the app works for the people it is for.
 //
@@ -163,6 +168,8 @@ void main() {
           // does not appear, which is the same as a deployment with no areas configured.
           zoneApi: DeliveryZoneApi(dio),
           cart: Cart(),
+          // Nothing here opens a shop, so there is no basket bar to follow.
+          onOpenBasket: () {},
         ),
         const Locale('ar'),
       ));
@@ -206,4 +213,134 @@ void main() {
           TextDirection.ltr);
     });
   });
+
+  group('the services signup in Arabic', () {
+    Future<void> pumpSignup(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1170, 2532);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+      final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+        ..httpClientAdapter = _ServiceOptionsServer();
+
+      await tester.pumpWidget(MaterialApp(
+        locale: const Locale('ar'),
+        supportedLocales: LocaleController.supported,
+        localizationsDelegates: const <LocalizationsDelegate<Object>>[
+          DeliveryStrings.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: ServiceProviderSignupScreen(
+          api: OnboardingApi(dio),
+          documentsApi: DocumentsApi(dio),
+          authService: AuthService(
+            config: const AuthConfig(
+              issuer: 'https://iam.test/realms/delivery-platform',
+              clientId: 'mobile-app',
+              redirectUrl: 'com.delivery.app://oauth2redirect',
+            ),
+            oidcClient: _NoBrowser(),
+          ),
+          onFinished: (AuthSession _) {},
+          onClose: () {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    // A phone number reads left to right in Arabic too, +961 first, as the gift checkout draws it.
+    // Laid out right to left, "71 234 567" read back as "567 234 71".
+    testWidgets('keeps the phone number left to right after a fixed +961, and the words around it Arabic',
+        (WidgetTester tester) async {
+      await pumpSignup(tester);
+      final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
+      final Finder label = find.text(ar.authPhoneNumber.toUpperCase());
+      final Finder phone = find.descendant(
+          of: find.widgetWithText(AuthField, ar.authPhoneNumber.toUpperCase()),
+          matching: find.byType(TextField));
+      await tester.ensureVisible(phone);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<TextField>(phone).textDirection, TextDirection.ltr);
+      expect(Directionality.of(tester.element(phone)), TextDirection.ltr);
+      expect(tester.widget<TextField>(phone).decoration!.hintText, '71 234 567');
+      final Finder prefix =
+          find.descendant(of: phone, matching: find.text(LebanesePhone.countryCode));
+      expect(prefix, findsOneWidget, reason: '+961 is there before anything is typed');
+      expect(tester.getCenter(prefix).dx,
+          lessThan(tester.getCenter(find.descendant(of: phone, matching: find.byType(EditableText))).dx),
+          reason: '+961 comes first, on the left');
+      expect(Directionality.of(tester.element(label)), TextDirection.rtl);
+
+      await tester.enterText(phone, '12');
+      await tester.pump();
+      expect(Directionality.of(tester.element(find.text(ar.svcPhoneInvalid))), TextDirection.rtl,
+          reason: "the error is a sentence in the reader's language");
+    });
+
+    testWidgets('lays out right-to-left, in Arabic, down to the service names',
+        (WidgetTester tester) async {
+      await pumpSignup(tester);
+
+      final DeliveryStrings ar = lookupDeliveryStrings(const Locale('ar'));
+      final DeliveryStrings en = lookupDeliveryStrings(const Locale('en'));
+
+      expect(Directionality.of(tester.element(find.text(ar.svcSignupTitle))), TextDirection.rtl);
+      expect(find.text(ar.svcSignupBannerTitle), findsOneWidget);
+      expect(find.text(ar.svcSignupBannerBody), findsOneWidget);
+      expect(find.text(ar.svcApplyCta), findsOneWidget);
+      expect(find.text(en.svcSignupTitle), findsNothing);
+      expect(find.text(en.svcApplyCta), findsNothing);
+
+      // The services are named in Arabic too — and only the open ones are offered.
+      await tester.tap(find.text(ar.svcServiceCategoryHint));
+      await tester.pumpAndSettle();
+      expect(find.text(ar.svcCategoryPrinting), findsOneWidget);
+      expect(find.text(en.svcCategoryPrinting), findsNothing);
+      expect(find.text(ar.svcCategoryCleaning), findsNothing);
+    });
+  });
+}
+
+/// The services signup's options, as onboarding-service serves them. Nothing else is expected.
+class _ServiceOptionsServer implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(RequestOptions options, Stream<List<int>>? requestStream,
+      Future<void>? cancelFuture) async {
+    final bool options_ = options.path == '/api/onboarding/service-options';
+    return ResponseBody.fromString(
+      jsonEncode(options_
+          ? <String, Object?>{
+              'categories': <String>['PRINTING', 'TAILORING'],
+              'areas': <Map<String, String>>[
+                <String, String>{'zoneId': 'zone-hamra', 'name': 'الحمرا'},
+              ],
+            }
+          : <String, Object?>{'message': 'not expected'}),
+      options_ ? 200 : 404,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>[Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// An identity provider nobody signs in through: the screen is only drawn here, never submitted.
+class _NoBrowser implements OidcClient {
+  @override
+  Future<TokenSet?> signIn(AuthConfig config, {Map<String, String>? extraParams}) async => null;
+
+  @override
+  Future<TokenSet?> completeRedirect(AuthConfig config) async => null;
+
+  @override
+  Future<TokenSet> refresh(AuthConfig config, String refreshToken) =>
+      throw UnsupportedError('not signed in');
+
+  @override
+  Future<void> signOut(AuthConfig config, String? refreshToken) async {}
 }

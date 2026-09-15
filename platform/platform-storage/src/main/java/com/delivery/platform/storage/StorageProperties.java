@@ -1,7 +1,9 @@
 package com.delivery.platform.storage;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -33,8 +35,50 @@ public class StorageProperties {
     /** Upper bound enforced when the URL is issued, before any bytes move. */
     private long maxUploadSizeBytes = 10L * 1024 * 1024;
 
-    private List<String> allowedImageContentTypes = List.of(
-            "image/jpeg", "image/png", "image/webp");
+    /**
+     * How long a server-side call to storage — a stat, a ranged read, a delete — may wait to connect,
+     * and then for each read and each write on the connection. MinIO's own client waits five minutes
+     * for each, so a storage that hangs would hold whichever thread asked for that long: a request
+     * thread, or a scheduled job's. Presigned URLs are signed locally and never wait on these.
+     */
+    private Duration connectTimeout = Duration.ofSeconds(5);
+    private Duration readTimeout = Duration.ofSeconds(30);
+    private Duration writeTimeout = Duration.ofSeconds(30);
+
+    /**
+     * Per purpose, the content types an upload may declare — replacing that purpose's built-in
+     * list ({@link FilePurpose#defaultContentTypes()}) and no other purpose's. Empty unless a service
+     * configures it:
+     *
+     * <pre>
+     * delivery.storage.minio.allowed-content-types:
+     *   ORDER_ATTACHMENT: [application/pdf]
+     * </pre>
+     */
+    private Map<FilePurpose, List<String>> allowedContentTypes = new LinkedHashMap<>();
+
+    /**
+     * No longer consulted (since 0.1.3). This one list, named for images, used to apply to every
+     * purpose, so accepting a PDF anywhere meant accepting it everywhere — onboarding-service's
+     * applicant documents let PDF into its public product-images bucket that way. Content types are
+     * per purpose now: see {@link FilePurpose} and {@link #allowedContentTypes}.
+     *
+     * <p>Still bound, and null unless a service sets it, only so that a service which still does is
+     * told so at startup by {@link StorageService} rather than silently behaving differently.
+     *
+     * @deprecated set {@code allowed-content-types.<PURPOSE>} instead, for the purpose that needs it
+     */
+    @Deprecated(since = "0.1.3")
+    private List<String> allowedImageContentTypes;
+
+    /**
+     * The content types an upload for {@code purpose} may declare: the service's configured list for
+     * that purpose when it has one, otherwise the purpose's own.
+     */
+    public List<String> allowedContentTypesFor(FilePurpose purpose) {
+        List<String> configured = allowedContentTypes.get(purpose);
+        return configured != null ? List.copyOf(configured) : purpose.defaultContentTypes();
+    }
 
     public String getEndpoint() {
         return endpoint;
@@ -92,10 +136,46 @@ public class StorageProperties {
         this.maxUploadSizeBytes = maxUploadSizeBytes;
     }
 
+    public Duration getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    public Duration getReadTimeout() {
+        return readTimeout;
+    }
+
+    public void setReadTimeout(Duration readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    public Duration getWriteTimeout() {
+        return writeTimeout;
+    }
+
+    public void setWriteTimeout(Duration writeTimeout) {
+        this.writeTimeout = writeTimeout;
+    }
+
+    public Map<FilePurpose, List<String>> getAllowedContentTypes() {
+        return allowedContentTypes;
+    }
+
+    public void setAllowedContentTypes(Map<FilePurpose, List<String>> allowedContentTypes) {
+        this.allowedContentTypes = allowedContentTypes;
+    }
+
+    /** @deprecated not consulted; see the field. */
+    @Deprecated(since = "0.1.3")
     public List<String> getAllowedImageContentTypes() {
         return allowedImageContentTypes;
     }
 
+    /** @deprecated not consulted; see the field. */
+    @Deprecated(since = "0.1.3")
     public void setAllowedImageContentTypes(List<String> allowedImageContentTypes) {
         this.allowedImageContentTypes = allowedImageContentTypes;
     }

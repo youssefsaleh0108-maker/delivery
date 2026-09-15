@@ -8,7 +8,29 @@ import 'package:flutter/material.dart';
 import 'cart.dart';
 import 'product_detail_screen.dart';
 import 'product_options_sheet.dart';
+import 'shop_limit_dialog.dart';
+import 'store_power_chip.dart';
 import 'store_state_mapping.dart';
+
+/// Builds the "chat with the shop" control for the dekkane shop page, or returns null for none.
+/// See [StorePageScreen.shopChatAction].
+typedef ShopChatActionBuilder = Widget? Function(BuildContext context, StoreCard store);
+
+/// Which of the two shop-page designs to draw. The data, the basket rules and every flow behind
+/// them are the same; only the layout differs.
+enum StorePageLayout {
+  /// `customer-shop` (Figma 3:224): the 200px cover hero, the stat strip, and the Shop / Aisles /
+  /// Offers / Buy again tabs over a list of rows.
+  standard,
+
+  /// `customer-dekkane-shop` (Figma 112:2041), for a shop opened from the neighbourhood browse: a
+  /// white header naming the district, an inset hero carrying the open and power pills, the aisle
+  /// chips, and the shelf as a two-column grid with the LBP line under every price.
+  ///
+  /// No tabs, no in-shop search and no favourite heart — the frame has none of them, and a
+  /// dekkane's whole shelf is a few dozen lines the aisle chips already cut.
+  dekkane,
+}
 
 /// A store's landing page: Shop, Aisles, Offers, Buy Again.
 ///
@@ -24,10 +46,38 @@ class StorePageScreen extends StatefulWidget {
     required this.storeApi,
     required this.cart,
     required this.storeId,
+    required this.onOpenBasket,
     this.preview,
     this.orderApi,
     this.onFavoriteChanged,
+    this.layout = StorePageLayout.standard,
+    this.shopChatAction,
   });
+
+  /// Which design to draw. The neighbourhood browse and its map open shops as
+  /// [StorePageLayout.dekkane]; every other road here keeps the standard page.
+  final StorePageLayout layout;
+
+  /// THE HOOK FOR "CHAT WITH THE SHOP" — deliberately empty today, and deliberately not drawn.
+  ///
+  /// The dekkane frame floats a green `Chat with <shopkeeper>` pill over the grid. No
+  /// customer-to-shop chat exists: the chat in app-notification is two-party and order-scoped, and
+  /// keeps the merchant out of it on purpose. A shop thread needs its own conversation kind and
+  /// membership rule, a way to resolve which merchant owns the store, a merchant inbox and a policy
+  /// for closing threads before a button here could do anything — and a button that cannot work is
+  /// not drawn.
+  ///
+  /// When that lands, whoever builds it passes this builder. It is called with the shop's card each
+  /// time the dekkane layout builds and returns the control, or null for none (capability off, chat
+  /// switched off for this shop). What it returns becomes the Scaffold's floating action button,
+  /// which the Scaffold lays out ABOVE the basket bar in `bottomNavigationBar` — so the chat pill and
+  /// the basket bar cannot overlap however tall either grows, with nothing measured by hand. Thread
+  /// it from CustomerShell (which holds the ChatApi) through StoreHomeScreen and
+  /// `HyperlocalScreen.shopChatAction`, which already passes it on to every shop it opens. The
+  /// label wants the store's name: the data has no shopkeeper name to put in "Chat with Abu Hassan".
+  ///
+  /// Ignored by [StorePageLayout.standard], which has no such slot in its frame.
+  final ShopChatActionBuilder? shopChatAction;
 
   final StoreApi storeApi;
   final Cart cart;
@@ -47,6 +97,23 @@ class StorePageScreen extends StatefulWidget {
   /// rather than a popped result because this page can leave by system back or edge swipe, which
   /// return nothing.
   final void Function(StoreCard store)? onFavoriteChanged;
+
+  /// Where the basket bar's "View basket" goes: the customer shell's Basket tab.
+  ///
+  /// The bar used to call `Navigator.pop()`, on the theory that the basket was "back there". It is
+  /// not. This page is pushed over the shell from Home, from a banner, from a category listing,
+  /// from a past order's Reorder and from an order's shop card, so popping it lands on whichever of
+  /// those the customer came from — the home grid, the listing, the order — and never on the
+  /// basket. A customer who had just filled one pressed View basket and was shown the screen
+  /// before the shop, with the basket still one unexplained tab-tap away.
+  ///
+  /// A callback rather than a push of the basket screen, because the basket is a TAB and the shell
+  /// owns it: one cart, one Basket screen, and checkout's jump to Orders only works when nothing is
+  /// left covering the shell. The shell pops back to itself and switches tabs; this page only asks.
+  ///
+  /// Required, so every road here has to say where the basket is. A hop that forgets is a compile
+  /// error rather than a bar that goes nowhere — which is what the pop was, quietly, for everyone.
+  final VoidCallback onOpenBasket;
 
   @override
   State<StorePageScreen> createState() => _StorePageScreenState();
@@ -227,8 +294,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// The options are fetched on demand rather than with the shelf: most products have none, and
   /// loading every product's option tree to render a list would undo the paging.
   Future<void> _add(Product product) async {
-    if (widget.cart.conflictsWith(product)) {
-      await _askToSwitchStore(product);
+    if (widget.cart.exceedsShopLimit(product, from: _card)) {
+      await _explainShopLimit();
       return;
     }
 
@@ -269,8 +336,8 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// Opening a row rather than its add button: the detail screen is the frame's own destination
   /// for a product, options or not.
   Future<void> _openProduct(Product product) async {
-    if (widget.cart.conflictsWith(product)) {
-      await _askToSwitchStore(product);
+    if (widget.cart.exceedsShopLimit(product, from: _card)) {
+      await _explainShopLimit();
       return;
     }
     List<OptionGroup> groups = _optionGroups[product.id] ?? const <OptionGroup>[];
@@ -287,43 +354,15 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
     await _openDetail(product, groups);
   }
 
-  /// The one-store rule, explained at the moment of the tap rather than as a 422 at checkout.
-  Future<void> _askToSwitchStore(Product product) async {
-    final bool? discard = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        backgroundColor: DeliveryColors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DeliveryRadius.lg)),
-        title: Text(DeliveryStrings.of(context).startNewBasket,
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w700, color: DeliveryColors.ink)),
-        content: Text(
-          '${DeliveryStrings.of(context).basketFromShopReplace(widget.cart.store?.name ?? '')} '
-          '${DeliveryStrings.of(context).basketFromAnotherShopSingle}',
-          style: const TextStyle(fontSize: 14, color: DeliveryColors.muted, height: 1.4),
-        ),
-        actions: <Widget>[
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              style: TextButton.styleFrom(foregroundColor: DeliveryColors.muted),
-              child: Text(DeliveryStrings.of(context).keepIt)),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: DeliveryColors.brand,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(DeliveryRadius.md)),
-            ),
-            child: Text(DeliveryStrings.of(context).startHere),
-          ),
-        ],
-      ),
-    );
-    if (discard == true) {
-      widget.cart.switchTo(_card);
-      widget.cart.add(product, from: _card);
-    }
+  /// The one limit a basket still has, explained at the moment of the tap rather than as a 422 at
+  /// checkout: items from at most [Cart.maxShops] shops at once.
+  ///
+  /// It used to be one shop, and adding from a second offered to throw the first shop's basket
+  /// away. Nothing is thrown away now: the customer is shown the way to the basket, where they
+  /// choose which shop to check out or remove.
+  Future<void> _explainShopLimit() async {
+    final bool openBasket = await explainShopLimit(context);
+    if (openBasket && mounted) widget.onOpenBasket();
   }
 
   Future<void> _toggleFavorite() async {
@@ -383,6 +422,10 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
       );
     }
 
+    if (widget.layout == StorePageLayout.dekkane) {
+      return _dekkanePage();
+    }
+
     return Scaffold(
       backgroundColor: DeliveryColors.background,
       body: AnimatedBuilder(
@@ -409,21 +452,339 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
           ),
         ),
       ),
-      bottomNavigationBar: widget.cart.isEmpty
-          ? null
-          : AnimatedBuilder(
-              animation: widget.cart,
-              builder: (BuildContext context, _) => StickyBasketBar(
+      bottomNavigationBar: _basketBar(),
+    );
+  }
+
+  /// The basket bar both layouts share.
+  ///
+  /// The empty check belongs INSIDE the builder, not outside it.
+  ///
+  /// It used to read `widget.cart.isEmpty ? null : AnimatedBuilder(...)`, which looks equivalent
+  /// and is not: that test runs during build(), and the only thing subscribed to the cart was the
+  /// AnimatedBuilder around the body. So adding the first item rebuilt the body — the product row's
+  /// quantity badge duly appeared — while the Scaffold's bottomNavigationBar argument was never
+  /// re-evaluated and stayed null. A customer put their first item in the basket and got no basket
+  /// bar at all, on the shop page, with no way forward from that screen; it only appeared later, if
+  /// something unrelated happened to rebuild the page. Subscribing first and deciding second is what
+  /// makes the bar arrive with the item it is about.
+  Widget _basketBar() {
+    return AnimatedBuilder(
+        animation: widget.cart,
+        builder: (BuildContext context, _) => widget.cart.isEmpty
+            ? const SizedBox.shrink()
+            : StickyBasketBar(
                 itemCount: widget.cart.itemCount,
                 total: widget.cart.subtotal.toStringAsFixed(2),
                 label: DeliveryStrings.of(context).viewBasket,
-                blockedReason: widget.cart.meetsMinimum
+                // THIS shop's shortfall, on this shop's page — the one piece of minimum advice the
+                // page can act on, because anything added here counts towards it. Another shop in
+                // the basket that is under its own minimum is not mentioned here, where nothing can
+                // be done about it; the basket names that shop on its own line. (When a basket held
+                // one shop, shop B's page used to repeat shop A's shortfall as advice it could not
+                // follow.)
+                blockedReason: widget.cart.shortfallAt(widget.storeId) == 0
                     ? null
                     : DeliveryStrings.of(context).addToReachMinimumShort(
-                        widget.cart.amountBelowMinimum.toStringAsFixed(2)),
-                onTap: () => Navigator.of(context).pop(),
+                        widget.cart.shortfallAt(widget.storeId).toStringAsFixed(2)),
+                // To the basket itself, not back to wherever this page was opened from. See
+                // [StorePageScreen.onOpenBasket] for what the old pop() did instead.
+                onTap: widget.onOpenBasket,
+              ),
+    );
+  }
+
+  // ------------------------------------------------------------------------------- dekkane layout
+
+  /// `customer-dekkane-shop` (Figma 112:2041). Same state, same flows — [_add] with its option
+  /// sheet and one-store rule, the paged shelf, the aisle filter, the basket bar — in the frame's
+  /// layout.
+  Widget _dekkanePage() {
+    final DeliveryStrings t = DeliveryStrings.of(context);
+    final StoreCard card = _card;
+    final String? district = card.neighborhood?.trim();
+
+    return Scaffold(
+      backgroundColor: DeliveryColors.background,
+      appBar: YdScreenHeader(
+        title: card.name,
+        // The district the shop declared, omitted when it never declared one.
+        subtitle: (district == null || district.isEmpty) ? null : district,
+        onBack: () => Navigator.of(context).maybePop(),
+        backSemanticLabel: t.back,
+        trailing: YouDropPill(semanticLabel: t.appTitle),
+      ),
+      body: AnimatedBuilder(
+        // The rate as well as the cart: the LBP line under each price appears the moment the
+        // platform's rate arrives, rather than on whatever rebuild happens next.
+        animation: Listenable.merge(<Listenable>[widget.cart, MarketRates.instance]),
+        builder: (BuildContext context, _) => NotificationListener<ScrollNotification>(
+          onNotification: (ScrollNotification notification) {
+            if (notification.depth == 0 && shouldLoadMore(notification.metrics)) {
+              _products.loadMore();
+            }
+            return false;
+          },
+          child: CustomScrollView(
+            slivers: <Widget>[
+              SliverToBoxAdapter(child: _dekkaneHero(t, card)),
+              if (_aisles.isNotEmpty) SliverToBoxAdapter(child: _dekkaneAisles(t)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                      DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md - 4),
+                  child: Text(
+                    t.dekkaneShopInventory.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              ..._dekkaneShelf(t),
+              const SliverToBoxAdapter(child: SizedBox(height: DeliverySpacing.xl)),
+            ],
+          ),
+        ),
+      ),
+      // The chat hook's slot — empty until the capability exists. See
+      // [StorePageScreen.shopChatAction].
+      floatingActionButton: widget.shopChatAction?.call(context, card),
+      bottomNavigationBar: _basketBar(),
+    );
+  }
+
+  /// The inset hero: the full-size cover under a 45% scrim, the open and power pills across the
+  /// top, the name, and the rating with the shop's own tagline.
+  ///
+  /// The frame's "Family-run since 1985" is a field the platform does not have; the tagline is what
+  /// the merchant wrote about themselves, which is the honest stand-in.
+  Widget _dekkaneHero(DeliveryStrings t, StoreCard card) {
+    final String? tagline = card.tagline?.trim();
+    final String facts = <String>[
+      if (card.rating != null)
+        '★ ${card.rating!.toStringAsFixed(1)} (${t.custRatingsCount(card.ratingCount)})'
+      else
+        t.ratingNew,
+      if (tagline != null && tagline.isNotEmpty) tagline,
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(DeliveryRadius.lg),
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: CustomerPhoto(
+                // The full-size cover: this is the one place on the page it is drawn large.
+                url: card.coverUrl,
+                icon: iconForVertical(card.vertical),
               ),
             ),
+            Positioned.fill(
+              child: ColoredBox(color: DeliveryColors.ink.withValues(alpha: 0.45)),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.all(DeliverySpacing.md),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _dekkaneStatePill(card),
+                        ),
+                      ),
+                      const SizedBox(width: DeliverySpacing.sm),
+                      DekkanePowerPill(store: card, solid: true),
+                    ],
+                  ),
+                  if (DekkanePowerPill.shows(card) && card.powerUpdatedAt != null) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: DekkanePowerAge(store: card, onPhoto: true),
+                    ),
+                  ],
+                  const SizedBox(height: DeliverySpacing.md - 4),
+                  Text(
+                    card.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: DeliveryColors.white,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: DeliverySpacing.xs),
+                  Text(
+                    facts,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: DeliveryColors.white, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// "Open · Closes 10:00 PM" — the frame's green pill, from the card's availability and the
+  /// store's closing time in the reader's own clock format. [DekkanePowerPill]'s neighbour,
+  /// [DekkaneStatePill], is shared with the neighbourhood cards, which show it for a shop that is
+  /// not open.
+  Widget _dekkaneStatePill(StoreCard card) =>
+      DekkaneStatePill(availability: card.availability, closesAt: _closingTime());
+
+  /// The store's closing time for the window it is in, formatted by the reader's locale — "10:00
+  /// PM", or the 24-hour and Arabic forms — or null when the full store has not arrived yet or the
+  /// shop is shut.
+  String? _closingTime() {
+    final String? raw = _store?.closesAt;
+    if (raw == null) return null;
+    final List<String> parts = raw.split(':');
+    if (parts.length < 2) return null;
+    final int? hour = int.tryParse(parts[0]);
+    final int? minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return MaterialLocalizations.of(context)
+        .formatTimeOfDay(TimeOfDay(hour: hour, minute: minute));
+  }
+
+  Widget _dekkaneAisles(DeliveryStrings t) {
+    return SizedBox(
+      height: YdChip.minHeight + DeliverySpacing.md - 4,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            DeliverySpacing.md, 0, DeliverySpacing.md, DeliverySpacing.md - 4),
+        children: <Widget>[
+          // "All", as the frame labels it, where the standard page says "Everything".
+          YdChip(
+            label: t.all,
+            selected: _selectedAisle == null,
+            onTap: () => _selectAisle(null),
+          ),
+          for (final Aisle aisle in _aisles) ...<Widget>[
+            const SizedBox(width: DeliverySpacing.md - 4),
+            YdChip(
+              label: aisle.name,
+              selected: _selectedAisle == aisle.categoryId,
+              onTap: () => _selectAisle(aisle.categoryId),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The shelf as the frame's two-column grid.
+  ///
+  /// Rows of two rather than a fixed-extent grid: a grid cell has to be told its height, and one
+  /// that fits "Pepsi Glass Bottle 330ml" at the default text size clips it at Android's largest.
+  /// Each row is as tall as its taller tile, and the tiles pin their buttons to the foot, so the
+  /// two Add buttons in a row stay level whatever the names do.
+  List<Widget> _dekkaneShelf(DeliveryStrings t) {
+    final PagedList<Product> list = _products;
+    if (list.isLoadingFirstPage) {
+      return const <Widget>[
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(DeliverySpacing.xl),
+            child: Center(child: CircularProgressIndicator(color: DeliveryColors.brand)),
+          ),
+        ),
+      ];
+    }
+    if (list.error != null && list.isEmpty) {
+      return <Widget>[
+        SliverToBoxAdapter(
+          child: YdEmptyState(
+            icon: Icons.cloud_off,
+            title: t.dekkaneCouldNotLoadShelf,
+            padding: const EdgeInsets.all(DeliverySpacing.xl),
+            action: YdPillButton(
+              label: t.tryAgain,
+              onPressed: list.refresh,
+              size: YdPillButtonSize.compact,
+              expand: false,
+            ),
+          ),
+        ),
+      ];
+    }
+    if (list.isEmptyAfterLoad) {
+      return <Widget>[
+        SliverToBoxAdapter(
+          child: _empty(
+            _selectedAisle == null ? Icons.inventory_2_outlined : Icons.search_off_rounded,
+            _selectedAisle == null ? t.nothingOnShelves : t.nothingInAisle,
+          ),
+        ),
+      ];
+    }
+
+    final List<Product> products = list.items;
+    final int rows = (products.length + 1) ~/ 2;
+    return <Widget>[
+      SliverPadding(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: DeliverySpacing.md),
+        sliver: SliverList.separated(
+          itemCount: rows,
+          separatorBuilder: (_, __) => const SizedBox(height: DeliverySpacing.md - 4),
+          itemBuilder: (BuildContext context, int row) {
+            final Product first = products[row * 2];
+            final Product? second =
+                row * 2 + 1 < products.length ? products[row * 2 + 1] : null;
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Expanded(child: _dekkaneTile(t, first)),
+                  const SizedBox(width: DeliverySpacing.md - 4),
+                  Expanded(
+                    child: second == null ? const SizedBox.shrink() : _dekkaneTile(t, second),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+      SliverToBoxAdapter(child: _listFooter(list)),
+    ];
+  }
+
+  Widget _dekkaneTile(DeliveryStrings t, Product product) {
+    final int? pounds = MarketRates.instance.lbpRounded(product.price);
+    return ShelfGridTile(
+      name: product.name,
+      price: '\$${product.price.toStringAsFixed(2)}',
+      // The platform rate's conversion, not a second price — and nothing at all without a rate.
+      secondaryPrice: pounds == null ? null : t.dekkaneLbpAmount(pounds),
+      imageUrl: product.listImageUrl,
+      addLabel: t.custAddToBasket,
+      quantityInBasket: widget.cart.qtyOf(product.id),
+      // A closed shop's shelf still browses, and draws no add control it could not honour.
+      onAdd: _acceptsOrders ? () => _add(product) : null,
+      onRemove: () => widget.cart.removeProduct(product.id),
+      onTap: () => _openProduct(product),
+      removeSemanticLabel: t.remove,
+      addMoreSemanticLabel: t.dekkaneAddOneMore,
     );
   }
 
@@ -434,7 +795,10 @@ class _StorePageScreenState extends State<StorePageScreen> with SingleTickerProv
   /// never inferred. Mains and undeclared shops draw nothing.
   Widget _powerBanner() {
     final DeliveryStrings t = DeliveryStrings.of(context);
-    final StorePowerStatus status = _card.powerStatus;
+    // Only a declaration that still counts as now: the banner says what is happening, and an old
+    // one is history rather than the state of the shop (StoreCard.powerCurrent).
+    final StorePowerStatus status =
+        _card.powerCurrent ? _card.powerStatus : StorePowerStatus.unknown;
     final (String text, Color fg, Color bg) = switch (status) {
       StorePowerStatus.generator => (
           t.custGeneratorBanner,

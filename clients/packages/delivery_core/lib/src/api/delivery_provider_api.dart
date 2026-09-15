@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../models/catalog_models.dart';
 import '../models/provider_models.dart';
+import '../models/rating_models.dart';
 
 /// The register of who can carry an order, and a merchant's choice among them.
 ///
@@ -63,6 +64,30 @@ class DeliveryProviderApi {
         .map((dynamic r) => r as String)
         .toList();
   }
+
+  /// Every rider on the caller's fleet with their rating aggregate, in one read — an unrated rider
+  /// included, with a null average. What the Riders HR directory draws its ratings from, instead of
+  /// asking for each rider's rating separately.
+  Future<List<RiderStanding>> myRiderRatings() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/delivery-providers/my-company/riders/ratings');
+    return (response.data as List<dynamic>)
+        .map((dynamic s) => RiderStanding.fromJson(s as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Ends a rider's contract with the caller's company, recording [reason] and who asked. The rider
+  /// comes off this fleet onto no fleet at all — not YouDrop's own riders — and can take no work
+  /// until another company hires them or YouDrop takes them on. Reachable by carrier staff only for
+  /// a rider on their own fleet.
+  ///
+  /// 400 without a reason; 404 for a rider not on this fleet (identical for one that does not
+  /// exist); 409 while the rider is carrying one of this company's unfinished jobs, with `jobs` in
+  /// the body. Sign-in, history, ratings and money stay exactly where they were.
+  Future<void> releaseMyRider(String riderRef, {required String reason}) => _dio.post<void>(
+        '/api/delivery-providers/my-company/riders/$riderRef/release',
+        data: <String, dynamic>{'reason': reason},
+      );
 
   /// How this carrier is performing, and therefore how much work they are offered.
   Future<CarrierScore> myScore() async {

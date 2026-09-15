@@ -97,6 +97,20 @@ http:
         frameDeny: true
         referrerPolicy: no-referrer
 
+    # The size limit a customer's file for a service order meets before storage — the middleware
+    # deploy/k3s puts on the same route. The file is PUT straight to MinIO with a URL order-manager
+    # signed, and neither the signature nor MinIO can cap a body, while the URL works until it expires,
+    # as often as whoever holds it likes. order-manager refuses an oversized file once it has arrived;
+    # this refuses it on the way in, with a 413, before MinIO stores a byte.
+    #
+    # 10 MiB is order-manager's delivery.attachments.max-size-bytes — keep the two in step — plus 64 KiB
+    # of slack for a client that frames its body. Traefik holds the first MiB of a body in memory and
+    # spools the rest to disk, which is what lets a 64 MB container take a 10 MB upload.
+    order-attachment-upload-limit:
+      buffering:
+        maxRequestBodyBytes: 10551296
+        memRequestBodyBytes: 1048576
+
   routers:
     # ------------------------------------------------------------------ product-service (8103)
     product-service:
@@ -376,6 +390,23 @@ http:
       priority: 90
       entryPoints: [web, https]
       middlewares: [security-headers@file]
+
+    # order-attachments, on a router of its own for the body limit the other buckets do not carry — the
+    # route deploy/k3s serves. It is PRIVATE (no anonymous policy) and routed anyway because all of its
+    # traffic is presigned: a customer's phone PUTs the file for a service order, and the provider or
+    # back office opens it with a download URL order-manager signed for them. MinIO refuses any request
+    # without a valid signature, a bucket listing included. The limit runs first, so an oversized body
+    # is refused before anything else handles it.
+    #
+    # Used only when MINIO_PUBLIC_ENDPOINT is this hostname. Signed for http://<host>:9010 instead, as
+    # on a laptop, uploads reach MinIO's published port directly and meet no limit until order-manager
+    # checks the file's size.
+    order-attachments:
+      rule: Host(`api-dev.youdrop.shop`) && PathPrefix(`/order-attachments`)
+      service: minio-s3
+      priority: 90
+      entryPoints: [web, https]
+      middlewares: [order-attachment-upload-limit@file, security-headers@file]
 
     # The landing page at the root of monitoring-dev, so somebody arriving there is told what is
     # under it rather than meeting a 404.

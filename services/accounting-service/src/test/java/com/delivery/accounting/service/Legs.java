@@ -32,6 +32,11 @@ final class Legs {
                 CounterpartyKind.MERCHANT, merchantRef);
     }
 
+    static AccountingTransaction giftWrapCredit(UUID orderId, String amount, String merchantRef) {
+        return of(orderId, Leg.GIFT_WRAP_CREDIT, amount, Direction.CREDIT,
+                CounterpartyKind.MERCHANT, merchantRef);
+    }
+
     static AccountingTransaction commission(UUID orderId, String amount) {
         return of(orderId, Leg.PLATFORM_COMMISSION, amount, Direction.CREDIT,
                 CounterpartyKind.PLATFORM, CounterpartyKind.PLATFORM_REF);
@@ -56,6 +61,13 @@ final class Legs {
         return AccountingTransaction.obligation(orderId, Leg.CASH_COLLECTED, riderRef,
                         new BigDecimal(amount), "USD", Direction.DEBIT, "corr")
                 .attributedTo(CounterpartyKind.RIDER, riderRef);
+    }
+
+    /** A pickup's cash, held by the shop that took it at its counter (V52). */
+    static AccountingTransaction cashHeldByShop(UUID orderId, String amount, String merchantRef) {
+        return AccountingTransaction.obligation(orderId, Leg.CASH_COLLECTED, merchantRef,
+                        new BigDecimal(amount), "USD", Direction.DEBIT, "corr")
+                .attributedTo(CounterpartyKind.MERCHANT, merchantRef);
     }
 
     /** A merchant credit from before attribution existed — the 45 rows already in the database. */

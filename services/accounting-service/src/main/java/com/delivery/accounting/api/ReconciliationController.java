@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.slf4j.MDC;
@@ -18,10 +19,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.RequestBody;
+
 import com.delivery.accounting.domain.AccountingTransaction;
 import com.delivery.accounting.domain.AccountingTransactionRepository;
-import com.delivery.accounting.domain.CashFloatRepository;
+import com.delivery.accounting.domain.CashFloatEntry;
+import com.delivery.accounting.service.CarrierCashService;
 import com.delivery.accounting.service.CashFloatService;
+import com.delivery.accounting.service.Statement;
 import com.delivery.platform.observability.CorrelationIdFilter;
 import com.delivery.accounting.domain.CoreBankingSyncLogRepository;
 
@@ -44,40 +49,158 @@ public class ReconciliationController {
     private static final int MAX_PAGE = 200;
 
     private final AccountingTransactionRepository transactions;
-    private final CashFloatRepository floatEntries;
     private final CashFloatService cashFloat;
     private final CoreBankingSyncLogRepository syncLog;
+    private final CarrierCashService carrierCash;
 
     public ReconciliationController(AccountingTransactionRepository transactions,
-                                    CashFloatRepository floatEntries,
                                     CashFloatService cashFloat,
-                                    CoreBankingSyncLogRepository syncLog) {
+                                    CoreBankingSyncLogRepository syncLog,
+                                    CarrierCashService carrierCash) {
         this.transactions = transactions;
-        this.floatEntries = floatEntries;
         this.cashFloat = cashFloat;
         this.syncLog = syncLog;
+        this.carrierCash = carrierCash;
     }
 
     /**
-     * Records that a holder has banked everything they were carrying.
+     * Records that a holder has banked everything they were carrying — a rider of the platform's own
+     * fleet, a delivery company paying in what its riders handed it, or a shop paying in what its
+     * counter took for pickup orders (V52).
      *
      * <p>BACKOFFICE only, and deliberately so: this is somebody at the platform confirming that
      * money physically arrived. A rider marking their own float clear would be the one party with
-     * an incentive to get it wrong.
+     * an incentive to get it wrong — and so would a company, and so would a shop.
+     *
+     * <p>The body is optional, so a caller written before it existed banks exactly as it always did.
+     * With one, {@code expectedAmount} is the figure the operator counted against: a company's
+     * balance grows with every hand-over at its hub, and if it moved since the page loaded nothing
+     * is recorded and the answer is 409 with the current figure. {@code requestKey} makes a double
+     * press harmless, and whoever is signed in is recorded as the person who confirmed it.
+     *
+     * <p><strong>A shop's till (V52)</strong> takes this route too, on its own terms: the shop keeps
+     * its share and pays the platform only its commission, so {@code expectedAmount} is what the shop
+     * owes — the {@code owed} figure the cash-on-hand list shows — and never the till, and it is
+     * required (400 {@code AMOUNT_REQUIRED} without it). The answer carries {@code retained}, the
+     * share the shop kept.
+     *
+     * <p>{@code holderKind} says which of the account's cash is being paid in. One account can be a
+     * shop with a till and a rider with a bag, settled on different terms, so when it holds both and
+     * the body does not say, nothing is recorded and the answer is 409 {@code HOLDER_KIND_REQUIRED}.
      */
     @PostMapping("/float/{holderRef}/remit")
-    public ResponseEntity<Map<String, Object>> remit(@PathVariable String holderRef) {
-        return cashFloat.remitAll(holderRef, MDC.get(CorrelationIdFilter.MDC_KEY))
-                .<ResponseEntity<Map<String, Object>>>map(r -> ResponseEntity.ok(Map.of(
-                        "remittanceId", r.id(),
-                        "holderRef", r.holderRef(),
-                        "amount", r.amount(),
-                        "collections", r.collections())))
-                // Nothing outstanding is not an error — it is the answer to "have they banked it".
-                .orElseGet(() -> ResponseEntity.ok(Map.of(
-                        "holderRef", holderRef,
-                        "amount", java.math.BigDecimal.ZERO,
-                        "collections", 0)));
+    public ResponseEntity<?> remit(@PathVariable String holderRef,
+                                   @RequestBody(required = false) RemitRequest body) {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        CashFloatEntry.Method method = null;
+        if (body != null && body.method() != null && !body.method().isBlank()) {
+            method = CashFloatEntry.Method.parse(body.method());
+            if (method == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "method must be one of CASH, BANK_DEPOSIT or WALLET"));
+            }
+        }
+        String note = body == null || body.note() == null || body.note().isBlank()
+                ? null
+                : body.note().trim().substring(0, Math.min(body.note().trim().length(), 500));
+        String key = body == null || body.requestKey() == null || body.requestKey().isBlank()
+                ? null
+                : body.requestKey().trim();
+        // The shape the carrier's hand-over route accepts too. Refused here, before anything is
+        // written: the column holds 64 characters, and a longer key used to fail only at commit — a
+        // 500 for a payment that was simply not recorded.
+        // A pay run's key is refused here too: see Callers#requestKeyProblem.
+        String keyProblem = Callers.requestKeyProblem(key);
+        if (keyProblem != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", keyProblem));
+        }
+        // Which of the account's cash is being paid in, when the caller says (V52). Unsaid is still
+        // allowed, and refused only when the account really does hold more than one kind.
+        CashFloatEntry.HolderKind holderKind = null;
+        if (body != null && body.holderKind() != null && !body.holderKind().isBlank()) {
+            holderKind = holderKindOf(body.holderKind());
+            if (holderKind == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "holderKind must be one of RIDER, PROVIDER or MERCHANT"));
+            }
+        }
+
+        try {
+            return cashFloat.remit(holderRef, MDC.get(CorrelationIdFilter.MDC_KEY),
+                            body == null ? null : body.expectedAmount(),
+                            new CashFloatEntry.Recorded(Callers.jwt().getSubject(), method, note,
+                                    key),
+                            holderKind)
+                    .<ResponseEntity<?>>map(r -> {
+                        Map<String, Object> out = new LinkedHashMap<>();
+                        out.put("remittanceId", r.id());
+                        out.put("holderRef", r.holderRef());
+                        out.put("amount", r.amount());
+                        out.put("collections", r.collections());
+                        out.put("replayed", r.replayed());
+                        // A shop's payment: the share it kept of its till, beside what it paid.
+                        // Absent for everybody else, whose answer reads exactly as it always did.
+                        if (r.retained().signum() != 0) {
+                            out.put("retained", r.retained());
+                        }
+                        return ResponseEntity.ok(out);
+                    })
+                    // Nothing outstanding is not an error — it is the answer to "have they banked it".
+                    .orElseGet(() -> ResponseEntity.ok(Map.of(
+                            "holderRef", holderRef,
+                            "amount", java.math.BigDecimal.ZERO,
+                            "collections", 0)));
+        } catch (CashFloatService.AmountChangedException e) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            // A shop is asked for what it owes out of its till, never for the till, so its figure is
+            // said that way (V52).
+            out.put("error", (holderKind == CashFloatEntry.HolderKind.MERCHANT
+                    ? "The shop owes " : "They are holding ")
+                    + Statement.money(e.current()).toPlainString()
+                    + " now, not the amount you confirmed. Nothing was recorded.");
+            out.put("code", "AMOUNT_CHANGED");
+            out.put("current", Statement.money(e.current()).toPlainString());
+            return ResponseEntity.status(409).body(out);
+        } catch (CashFloatService.HolderKindRequiredException e) {
+            // A shop that also delivers holds a till and a rider's bag, settled on different terms:
+            // nothing was recorded, and the caller says which of the two is paying.
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(), "code", "HOLDER_KIND_REQUIRED"));
+        } catch (CashFloatService.AmountRequiredException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage(), "code", "AMOUNT_REQUIRED"));
+        } catch (CashFloatService.RequestKeyReusedException e) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", e.getMessage(), "code", "REQUEST_KEY_REUSED"));
+        } catch (DataIntegrityViolationException e) {
+            // Two presses with one key racing past the replay check: the unique index refused the
+            // second at commit, and the first was recorded. Saying so is the honest answer, as on
+            // the carrier's hand-over route.
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", "That has already been recorded. Reload to see it.",
+                    "code", "ALREADY_RECORDED"));
+        }
+    }
+
+    /** A holder kind named in a request, case aside; null for anything that is not one. */
+    private static CashFloatEntry.HolderKind holderKindOf(String value) {
+        for (CashFloatEntry.HolderKind kind : CashFloatEntry.HolderKind.values()) {
+            if (kind.name().equalsIgnoreCase(value.trim())) {
+                return kind;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * {@code {"expectedAmount":"320.00","method":"BANK_DEPOSIT","note":"...","requestKey":"...",
+     * "holderKind":"MERCHANT"}}.
+     */
+    public record RemitRequest(BigDecimal expectedAmount, String method, String note,
+                               String requestKey, String holderKind) {
     }
 
     /**
@@ -87,20 +210,89 @@ public class ReconciliationController {
      * account yet, and the age of the oldest entry is the part worth watching: a large balance
      * collected this morning is a working day, and the same balance collected three weeks ago is a
      * problem.
+     *
+     * <p>A delivery company appears here as a {@code PROVIDER} holder once its riders hand it cash,
+     * and a shop as a {@code MERCHANT} holder once a pickup is paid at its counter (V52).
+     * {@code overdue} is the server's call, by the limit for the cash each holder has: a day for a
+     * rider of the platform's own fleet, as this list always flagged them, the carrier limit for
+     * a company's custody — the one the company's own reconciliation page states, so the two cannot
+     * disagree about what "late" means — and the shop limit for a shop's till. See
+     * {@link CarrierCashService#cashOnHand()}.
+     *
+     * <p>A shop's line also carries {@code owed} and {@code retained} (V52), as two-decimal strings.
+     * A shop keeps its share of its till and pays the platform its commission, so {@code amount} is
+     * the cash it holds, {@code owed} is the figure its payment is recorded against — what
+     * {@code /float/{ref}/remit} expects — and {@code retained} is the share it keeps.
+     *
+     * <p>The role is checked in the method as well as on the class, as on every cash route here: this
+     * list names who holds the platform's money, and a standalone test can only prove a lock it can
+     * see.
      */
     @GetMapping("/float")
-    public List<Map<String, Object>> outstandingFloat() {
-        return floatEntries.outstandingByHolder().stream()
-                .map(row -> {
+    public ResponseEntity<?> outstandingFloat() {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        List<CarrierCashService.OnHand> holders = carrierCash.cashOnHand();
+        // Read only when a shop is on the list at all.
+        Map<String, com.delivery.accounting.service.ShopTill> tills = holders.stream()
+                .anyMatch(holder -> holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT)
+                ? cashFloat.shopTills()
+                : Map.of();
+        return ResponseEntity.ok(holders.stream()
+                .map(holder -> {
                     Map<String, Object> out = new LinkedHashMap<String, Object>();
-                    out.put("holderRef", row.getHolderRef());
-                    out.put("holderKind", row.getHolderKind());
-                    out.put("amount", row.getAmount());
-                    out.put("orders", row.getOrders());
-                    out.put("oldest", row.getOldest());
+                    out.put("holderRef", holder.holderRef());
+                    out.put("holderKind", holder.holderKind());
+                    out.put("amount", holder.amount());
+                    out.put("orders", holder.orders());
+                    out.put("oldest", holder.oldest());
+                    out.put("overdue", holder.overdue());
+                    var till = holder.holderKind() == CashFloatEntry.HolderKind.MERCHANT
+                            ? tills.get(holder.holderRef())
+                            : null;
+                    if (till != null) {
+                        out.put("owed", Statement.money(till.owed()).toPlainString());
+                        out.put("retained", Statement.money(till.retained()).toPlainString());
+                    }
                     return out;
                 })
-                .toList();
+                .toList());
+    }
+
+    /**
+     * Cash held by delivery companies: what each holds and owes the platform now, and what its
+     * riders still hold for it.
+     *
+     * <p>The Back Office half of the custody model. A company's own balance is what an operator
+     * records a payment against (through {@code /float/{ref}/remit}, as for any holder); its riders'
+     * balance is reported beside it and never added to it, because that cash is owed to the company
+     * until the company records the hand-over. Money as two-decimal strings.
+     */
+    @GetMapping("/float/carriers")
+    public ResponseEntity<?> carriers() {
+        ResponseEntity<?> refusal = Callers.requireRole("BACKOFFICE");
+        if (refusal != null) {
+            return refusal;
+        }
+        return ResponseEntity.ok(Map.of(
+                "overdueAfterHours", carrierCash.overdueAfterHours(),
+                "carriers", carrierCash.carriers().stream().map(c -> {
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("carrierRef", c.carrierRef());
+                    out.put("held", Statement.money(c.held()).toPlainString());
+                    out.put("orders", c.orders());
+                    out.put("oldest", c.oldest() == null ? null : c.oldest().toString());
+                    out.put("overdue", c.overdue());
+                    out.put("withRiders", Statement.money(c.withRiders()).toPlainString());
+                    out.put("ridersHolding", c.ridersHolding());
+                    out.put("ridersOldest",
+                            c.ridersOldest() == null ? null : c.ridersOldest().toString());
+                    out.put("lastPaidAt",
+                            c.lastPaidAt() == null ? null : c.lastPaidAt().toString());
+                    return out;
+                }).toList()));
     }
 
     /**

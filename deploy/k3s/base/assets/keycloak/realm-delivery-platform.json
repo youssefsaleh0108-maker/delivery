@@ -110,15 +110,6 @@
         "claim": "family_name",
         "user.attribute": "lastName"
       }
-    },
-    {
-      "name": "customer-role",
-      "identityProviderAlias": "google",
-      "identityProviderMapper": "oidc-hardcoded-role-idp-mapper",
-      "config": {
-        "syncMode": "INHERIT",
-        "role": "CUSTOMER"
-      }
     }
   ],
   "clients": [
@@ -383,7 +374,8 @@
         }
       ],
       "realmRoles": [
-        "CUSTOMER"
+        "CUSTOMER",
+        "default-roles-delivery-platform"
       ],
       "attributes": {
         "phoneNumber": [
@@ -415,7 +407,8 @@
         }
       ],
       "realmRoles": [
-        "DELIVERY"
+        "DELIVERY",
+        "default-roles-delivery-platform"
       ],
       "attributes": {
         "phoneNumber": [
@@ -447,7 +440,8 @@
         }
       ],
       "realmRoles": [
-        "MERCHANT"
+        "MERCHANT",
+        "default-roles-delivery-platform"
       ],
       "attributes": {
         "phoneNumber": [
@@ -479,7 +473,8 @@
         }
       ],
       "realmRoles": [
-        "BACKOFFICE"
+        "BACKOFFICE",
+        "default-roles-delivery-platform"
       ]
     },
     {
@@ -497,7 +492,8 @@
         }
       ],
       "realmRoles": [
-        "CARRIER"
+        "CARRIER",
+        "default-roles-delivery-platform"
       ],
       "attributes": {
         "phoneNumber": [

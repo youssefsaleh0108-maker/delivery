@@ -13,6 +13,8 @@ import 'notification_inbox.dart';
 import 'notifications_screen.dart';
 import 'product_detail_screen.dart' show CoverCard, CustomerPhoto;
 import 'friend_split_screen.dart';
+import 'hyperlocal_screen.dart';
+import 'neighbourhood_chat_screen.dart';
 import 'shops_listing_screen.dart';
 import 'store_page_screen.dart';
 import 'store_state_mapping.dart';
@@ -41,7 +43,12 @@ class StoreHomeScreen extends StatefulWidget {
     this.profileApi,
     this.splitApi,
     this.transferApi,
+    this.neighbourhoodChatApi,
+    this.chatSocket,
+    this.shopChatAction,
     required this.onSignOut,
+    required this.onOpenBasket,
+    this.onOpenGiftHub,
   });
 
   final StoreApi storeApi;
@@ -75,6 +82,23 @@ class StoreHomeScreen extends StatefulWidget {
   final TransferApi? transferApi;
   final Future<void> Function() onSignOut;
 
+  /// The shell's way to its Basket tab, handed to every shop page opened from here — a card, a
+  /// banner, or a shop reached through a category listing — for the basket bar's View basket.
+  final VoidCallback onOpenBasket;
+
+  /// Opens the gift hub (Figma 112:1684) over the shell. Null draws no entry.
+  final VoidCallback? onOpenGiftHub;
+
+  /// The neighbourhood room behind the chat entry under the browse entry. Null leaves it undrawn.
+  final NeighbourhoodChatApi? neighbourhoodChatApi;
+
+  /// App Notification's socket, for the room's live messages.
+  final UserQueueSocket? chatSocket;
+
+  /// What a dekkane shop page draws above its basket bar, from the shell — handed to the
+  /// neighbourhood browse, which passes it to every shop it opens. Null draws nothing.
+  final ShopChatActionBuilder? shopChatAction;
+
   @override
   State<StoreHomeScreen> createState() => _StoreHomeScreenState();
 }
@@ -101,6 +125,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   );
 
   List<StoreCard> _favorites = <StoreCard>[];
+
+  /// The starred shops the "Your favourites" rail draws: goods shops only.
+  ///
+  /// Service shops are never on Home. The server already leaves them out of the favourites read;
+  /// this holds the same rule again where the rail is drawn, so that neither a server that sent one
+  /// anyway nor a heart toggled on a service shop's own page (which reaches [_applyFavorite] like
+  /// any other) can put one here — or leave a favourites heading over an empty rail.
+  List<StoreCard> get _railFavorites => _favorites
+      .where((StoreCard s) => StoreVertical.pickerVerticals.contains(s.vertical))
+      .toList();
 
   /// Designed banners from the Backoffice, and the category strip. Both are small curated lists —
   /// a rail nobody can reach the end of does not need paging.
@@ -282,17 +316,25 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         storeId: store.id,
         preview: store,
         onFavoriteChanged: _applyFavorite,
+        onOpenBasket: widget.onOpenBasket,
       ),
     ));
   }
 
   /// The verticals to show as chips.
   ///
-  /// Driven by the curated categories when there are any, falling back to the full enum — so the
-  /// strip still works on a database where nobody has tagged a category yet.
+  /// Driven by the curated categories when there are any, falling back to the goods verticals — so
+  /// the strip still works on a database where nobody has tagged a category yet.
+  ///
+  /// Never Services. Service shops are not on Home and this storefront never lists one, so a
+  /// Services chip would open onto nothing. The server refuses to tag a Services chip; one that
+  /// arrived anyway is dropped here.
   List<StoreVertical> get _chipVerticals => _chips.isEmpty
-      ? StoreVertical.values
-      : _chips.map((CategoryChip c) => c.vertical).toList();
+      ? StoreVertical.pickerVerticals
+      : _chips
+          .map((CategoryChip c) => c.vertical)
+          .where(StoreVertical.pickerVerticals.contains)
+          .toList();
 
   CategoryChip? _chipFor(StoreVertical vertical) {
     for (final CategoryChip c in _chips) {
@@ -392,6 +434,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 SliverToBoxAdapter(child: _splitRequestBanner(t)),
                 SliverToBoxAdapter(
                     child: KeyedSubtree(key: _stripKey, child: _categoryStrip(context))),
+                if (widget.onOpenGiftHub != null) SliverToBoxAdapter(child: _giftEntry(t)),
                 if (_filtersOpen) SliverToBoxAdapter(child: _filterRow()),
                 if (_stores.isLoadingFirstPage || _loadingRails)
                   const SliverFillRemaining(
@@ -401,10 +444,13 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 else if (_error != null)
                   SliverFillRemaining(hasScrollBody: false, child: _errorState())
                 else ...<Widget>[
+                  SliverToBoxAdapter(child: _neighbourhoodEntry(t)),
+                  if (widget.neighbourhoodChatApi != null)
+                    SliverToBoxAdapter(child: _neighbourhoodChatEntry(t)),
                   // Banners sit above the offers rail: designed artwork the business chose to lead
                   // with, ahead of the mechanical list of discounts.
                   if (_banners.isNotEmpty) SliverToBoxAdapter(child: _bannerRail()),
-                  if (_favorites.isNotEmpty)
+                  if (_railFavorites.isNotEmpty)
                     SliverToBoxAdapter(child: _featuredSection()),
                   SliverToBoxAdapter(
                     child: Padding(
@@ -827,6 +873,60 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     );
   }
 
+  /// The door to the gift hub, under the category cards. The hub is a route pushed over the shell,
+  /// like every customer detail screen; this card and the profile menu's row are how it is reached.
+  Widget _giftEntry(DeliveryStrings t) {
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(_gutter, DeliverySpacing.md, _gutter, 0),
+      child: YdCard.bordered(
+        onTap: widget.onOpenGiftHub,
+        padding: const EdgeInsets.all(DeliverySpacing.md - DeliverySpacing.xs),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: DeliveryColors.brandSoft,
+                borderRadius: BorderRadius.circular(DeliveryRadius.md),
+              ),
+              child: const Icon(Icons.card_giftcard_rounded,
+                  size: 22, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    t.giftHomeEntryTitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.giftHomeEntrySub,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+            Icon(rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                size: 20, color: DeliveryColors.faint),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// The horizontally scrolling pill strip. Ends in the door to the full directory — the design
   /// gives the categories screen no other entrance.
   /// The frame's category CARDS — a white tile per vertical, the glyph in a brand-soft square
@@ -849,6 +949,120 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         cart: widget.cart,
         initialVertical: vertical,
         chips: _chips,
+        onOpenBasket: widget.onOpenBasket,
+      ),
+    ));
+  }
+
+  /// The door to the neighbourhood browse (Figma 112:1941).
+  ///
+  /// That screen existed long before anything opened it — the surface checklist carried it as
+  /// UNREACHABLE — so it gets a place on Home, just under the category tiles, where somebody asking
+  /// "what is near me" already is. The frames draw no entry card of their own; this is the home
+  /// feed's own card language, and it names the screen it opens.
+  Widget _neighbourhoodEntry(DeliveryStrings t) => _homeEntryCard(
+        icon: Icons.storefront_rounded,
+        title: t.dekkaneBrowseTitle,
+        subtitle: t.dekkaneEntrySub,
+        onTap: _openNeighbourhood,
+      );
+
+  /// The door to the neighbourhood's chat room (Figma 121:102), right under the browse because it
+  /// is the same neighbourhood: the shops near the address, then the people. The frame marks Home
+  /// as the tab it belongs to and draws no entry of its own, so it takes the feed's card language.
+  Widget _neighbourhoodChatEntry(DeliveryStrings t) => _homeEntryCard(
+        icon: Icons.forum_rounded,
+        title: t.chatRoomEntryTitle,
+        subtitle: t.chatRoomEntrySub,
+        onTap: _openNeighbourhoodChat,
+      );
+
+  Widget _homeEntryCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          _gutter, DeliverySpacing.sm, _gutter, DeliverySpacing.sm),
+      child: YdCard(
+        onTap: onTap,
+        padding: const EdgeInsetsDirectional.all(DeliverySpacing.md - 4),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                  color: DeliveryColors.brandSoft, shape: BoxShape.circle),
+              child: Icon(icon, size: 20, color: DeliveryColors.brand),
+            ),
+            const SizedBox(width: DeliverySpacing.md - 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: DeliveryColors.ink,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: DeliveryColors.muted, height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+            // Always chevron_right: the icon is declared with matchTextDirection, so Icon already
+            // mirrors it in Arabic, and choosing chevron_left there would flip it a second time.
+            const Icon(Icons.chevron_right, size: 20, color: DeliveryColors.faint),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pushed over the shell like every other shop list, with the shell's basket and address book —
+  /// the browse is measured from the same address this screen's header shows.
+  void _openNeighbourhood() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => HyperlocalScreen(
+        storeApi: widget.storeApi,
+        orderApi: widget.orderApi,
+        cart: widget.cart,
+        addresses: widget.addresses,
+        zoneApi: widget.zoneApi,
+        onOpenBasket: widget.onOpenBasket,
+        shopChatAction: widget.shopChatAction,
+      ),
+    ));
+  }
+
+  /// Pushed over the shell like the browse. The room is the area of the same address this screen's
+  /// header shows, and a customer whose address has no area picks one on the shell's own sheet.
+  void _openNeighbourhoodChat() {
+    final NeighbourhoodChatApi? api = widget.neighbourhoodChatApi;
+    if (api == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => NeighbourhoodChatScreen(
+        api: api,
+        addresses: widget.addresses,
+        socket: widget.chatSocket,
+        onChooseArea: (BuildContext sheetContext) =>
+            showAddressSheet(sheetContext, widget.addresses, zoneApi: widget.zoneApi),
       ),
     ));
   }
@@ -1105,6 +1319,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             cart: widget.cart,
             storeId: banner.linkTarget!,
             onFavoriteChanged: _applyFavorite,
+            onOpenBasket: widget.onOpenBasket,
           ),
         ));
       case BannerLinkKind.category:
@@ -1124,6 +1339,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// cards. The shops on it are the customer's own starred ones.
   Widget _featuredSection() {
     final DeliveryStrings t = DeliveryStrings.of(context);
+    final List<StoreCard> favorites = _railFavorites;
     return Padding(
       padding: const EdgeInsetsDirectional.symmetric(vertical: DeliverySpacing.sm),
       child: Column(
@@ -1150,9 +1366,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsetsDirectional.symmetric(horizontal: _gutter),
-              itemCount: _favorites.length,
+              itemCount: favorites.length,
               separatorBuilder: (_, __) => const SizedBox(width: DeliverySpacing.md),
-              itemBuilder: (BuildContext context, int i) => _shopCard(_favorites[i]),
+              itemBuilder: (BuildContext context, int i) => _shopCard(favorites[i]),
             ),
           ),
         ],

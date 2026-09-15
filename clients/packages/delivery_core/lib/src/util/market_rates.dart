@@ -42,9 +42,19 @@ class MarketRates extends ChangeNotifier {
   /// Rounded to the nearest thousand — the design's own figures do exactly that, and no LBP note
   /// smaller than a thousand exists to be owed.
   String? lbp(double usd) {
+    final int? pounds = lbpRounded(usd);
+    return pounds == null ? null : '${_group(pounds)} LBP';
+  }
+
+  /// The same conversion as a bare number of pounds — 313000 for $3.50 at 89,500 — or null when
+  /// there is no rate.
+  ///
+  /// For a caller that lays the figure out itself: the dekkane shop grid prints "LBP 313,000" in the
+  /// reader's language, which needs the number handed to the translation rather than a finished
+  /// English string.
+  int? lbpRounded(double usd) {
     if (!hasLbp) return null;
-    final int thousands = (usd * _lbpPerUsd / 1000).round();
-    return '${_group(thousands * 1000)} LBP';
+    return (usd * _lbpPerUsd / 1000).round() * 1000;
   }
 
   /// "(315,000 LBP)" — the parenthesised secondary form most rows use.

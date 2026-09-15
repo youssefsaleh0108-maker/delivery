@@ -133,14 +133,27 @@ public class OrderEventListener {
             // order the customer handed notes to whoever turned up — the ledger records that as an
             // obligation against them rather than pretending a bank account moved.
             //
-            // A cash order with no rider on it cannot say who took the money, so it falls back to
-            // the old approximation rather than inventing a holder. That should not happen: nobody
-            // delivered it.
+            // A pickup is the one cash order nobody carries (a service order, V52): the customer pays
+            // at the counter of the shop that did the work, so the SHOP is holding the notes and owes
+            // them to the platform. Its collection is attributed to the shop and never to the
+            // customer. Decided by the order's own fulfilment and never inferred from a missing
+            // rider: a delivery that names no rider is a data problem, and charging its cash to the
+            // shop would bill a merchant for notes a stranger took. Absent on every event published
+            // before service orders — all of them deliveries — which settle exactly as they did.
+            //
+            // Any other cash order with no rider on it cannot say who took the money, so it falls
+            // back to the old approximation rather than inventing a holder. That should not happen:
+            // nobody delivered it.
+            boolean pickup = "PICKUP".equals(event.path("fulfilment").asText(null));
             SettlementService.CashHolder holder = null;
             if ("CASH".equals(event.path("paymentMethod").asText(null))) {
                 if (riderId != null) {
                     holder = new SettlementService.CashHolder(
-                            riderId, CashFloatEntry.HolderKind.RIDER);
+                            riderId, CashFloatEntry.HolderKind.RIDER,
+                            carrierOwningTheCash(event, errand));
+                } else if (pickup) {
+                    holder = new SettlementService.CashHolder(
+                            merchantId, CashFloatEntry.HolderKind.MERCHANT);
                 } else {
                     log.warn("Order {} was paid in cash but names no rider; recording the "
                             + "collection against the customer, which overstates their account.",
@@ -193,6 +206,12 @@ public class OrderEventListener {
                         event.path("carrierFeeWaived").asBoolean(false),
                         discount.isNumber() ? discount.decimalValue() : null);
 
+                // What wrapping a gift added, paid in full to the shop that wrapped it. Read because
+                // the total already includes it: unread, it fell into the platform's residue and was
+                // reported as commission. Absent on events published before gifting and zero on
+                // every other order, which then settle exactly as they always did.
+                JsonNode wrap = event.path("giftWrapFee");
+
                 // WHO, alongside WHERE THE MONEY GOES. Both identifiers were already parsed a few
                 // lines above and then used only to look up an account — which is how the ledger
                 // ended up unable to name a shop: `accounts.forUser` answers a different question,
@@ -207,7 +226,8 @@ public class OrderEventListener {
                         carrierAccount,
                         holder, correlationId, waivers, rider, deliveredAt,
                         new SettlementService.Parties(
-                                merchantId, event.path("deliveryProviderId").asText(null)));
+                                merchantId, event.path("deliveryProviderId").asText(null)),
+                        wrap.isNumber() ? wrap.decimalValue() : null);
             }
 
             // Points, which is what the merchant and the carrier can actually convert into money.
@@ -276,6 +296,32 @@ public class OrderEventListener {
             // because the tip is already recorded.
             log.warn("Tip on order {} not recorded: {}", orderId, e.getMessage());
         }
+    }
+
+    /**
+     * The delivery company a cash order's notes are owed to, or null when they are owed to the
+     * platform.
+     *
+     * <p>The owner's rule: a delivery company holds its riders' cash. So a catalog order carried by a
+     * company's rider names that company, and the rider hands the notes to it rather than to the
+     * platform. Decided by the same discriminator the fee split turns on —
+     * {@code deliveryProviderAccount} is null for the platform's own riders — so the fee and the cash
+     * can never disagree about which fleet carried the job.
+     *
+     * <p>Never for an errand. The rider fronted the goods on the platform's instruction and every row
+     * of an errand is platform-payable whoever they ride for; a company that never saw that
+     * transaction cannot be made answerable for its cash.
+     */
+    private static String carrierOwningTheCash(JsonNode event, boolean errand) {
+        if (errand) {
+            return null;
+        }
+        String carrierAccount = event.path("deliveryProviderAccount").asText(null);
+        if (carrierAccount == null) {
+            return null;
+        }
+        String providerId = event.path("deliveryProviderId").asText(null);
+        return providerId == null || providerId.isBlank() ? null : providerId;
     }
 
     /**

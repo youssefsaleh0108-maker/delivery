@@ -5,12 +5,13 @@ import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Binds this service's own queue to the shared domain-event exchange.
+ * Binds this service's own queues to the shared domain-event exchange.
  *
  * <p>Each consumer declares its own durable queue rather than sharing one: a topic exchange fans
  * out, so Notifications Manager (Phase 3) binding to the same routing keys will get its own copy
@@ -48,10 +49,50 @@ public class TrackingRabbitConfiguration {
      * change here.
      */
     @Bean
-    public Binding trackingOrderEventsBinding(Queue trackingOrderEventsQueue,
-                                              TopicExchange deliveryEventsExchange) {
+    public Binding trackingOrderEventsBinding(
+            @Qualifier("trackingOrderEventsQueue") Queue trackingOrderEventsQueue,
+            TopicExchange deliveryEventsExchange) {
         return BindingBuilder.bind(trackingOrderEventsQueue)
                 .to(deliveryEventsExchange)
                 .with("order.#");
+    }
+
+    /**
+     * Riders joining and leaving delivery companies' fleets — the periods every carrier history read
+     * is clipped to. Its own queue rather than a second binding on the order queue: a different
+     * payload, a different listener, and a backlog of one must never hold up the other.
+     */
+    @Bean
+    public Queue trackingMembershipEventsQueue(
+            @Value("${delivery.tracking.membership-events-queue:tracking.carrier-membership}") String name) {
+        return QueueBuilder.durable(name)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(name + ".dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue trackingMembershipEventsDlq(
+            @Value("${delivery.tracking.membership-events-queue:tracking.carrier-membership}") String name) {
+        return QueueBuilder.durable(name + ".dlq").build();
+    }
+
+    /** The two exact keys, not {@code carrier.#}: other carrier events are not this listener's. */
+    @Bean
+    public Binding trackingMemberJoinedBinding(
+            @Qualifier("trackingMembershipEventsQueue") Queue trackingMembershipEventsQueue,
+            TopicExchange deliveryEventsExchange) {
+        return BindingBuilder.bind(trackingMembershipEventsQueue)
+                .to(deliveryEventsExchange)
+                .with("carrier.member_joined");
+    }
+
+    @Bean
+    public Binding trackingMemberLeftBinding(
+            @Qualifier("trackingMembershipEventsQueue") Queue trackingMembershipEventsQueue,
+            TopicExchange deliveryEventsExchange) {
+        return BindingBuilder.bind(trackingMembershipEventsQueue)
+                .to(deliveryEventsExchange)
+                .with("carrier.member_left");
     }
 }

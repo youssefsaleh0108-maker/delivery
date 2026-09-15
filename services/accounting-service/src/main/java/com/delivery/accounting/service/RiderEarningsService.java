@@ -231,7 +231,10 @@ public class RiderEarningsService {
         if (!offsetCashFloat) {
             return balance;
         }
-        return scale(balance.subtract(floatEntries.outstandingTotalFor(riderRef)));
+        // As a rider, and never as the shop the same account may also be: a shop's till is settled
+        // with the platform on its own terms and is no part of what a rider may cash out (V52).
+        return scale(balance.subtract(floatEntries.outstandingTotalFor(riderRef,
+                com.delivery.accounting.domain.CashFloatEntry.HolderKind.RIDER)));
     }
 
     // -------------------------------------------------------------------------------- statement

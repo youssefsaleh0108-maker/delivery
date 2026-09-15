@@ -145,7 +145,9 @@ class RiderCashOutTest {
     }
 
     private void isCarrying(String cash) {
-        when(floatEntries.outstandingTotalFor(RIDER)).thenReturn(new BigDecimal(cash));
+        when(floatEntries.outstandingTotalFor(RIDER,
+                com.delivery.accounting.domain.CashFloatEntry.HolderKind.RIDER))
+                .thenReturn(new BigDecimal(cash));
     }
 
     @Nested

@@ -190,6 +190,84 @@ class OnboardingApi {
     }
   }
 
+  /// The signed-in applicant's own application, telling "none" apart from "could not ask".
+  ///
+  /// [mine] answers null for both, which suits the screens that use it: to the pending screen and the
+  /// Google path either one means "nothing to show". Opening a services provider's shop is not like
+  /// that — a dropped connection read as "no application" would skip the shop without a word — so
+  /// this is null only for the server's 404 and rethrows everything else.
+  Future<OnboardingApplication?> myApplication() async {
+    try {
+      final Response<dynamic> response =
+          await _dio.get<dynamic>('/api/onboarding/applications/mine');
+      return OnboardingApplication.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// What the services signup form (Figma 126:11) offers: the service categories open right now and
+  /// the areas to pick from.
+  ///
+  /// No token needed — the open application form asks before there is an account — and these are the
+  /// lists the server checks an application against, so nothing offered here is refused there.
+  Future<ServiceSignupOptions> serviceOptions() async {
+    final Response<dynamic> response =
+        await _dio.get<dynamic>('/api/onboarding/service-options');
+    return ServiceSignupOptions.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Applies to ride or to sell as the account that is already signed in — the Google path.
+  ///
+  /// The open [applyAsRider] and [applyAsMerchant] take an address and a code-verified proof of it,
+  /// because that applicant has no account yet. This takes neither: the server reads the address
+  /// off the caller's token, and Google already proved it (the realm trusts Google's
+  /// `email_verified`). Everything else is the same wizard answers, and the application lands in
+  /// the same queue behind the same gates — the account gets APPLICANT beside the live role, and
+  /// only auto-approval or a reviewer takes APPLICANT off.
+  ///
+  /// **Idempotent.** A second call — a retry, a double tap, a returning user — hands back the same
+  /// application rather than making another; asking for the other kind is refused with a sentence.
+  ///
+  /// **Refresh afterwards.** The account's roles change on the server, not in the token this app is
+  /// holding. Call [AuthService.refresh] before choosing a screen, or the app routes on the roles
+  /// the account had before it asked.
+  ///
+  /// [businessName] is the shop's name for a seller; a rider applies in their own name and it
+  /// defaults to [name]. [companyId] null rides for YouDrop itself, as on the open form.
+  Future<OnboardingApplication> applyForMyAccount({
+    required OnboardingKind kind,
+    required String name,
+    String? businessName,
+    String? phone,
+    String? phoneVerificationToken,
+    String? notes,
+    Map<String, dynamic>? details,
+    String? companyId,
+  }) async {
+    final Response<dynamic> response =
+        await _dio.post<dynamic>('/api/onboarding/applications/mine', data: <String, dynamic>{
+      'kind': kind.wire,
+      'businessName': businessName ?? name,
+      'contactName': name,
+      'contactPhone': phone,
+      'phoneVerificationToken': phoneVerificationToken,
+      'notes': notes,
+      'details': details,
+      'targetProviderId': companyId,
+    });
+    return OnboardingApplication.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Makes the signed-in account a customer — the Google path's "I want to order".
+  ///
+  /// Idempotent, and it grants CUSTOMER and nothing else. Like [applyForMyAccount], the role lands
+  /// in Keycloak and not in the current token: refresh before routing.
+  Future<void> becomeCustomer() async {
+    await _dio.post<dynamic>('/api/onboarding/me/customer');
+  }
+
   /// Following your own application with the reference you were given, and nothing else.
   Future<OnboardingApplication?> byReference(String reference) async {
     try {

@@ -1,6 +1,10 @@
 /// Applications to join the platform, as a reviewer sees them.
 library;
 
+import 'service_signup_models.dart';
+
+export 'service_signup_models.dart';
+
 /// What somebody is applying to be. The commercial relationship, not the Keycloak role.
 enum OnboardingKind {
   merchant('MERCHANT', 'Shop'),
@@ -78,7 +82,25 @@ class OnboardingApplication {
     required this.provisionedUserRef,
     required this.provisionedEntityId,
     this.details = const <String, String>{},
+    this.suspended,
+    this.service,
   });
+
+  /// What an application to offer services said — its category and area — as the applicant's own
+  /// receipt carries them. Null for every other application, and on the reviewer's full view, which
+  /// reads the same answers out of [details].
+  ///
+  /// The provider's app opens its services shop from this, so it is read only from the receipt's
+  /// own block and never guessed from [details].
+  final ServiceApplicationAnswers? service;
+
+  /// Whether the partner is suspended now — carried only on a delivery company's own applications
+  /// listing, which reads every rider's standing at once so the Riders HR directory needs no request
+  /// per rider.
+  ///
+  /// Null wherever the server did not say, and null is its own answer: never read it as "not
+  /// suspended", or a suspended rider whose standing was not delivered shows as fit to work.
+  final bool? suspended;
 
   final String id;
   final String reference;
@@ -143,6 +165,8 @@ class OnboardingApplication {
         provisionedUserRef: json['provisionedUserRef'] as String?,
         provisionedEntityId: json['provisionedEntityId'] as String?,
         details: _details(json['details']),
+        suspended: json['suspended'] as bool?,
+        service: ServiceApplicationAnswers.fromJson(json['service']),
       );
 
   /// Anything that is not a JSON object reads as no details at all, including the null the receipt

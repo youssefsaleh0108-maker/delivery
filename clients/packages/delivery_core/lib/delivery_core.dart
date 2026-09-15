@@ -2,15 +2,23 @@
 library;
 
 export 'src/api/accounting_api.dart';
+export 'src/api/carrier_cash_api.dart';
+export 'src/models/carrier_cash_models.dart';
+export 'src/api/carrier_payroll_api.dart';
+export 'src/models/carrier_payroll_models.dart';
 export 'src/util/image_prep.dart';
 export 'src/util/device_location.dart';
 export 'src/util/market_rates.dart';
+export 'src/util/map_tiles.dart';
 export 'src/api/auto_approval_api.dart';
 export 'src/models/auto_approval_models.dart';
 export 'src/api/banner_api.dart';
 export 'src/api/butler_api.dart';
 export 'src/api/catalog_api.dart';
 export 'src/api/chat_api.dart';
+export 'src/api/chat_moderation_api.dart';
+export 'src/api/neighbourhood_chat_api.dart';
+export 'src/api/shop_chat_api.dart';
 export 'src/api/connector_settings_api.dart';
 export 'src/api/delivery_provider_api.dart';
 export 'src/api/delivery_zone_api.dart';
@@ -26,17 +34,22 @@ export 'src/api/statements_api.dart';
 export 'src/models/statement_models.dart';
 export 'src/api/tracking_api.dart';
 export 'src/models/chat_models.dart';
+export 'src/models/neighbourhood_chat_models.dart';
+export 'src/models/shop_chat_models.dart';
 export 'src/models/geo_models.dart';
 export 'src/models/promo_models.dart';
 export 'src/models/rating_models.dart';
 export 'src/models/rider_money_models.dart';
 export 'src/models/tracking_models.dart';
+export 'src/models/attendance_models.dart';
 export 'src/network/user_queue_socket.dart';
 export 'src/models/offer_models.dart';
 export 'src/api/onboarding_api.dart';
 export 'src/models/onboarding_models.dart';
 export 'src/api/activity_api.dart';
 export 'src/api/aggregates_api.dart';
+export 'src/api/demand_api.dart';
+export 'src/models/demand_models.dart';
 export 'src/api/partner_api_keys_api.dart';
 export 'src/api/partner_jobs_api.dart';
 export 'src/api/partner_management_api.dart';
@@ -56,10 +69,16 @@ export 'src/models/partner_management_models.dart';
 export 'src/models/performance_models.dart';
 export 'src/models/provider_profile_models.dart';
 export 'src/api/order_api.dart';
+export 'src/models/gift_models.dart';
+export 'src/models/order_submission.dart';
+export 'src/models/checkout_models.dart';
+export 'src/models/service_order_models.dart';
+export 'src/network/connectivity.dart';
 export 'src/api/store_api.dart';
 export 'src/api/whatsapp_api.dart';
 export 'src/models/whatsapp_models.dart';
 export 'src/models/store_models.dart';
+export 'src/models/service_category_icons.dart';
 export 'src/models/accounting_models.dart';
 export 'src/models/butler_models.dart';
 export 'src/models/provider_models.dart';
@@ -71,6 +90,11 @@ export 'src/models/zone_models.dart';
 export 'src/models/localised_labels.dart';
 export 'src/auth/auth_config.dart';
 export 'src/auth/auth_service.dart';
+export 'src/auth/broker_sign_in.dart';
+// AuthService's constructor has taken an `OidcClient` since it was written, so the type was already
+// public API in all but name. Exported so an app's own tests can stand in for the browser — the
+// Google path cannot be exercised any other way — without reaching into src/.
+export 'src/auth/oidc_client.dart' show OidcClient, TokenSet;
 export 'src/auth/device_token.dart';
 export 'src/auth/delivery_role.dart';
 export 'src/models/catalog_models.dart';
@@ -87,3 +111,15 @@ export 'src/api/store_staff_api.dart';
 export 'src/models/staff_models.dart';
 export 'src/api/reports_api.dart';
 export 'src/models/report_models.dart';
+// Merchant Blitz: shelf photos in, a draft catalogue out. Listed for the reason above — the review
+// screens in delivery_merchant name every one of these types.
+export 'src/api/catalog_scan_api.dart';
+export 'src/models/catalog_scan_models.dart';
+// Service orders: the customer's design file, uploaded before the order is placed and read by the
+// order's provider and back office.
+export 'src/api/order_attachment_api.dart';
+export 'src/models/order_attachment_models.dart';
+// Back office's moderation of service offers (V36): every service shop's offers, take-down and restore
+// with a reason, and the trail. The hold a provider reads on their offer is Product.moderation.
+export 'src/api/backoffice_catalog_api.dart';
+export 'src/models/offer_moderation_models.dart';

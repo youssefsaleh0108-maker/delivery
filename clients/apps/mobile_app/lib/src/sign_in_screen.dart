@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'biometric_lock.dart';
 import 'forgot_password_screen.dart';
+import 'google_sign_in.dart';
 import 'one_time_code.dart';
 import 'passcode_pad.dart';
 
@@ -39,6 +40,8 @@ class SignInScreen extends StatefulWidget {
     required this.onCreateAccount,
     this.locale,
     this.passwordResetApi,
+    this.onGoogle,
+    this.googleBusy = false,
   });
 
   final AuthService authService;
@@ -58,6 +61,15 @@ class SignInScreen extends StatefulWidget {
   /// the same `API_BASE_URL` define when none is passed. This exists so a caller that already has
   /// a wired Dio can share it, and so a test can inject one.
   final PasswordResetApi? passwordResetApi;
+
+  /// Starts the Google round trip with the answer to the customer / rider / seller sheet, which the
+  /// social row shows first — see [SocialSignInRow]. Null keeps the button saying Google is coming
+  /// soon rather than drawing one that cannot work.
+  final ValueChanged<AccountIntent>? onGoogle;
+
+  /// True while that round trip is in flight: a spinner on the Google button, and the row held
+  /// still until it comes back. The passcode form stays usable — it is a different way in.
+  final bool googleBusy;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -489,7 +501,11 @@ class _SignInScreenState extends State<SignInScreen> {
           onPressed: _busy ? null : _submitCredentials,
         ),
         const SizedBox(height: DeliverySpacing.lg),
-        _SocialAuth(enabled: !_busy),
+        SocialSignInRow(
+          enabled: !_busy && !widget.googleBusy,
+          onGoogle: widget.onGoogle,
+          googleBusy: widget.googleBusy,
+        ),
       ];
 
   /// The design's password group (Figma `password-input-group` 40:1054): the label with "Forgot?"
@@ -721,129 +737,6 @@ class _BrandLockup extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// The divider and the two social buttons (Figma `social-logins` 40:1066).
-///
-/// Neither provider works: the Google identity provider on this realm has no client id or secret —
-/// Google refuses to register a redirect URI on a bare IP over http, which is what this deployment
-/// is — and Apple is not configured at all. The updated design drops the "Soon" chip and draws them
-/// as plain buttons, so that is what is rendered; a tap says so in a snackbar rather than quietly
-/// opening a browser onto a broker that will refuse.
-class _SocialAuth extends StatelessWidget {
-  const _SocialAuth({required this.enabled});
-
-  final bool enabled;
-
-  void _comingSoon(BuildContext context, String provider) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-          SnackBar(content: Text(t.authSocialComingSoon(provider))));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final DeliveryStrings t = DeliveryStrings.of(context);
-    return Column(
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            const Expanded(child: Divider(color: DeliveryColors.border, height: 1)),
-            Padding(
-              padding: const EdgeInsetsDirectional.symmetric(
-                  horizontal: DeliverySpacing.sm),
-              child: Text(
-                t.authOrContinueWith.toLowerCase(),
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: DeliveryColors.faint,
-                  height: 1.2,
-                ),
-              ),
-            ),
-            const Expanded(child: Divider(color: DeliveryColors.border, height: 1)),
-          ],
-        ),
-        const SizedBox(height: DeliverySpacing.md),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _SocialButton(
-                icon: Icons.g_mobiledata,
-                iconColor: DeliveryColors.brand,
-                label: 'Google',
-                onTap: enabled ? () => _comingSoon(context, 'Google') : null,
-              ),
-            ),
-            const SizedBox(width: DeliverySpacing.md - DeliverySpacing.xs),
-            Expanded(
-              child: _SocialButton(
-                icon: Icons.apple,
-                iconColor: DeliveryColors.ink,
-                label: 'Apple',
-                onTap: enabled ? () => _comingSoon(context, 'Apple') : null,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.icon,
-    required this.label,
-    this.iconColor = DeliveryColors.ink,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-
-  /// A provider's own name — not translated, and so not an l10n string.
-  final String label;
-
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: DeliveryColors.white,
-      borderRadius: BorderRadius.circular(DeliveryRadius.md),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(DeliveryRadius.md),
-        child: Container(
-          padding: const EdgeInsetsDirectional.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(DeliveryRadius.md),
-            border: Border.all(color: DeliveryColors.borderFaint),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Icon(icon, size: 20, color: iconColor),
-              const SizedBox(width: DeliverySpacing.sm),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: DeliveryColors.ink,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

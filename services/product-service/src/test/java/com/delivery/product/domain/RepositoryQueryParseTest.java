@@ -39,14 +39,19 @@ class RepositoryQueryParseTest {
     static void bootHibernateWithoutADatabase() {
         Configuration configuration = new Configuration()
                 .addAnnotatedClass(Banner.class)
+                .addAnnotatedClass(CatalogScan.class)
+                .addAnnotatedClass(CatalogScanItem.class)
+                .addAnnotatedClass(CatalogScanPhoto.class)
                 .addAnnotatedClass(Category.class)
                 .addAnnotatedClass(DeliveredOrderLine.class)
                 .addAnnotatedClass(DeliveryZone.class)
                 .addAnnotatedClass(GeocodeCacheEntry.class)
+                .addAnnotatedClass(OfferModerationAction.class)
                 .addAnnotatedClass(Product.class)
                 .addAnnotatedClass(ProductOption.class)
                 .addAnnotatedClass(ProductOptionGroup.class)
                 .addAnnotatedClass(ReviewableOrder.class)
+                .addAnnotatedClass(ServiceTerms.class)
                 .addAnnotatedClass(Store.class)
                 .addAnnotatedClass(StoreDeliveryZone.class)
                 .addAnnotatedClass(StoreFavorite.class)
@@ -114,6 +119,104 @@ class RepositoryQueryParseTest {
                 """);
     }
 
+    /**
+     * Merchant Blitz's JPQL, read straight off the repository's annotations so this cannot drift from
+     * what actually runs — plus the scan tables' columns as the entities map them, which is what
+     * {@code ddl-auto: validate} would otherwise be the first to check, at deploy. The merchant lock
+     * is native SQL, which Hibernate does not parse; CatalogScanServiceTest pins where it is taken.
+     */
+    @Test
+    void the_merchant_blitz_queries_parse() throws NoSuchMethodException {
+        parses(CatalogScanRepository.class.getMethod("lockOwned", java.util.UUID.class, String.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses(CatalogScanRepository.class.getMethod("countOtherLiveAnalyses", String.class,
+                        java.util.UUID.class, CatalogScan.Status.class, java.time.Instant.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+
+        // What the derived quota count generates.
+        parses("SELECT COUNT(s) FROM CatalogScan s WHERE s.merchantId = :merchantId AND s.createdAt > :since");
+        // And the two derived reads behind "pick up where I left off".
+        parses("SELECT s FROM CatalogScan s WHERE s.merchantId = :merchantId AND s.createdAt > :since "
+                + "ORDER BY s.createdAt DESC");
+        parses("SELECT i.id FROM CatalogScanItem i WHERE i.scanId = :scanId AND i.status = :status");
+
+        parses("""
+                SELECT s.id, s.merchantId, s.storeId, s.status, s.provider, s.failureCode,
+                       s.analysisAttempts, s.analysisStartedAt, s.completedAt, s.createdAt, s.updatedAt
+                FROM CatalogScan s
+                """);
+        parses("SELECT p.id, p.scanId, p.fileId, p.objectKey, p.status, p.position, p.createdAt "
+                + "FROM CatalogScanPhoto p");
+        parses("""
+                SELECT i.id, i.scanId, i.photoId, i.position, i.name, i.brand, i.sizeLabel,
+                       i.categoryId, i.confidence, i.priceGuess, i.price, i.boxLeft, i.boxTop,
+                       i.boxWidth, i.boxHeight, i.status, i.productId, i.decidedAt
+                FROM CatalogScanItem i
+                """);
+    }
+
+    /** The gift hub's featured bundles, kept in step with ProductRepository.findFeaturedGifts. */
+    @Test
+    void the_gift_hub_query_parses() {
+        parses("""
+                SELECT p FROM Product p
+                WHERE p.giftFeatured = true
+                  AND p.status = com.delivery.product.domain.Product$Status.ACTIVE
+                ORDER BY p.giftFeaturedAt DESC, p.id ASC
+                """);
+    }
+
+    /**
+     * The services marketplace's reads, straight off the repositories' annotations so they cannot
+     * drift: the customer's offer search with its shop subquery. Plus what the derived counts by status
+     * and by shop generate, and the terms' columns as ServiceTerms maps them, which
+     * {@code ddl-auto: validate} would otherwise be the first to check. The "Popular near you" ranking
+     * is native PostGIS SQL, out of this test's reach, and runs against a database in
+     * {@code ServiceOffersDatabaseTest}.
+     */
+    @Test
+    void the_service_offer_queries_parse() throws NoSuchMethodException {
+        parses(ProductRepository.class.getMethod("findListedServiceOffers", java.util.Collection.class,
+                        String.class, org.springframework.data.domain.Pageable.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+
+        parses("SELECT p FROM Product p WHERE p.merchantId = :merchantId AND p.status = :status");
+        parses("SELECT p FROM Product p WHERE p.merchantId = :merchantId AND p.storeId = :storeId");
+        parses("""
+                SELECT p FROM Product p
+                WHERE p.merchantId = :merchantId AND p.storeId = :storeId AND p.status = :status
+                """);
+        parses("""
+                SELECT t.productId, t.pricingType, t.unitLabel, t.unitSize, t.turnaroundMinHours,
+                       t.turnaroundMaxHours, t.fulfilmentModes, t.attachmentPolicy, t.instructionsPrompt
+                FROM ServiceTerms t
+                """);
+    }
+
+    /**
+     * Back office's moderation of service offers (V36), read straight off the repository's annotations so
+     * they cannot drift: the locked read an act takes its offer with, and the list with its optional
+     * filters and its two shop subqueries. Plus the derived trail read, and the trail's and the hold's
+     * columns as the entities map them. What the queries answer is proven against a database in
+     * {@code OfferModerationDatabaseTest}.
+     */
+    @Test
+    void the_offer_moderation_queries_parse() throws NoSuchMethodException {
+        parses(ProductRepository.class.getMethod("findForModerationById", java.util.UUID.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+        parses(ProductRepository.class.getMethod("findServiceOffersForBackoffice", java.util.Collection.class,
+                        boolean.class, boolean.class, java.util.Collection.class, java.util.UUID.class,
+                        String.class, org.springframework.data.domain.Pageable.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class).value());
+
+        parses("SELECT a FROM OfferModerationAction a WHERE a.productId = :productId ORDER BY a.createdAt DESC");
+        parses("""
+                SELECT a.id, a.productId, a.storeId, a.action, a.reason, a.actorId, a.actorName, a.createdAt
+                FROM OfferModerationAction a
+                """);
+        parses("SELECT p.takenDownAt, p.takedownReason, p.statusBeforeTakedown FROM Product p");
+    }
+
     @Test
     void the_geocode_cache_eviction_query_parses() {
         parsesMutation("DELETE FROM GeocodeCacheEntry e WHERE e.fetchedAt < :cutoff");
@@ -140,6 +243,7 @@ class RepositoryQueryParseTest {
                 JOIN StoreFavorite f ON f.id.storeId = s.id
                 WHERE f.id.userId = :userId
                   AND s.status = :status
+                  AND s.vertical <> com.delivery.product.domain.Store$Vertical.SERVICES
                 ORDER BY f.createdAt DESC
                 """);
     }

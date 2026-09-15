@@ -140,6 +140,9 @@ class ApplicationDocumentsStep extends StatelessWidget {
     required this.enabled,
     required this.onPicked,
     required this.onRemoved,
+    this.intro,
+    this.footnote,
+    this.pick = pickApplicantDocument,
   });
 
   final List<ApplicantDocumentKind> kinds;
@@ -148,13 +151,24 @@ class ApplicationDocumentsStep extends StatelessWidget {
   final void Function(ApplicantDocumentKind kind, PickedDocument document) onPicked;
   final void Function(ApplicantDocumentKind kind) onRemoved;
 
+  /// The line above the rows. Null is the wizard's own.
+  final String? intro;
+
+  /// The note under the rows. Null is the wizard's "sent when you submit the application" — true in
+  /// the wizard, where the files wait for the account the last step creates, and untrue on a screen
+  /// that comes after the application is already in.
+  final String? footnote;
+
+  /// Opens the file dialog: the platform's, unless a test hands in its own.
+  final Future<PickedDocument?> Function(String groupLabel) pick;
+
   Future<void> _pick(BuildContext context, ApplicantDocumentKind kind) async {
-    // Guarded: pickApplicantDocument returns null for a cancel but THROWS when the platform picker
-    // itself fails, and an unguarded call leaves that as an unhandled async error — the applicant
-    // taps "choose a file" and nothing happens, with no way to tell a dead button from a refusal.
+    // Guarded: the picker returns null for a cancel but THROWS when the platform picker itself
+    // fails, and an unguarded call leaves that as an unhandled async error — the applicant taps
+    // "choose a file" and nothing happens, with no way to tell a dead button from a refusal.
     final PickedDocument? document;
     try {
-      document = await pickApplicantDocument(DeliveryStrings.of(context).wizDocFileTypes);
+      document = await pick(DeliveryStrings.of(context).wizDocFileTypes);
     } catch (e, stack) {
       debugPrint('APPLICANT DOCUMENT PICKER FAILED (${kind.wire}): $e');
       debugPrintStack(stackTrace: stack, label: 'applicant-document-picker');
@@ -174,7 +188,7 @@ class ApplicationDocumentsStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Text(
-          t.wizDocsIntro,
+          intro ?? t.wizDocsIntro,
           style: const TextStyle(
             fontSize: 13,
             color: DeliveryColors.muted,
@@ -201,7 +215,7 @@ class ApplicationDocumentsStep extends StatelessWidget {
           const SizedBox(height: DeliverySpacing.sm),
         ],
         const SizedBox(height: DeliverySpacing.xs),
-        SoftNote(text: t.wizDocSentOnSubmit, icon: Icons.schedule),
+        SoftNote(text: footnote ?? t.wizDocSentOnSubmit, icon: Icons.schedule),
       ],
     );
   }
@@ -486,14 +500,24 @@ class _DocumentRow extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 4),
-                    pill,
+                    // The status pill and the action chip share a line, and the chip moves under the
+                    // pill when the row is too narrow for both. The chip used to sit at the trailing
+                    // edge, beside the remove button, and there it left an uppercase status less room
+                    // than it takes on a 390pt phone: a badge cannot shorten its label, so a picked
+                    // document's "Ready to send" overflowed its row.
+                    Wrap(
+                      spacing: DeliverySpacing.sm,
+                      runSpacing: DeliverySpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: <Widget>[
+                        pill,
+                        if (onTap != null && actionLabel != null)
+                          YdBadge.brand(label: actionLabel!, icon: Icons.upload_outlined),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              if (onTap != null && actionLabel != null) ...<Widget>[
-                const SizedBox(width: DeliverySpacing.sm),
-                YdBadge.brand(label: actionLabel!, icon: Icons.upload_outlined),
-              ],
               if (onRemove != null) ...<Widget>[
                 const SizedBox(width: DeliverySpacing.xs),
                 IconButton(

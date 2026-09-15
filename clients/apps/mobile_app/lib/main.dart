@@ -12,10 +12,15 @@ import 'src/biometric_lock.dart';
 import 'src/biometric_lock_screen.dart';
 import 'src/carrier_shell.dart';
 import 'src/customer_shell.dart';
+import 'src/google_sign_in.dart';
+import 'src/home_route.dart';
+import 'src/order_attachment_files.dart';
 import 'src/partner_application_screen.dart';
 import 'src/partner_choice_screen.dart';
 import 'src/partner_intro_screen.dart';
 import 'src/pending_application_screen.dart';
+import 'src/service_signup_screen.dart';
+import 'src/services_shop_bootstrap.dart';
 import 'src/sign_in_screen.dart';
 import 'src/sign_up_screen.dart';
 import 'src/splash_screen.dart';
@@ -115,9 +120,15 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     ),
   );
 
+  /// Whether the platform answers, learned from this app's own requests rather than the phone's
+  /// network settings — see [ConnectivityService] for why. One for the whole app, fed by the one
+  /// Dio below; the customer shell draws it and queues checkouts on it.
+  late final ConnectivityService _connectivity = ConnectivityService();
+
   late final Dio _dio = ApiClient.create(
     baseUrl: _apiBaseUrl,
     authService: _authService,
+    connectivity: _connectivity,
   );
 
   late final StoreApi _storeApi = StoreApi(_dio);
@@ -126,8 +137,17 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The shop owner's own catalogue — a different endpoint from the storefront a customer browses,
   /// because a merchant sees their unpublished and archived products too.
   late final CatalogApi _catalogApi = CatalogApi(_dio);
+
+  /// A customer's design files on service orders, over order-manager's attachment endpoints: sent
+  /// before the order is placed, taken back with Remove, and listed again on its tracking page.
+  late final OrderAttachmentFiles _serviceFiles = OrderAttachmentFiles(_orderAttachmentApi);
   late final OfferApi _offerApi = OfferApi(_dio);
   late final OnboardingApi _onboardingApi = OnboardingApi(_dio);
+
+  /// Google sign-in, and turning the customer / rider / seller answer into a role. See
+  /// [BrokerSignIn] — kept out of this State so the decision can be tested without a browser.
+  late final BrokerSignIn _brokerSignIn =
+      BrokerSignIn(auth: _authService, onboarding: _onboardingApi);
   late final ProfileApi _profileApi = ProfileApi(_dio);
   late final PointsApi _pointsApi = PointsApi(_dio);
   late final TransferApi _transferApi = TransferApi(_dio);
@@ -137,6 +157,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The applicant's documents and payout details — the wizard sends them right after the account
   /// exists, and the pending screen reads and corrects them while the application waits.
   late final DocumentsApi _documentsApi = DocumentsApi(_dio);
+
+  /// Accounts this session already knows are not services providers, kept above the shop shell —
+  /// which is built afresh on every entry — so a goods merchant's application is read once, not on
+  /// every entry. See [ServicesProviderMemory].
+  final ServicesProviderMemory _servicesProviderMemory = ServicesProviderMemory();
   late final NotificationApi _notificationApi = NotificationApi(_dio);
   // The merchant suite's four clients. inventory/pos/reports talk to services that are not yet
   // deployed; their screens render a calm unavailable state until they are. Staff is live.
@@ -144,6 +169,9 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   late final InventoryApi _inventoryApi = InventoryApi(_dio);
   late final StoreStaffApi _storeStaffApi = StoreStaffApi(_dio);
   late final ReportsApi _reportsApi = ReportsApi(_dio);
+
+  /// Merchant Blitz: shelf photos in, draft products out. Live against product-service.
+  late final CatalogScanApi _catalogScanApi = CatalogScanApi(_dio);
 
   // The capability APIs. Every screen takes these as OPTIONAL parameters — null renders the
   // feature's honest inert state — which is what let the screens land in parallel without breaking
@@ -154,9 +182,12 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   // the app decides those features exist. Removing a line here turns the feature off everywhere,
   // silently — treat it like the release switch it is.
   late final TrackingApi _trackingApi = TrackingApi(_dio);
-  late final PromoApi _promoApi = PromoApi(_dio);
   late final GeocodingApi _geocodingApi = GeocodingApi(_dio);
   late final AggregatesApi _aggregatesApi = AggregatesApi(_dio);
+
+  /// How busy the areas around a shop are — the merchant Demand Radar. Owner-only, like every
+  /// order-backed number a shop sees; MerchantShell decides who gets the door.
+  late final DemandApi _demandApi = DemandApi(_dio);
   late final RiderMoneyApi _riderMoneyApi = RiderMoneyApi(_dio);
 
   /// The rider's own completion rate and claimed/delivered counts, behind the Earnings tab.
@@ -171,6 +202,11 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// BACKOFFICE-gated server-side and are not reachable from any screen here.
   late final StatementsApi _statementsApi = StatementsApi(_dio);
   late final ChatApi _chatApi = ChatApi(_dio);
+
+  /// Neighbourhood rooms and conversations with shops — the same App Notification service as order
+  /// chat, and the same [_socket] for their live frames.
+  late final NeighbourhoodChatApi _neighbourhoodChatApi = NeighbourhoodChatApi(_dio);
+  late final ShopChatApi _shopChatApi = ShopChatApi(_dio);
   late final NotificationPrefsApi _prefsApi = NotificationPrefsApi(_dio);
 
   /// One socket for the session's live frames (chat, and whatever joins it later). Lazy, so a
@@ -189,6 +225,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// The area list the address sheet offers. Nullable nowhere: a deployment with no areas
   /// configured simply gets an empty list and no picker.
   late final DeliveryZoneApi _zoneApi = DeliveryZoneApi(_dio);
+
+  /// A service order's files: a services shop reads its customers' designs through Order Manager's
+  /// attachment endpoints, with links that work for a few minutes.
+  late final OrderAttachmentApi _orderAttachmentApi = OrderAttachmentApi(_dio);
 
   late Future<AuthSession?> _bootstrap = _restoreAfterSplash();
 
@@ -218,6 +258,15 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// One key, created once and never rebuilt: a GlobalKey that changed identity between frames
   /// would detach and re-attach the whole navigator, losing every route on it.
   final GlobalKey<NavigatorState> _navigator = GlobalKey<NavigatorState>();
+
+  /// The app's own snackbar host, for the Google sign-in's sentences.
+  ///
+  /// The outcome of a Google round trip arrives in this State, whose context sits ABOVE the
+  /// MaterialApp — `ScaffoldMessenger.of(context)` from here throws, which is what the first,
+  /// never-wired version of the Google handler would have done on its first failure. A key on the
+  /// app's messenger reaches whichever screen is showing, and the message survives the screen
+  /// changing underneath it, which it usually does: a successful sign-in swaps the whole tree.
+  final GlobalKey<ScaffoldMessengerState> _messenger = GlobalKey<ScaffoldMessengerState>();
 
   /// Whether a restored session is still behind the lock screen.
   ///
@@ -312,37 +361,121 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// busy and error state, because both are forms somebody is actively working in.
   _Gate _gate = _Gate.signIn;
 
-  /// True while the Google round trip is in flight.
+  /// True while a Google round trip, or the role change after one, is in flight.
   bool _brokering = false;
 
-  // Kept, not deleted: the broker round trip is written and correct, and it is wired back in by
-  // passing it to WelcomeScreen again once Google credentials exist. Deleting it would mean
-  // rewriting it later from nothing.
-  /// Signs in through Keycloak's Google broker. Opens a browser, unlike the passcode path — an
-  /// external consent screen cannot be rendered inside the app, and any app that tried would be
-  /// asking for somebody's Google password directly.
-  // ignore: unused_element
-  Future<void> _signInWithGoogle() async {
+  /// What Keycloak last said about the Google provider: false hides Create Account's Google button
+  /// and turns the sign-in screen's into "coming soon"; true or null (not asked yet, or no answer)
+  /// leaves them live, and [BrokerSignIn.start] asks again before any browser opens.
+  ///
+  /// Asked up front — at launch and after every sign-out — because asking only after the customer
+  /// / rider / seller sheet made everybody answer a question, wait on a spinner, and then be told
+  /// Google was not available. That is what every user saw while the realm shipped the provider
+  /// disabled. See [_checkGoogle].
+  bool? _googleAvailable;
+
+  /// The Google button, or null where Google is known to be off — see [_googleAvailable].
+  ValueChanged<AccountIntent>? get _googleButton =>
+      _googleAvailable == false ? null : _signInWithGoogle;
+
+  /// Set when a signed-in account asked to ride or to sell and has no application yet: that
+  /// application is shown, for that account, before the role branch runs. Null otherwise.
+  PartnerKind? _accountApplication;
+
+  /// The same for an account that answered "Services" on the Google question: the services signup,
+  /// for that account, before the role branch runs.
+  bool _accountServicesApplication = false;
+
+  /// The surface somebody just asked for on the Google question, honoured for this session when
+  /// the account holds it. See [homeFor].
+  DeliveryRole? _preferredSurface;
+
+  /// Signs in through Keycloak's Google broker, then gives the account the role they asked for.
+  ///
+  /// Opens a browser, unlike the passcode path — an external consent screen cannot be rendered
+  /// inside the app, and any app that tried would be asking for somebody's Google password
+  /// directly. [intent] is the answer to the customer / rider / seller sheet, which both Google
+  /// buttons show before calling this; [BrokerSignIn] turns it into a role, or an application.
+  Future<void> _signInWithGoogle(AccountIntent intent) async {
+    if (_brokering) return;
     setState(() => _brokering = true);
-    try {
-      final AuthSession? session =
-          await _authService.signInWithBroker(AuthService.googleBroker);
-      // Null means the user backed out of the browser, which is not an error worth a message.
-      if (session != null) {
+    final BrokerOutcome outcome = await _brokerSignIn.start(intent);
+    _land(outcome, intent);
+  }
+
+  /// The same question answered by an account that is already signed in and holds no role — no
+  /// browser this time. See [AccountSetupScreen].
+  Future<void> _finishSetup(AuthSession session, AccountIntent intent) async {
+    if (_brokering) return;
+    setState(() => _brokering = true);
+    final BrokerOutcome outcome = await _brokerSignIn.settle(session, intent);
+    _land(outcome, intent);
+  }
+
+  /// Every way a Google sign-in can end, each with somewhere to go and, where it helps, a sentence.
+  /// None of them is a blank screen: the worst case is the screen they were on, with a reason.
+  void _land(BrokerOutcome outcome, AccountIntent intent) {
+    if (!mounted) return;
+    setState(() => _brokering = false);
+    switch (outcome) {
+      case BrokerSignedIn(:final AuthSession session, :final BrokerNotice? notice):
+        _preferredSurface = intent.role;
         _adoptSession(session);
-        return;
-      }
-    } catch (e, stack) {
-      // The screen says one sentence; without this the cause never leaves the device.
-      debugPrint('GOOGLE SIGN-IN FAILED: ');
-      debugPrintStack(stackTrace: stack, label: 'google-sign-in');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(DeliveryStrings.of(context).couldNotSignInWithGoogle),
-        ));
-      }
+        switch (notice) {
+          case BrokerNotice.roleNotAdded:
+            _tell((DeliveryStrings t) => t.googleRoleNotAdded);
+          case BrokerNotice.existingApplication:
+            _tell((DeliveryStrings t) => t.googleExistingApplication);
+          case BrokerNotice.applicationClosed:
+            _tell((DeliveryStrings t) => t.accountApplicationClosed);
+          case BrokerNotice.alreadyPartner:
+            _tell((DeliveryStrings t) => t.accountAlreadyPartner);
+          case null:
+            break;
+        }
+      case BrokerNeedsApplication(:final AuthSession session):
+        // Into the application for THIS account. The role is granted when it is submitted; until
+        // then the account holds whatever it held before — for a new Google account, nothing — so
+        // backing out lands on the role question rather than in a shop.
+        if (intent == AccountIntent.services) {
+          _accountServicesApplication = true;
+        } else {
+          _accountApplication =
+              intent == AccountIntent.seller ? PartnerKind.merchant : PartnerKind.rider;
+        }
+        _preferredSurface = intent.role;
+        _adoptSession(session);
+      case BrokerCancelled():
+        _tell((DeliveryStrings t) => t.googleSignInCancelled);
+      case BrokerUnavailable():
+        // Known now, so the buttons stop offering it rather than asking the question again.
+        setState(() => _googleAvailable = false);
+        _tell((DeliveryStrings t) => t.googleSignInUnavailable);
+      case BrokerFailed(:final Object error):
+        // The screen says one sentence; without this the cause never leaves the device.
+        debugPrint('GOOGLE SIGN-IN FAILED: $error');
+        _tell((DeliveryStrings t) => t.couldNotSignInWithGoogle);
     }
-    if (mounted) setState(() => _brokering = false);
+  }
+
+  /// Asks Keycloak whether Google is switched on, for [_googleAvailable]. Fire and forget.
+  ///
+  /// No browser and no sign-in — see [AuthService.brokerAvailable]. A provider enabled while the
+  /// app is open is picked up at the next launch or sign-out, and a tap in between still works:
+  /// the answer is only ever false after Keycloak actually said so.
+  Future<void> _checkGoogle() async {
+    final bool? available = await _brokerSignIn.available();
+    if (mounted) setState(() => _googleAvailable = available);
+  }
+
+  /// Shows one sentence on whichever screen is up, in the app's language.
+  void _tell(String Function(DeliveryStrings t) message) {
+    final BuildContext? inApp = _navigator.currentContext;
+    if (inApp == null) return;
+    final String text = message(DeliveryStrings.of(inApp));
+    _messenger.currentState
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
   }
 
   /// Set when somebody with no account is applying to sell or to ride.
@@ -352,6 +485,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
   /// session. Null kind means the choice screen is showing and they have not picked yet.
   bool _applyingAsPartner = false;
   PartnerKind? _partnerKind;
+
+  /// True when somebody with no account picked Services on the partner choice: the services signup
+  /// (Figma 126:11) shows instead of a shop wizard, and Back returns to the choice.
+  bool _applyingForServices = false;
 
   /// Whether the role's intro has been passed. Once a kind is known the intro sells that role
   /// (Figma `rider-signup-intro` / `merchant-signup-intro`), then the application form follows.
@@ -404,6 +541,8 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
     _locale.load();
     // Likewise the LBP display rate: prices render USD-only until it lands, then twice.
     MarketRates.instance.load(_dio);
+    // And whether Google is on, so the sign-in screens know before anybody taps it.
+    _checkGoogle();
   }
 
   Future<void> _signOut() async {
@@ -420,10 +559,18 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       _locked = true;
       _lockError = null;
       _lockCheckedFor = null;
+      // Both belong to the session that just ended; the next person to sign in starts clean.
+      _preferredSurface = null;
+      _accountServicesApplication = false;
+      _applyingForServices = false;
+      _accountApplication = null;
       // Block body, not an arrow: `() => x = Future...` RETURNS that Future, and setState
       // asserts its callback returns nothing.
       _bootstrap = Future<AuthSession?>.value(null);
     });
+    // Back on the signed-out screens, which offer Google: ask again, since it may have been
+    // switched on (or off) while this session was open.
+    _checkGoogle();
   }
 
   /// The shopping surface, for whoever is entitled to it.
@@ -442,23 +589,66 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       storeApi: _storeApi,
       orderApi: _orderApi,
       offerApi: _offerApi,
+      // The Services tab's offer search, and a service order's design files. Without the files an
+      // offer that needs one could not be ordered at all.
+      catalogApi: _catalogApi,
+      serviceFiles: _serviceFiles,
       notificationApi: _notificationApi,
       butlerApi: _butlerApi,
       zoneApi: _zoneApi,
-      promoApi: _promoApi,
       geocodingApi: _geocodingApi,
       trackingApi: _trackingApi,
       trackingSocket: _trackingSocket,
       chatApi: _chatApi,
+      neighbourhoodChatApi: _neighbourhoodChatApi,
+      shopChatApi: _shopChatApi,
+      // App Notification's socket, not _trackingSocket: rooms and shop threads ride the socket
+      // order chat already uses for riders.
+      chatSocket: _socket,
       prefsApi: _prefsApi,
       profileApi: _profileApi,
       pointsApi: _pointsApi,
       transferApi: _transferApi,
       splitApi: _splitApi,
+      connectivity: _connectivity,
       session: session,
       locale: _locale,
       onSignOut: onSignOut ?? _signOut,
+      onOfferServices: _mayOfferServices(session) ? () => _offerServices(session) : null,
+      onSwitchToShop: session.hasRole(DeliveryRole.merchant)
+          ? () => setState(() => _preferredSurface = DeliveryRole.merchant)
+          : null,
     );
+  }
+
+  /// Whether the profile menu may offer this account the services signup: only an account holding no
+  /// partner role and no application, the one kind the server takes an application from.
+  static bool _mayOfferServices(AuthSession session) =>
+      !session.hasRole(DeliveryRole.merchant) &&
+      !session.hasRole(DeliveryRole.delivery) &&
+      !session.hasRole(DeliveryRole.carrier) &&
+      !session.hasRole(DeliveryRole.applicant);
+
+  /// The services signup over the customer shell, for this account (Figma 126:11).
+  ///
+  /// Pushed, so Back returns to shopping. When it is done the refreshed session is adopted with
+  /// shopping still preferred: somebody who applied from the profile menu stays where they were, and
+  /// the menu now offers the switch to their shop (see [homeFor]).
+  Future<void> _offerServices(AuthSession session) async {
+    await _navigator.currentState?.push(MaterialPageRoute<void>(
+      builder: (BuildContext context) => ServiceProviderSignupScreen(
+        api: _onboardingApi,
+        documentsApi: _documentsApi,
+        authService: _authService,
+        account: session,
+        onClose: () => _navigator.currentState?.pop(),
+        onFinished: (AuthSession refreshed) {
+          _navigator.currentState?.pop();
+          setState(() => _preferredSurface = DeliveryRole.customer);
+          _adoptSession(refreshed);
+        },
+      ),
+    ));
   }
 
   /// The pending screen's "Explore Dashboard", made real.
@@ -499,6 +689,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
       animation: _locale,
       builder: (BuildContext context, _) => MaterialApp(
       navigatorKey: _navigator,
+      scaffoldMessengerKey: _messenger,
       // onGenerateTitle rather than title: the app name shown in the OS task switcher is resolved
       // after the localisations are in place, so it follows the chosen language too.
       onGenerateTitle: (BuildContext context) => DeliveryStrings.of(context).appTitle,
@@ -559,8 +750,26 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               // The choice first, then the form for whichever they picked. Back from the form
               // returns to the choice rather than all the way out, because picking the wrong one
               // is an easy mistake and should cost one tap.
+              if (_applyingForServices) {
+                return ServiceProviderSignupScreen(
+                  api: _onboardingApi,
+                  documentsApi: _documentsApi,
+                  authService: _authService,
+                  onFinished: (AuthSession session) {
+                    // Out of the application flow: the account exists and is signed in, and the
+                    // role branch below puts it in the shop shell — waiting, or approved.
+                    setState(() {
+                      _applyingForServices = false;
+                      _applyingAsPartner = false;
+                    });
+                    _adoptSession(session);
+                  },
+                  onClose: () => setState(() => _applyingForServices = false),
+                );
+              }
               if (_partnerKind == null) {
                 return PartnerChoiceScreen(
+                  onChooseServices: () => setState(() => _applyingForServices = true),
                   onChoose: (PartnerKind kind) => setState(() {
                     _partnerKind = kind;
                     // The generic intro speaks rider and merchant; the carrier wizard opens on
@@ -636,6 +845,10 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                   onBack: () {},
                   onCreateAccount: () => setState(() => _gate = _Gate.welcome),
                   locale: _locale,
+                  // The social row's Google button asks customer / rider / seller, then this — or,
+                  // once Keycloak has said Google is off, says "coming soon" and asks nothing.
+                  onGoogle: _googleButton,
+                  googleBusy: _brokering,
                 );
               case _Gate.signUp:
                 return SignUpScreen(
@@ -651,11 +864,13 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
                 return WelcomeScreen(
                   busy: _brokering,
                   onBack: () => setState(() => _gate = _Gate.signIn),
-                  // Null until a Google client id and secret exist. Google refuses to register a
-                  // redirect URI on a bare IP over http, which is what this deployment is, so the
-                  // round trip cannot work yet and a control that cannot work should not be shown.
-                  // Restore this to _signInWithGoogle once the box has a hostname and TLS.
-                  onGoogle: null,
+                  // Live. Keycloak is served over TLS at iam-dev / iam-qa.youdrop.shop now, so
+                  // Google will register its redirect URI, and the button asks customer / rider /
+                  // seller before any browser opens. While Keycloak says the provider is off the
+                  // button is not drawn — a control that cannot work should not be shown, and it
+                  // should not ask a question first either. See _googleAvailable and
+                  // docs/google-sign-in.md.
+                  onGoogle: _googleButton,
                   onSignIn: () => setState(() => _gate = _Gate.signIn),
                   onSignUp: () => setState(() => _gate = _Gate.signUp),
                   onJoinAsPartner: () => _applyAs(null),
@@ -683,6 +898,62 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             );
           }
 
+          // Answered "Services" with Google, and no application yet: the services signup comes first,
+          // for this account. See [_land].
+          if (_accountServicesApplication) {
+            return ServiceProviderSignupScreen(
+              key: ValueKey<String>('services-${session.subject}'),
+              api: _onboardingApi,
+              documentsApi: _documentsApi,
+              authService: _authService,
+              account: session,
+              onFinished: (AuthSession refreshed) {
+                setState(() => _accountServicesApplication = false);
+                _adoptSession(refreshed);
+              },
+              // Backing out leaves the application, not the session: what the account holds then
+              // decides where it lands.
+              onClose: () => setState(() => _accountServicesApplication = false),
+            );
+          }
+
+          // Asked to ride or sell with Google, and no application yet: the application comes first,
+          // for this account. See [_land].
+          final PartnerKind? applying = _accountApplication;
+          if (applying != null) {
+            return PartnerApplicationScreen(
+              // Keyed by the account and the kind, so a second account on this phone never
+              // inherits the first one's half-filled form.
+              key: ValueKey<String>('apply-${session.subject}-${applying.name}'),
+              api: _onboardingApi,
+              documentsApi: _documentsApi,
+              kind: applying,
+              authService: _authService,
+              account: session,
+              onSignedIn: (AuthSession refreshed) {
+                setState(() => _accountApplication = null);
+                _adoptSession(refreshed);
+              },
+              // Backing out leaves the application, not the session. What the account holds then
+              // decides where it lands — for a new Google account nothing, which is the role
+              // question below rather than a shop.
+              onClose: () => setState(() => _accountApplication = null),
+            );
+          }
+
+          // The role branch, decided in one place — see [homeFor], which also says why an account
+          // holding no role at all is asked rather than dropped into the customer shell.
+          final HomeSurface home = homeFor(session.roles, preferred: _preferredSurface);
+          if (home == HomeSurface.chooseRole) {
+            return AccountSetupScreen(
+              key: ValueKey<String>('setup-${session.subject}'),
+              session: session,
+              busy: _brokering,
+              onChoose: (AccountIntent intent) => _finishSetup(session, intent),
+              onSignOut: _signOut,
+            );
+          }
+
           // A pending partner gets their real surface, not a waiting room. They carry the role they
           // applied for, so every screen works and they can set a shop up or read the job board —
           // the server refuses only the committing acts, publishing and claiming, until APPLICANT
@@ -693,9 +964,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
           // from the company record, and the company is registered at approval — before that the
           // shell has literally nothing to load.
           final bool pending = session.hasRole(DeliveryRole.applicant);
-          if (pending &&
-              !session.hasRole(DeliveryRole.merchant) &&
-              !session.hasRole(DeliveryRole.delivery)) {
+          if (home == HomeSurface.pendingApplication) {
             return PendingApplicationScreen(
               // Bumped when the explore route pops, which re-creates the State and re-reads the
               // application. See [_exploreAsCustomer].
@@ -714,7 +983,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
           // flow is the one with a time-critical task attached.
           // The carrier's company surface (Figma 87:*). Before the rider branch: an account
           // holding both runs the company; the rider queue is their staff's job, not theirs.
-          if (session.hasRole(DeliveryRole.carrier)) {
+          if (home == HomeSurface.carrier) {
             return CarrierShell(
               session: session,
               providerApi: _deliveryProviderApi,
@@ -724,7 +993,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
             );
           }
 
-          if (session.hasRole(DeliveryRole.delivery)) {
+          if (home == HomeSurface.rider) {
             return RiderHomeScreen(
               api: _orderApi,
               butlerApi: _butlerApi,
@@ -751,7 +1020,7 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
           // in the storefront with no way to see their own orders; then it gave them a queue and
           // nothing else. The redesign gives them the four-tab app — dashboard, queue, catalogue,
           // settings — mounting the same screens the web portal runs.
-          if (session.hasRole(DeliveryRole.merchant)) {
+          if (home == HomeSurface.merchant) {
             return MerchantShell(
               orderApi: _orderApi,
               storeApi: _storeApi,
@@ -766,9 +1035,24 @@ class _DeliveryMobileAppState extends State<DeliveryMobileApp> {
               inventoryApi: _inventoryApi,
               staffApi: _storeStaffApi,
               reportsApi: _reportsApi,
+              catalogScanApi: _catalogScanApi,
+              demandApi: _demandApi,
+              shopChatApi: _shopChatApi,
+              chatSocket: _socket,
+              // A services shop's bell (126:51), the delivery rule on its offers, and its
+              // customers' files on a service order.
+              notificationApi: _notificationApi,
+              zoneApi: _zoneApi,
+              orderAttachmentApi: _orderAttachmentApi,
               session: session,
               locale: _locale,
               pendingApproval: pending,
+              // Opens an approved services provider's shop on the first entry, before anything else.
+              onboardingApi: _onboardingApi,
+              servicesProviderMemory: _servicesProviderMemory,
+              onSwitchToShopping: session.hasRole(DeliveryRole.customer)
+                  ? () => setState(() => _preferredSurface = DeliveryRole.customer)
+                  : null,
               onSignOut: _signOut,
             );
           }

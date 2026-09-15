@@ -11,6 +11,7 @@
 library;
 
 export 'src/dashboard_screen.dart';
+export 'src/demand_radar_screen.dart';
 export 'src/delivery_screen.dart';
 // The merchant suite: the register, the shelves and the people who work them. Each of these is
 // mounted by both hosts like the screens above, and the POS trio is exported together because a
@@ -23,6 +24,11 @@ export 'src/pos/pos_terminal_screen.dart';
 export 'src/staff_screen.dart';
 export 'src/stock_alerts_screen.dart';
 export 'src/stock_count_screen.dart';
+// Merchant Blitz: the shelf-photo scan and the review behind it. The review is exported with the
+// scan because the scan pushes it and a host's tests have to be able to name both; the photo source
+// seam is exported so a host (or a test) can stand in for the camera.
+export 'src/catalog_scan_review_screen.dart';
+export 'src/merchant_blitz_screen.dart';
 // The shop's own daily series as a page. Exported as well as reachable from settings, so a host
 // with room for it in a rail can mount it directly instead of hiding it one tap into a menu.
 export 'src/merchant_analytics_screen.dart';
@@ -42,6 +48,13 @@ export 'src/order_detail_screen.dart';
 export 'src/orders_screen.dart';
 export 'src/product_form_screen.dart';
 export 'src/product_list_screen.dart';
+// A shop's conversations with its customers, and one conversation. Mounted by the mobile shell from
+// Settings and by the portal's merchant rail; the customer app opens the same thread screen from a
+// shop's page, so both ends of one conversation are one widget and cannot drift apart.
+export 'src/shop_inbox_screen.dart';
+export 'src/shop_thread_screen.dart';
+// The number both hosts put on their way into that inbox, kept current without a push.
+export 'src/shop_unread_count.dart';
 export 'src/store_screen.dart';
 // The map pin's own parts — the preview that sits in the shop-config frame's map slot and the
 // picker behind it. Exported for the same reason the metric cards are: a host or a test has to be
@@ -53,3 +66,12 @@ export 'src/store_pin_map.dart';
 export 'src/whatsapp_draft_panel.dart';
 export 'src/whatsapp_screen.dart';
 export 'src/zones_screen.dart';
+// The services marketplace's provider side (Figma 126:51, 126:133, 126:200): a services shop's order
+// queue and order detail, mounted by the phone's shell in services mode and by the portal's services
+// rail like every page above. The files interface is exported because a host hands the order detail
+// its implementation.
+export 'src/services/service_dashboard_screen.dart';
+export 'src/services/service_offer_form_screen.dart';
+export 'src/services/service_offers_screen.dart';
+export 'src/services/service_order_detail_screen.dart';
+export 'src/services/service_orders_screen.dart';

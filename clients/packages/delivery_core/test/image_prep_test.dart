@@ -68,6 +68,41 @@ void main() {
       expect(decoded.width / decoded.height, closeTo(4.0, 0.05));
     });
 
+    test('a caller that needs more of the photo keeps more of it when it has to be shrunk', () {
+      // A shelf photo: the server sends the reader up to 2236 px on the long edge, so the phone must
+      // not cut it down to a product photo's 1600 on the way.
+      final Uint8List big = jpeg(3000, 1500);
+
+      final PreparedImage out =
+          ImagePrep.forUpload(big, 'image/jpeg', maxBytes: big.length - 1, maxEdge: 2400);
+
+      expect(out.wasResized, isTrue);
+      final img.Image decoded = img.decodeImage(out.bytes)!;
+      expect(decoded.width, 2400);
+      expect(decoded.height, 1200);
+    });
+
+    test('a camera photo it has to re-encode comes back upright, with no tag left to turn it twice',
+        () {
+      // Stored the way a phone camera stores a portrait photo: landscape pixels, and an EXIF tag
+      // saying to turn them a quarter clockwise. Uploaded untouched, the server honours that tag;
+      // re-encoded here, the pixels must already be upright and the tag gone, or the server would
+      // turn the photo a second time and the reader's boxes would miss the merchant's shelf.
+      final img.Image sideways = img.decodeJpg(jpeg(1200, 600))!;
+      sideways.exif.imageIfd.orientation = 6;
+      final Uint8List tagged = Uint8List.fromList(img.encodeJpg(sideways, quality: 100));
+      expect(img.decodeJpgExif(tagged)?.imageIfd.orientation, 6);
+
+      final PreparedImage out =
+          ImagePrep.forUpload(tagged, 'image/jpeg', maxBytes: tagged.length - 1);
+
+      expect(out.wasResized, isTrue);
+      expect(img.decodeJpgExif(out.bytes)?.imageIfd.orientation ?? 1, 1);
+      final img.Image upright = img.decodeJpg(out.bytes)!;
+      expect(upright.width, 600);
+      expect(upright.height, 1200);
+    });
+
     test('bytes that are not a decodable image are passed through, not dropped', () {
       // Over the cap, but not an image. The server is the authority on whether it is usable; this
       // must not swallow it, or a real problem would read as "nothing happened".

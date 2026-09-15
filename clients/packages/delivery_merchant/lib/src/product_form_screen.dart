@@ -193,7 +193,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         if (!mounted) return null;
         // The product saved; only a picture did not. Say which way it failed and stop — the
         // remaining pending ones stay in the list for a retry from the now-existing product.
-        return DeliveryStrings.of(context).uploadFailedBecause(_reasonFrom(e));
+        return DeliveryStrings.of(context).uploadFailedBecause(productImageFailureReason(e));
       }
     }
     return null;
@@ -206,7 +206,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   /// when it does not, the bytes are held in [_pendingImages] and attached the moment [_save]
   /// creates the product.
   Future<void> _addImage() async {
-    final PickedImageBytes? picked = await _pickImage();
+    final PickedImageBytes? picked = await pickProductImage(context);
     if (picked == null) {
       return;
     }
@@ -243,61 +243,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       // With the reason. "Upload failed" on its own cannot be acted on and cannot be reported:
       // a file too large, a refused type and a network that is not there all read identically.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(DeliveryStrings.of(context).uploadFailedBecause(_reasonFrom(e)))));
+          content: Text(DeliveryStrings.of(context).uploadFailedBecause(productImageFailureReason(e)))));
     }
-  }
-
-  /// Opens the picker and reads the bytes, or null on cancel. Failures are surfaced, never silent.
-  Future<PickedImageBytes?> _pickImage() async {
-    // The accepted types mirror the service's allow-list; it re-checks and returns 422 regardless,
-    // so this only saves the user a pointless round trip.
-    final XTypeGroup images = XTypeGroup(
-      label: DeliveryStrings.of(context).images,
-      extensions: <String>['jpg', 'jpeg', 'png', 'webp'],
-      mimeTypes: <String>['image/jpeg', 'image/png', 'image/webp'],
-    );
-
-    // INSIDE the guard, and that is the whole point of this block.
-    //
-    // openFile used to be called before the try, so anything it threw — a plugin missing on the
-    // platform, a picker the OS refused to open — escaped this method as an unhandled async error.
-    // The screen showed nothing at all: no snackbar, no spinner, no message. Tapping "add a photo"
-    // simply did nothing, which is indistinguishable from a dead button and is exactly how it was
-    // reported. Whatever goes wrong here now has to say so.
-    final XFile? file;
-    try {
-      file = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
-    } catch (e, stack) {
-      // The reason reaches the device log as well as the screen: a picker failure is a platform
-      // fault, and the sentence a shopkeeper can read is rarely the sentence that diagnoses it.
-      debugPrint('PRODUCT IMAGE PICKER FAILED: $e');
-      debugPrintStack(stackTrace: stack, label: 'product-image-picker');
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(DeliveryStrings.of(context).couldNotOpenPicker(_reasonFrom(e)))));
-      return null;
-    }
-    if (file == null) {
-      // Cancelled. Not a failure, and must not be reported as one.
-      return null;
-    }
-    return PickedImageBytes(await file.readAsBytes(), _contentTypeFor(file));
-  }
-
-  /// The shortest true sentence about a failure, for a snackbar.
-  ///
-  /// Dio wraps the useful part in a long toString that begins with the whole request; an
-  /// ArgumentError carries only its message. Neither renders well raw, and a shopkeeper reading
-  /// "DioException [bad response]: This exception was thrown because..." learns nothing.
-  static String _reasonFrom(Object e) {
-    if (e is DioException) {
-      final int? code = e.response?.statusCode;
-      if (code != null) return 'the server refused it ($code)';
-      return e.message ?? 'the server could not be reached';
-    }
-    if (e is ArgumentError) return e.message?.toString() ?? e.toString();
-    final String text = e.toString();
-    return text.length > 140 ? '${text.substring(0, 140)}…' : text;
   }
 
   Future<void> _removeImage(String objectKey) async {
@@ -308,19 +255,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _product = refreshed;
       _dirty = true;
     });
-  }
-
-  /// `XFile.mimeType` is null on several platforms, so fall back to the extension. The service
-  /// rejects anything outside its allow-list either way.
-  static String _contentTypeFor(XFile file) {
-    final String? declared = file.mimeType;
-    if (declared != null && declared.startsWith('image/')) {
-      return declared;
-    }
-    final String name = file.name.toLowerCase();
-    if (name.endsWith('.png')) return 'image/png';
-    if (name.endsWith('.webp')) return 'image/webp';
-    return 'image/jpeg';
   }
 
   @override
@@ -412,7 +346,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             runSpacing: DeliverySpacing.sm,
             children: <Widget>[
               for (int i = 0; i < _pendingImages.length; i++)
-                _PendingImageTile(
+                PendingProductImageTile(
                   bytes: _pendingImages[i].bytes,
                   onRemove: _saving
                       ? null
@@ -428,7 +362,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             runSpacing: DeliverySpacing.sm,
             children: <Widget>[
               for (int i = 0; i < urls.length; i++)
-                _ImageTile(
+                ProductImageTile(
                   url: urls[i],
                   onRemove: i < _product!.imageRefs.length
                       ? () => _removeImage(_product!.imageRefs[i])
@@ -1069,8 +1003,8 @@ class _OptionRow extends StatelessWidget {
   }
 }
 
-class _ImageTile extends StatelessWidget {
-  const _ImageTile({required this.url, this.onRemove});
+class ProductImageTile extends StatelessWidget {
+  const ProductImageTile({super.key, required this.url, this.onRemove});
 
   final String url;
   final VoidCallback? onRemove;
@@ -1128,10 +1062,10 @@ class PickedImageBytes {
 
 /// One picked-but-not-yet-uploaded photo, drawn from its own bytes.
 ///
-/// Distinct from [_ImageTile], which loads an already-hosted image over the network. This one has
+/// Distinct from [ProductImageTile], which loads an already-hosted image over the network. This one has
 /// no URL — the point of the feature is that it is shown before it has been sent anywhere.
-class _PendingImageTile extends StatelessWidget {
-  const _PendingImageTile({required this.bytes, this.onRemove});
+class PendingProductImageTile extends StatelessWidget {
+  const PendingProductImageTile({super.key, required this.bytes, this.onRemove});
 
   final Uint8List bytes;
   final VoidCallback? onRemove;
@@ -1189,4 +1123,74 @@ class _PendingImageTile extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Opens the picker and reads the bytes, or null on cancel. Failures are surfaced, never silent.
+///
+/// A library function rather than the product form's own, because the service offer form picks
+/// its photos the same way, and a second copy of this guard is where "add a photo does nothing"
+/// would come back.
+Future<PickedImageBytes?> pickProductImage(BuildContext context) async {
+  // The accepted types mirror the service's allow-list; it re-checks and returns 422 regardless,
+  // so this only saves the user a pointless round trip.
+  final XTypeGroup images = XTypeGroup(
+    label: DeliveryStrings.of(context).images,
+    extensions: <String>['jpg', 'jpeg', 'png', 'webp'],
+    mimeTypes: <String>['image/jpeg', 'image/png', 'image/webp'],
+  );
+
+  // INSIDE the guard, and that is the whole point of this block.
+  //
+  // openFile used to be called before the try, so anything it threw — a plugin missing on the
+  // platform, a picker the OS refused to open — escaped this method as an unhandled async error.
+  // The screen showed nothing at all: no snackbar, no spinner, no message. Tapping "add a photo"
+  // simply did nothing, which is indistinguishable from a dead button and is exactly how it was
+  // reported. Whatever goes wrong here now has to say so.
+  final XFile? file;
+  try {
+    file = await openFile(acceptedTypeGroups: <XTypeGroup>[images]);
+  } catch (e, stack) {
+    // The reason reaches the device log as well as the screen: a picker failure is a platform
+    // fault, and the sentence a shopkeeper can read is rarely the sentence that diagnoses it.
+    debugPrint('PRODUCT IMAGE PICKER FAILED: $e');
+    debugPrintStack(stackTrace: stack, label: 'product-image-picker');
+    if (!context.mounted) return null;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(DeliveryStrings.of(context).couldNotOpenPicker(productImageFailureReason(e)))));
+    return null;
+  }
+  if (file == null) {
+    // Cancelled. Not a failure, and must not be reported as one.
+    return null;
+  }
+  return PickedImageBytes(await file.readAsBytes(), _imageContentTypeFor(file));
+}
+
+/// The shortest true sentence about a failure, for a snackbar.
+///
+/// Dio wraps the useful part in a long toString that begins with the whole request; an
+/// ArgumentError carries only its message. Neither renders well raw, and a shopkeeper reading
+/// "DioException [bad response]: This exception was thrown because..." learns nothing.
+String productImageFailureReason(Object e) {
+  if (e is DioException) {
+    final int? code = e.response?.statusCode;
+    if (code != null) return 'the server refused it ($code)';
+    return e.message ?? 'the server could not be reached';
+  }
+  if (e is ArgumentError) return e.message?.toString() ?? e.toString();
+  final String text = e.toString();
+  return text.length > 140 ? '${text.substring(0, 140)}…' : text;
+}
+
+/// `XFile.mimeType` is null on several platforms, so fall back to the extension. The service
+/// rejects anything outside its allow-list either way.
+String _imageContentTypeFor(XFile file) {
+  final String? declared = file.mimeType;
+  if (declared != null && declared.startsWith('image/')) {
+    return declared;
+  }
+  final String name = file.name.toLowerCase();
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
 }

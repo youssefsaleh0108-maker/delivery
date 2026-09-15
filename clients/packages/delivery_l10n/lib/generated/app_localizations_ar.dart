@@ -880,6 +880,140 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get butlerStatusExpired => 'منتهية';
 
   @override
+  String get butlerDetailsTitle => 'تفاصيل المهمة';
+
+  @override
+  String get butlerViewDetails => 'عرض التفاصيل';
+
+  @override
+  String get butlerCancelErrand => 'إلغاء المهمة';
+
+  @override
+  String get butlerCancelConfirmTitle => 'هل تريد إلغاء هذه المهمة؟';
+
+  @override
+  String get butlerCancelConfirmBody =>
+      'ستُسحب فورًا ولن يذهب أحد لتنفيذها. يمكنك طلبها مجددًا في أي وقت.';
+
+  @override
+  String get butlerCancelConfirmYes => 'نعم، ألغِها';
+
+  @override
+  String get butlerTrackOrder => 'تتبّع الطلب';
+
+  @override
+  String get butlerDetailProgress => 'سير المهمة';
+
+  @override
+  String get butlerDetailTheErrand => 'المهمة';
+
+  @override
+  String get butlerDetailWhereFrom => 'من أين';
+
+  @override
+  String get butlerDetailRecipient => 'من سيستلمها';
+
+  @override
+  String get butlerDetailContactPhone => 'هاتف التواصل';
+
+  @override
+  String get butlerDetailPrice => 'السعر';
+
+  @override
+  String get butlerDetailBudgetCap => 'سقف ميزانيتك';
+
+  @override
+  String get butlerDetailGoods => 'المشتريات';
+
+  @override
+  String get butlerDetailGoodsPending => 'يُعرف بعد أن يدفع المتسوّق';
+
+  @override
+  String get butlerDetailErrandFee => 'رسوم المهمة';
+
+  @override
+  String get butlerDetailTotal => 'الإجمالي المستحق';
+
+  @override
+  String get butlerDetailReceipt => 'رقم الإيصال';
+
+  @override
+  String butlerDeclineReason(String reason) {
+    return 'السبب: $reason';
+  }
+
+  @override
+  String get butlerStepRequested => 'تم إرسال الطلب';
+
+  @override
+  String get butlerStepClaimedBuy => 'تولّاها متسوّق';
+
+  @override
+  String get butlerStepClaimedSend => 'تولّاها سائق';
+
+  @override
+  String get butlerStepQuoted => 'تم تحديد السعر';
+
+  @override
+  String get butlerStepAgreed => 'تم الاتفاق على السعر';
+
+  @override
+  String get butlerStepConfirmed => 'تم التأكيد';
+
+  @override
+  String get butlerStepClaimBuyPending => 'بانتظار متسوّق';
+
+  @override
+  String get butlerStepClaimSendPending => 'بانتظار سائق';
+
+  @override
+  String get butlerStepQuotePending => 'يخبرك المتسوّق بالسعر';
+
+  @override
+  String get butlerStepAgreePending => 'توافق على السعر';
+
+  @override
+  String get butlerStepConfirmPending => 'تؤكّد الرسوم';
+
+  @override
+  String get butlerStepStateDone => 'تم';
+
+  @override
+  String get butlerStepStateNow => 'الآن';
+
+  @override
+  String get butlerStepStateNext => 'لم يحن بعد';
+
+  @override
+  String get butlerStepStateEnded => 'انتهت';
+
+  @override
+  String get butlerDetailQuotedTotal => 'الإجمالي المعروض';
+
+  @override
+  String butlerConfirmFee(String amount) {
+    return 'تأكيد $amount';
+  }
+
+  @override
+  String get butlerSendConfirmed => 'تم التأكيد. سيأتي السائق لاستلامها.';
+
+  @override
+  String butlerSendAwaitingConfirm(String fee) {
+    return 'تولّاها سائق. أكّد رسوم $fee وسيأتي لاستلامها.';
+  }
+
+  @override
+  String get butlerDeclineConfirmTitle => 'هل تريد رفض هذا السعر؟';
+
+  @override
+  String get butlerDeclineConfirmBody =>
+      'تنتهي المهمة هنا ولا يمكن إعادة فتحها. لقد دفع المتسوّق ثمن المشتريات بالفعل.';
+
+  @override
+  String get butlerDeclineConfirmYes => 'نعم، ارفض';
+
+  @override
   String get somebodyElseClaimed => 'استلمها شخص آخر';
 
   @override
@@ -3792,23 +3926,7 @@ class DeliveryStringsAr extends DeliveryStrings {
   String get custAllDistricts => 'كل المناطق';
 
   @override
-  String get custDiasporaTitle => 'أرسل إلى لبنان';
-
-  @override
   String get custDiasporaSub => 'بوابة هدايا المغتربين';
-
-  @override
-  String get custDiasporaBanner => 'الحوالة الحقيقية';
-
-  @override
-  String get custDiasporaBlurb =>
-      'ادفع بالدولار من الخارج — ونوصل البقالة الطازجة والدواء والطعام الساخن إلى بابهم في لبنان.';
-
-  @override
-  String get custFamilyRecipient => 'المستلم من العائلة';
-
-  @override
-  String get custPersonalNote => 'أرفق رسالة شخصية (تُسلَّم مع الطلب)';
 
   @override
   String get custPersonalNoteHint =>
@@ -7069,4 +7187,5463 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get next => 'التالي';
+
+  @override
+  String get accountIntentSheetTitle => 'كيف ستستخدم YouDrop؟';
+
+  @override
+  String get accountIntentSheetSubtitle =>
+      'اختر واحداً ثم تابع باستخدام Google. تتم مراجعة التوصيل والبيع قبل أن تبدأ، ويمكن للحساب التقدّم لواحد منهما فقط.';
+
+  @override
+  String get accountIntentCustomer => 'زبون';
+
+  @override
+  String get accountIntentCustomerBlurb => 'أريد أن أطلب';
+
+  @override
+  String get accountIntentRider => 'سائق توصيل';
+
+  @override
+  String get accountIntentRiderBlurb => 'أريد أن أوصّل';
+
+  @override
+  String get accountIntentSeller => 'بائع';
+
+  @override
+  String get accountIntentSellerBlurb => 'أريد أن أبيع';
+
+  @override
+  String get googleSignInCancelled =>
+      'تم إلغاء تسجيل الدخول عبر Google. لم يتغيّر شيء.';
+
+  @override
+  String get googleSignInUnavailable =>
+      'تسجيل الدخول عبر Google غير متاح بعد. يُرجى استخدام بريدك الإلكتروني أو هاتفك حالياً.';
+
+  @override
+  String get googleRoleNotAdded =>
+      'تم تسجيل دخولك، لكن تعذّر إكمال إعداد حسابك. يُرجى الاختيار مجدداً.';
+
+  @override
+  String get googleExistingApplication =>
+      'لدى هذا الحساب طلب انضمام بالفعل، لذا فتحناه بدلاً من بدء طلب جديد.';
+
+  @override
+  String get accountSetupTitle => 'خطوة أخيرة';
+
+  @override
+  String get accountSetupSubtitle =>
+      'أخبرنا كيف ستستخدم YouDrop لإكمال إعداد حسابك.';
+
+  @override
+  String get wizAccountEmailNote =>
+      'سنستخدم البريد الإلكتروني المرتبط بالحساب الذي سجّلت الدخول به.';
+
+  @override
+  String get wizAccountRefreshFailed =>
+      'تم استلام طلبك، لكن تعذّر تحديث تسجيل دخولك. حاول مجدداً.';
+
+  @override
+  String get accountApplicationClosed =>
+      'تم البتّ في طلب الشراكة على هذا الحساب مسبقاً، لذا لا يمكن إعادة فتحه من هنا. يُرجى التواصل مع الدعم.';
+
+  @override
+  String get accountAlreadyPartner =>
+      'هذا الحساب شريك لدى YouDrop بالفعل، ولا يمكن للحساب الواحد أن يحمل أكثر من دور شريك واحد.';
+
+  @override
+  String get accountOtherApplication =>
+      'لدى هذا الحساب طلب لدور آخر بالفعل، ولا يمكن للحساب الواحد التقدّم إلا لدور واحد.';
+
+  @override
+  String get accountEmailUnverified =>
+      'لم يتم التحقق من البريد الإلكتروني لحسابك بعد، لذا لا يمكننا استلام طلب عليه حالياً.';
+
+  @override
+  String get wizAccountRolesRetry =>
+      'تم استلام طلبك، لكن تعذّر إكمال إعداد حسابك. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get offlinePill => 'غير متصل';
+
+  @override
+  String get offlineBanner =>
+      'أنت غير متصل. سنرسل الطلبات المنتظِرة فور عودة الاتصال.';
+
+  @override
+  String get offlineBackOnline => 'عاد الاتصال';
+
+  @override
+  String get offlineSavedItems => 'المحفوظات';
+
+  @override
+  String get offlineModeBadge => 'وضع عدم الاتصال';
+
+  @override
+  String get offlineCachedCatalogTitle => 'الكتالوج المحفوظ';
+
+  @override
+  String get offlineLastPurchases => 'آخر مشترياتك المحفوظة';
+
+  @override
+  String offlinePricesAsOf(String when) {
+    return 'الأسعار كما كانت في $when، وقد تكون تغيّرت منذ ذلك الحين.';
+  }
+
+  @override
+  String get offlineQuickAdd => 'إضافة سريعة';
+
+  @override
+  String get offlineNeedsOptions => 'اختر الإضافات عند عودة الاتصال';
+
+  @override
+  String get offlineNothingSaved => 'لا شيء محفوظ بعد';
+
+  @override
+  String get offlineNothingSavedHint =>
+      'نحفظ هنا ما تطلبه أثناء الاتصال، لتطلبه مجدداً حين ينقطع الإنترنت.';
+
+  @override
+  String get offlineOutboxTitle => 'بانتظار الإرسال';
+
+  @override
+  String offlineQueuedTitle(String store) {
+    return '$store — بالانتظار';
+  }
+
+  @override
+  String get offlineWillSend => 'سيُرسَل فور عودة الاتصال';
+
+  @override
+  String get offlineSending => 'جارٍ الإرسال…';
+
+  @override
+  String offlinePriceChanged(String total) {
+    return 'أصبح المجموع $total. أكّد لإرسال الطلب بهذا السعر.';
+  }
+
+  @override
+  String offlineSendAt(String total) {
+    return 'أرسِل بـ $total';
+  }
+
+  @override
+  String get offlineStale => 'ينتظر هذا الطلب منذ مدة. هل ما زلت تريده؟';
+
+  @override
+  String get offlineSendNow => 'أرسِل الآن';
+
+  @override
+  String offlineFailed(String reason) {
+    return 'تعذّر تنفيذ هذا الطلب: $reason';
+  }
+
+  @override
+  String get offlineDiscard => 'حذف';
+
+  @override
+  String get offlineDiscardTitle => 'حذف هذا الطلب؟';
+
+  @override
+  String get offlineDiscardBody => 'لم يُنفَّذ هذا الطلب، ولن يُرسَل.';
+
+  @override
+  String get offlineQueueTitle => 'تعذّر الوصول إلى YouDrop';
+
+  @override
+  String get offlineQueueBody =>
+      'لم يصل طلبك بعد. يمكننا الاحتفاظ به على هذا الهاتف وإرساله تلقائياً عند عودة الاتصال، وإن تغيّر السعر فسنسألك أولاً.';
+
+  @override
+  String get offlineQueueAction => 'اطلب عند عودة الاتصال';
+
+  @override
+  String get offlineQueueCashOnly =>
+      'وحدها الطلبات النقدية يمكنها انتظار عودة الاتصال. اختر الدفع نقداً، أو حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String get offlineQueued =>
+      'حُفظ الطلب على هذا الهاتف، وسيُرسَل عند عودة الاتصال.';
+
+  @override
+  String get offlineQueueSaveFailed =>
+      'تعذّر حفظ الطلب على هذا الهاتف، لذا لم يُحفَظ أي طلب.';
+
+  @override
+  String get offlineAlreadyPlaced =>
+      'نجحت محاولتك السابقة بالفعل، وهذا هو الطلب الذي نفّذناه.';
+
+  @override
+  String offlineSent(String store) {
+    return 'تم تنفيذ طلبك المنتظِر من $store.';
+  }
+
+  @override
+  String get offlineQueueUnavailable =>
+      'لا يمكن للطلبات المقسومة مع الأصدقاء انتظار عودة الاتصال، لأن حصة كل صديق تُربط بالطلب لحظة تنفيذه. حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String offlineQueuedWhenAmount(String when, String amount) {
+    return 'حُفظ $when • $amount';
+  }
+
+  @override
+  String get offlineMaybePlaced =>
+      'تعذّر التأكد من وصول هذا الطلب. سنتحقق مجدداً تلقائياً، ولن يُنفَّذ مرتين.';
+
+  @override
+  String get offlineStaleMaybePlaced =>
+      'تعذّر التأكد من وصول هذا الطلب، وقد مضى على انتظاره وقت. أرسِله مجدداً لتعرف: إن كان قد وصل فستحصل على ذلك الطلب نفسه، لا على طلب ثانٍ.';
+
+  @override
+  String get offlineSendAgain => 'أرسِل مجدداً';
+
+  @override
+  String get offlineDiscardMaybePlacedBody =>
+      'ربما نُفِّذ هذا الطلب بالفعل، فقد تعذّر علينا التأكد. الحذف يزيله من هذا الهاتف فقط، لذا راجع «الطلبات» لتعرف إن كان قد وصل.';
+
+  @override
+  String get offlineUnconfirmedTitle => 'تعذّر تأكيد طلبك';
+
+  @override
+  String get offlineUnconfirmedLead =>
+      'ربما وصل طلبك قبل انقطاع الاتصال، فراجع «الطلبات» عند عودة الاتصال.';
+
+  @override
+  String get offlineQueueResendBody =>
+      'يمكننا الاحتفاظ به على هذا الهاتف وإرساله مجدداً عند عودة الاتصال. إن كان قد وصل فستحصل على ذلك الطلب لا على طلب ثانٍ، وإن تغيّر السعر فسنسألك أولاً.';
+
+  @override
+  String get offlineUnconfirmedRetry =>
+      'تعذّر تأكيد طلبك، وربما يكون قد وصل. إعادة المحاولة آمنة ولن يُنفَّذ الطلب مرتين.';
+
+  @override
+  String get offlineQueueStandardOnly =>
+      'لا يمكن للطلبات السريعة انتظار عودة الاتصال، لأن سعر التوصيل السريع لا يُحدَّد إلا عند تنفيذ الطلب. اختر «عادي»، أو حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String get offlineQueueTotalUnknown =>
+      'تعذّر علينا تأكيد مجموع هذا الطلب لهذا العنوان، لذا لا يمكنه انتظار عودة الاتصال. حاول مجدداً عند عودة الاتصال.';
+
+  @override
+  String get carrCashNavLabel => 'التسوية';
+
+  @override
+  String get carrCashTitle => 'تسوية نقد السائقين';
+
+  @override
+  String get carrCashSubtitle => 'طابِق النقد الذي جمعه سائقوك مع ما يسلّمونه';
+
+  @override
+  String carrCashTodayChip(String date) {
+    return 'اليوم: $date';
+  }
+
+  @override
+  String carrCashDayChip(String date) {
+    return 'يوم $date';
+  }
+
+  @override
+  String get carrCashPickDay => 'أيّ يوم؟';
+
+  @override
+  String get carrCashKpiWithRiders => 'لدى سائقيك';
+
+  @override
+  String carrCashKpiWithRidersNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مع $count سائق',
+      many: 'مع $count سائقاً',
+      few: 'مع $count سائقين',
+      two: 'مع سائقَين',
+      one: 'مع سائق واحد',
+      zero: 'لا أحد يحمل نقداً',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiHandedOver => 'تم تسليمه';
+
+  @override
+  String carrCashKpiHandedOverNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عملية تسليم في هذا اليوم',
+      many: '$count عملية تسليم في هذا اليوم',
+      few: '$count عمليات تسليم في هذا اليوم',
+      two: 'عمليتا تسليم في هذا اليوم',
+      one: 'عملية تسليم واحدة في هذا اليوم',
+      zero: 'لا عمليات تسليم في هذا اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOwed => 'مستحق لـ YouDrop';
+
+  @override
+  String carrCashKpiOwedNote(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'بحوزة شركتك · $count طلب',
+      many: 'بحوزة شركتك · $count طلباً',
+      few: 'بحوزة شركتك · $count طلبات',
+      two: 'بحوزة شركتك · طلبان',
+      one: 'بحوزة شركتك · طلب واحد',
+      zero: 'لا تحتفظ شركتك بأي نقد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashKpiOverdue => 'متأخر';
+
+  @override
+  String carrCashKpiOverdueNote(int count, int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق تجاوزوا حدّ $hours ساعة',
+      many: '$count سائقاً تجاوزوا حدّ $hours ساعة',
+      few: '$count سائقين تجاوزوا حدّ $hours ساعة',
+      two: 'سائقان تجاوزا حدّ $hours ساعة',
+      one: 'سائق واحد تجاوز حدّ $hours ساعة',
+      zero: 'لا أحد تجاوز حدّ $hours ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String carrCashOverdueSoftNote(int hours) {
+    return 'بعض النقد محتفظ به منذ أكثر من $hours ساعة. اطلب من هؤلاء السائقين تسليمه.';
+  }
+
+  @override
+  String get carrCashBalancesTitle => 'أرصدة السائقين';
+
+  @override
+  String get carrCashColRider => 'السائق';
+
+  @override
+  String get carrCashColCollected => 'المُحصَّل';
+
+  @override
+  String get carrCashColEarned => 'رسوم مكتسبة لك';
+
+  @override
+  String get carrCashColHolding => 'نقد للتسليم';
+
+  @override
+  String get carrCashColLastHandover => 'آخر تسليم';
+
+  @override
+  String get carrCashColStatus => 'الحالة';
+
+  @override
+  String get carrCashColActions => 'الإجراءات';
+
+  @override
+  String get carrCashStatusHolding => 'يحمل نقداً';
+
+  @override
+  String carrCashStatusOverdue(int hours) {
+    return 'متأخر $hours ساعة';
+  }
+
+  @override
+  String get carrCashStatusSettled => 'مُسوّى';
+
+  @override
+  String get carrCashActionSettle => 'تسوية';
+
+  @override
+  String get carrCashActionView => 'عرض';
+
+  @override
+  String get carrCashNever => 'أبداً';
+
+  @override
+  String get carrCashToday => 'اليوم';
+
+  @override
+  String get carrCashYesterday => 'أمس';
+
+  @override
+  String carrCashDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'منذ $count يوم',
+      many: 'منذ $count يوماً',
+      few: 'منذ $count أيام',
+      two: 'منذ يومين',
+      one: 'منذ يوم',
+      zero: 'اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashNobodyYet => 'لم يحمل أيّ من سائقيك نقداً لشركتك بعد.';
+
+  @override
+  String get carrCashTableNote =>
+      'المُحصَّل والرسوم تخصّ اليوم المختار. أمّا النقد للتسليم فهو كل ما لا يزال بحوزة السائق أيّاً كان تاريخ تحصيله. ما تدفعه شركتك لسائقيها متّفق عليه بينكم ولا يظهر هنا.';
+
+  @override
+  String carrCashSelectRider(String name) {
+    return 'اختر $name';
+  }
+
+  @override
+  String get carrCashSelectAll => 'اختر كل السائقين الذين يحملون نقداً';
+
+  @override
+  String get carrCashSettleSelected => 'تسوية المحدَّد';
+
+  @override
+  String carrCashSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count محدَّد',
+      many: '$count محدَّداً',
+      few: '$count محدَّدين',
+      two: 'محدَّدان',
+      one: 'محدَّد واحد',
+      zero: 'لم يُحدَّد أحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashExportCsv => 'تصدير CSV';
+
+  @override
+  String carrCashExported(String file) {
+    return 'تم حفظ $file';
+  }
+
+  @override
+  String get carrCashCsvRiderId => 'معرّف السائق';
+
+  @override
+  String get carrCashCsvOrdersHeld => 'الطلبات المحتفظ بها';
+
+  @override
+  String get carrCashCsvOldest => 'أقدم تحصيل';
+
+  @override
+  String carrCashOrderCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count طلب',
+      many: '$count طلباً',
+      few: '$count طلبات',
+      two: 'طلبان',
+      one: 'طلب واحد',
+      zero: 'لا طلبات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmTitle => 'تسجيل عملية تسليم';
+
+  @override
+  String carrCashConfirmBody(String name, String amount, String orders) {
+    return 'أكّد أنّ $name سلّم شركتك $amount نقداً عن $orders. هذا يُصفّي رصيده معك بالكامل ولا يمكن التراجع عنه.';
+  }
+
+  @override
+  String carrCashConfirmBulkTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تسجيل $count عملية تسليم',
+      many: 'تسجيل $count عملية تسليم',
+      few: 'تسجيل $count عمليات تسليم',
+      two: 'تسجيل عمليتي تسليم',
+      one: 'تسجيل عملية تسليم واحدة',
+      zero: 'لا عمليات تسليم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashConfirmBulkBody =>
+      'أكّد أنّ كل واحد من هؤلاء السائقين سلّم شركتك المبلغ الظاهر. يُصفّى كل رصيد بالكامل ولا يمكن التراجع عن أيّ منها.';
+
+  @override
+  String carrCashConfirmBulkTotal(String amount) {
+    return 'المجموع $amount';
+  }
+
+  @override
+  String get carrCashConfirmYes => 'نعم، سجّلها';
+
+  @override
+  String get carrCashMethodLabel => 'طريقة التسليم';
+
+  @override
+  String get carrCashMethodCash => 'تسليم نقدي';
+
+  @override
+  String get carrCashMethodBank => 'إيداع مصرفي';
+
+  @override
+  String get carrCashMethodWallet => 'تطبيق تحويل أموال';
+
+  @override
+  String get carrCashNoteLabel => 'ملاحظة (اختيارية)';
+
+  @override
+  String get carrCashNoteHint => 'أيّ شيء يجب أن يتذكّره المركز، مثل رقم الكيس';
+
+  @override
+  String carrCashRecorded(String amount, String name) {
+    return 'تم تسجيل $amount من $name.';
+  }
+
+  @override
+  String get carrCashReplayed =>
+      'هذه العملية مسجّلة مسبقاً، لذا لم يُسجَّل شيء مرتين.';
+
+  @override
+  String carrCashAmountChanged(String name, String amount) {
+    return 'يحمل $name الآن $amount، وليس المبلغ الذي أكّدته. لم يُسجَّل شيء؛ أعد العدّ.';
+  }
+
+  @override
+  String carrCashAmountChangedUnknown(String name) {
+    return 'تغيّر رصيد $name منذ فتحت الصفحة. لم يُسجَّل شيء؛ أعد التحميل ثم العدّ.';
+  }
+
+  @override
+  String get carrCashRecordFailed =>
+      'تعذّر التسجيل. لم يتغيّر شيء؛ حاول مجدداً.';
+
+  @override
+  String carrCashBulkDone(int done, int total) {
+    return 'تم تسجيل $done من $total.';
+  }
+
+  @override
+  String get carrCashLoadFailed =>
+      'تعذّر تحميل نقد شركتك الآن. لا مشكلة في سجلاتك؛ حاول مجدداً.';
+
+  @override
+  String get carrCashTryAgain => 'حاول مجدداً';
+
+  @override
+  String get carrCashRiderTitle => 'تفاصيل تسوية السائق';
+
+  @override
+  String carrCashRiderSubtitle(String name) {
+    return 'طابِق كيس النقد مع $name';
+  }
+
+  @override
+  String get carrCashBack => 'العودة إلى التسوية';
+
+  @override
+  String get carrCashBadgeUnsettled => 'رصيد غير مُسوّى';
+
+  @override
+  String carrCashRiderSince(String date) {
+    return 'يحمل نقداً لشركتك منذ $date';
+  }
+
+  @override
+  String carrCashRatings(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '($count تقييم)',
+      many: '($count تقييماً)',
+      few: '($count تقييمات)',
+      two: '(تقييمان)',
+      one: '(تقييم واحد)',
+      zero: '(لا تقييمات)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrCashRatingNew => 'سائق جديد';
+
+  @override
+  String get carrCashHeldTitle => 'توصيلات غير مُسوّاة';
+
+  @override
+  String get carrCashColOrder => 'رقم الطلب';
+
+  @override
+  String get carrCashColCash => 'إجمالي النقد';
+
+  @override
+  String get carrCashColFee => 'الرسم المكتسب لك';
+
+  @override
+  String get carrCashHeldEmpty =>
+      'لا شيء للتسوية: هذا السائق لا يحمل أيّ نقد لشركتك.';
+
+  @override
+  String get carrCashSummaryTitle => 'ملخّص التسوية';
+
+  @override
+  String get carrCashSummaryCollected => 'نقد مُحصَّل لم يُسلَّم بعد';
+
+  @override
+  String get carrCashSummaryFees => 'رسوم مكتسبة لشركتك';
+
+  @override
+  String get carrCashSummaryDue => 'نقد مستحق لشركتك';
+
+  @override
+  String get carrCashSummaryKeeps =>
+      'لا يحتفظ السائق بأيّ جزء من هذا النقد. ما تدفعه شركتك له متّفق عليه بينكما، والرسوم أعلاه تدفعها YouDrop لشركتك ولا تُقتطع من النقد.';
+
+  @override
+  String get carrCashConfirmSettlement => 'تأكيد التسوية';
+
+  @override
+  String get carrCashNothingToSettle => 'لا شيء للتسوية';
+
+  @override
+  String get carrCashHistoryTitle => 'سجلّ التسليمات';
+
+  @override
+  String carrCashHistoryItem(String date) {
+    return 'تسليم · $date';
+  }
+
+  @override
+  String carrCashHistoryDetail(String amount, String orders, String name) {
+    return '$amount عن $orders، سجّله $name';
+  }
+
+  @override
+  String carrCashHistoryDetailAnon(String amount, String orders) {
+    return '$amount عن $orders';
+  }
+
+  @override
+  String get carrCashHistoryEmpty => 'لم تُسجَّل أيّ عمليات تسليم بعد.';
+
+  @override
+  String get carrCashRiderNotFound => 'لم يعمل هذا السائق لدى شركتك من قبل.';
+
+  @override
+  String get carrCashBoTitle => 'بحوزة شركات التوصيل';
+
+  @override
+  String get carrCashBoOwes => 'مستحق للمنصة';
+
+  @override
+  String carrCashBoWithRiders(String amount) {
+    return 'لدى سائقيها: $amount';
+  }
+
+  @override
+  String carrCashBoLastPaid(String when) {
+    return 'آخر دفعة $when';
+  }
+
+  @override
+  String get carrCashBoNeverPaid => 'لم تدفع بعد';
+
+  @override
+  String get carrCashBoHoldsNothing => 'لا تحتفظ بشيء بعد';
+
+  @override
+  String get carrCashBoRecordPayment => 'تسجيل دفعة';
+
+  @override
+  String get carrCashBoConfirmTitle => 'تسجيل دفعة';
+
+  @override
+  String carrCashBoConfirmBody(String company, String amount, String orders) {
+    return 'أكّد أنّ $company دفعت للمنصة $amount عن $orders. هذا يُصفّي كل ما تحتفظ به الشركة ولا يمكن التراجع عنه.';
+  }
+
+  @override
+  String get carrCashBoConfirmYes => 'نعم، تم الدفع';
+
+  @override
+  String carrCashBoRecorded(String amount, String company) {
+    return 'تم تسجيل $amount من $company.';
+  }
+
+  @override
+  String get carrCashBoNothing =>
+      'لم يكن هناك مبلغ مستحق؛ ربما سجّله أحدهم مسبقاً.';
+
+  @override
+  String carrCashBoAmountChanged(String company, String amount) {
+    return 'تحتفظ $company الآن بـ $amount، وليس المبلغ الذي أكّدته. لم يُسجَّل شيء.';
+  }
+
+  @override
+  String carrCashBoFailed(String error) {
+    return 'تعذّر التسجيل: $error';
+  }
+
+  @override
+  String get carrCashBoOverdueNote =>
+      'بعض النقد لم يُسلَّم منذ مدة تتجاوز الحدّ الذي تعتمده المنصة. لا خطأ في السجلات: هذا مال لم يصل إلى المصرف بعد.';
+
+  @override
+  String get carrCashBoLoadFailed =>
+      'تعذّر تحميل ما تحتفظ به شركات التوصيل حالياً. بقية هذه الصفحة غير متأثرة.';
+
+  @override
+  String get carrCashBoMethodLabel => 'طريقة الدفع (اختياري)';
+
+  @override
+  String get dekkaneBrowseTitle => 'حيّك';
+
+  @override
+  String dekkaneBrowseSubRegion(String region) {
+    return 'دكاكين $region المحلية';
+  }
+
+  @override
+  String dekkaneAreaInRegion(String area, String region) {
+    return '$area، $region';
+  }
+
+  @override
+  String get dekkaneEntrySub => 'الدكاكين والمحلات الصغيرة حول عنوانك';
+
+  @override
+  String get dekkaneFilterOpenNow => 'مفتوح الآن';
+
+  @override
+  String get dekkaneFilterOnGenerator => 'على المولّد الآن';
+
+  @override
+  String get dekkaneFilterNew => 'جديد على YouDrop';
+
+  @override
+  String get dekkaneExpandMap => 'توسيع الخريطة التفاعلية';
+
+  @override
+  String get dekkaneNearbyShops => 'محلات قريبة منك';
+
+  @override
+  String get dekkaneLocalShops => 'محلات الحي';
+
+  @override
+  String dekkaneDistanceMetres(int metres) {
+    final intl.NumberFormat metresNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String metresString = metresNumberFormat.format(metres);
+
+    return 'على بُعد $metresString م';
+  }
+
+  @override
+  String dekkaneDistanceKm(double km) {
+    final intl.NumberFormat kmNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+            locale: localeName, decimalDigits: 1);
+    final String kmString = kmNumberFormat.format(km);
+
+    return 'على بُعد $kmString كم';
+  }
+
+  @override
+  String get dekkaneGeneratorActive => 'المولّد يعمل';
+
+  @override
+  String get dekkaneTrustedLocal => 'محلّي موثوق';
+
+  @override
+  String get dekkaneCouldNotLoadShops => 'تعذّر تحميل المحلات من حولك';
+
+  @override
+  String get dekkanePinAddressPrompt =>
+      'ثبّت عنوانك على الخريطة لترى أقرب المحلات إليك وكم يبعد كلّ منها.';
+
+  @override
+  String get dekkaneNoShopsNearby => 'لا توجد محلات قرب هذا العنوان بعد';
+
+  @override
+  String get dekkaneMapTitle => 'المحلات على الخريطة';
+
+  @override
+  String dekkaneOpenClosesAt(String time) {
+    return 'مفتوح · يغلق $time';
+  }
+
+  @override
+  String get dekkaneShopInventory => 'بضاعة المحل';
+
+  @override
+  String dekkaneLbpAmount(int amount) {
+    final intl.NumberFormat amountNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String amountString = amountNumberFormat.format(amount);
+
+    return '$amountString ل.ل.';
+  }
+
+  @override
+  String get dekkaneAddOneMore => 'أضف واحداً آخر';
+
+  @override
+  String get dekkaneMerchNeighborhood => 'الحي';
+
+  @override
+  String get dekkaneMerchNeighborhoodHint => 'مثلاً: مار مخايل';
+
+  @override
+  String get dekkaneMerchNeighborhoodHelp =>
+      'يظهر تحت اسم محلّك عندما يفتحه الزبائن من قائمة حيّهم.';
+
+  @override
+  String get dekkaneMerchNeighborhoodTooLong => 'يجب ألّا يتجاوز 80 حرفاً';
+
+  @override
+  String get dekkaneCouldNotLoadShelf => 'تعذّر تحميل رفوف المحل';
+
+  @override
+  String get dekkaneBrowseTitleAll => 'المحلات على YouDrop';
+
+  @override
+  String get dekkaneBrowseSubAll => 'كل المحلات، الأعلى تقييماً أولاً';
+
+  @override
+  String get dekkaneAllShops => 'كل المحلات';
+
+  @override
+  String dekkanePowerUpdatedMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'آخر تحديث منذ $minutes دقيقة',
+      many: 'آخر تحديث منذ $minutes دقيقة',
+      few: 'آخر تحديث منذ $minutes دقائق',
+      two: 'آخر تحديث منذ دقيقتين',
+      one: 'آخر تحديث منذ دقيقة',
+      zero: 'حُدِّث للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkanePowerUpdatedHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'آخر تحديث منذ $hours ساعة',
+      many: 'آخر تحديث منذ $hours ساعة',
+      few: 'آخر تحديث منذ $hours ساعات',
+      two: 'آخر تحديث منذ ساعتين',
+      one: 'آخر تحديث منذ ساعة',
+      zero: 'حُدِّث للتو',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String dekkaneSearchedNearest(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم البحث في أقرب $count محل فقط',
+      many: 'تم البحث في أقرب $count محلاً فقط',
+      few: 'تم البحث في أقرب $count محلات فقط',
+      two: 'تم البحث في أقرب محلّين فقط',
+      one: 'تم البحث في أقرب محل فقط',
+      zero: 'لم يتم البحث في أي محل',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceNavShifts => 'الورديات والحضور';
+
+  @override
+  String get attendanceTitle => 'حضور السائقين وسجلّ الورديات';
+
+  @override
+  String get attendanceSubtitle =>
+      'تابِع تسجيلات الدخول اليومية والتأخير والغياب وتعديلات الورديات';
+
+  @override
+  String attendanceForMonth(String month) {
+    return 'الحضور وسجلّات الدوام لشهر $month';
+  }
+
+  @override
+  String get attendanceBackToRiders => 'العودة إلى السائقين';
+
+  @override
+  String get attendanceManualLog => 'تسجيل حضور يدوي';
+
+  @override
+  String get attendancePrevMonth => 'الشهر السابق';
+
+  @override
+  String get attendanceNextMonth => 'الشهر التالي';
+
+  @override
+  String get attendanceLegendPresent => 'حاضر';
+
+  @override
+  String get attendanceLegendLate => 'متأخر';
+
+  @override
+  String get attendanceLegendAbsent => 'غائب';
+
+  @override
+  String get attendanceLegendOff => 'يوم عطلة';
+
+  @override
+  String get attendanceLegendOnDuty => 'في الخدمة';
+
+  @override
+  String get attendanceWeekMon => 'إثنين';
+
+  @override
+  String get attendanceWeekTue => 'ثلاثاء';
+
+  @override
+  String get attendanceWeekWed => 'أربعاء';
+
+  @override
+  String get attendanceWeekThu => 'خميس';
+
+  @override
+  String get attendanceWeekFri => 'جمعة';
+
+  @override
+  String get attendanceWeekSat => 'سبت';
+
+  @override
+  String get attendanceWeekSun => 'أحد';
+
+  @override
+  String get attendanceAggregatesTitle => 'ملخّص الحضور';
+
+  @override
+  String get attendanceDaysWorked => 'أيام العمل';
+
+  @override
+  String get attendanceAbsences => 'الغياب';
+
+  @override
+  String get attendanceTimesLate => 'مرات التأخير';
+
+  @override
+  String get attendanceOvertime => 'الساعات الإضافية المتراكمة';
+
+  @override
+  String get attendanceHoursOnDuty => 'ساعات الخدمة';
+
+  @override
+  String get attendanceManualHours => 'ساعات مسجّلة يدويًا';
+
+  @override
+  String get attendanceExcusedDays => 'أعذار أو مرض أو إجازة';
+
+  @override
+  String attendanceDaysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count يوم',
+      many: '$count يومًا',
+      few: '$count أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+      zero: '0 يوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String attendanceHoursValue(String hours) {
+    return '$hours ساعة';
+  }
+
+  @override
+  String attendanceHoursShort(String hours) {
+    return '$hours س';
+  }
+
+  @override
+  String get attendanceLogsTitle => 'أحدث سجلّات الدخول والخروج';
+
+  @override
+  String get attendanceColDate => 'التاريخ';
+
+  @override
+  String get attendanceColShift => 'الوردية المجدولة';
+
+  @override
+  String get attendanceColClockIn => 'الدخول';
+
+  @override
+  String get attendanceColClockOut => 'الخروج';
+
+  @override
+  String get attendanceColHours => 'الساعات';
+
+  @override
+  String get attendanceColStatus => 'الحالة';
+
+  @override
+  String get attendanceColNotes => 'ملاحظات';
+
+  @override
+  String attendanceShiftLabel(String name, String start, String end) {
+    return '$name ($start - $end)';
+  }
+
+  @override
+  String get attendanceStatusOnTime => 'في الموعد';
+
+  @override
+  String get attendanceStatusLate => 'دخول متأخر';
+
+  @override
+  String get attendanceStatusAbsent => 'غائب';
+
+  @override
+  String get attendanceStatusPending => 'لم يصل بعد';
+
+  @override
+  String get attendanceStatusDayOff => 'يوم عطلة';
+
+  @override
+  String get attendanceStatusExtra => 'عمل في يوم عطلة';
+
+  @override
+  String get attendanceStatusWorked => 'في الخدمة';
+
+  @override
+  String get attendanceStatusLateExcused => 'متأخر (بعذر)';
+
+  @override
+  String get attendanceStatusExcused => 'غياب بعذر';
+
+  @override
+  String get attendanceStatusSick => 'إجازة مرضية';
+
+  @override
+  String get attendanceStatusLeave => 'إجازة';
+
+  @override
+  String get attendanceOnShiftNow => 'في الوردية الآن';
+
+  @override
+  String get attendanceAutoClosed => 'أُغلقت تلقائيًا: انقطعت الإشارة';
+
+  @override
+  String attendanceLateBy(int minutes) {
+    return 'متأخر $minutes دقيقة';
+  }
+
+  @override
+  String attendanceOvertimeNote(int minutes) {
+    return '$minutes دقيقة إضافية';
+  }
+
+  @override
+  String get attendanceLoggedByHand => 'مسجّل يدويًا';
+
+  @override
+  String get attendanceNoSchedule =>
+      'لا توجد وردية مجدولة لهذا السائق، لذا يظهر وقت الخدمة فقط.';
+
+  @override
+  String get attendanceEmptyMonth =>
+      'لا يوجد دوام مسجّل لهذا الشهر. يبدأ السجلّ منذ بدء تتبّع الدوام، ولا يُضاف أي شيء بأثر رجعي.';
+
+  @override
+  String attendanceZoneNote(String zone) {
+    return 'تُقسَّم الأيام حسب المنطقة الزمنية $zone.';
+  }
+
+  @override
+  String get attendanceNotOnFleet =>
+      'هذا السائق غير مرتبط بأسطولك في نظام التتبّع بعد، لذا لا يمكن عرض حضوره. يُربط عندما يصل خبر تعيينه إلى نظام التتبّع، أو عندما ينقل طلبًا لشركتك.';
+
+  @override
+  String get attendanceLoadFailed => 'تعذّر تحميل الحضور حاليًا.';
+
+  @override
+  String attendanceLogTitle(String name) {
+    return 'تسجيل حضور $name';
+  }
+
+  @override
+  String get attendanceLogStatus => 'ما الذي حدث';
+
+  @override
+  String get attendanceLogChooseStatus => 'اختر الحالة';
+
+  @override
+  String get attendanceKindPresent => 'حاضر (لم يظهر في التطبيق)';
+
+  @override
+  String get attendanceKindLateExcused => 'متأخر بعذر';
+
+  @override
+  String get attendanceKindAbsentExcused => 'غائب بعذر';
+
+  @override
+  String get attendanceKindSick => 'مريض';
+
+  @override
+  String get attendanceKindLeave => 'في إجازة';
+
+  @override
+  String get attendanceLogClockIn => 'وقت الدخول (اختياري)';
+
+  @override
+  String get attendanceLogClockOut => 'وقت الخروج (اختياري)';
+
+  @override
+  String get attendanceLogNote => 'ملاحظة (اختيارية)';
+
+  @override
+  String get attendanceLogSave => 'حفظ السجل';
+
+  @override
+  String get attendanceLogWithdraw => 'حذف السجل';
+
+  @override
+  String get attendanceLogSaved => 'تم حفظ سجل الحضور.';
+
+  @override
+  String get attendanceLogRemoved =>
+      'تم حذف السجل. يعرض اليوم ما سجّله التطبيق.';
+
+  @override
+  String get attendanceLogTimesRule =>
+      'تُسجَّل الأوقات في يوم الحضور فقط، ويجب إدخال وقتي الدخول والخروج معًا.';
+
+  @override
+  String get attendanceLogManualNote =>
+      'تُحتسب الساعات المُدخلة هنا ساعاتٍ يدوية، وليست دليلًا من التطبيق، ويُتجاهَل إدخالها في يوم يُظهره التطبيق أصلًا.';
+
+  @override
+  String get attendanceLogFutureRule =>
+      'اليوم الذي لم يأتِ بعد لا يمكن تسجيله إلا إجازةً أو مرضًا أو غيابًا بعذر.';
+
+  @override
+  String get attendanceTimeInvalid => 'استخدم صيغة 24 ساعة مثل 08:00.';
+
+  @override
+  String get attendanceShiftsTitle => 'جداول الورديات';
+
+  @override
+  String get attendanceShiftsSubtitle =>
+      'حدّد الورديات التي يعمل بها سائقوك، ثم افتح الحضور الشهري لأيٍّ منهم.';
+
+  @override
+  String get attendanceShiftsCard => 'الورديات';
+
+  @override
+  String get attendanceAddShift => 'إضافة وردية';
+
+  @override
+  String get attendanceNoShifts =>
+      'لا توجد ورديات بعد. يُعامَل السائقون دون وردية كعاملين أحرار: لا تأخير ولا غياب.';
+
+  @override
+  String attendanceShiftGrace(int minutes) {
+    return 'مهلة $minutes دقيقة';
+  }
+
+  @override
+  String attendanceShiftRiders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق',
+      many: '$count سائقًا',
+      few: '$count سائقين',
+      two: 'سائقان',
+      one: 'سائق واحد',
+      zero: 'لا سائقين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get attendanceShiftOvernight => 'تنتهي في اليوم التالي';
+
+  @override
+  String get attendanceRetireShift => 'إيقاف الوردية';
+
+  @override
+  String get attendanceRetireBlocked =>
+      'انقل السائقين في هذه الوردية إلى وردية أخرى أولًا.';
+
+  @override
+  String get attendanceShiftRetired => 'تم إيقاف الوردية.';
+
+  @override
+  String get attendanceRidersCard => 'السائقون';
+
+  @override
+  String get attendanceColRider => 'السائق';
+
+  @override
+  String get attendanceColCurrentShift => 'الوردية';
+
+  @override
+  String get attendanceColActions => 'إجراءات';
+
+  @override
+  String get attendanceFreelancer => 'بلا جدول (عمل حر)';
+
+  @override
+  String get attendanceChangeShift => 'تغيير الوردية';
+
+  @override
+  String get attendanceOpenAttendance => 'الحضور';
+
+  @override
+  String attendanceUpcomingShift(String name, String date) {
+    return '$name اعتبارًا من $date';
+  }
+
+  @override
+  String get attendanceNoRiders => 'لا يوجد سائقون في أسطولك بعد.';
+
+  @override
+  String get attendanceNewShiftTitle => 'وردية جديدة';
+
+  @override
+  String get attendanceShiftName => 'الاسم';
+
+  @override
+  String get attendanceShiftStart => 'تبدأ (HH:mm)';
+
+  @override
+  String get attendanceShiftEnd => 'تنتهي (HH:mm)';
+
+  @override
+  String get attendanceShiftDays => 'الأيام';
+
+  @override
+  String get attendanceShiftGraceField =>
+      'المهلة قبل احتساب التأخير (بالدقائق)';
+
+  @override
+  String get attendanceShiftImmutable =>
+      'لا يمكن تعديل ساعات الوردية لاحقًا. لتغييرها، أضِف وردية جديدة وانقل السائقين إليها، لتبقى الأيام السابقة على الوردية التي عُمل بها.';
+
+  @override
+  String get attendanceCreateShift => 'إنشاء الوردية';
+
+  @override
+  String get attendanceShiftCreated => 'تم إنشاء الوردية.';
+
+  @override
+  String get attendanceShiftNeedsName => 'أدخل اسمًا للوردية.';
+
+  @override
+  String get attendanceShiftNeedsDays => 'اختر يومًا واحدًا على الأقل.';
+
+  @override
+  String get attendanceShiftSameTimes =>
+      'لا يمكن أن تبدأ الوردية وتنتهي في الوقت نفسه.';
+
+  @override
+  String get attendanceGraceInvalid => 'أدخل عدد دقائق بين 0 و120.';
+
+  @override
+  String attendanceAssignTitle(String name) {
+    return 'وردية $name';
+  }
+
+  @override
+  String get attendanceAssignFrom => 'ابتداءً من';
+
+  @override
+  String get attendanceAssignNote =>
+      'تبدأ الجداول اليوم أو لاحقًا. بعد أن تبدأ وردية اليوم، أو بعد أن يعمل السائق اليوم، يسري أي تغيير لليوم ابتداءً من الغد، لتبقى الأيام السابقة واليوم الجاري على الجدول الذي تُحتسب عليه.';
+
+  @override
+  String get attendanceAssignSave => 'حفظ الجدول';
+
+  @override
+  String get attendanceAssignSaved => 'تم تحديث الجدول.';
+
+  @override
+  String get attendanceHistoryLimit =>
+      'هذا الشهر أقدم من سجلّ الدوام الذي تحتفظ به المنصّة، لذا لا يمكن عرضه بعد الآن.';
+
+  @override
+  String get attendanceManualTag => 'يدوي';
+
+  @override
+  String get attendanceTypedByHand =>
+      'أُدخل يدويًا في سجل الحضور اليدوي، ولم يسجّله التطبيق';
+
+  @override
+  String get attendanceLogPresentKeepsLate =>
+      'تسجيل الحضور لا يلغي الدخول المتأخر. لاعتباره بعذر، اختر «متأخر بعذر».';
+
+  @override
+  String get attendanceLogChecking =>
+      'جارٍ التحقق من وجود سجل سابق لهذا اليوم…';
+
+  @override
+  String get attendanceLogCheckFailed =>
+      'تعذّر التحقق من وجود سجل سابق لهذا اليوم، لذا لا يمكن الحفظ له بعد. اختر التاريخ مجددًا لإعادة المحاولة.';
+
+  @override
+  String attendanceRetiredShifts(int count) {
+    return 'الورديات الموقوفة ($count)';
+  }
+
+  @override
+  String get attendanceRetireKeepsHistory =>
+      'تبقى الأيام السابقة محسوبة على هذه الوردية. إيقافها يمنع اختيارها في الجداول الجديدة فقط.';
+
+  @override
+  String attendanceLiveOnDuty(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مباشر: $count سائق في الخدمة',
+      many: 'مباشر: $count سائقًا في الخدمة',
+      few: 'مباشر: $count سائقين في الخدمة',
+      two: 'مباشر: سائقان في الخدمة',
+      one: 'مباشر: سائق واحد في الخدمة',
+      zero: 'مباشر: لا سائقين في الخدمة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNavReconciliation => 'التسويات';
+
+  @override
+  String get carrRidersNavRidersHr => 'شؤون السائقين';
+
+  @override
+  String get carrRidersNavDirectory => 'دليل السائقين';
+
+  @override
+  String get carrRidersNavStatement => 'كشف الحساب';
+
+  @override
+  String get carrRidersTitle => 'دليل شؤون السائقين';
+
+  @override
+  String get carrRidersSubtitle => 'إدارة ملفات السائقين وحالاتهم ومناطقهم';
+
+  @override
+  String get carrRidersStatTotal => 'إجمالي السائقين المنضمّين';
+
+  @override
+  String get carrRidersStatTotalNote => 'أسطول الشركة المسجّل';
+
+  @override
+  String get carrRidersStatOnDuty => 'في الخدمة الآن';
+
+  @override
+  String get carrRidersStatOnDutyNote => 'متاحون أو في مهمة';
+
+  @override
+  String get carrRidersStatSignalLost => 'انقطعت الإشارة';
+
+  @override
+  String get carrRidersStatSignalLostNote =>
+      'في الخدمة، لكن هواتفهم توقفت عن الإرسال';
+
+  @override
+  String get carrRidersStatOffline => 'غير متصلين / غير نشطين';
+
+  @override
+  String get carrRidersStatOfflineNote => 'أعلنوا أنهم خارج الخدمة';
+
+  @override
+  String get carrRidersPresenceUnknown => 'تعذّرت قراءة حالة التواجد حالياً';
+
+  @override
+  String get carrRidersSearchHint => 'ابحث عن السائقين بالاسم أو الرقم...';
+
+  @override
+  String get carrRidersZoneAll => 'المنطقة: الكل';
+
+  @override
+  String carrRidersZoneValue(String zone) {
+    return 'المنطقة: $zone';
+  }
+
+  @override
+  String get carrRidersZoneTooltip =>
+      'المنطقة هنا هي التي كتبها كل سائق في طلب انضمامه';
+
+  @override
+  String get carrRidersVehicleAll => 'المركبة: الكل';
+
+  @override
+  String carrRidersVehicleValue(String vehicle) {
+    return 'المركبة: $vehicle';
+  }
+
+  @override
+  String get carrRidersVehicleMotorcycle => 'دراجة نارية';
+
+  @override
+  String get carrRidersVehicleCar => 'سيارة';
+
+  @override
+  String get carrRidersVehicleBicycle => 'دراجة هوائية';
+
+  @override
+  String get carrRidersVehicleVan => 'شاحنة صغيرة';
+
+  @override
+  String get carrRidersVehicleTruck => 'شاحنة';
+
+  @override
+  String get carrRidersAddRider => 'إضافة سائق';
+
+  @override
+  String get carrRidersAddRiderTooltip =>
+      'وافق على شخص تقدّم للعمل سائقاً لديك';
+
+  @override
+  String get carrRidersAddRiderUnavailable =>
+      'تعذّرت قراءة الطلبات حالياً، لذا لا يمكن الموافقة على أحد من هنا';
+
+  @override
+  String get carrRidersManageProfile => 'إدارة الملف';
+
+  @override
+  String carrRidersDeliveredToday(int count) {
+    return '($count اليوم)';
+  }
+
+  @override
+  String get carrRidersRatingNew => 'جديد';
+
+  @override
+  String get carrRidersStatusActive => 'نشط';
+
+  @override
+  String get carrRidersStatusSignalLost => 'انقطعت الإشارة';
+
+  @override
+  String get carrRidersStatusOffline => 'غير متصل';
+
+  @override
+  String get carrRidersStatusSuspended => 'موقوف';
+
+  @override
+  String get carrRidersStatusOnAJob => 'في مهمة';
+
+  @override
+  String get carrRidersNoMatch => 'لا يوجد سائق مطابق.';
+
+  @override
+  String carrRidersShowingOnly(String filter) {
+    return 'المعروض فقط: $filter';
+  }
+
+  @override
+  String get carrRidersShowEveryone => 'عرض الجميع';
+
+  @override
+  String get carrRidersDirectoryFootnote =>
+      'المنطقة هي التي ذكرها كل سائق في طلبه — لا تعيّن المنصّة السائقين إلى مناطق تغطيتك. التقييم هو ما تركه العملاء عبر جميع توصيلات السائق. تظهر حالة التواجد هنا بعد أن يحمل السائق عملاً لشركتك، لذا لا تظهر لمن لم يفعل ذلك بعد.';
+
+  @override
+  String get carrRidersWaitingTitle => 'إضافة سائق';
+
+  @override
+  String carrRidersWaitingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count شخص ينتظرون العمل لديك',
+      many: '$count شخصًا ينتظرون العمل لديك',
+      few: '$count أشخاص ينتظرون العمل لديك',
+      two: 'شخصان ينتظران العمل لديك',
+      one: 'شخص واحد ينتظر العمل لديك',
+      zero: 'لا أحد ينتظر العمل لديك',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersWaitingEmpty =>
+      'لم يتقدّم أحد للعمل سائقاً لديك. ينضمّ السائقون إلى الأسطول بتقديم طلب — ولا توجد طريقة لإنشاء سائق مباشرة.';
+
+  @override
+  String get carrRidersApprove => 'موافقة';
+
+  @override
+  String get carrRidersOnYourFleet => 'ضمن أسطولك';
+
+  @override
+  String carrRidersSuspendTitle(String name) {
+    return 'إيقاف $name';
+  }
+
+  @override
+  String carrRidersReinstateTitle(String name) {
+    return 'إعادة $name إلى العمل';
+  }
+
+  @override
+  String get carrRidersSuspendBody =>
+      'يحتفظ بتسجيل دخوله وسجلّه، ويتوقف عرض العمل عليه. يمكنك إعادته في أي وقت.';
+
+  @override
+  String get carrRidersReinstateBody =>
+      'يمكن عرض العمل عليه مجدداً فور حفظ هذا.';
+
+  @override
+  String get carrRidersChooseReason => 'اختر سبباً';
+
+  @override
+  String get carrRidersNoteHint => 'ملاحظة للسجل (اختيارية)';
+
+  @override
+  String get carrRidersSuspendRider => 'إيقاف السائق';
+
+  @override
+  String get carrRidersReinstateRider => 'إعادة السائق';
+
+  @override
+  String carrRidersSuspendedToast(String name) {
+    return 'تم إيقاف $name ولن يُعرض عليه عمل.';
+  }
+
+  @override
+  String carrRidersReinstatedToast(String name) {
+    return 'يمكن لـ$name استلام العمل مجدداً.';
+  }
+
+  @override
+  String get carrRidersReasonFraud => 'احتيال';
+
+  @override
+  String get carrRidersReasonAbuse => 'إساءة';
+
+  @override
+  String get carrRidersReasonNonPayment => 'عدم الدفع';
+
+  @override
+  String get carrRidersReasonPolicyViolation => 'مخالفة السياسة';
+
+  @override
+  String get carrRidersReasonPartnerRequest => 'بطلب من الشريك';
+
+  @override
+  String get carrRidersReasonOther => 'سبب آخر';
+
+  @override
+  String get carrRidersProfileTitle => 'ملف السائق';
+
+  @override
+  String get carrRidersProfileSubtitle => 'المستندات وتفاصيل العمل والأداء';
+
+  @override
+  String get carrRidersBackToDirectory => 'العودة إلى السائقين';
+
+  @override
+  String carrRidersBadgeId(String code) {
+    return 'رقم الشارة: $code';
+  }
+
+  @override
+  String get carrRidersPhone => 'الهاتف';
+
+  @override
+  String get carrRidersEmail => 'البريد الإلكتروني';
+
+  @override
+  String get carrRidersLastSeen => 'آخر ظهور';
+
+  @override
+  String get carrRidersNoPresenceYet => 'لا توجد حالة خدمة أو موقع بعد';
+
+  @override
+  String get carrRidersStaleNote =>
+      'أعلن أنه في الخدمة، لكن آخر موقع قديم جداً لإسناد المهام إليه.';
+
+  @override
+  String get carrRidersNoApplication =>
+      'أضافت المنصّة هذا السائق مباشرة، لذا لا يوجد طلب في السجل — لا اسم ولا بيانات تواصل ولا مستندات لعرضها.';
+
+  @override
+  String get carrRidersDocumentsTitle => 'التحقق من المستندات';
+
+  @override
+  String get carrRidersDocNationalId => 'الهوية الوطنية';
+
+  @override
+  String get carrRidersDocDrivingLicence => 'رخصة القيادة';
+
+  @override
+  String get carrRidersDocVehicleRegistration => 'تسجيل المركبة';
+
+  @override
+  String get carrRidersDocVerified => 'موثّق';
+
+  @override
+  String get carrRidersDocWaiting => 'قيد المراجعة';
+
+  @override
+  String get carrRidersDocRefused => 'مرفوض';
+
+  @override
+  String get carrRidersDocNotUploaded => 'لم يُرفع';
+
+  @override
+  String get carrRidersDocOpen => 'فتح المستند';
+
+  @override
+  String get carrRidersCouldNotRead => 'تعذّرت القراءة حالياً.';
+
+  @override
+  String get carrRidersAvgRating => 'متوسط التقييم';
+
+  @override
+  String carrRidersHappyCustomers(int percent) {
+    return '$percent% من العملاء راضون';
+  }
+
+  @override
+  String get carrRidersNoRatingsYet => 'لا توجد تقييمات بعد';
+
+  @override
+  String carrRidersDeliveriesWindow(int days) {
+    return 'التوصيلات، آخر $days يوماً';
+  }
+
+  @override
+  String carrRidersClaimedCaption(int claimed, int cancelled) {
+    return '$claimed مُستلمة، $cancelled أُلغيت بعد الاستلام';
+  }
+
+  @override
+  String get carrRidersCompletionRate => 'نسبة الإنجاز';
+
+  @override
+  String get carrRidersCompletionCaption => 'ما وُصّل من المُستلم، لشركتك';
+
+  @override
+  String get carrRidersNothingClaimed => 'لم يُستلم شيء في هذه الفترة';
+
+  @override
+  String get carrRidersDeliveredTodayLabel => 'وُصّل اليوم';
+
+  @override
+  String get carrRidersDeliveredTodayCaption => 'لشركتك، منذ منتصف الليل';
+
+  @override
+  String carrRidersOutputTitle(int days) {
+    return 'ناتج التوصيل، آخر $days يوماً';
+  }
+
+  @override
+  String get carrRidersOutputEmpty => 'لا توجد توصيلات في هذه الفترة';
+
+  @override
+  String carrRidersOutputNote(String zone) {
+    return 'تُقسَم الأيام حسب المنطقة الزمنية $zone، ولا تُحتسب إلا التوصيلات التي تمّت لشركتك.';
+  }
+
+  @override
+  String carrRidersHoursTitle(int days) {
+    return 'ساعات الخدمة، آخر $days أيام';
+  }
+
+  @override
+  String carrRidersHoursValue(String hours) {
+    return '$hours س';
+  }
+
+  @override
+  String carrRidersHoursTotal(String hours) {
+    return '$hours س إجمالاً';
+  }
+
+  @override
+  String carrRidersShifts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count نوبة',
+      many: '$count نوبة',
+      few: '$count نوبات',
+      two: 'نوبتان',
+      one: 'نوبة واحدة',
+      zero: 'لا نوبات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersHoursNone => 'لا توجد ساعات خدمة لعرضها لشركتك.';
+
+  @override
+  String carrRidersHoursZone(String zone) {
+    return 'تُقسَم الأيام حسب المنطقة الزمنية $zone، كما يوردها الخادم.';
+  }
+
+  @override
+  String get carrRidersEmploymentTitle => 'تفاصيل العمل';
+
+  @override
+  String get carrRidersStartDate => 'تاريخ البدء';
+
+  @override
+  String get carrRidersApplied => 'تاريخ التقديم';
+
+  @override
+  String get carrRidersRegion => 'المنطقة (من طلبه)';
+
+  @override
+  String get carrRidersVehicle => 'المركبة';
+
+  @override
+  String get carrRidersEmploymentNote =>
+      'نوع العقد وأجر التوصيل وتعيين المنطقة غير مسجّلة على هذه المنصّة.';
+
+  @override
+  String get carrRidersSuspendUnavailable =>
+      'يتم الإيقاف عبر طلب السائق لديك. أضافت المنصّة هذا السائق مباشرة، لذا اطلب من YouDrop إيقافه.';
+
+  @override
+  String get carrRidersTerminate => 'إنهاء العقد';
+
+  @override
+  String carrRidersTerminateTitle(String name) {
+    return 'إنهاء عقد $name؟';
+  }
+
+  @override
+  String carrRidersTerminateBody(String name) {
+    return 'يخرج $name من أسطولك فوراً ولا يُعرض عليه أي من عملك. يحتفظ بتسجيل دخوله في YouDrop وبسجلّه، لكنه لا يصبح من سائقي YouDrop: لا يمكنه تولّي أي عمل إلى أن تعيّنه شركة أخرى أو تضمّه YouDrop إلى سائقيها.';
+  }
+
+  @override
+  String get carrRidersTerminateJobs =>
+      'المهام الجارية: ما دام يحمل مهمة لك، يُرفض هذا الإجراء حتى تُسلَّم تلك المهمة أو تُلغى. لا يُسقَط شيء مما يحمله ولا يُسلَّم لشخص آخر.';
+
+  @override
+  String get carrRidersTerminateMoney =>
+      'استلم منه أولاً أي نقد تحصيل يحمله لك. إنهاء العقد لا يسوّي أي مبالغ: ما كسبه وما حصّله يبقى في السجل كما هو تماماً.';
+
+  @override
+  String get carrRidersTerminateUndo =>
+      'إعادته إلى أسطولك لاحقاً تعني تعيينه من جديد.';
+
+  @override
+  String get carrRidersTerminateConfirm => 'إنهاء العقد';
+
+  @override
+  String carrRidersTerminated(String name) {
+    return 'لم يعد $name ضمن أسطولك.';
+  }
+
+  @override
+  String carrRidersTerminateCarrying(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      many:
+          'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      few: 'يحمل $count من مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      two:
+          'يحمل مهمتين من مهامك الآن. يمكن إنهاء عقده بعد تسليمهما أو إلغائهما.',
+      one: 'يحمل إحدى مهامك الآن. يمكن إنهاء عقده بعد تسليمها أو إلغائها.',
+      zero: 'لا يحمل أي مهمة لك الآن.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNotOnFleet => 'لم يعد هذا السائق ضمن أسطولك.';
+
+  @override
+  String carrRidersNoPresenceCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق آخر بلا حالة خدمة أو موقع بعد',
+      many: '$count سائقاً آخر بلا حالة خدمة أو موقع بعد',
+      few: '$count سائقين آخرين بلا حالة خدمة أو موقع بعد',
+      two: 'سائقان آخران بلا حالة خدمة أو موقع بعد',
+      one: 'سائق آخر بلا حالة خدمة أو موقع بعد',
+      zero: 'لا أحد غيرهم بلا حالة خدمة أو موقع',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get carrRidersNoPresenceNote =>
+      'تظهر حالة خدمته وموقعه هنا بعد أن تربطه YouDrop بأسطولك — على أبعد تقدير بعد أول توصيل له لشركتك. وحتى ذلك الحين لا تستطيع هذه الصفحة معرفة ما إذا كان في الخدمة.';
+
+  @override
+  String get carrRidersVehicleModel => 'طراز المركبة';
+
+  @override
+  String get carrRidersPlateNumber => 'رقم اللوحة';
+
+  @override
+  String get carrRidersDateOfBirth => 'تاريخ الميلاد';
+
+  @override
+  String get carrRidersNationalIdNumber => 'رقم الهوية الوطنية';
+
+  @override
+  String get carrRidersDutyChanged => 'آخر تغيير لحالة الخدمة';
+
+  @override
+  String get carrRidersVehicleYear => 'سنة صنع المركبة';
+
+  @override
+  String get carrRidersTerminateReason => 'السبب، ويُحفظ في السجل';
+
+  @override
+  String get carrRidersTerminateReasonHint => 'لماذا ينتهي هذا العقد؟';
+
+  @override
+  String get carrRidersStatusStandingUnknown => 'الوضع غير معروف';
+
+  @override
+  String get carrRidersStandingUnknownNote =>
+      'تعذّرت معرفة ما إذا كان هذا السائق موقوفاً حالياً، لذلك لا يُعرض الإيقاف ولا إعادة التفعيل. أعد تحميل الصفحة للمحاولة مجدداً.';
+
+  @override
+  String get attendanceBackToProfile => 'العودة إلى الملف الشخصي';
+
+  @override
+  String get blitzTitle => 'الكتالوج السريع';
+
+  @override
+  String get blitzSubtitle => 'كتالوجك من صور رفوفك';
+
+  @override
+  String get blitzFastSetup => 'إعداد سريع';
+
+  @override
+  String get blitzStepScan => 'صوّر المتجر';
+
+  @override
+  String get blitzStepCheck => 'راجع الأصناف';
+
+  @override
+  String get blitzStepSave => 'احفظ المسودات';
+
+  @override
+  String blitzStepDone(String step) {
+    return '$step، مكتمل';
+  }
+
+  @override
+  String blitzStepCurrent(String step) {
+    return '$step، الخطوة الحالية';
+  }
+
+  @override
+  String get blitzIntroTitle => 'صوّر رفوفك ووفّر على نفسك الكتابة';
+
+  @override
+  String get blitzIntroBody =>
+      'التقط صورة لكل رف. نقرأ أسماء المنتجات وأحجامها ونقترح لكل منها قسماً وسعراً تقريبياً، وأنت تراجع كل صنف قبل حفظ أي شيء.';
+
+  @override
+  String get blitzTakePhoto => 'التقط صورة';
+
+  @override
+  String get blitzChoosePhotos => 'اختر صوراً';
+
+  @override
+  String blitzPhotoCount(int count, int max) {
+    return 'الصور: $count من $max';
+  }
+
+  @override
+  String blitzPhotoLabel(int number) {
+    return 'صورة الرف $number';
+  }
+
+  @override
+  String blitzUploading(int current, int total) {
+    return 'جارٍ رفع الصورة $current من $total…';
+  }
+
+  @override
+  String blitzScanPhotos(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'حلّل $count صورة',
+      few: 'حلّل $count صور',
+      two: 'حلّل صورتين',
+      one: 'حلّل صورة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzAnalyzing => 'نقرأ رفوفك…';
+
+  @override
+  String get blitzAnalyzingHint =>
+      'قد يستغرق ذلك دقيقة أو دقيقتين. أبقِ هذه الشاشة مفتوحة.';
+
+  @override
+  String get blitzScanComplete => 'اكتمل التحليل';
+
+  @override
+  String blitzItemsFound(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count صنف',
+      many: '$count صنفاً',
+      few: '$count أصناف',
+      two: 'صنفان',
+      one: 'صنف واحد',
+      zero: 'لا أصناف',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSampleTitle => 'أصناف تجريبية';
+
+  @override
+  String get blitzSampleBody =>
+      'قارئ الصور غير مفعّل بعد، لذا هذه أصناف على سبيل المثال وليست ما على رفوفك. تجاوز أي صنف لا تبيعه.';
+
+  @override
+  String get blitzNoneFound => 'لم نتعرّف على أي منتج في هذه الصور.';
+
+  @override
+  String get blitzNoneFoundHint =>
+      'جرّب صوراً أقرب تظهر فيها ملصقات المنتجات بوضوح.';
+
+  @override
+  String get blitzNewScan => 'ابدأ تحليلاً جديداً';
+
+  @override
+  String get blitzReviewCta => 'راجع واحفظ كمسودات';
+
+  @override
+  String get blitzFooter => 'لا يظهر شيء للزبائن قبل أن تنشره بنفسك.';
+
+  @override
+  String blitzScansLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تبقّى $count تحليل اليوم',
+      many: 'تبقّى $count تحليلاً اليوم',
+      few: 'تبقّت $count تحليلات اليوم',
+      two: 'تبقّى تحليلان اليوم',
+      one: 'تبقّى تحليل واحد اليوم',
+      zero: 'لم يتبقَّ لك أي تحليل اليوم',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String blitzQuotaReached(int limit) {
+    return 'استخدمت كل التحليلات المتاحة لك اليوم ($limit). حاول مجدداً غداً.';
+  }
+
+  @override
+  String get blitzFailedRefused =>
+      'تعذّرت قراءة هذه الصور. جرّب صوراً واضحة لرفوف متجرك.';
+
+  @override
+  String get blitzFailedUnreadable =>
+      'تعذّر فتح إحدى الصور. جرّب التقاطها من جديد.';
+
+  @override
+  String get blitzFailedProvider => 'لم يستجب قارئ الصور.';
+
+  @override
+  String get blitzFailedBusy =>
+      'متاجر كثيرة تحلّل صورها الآن. حاول مجدداً بعد دقيقة.';
+
+  @override
+  String get blitzFailedInterrupted => 'توقّف التحليل قبل أن يكتمل.';
+
+  @override
+  String get blitzFailedOther => 'لم يكتمل التحليل.';
+
+  @override
+  String get blitzNoRetriesLeft =>
+      'لا يمكن إعادة هذا التحليل. ابدأ تحليلاً جديداً.';
+
+  @override
+  String get blitzCameraFailed => 'لم تُفتح الكاميرا. اختر صورة بدلاً من ذلك.';
+
+  @override
+  String get blitzUploadFailed =>
+      'لم تُرفع إحدى الصور. تحقّق من اتصالك وحاول مجدداً.';
+
+  @override
+  String get blitzCouldNotStart => 'تعذّر بدء التحليل.';
+
+  @override
+  String get blitzConnectionLost =>
+      'تعذّر الاطلاع على حالة التحليل. تحقّق من اتصالك.';
+
+  @override
+  String blitzTag(String name, String price) {
+    return '$name · حوالي $price';
+  }
+
+  @override
+  String get blitzReviewTitle => 'راجع الأصناف';
+
+  @override
+  String get blitzReviewSubtitle => 'ما تبقيه يُحفظ كمسودة';
+
+  @override
+  String get blitzKeep => 'إبقاء';
+
+  @override
+  String blitzKeepItem(String name) {
+    return 'إبقاء $name';
+  }
+
+  @override
+  String get blitzName => 'الاسم';
+
+  @override
+  String get blitzPriceUsd => 'السعر (بالدولار)';
+
+  @override
+  String get blitzSection => 'القسم';
+
+  @override
+  String get blitzNoSection => 'بدون قسم';
+
+  @override
+  String blitzGuess(String price) {
+    return 'تقدير: $price';
+  }
+
+  @override
+  String get blitzUseGuess => 'استخدم هذا السعر';
+
+  @override
+  String get blitzCheckThis => 'لسنا متأكدين من هذا الصنف — تحقّق منه';
+
+  @override
+  String get blitzNeedName => 'أدخل اسماً';
+
+  @override
+  String get blitzNeedPrice => 'أدخل سعراً أكبر من صفر';
+
+  @override
+  String get blitzPriceDecimals => 'استخدم منزلتين عشريتين كحد أقصى';
+
+  @override
+  String blitzSaveDrafts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'احفظ $count مسودة',
+      many: 'احفظ $count مسودة',
+      few: 'احفظ $count مسودات',
+      two: 'احفظ مسودتين',
+      one: 'احفظ مسودة واحدة',
+      zero: 'لا شيء للحفظ',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSkipAll => 'تجاوز كل الأصناف';
+
+  @override
+  String get blitzFixItems => 'أصلح الأصناف المعلَّمة أولاً.';
+
+  @override
+  String get blitzSavedTitle => 'حُفظت كمسودات';
+
+  @override
+  String blitzSavedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'أُضيف $count منتج إلى كتالوجك كمسودات.',
+      many: 'أُضيف $count منتجاً إلى كتالوجك كمسودات.',
+      few: 'أُضيفت $count منتجات إلى كتالوجك كمسودات.',
+      two: 'أُضيف منتجان إلى كتالوجك كمسودتين.',
+      one: 'أُضيف منتج واحد إلى كتالوجك كمسودة.',
+      zero: 'لم تُضف أي منتجات.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blitzSavedHint =>
+      'تبقى المسودات مخفية عن الزبائن. أضف صورة لكل منها ثم انشرها من المخزون.';
+
+  @override
+  String get blitzDone => 'تم';
+
+  @override
+  String get blitzAlreadySaved => 'محفوظ';
+
+  @override
+  String blitzTooManyPhotos(int max) {
+    return 'يتّسع التحليل الواحد لـ $max صور كحد أقصى، لذا لم تُضف الصور الزائدة.';
+  }
+
+  @override
+  String get blitzSectionsUnavailable =>
+      'تعذّر تحميل الأقسام، لذا يبقى لكل صنف القسم الذي اقترحناه.';
+
+  @override
+  String get blitzEntryAction => 'صوّر الرفوف';
+
+  @override
+  String get blitzSettingsRow => 'أنشئ الكتالوج من الصور';
+
+  @override
+  String get blitzSaveFailed => 'تعذّر الحفظ. تحقّق من اتصالك وحاول مرة أخرى.';
+
+  @override
+  String get blitzSavedEarlier => 'كانت هذه الأصناف قد حُفظت من قبل.';
+
+  @override
+  String get blitzListChanged =>
+      'حُسم أمر بعض الأصناف في مكان آخر فخرجت من القائمة. راجع الباقي ثم احفظ مرة أخرى.';
+
+  @override
+  String get giftHubTitle => 'أرسل هدية';
+
+  @override
+  String get giftHubBannerTitle => 'الحوالة الحقيقية';
+
+  @override
+  String get giftHubBannerBody =>
+      'ساند أحبّاءك في لبنان. اختر الأساسيات الحقيقية أو البقالة أو الوجبات الساخنة، وتصل إلى بابهم — غالباً في اليوم نفسه.';
+
+  @override
+  String get giftHowItWorks => 'كيف تعمل';
+
+  @override
+  String get giftStep1Title => 'اختر من المتاجر المحلية';
+
+  @override
+  String get giftStep1Body =>
+      'اختر البقالة أو الحلويات أو منتجات الصيدلية أو سلة رعاية جاهزة.';
+
+  @override
+  String get giftStep2Title => 'أدخل عنوانهم في لبنان';
+
+  @override
+  String get giftStep2Body => 'نوصل إلى أي مكان يوصل إليه المتجر الذي تختاره.';
+
+  @override
+  String get giftStep3Title => 'توصيل في اليوم نفسه';
+
+  @override
+  String get giftStep3Body =>
+      'يسلّمها السائق مع رسالتك الشخصية — في اليوم نفسه، ما دام المتجر مفتوحاً.';
+
+  @override
+  String get giftCategories => 'فئات الهدايا';
+
+  @override
+  String get giftCatCarePackage => 'سلة رعاية';
+
+  @override
+  String get giftCatGroceries => 'بقالة';
+
+  @override
+  String get giftCatMedicine => 'الدواء والصحة';
+
+  @override
+  String get giftRecentRecipients => 'المستلمون مؤخراً';
+
+  @override
+  String get giftAddRecipient => 'أضف مستلماً';
+
+  @override
+  String get giftFeaturedBundles => 'سلال رعاية مختارة';
+
+  @override
+  String get giftSameDayDeliverable => 'يصل في اليوم نفسه';
+
+  @override
+  String get giftHomeEntryTitle => 'أرسل هدية إلى لبنان';
+
+  @override
+  String get giftHomeEntrySub =>
+      'بقالة وحلويات وسلال رعاية للعائلة، تصل إلى بابهم';
+
+  @override
+  String get giftDetailsTitle => 'تفاصيل الهدية';
+
+  @override
+  String get giftCheckoutSub => 'دفع المغتربين';
+
+  @override
+  String get giftRecipientInfo => 'معلومات المستلم';
+
+  @override
+  String get giftRecipientName => 'اسم المستلم';
+
+  @override
+  String get giftRecipientNameRequired => 'من سيستلمها؟';
+
+  @override
+  String get giftRecipientPhone => 'رقم الهاتف (لبنان)';
+
+  @override
+  String get giftPhoneInvalid => 'أدخل رقماً لبنانياً، مثل 71 234 567';
+
+  @override
+  String get giftDeliveryDate => 'تاريخ التوصيل';
+
+  @override
+  String get giftNoteTitle => 'أرفق رسالة شخصية';
+
+  @override
+  String get giftNoteHelper => 'يرسل المتجر رسالتك مع الهدية.';
+
+  @override
+  String get giftWrapTitle => 'تغليف هدايا فاخر';
+
+  @override
+  String giftWrapSubtitle(String amount) {
+    return 'تغليف احتفالي مع رسالتك على بطاقة (+$amount)';
+  }
+
+  @override
+  String get giftPaymentTitle => 'الدفع';
+
+  @override
+  String get giftCashNotAllowed =>
+      'تُدفع الهدايا عبر الإنترنت — لا يُطلب من المستلم أن يدفع أبداً.';
+
+  @override
+  String get giftNoPaymentMethods =>
+      'تُدفع الهدايا عبر الإنترنت، والدفع عبر الإنترنت غير مفعّل بعد — لذا لا يمكن إرسال هدية الآن.';
+
+  @override
+  String get giftTermsFailed => 'تعذّر تحميل خيارات الدفع للهدية.';
+
+  @override
+  String get giftOfflineCannotWait =>
+      'لا يمكن للهدية انتظار عودة الاتصال كما يفعل الطلب النقدي، لأنها تُدفع عبر الإنترنت. أرسلها عند عودة الاتصال.';
+
+  @override
+  String get giftOrderSummary => 'ملخص الطلب';
+
+  @override
+  String giftLineQty(int qty, String name) {
+    return '$qty× $name';
+  }
+
+  @override
+  String get giftWrapLine => 'تغليف الهدية';
+
+  @override
+  String get giftDeliveryFee => 'رسوم التوصيل';
+
+  @override
+  String get giftTotalUsd => 'المجموع بالدولار';
+
+  @override
+  String giftApproxLbp(String amount) {
+    return '≈ $amount';
+  }
+
+  @override
+  String get giftTotalConfirmed => 'يُؤكَّد المجموع النهائي عند إرسال هديتك.';
+
+  @override
+  String get giftSendAndPay => 'أرسل الهدية وادفع';
+
+  @override
+  String giftForName(String name) {
+    return 'هدية إلى $name';
+  }
+
+  @override
+  String get giftWrapRequested => 'مطلوب تغليف الهدية';
+
+  @override
+  String get giftCardMessage => 'رسالة البطاقة';
+
+  @override
+  String get giftRecipientPhoneLabel => 'هاتف المستلم';
+
+  @override
+  String get giftBasketBanner => 'ترسل هذه السلة كهدية';
+
+  @override
+  String get giftBasketNotGift => 'ليست هدية';
+
+  @override
+  String get giftDeliveredToday => 'اليوم، خلال ساعات عمل المتجر';
+
+  @override
+  String giftNoteLength(int used, int max) {
+    return '$used من $max';
+  }
+
+  @override
+  String get giftUnnamed => 'هدية — يظهر اسم المستلم عندما تتولى توصيلها';
+
+  @override
+  String get heatmapTitle => 'رادار الطلب';
+
+  @override
+  String get heatmapSubtitle => 'نبض الأحياء لحظة بلحظة';
+
+  @override
+  String get heatmapActiveOrderDensities => 'كثافة الطلبات النشطة';
+
+  @override
+  String get heatmapLiveSyncing => 'مزامنة مباشرة';
+
+  @override
+  String get heatmapCantRefresh => 'تعذّر التحديث الآن';
+
+  @override
+  String get heatmapLevelHigh => 'مرتفع';
+
+  @override
+  String get heatmapLevelMedium => 'متوسط';
+
+  @override
+  String get heatmapLevelLow => 'منخفض';
+
+  @override
+  String heatmapZoneWithLevel(String zone, String level) {
+    return '$zone ($level)';
+  }
+
+  @override
+  String get heatmapWindowHour => 'آخر ساعة';
+
+  @override
+  String get heatmapWindowDay => 'آخر 24 ساعة';
+
+  @override
+  String get heatmapWindowWeek => 'آخر 7 أيام';
+
+  @override
+  String get heatmapAreasTitle => 'المناطق المحيطة بمتجرك';
+
+  @override
+  String get heatmapNotOnMap => 'غير محددة على الخريطة بعد';
+
+  @override
+  String get heatmapNoneOnMap => 'هذه المناطق غير محددة على الخريطة بعد';
+
+  @override
+  String get heatmapMapUnavailable => 'تعذّر تحميل الخريطة الآن';
+
+  @override
+  String get heatmapNoAreaTitle => 'لا نعرف حيّك بعد';
+
+  @override
+  String get heatmapNoAreaMessage =>
+      'يظهر الطلب للمناطق المحددة على الخريطة قرب موقع متجرك. حدّد موقع متجرك إن لم تفعل بعد، وستظهر هنا المناطق القريبة فور إضافتها إلى الخريطة.';
+
+  @override
+  String get heatmapNotEnoughTitle => 'لا توجد طلبات كافية بالقرب منك بعد';
+
+  @override
+  String heatmapNotEnoughMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'تظهر المنطقة عندما يطلب منها $count عميل مختلف خلال هذه الفترة، فلا يمكن تمييز أي عميل بعينه.',
+      many:
+          'تظهر المنطقة عندما يطلب منها $count عميلاً مختلفاً خلال هذه الفترة، فلا يمكن تمييز أي عميل بعينه.',
+      few:
+          'تظهر المنطقة عندما يطلب منها $count عملاء مختلفين خلال هذه الفترة، فلا يمكن تمييز أي عميل بعينه.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get heatmapCouldNotLoad => 'تعذّر تحميل الطلب الآن';
+
+  @override
+  String get heatmapNoShopMessage =>
+      'سيظهر هنا الطلب من حول متجرك بعد إعداد متجرك.';
+
+  @override
+  String get heatmapEntryBlurb => 'اعرف أي الأحياء حول متجرك تطلب الآن';
+
+  @override
+  String get heatmapZoneCentreLatitude => 'خط العرض لمركز المنطقة (اختياري)';
+
+  @override
+  String get heatmapZoneCentreLongitude => 'خط الطول لمركز المنطقة (اختياري)';
+
+  @override
+  String get heatmapZoneCentreHelp =>
+      'منتصف المنطقة تقريباً. يُظهر المنطقة على خريطة الطلب لدى التجار، ولا يدخل في التسعير.';
+
+  @override
+  String get heatmapZoneCentreBoth =>
+      'أدخل القيمتين معاً أو اترك كلتيهما فارغتين';
+
+  @override
+  String get heatmapZoneCentreLatRange => 'خط عرض بين -90 و 90';
+
+  @override
+  String get heatmapZoneCentreLngRange => 'خط طول بين -180 و 180';
+
+  @override
+  String get heatmapZoneOnMap => 'على خريطة الطلب';
+
+  @override
+  String get heatmapZoneNotOnMap => 'ليست على خريطة الطلب';
+
+  @override
+  String get heatmapSubtitleDay => 'نبض الأحياء خلال آخر 24 ساعة';
+
+  @override
+  String get heatmapSubtitleWeek => 'نبض الأحياء خلال آخر 7 أيام';
+
+  @override
+  String get heatmapUpdatedHourly => 'يُحدَّث كل ساعة';
+
+  @override
+  String get heatmapUpdatedDaily => 'يُحدَّث مرة واحدة يومياً';
+
+  @override
+  String get heatmapLegendRelative => 'مقارنةً بأكثر منطقة طلباً من حولك';
+
+  @override
+  String get heatmapNotLiveTitle => 'متجرك غير منشور بعد';
+
+  @override
+  String get heatmapNotLiveMessage =>
+      'سيظهر هنا الطلب من حول متجرك بعد نشر متجرك.';
+
+  @override
+  String get payrollNavLabel => 'الرواتب';
+
+  @override
+  String get payrollTitle => 'إدارة رواتب السائقين ومستحقاتهم';
+
+  @override
+  String get payrollSubtitle =>
+      'اعتمد الدفعات، واحسب المكافآت، وتابع سجل الدفعات';
+
+  @override
+  String payrollPeriodLabel(String from, String to) {
+    return 'فترة الرواتب: $from – $to';
+  }
+
+  @override
+  String get payrollPeriodTooltip => 'اختر فترة الرواتب';
+
+  @override
+  String payrollPeriodOption(String from, String to, String state) {
+    return '$from – $to · $state';
+  }
+
+  @override
+  String get payrollRulesButton => 'قواعد الرواتب';
+
+  @override
+  String get payrollExport => 'تصدير كشوف الرواتب';
+
+  @override
+  String payrollExported(String file) {
+    return 'تم حفظ $file.';
+  }
+
+  @override
+  String get payrollStart => 'بدء دورة الرواتب';
+
+  @override
+  String get payrollRecompute => 'إعادة الحساب';
+
+  @override
+  String get payrollApprove => 'اعتماد دورة الرواتب';
+
+  @override
+  String get payrollPayAll => 'تسجيل كل الدفعات';
+
+  @override
+  String get payrollDiscard => 'تجاهل المسودة';
+
+  @override
+  String get payrollKpiPool => 'إجمالي الرواتب';
+
+  @override
+  String payrollKpiPoolNote(String from, String to) {
+    return 'المستحق عن $from – $to';
+  }
+
+  @override
+  String get payrollKpiRiders => 'السائقون في الرواتب';
+
+  @override
+  String payrollKpiRidersValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سائق',
+      many: '$count سائقاً',
+      few: '$count سائقين',
+      two: 'سائقان',
+      one: 'سائق واحد',
+      zero: 'لا سائقين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollKpiRidersNote => 'لديهم كشف راتب في هذه الفترة';
+
+  @override
+  String get payrollKpiAverage => 'متوسط مستحقات السائق';
+
+  @override
+  String payrollKpiAverageNote(int days) {
+    return 'لكل فترة من $days يوماً';
+  }
+
+  @override
+  String get payrollKpiBonuses => 'المكافآت';
+
+  @override
+  String get payrollKpiBonusesNote => 'المكافآت المسمّاة والتصحيحات';
+
+  @override
+  String get payrollLedgerTitle => 'سجل رواتب السائقين';
+
+  @override
+  String get payrollColRider => 'اسم السائق';
+
+  @override
+  String get payrollColBase => 'الأجر الأساسي';
+
+  @override
+  String get payrollColDelivery => 'أجر التوصيلات';
+
+  @override
+  String get payrollColTips => 'الإكراميات';
+
+  @override
+  String get payrollColDeductions => 'الاقتطاعات';
+
+  @override
+  String get payrollColGross => 'إجمالي الأجر';
+
+  @override
+  String get payrollColNet => 'صافي الأجر';
+
+  @override
+  String get payrollColStatus => 'الحالة';
+
+  @override
+  String get payrollColActions => 'الإجراءات';
+
+  @override
+  String get payrollPayslip => 'كشف الراتب';
+
+  @override
+  String get payrollTipsNote => 'الإكراميات ملك السائق ولا تدخل في أجره أبداً.';
+
+  @override
+  String get payrollHoursUnknown => 'تعذّرت قراءة ساعات هذا السائق.';
+
+  @override
+  String get payrollNobody => 'لا أحد من سائقي أسطولك لديه أجر في هذه الفترة.';
+
+  @override
+  String get payrollTableNote =>
+      'هذه رواتب شركتك، محسوبة وفق قواعدك. لا تدفع YouDrop أجور سائقيك.';
+
+  @override
+  String get payrollStatusDraft => 'مسودة';
+
+  @override
+  String get payrollStatusDue => 'بانتظار الدفع';
+
+  @override
+  String get payrollStatusNothingDue => 'لا شيء للدفع';
+
+  @override
+  String get payrollStatusPaid => 'مدفوع ✓';
+
+  @override
+  String get payrollStatusFailed => 'فشل الدفع';
+
+  @override
+  String get payrollRunApproved => 'معتمدة';
+
+  @override
+  String get payrollRunPaid => 'مدفوعة';
+
+  @override
+  String get payrollNotStarted => 'لم تبدأ';
+
+  @override
+  String payrollRunMeta(String state, String time) {
+    return '$state · حُسبت الأرقام في $time';
+  }
+
+  @override
+  String payrollRunRevision(int revision) {
+    return 'مسودة، النسخة $revision';
+  }
+
+  @override
+  String payrollHoursAsOf(String time) {
+    return 'الساعات كما قُرئت في $time';
+  }
+
+  @override
+  String get payrollNoRulesTitle => 'حدّد قواعد الرواتب أولاً';
+
+  @override
+  String get payrollNoRulesBody =>
+      'تحسب الرواتب أجر كل سائق وفق قواعد شركتك: كم تدفع عن التوصيلة، وهل تُدفع الساعات، وأي اقتطاعات. لا يُفترض شيء نيابةً عنك.';
+
+  @override
+  String get payrollNoRunTitle => 'لا توجد دورة رواتب لهذه الفترة بعد';
+
+  @override
+  String get payrollNoRunBody =>
+      'بدء دورة يحسب مسودة من التوصيلات والساعات المسجّلة. لا شيء نهائي حتى تعتمدها.';
+
+  @override
+  String payrollPeriodOpen(String date) {
+    return 'تستمر هذه الفترة حتى $date. يمكن اعتمادها بعد انتهائها.';
+  }
+
+  @override
+  String get payrollHoursMissing =>
+      'تعذّرت قراءة ساعات الحضور، لذا لا تتضمن هذه الأرقام أي ساعات.';
+
+  @override
+  String get payrollHoursNotDeployed =>
+      'ساعات الحضور غير متاحة على هذه المنصة بعد، لذا لا تتضمن هذه الأرقام أي ساعات.';
+
+  @override
+  String get payrollHoursNotRead =>
+      'أصبحت قواعد الرواتب تعتمد على الساعات. أعد الحساب لقراءتها.';
+
+  @override
+  String payrollJobsLateDraft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'وصلت $count توصيلة إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
+      many:
+          'وصلت $count توصيلة إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
+      few:
+          'وصلت $count توصيلات إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
+      two:
+          'وصلت توصيلتان إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينهما.',
+      one:
+          'وصلت توصيلة واحدة إلى السجل بعد حساب هذه الأرقام. أعد الحساب لتضمينها.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollJobsLateApproved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'وصلت $count توصيلة من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
+      many:
+          'وصلت $count توصيلة من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
+      few:
+          'وصلت $count توصيلات من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
+      two:
+          'وصلت توصيلتان من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحات للسائقين المعنيين.',
+      one:
+          'وصلت توصيلة واحدة من هذه الفترة إلى السجل بعد اعتمادها. أضف تصحيحاً للسائق المعني.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollPeriodChanged =>
+      'أصبحت قواعد الرواتب تدفع هذه الأيام ضمن فترة مختلفة. تجاهل هذه المسودة وابدأ تلك الفترة.';
+
+  @override
+  String get payrollLoadFailed => 'تعذّر تحميل الرواتب حالياً.';
+
+  @override
+  String get payrollTryAgain => 'حاول مجدداً';
+
+  @override
+  String payrollPayslipSubtitle(String from, String to) {
+    return 'كشف الراتب عن $from – $to';
+  }
+
+  @override
+  String get payrollSectionPay => 'الأجر';
+
+  @override
+  String get payrollSectionSummary => 'الملخص';
+
+  @override
+  String get payrollSectionAttendance => 'الساعات والحضور';
+
+  @override
+  String get payrollSectionPayment => 'الدفع';
+
+  @override
+  String payrollLineDeliveries(int count, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count توصيلة × $rate',
+      many: '$count توصيلة × $rate',
+      few: '$count توصيلات × $rate',
+      two: 'توصيلتان × $rate',
+      one: 'توصيلة واحدة × $rate',
+      zero: 'لا توصيلات × $rate',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollLineHours(String hours, String rate) {
+    return '$hours ساعة مسجّلة × $rate';
+  }
+
+  @override
+  String payrollLineOvertime(String hours, String rate) {
+    return '$hours ساعة إضافية × $rate';
+  }
+
+  @override
+  String payrollLineTyped(String hours, String rate) {
+    return '$hours ساعة أدخلها المكتب × $rate';
+  }
+
+  @override
+  String payrollLineTypedUnpaid(String hours) {
+    return '$hours ساعة أدخلها المكتب، لا تُدفع وفق قواعدك';
+  }
+
+  @override
+  String payrollLineLate(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days يوم تأخير × $rate',
+      many: '$days يوم تأخير × $rate',
+      few: '$days أيام تأخير × $rate',
+      two: 'يوما تأخير × $rate',
+      one: 'يوم تأخير واحد × $rate',
+      zero: 'لا أيام تأخير × $rate',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollLineAbsence(int days, String rate) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days يوم غياب × $rate',
+      many: '$days يوم غياب × $rate',
+      few: '$days أيام غياب × $rate',
+      two: 'يوما غياب × $rate',
+      one: 'يوم غياب واحد × $rate',
+      zero: 'لا أيام غياب × $rate',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollLineCash =>
+      'نقد الشركة الذي كان بحوزة السائق، مقتطع من الأجر';
+
+  @override
+  String payrollLineBonus(String label) {
+    return 'مكافأة: $label';
+  }
+
+  @override
+  String payrollLineDeduction(String label) {
+    return 'اقتطاع: $label';
+  }
+
+  @override
+  String payrollLineCorrection(String label) {
+    return 'تصحيح: $label';
+  }
+
+  @override
+  String get payrollLineOther => 'أخرى';
+
+  @override
+  String payrollOwes(String amount) {
+    return 'مدين للشركة بمبلغ $amount. لا يُدفع له شيء.';
+  }
+
+  @override
+  String payrollTipsInfo(String amount) {
+    return 'إكراميات $amount: ملك السائق، وليست جزءاً من هذا الأجر.';
+  }
+
+  @override
+  String payrollCashKept(String amount, String date) {
+    return 'يحتفظ بمبلغ $amount من نقد الشركة جمعه حتى $date، وهو أكثر مما يغطيه هذا الأجر. يبقى ليُستلم في المركز.';
+  }
+
+  @override
+  String payrollHoursFacts(String recorded, String typed, String overtime) {
+    return 'مسجّلة $recorded س · مُدخلة $typed س · إضافية $overtime س';
+  }
+
+  @override
+  String payrollDaysFacts(int lates, int absences) {
+    return 'أيام التأخير $lates · أيام الغياب $absences';
+  }
+
+  @override
+  String get payrollAddBonus => 'إضافة مكافأة';
+
+  @override
+  String get payrollAddDeduction => 'إضافة اقتطاع';
+
+  @override
+  String get payrollRemove => 'إزالة';
+
+  @override
+  String get payrollMarkPaid => 'تسجيل الدفع';
+
+  @override
+  String get payrollMarkFailed => 'تسجيل فشل الدفع';
+
+  @override
+  String get payrollAddCorrection => 'إضافة تصحيح';
+
+  @override
+  String payrollPaidOn(String date, String method) {
+    return 'دُفع في $date · $method';
+  }
+
+  @override
+  String payrollRecordedBy(String name) {
+    return 'سجّله $name';
+  }
+
+  @override
+  String payrollFailedBecause(String reason) {
+    return 'فشل الدفع: $reason';
+  }
+
+  @override
+  String get payrollCorrections => 'التصحيحات';
+
+  @override
+  String get payrollCorrectionWaiting => 'تُدفع في دورة الرواتب التالية للسائق';
+
+  @override
+  String get payrollCorrectionPaid => 'دُفعت في دورة رواتب لاحقة';
+
+  @override
+  String payrollLineDialogBonus(String name) {
+    return 'إضافة مكافأة لـ$name';
+  }
+
+  @override
+  String payrollLineDialogDeduction(String name) {
+    return 'إضافة اقتطاع من أجر $name';
+  }
+
+  @override
+  String get payrollLabelField => 'سببها';
+
+  @override
+  String get payrollAmountField => 'المبلغ';
+
+  @override
+  String get payrollAmountInvalid => 'مبلغ حتى السنت، مثل 25.00';
+
+  @override
+  String get payrollRequired => 'مطلوب';
+
+  @override
+  String get payrollReasonField => 'السبب';
+
+  @override
+  String get payrollReferenceField => 'المرجع (اختياري)';
+
+  @override
+  String get payrollSave => 'حفظ';
+
+  @override
+  String payrollCorrectionTitle(String name) {
+    return 'تصحيح أجر $name';
+  }
+
+  @override
+  String get payrollCorrectionBody =>
+      'يبقى كشف الراتب المعتمد كما هو. يُدفع التصحيح في دورة الرواتب التالية للسائق.';
+
+  @override
+  String get payrollCorrectionMore => 'دفع مبلغ إضافي';
+
+  @override
+  String get payrollCorrectionLess => 'استرداد مبلغ';
+
+  @override
+  String payrollFailedTitle(String name) {
+    return 'لم يصل الدفع إلى $name؟';
+  }
+
+  @override
+  String get payrollFailedBody => 'يبقى الأجر مستحقاً ويمكن تسجيل دفعه لاحقاً.';
+
+  @override
+  String payrollPaidTitle(String name, String amount) {
+    return 'تسجيل دفع $amount إلى $name؟';
+  }
+
+  @override
+  String get payrollPaidBody =>
+      'يسجّل هذا أن شركتك دفعت للسائق. لا تحوّل YouDrop أي أموال.';
+
+  @override
+  String payrollApproveTitle(String from, String to) {
+    return 'اعتماد الرواتب عن $from – $to؟';
+  }
+
+  @override
+  String payrollApproveBody(int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count سائق، والمستحق $total. تصبح كشوف الرواتب نهائية بعد الاعتماد، ويُصحَّح أي خطأ في دورة لاحقة.',
+      many:
+          '$count سائقاً، والمستحق $total. تصبح كشوف الرواتب نهائية بعد الاعتماد، ويُصحَّح أي خطأ في دورة لاحقة.',
+      few:
+          '$count سائقين، والمستحق $total. تصبح كشوف الرواتب نهائية بعد الاعتماد، ويُصحَّح أي خطأ في دورة لاحقة.',
+      two:
+          'سائقان، والمستحق $total. تصبح كشوف الرواتب نهائية بعد الاعتماد، ويُصحَّح أي خطأ في دورة لاحقة.',
+      one:
+          'سائق واحد، والمستحق $total. تصبح كشوف الرواتب نهائية بعد الاعتماد، ويُصحَّح أي خطأ في دورة لاحقة.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollApproveCash(String amount, String date) {
+    return 'يُقتطع من أجور سائقيك $amount من نقد الشركة الذي جمعوه حتى $date وما زال بحوزتهم، ويُسجَّل على أنه سُلِّم إلى شركتك.';
+  }
+
+  @override
+  String get payrollApproveYes => 'اعتماد';
+
+  @override
+  String payrollPayAllTitle(int count, String total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تسجيل $count دفعة بمجموع $total؟',
+      many: 'تسجيل $count دفعة بمجموع $total؟',
+      few: 'تسجيل $count دفعات بمجموع $total؟',
+      two: 'تسجيل دفعتين بمجموع $total؟',
+      one: 'تسجيل دفعة واحدة بقيمة $total؟',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollPayAllBody =>
+      'يسجّل هذا أن شركتك دفعت لهؤلاء السائقين، ولا يمكن التراجع عنه. تُترك الدفعات الفاشلة لتُسجَّل واحدة تلو الأخرى.';
+
+  @override
+  String get payrollRecordYes => 'تسجيل';
+
+  @override
+  String get payrollDiscardTitle => 'تجاهل هذه المسودة؟';
+
+  @override
+  String get payrollDiscardBody =>
+      'تُحذف أرقامها ويُحتفظ بسجلها. يمكنك بدء الفترة من جديد.';
+
+  @override
+  String get payrollDiscardYes => 'تجاهل';
+
+  @override
+  String get payrollDone => 'تم الحفظ.';
+
+  @override
+  String get payrollApproved => 'اعتُمدت دورة الرواتب.';
+
+  @override
+  String get payrollErrFiguresChanged =>
+      'تغيّرت الأرقام منذ اطّلعت عليها. راجع الأرقام الجديدة ثم اعتمد مجدداً.';
+
+  @override
+  String get payrollErrCashChanged =>
+      'تغيّر نقد أحد السائقين للتو. لم يُعتمد شيء؛ اعتمد مجدداً لترى الأرقام الجديدة.';
+
+  @override
+  String payrollErrTotalChanged(String amount) {
+    return 'أصبح المجموع المنتظر للدفع $amount. لم يُسجَّل شيء.';
+  }
+
+  @override
+  String get payrollErrRefused =>
+      'تعذّر ذلك: تغيّرت دورة الرواتب أو لم تعد تسمح به. أعد التحميل وحاول مجدداً.';
+
+  @override
+  String get payrollErrFailed => 'تعذّر ذلك حالياً. يُرجى المحاولة مجدداً.';
+
+  @override
+  String get payrollErrRulesStart =>
+      'لا يمكن أن تبدأ القواعد الجديدة في ذلك اليوم. اختر أحد الأيام المتاحة.';
+
+  @override
+  String payrollRulesNow(String from) {
+    return 'سارية منذ $from';
+  }
+
+  @override
+  String get payrollRulesNone => 'لا توجد قواعد رواتب بعد.';
+
+  @override
+  String payrollRulesNext(String date) {
+    return 'تبدأ قواعد جديدة في $date';
+  }
+
+  @override
+  String get payrollRulesCycle => 'دورية الدفع';
+
+  @override
+  String get payrollCycleSemiMonthly => 'مرتين شهرياً (1–15، و16–نهاية الشهر)';
+
+  @override
+  String get payrollCycleMonthly => 'شهرياً';
+
+  @override
+  String get payrollRulesStart => 'ابتداءً من';
+
+  @override
+  String get payrollRulesPerDelivery => 'الأجر عن كل توصيلة';
+
+  @override
+  String get payrollRulesHourly => 'أجر الساعة (اختياري)';
+
+  @override
+  String get payrollRulesHourlyHint =>
+      'اتركه فارغاً إن لم يكن هناك أجر بالساعة';
+
+  @override
+  String get payrollRulesTyped => 'دفع الساعات التي يُدخلها المكتب';
+
+  @override
+  String get payrollRulesOvertime => 'مضاعِف الساعات الإضافية';
+
+  @override
+  String get payrollRulesLate => 'الاقتطاع عن كل يوم تأخير';
+
+  @override
+  String get payrollRulesAbsence => 'الاقتطاع عن كل يوم غياب';
+
+  @override
+  String get payrollRulesSave => 'حفظ القواعد';
+
+  @override
+  String get payrollRulesNote =>
+      'تسري القواعد من أول يوم في فترة الرواتب، ولا تغيّر أي دورة رواتب معتمدة.';
+
+  @override
+  String get payrollMultiplierInvalid => 'بين 1.00 و5.00';
+
+  @override
+  String get payrollRulesNoStart => 'لا يوجد يوم متاح لقواعد جديدة حالياً.';
+
+  @override
+  String get payrollCashMethodKeptFromPay => 'مقتطع من الأجر';
+
+  @override
+  String payrollReadBeforeEnd(String time) {
+    return 'قُرئت هذه الأرقام في $time، قبل انتهاء الفترة. أعد الحساب لاحتساب الفترة كاملة قبل الاعتماد.';
+  }
+
+  @override
+  String get payrollDeliveriesNotDeployed =>
+      'لا يمكن بعدُ احتساب التوصيلات من الطلبات على هذه المنصة، لذا لا تحتسب هذه الأرقام إلا التوصيلات التي حقّقت أجرة، وتنقصها التوصيلات المجانية.';
+
+  @override
+  String get payrollDeliveriesMissing =>
+      'تعذّر احتساب التوصيلات من الطلبات حالياً، لذا لا تحتسب هذه الأرقام إلا التوصيلات التي حقّقت أجرة. أعد الحساب لاحتساب كل التوصيلات.';
+
+  @override
+  String payrollHoursMissingFor(int count, String names) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهم أي ساعات.',
+      many: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهم أي ساعات.',
+      few: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهم أي ساعات.',
+      two: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجرهما أي ساعات.',
+      one: 'تعذّرت قراءة ساعات $names، لذا لا يتضمن أجره أي ساعات.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String payrollNamesMore(String names, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$names و$count سائق آخر',
+      many: '$names و$count سائقاً آخر',
+      few: '$names و$count سائقين آخرين',
+      two: '$names وسائقان آخران',
+      one: '$names وسائق آخر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get payrollListSeparator => '، ';
+
+  @override
+  String get payrollApproveDeliveriesLedger =>
+      'احتُسبت التوصيلات من المهام التي حقّقت أجرة فقط، لذا تنقص التوصيلات المجانية من هذا الأجر.';
+
+  @override
+  String get payrollApproveWithoutMissing => 'الاعتماد من دون ما ينقص';
+
+  @override
+  String get payrollErrNeedsAcknowledgement =>
+      'تنقص هذه الأرقام بعض المعطيات. حدّد الخانة للاعتماد من دونها.';
+
+  @override
+  String get payrollErrRecomputeNeeded =>
+      'قُرئت هذه الأرقام قبل انتهاء الفترة. أعد الحساب وراجع الأرقام ثم اعتمد مجدداً.';
+
+  @override
+  String get payrollHoursNotListed =>
+      'لا يُظهر الحضور أي وقت عمل فيه هذا السائق لشركتك خلال هذه الفترة، لذا ساعاته غير معروفة.';
+
+  @override
+  String get chatRoomEntryTitle => 'دردشة الحي';
+
+  @override
+  String get chatRoomEntrySub => 'تحدّث مع الناس الذين يسكنون حولك';
+
+  @override
+  String chatRoomTitle(String area) {
+    return 'دردشة $area';
+  }
+
+  @override
+  String get chatRoomLive => 'مباشر';
+
+  @override
+  String chatRoomMembers(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count جار',
+      many: '$count جاراً',
+      few: '$count جيران',
+      two: 'جاران',
+      one: 'جار واحد',
+      zero: 'لا جيران',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatRoomCommunity => 'المجتمع';
+
+  @override
+  String get chatRoomComposerHint => 'اكتب رسالة أو اسأل جارك…';
+
+  @override
+  String get chatRoomEmpty => 'لا رسائل بعد. ألقِ التحية على جيرانك.';
+
+  @override
+  String get chatRoomCouldNotLoad => 'تعذّر تحميل دردشة الحي';
+
+  @override
+  String get chatRoomPickAreaTitle => 'اختر منطقتك لتنضمّ إلى دردشتها';
+
+  @override
+  String get chatRoomPickAreaBody =>
+      'تتبع دردشة الحي منطقة عنوان التوصيل الخاص بك.';
+
+  @override
+  String get chatRoomChooseArea => 'اختر المنطقة';
+
+  @override
+  String get chatRoomUnknownAreaTitle => 'لا توجد دردشة حي لمنطقتك';
+
+  @override
+  String get chatRoomUnknownAreaBody =>
+      'اختر إحدى مناطق التوصيل لعنوانك لتنضمّ إلى دردشتها.';
+
+  @override
+  String chatRoomMoveBlocked(String date) {
+    return 'يمكنك الانتقال إلى دردشة منطقتك الجديدة ابتداءً من $date.';
+  }
+
+  @override
+  String chatRoomMuted(String date) {
+    return 'أوقف أحد المشرفين رسائلك هنا حتى $date.';
+  }
+
+  @override
+  String get chatRoomHidden => 'أُزيلت هذه الرسالة';
+
+  @override
+  String get chatRoomNeighbour => 'جار';
+
+  @override
+  String get chatRoomReport => 'إبلاغ';
+
+  @override
+  String get chatRoomReportTitle => 'لماذا تبلّغ عن هذه الرسالة؟';
+
+  @override
+  String get chatRoomReasonSpam => 'رسائل مزعجة أو إعلانات';
+
+  @override
+  String get chatRoomReasonAbuse => 'إساءة أو مضايقة';
+
+  @override
+  String get chatRoomReasonPersonalInfo => 'معلومات شخصية لأحدهم';
+
+  @override
+  String get chatRoomReasonOther => 'سبب آخر';
+
+  @override
+  String get chatRoomReportSent => 'شكراً. سيراجعها أحد المشرفين.';
+
+  @override
+  String get chatRoomBlock => 'حظر';
+
+  @override
+  String chatRoomBlockTitle(String name) {
+    return 'حظر $name؟';
+  }
+
+  @override
+  String get chatRoomBlockBody =>
+      'لن ترى رسائله في دردشة الحي، ولن يُبلَّغ بذلك.';
+
+  @override
+  String get chatRoomBlockedToast => 'تم الحظر. لن ترى رسائله.';
+
+  @override
+  String get chatRoomCopy => 'نسخ';
+
+  @override
+  String get chatRoomCopied => 'تم النسخ';
+
+  @override
+  String get chatRoomRulesTitle => 'قواعد المجتمع';
+
+  @override
+  String get chatRoomRulesBody =>
+      'كن لطيفاً مع جيرانك. لا رسائل مزعجة أو إعلانات، ولا مضايقات، ولا تنشر أبداً رقم هاتف أحد أو عنوانه. يزيل المشرفون الرسائل التي تخالف هذه القواعد.';
+
+  @override
+  String get chatRoomBlockedPeople => 'الأشخاص الذين حظرتهم';
+
+  @override
+  String get chatRoomNoBlocks => 'لم تحظر أحداً.';
+
+  @override
+  String get chatRoomUnblock => 'إلغاء الحظر';
+
+  @override
+  String get chatSlowDown =>
+      'ترسل الرسائل بسرعة كبيرة. انتظر قليلاً ثم حاول مجدداً.';
+
+  @override
+  String get chatTooLong => 'هذه الرسالة طويلة جداً.';
+
+  @override
+  String get chatActionFailed => 'لم ينجح ذلك. حاول مجدداً.';
+
+  @override
+  String chatShopWith(String shop) {
+    return 'دردش مع $shop';
+  }
+
+  @override
+  String get chatShopHintCustomer => 'راسل المحل…';
+
+  @override
+  String get chatShopHintMerchant => 'ردّ على الزبون…';
+
+  @override
+  String get chatShopEmptyCustomer =>
+      'اسأل المحل عن أي شيء: البضاعة المتوفرة، الأسعار، مواعيد العمل.';
+
+  @override
+  String get chatShopEmptyMerchant => 'لا رسائل في هذه المحادثة بعد.';
+
+  @override
+  String get chatShopCouldNotLoad => 'تعذّر تحميل هذه المحادثة';
+
+  @override
+  String get chatShopQuietCustomer => 'هدأت هذه المحادثة.';
+
+  @override
+  String get chatShopReopen => 'إعادة فتح';
+
+  @override
+  String get chatShopQuietMerchant =>
+      'هدأت هذه المحادثة. يستطيع الزبون استئنافها من صفحة محلك.';
+
+  @override
+  String get chatShopInboxTitle => 'رسائل الزبائن';
+
+  @override
+  String get chatShopInboxEmpty => 'لا رسائل من الزبائن بعد';
+
+  @override
+  String get chatShopInboxEmptySub =>
+      'يستطيع الزبائن مراسلة محلك من صفحته في التطبيق.';
+
+  @override
+  String get chatShopInboxCouldNotLoad => 'تعذّر تحميل رسائل الزبائن';
+
+  @override
+  String get chatShopCustomer => 'زبون';
+
+  @override
+  String chatShopYouPrefix(String text) {
+    return 'أنت: $text';
+  }
+
+  @override
+  String get chatShopQuietBadge => 'هادئة';
+
+  @override
+  String get chatModerationTitle => 'الإشراف';
+
+  @override
+  String get chatModerationSub =>
+      'رسائل دردشة الحي المُبلَّغ عنها، الأقدم أولاً.';
+
+  @override
+  String get chatModerationEmpty => 'لا بلاغات بانتظار المراجعة';
+
+  @override
+  String get chatModerationCouldNotLoad => 'تعذّر تحميل قائمة الإشراف';
+
+  @override
+  String chatModerationReports(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count بلاغ',
+      many: '$count بلاغاً',
+      few: '$count بلاغات',
+      two: 'بلاغان',
+      one: 'بلاغ واحد',
+      zero: 'لا بلاغات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatModerationHide => 'إخفاء الرسالة';
+
+  @override
+  String get chatModerationDismiss => 'تجاهل';
+
+  @override
+  String get chatModerationMute => 'كتم الكاتب';
+
+  @override
+  String get chatModerationUnmute => 'إلغاء كتم الكاتب';
+
+  @override
+  String get chatModerationMute24h => 'لمدة 24 ساعة';
+
+  @override
+  String get chatModerationMute7d => 'لمدة 7 أيام';
+
+  @override
+  String get chatModerationMute30d => 'لمدة 30 يوماً';
+
+  @override
+  String get chatModerationReasonLabel => 'السبب (يُحفظ في سجل التدقيق)';
+
+  @override
+  String get chatModerationReasonTooShort => 'اكتب 3 أحرف على الأقل';
+
+  @override
+  String get chatModerationConfirm => 'تأكيد';
+
+  @override
+  String get chatModerationRemoved => 'أُزيلت';
+
+  @override
+  String chatModerationMutedUntil(String date) {
+    return 'الكاتب مكتوم حتى $date';
+  }
+
+  @override
+  String get chatModerationDone => 'تم';
+
+  @override
+  String get chatModerationRefresh => 'تحديث';
+
+  @override
+  String get chatRoomOlderFailed =>
+      'تعذّر تحميل الرسائل الأقدم. اضغط للمحاولة مجدداً.';
+
+  @override
+  String get chatRoomPostAfterDelivery =>
+      'يمكنك الكتابة هنا بعد أول توصيل لك إلى هذه المنطقة.';
+
+  @override
+  String get chatRoomPostingUnavailable =>
+      'الكتابة متوقفة مؤقتاً ريثما نتحقق من طلباتك. حاول مجدداً بعد قليل.';
+
+  @override
+  String chatShopUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count رسالة غير مقروءة',
+      many: '$count رسالة غير مقروءة',
+      few: '$count رسائل غير مقروءة',
+      two: 'رسالتان غير مقروءتين',
+      one: 'رسالة واحدة غير مقروءة',
+      zero: 'لا رسائل غير مقروءة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartTitle => 'السلة الذكية';
+
+  @override
+  String get multiCartSubtitle => 'دفعة واحدة لكل المتاجر';
+
+  @override
+  String multiCartShopCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count متجر',
+      many: '$count متجرًا',
+      few: '$count متاجر',
+      two: 'متجران',
+      one: 'متجر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartFromShop(int count, String store) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'من $store ($count صنف)',
+      many: 'من $store ($count صنفًا)',
+      few: 'من $store ($count أصناف)',
+      two: 'من $store (صنفان)',
+      one: 'من $store (صنف واحد)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopDelivery => 'التوصيل من هذا المتجر';
+
+  @override
+  String multiCartDeliveryFromShops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'التوصيل من $count متجر',
+      many: 'التوصيل من $count متجرًا',
+      few: 'التوصيل من $count متاجر',
+      two: 'التوصيل من متجرين',
+      one: 'التوصيل من متجر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiCartCheckoutAmount(String amount) {
+    return 'إتمام الطلب — $amount';
+  }
+
+  @override
+  String multiCartBelowMinimum(String amount, String store) {
+    return 'أضف $amount من $store لبلوغ الحد الأدنى للطلب';
+  }
+
+  @override
+  String multiCartShopClosed(String store) {
+    return '$store مغلق الآن. أزل منتجاته لإتمام الطلب.';
+  }
+
+  @override
+  String multiCartShopNotServing(String store) {
+    return '$store لا يوصّل إلى عنوانك. أزل منتجاته لإتمام الطلب.';
+  }
+
+  @override
+  String multiCartShopUnavailable(String store) {
+    return 'لا يستطيع $store استلام هذا الطلب الآن.';
+  }
+
+  @override
+  String multiCartRemoveShop(String store) {
+    return 'إزالة $store';
+  }
+
+  @override
+  String multiCartShopLimitTitle(int max) {
+    String _temp0 = intl.Intl.pluralLogic(
+      max,
+      locale: localeName,
+      other: 'حتى $max متجر في السلة',
+      many: 'حتى $max متجرًا في السلة',
+      few: 'حتى $max متاجر في السلة',
+      two: 'حتى متجرين في السلة',
+      one: 'متجر واحد في السلة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartShopLimitBody =>
+      'أتمّ طلبك أو أزل متجرًا من سلتك قبل إضافة منتجات من متجر آخر.';
+
+  @override
+  String multiCartPartOfOrder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'جزء من طلب من $count متجر',
+      many: 'جزء من طلب من $count متجرًا',
+      few: 'جزء من طلب من $count متاجر',
+      two: 'جزء من طلب من متجرين',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartCannotWait =>
+      'لا يمكن لسلة من عدة متاجر أن تنتظر عودة الاتصال: تُرسل طلبات متاجرها معًا وأنت متصل. أتمّ الطلب عند عودة الاتصال.';
+
+  @override
+  String get multiCartGiftOneShop =>
+      'تُرسل الهدية من متجر واحد في كل مرة. أزل منتجات المتاجر الأخرى، أو أرسل هذه السلة كطلب عادي.';
+
+  @override
+  String multiCartPlaced(int count, String amount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم إرسال $count طلب · $amount',
+      many: 'تم إرسال $count طلبًا · $amount',
+      few: 'تم إرسال $count طلبات · $amount',
+      two: 'تم إرسال طلبين · $amount',
+      one: 'تم إرسال طلب واحد · $amount',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get multiCartPricesUpdating => 'جارٍ تحديث الأسعار…';
+
+  @override
+  String get multiCartPricesFailed => 'تعذّر تأكيد أحدث الأسعار.';
+
+  @override
+  String get multiCartPriceChangedTitle => 'تغيّر المجموع';
+
+  @override
+  String multiCartPriceChangedBody(String total, String agreed) {
+    return 'أصبح مجموع سلتك $total بدلًا من $agreed الذي رأيته. هل تريد إتمام طلباتها بالمجموع الجديد؟';
+  }
+
+  @override
+  String multiCartEarlierCheckoutPlaced(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      many: 'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      few: 'نجحت محاولتك السابقة بالفعل: الطلبات الـ$count كلها في «الطلبات».',
+      two: 'نجحت محاولتك السابقة بالفعل: الطلبان كلاهما في «الطلبات».',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcVerticalServices => 'خدمات';
+
+  @override
+  String get svcCategoryPrinting => 'طباعة';
+
+  @override
+  String get svcCategoryTailoring => 'خياطة وتعديل ملابس';
+
+  @override
+  String get svcCategoryRepairs => 'تصليحات';
+
+  @override
+  String get svcCategoryPhotography => 'تصوير';
+
+  @override
+  String get svcCategoryCleaning => 'تنظيف';
+
+  @override
+  String get svcCategoryBeauty => 'تجميل';
+
+  @override
+  String get svcCategoryTutoring => 'دروس خصوصية';
+
+  @override
+  String get svcSignupTitle => 'كبّر عملك مع YouDrop';
+
+  @override
+  String get svcSignupSubtitle => 'اوصل إلى الزبائن في منطقتك.';
+
+  @override
+  String get svcSignupBannerTitle => 'خدمات لبنانية';
+
+  @override
+  String get svcSignupBannerBody =>
+      'طباعة، خياطة، تصليحات، تصوير والمزيد — يستلمها الزبون من محلّك أو يوصلها YouDrop.';
+
+  @override
+  String get svcBusinessName => 'اسم العمل';
+
+  @override
+  String get svcBusinessNameHint => 'مثلاً: مطبعة الفاخوري';
+
+  @override
+  String get svcServiceCategory => 'فئة الخدمة';
+
+  @override
+  String get svcServiceCategoryHint => 'اختر ما تقدّمه';
+
+  @override
+  String get svcPhoneHint => '71 234 567';
+
+  @override
+  String get svcPhoneInvalid => 'أدخل رقماً لبنانياً، مثل 71 234 567';
+
+  @override
+  String get svcArea => 'الموقع / المنطقة';
+
+  @override
+  String get svcAreaHint => 'اختر منطقتك';
+
+  @override
+  String get svcApplyCta => 'قدّم طلب بيع الخدمات';
+
+  @override
+  String get svcOptionsFailed =>
+      'تعذّر تحميل الخدمات المتاحة. تحقّق من اتصالك وحاول مجدداً.';
+
+  @override
+  String get svcNoCategoriesOpen =>
+      'لا يستقبل YouDrop طلبات لبيع الخدمات حالياً.';
+
+  @override
+  String get svcPendingTitle => 'تم إرسال طلبك';
+
+  @override
+  String svcPendingBody(String email) {
+    return 'يقرأ فريق YouDrop كل طلب لبيع الخدمات. سنراسلك على $email عند اتخاذ القرار.';
+  }
+
+  @override
+  String get svcPendingBodyNoEmail =>
+      'يقرأ فريق YouDrop كل طلب لبيع الخدمات، وسنبلغك عند اتخاذ القرار.';
+
+  @override
+  String svcReference(String reference) {
+    return 'المرجع: $reference';
+  }
+
+  @override
+  String get svcApprovedTitle => 'تمت الموافقة على طلبك';
+
+  @override
+  String get svcApprovedBody => 'نفتح محلّ خدماتك في أول مرة تدخل إليه.';
+
+  @override
+  String get svcErrCategoryClosed =>
+      'لا يستقبل YouDrop طلبات لهذه الخدمة بعد. اختر خدمة أخرى.';
+
+  @override
+  String get svcErrCategoryMissing => 'اختر الخدمة التي تقدّمها.';
+
+  @override
+  String get svcErrAreaUnknown =>
+      'لم تعد هذه المنطقة على القائمة. اختر منطقتك من جديد.';
+
+  @override
+  String get svcErrAreaMissing => 'اختر المنطقة التي يقع فيها عملك.';
+
+  @override
+  String get svcErrCatalogUnavailable =>
+      'تعذّر التحقق من الخدمات المتاحة الآن. حاول بعد قليل.';
+
+  @override
+  String get svcOfferYourServices => 'قدّم خدماتك';
+
+  @override
+  String get svcOfferYourServicesSub => 'طباعة، خياطة، تصليحات أو تصوير';
+
+  @override
+  String get svcSwitchToShop => 'انتقل إلى محلّك';
+
+  @override
+  String get svcSwitchToShopping => 'انتقل إلى التسوّق';
+
+  @override
+  String get svcChoiceCard => 'قدّم خدمات';
+
+  @override
+  String get svcChoiceCardBlurb =>
+      'اطبع أو خيّط أو صلّح أو صوّر لزبائن منطقتك، من محلّك.';
+
+  @override
+  String get svcIntent => 'خدمات';
+
+  @override
+  String get svcIntentBlurb => 'أطبع أو أخيّط أو أصلّح أو أصوّر';
+
+  @override
+  String get svcOpeningShop => 'نفتح محلّ خدماتك…';
+
+  @override
+  String get svcOpeningShopFailed => 'تعذّر فتح محلّ خدماتك.';
+
+  @override
+  String get svcDocsTitle => 'أضف مستنداتك';
+
+  @override
+  String get svcDocsIntro =>
+      'تساعد بطاقة هويتك وسجلّك التجاري فريق المراجعة على اتخاذ القرار. أرسل صوراً واضحة أو ملفات PDF.';
+
+  @override
+  String get svcDocsFootnote =>
+      'تصل المستندات إلى فريق المراجعة عند الضغط على «أرسل المستندات».';
+
+  @override
+  String get svcDocsSend => 'أرسل المستندات';
+
+  @override
+  String get svcDocsSent => 'مستنداتك لدى فريق المراجعة.';
+
+  @override
+  String get svcDocsSkipped =>
+      'لم تُرسل أي مستندات، لذا سيرى فريق المراجعة أن بطاقة هويتك وسجلّك التجاري غير مرفقين.';
+
+  @override
+  String get svcShopCategoryClosedTitle => 'خدمتك غير متاحة حالياً';
+
+  @override
+  String get svcShopCategoryClosedBody =>
+      'تمت الموافقة على طلبك، لكن YouDrop لا يقدّم هذه الخدمة حالياً، لذا لا يمكن فتح محلّك. يُرجى التواصل مع الدعم.';
+
+  @override
+  String svcCashShopName(String id) {
+    return 'المتجر $id';
+  }
+
+  @override
+  String svcCashShopTakenAtCounter(String amount) {
+    return '$amount دفعها الزبائن على صندوقه';
+  }
+
+  @override
+  String svcCashShopConfirmBody(
+      String shop, String owed, String held, String orders) {
+    return 'أكّد أنّ $shop دفع للمنصة $owed: عمولتها من $held دفعها زبائنه على صندوقه، عن $orders. يحتفظ المتجر بالباقي حصةً له. لا يمكن التراجع عن ذلك.';
+  }
+
+  @override
+  String svcCashShopAmountChanged(String shop, String amount) {
+    return '$shop مدين الآن بـ $amount، وليس بالمبلغ الذي أكّدته. لم يُسجَّل شيء.';
+  }
+
+  @override
+  String get svcActionCollected => 'استلمه الزبون';
+
+  @override
+  String get svcDeclineTooBusy => 'مشغولون جدًا الآن';
+
+  @override
+  String get svcDeclineCannotDo => 'لا يمكننا تنفيذ هذا العمل';
+
+  @override
+  String get svcDeclineFileProblem => 'مشكلة في الملف';
+
+  @override
+  String get svcDeclineOther => 'سبب آخر';
+
+  @override
+  String get svcNavServices => 'الخدمات';
+
+  @override
+  String get svcBrandPill => 'خدمات يودروب';
+
+  @override
+  String get svcSearchHint => 'ابحث عن خدمة…';
+
+  @override
+  String get svcCategoriesTitle => 'فئات الخدمات';
+
+  @override
+  String get svcPopularNearYou => 'خدمات رائجة بالقرب منك';
+
+  @override
+  String get svcNearYou => 'خدمات بالقرب منك';
+
+  @override
+  String get svcAllProviders => 'مقدّمو الخدمات';
+
+  @override
+  String get svcNoServicesNearby => 'لا توجد خدمات بالقرب منك بعد';
+
+  @override
+  String get svcNoServicesNearbyHint =>
+      'جرّب إحدى الفئات، أو ابحث عمّا تحتاجه.';
+
+  @override
+  String get svcServicesNotOffered => 'لا تقدّم يودروب خدمات هنا بعد';
+
+  @override
+  String get svcCouldNotLoadServices => 'تعذّر تحميل الخدمات';
+
+  @override
+  String svcDistanceAway(String distance) {
+    return 'على بُعد $distance';
+  }
+
+  @override
+  String get svcOffers => 'العروض';
+
+  @override
+  String get svcSearchProviders => 'مقدّمو الخدمات';
+
+  @override
+  String svcSearchTitle(String query) {
+    return 'نتائج «$query»';
+  }
+
+  @override
+  String svcNoResults(String query) {
+    return 'لم نجد شيئًا لـ«$query»';
+  }
+
+  @override
+  String svcCategoryEmpty(String category) {
+    return 'لا يوجد مقدّمو خدمات في فئة $category بعد';
+  }
+
+  @override
+  String svcReviewsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مراجعة',
+      many: '$count مراجعة',
+      few: '$count مراجعات',
+      two: 'مراجعتان',
+      one: 'مراجعة واحدة',
+      zero: 'لا مراجعات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcOpenUntil(String time) {
+    return 'مفتوح حتى $time';
+  }
+
+  @override
+  String get svcTabAbout => 'نبذة';
+
+  @override
+  String svcFromPrice(String price) {
+    return 'ابتداءً من $price';
+  }
+
+  @override
+  String get svcOrderCta => 'اطلب';
+
+  @override
+  String get svcNoOffers => 'لا توجد عروض لدى مقدّم الخدمة هذا حاليًا';
+
+  @override
+  String get svcAboutHours => 'ساعات العمل';
+
+  @override
+  String get svcAboutAddress => 'العنوان';
+
+  @override
+  String get svcAboutGetIt => 'كيف تحصل على طلبك';
+
+  @override
+  String get svcPickupAtShop => 'الاستلام من المحل';
+
+  @override
+  String get svcYouDropDelivery => 'توصيل يودروب';
+
+  @override
+  String get svcClosedNoOrders => 'مغلق الآن — يمكنك الطلب عندما يفتح المحل';
+
+  @override
+  String get svcNeedsFileUnavailable =>
+      'يحتاج هذا العرض إلى ملف، ولا يمكن إرسال الملفات مع الطلبات بعد';
+
+  @override
+  String svcPackOf(String count, String unit) {
+    return 'حزمة من $count $unit';
+  }
+
+  @override
+  String svcPerUnit(String unit) {
+    return 'لكل $unit';
+  }
+
+  @override
+  String get svcLoadMore => 'تحميل المزيد';
+
+  @override
+  String get svcCouldNotLoadOffer => 'تعذّر تحميل هذا العرض';
+
+  @override
+  String get svcCouldNotLoadReviews => 'تعذّر تحميل المراجعات';
+
+  @override
+  String get svcOrderServiceTitle => 'اطلب الخدمة';
+
+  @override
+  String svcProviderLine(String name) {
+    return 'مقدّم الخدمة: $name';
+  }
+
+  @override
+  String get svcQuantity => 'الكمية';
+
+  @override
+  String svcUnitsLine(String units, String unit) {
+    return '$units $unit';
+  }
+
+  @override
+  String svcPacksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count حزمة',
+      many: '$count حزمة',
+      few: '$count حزم',
+      two: 'حزمتان',
+      one: 'حزمة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcChooseOption => 'اختر واحدًا';
+
+  @override
+  String get svcOptionRequired => 'مطلوب';
+
+  @override
+  String get svcOptionOptional => 'اختياري';
+
+  @override
+  String get svcUploadDesign => 'ارفع ملف التصميم';
+
+  @override
+  String get svcUploadHint =>
+      'اضغط لاختيار ملف PDF أو JPG أو PNG، حتى 10 ميغابايت';
+
+  @override
+  String get svcUploading => 'جارٍ الرفع…';
+
+  @override
+  String get svcUploaded => 'تم الرفع';
+
+  @override
+  String get svcRemoveFile => 'إزالة';
+
+  @override
+  String get svcUploadFailed => 'تعذّر رفع هذا الملف. حاول مجددًا.';
+
+  @override
+  String get svcAddAnotherFile => 'أضف ملفًا آخر';
+
+  @override
+  String get svcFileRequired => 'يحتاج مقدّم الخدمة إلى ملفك للبدء';
+
+  @override
+  String get svcSpecialInstructions => 'تعليمات خاصة';
+
+  @override
+  String get svcInstructionsHint => 'مثال: اترك إطارًا أبيض حول حواف البطاقة';
+
+  @override
+  String get svcHowYouGetIt => 'طريقة الحصول على الطلب';
+
+  @override
+  String svcDeliveryFeePlus(String amount) {
+    return '+$amount';
+  }
+
+  @override
+  String get svcPayCashPickup => 'نقدًا — ادفع عند الاستلام';
+
+  @override
+  String get svcPayCashDelivery => 'نقدًا — ادفع عند التوصيل';
+
+  @override
+  String get svcDeliveryFee => 'رسوم التوصيل';
+
+  @override
+  String get svcDiscount => 'الخصم';
+
+  @override
+  String svcPlaceOrderTotal(String amount) {
+    return 'أكّد الطلب — $amount';
+  }
+
+  @override
+  String get svcOfflineNoQueue =>
+      'طلبات الخدمات تحتاج إلى اتصال — لا يمكن حفظها على هذا الهاتف لإرسالها لاحقًا.';
+
+  @override
+  String get svcChooseDeliveryAddress => 'اختر عنوان التوصيل';
+
+  @override
+  String get svcQuoteFailed => 'تعذّر الحصول على السعر. حاول مجددًا.';
+
+  @override
+  String svcPriceChangedBody(String total, String agreed) {
+    return 'أصبح مجموع هذا الطلب $total بدلًا من $agreed الذي رأيته. هل تريد تأكيده بالمجموع الجديد؟';
+  }
+
+  @override
+  String get svcDirectoryUnavailable =>
+      'الخدمات غير متاحة مؤقتًا. حاول مجددًا بعد لحظات.';
+
+  @override
+  String svcNotServed(String shop) {
+    return 'لا يوصل $shop إلى هذا العنوان';
+  }
+
+  @override
+  String svcShopClosed(String shop) {
+    return '$shop مغلق ولا يستقبل طلبات حاليًا';
+  }
+
+  @override
+  String svcBelowMinimum(String shop, String amount) {
+    return 'يوصل $shop الطلبات التي تبلغ $amount أو أكثر';
+  }
+
+  @override
+  String get svcRefusedCategoryClosed => 'هذه الخدمة غير متاحة حاليًا';
+
+  @override
+  String get svcRefusedOfferNotOrderable => 'لا يمكن طلب هذا العرض حاليًا';
+
+  @override
+  String get svcRefusedFulfilment => 'لا يقدّم مقدّم الخدمة طريقة الحصول هذه';
+
+  @override
+  String get svcRefusedAttachmentsUnavailable =>
+      'لا يمكن إرسال الملفات مع الطلبات بعد، لذا لا يمكن طلب هذا العرض';
+
+  @override
+  String get svcRefusedWrongType => 'ملفات PDF أو JPG أو PNG فقط';
+
+  @override
+  String get svcRefusedEmpty => 'هذا الملف فارغ';
+
+  @override
+  String get svcRefusedTooLarge => 'يجب ألا يتجاوز حجم الملف 10 ميغابايت';
+
+  @override
+  String get svcRefusedTooManyWaiting =>
+      'لديك ملفات كثيرة بانتظار طلب. أزل أحدها أولًا.';
+
+  @override
+  String get svcRefusedNotUploaded => 'لم يكتمل رفع هذا الملف. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedExpired => 'انتهت صلاحية هذا الملف. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedAlreadyAttached =>
+      'هذا الملف مرفق بطلب آخر. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedTooManyFiles => '3 ملفات كحدّ أقصى لكل طلب';
+
+  @override
+  String get svcRefusedDuplicate => 'هذا الملف مضاف بالفعل';
+
+  @override
+  String get svcRefusedNotAccepted => 'هذا العرض لا يقبل ملفات';
+
+  @override
+  String get svcRefusedUnknownFile =>
+      'تعذّر العثور على هذا الملف. ارفعه مجددًا.';
+
+  @override
+  String get svcRefusedPacks => 'اختر بين 1 و99 حزمة';
+
+  @override
+  String get svcRefusedGeneric => 'لا يمكن تقديم هذا الطلب كما هو';
+
+  @override
+  String get svcTrackTitle => 'تتبّع طلب الخدمة';
+
+  @override
+  String svcOrderNumber(String ref) {
+    return 'الطلب #$ref';
+  }
+
+  @override
+  String get svcStatusWaiting => 'بانتظار مقدّم الخدمة';
+
+  @override
+  String get svcStatusInProgress => 'قيد التنفيذ';
+
+  @override
+  String get svcStatusReadyPickup => 'جاهز للاستلام';
+
+  @override
+  String get svcStatusReadyDelivery => 'جاهز للتوصيل';
+
+  @override
+  String get svcStatusOnTheWay => 'في الطريق';
+
+  @override
+  String get svcStatusCompleted => 'مكتمل';
+
+  @override
+  String get svcStatusCollected => 'تم الاستلام';
+
+  @override
+  String get svcStatusDeclined => 'مرفوض';
+
+  @override
+  String get svcStatusNotCollected => 'لم يُستلم';
+
+  @override
+  String get svcEstimatedCompletion => 'موعد الإنجاز المتوقع';
+
+  @override
+  String get svcReadyByCaption => 'جاهز بحلول';
+
+  @override
+  String svcEstimateAfterAccept(String range) {
+    return '$range، ويُؤكَّد بعد قبول مقدّم الخدمة';
+  }
+
+  @override
+  String svcTurnaroundRange(String min, String max) {
+    return 'من $min إلى $max ساعة';
+  }
+
+  @override
+  String svcTurnaroundUpTo(String max) {
+    return 'حتى $max ساعة';
+  }
+
+  @override
+  String svcTodayAt(String time) {
+    return 'اليوم، $time';
+  }
+
+  @override
+  String svcTomorrowAt(String time) {
+    return 'غدًا، $time';
+  }
+
+  @override
+  String svcDateAt(String date, String time) {
+    return '$date، $time';
+  }
+
+  @override
+  String get svcOrderStatusTitle => 'حالة الطلب';
+
+  @override
+  String get svcTimelinePlaced => 'تم تقديم الطلب';
+
+  @override
+  String get svcTimelineAccepted => 'قَبِل مقدّم الخدمة الطلب';
+
+  @override
+  String get svcTimelineInProduction => 'قيد الإنجاز';
+
+  @override
+  String get svcTimelineOutForDelivery => 'خرج للتوصيل';
+
+  @override
+  String svcDeclinedReason(String reason) {
+    return 'رفض مقدّم الخدمة الطلب: $reason';
+  }
+
+  @override
+  String get svcTimelineNotCollected => 'أُلغي — لم يُستلم في الوقت المحدد';
+
+  @override
+  String get svcProviderRole => 'مقدّم الخدمة';
+
+  @override
+  String get svcShowNumberAtPickup => 'أظهر رقم الطلب هذا عند الاستلام';
+
+  @override
+  String svcPickupFrom(String shop) {
+    return 'الاستلام من $shop';
+  }
+
+  @override
+  String svcDeliveringTo(String address) {
+    return 'التوصيل إلى $address';
+  }
+
+  @override
+  String get svcYourInstructions => 'تعليماتك';
+
+  @override
+  String get svcSummary => 'الملخص';
+
+  @override
+  String get svcServiceChip => 'خدمة';
+
+  @override
+  String get svcRefusedTooManyUploads =>
+      'أرسلت عدة ملفات خلال الدقائق الأخيرة. انتظر بضع دقائق، ثم أضف هذا الملف من جديد.';
+
+  @override
+  String svcInstructionsLength(int used, int max) {
+    return '$used من $max';
+  }
+
+  @override
+  String get svcOrderNotAccepted =>
+      'تعذّر إرسال هذا الطلب كما هو. راجع ما كتبته فيه، ثم حاول مجددًا.';
+
+  @override
+  String get svcOrderChangedRequote =>
+      'تغيّر طلبك أثناء إرساله، لذا لم يُرسَل شيء. نتحقق الآن من مجموعه من جديد.';
+
+  @override
+  String get svcUnconfirmedLeaveTitle => 'ربما وصل طلبك';
+
+  @override
+  String get svcUnconfirmedLeaveBody =>
+      'لم يصلنا ردّ بعد أن ضغطت «اطلب». راجع طلباتك قبل أن تطلبه مجددًا، كي لا تطلبه مرتين.';
+
+  @override
+  String get svcCheckOrders => 'راجع الطلبات';
+
+  @override
+  String get svcLeaveAnyway => 'غادر على أي حال';
+
+  @override
+  String get svcStayHere => 'ابقَ هنا';
+
+  @override
+  String get svcYourFiles => 'ملفاتك';
+
+  @override
+  String svcYourFileNumber(int n) {
+    return 'الملف $n';
+  }
+
+  @override
+  String get svcYourFilesFailed => 'تعذّر تحميل ملفاتك';
+
+  @override
+  String get svcFileGone => 'هذا الملف لم يعد متاحًا.';
+
+  @override
+  String svcRateProvider(String shop) {
+    return 'قيّم $shop';
+  }
+
+  @override
+  String get svcRateProviderPrompt => 'كيف كان العمل؟';
+
+  @override
+  String svcRatedProvider(String shop) {
+    return 'لقد قيّمت $shop';
+  }
+
+  @override
+  String get svcReviewNotYet =>
+      'لم يُسجَّل هذا الطلب مكتملًا بعد، لذا لا يمكن تقييمه الآن. حاول مجددًا بعد دقيقة.';
+
+  @override
+  String get svcBoOffersTitle => 'عروض الخدمات';
+
+  @override
+  String get svcBoOffersSubtitle =>
+      'عروض كل متاجر الخدمات بكل حالاتها — احجب عرضًا أو أعِده مع ذكر السبب';
+
+  @override
+  String get svcBoShopsTitle => 'المتاجر';
+
+  @override
+  String get svcBoShopsSubtitle =>
+      'المتاجر المُدرجة، وأيّها يحمل شارة «محل موثوق»';
+
+  @override
+  String get svcBoFilterAll => 'الكل';
+
+  @override
+  String get svcBoOfferDraft => 'مسودة';
+
+  @override
+  String get svcBoOfferActive => 'نشط';
+
+  @override
+  String get svcBoOfferPaused => 'متوقف مؤقتًا';
+
+  @override
+  String get svcBoOfferArchived => 'مؤرشف';
+
+  @override
+  String get svcBoOfferTakenDown => 'محجوب';
+
+  @override
+  String get svcBoAllCategories => 'كل الفئات';
+
+  @override
+  String get svcBoAllShops => 'كل المتاجر';
+
+  @override
+  String get svcBoShopFilterTooltip => 'المتاجر التي ظهرت في النتائج حتى الآن';
+
+  @override
+  String get svcBoOffersSearchHint => 'ابحث باسم العرض أو المتجر';
+
+  @override
+  String get svcBoColOffer => 'العرض';
+
+  @override
+  String get svcBoColShop => 'المتجر';
+
+  @override
+  String get svcBoColCategory => 'الفئة';
+
+  @override
+  String get svcBoColPrice => 'السعر';
+
+  @override
+  String get svcBoColStatus => 'الحالة';
+
+  @override
+  String get svcBoOffersEmpty => 'لا توجد عروض خدمات تطابق هذه التصفية.';
+
+  @override
+  String get svcBoOffersLoadFailed => 'تعذّر تحميل عروض الخدمات.';
+
+  @override
+  String get svcBoOffersRefused =>
+      'لا يُسمح لهذا الحساب بقراءة عروض الخدمات — هذا متاح لموظفي الإدارة فقط.';
+
+  @override
+  String svcBoPageOf(int page, int pages) {
+    return 'الصفحة $page من $pages';
+  }
+
+  @override
+  String svcBoOffersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عرض',
+      many: '$count عرضًا',
+      few: '$count عروض',
+      two: 'عرضان',
+      one: 'عرض واحد',
+      zero: 'لا عروض',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String svcBoPriceFrom(String price) {
+    return 'ابتداءً من $price';
+  }
+
+  @override
+  String svcBoPricePer(String price, String unit) {
+    return '$price لكل $unit';
+  }
+
+  @override
+  String svcBoPricePerPack(String price, int count, String unit) {
+    return '$price لكل $count $unit';
+  }
+
+  @override
+  String get svcBoSectionOffer => 'العرض';
+
+  @override
+  String get svcBoSectionShop => 'متجر مقدّم الخدمة';
+
+  @override
+  String get svcBoSectionTerms => 'الشروط';
+
+  @override
+  String get svcBoSectionPhotos => 'الصور';
+
+  @override
+  String get svcBoSectionHold => 'محجوب عن البيع';
+
+  @override
+  String get svcBoSectionModerationHistory => 'سجل الإدارة';
+
+  @override
+  String get svcBoFactDescription => 'الوصف';
+
+  @override
+  String get svcBoFactName => 'الاسم';
+
+  @override
+  String get svcBoFactListing => 'الإدراج';
+
+  @override
+  String get svcBoShopListed => 'مُدرج';
+
+  @override
+  String get svcBoShopDraft => 'غير مُدرج بعد';
+
+  @override
+  String get svcBoShopSuspended => 'معلّق';
+
+  @override
+  String get svcBoTermPricing => 'التسعير';
+
+  @override
+  String get svcBoPricingFixed => 'سعر ثابت';
+
+  @override
+  String get svcBoPricingPerUnit => 'لكل وحدة';
+
+  @override
+  String get svcBoPricingFrom => 'سعر ابتدائي';
+
+  @override
+  String get svcBoTermUnknown => 'غير معروف لهذا الإصدار';
+
+  @override
+  String get svcBoTermPack => 'العبوة الواحدة';
+
+  @override
+  String svcBoPackOf(int count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcBoPackUnits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count وحدة',
+      many: '$count وحدة',
+      few: '$count وحدات',
+      two: 'وحدتان',
+      one: 'وحدة واحدة',
+      zero: 'لا وحدات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get svcBoTermTurnaround => 'مدة التنفيذ';
+
+  @override
+  String svcBoTurnaroundRange(int min, int max) {
+    return '$min–$max ساعة';
+  }
+
+  @override
+  String svcBoTurnaroundUpTo(int max) {
+    return 'حتى $max ساعة';
+  }
+
+  @override
+  String get svcBoTermFulfilment => 'طريقة التسليم';
+
+  @override
+  String get svcBoFulfilPickup => 'استلام من المتجر';
+
+  @override
+  String get svcBoFulfilDelivery => 'توصيل YouDrop';
+
+  @override
+  String get svcBoFulfilBoth => 'استلام أو توصيل';
+
+  @override
+  String get svcBoTermFiles => 'ملفات الزبون';
+
+  @override
+  String get svcBoFilesPolicyNone => 'بدون ملفات';
+
+  @override
+  String get svcBoFilesPolicyOptional => 'اختيارية';
+
+  @override
+  String get svcBoFilesPolicyRequired => 'إلزامية';
+
+  @override
+  String get svcBoTermPrompt => 'سؤال للزبون';
+
+  @override
+  String get svcBoNoPhotos => 'لا توجد صور';
+
+  @override
+  String get svcBoPhotoUnavailable => 'الصورة غير متاحة';
+
+  @override
+  String get svcBoOpenPhoto => 'فتح الصورة بالحجم الكامل';
+
+  @override
+  String get svcBoPhoto => 'صورة';
+
+  @override
+  String svcBoPhotoPosition(int index, int count) {
+    return '$index من $count';
+  }
+
+  @override
+  String get svcBoHoldReason => 'السبب المذكور';
+
+  @override
+  String get svcBoHoldSince => 'منذ';
+
+  @override
+  String get svcBoTakeDown => 'حجب العرض';
+
+  @override
+  String get svcBoRestore => 'إعادة العرض';
+
+  @override
+  String svcBoTakeDownTitle(String offer) {
+    return 'حجب $offer؟';
+  }
+
+  @override
+  String get svcBoTakeDownBody =>
+      'يُسحب من البيع لجميع الزبائن فورًا. يقرأ مقدّم الخدمة سببك، ولا يمكنه إعادته إلى البيع حتى تعيده الإدارة.';
+
+  @override
+  String svcBoRestoreTitle(String offer) {
+    return 'إعادة $offer؟';
+  }
+
+  @override
+  String get svcBoRestoreBody =>
+      'يُرفع الحجب. العرض الذي كان معروضًا للبيع يعود متوقفًا مؤقتًا ليستأنفه مقدّم الخدمة.';
+
+  @override
+  String get svcBoReasonLabel => 'السبب — إلزامي ويُحفظ في السجل';
+
+  @override
+  String get svcBoReasonRequired => 'اذكر السبب: السبب إلزامي.';
+
+  @override
+  String svcBoTakenDownDone(String offer) {
+    return 'حُجب $offer. يمكن لمقدّم الخدمة قراءة سببك.';
+  }
+
+  @override
+  String svcBoRestoredDone(String offer) {
+    return 'أُعيد $offer. إن كان معروضًا للبيع فهو ينتظر متوقفًا مؤقتًا حتى يستأنفه مقدّم الخدمة.';
+  }
+
+  @override
+  String get svcBoTakeDownRefused =>
+      'لم يُحجب: يفيد الخادم بأن هذا العرض محجوب أصلًا أو ليس عرض خدمة. لم يتغيّر شيء وأُعيد تحميل القائمة.';
+
+  @override
+  String get svcBoRestoreRefused =>
+      'لم يُعَد: يفيد الخادم بأن هذا العرض لم يعد محجوبًا. لم يتغيّر شيء وأُعيد تحميل القائمة.';
+
+  @override
+  String get svcBoOfferChanged =>
+      'تغيّر هذا العرض أثناء إجرائك، لذلك لم يُسجَّل شيء. أُعيد تحميله؛ حاول مجددًا.';
+
+  @override
+  String get svcBoOfferGone => 'هذا العرض لم يعد موجودًا.';
+
+  @override
+  String get svcBoModerateRefused => 'لا يُسمح لهذا الحساب بإدارة العروض.';
+
+  @override
+  String svcBoReasonRejected(int max) {
+    return 'لم يقبل الخادم هذا السبب. اكتب سببًا لا يتجاوز $max حرفًا.';
+  }
+
+  @override
+  String get svcBoActionFailed => 'لم يتم الإجراء ولم يتغيّر شيء. حاول مجددًا.';
+
+  @override
+  String get svcBoHistoryNever => 'لم تتخذ الإدارة أي إجراء بشأن هذا العرض.';
+
+  @override
+  String get svcBoHistoryLoadFailed => 'تعذّر تحميل السجل.';
+
+  @override
+  String get svcBoActTakeDown => 'حُجب';
+
+  @override
+  String get svcBoActRestore => 'أُعيد';
+
+  @override
+  String get svcBoActUnknown => 'إجراء لا يعرفه هذا الإصدار';
+
+  @override
+  String svcBoActBy(String actor) {
+    return 'بواسطة $actor';
+  }
+
+  @override
+  String get svcBoKindAll => 'كل الأنواع';
+
+  @override
+  String get svcBoKindService => 'طلبات الخدمات';
+
+  @override
+  String get svcBoFulfilmentAll => 'الاستلام والتوصيل';
+
+  @override
+  String get svcBoFulfilmentPickup => 'استلام';
+
+  @override
+  String get svcBoFulfilmentDelivery => 'توصيل';
+
+  @override
+  String get svcBoServiceTag => 'خدمة';
+
+  @override
+  String get svcBoStatusPlaced => 'تم الطلب';
+
+  @override
+  String get svcBoStatusAccepted => 'مقبول';
+
+  @override
+  String get svcBoStatusInProduction => 'قيد التنفيذ';
+
+  @override
+  String get svcBoStatusReadyPickup => 'جاهز للاستلام';
+
+  @override
+  String get svcBoStatusReadyDelivery => 'جاهز للتوصيل';
+
+  @override
+  String get svcBoStatusOnTheWay => 'في الطريق';
+
+  @override
+  String get svcBoStatusCollected => 'تم الاستلام';
+
+  @override
+  String get svcBoStatusDelivered => 'تم التوصيل';
+
+  @override
+  String get svcBoStatusDeclined => 'رفضه مقدّم الخدمة';
+
+  @override
+  String get svcBoStatusNotCollected => 'أُلغي: لم يُستلم';
+
+  @override
+  String get svcBoStatusCancelled => 'أُلغي';
+
+  @override
+  String get svcBoDetailKind => 'النوع';
+
+  @override
+  String svcBoKindServiceIn(String category) {
+    return 'خدمة · $category';
+  }
+
+  @override
+  String get svcBoDetailService => 'الخدمة';
+
+  @override
+  String svcBoPacksOfUnits(int packs, int size, String unit) {
+    return '$packs × $size $unit';
+  }
+
+  @override
+  String svcBoPacksOf(int packs, int size) {
+    return '$packs × $size';
+  }
+
+  @override
+  String get svcBoDetailOptions => 'الخيارات';
+
+  @override
+  String get svcBoDetailInstructions => 'التعليمات';
+
+  @override
+  String get svcBoNoInstructions => 'لم تُكتب تعليمات';
+
+  @override
+  String get svcBoDetailReadyBy => 'الجاهزية المتوقعة';
+
+  @override
+  String get svcBoHistoryTitle => 'سجل الحالة';
+
+  @override
+  String get svcBoHistoryNone => 'لا توجد خطوات مسجّلة بعد.';
+
+  @override
+  String get svcBoHistoryFailed => 'تعذّر تحميل سجل الحالة.';
+
+  @override
+  String get svcBoFilesTitle => 'ملفات الزبون';
+
+  @override
+  String get svcBoFilesAuditNotice =>
+      'تُسجَّل قراءات الإدارة لملفات الزبون: عرضها يسجّل حسابك مقابل كل ملف.';
+
+  @override
+  String get svcBoFilesShow => 'عرض الملفات';
+
+  @override
+  String get svcBoFilesNotTaken => 'هذا العرض لا يقبل ملفات.';
+
+  @override
+  String get svcBoFilesEmpty =>
+      'لا توجد ملفات على هذا الطلب. تُحذف الملفات بعد 90 يومًا من اكتمال الطلب.';
+
+  @override
+  String get svcBoFileOpen => 'فتح';
+
+  @override
+  String get svcBoFileOpened =>
+      'فُتح في علامة تبويب جديدة. وصولك إلى هذا الملف مسجَّل.';
+
+  @override
+  String get svcBoFilePdf => 'ملف PDF';
+
+  @override
+  String get svcBoFileImage => 'صورة';
+
+  @override
+  String get svcBoFileOther => 'ملف';
+
+  @override
+  String svcBoSizeMb(String size) {
+    return '$size ميغابايت';
+  }
+
+  @override
+  String svcBoSizeKb(String size) {
+    return '$size كيلوبايت';
+  }
+
+  @override
+  String get svcBoFilesRefused => 'رفض الخادم عرض ملفات هذا الطلب.';
+
+  @override
+  String get svcBoFilesUnavailable =>
+      'تعذّر الوصول إلى الملفات الآن. حاول بعد قليل.';
+
+  @override
+  String get svcBoFilesFailed => 'تعذّر تحميل الملفات.';
+
+  @override
+  String get svcBoLedgerRefused => 'لا يُسمح لهذا الحساب بقراءة سجل الطلبات.';
+
+  @override
+  String get svcBoShopsGoods => 'متاجر السلع';
+
+  @override
+  String get svcBoShopsServices => 'متاجر الخدمات';
+
+  @override
+  String get svcBoShopsSearchHint => 'ابحث باسم المتجر';
+
+  @override
+  String get svcBoShopsListedOnly =>
+      'تظهر هنا فقط المتاجر المُدرجة في الواجهة.';
+
+  @override
+  String get svcBoShopsEmpty => 'لا توجد متاجر مُدرجة مطابقة.';
+
+  @override
+  String get svcBoShopsLoadFailed => 'تعذّر تحميل المتاجر.';
+
+  @override
+  String svcBoVerifyGrantTitle(String shop) {
+    return 'منح $shop شارة «محل موثوق»؟';
+  }
+
+  @override
+  String get svcBoVerifyGrantBody =>
+      'يرى الزبائن الشارة على هذا المتجر أينما ظهر. إنها شهادة من YouDrop لجيران المتجر، فامنحها فقط لمتجر تم التحقق منه.';
+
+  @override
+  String svcBoVerifyRevokeTitle(String shop) {
+    return 'إزالة شارة «محل موثوق» عن $shop؟';
+  }
+
+  @override
+  String get svcBoVerifyRevokeBody =>
+      'تختفي الشارة عن هذا المتجر لدى جميع الزبائن.';
+
+  @override
+  String get svcBoVerifyGrant => 'منح الشارة';
+
+  @override
+  String get svcBoVerifyRevoke => 'إزالة الشارة';
+
+  @override
+  String svcBoVerifyGranted(String shop) {
+    return 'أصبح $shop «محلًا موثوقًا».';
+  }
+
+  @override
+  String svcBoVerifyRevoked(String shop) {
+    return 'لم يعد $shop «محلًا موثوقًا».';
+  }
+
+  @override
+  String get svcBoVerifyRefused => 'تغيير هذه الشارة متاح للإدارة فقط.';
+
+  @override
+  String get svcBoVerifyGone => 'هذا المتجر لم يعد موجودًا.';
+
+  @override
+  String get svcBoVerifyFailed => 'لم تتغيّر الشارة. حاول مجددًا.';
+
+  @override
+  String svcBoVerifiedToggle(String shop) {
+    return 'شارة «محل موثوق» لـ $shop';
+  }
+
+  @override
+  String svcBoReasonLength(int used, int max) {
+    return '$used من $max';
+  }
+
+  @override
+  String get svcBoOfferNotListed =>
+      'لم يُسجَّل شيء، وهذا العرض لم يعد ضمن عروض الخدمات، لذلك لم يبقَ ما يُتخذ بشأنه إجراء.';
+
+  @override
+  String get svcBoOfferUnreadable =>
+      'لم يُسجَّل شيء، لكن تعذّرت إعادة قراءة هذا العرض، لذلك قد لا يكون المعروض محدَّثًا. أغلقه ثم افتحه مجددًا من القائمة.';
+
+  @override
+  String get svcNavOffers => 'خدماتي';
+
+  @override
+  String get svcDashboardActiveOffers => 'خدمات متاحة';
+
+  @override
+  String get svcDashboardThisWeek => 'هذا الأسبوع';
+
+  @override
+  String get svcDashboardThisWeekCaption => 'الطلبات في آخر 7 أيام';
+
+  @override
+  String get svcDashboardRating => 'التقييم';
+
+  @override
+  String get svcQuickActions => 'إجراءات سريعة';
+
+  @override
+  String get svcAddOffer => 'أضف خدمة';
+
+  @override
+  String get svcViewOrders => 'عرض الطلبات';
+
+  @override
+  String get svcCurrentOffers => 'خدماتك الحالية';
+
+  @override
+  String get svcSeeAllOffers => 'عرض الكل';
+
+  @override
+  String get svcOfferActive => 'متاحة';
+
+  @override
+  String get svcOfferPaused => 'متوقفة';
+
+  @override
+  String get svcOfferDraft => 'مسودة';
+
+  @override
+  String get svcPauseOffer => 'إيقاف مؤقت';
+
+  @override
+  String get svcResumeOffer => 'استئناف';
+
+  @override
+  String get svcOfferPausedDone =>
+      'أوقفت الخدمة مؤقتًا. لن يتمكن الزبائن من طلبها حتى تستأنفها.';
+
+  @override
+  String get svcOfferResumedDone => 'الخدمة متاحة من جديد.';
+
+  @override
+  String get svcNoOffersYet => 'لا خدمات بعد';
+
+  @override
+  String get svcNoOffersYetBody => 'أضف خدمتك الأولى ليتمكن الزبائن من طلبها.';
+
+  @override
+  String get svcDashboardLoadFailed => 'تعذّر تحميل لوحة التحكم';
+
+  @override
+  String get svcOffersLoadFailed => 'تعذّر تحميل خدماتك';
+
+  @override
+  String get svcNoShopYet => 'متجر خدماتك لم يُفتح بعد';
+
+  @override
+  String get svcNoShopYetBody => 'سيُفتح فور الموافقة على طلبك.';
+
+  @override
+  String get svcPublishAfterApproval =>
+      'يمكنك نشر خدماتك بعد الموافقة على طلبك.';
+
+  @override
+  String get svcOffersTitle => 'خدماتك';
+
+  @override
+  String get svcOffersSubtitle => 'ما يمكن للزبائن طلبه منك';
+
+  @override
+  String svcUnitPack(String count, String unit) {
+    return '$count $unit';
+  }
+
+  @override
+  String svcUnitPer(String unit) {
+    return 'لكل $unit';
+  }
+
+  @override
+  String svcPriceUsd(String amount) {
+    return '$amount \$';
+  }
+
+  @override
+  String svcPriceLbp(String amount) {
+    return '$amount ل.ل.';
+  }
+
+  @override
+  String svcLbpPreview(String amount) {
+    return '≈ $amount بسعر اليوم';
+  }
+
+  @override
+  String get svcNewOffer => 'خدمة جديدة';
+
+  @override
+  String get svcEditOffer => 'تعديل الخدمة';
+
+  @override
+  String get svcOfferTitle => 'اسم الخدمة';
+
+  @override
+  String get svcOfferTitleRequired => 'أدخل اسم الخدمة';
+
+  @override
+  String svcTooLong(String max) {
+    return '$max حرفًا كحد أقصى';
+  }
+
+  @override
+  String get svcDescription => 'الوصف';
+
+  @override
+  String get svcCategory => 'الفئة';
+
+  @override
+  String get svcCategoryOfShop => 'تأخذ الخدمات فئة متجرك';
+
+  @override
+  String get svcPriceLabel => 'السعر (بالدولار الأمريكي)';
+
+  @override
+  String get svcPriceInvalid =>
+      'أدخل سعرًا أكبر من صفر بخانتين عشريتين على الأكثر';
+
+  @override
+  String get svcPricingType => 'طريقة التسعير';
+
+  @override
+  String get svcPricingFixed => 'سعر ثابت';
+
+  @override
+  String get svcPricingPerUnit => 'سعر للوحدة';
+
+  @override
+  String get svcPricingFrom => 'سعر ابتدائي (تُضاف إليه الخيارات)';
+
+  @override
+  String get svcUnitLabel => 'الوحدة (مثل: بطاقة، متر مربع)';
+
+  @override
+  String get svcPackSize => 'عدد الوحدات في كل خطوة';
+
+  @override
+  String get svcUnitRequired => 'حدّد الوحدة، مثل بطاقة أو متر مربع';
+
+  @override
+  String svcPackSizeRange(String min, String max) {
+    return 'بين $min و$max';
+  }
+
+  @override
+  String get svcPerUnitIsOne => 'سعر الوحدة هو سعر وحدة واحدة';
+
+  @override
+  String svcPackPreview(String pack) {
+    return 'يطلب الزبائن بخطوات من $pack';
+  }
+
+  @override
+  String get svcPhotos => 'الصور';
+
+  @override
+  String get svcPhotoRequired => 'أضف صورة واحدة على الأقل لتنشر';
+
+  @override
+  String get svcAddPhoto => 'أضف صورة';
+
+  @override
+  String get svcTurnaround => 'مدة التنفيذ';
+
+  @override
+  String get svcTurnaroundSameDay => 'في اليوم نفسه';
+
+  @override
+  String get svcTurnaround1to2 => 'من يوم إلى يومين';
+
+  @override
+  String get svcTurnaround3to5 => 'من 3 إلى 5 أيام';
+
+  @override
+  String get svcTurnaroundWeek => 'نحو أسبوع';
+
+  @override
+  String svcTurnaroundHours(String min, String max) {
+    return '$min–$max ساعة';
+  }
+
+  @override
+  String get svcTurnaroundRequired => 'اختر مدة التنفيذ';
+
+  @override
+  String get svcFulfilment => 'كيف يحصل الزبون عليها';
+
+  @override
+  String get svcFulfilmentPickup => 'الاستلام من متجرك';
+
+  @override
+  String get svcFulfilmentDelivery => 'توصيل يو دروب';
+
+  @override
+  String get svcFulfilmentBoth => 'الاثنان معًا';
+
+  @override
+  String get svcFulfilmentRequired => 'اختر كيف يحصل الزبون عليها';
+
+  @override
+  String get svcDeliveryNeedsAreas =>
+      'حدّد مناطق التوصيل أو ثبّت موقع متجرك قبل عرض توصيل يو دروب';
+
+  @override
+  String get svcCustomerFile => 'ملف من الزبون';
+
+  @override
+  String get svcCustomerFileNone => 'غير مطلوب';
+
+  @override
+  String get svcCustomerFileOptional => 'اختياري';
+
+  @override
+  String get svcCustomerFileRequired => 'مطلوب';
+
+  @override
+  String get svcInstructionsPrompt => 'ماذا يجب أن يخبرك الزبون؟';
+
+  @override
+  String get svcInstructionsPromptHint =>
+      'مثال: الأسماء والمسميات المطلوب طباعتها';
+
+  @override
+  String get svcOptions => 'الخيارات';
+
+  @override
+  String get svcOptionsAfterSave =>
+      'احفظ الخدمة أولًا، ثم أضف خيارات مثل نوع الورق';
+
+  @override
+  String get svcEditOptions => 'تعديل الخيارات';
+
+  @override
+  String get svcNoOptions => 'لا خيارات';
+
+  @override
+  String get svcPublishOffer => 'انشر الخدمة';
+
+  @override
+  String get svcSaveDraft => 'احفظ كمسودة';
+
+  @override
+  String get svcSaveChanges => 'احفظ التغييرات';
+
+  @override
+  String get svcOfferPublished => 'نُشرت الخدمة';
+
+  @override
+  String get svcDraftSaved => 'حُفظت المسودة';
+
+  @override
+  String get svcOfferSaveFailed => 'تعذّر حفظ الخدمة';
+
+  @override
+  String get svcOfferRefused =>
+      'لم تُقبل الخدمة بصيغتها الحالية. راجع تفاصيلها وحاول مجددًا.';
+
+  @override
+  String get svcArchiveOffer => 'أرشفة الخدمة';
+
+  @override
+  String get svcArchiveConfirm =>
+      'أرشفة هذه الخدمة؟ لن يراها الزبائن بعد الآن.';
+
+  @override
+  String get svcOfferArchived => 'أُرشفت الخدمة';
+
+  @override
+  String get svcOfferNotEditable =>
+      'تستخدم هذه الخدمة إعدادات لا يستطيع هذا الإصدار من التطبيق تعديلها. حدّث التطبيق لتعديلها.';
+
+  @override
+  String get svcMoreActions => 'إجراءات أخرى';
+
+  @override
+  String get svcIncomingOrders => 'الطلبات الواردة';
+
+  @override
+  String get svcTabNew => 'جديدة';
+
+  @override
+  String get svcTabInProgress => 'قيد التنفيذ';
+
+  @override
+  String get svcTabCompleted => 'مكتملة';
+
+  @override
+  String get svcChipNew => 'جديد';
+
+  @override
+  String get svcChipAccepted => 'مقبول';
+
+  @override
+  String get svcChipInProduction => 'قيد الإنتاج';
+
+  @override
+  String get svcChipReady => 'جاهز';
+
+  @override
+  String get svcChipOnTheWay => 'في الطريق';
+
+  @override
+  String get svcChipCollected => 'استُلم';
+
+  @override
+  String get svcChipDelivered => 'وُصِّل';
+
+  @override
+  String get svcChipDeclined => 'مرفوض';
+
+  @override
+  String get svcChipNotCollected => 'لم يُستلم';
+
+  @override
+  String get svcChipCancelled => 'ملغى';
+
+  @override
+  String get svcChipPickup => 'استلام';
+
+  @override
+  String get svcChipDelivery => 'توصيل';
+
+  @override
+  String get svcAcceptOrder => 'اقبل الطلب';
+
+  @override
+  String get svcDecline => 'ارفض';
+
+  @override
+  String get svcDeclineTitle => 'لماذا ترفض الطلب؟';
+
+  @override
+  String get svcDeclineBody => 'سيرى الزبون السبب الذي تختاره.';
+
+  @override
+  String get svcDeclineConfirm => 'ارفض الطلب';
+
+  @override
+  String get svcWaitingForPickup => 'بانتظار أن يستلمه الزبون';
+
+  @override
+  String get svcWaitingForRider => 'بانتظار السائق';
+
+  @override
+  String svcReadyBy(String time) {
+    return 'جاهز بحلول $time';
+  }
+
+  @override
+  String svcAcceptedReadyBy(String time) {
+    return 'قُبل الطلب. موعد جاهزيته $time.';
+  }
+
+  @override
+  String get svcAccepted => 'قُبل الطلب';
+
+  @override
+  String get svcMarkedReady => 'حُدِّد كجاهز';
+
+  @override
+  String get svcNoNewOrders => 'لا طلبات جديدة';
+
+  @override
+  String get svcNoOrdersInProgress => 'لا شيء قيد التنفيذ';
+
+  @override
+  String get svcNoCompletedOrders => 'لا طلبات مكتملة بعد';
+
+  @override
+  String get svcOrdersEmptyBody => 'تظهر الطلبات هنا عندما يطلبها الزبائن.';
+
+  @override
+  String get svcCancelNotCollected => 'ألغِ لعدم الاستلام';
+
+  @override
+  String svcCancelNotCollectedIn(String time) {
+    return 'يمكنك إلغاؤه لعدم الاستلام بعد $time';
+  }
+
+  @override
+  String get svcCancelNotCollectedTitle => 'إلغاء هذا الطلب غير المستلم؟';
+
+  @override
+  String get svcCancelNotCollectedBody =>
+      'سيُبلَّغ الزبون أن الطلب أُلغي لأنه لم يُستلم.';
+
+  @override
+  String get svcCancelNotCollectedNote => 'ملاحظة للزبون (اختيارية)';
+
+  @override
+  String get svcKeepOrder => 'أبقِ الطلب';
+
+  @override
+  String svcDurationDaysHours(String days, String hours) {
+    return '$days يوم و$hours ساعة';
+  }
+
+  @override
+  String svcDurationHoursMinutes(String hours, String minutes) {
+    return '$hours ساعة و$minutes دقيقة';
+  }
+
+  @override
+  String svcDurationMinutes(String minutes) {
+    return '$minutes دقيقة';
+  }
+
+  @override
+  String get svcRefusedNotDeclinable =>
+      'قُبل هذا الطلب في هذه الأثناء، فلا يمكن رفضه. جارٍ التحديث.';
+
+  @override
+  String get svcRefusedNotCollectable =>
+      'لم يعد هذا الطلب بانتظار الاستلام لديك. جارٍ التحديث.';
+
+  @override
+  String get svcRefusedTooSoon =>
+      'الوقت مبكر: ما زال أمام الزبون وقت للاستلام. جارٍ التحديث.';
+
+  @override
+  String get svcRefusedOther => 'تعذّر تعديل الطلب. جارٍ التحديث.';
+
+  @override
+  String get svcOrderDeclined => 'رُفض الطلب';
+
+  @override
+  String get svcOrderCollected => 'سُجِّل الاستلام';
+
+  @override
+  String get svcOrderCancelledNotCollected => 'أُلغي لعدم الاستلام';
+
+  @override
+  String svcOrderTitle(String id) {
+    return 'الطلب $id';
+  }
+
+  @override
+  String get svcChatWithCustomer => 'راسل الزبون';
+
+  @override
+  String get svcTheJob => 'العمل المطلوب';
+
+  @override
+  String get svcInstructions => 'تعليمات خاصة';
+
+  @override
+  String get svcNoInstructions => 'لم تُذكر تعليمات';
+
+  @override
+  String get svcCustomerFiles => 'ملفات الزبون';
+
+  @override
+  String get svcNoFiles => 'لم تُرسَل ملفات';
+
+  @override
+  String get svcFilesLoadFailed => 'تعذّر تحميل الملفات';
+
+  @override
+  String get svcOpenFile => 'افتح';
+
+  @override
+  String get svcFileCouldNotOpen => 'تعذّر فتح هذا الملف';
+
+  @override
+  String get svcFileDocument => 'مستند';
+
+  @override
+  String get svcFileImage => 'صورة';
+
+  @override
+  String svcFileSizeKb(String size) {
+    return '$size ك.ب';
+  }
+
+  @override
+  String svcFileSizeMb(String size) {
+    return '$size م.ب';
+  }
+
+  @override
+  String get svcFulfilmentPickupDetail => 'يستلمه الزبون من متجرك';
+
+  @override
+  String svcFulfilmentDeliveryDetail(String address) {
+    return 'يوصله السائق إلى $address';
+  }
+
+  @override
+  String get svcEstimatedReady => 'الجاهزية المتوقعة';
+
+  @override
+  String svcTurnaroundAfterAccept(String range) {
+    return 'مدة التنفيذ بعد القبول: $range';
+  }
+
+  @override
+  String get svcRiderOnTheWay => 'السائق في طريقه لاستلامه';
+
+  @override
+  String get svcFileLinkRefreshFailed =>
+      'تعذّر الحصول على رابط جديد لهذا الملف. حاول مجددًا.';
+
+  @override
+  String get svcOfferTakenDown => 'سحبتها يو دروب';
+
+  @override
+  String svcOfferTakenDownReason(String reason) {
+    return 'سبب يو دروب: $reason';
+  }
+
+  @override
+  String get svcOfferTakenDownBody =>
+      'لا يستطيع الزبائن طلبها، ولا يمكن نشرها أو إيقافها مؤقتًا أو استئنافها حتى تعيدها يو دروب. ما زال بإمكانك تعديلها.';
+
+  @override
+  String get svcOfferChangedElsewhere =>
+      'عُدّلت هذه الخدمة للتو من مكان آخر، فأعدنا قراءتها. راجعها وحاول مجددًا.';
+
+  @override
+  String get svcShopReadFailed => 'تعذّر تحميل متجرك';
+
+  @override
+  String get svcServiceOrdersRow => 'طلبات الخدمات';
+
+  @override
+  String get svcServiceOffersRow => 'خدماتك';
+
+  @override
+  String svcChatOrderLabel(String ref) {
+    return 'الطلب $ref';
+  }
+
+  @override
+  String svcChatClosedOn(String date) {
+    return 'أُغلقت المحادثة بشأن هذا الطلب في $date';
+  }
+
+  @override
+  String get svcChatClosed => 'أُغلقت المحادثة بشأن هذا الطلب';
+
+  @override
+  String get svcChatUnavailable => 'المحادثة غير متاحة حاليًا.';
+
+  @override
+  String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
 }

@@ -38,9 +38,10 @@ class OverviewScreen extends StatefulWidget {
 
   final OrderApi api;
 
-  /// Only ever asked for a count — `browse(size: 1).totalElements`, which is how many storefronts
-  /// are live. There is no "merchants" endpoint on the platform; the store list is the closest true
-  /// answer to the design's "Active Merchants".
+  /// Only ever asked for counts — `browse(size: 1).totalElements` for the goods storefront and for
+  /// [StoreVertical.services], which together are how many storefronts are live. There is no
+  /// "merchants" endpoint on the platform; the store lists are the closest true answer to the
+  /// design's "Active Merchants".
   final StoreApi storeApi;
 
   /// The platform's tier-split daily series, behind the KPI movements and the trend chart. Optional
@@ -111,15 +112,28 @@ class _OverviewScreenState extends State<OverviewScreen> {
     super.dispose();
   }
 
+  /// How many storefronts are live: goods shops plus service shops, each counted by the read that
+  /// lists them.
+  ///
+  /// A read naming no vertical is the goods storefront, which never lists a service shop, so on its
+  /// own it stopped counting every provider the day the services vertical arrived. The Services read
+  /// counts service shops in the categories that are open; a shop in a closed category is listed
+  /// nowhere, so it is not a live storefront either. Both counts or neither: if one read fails the
+  /// card shows a dash, never the half that did answer as though it were the whole.
+  Future<int?> _liveStorefronts() async {
+    final List<Paged<StoreCard>> counts = await Future.wait(<Future<Paged<StoreCard>>>[
+      widget.storeApi.browse(size: 1),
+      widget.storeApi.browse(vertical: StoreVertical.services, size: 1),
+    ]);
+    return counts.fold<int>(0, (int sum, Paged<StoreCard> page) => sum + page.totalElements);
+  }
+
   Future<void> _refresh({bool silent = false}) async {
     if (!silent) setState(() => _loading = true);
 
     // Three side reads fetched beside the orders and never allowed to fail the page — see the
     // fields' own notes. Each degrades to its own card.
-    final Future<int?> storefronts = widget.storeApi
-        .browse(size: 1)
-        .then<int?>((Paged<StoreCard> p) => p.totalElements)
-        .catchError((Object _) => null);
+    final Future<int?> storefronts = _liveStorefronts().catchError((Object _) => null);
     final Future<TierTradeSeries?> series = widget.aggregatesApi == null
         ? Future<TierTradeSeries?>.value(null)
         : widget.aggregatesApi!

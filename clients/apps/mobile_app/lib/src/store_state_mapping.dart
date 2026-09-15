@@ -26,4 +26,6 @@ IconData iconForVertical(StoreVertical vertical) => switch (vertical) {
       StoreVertical.pharmacy => Icons.local_pharmacy_rounded,
       StoreVertical.electronics => Icons.headphones_rounded,
       StoreVertical.flowersGifts => Icons.card_giftcard_rounded,
+      // The briefcase the services frames draw for their tab. No goods strip shows it.
+      StoreVertical.services => Icons.work_outline_rounded,
     };

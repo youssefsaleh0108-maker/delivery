@@ -321,7 +321,7 @@ String riderDistanceLabel(DeliveryStrings t, double metres) => metres >= 1000
 const String riderOsmAttribution = '© OpenStreetMap contributors';
 
 /// The OSM raster tile template every map in this app draws from.
-const String riderOsmTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const String riderOsmTileTemplate = mapTileUrlTemplate;
 
 /// The user agent OSM's policy asks a client to identify itself with.
 const String riderOsmUserAgent = 'shop.youdrop.app';

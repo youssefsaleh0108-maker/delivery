@@ -11,11 +11,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import com.delivery.notifications.domain.NotificationCategory;
 import com.delivery.notifications.domain.NotificationLog;
@@ -599,6 +605,107 @@ class NotificationDispatchServiceTest {
 
             verify(preferences, never()).allows(anyString(), anyString(), anyString());
             verify(rabbit).send(anyString(), eq("notification.dispatch.email"), any(Message.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("sending English where the configured locale has no row")
+    class LocaleFallback {
+
+        /** The same service with Arabic configured, as somebody might set it before recipients have one. */
+        private NotificationDispatchService arabic;
+
+        @BeforeEach
+        void arabicConfigured() {
+            arabic = new NotificationDispatchService(
+                    templates, logs, preferences, rabbit, objectMapper, "delivery.events", "ar");
+        }
+
+        private List<NotificationLog> dispatchInArabic(UUID order) {
+            return arabic.dispatch("order.status_changed", order, CUSTOMER,
+                    Map.of("SMS", "+9613123456", "PUSH", "device-token"),
+                    Map.of("status", "on its way"), "corr-1");
+        }
+
+        /** A status-change row in a locale other than English. */
+        private NotificationTemplate localised(String channel, String locale, String body) {
+            NotificationTemplate template = template("order.status_changed", channel, "s", body, null);
+            try {
+                set(template, "locale", locale);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+            return template;
+        }
+
+        /**
+         * What the fallback is for. No basket event has an Arabic row, so with ar configured and the
+         * lookup made in ar alone, every basket notification on the platform stopped, said only at
+         * DEBUG as "nothing to send".
+         */
+        @Test
+        void an_event_with_no_row_in_the_configured_locale_is_sent_in_english() {
+            templatesFor(template("SMS", null, "Delivery: order {{status}}"),
+                    template("PUSH", "s", "Your order is {{status}}"));
+
+            assertThat(dispatchInArabic(ORDER))
+                    .extracting(entry -> entry.getChannel() + " " + entry.getBody())
+                    .containsExactlyInAnyOrder(
+                            "SMS Delivery: order on its way",
+                            "PUSH Your order is on its way");
+        }
+
+        /** Per channel: the locale's own row wins where there is one, and English fills the rest. */
+        @Test
+        void english_fills_only_the_channels_the_configured_locale_has_no_row_for() {
+            templatesFor(template("SMS", null, "Delivery: order {{status}}"),
+                    template("PUSH", "s", "Your order is {{status}}"));
+            when(templates.findByEventTypeAndLocale("order.status_changed", "ar"))
+                    .thenReturn(List.of(localised("PUSH", "ar", "طلبك {{status}}")));
+
+            assertThat(dispatchInArabic(ORDER))
+                    .extracting(entry -> entry.getChannel() + " " + entry.getBody())
+                    .containsExactlyInAnyOrder(
+                            "PUSH طلبك on its way",
+                            "SMS Delivery: order on its way");
+        }
+
+        /** A gap in the copy is said once. Said per send, it would be most of the log. */
+        @Test
+        void the_fallback_is_logged_once_per_event_type_and_channel_not_per_send() {
+            Logger logger = (Logger) LoggerFactory.getLogger(NotificationDispatchService.class);
+            Level before = logger.getLevel();
+            ListAppender<ILoggingEvent> logged = new ListAppender<>();
+            logged.start();
+            logger.addAppender(logged);
+            logger.setLevel(Level.INFO);
+            try {
+                templatesFor(template("SMS", null, "body"), template("PUSH", "s", "body"));
+
+                for (int send = 0; send < 3; send++) {
+                    assertThat(dispatchInArabic(UUID.randomUUID())).hasSize(2);
+                }
+
+                assertThat(logged.list)
+                        .extracting(event -> event.getLevel() + " " + event.getFormattedMessage())
+                        .containsExactlyInAnyOrder(
+                                "INFO No ar template for order.status_changed on SMS; sending the en one",
+                                "INFO No ar template for order.status_changed on PUSH; sending the en one");
+            } finally {
+                logger.detachAppender(logged);
+                logger.setLevel(before);
+            }
+        }
+
+        /** English configured asks once, as it always did: the fallback costs the ordinary case nothing. */
+        @Test
+        void with_english_configured_nothing_is_looked_up_twice() {
+            templatesFor(template("SMS", null, "body"));
+
+            dispatchTo(Map.of("SMS", "+9613123456"));
+
+            verify(templates, org.mockito.Mockito.times(1))
+                    .findByEventTypeAndLocale(anyString(), anyString());
         }
     }
 

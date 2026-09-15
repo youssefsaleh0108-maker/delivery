@@ -118,6 +118,12 @@ class _DeliveryPortalAppState extends State<DeliveryPortalApp> {
     inventory: InventoryApi(_dio),
     staff: StoreStaffApi(_dio),
     reports: ReportsApi(_dio),
+    catalogScan: CatalogScanApi(_dio),
+    demand: DemandApi(_dio),
+    shopChat: ShopChatApi(_dio),
+    moderation: ChatModerationApi(_dio),
+    attachments: OrderAttachmentApi(_dio),
+    offerModeration: BackofficeCatalogApi(_dio),
   );
 
   /// The chosen language, remembered across sessions. There is nowhere else on web that survives

@@ -183,13 +183,38 @@ public class Thumbnailer {
      *                                       source too large to decode safely
      */
     public byte[] render(byte[] source) {
+        return renderLongEdge(source, LONG_EDGE_PX);
+    }
+
+    /**
+     * The same decode-shrink-encode at a caller-chosen size.
+     *
+     * <p>Merchant Blitz needs a shelf photo at the size a vision model reads best rather than the
+     * size a list row draws, and it needs the same protection the thumbnail path already has: the
+     * pixel budget in front of the decoder is the part that stops a decompression bomb, and a
+     * second copy of it written for one caller is the copy that would drift. So this is the one
+     * implementation, and {@link #render} is this at {@link #LONG_EDGE_PX}.
+     *
+     * <p>The result is always upright. A camera photo's EXIF orientation is applied, because every
+     * viewer that shows the original honours it — see {@link ExifOrientation} for what went wrong
+     * without it.
+     */
+    public byte[] renderLongEdge(byte[] source, int longEdgePx) {
         if (source == null || source.length == 0) {
             throw new ThumbnailUnavailableException("nothing to read");
+        }
+        if (longEdgePx < 1) {
+            throw new IllegalArgumentException("A long edge must be at least one pixel");
         }
 
         BufferedImage decoded = decodeWithinBudget(source);
         try {
-            return encodeJpeg(scale(decoded));
+            // Stood upright after shrinking rather than before: a quarter turn only swaps which edge
+            // is the long one, so the picture is the same, and turning a 40 MP decode at full size
+            // would hold a second full-size raster — hundreds of megabytes, on a pod allowed 512 —
+            // for nothing.
+            return encodeJpeg(ExifOrientation.apply(scale(decoded, longEdgePx),
+                    ExifOrientation.of(source)));
         } catch (IOException | RuntimeException e) {
             throw new ThumbnailUnavailableException("could not encode the thumbnail", e);
         } finally {
@@ -242,7 +267,8 @@ public class Thumbnailer {
     }
 
     /**
-     * Shrinks to {@link #LONG_EDGE_PX} on the long edge, preserving the aspect ratio.
+     * Shrinks to {@code longEdgePx} on the long edge — {@link #LONG_EDGE_PX} for a thumbnail —
+     * preserving the aspect ratio.
      *
      * <p>Halves repeatedly before the final step rather than jumping straight to the target. A
      * single bilinear pass from 4000 px to 320 px samples about one source pixel in twelve and
@@ -253,11 +279,11 @@ public class Thumbnailer {
      * <p>Never upscales: a source smaller than the target is copied at its own size. A 200 px photo
      * blown up to 320 px would be bigger on the wire and no better on screen.
      */
-    private static BufferedImage scale(BufferedImage source) {
+    private static BufferedImage scale(BufferedImage source, int longEdgePx) {
         int width = source.getWidth();
         int height = source.getHeight();
 
-        double factor = Math.min(1.0, (double) LONG_EDGE_PX / Math.max(width, height));
+        double factor = Math.min(1.0, (double) longEdgePx / Math.max(width, height));
         int targetWidth = Math.max(1, (int) Math.round(width * factor));
         int targetHeight = Math.max(1, (int) Math.round(height * factor));
 

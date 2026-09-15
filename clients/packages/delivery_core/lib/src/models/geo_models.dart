@@ -121,6 +121,60 @@ class NearbyStore {
         longitude: (json['longitude'] as num).toDouble(),
         distanceMetres: (json['distanceMetres'] as num?)?.toInt() ?? 0,
       );
+
+  /// The row, or null when [json] is not one this build can draw: no card with an id and a name, or no
+  /// pin. For a list the server sends bare, such as the Services tab's popular shops, where one row
+  /// this build cannot read is dropped rather than failing the whole list or being drawn with a guess.
+  static NearbyStore? maybeFromJson(Object? json) {
+    if (json is! Map<String, dynamic>) {
+      return null;
+    }
+    final Object? store = json['store'];
+    if (store is! Map<String, dynamic> ||
+        store['id'] is! String ||
+        store['name'] is! String ||
+        json['latitude'] is! num ||
+        json['longitude'] is! num) {
+      return null;
+    }
+    return NearbyStore.fromJson(json);
+  }
+}
+
+/// A page of the "near me" search, mirroring `GeoDtos.NearbyPageResponse`: the storefront's page,
+/// plus whether the search reached its ceiling.
+///
+/// [truncated] marks the one case in which [Paged.totalElements] is not "every shop in the radius
+/// that matches": more matched than one search reads, so the page and its total cover the nearest
+/// [candidateLimit] of them only. A screen about to say "no shops match" over a truncated answer
+/// should say it searched the nearest [candidateLimit] instead.
+class NearbyPage extends Paged<NearbyStore> {
+  const NearbyPage({
+    required super.content,
+    required super.page,
+    required super.totalElements,
+    required super.totalPages,
+    this.truncated = false,
+    this.candidateLimit,
+  });
+
+  final bool truncated;
+
+  /// How many of the nearest matching shops one search reads. Null from a server that does not
+  /// say, which is also a server that never reports [truncated].
+  final int? candidateLimit;
+
+  factory NearbyPage.fromJson(Map<String, dynamic> json) {
+    final Paged<NearbyStore> page = Paged<NearbyStore>.fromJson(json, NearbyStore.fromJson);
+    return NearbyPage(
+      content: page.content,
+      page: page.page,
+      totalElements: page.totalElements,
+      totalPages: page.totalPages,
+      truncated: json['truncated'] as bool? ?? false,
+      candidateLimit: (json['candidateLimit'] as num?)?.toInt(),
+    );
+  }
 }
 
 /// How a cross-sell suggestion was arrived at, mirroring `CrossSellService.Basis`.

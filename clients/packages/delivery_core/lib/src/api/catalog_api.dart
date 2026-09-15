@@ -35,11 +35,54 @@ class CatalogApi {
         response.data as Map<String, dynamic>, Product.fromJson);
   }
 
-  /// The Merchant Portal's list — the caller's own products, in any status.
-  Future<Paged<Product>> myProducts({int page = 0, int size = 20}) async {
+  /// The Merchant Portal's list — the caller's own products, in any status or in [status] alone, from
+  /// every shop the account owns or from [storeId] alone.
+  ///
+  /// The provider dashboard's "Active offers" is
+  /// `myProducts(storeId: serviceShop.id, status: ProductStatus.active, size: 1)` read as
+  /// [Paged.totalElements]: a count the server made, not the length of a page, and of that service
+  /// shop's offers only, since the same account may own a goods shop too. A [storeId] the caller does
+  /// not own answers 404, as an id that was never issued does.
+  Future<Paged<Product>> myProducts({
+    String? storeId,
+    ProductStatus? status,
+    int page = 0,
+    int size = 20,
+  }) async {
     final Response<dynamic> response = await _dio.get<dynamic>(
       '/api/products/mine',
-      queryParameters: <String, dynamic>{'page': page, 'size': size},
+      queryParameters: <String, dynamic>{
+        if (storeId != null) 'storeId': storeId,
+        if (status != null) 'status': status.wireValue,
+        'page': page,
+        'size': size,
+      },
+    );
+    return Paged<Product>.fromJson(
+        response.data as Map<String, dynamic>, Product.fromJson);
+  }
+
+  /// The services offer search: live offers of listed service shops in open categories.
+  ///
+  /// Never a goods product, a paused offer or one back office took down. A [serviceCategory] the
+  /// platform has closed answers an empty page. For any signed-in caller. Back office lists every
+  /// offer, in every status, with `BackofficeCatalogApi.serviceOffers`.
+  ///
+  /// The Services tab's "Popular near you" row is shops, not offers: [StoreApi.popularServices].
+  Future<Paged<Product>> searchServices({
+    String? search,
+    ServiceCategory? serviceCategory,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/products/services',
+      queryParameters: <String, dynamic>{
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (serviceCategory != null) 'serviceCategory': serviceCategory.wireValue,
+        'page': page,
+        'size': size,
+      },
     );
     return Paged<Product>.fromJson(
         response.data as Map<String, dynamic>, Product.fromJson);
@@ -68,6 +111,21 @@ class CatalogApi {
     return Product.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Takes a live service offer off sale for now. The provider's own offers only (404 for anyone
+  /// else's); a goods product answers 422, because goods are archived instead.
+  Future<Product> pause(String id) async {
+    final Response<dynamic> response = await _dio.post<dynamic>('/api/products/$id/pause');
+    return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Puts a paused service offer back on sale. Fails with 422 without a photo, or for an offer that
+  /// can be delivered when the shop has neither delivery areas nor a pin; with 403 while the provider
+  /// is still awaiting approval, as publishing does.
+  Future<Product> resume(String id) async {
+    final Response<dynamic> response = await _dio.post<dynamic>('/api/products/$id/resume');
+    return Product.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// Replaces the product's whole option structure — the merchant's side of what a customer sees
   /// as "Choose a size".
   ///
@@ -88,6 +146,16 @@ class CatalogApi {
     return (response.data as List<dynamic>)
         .map((dynamic json) => OptionGroup.fromJson(json as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Puts a live product on the customer gift hub, or takes it off. BACKOFFICE only; the server
+  /// refuses a product that is not live (422). Answers with what the switch now says.
+  Future<bool> setGiftFeatured(String id, {required bool featured}) async {
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      '/api/products/$id/gift-featured',
+      data: <String, dynamic>{'featured': featured},
+    );
+    return (response.data as Map<String, dynamic>)['giftFeatured'] as bool? ?? false;
   }
 
   /// Archive, not delete. Past orders still reference the product.

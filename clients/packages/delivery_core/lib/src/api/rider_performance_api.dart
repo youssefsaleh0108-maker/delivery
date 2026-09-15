@@ -31,6 +31,21 @@ class RiderPerformanceApi {
     return RiderPerformance.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// One rider's deliveries per day over the last [days] days (1–30), for the rider profile's
+  /// output chart.
+  ///
+  /// Scoped exactly like [forRider]: BACKOFFICE sees the rider's whole record, CARRIER only the
+  /// deliveries made for their own company, resolved from the caller and never a request field. A
+  /// rider who never rode for them charts as an empty window rather than a 404. A window outside
+  /// 1–30 is the caller's 400; a CARRIER in no company gets a 404.
+  Future<RiderDailyOutput> dailyForRider(String riderId, {int days = 30}) async {
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      '/api/orders/riders/$riderId/performance/daily',
+      queryParameters: <String, dynamic>{'days': days},
+    );
+    return RiderDailyOutput.fromJson(response.data as Map<String, dynamic>);
+  }
+
   /// Per-rider delivered counts for today, in the platform's zone.
   ///
   /// BACKOFFICE is platform-wide; CARRIER is their own company only. Riders with zero deliveries

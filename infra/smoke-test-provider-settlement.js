@@ -98,6 +98,23 @@ check('and the merchant chooses that carrier',
   send('PUT', '/api/delivery-providers/policy',
     { preferredProviderId: company.id, allowFallback: true }, merchant).code === '200');
 
+// THE UNDO, REGISTERED THE MOMENT THE DAMAGE BECOMES POSSIBLE — not written at the bottom of the
+// file, where only the happy path reaches it.
+//
+// A rider left inside an external company while dispatch keeps routing in-house makes EVERY order
+// on this environment reach READY and stop, invisible to the only rider who can sign in. That is
+// a platform nobody can use, produced by a test that happened to fail further down — and it is
+// the state dev was found in. `exit` fires on a normal end, on process.exit(), and after an
+// uncaught throw; every call here is synchronous execSync, so it completes before the process
+// goes. The tail of the file still does this and still checks it; this is the copy that runs
+// when the tail is never reached.
+process.on('exit', () => {
+  try {
+    send('PUT', '/api/delivery-providers/policy', { preferredProviderId: null }, merchant);
+    send('DELETE', `/api/delivery-providers/riders/${riderSub}`, null);
+  } catch { /* the environment may already be unreachable; there is nothing better to do here */ }
+});
+
 console.log('\n--- carried by that company ---');
 const carriedOrder = placeAndDeliver();
 check('the order records who carried it',
