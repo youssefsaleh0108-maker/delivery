@@ -166,6 +166,19 @@ public class AccountOnboardingController {
     }
 
     /**
+     * 503: Order Manager could not say which delivery companies are hiring, so a rider's application
+     * to one was not judged. Nothing was recorded and nothing granted; the same call, retried, is the
+     * remedy. Coded, so the app says it in the reader's language.
+     */
+    @ExceptionHandler(PlatformClient.CompaniesUnavailableException.class)
+    public ResponseEntity<Map<String, String>> companiesUnavailable(
+            PlatformClient.CompaniesUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", e.getMessage(),
+                "code", PlatformClient.CompaniesUnavailableException.CODE));
+    }
+
+    /**
      * 502: the record is fine but Keycloak would not set the roles. The same status
      * {@code PartnerManagementController} answers for the same failure. Retrying is safe and is
      * what finishes it — the application path is idempotent and re-asserts the roles. The app

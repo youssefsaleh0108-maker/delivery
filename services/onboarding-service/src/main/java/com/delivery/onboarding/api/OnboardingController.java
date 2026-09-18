@@ -901,6 +901,19 @@ public class OnboardingController {
     }
 
     /**
+     * 503: Order Manager could not say which delivery companies are hiring, so a rider's application
+     * to one was not judged at all. Retrying is the whole remedy; the code lets the app say so in its
+     * own words.
+     */
+    @ExceptionHandler(com.delivery.onboarding.client.PlatformClient.CompaniesUnavailableException.class)
+    public ResponseEntity<Map<String, String>> companiesUnavailable(
+            com.delivery.onboarding.client.PlatformClient.CompaniesUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "message", e.getMessage(),
+                "code", com.delivery.onboarding.client.PlatformClient.CompaniesUnavailableException.CODE));
+    }
+
+    /**
      * 429, and it must stay distinct from 422.
      *
      * <p>"Wrong code" and "wait a minute" call for opposite reactions from whoever is looking at the

@@ -147,9 +147,9 @@ class ServiceProviderAnswersTest {
             Map<String, Object> bakery = Map.of("businessType", "BAKERY");
             Map<String, Object> rider = Map.of("vehicleType", "MOTORCYCLE");
 
-            assertThat(answers.checked(Kind.MERCHANT, bakery).details()).isSameAs(bakery);
-            assertThat(answers.checked(Kind.RIDER, rider).details()).isSameAs(rider);
-            assertThat(answers.checked(Kind.CARRIER, null).details()).isNull();
+            assertThat(answers.checked(Kind.MERCHANT, bakery, null).details()).isSameAs(bakery);
+            assertThat(answers.checked(Kind.RIDER, rider, null).details()).isSameAs(rider);
+            assertThat(answers.checked(Kind.CARRIER, null, null).details()).isNull();
             verifyNoInteractions(platform);
         }
     }
@@ -162,7 +162,7 @@ class ServiceProviderAnswersTest {
         @DisplayName("an application to offer services that is not a shop's")
         void only_a_shop_offers_services() {
             assertThat(codeOf(() -> answers.checked(Kind.RIDER,
-                    services("PRINTING", area(HAMRA, "Hamra")))))
+                    services("PRINTING", area(HAMRA, "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.NOT_A_SHOP);
             verifyNoInteractions(platform);
         }
@@ -171,10 +171,10 @@ class ServiceProviderAnswersTest {
         @DisplayName("a missing category, before Product Service is asked anything")
         void a_category_is_required() {
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services(null, area(HAMRA, "Hamra")))))
+                    services(null, area(HAMRA, "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.CATEGORY_MISSING);
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services("   ", area(HAMRA, "Hamra")))))
+                    services("   ", area(HAMRA, "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.CATEGORY_MISSING);
             verifyNoInteractions(platform);
         }
@@ -182,13 +182,13 @@ class ServiceProviderAnswersTest {
         @Test
         @DisplayName("a missing or malformed area, before Product Service is asked anything")
         void an_area_is_required() {
-            assertThat(codeOf(() -> answers.checked(Kind.MERCHANT, services("PRINTING", null))))
+            assertThat(codeOf(() -> answers.checked(Kind.MERCHANT, services("PRINTING", null), null)))
                     .isEqualTo(ServiceAnswerException.AREA_MISSING);
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services("PRINTING", "Mar Mikhael, Beirut"))))
+                    services("PRINTING", "Mar Mikhael, Beirut"), null)))
                     .isEqualTo(ServiceAnswerException.AREA_MISSING);
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services("PRINTING", Map.of("zoneId", "not-a-zone", "label", "Hamra")))))
+                    services("PRINTING", Map.of("zoneId", "not-a-zone", "label", "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.AREA_MISSING);
             verifyNoInteractions(platform);
         }
@@ -197,7 +197,7 @@ class ServiceProviderAnswersTest {
         @DisplayName("a category Product Service has closed")
         void a_closed_category() {
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services("CLEANING", area(HAMRA, "Hamra")))))
+                    services("CLEANING", area(HAMRA, "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.CATEGORY_CLOSED);
             // Refused on the category; the zones are not worth reading for an application that is
             // already refused.
@@ -208,7 +208,7 @@ class ServiceProviderAnswersTest {
         @DisplayName("something that is not a category at all, the same way as a closed one")
         void not_a_category() {
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services("KNITTING", area(HAMRA, "Hamra")))))
+                    services("KNITTING", area(HAMRA, "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.CATEGORY_CLOSED);
         }
 
@@ -218,7 +218,7 @@ class ServiceProviderAnswersTest {
             UUID retired = UUID.fromString("9d9d9d9d-1111-4222-8333-444455556666");
 
             assertThat(codeOf(() -> answers.checked(Kind.MERCHANT,
-                    services("PRINTING", area(retired, "Gemmayze")))))
+                    services("PRINTING", area(retired, "Gemmayze")), null)))
                     .isEqualTo(ServiceAnswerException.AREA_UNKNOWN);
         }
     }
@@ -234,7 +234,7 @@ class ServiceProviderAnswersTest {
             sent.put("businessType", "services");
             sent.put("notesForReviewer", "We print on fabric too");
 
-            Map<String, Object> recorded = answers.checked(Kind.MERCHANT, sent).details();
+            Map<String, Object> recorded = answers.checked(Kind.MERCHANT, sent, null).details();
 
             assertThat(recorded)
                     .containsEntry("businessType", "SERVICES")
@@ -251,7 +251,7 @@ class ServiceProviderAnswersTest {
             when(platform.openServiceCategories()).thenReturn(List.of("PRINTING", "CLEANING"));
 
             assertThat(answers.checked(Kind.MERCHANT,
-                    services("CLEANING", area(HAMRA, "Hamra"))).details())
+                    services("CLEANING", area(HAMRA, "Hamra")), null).details())
                     .containsEntry("serviceCategory", "CLEANING");
         }
     }
@@ -263,7 +263,7 @@ class ServiceProviderAnswersTest {
                 new PlatformClient.CatalogUnavailableException("try again", null));
 
         assertThatThrownBy(() -> answers.checked(Kind.MERCHANT,
-                services("PRINTING", area(HAMRA, "Hamra"))))
+                services("PRINTING", area(HAMRA, "Hamra")), null))
                 .isInstanceOf(PlatformClient.CatalogUnavailableException.class)
                 .isNotInstanceOf(ServiceAnswerException.class);
     }
@@ -359,7 +359,7 @@ class ServiceProviderAnswersTest {
 
             assertThat(remembering.options().categories()).contains("PRINTING");
             assertThat(codeOf(() -> remembering.checked(Kind.MERCHANT,
-                    services("PRINTING", area(HAMRA, "Hamra")))))
+                    services("PRINTING", area(HAMRA, "Hamra")), null)))
                     .isEqualTo(ServiceAnswerException.CATEGORY_CLOSED);
             verify(platform, times(2)).openServiceCategories();
         }
@@ -491,6 +491,81 @@ class ServiceProviderAnswersTest {
                     any(), any(),
                     argThat((Checked checked) ->
                             Map.of("businessType", "BAKERY").equals(checked.details())),
+                    any());
+        }
+
+        /** A rider's open-form answers as an installed app still sends them: an area and a pin. */
+        private Map<String, Object> riderAnswers() {
+            return Map.of("vehicleType", "MOTORCYCLE", "preferredArea", "Hamra",
+                    "workLatitude", 33.8959, "workLongitude", 35.4828);
+        }
+
+        @Test
+        @DisplayName("a rider naming a company: the proof, then Order Manager, then the intake — which records the company's region, not the pin")
+        void a_company_rider_is_judged_before_the_intake() {
+            emailProved();
+            UUID swift = UUID.randomUUID();
+            when(platform.hiringCompanies()).thenReturn(List.of(
+                    new PlatformClient.HiringCompany(swift, "Swift Couriers",
+                            List.of("Achrafieh", "Hamra"))));
+
+            onboarding.submit(Kind.RIDER, "Sam Salem", "Sam Salem", "sam@example.test",
+                    "email-proof", null, null, null, riderAnswers(), swift);
+
+            InOrder order = inOrder(verifications, platform, intake);
+            order.verify(verifications).isVerified("email-proof", Channel.EMAIL, "sam@example.test");
+            order.verify(platform).hiringCompanies();
+            order.verify(intake).record(eq(Kind.RIDER), any(), any(), any(), eq("email-proof"),
+                    any(), any(), any(),
+                    argThat((Checked checked) ->
+                            List.of("Achrafieh", "Hamra").equals(checked.details().get("companyRegions"))
+                                    && "MOTORCYCLE".equals(checked.details().get("vehicleType"))
+                                    && !checked.details().containsKey("preferredArea")
+                                    && !checked.details().containsKey("workLatitude")
+                                    && !checked.details().containsKey("workLongitude")),
+                    eq(swift));
+            // A rider is not a services application: Product Service is not asked about them.
+            verify(platform, never()).openServiceCategories();
+            verify(platform, never()).serviceAreas();
+        }
+
+        @Test
+        @DisplayName("a rider naming a company with no valid proof is refused without a call to Order Manager")
+        void a_company_rider_without_proof_asks_nobody() {
+            assertThatThrownBy(() -> onboarding.submit(Kind.RIDER, "Sam Salem", "Sam Salem",
+                    "sam@example.test", "made-up", null, null, null, riderAnswers(),
+                    UUID.randomUUID()))
+                    .isInstanceOf(VerificationService.VerificationException.class);
+
+            verifyNoInteractions(platform, intake);
+        }
+
+        @Test
+        @DisplayName("a company that is not hiring is refused by name on the open form too, and spends no proof")
+        void a_company_not_hiring_spends_nothing() {
+            emailProved();
+            when(platform.hiringCompanies()).thenReturn(List.of());
+
+            assertThatThrownBy(() -> onboarding.submit(Kind.RIDER, "Sam Salem", "Sam Salem",
+                    "sam@example.test", "email-proof", null, null, null, riderAnswers(),
+                    UUID.randomUUID()))
+                    .isInstanceOfSatisfying(CompanyRiderAnswers.CompanyAnswerException.class,
+                            refused -> assertThat(refused.code()).isEqualTo("company-not-hiring"));
+
+            verifyNoInteractions(intake);
+            verify(verifications, never()).consume(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("a rider riding for YouDrop is not looked at early and keeps the area and pin they chose")
+        void a_rider_for_youdrop_is_unchanged() {
+            onboarding.submit(Kind.RIDER, "Sam Salem", "Sam Salem", "sam@example.test",
+                    "email-proof", null, null, null, riderAnswers(), null);
+
+            verifyNoInteractions(verifications, platform);
+            verify(intake).record(eq(Kind.RIDER), any(), any(), any(), eq("email-proof"), any(),
+                    any(), any(),
+                    argThat((Checked checked) -> riderAnswers().equals(checked.details())),
                     any());
         }
 

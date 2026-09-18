@@ -126,6 +126,11 @@ public class OnboardingService {
      * looked at without being spent ({@code requireProofs}): a made-up token is refused on one read
      * of this service's own table and costs no call to another service. Nothing is spent until the
      * intake, together with the insert, after every check has passed.
+     *
+     * <p>A rider applying to a delivery company is checked the same way, against Order Manager: the
+     * company has to be hiring, and its region is what the application records in place of any area
+     * the app sent (see {@link CompanyRiderAnswers}). The proofs are looked at first for the same
+     * reason, so a made-up application costs Order Manager nothing either.
      */
     public OnboardingApplication submit(OnboardingApplication.Kind kind, String businessName,
                                         String contactName, String contactEmail,
@@ -134,12 +139,13 @@ public class OnboardingService {
                                         Map<String, Object> details,
                                         UUID targetProviderId) {
 
-        if (ServiceProviderAnswers.isServices(details)) {
+        if (ServiceProviderAnswers.isServices(details)
+                || CompanyRiderAnswers.namesACompany(kind, targetProviderId)) {
             requireProofs(contactEmail, emailVerificationToken, contactPhone, phoneVerificationToken);
         }
         // details is applicant-supplied and holds bank details — it goes into the record and
         // nowhere else: not into a log line, not into a process variable.
-        ServiceProviderAnswers.Checked checked = services.checked(kind, details);
+        ServiceProviderAnswers.Checked checked = services.checked(kind, details, targetProviderId);
 
         OnboardingApplication application;
         try {

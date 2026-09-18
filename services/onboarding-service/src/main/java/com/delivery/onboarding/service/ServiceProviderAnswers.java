@@ -48,6 +48,12 @@ import com.delivery.onboarding.domain.OnboardingApplication.Kind;
  *
  * <p>Nothing here touches an application that is not a services one. A shop, a rider and a delivery
  * company go through exactly as before, and Product Service is never asked about them.
+ *
+ * <p>One exception rides through the same door, and only because it is the same kind of check: a
+ * rider naming a delivery company is judged against Order Manager — the company must be hiring, and
+ * its region is recorded in place of an area the rider chose. That rule is
+ * {@link CompanyRiderAnswers}'s; it is reached from {@link #checked} because {@link Checked} is the
+ * only form the intake records, so a front door cannot skip it.
  */
 @Component
 public class ServiceProviderAnswers {
@@ -79,6 +85,13 @@ public class ServiceProviderAnswers {
     private final PlatformClient platform;
     private final Clock clock;
 
+    /**
+     * The rider's half of the same check: a rider naming a delivery company has that company's region
+     * recorded, and is refused when the company is not hiring. Held here because {@link #checked} is
+     * the one check both front doors make before the intake, and the only maker of what it records.
+     */
+    private final CompanyRiderAnswers companyRiders;
+
     /** The form's lists and when they were read; null until the first read. Replaced whole. */
     private volatile CachedOptions cachedOptions;
 
@@ -94,6 +107,7 @@ public class ServiceProviderAnswers {
     ServiceProviderAnswers(PlatformClient platform, Clock clock) {
         this.platform = platform;
         this.clock = clock;
+        this.companyRiders = new CompanyRiderAnswers(platform);
     }
 
     /**
@@ -153,7 +167,11 @@ public class ServiceProviderAnswers {
             this.details = details;
         }
 
-        /** Any other application's details exactly as sent; a services one's in canonical form. */
+        /**
+         * A services application's details in canonical form; a rider's naming a delivery company
+         * with the company's region in place of any place the app sent; any other application's
+         * exactly as sent.
+         */
         public Map<String, Object> details() {
             return details;
         }
@@ -200,22 +218,28 @@ public class ServiceProviderAnswers {
     /**
      * The details to record.
      *
-     * <p>Unchanged for any other application. For a services one, checked and put in canonical form:
-     * the business type and category upper-cased, the area named as its zone is named. The refusals
-     * that need nothing from Product Service come first, and the zones are only read once the
-     * category is known to be open.
+     * <p>For a services application, checked and put in canonical form: the business type and
+     * category upper-cased, the area named as its zone is named. The refusals that need nothing from
+     * Product Service come first, and the zones are only read once the category is known to be open.
+     *
+     * <p>For a rider naming a delivery company, the company's region in place of any place the app
+     * sent, and a refusal when the company is not hiring — see {@link CompanyRiderAnswers}. Any other
+     * application's details are recorded as sent.
      *
      * <p>Never answered from memory, unlike {@link #options()}: this is the judgement, and it has to
-     * be the one Product Service would give now. It waits on Product Service, so call it with no
-     * transaction open.
+     * be the one Product Service, or Order Manager, would give now. It waits on them, so call it with
+     * no transaction open.
      *
+     * @param targetProviderId the delivery company a rider applies to; null for everybody else
      * @throws ServiceAnswerException for an answer the applicant has to change
+     * @throws CompanyRiderAnswers.CompanyAnswerException when the company a rider named is not hiring
      * @throws PlatformClient.CatalogUnavailableException when Product Service cannot answer — nothing
      *         was judged, so the applicant retries rather than changes an answer
+     * @throws PlatformClient.CompaniesUnavailableException when Order Manager cannot answer, likewise
      */
-    public Checked checked(Kind kind, Map<String, Object> details) {
+    public Checked checked(Kind kind, Map<String, Object> details, UUID targetProviderId) {
         if (!isServices(details)) {
-            return new Checked(details);
+            return new Checked(companyRiders.checked(kind, targetProviderId, details));
         }
         if (kind != Kind.MERCHANT) {
             throw new ServiceAnswerException(ServiceAnswerException.NOT_A_SHOP,

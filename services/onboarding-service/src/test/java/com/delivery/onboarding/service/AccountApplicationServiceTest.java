@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 import com.delivery.onboarding.client.KeycloakAdminClient;
@@ -499,6 +500,119 @@ class AccountApplicationServiceTest {
             assertThatExceptionOfType(OnboardingService.ApplicationRuleException.class)
                     .isThrownBy(() -> service.apply(sam(), shop("Sam's Shakes")))
                     .withMessage("Only a rider applies to a delivery company");
+        }
+    }
+
+    /**
+     * A rider applying to a delivery company works where the company works (owner, 2026-09). The
+     * company's region is recorded from Order Manager's list of who is hiring; the area and pin an
+     * installed app still sends are dropped rather than refused; and a company that is not on that
+     * list is refused by name before anything is written or granted.
+     */
+    @Nested
+    @DisplayName("a rider applying to a delivery company")
+    class CompanyRider {
+
+        private final UUID swift = UUID.fromString("8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d");
+
+        @BeforeEach
+        void theIntakeRecords() {
+            when(intake.recordForAccount(any(), any(), any(), any(), any(), any(), any(), any(),
+                    any(), any(), any())).thenReturn(recorded(Kind.RIDER));
+        }
+
+        /** A rider's answers as an installed app still sends them: an area, a pin, and the company. */
+        private Answers riderFor(UUID company) {
+            return new Answers(Kind.RIDER, null, "Sam Salem", null, null, null,
+                    Map.of("vehicleType", "MOTORCYCLE", "preferredArea", "Hamra",
+                            "workLatitude", 33.8959, "workLongitude", 35.4828,
+                            "ridesFor", "Swift Couriers"),
+                    company);
+        }
+
+        private void hiring(PlatformClient.HiringCompany... companies) {
+            when(platform.hiringCompanies()).thenReturn(List.of(companies));
+        }
+
+        /** The details the intake was handed to record. */
+        private Map<String, Object> recordedDetails() {
+            ArgumentCaptor<ServiceProviderAnswers.Checked> checked =
+                    ArgumentCaptor.forClass(ServiceProviderAnswers.Checked.class);
+            verify(intake).recordForAccount(any(), eq(Kind.RIDER), any(), any(), any(), any(),
+                    any(), any(), any(), checked.capture(), any());
+            return checked.getValue().details();
+        }
+
+        @Test
+        @DisplayName("records the company's zone names as the rider's region, and drops the area and pin the app sent")
+        void the_companys_region_is_recorded() {
+            hiring(new PlatformClient.HiringCompany(swift, "Swift Couriers",
+                    List.of("Achrafieh", "Hamra")));
+
+            service.apply(sam(), riderFor(swift));
+
+            assertThat(recordedDetails())
+                    .containsEntry("companyRegions", List.of("Achrafieh", "Hamra"))
+                    .containsEntry("vehicleType", "MOTORCYCLE")
+                    .containsEntry("ridesFor", "Swift Couriers")
+                    .doesNotContainKeys("preferredArea", "workLatitude", "workLongitude");
+            verify(intake).recordForAccount(any(), any(), any(), any(), any(), any(), any(), any(),
+                    any(), any(), eq(swift));
+        }
+
+        @Test
+        @DisplayName("a company that has drawn no zone yet is recorded with an empty region, not a guess")
+        void no_zones_is_an_empty_region() {
+            hiring(new PlatformClient.HiringCompany(swift, "Swift Couriers", List.of()));
+
+            service.apply(sam(), riderFor(swift));
+
+            assertThat(recordedDetails())
+                    .containsEntry("companyRegions", List.of())
+                    .doesNotContainKey("preferredArea");
+        }
+
+        @Test
+        @DisplayName("a company that is not hiring is refused by name before anything is written or granted")
+        void a_company_not_hiring_is_refused() {
+            hiring(new PlatformClient.HiringCompany(UUID.randomUUID(), "Another Fleet",
+                    List.of("Jounieh")));
+
+            assertThat(codeOf(() -> service.apply(sam(), riderFor(swift))))
+                    .isEqualTo(CompanyRiderAnswers.CompanyAnswerException.NOT_HIRING)
+                    .isEqualTo("company-not-hiring");
+
+            verifyNoInteractions(intake, keycloak, onboarding);
+        }
+
+        @Test
+        @DisplayName("Order Manager not answering is a try-again: nothing written, nothing granted")
+        void order_manager_not_answering() {
+            when(platform.hiringCompanies()).thenThrow(
+                    new PlatformClient.CompaniesUnavailableException("Please try again", null));
+
+            assertThatExceptionOfType(PlatformClient.CompaniesUnavailableException.class)
+                    .isThrownBy(() -> service.apply(sam(), riderFor(swift)));
+
+            verifyNoInteractions(intake, keycloak, onboarding);
+        }
+
+        @Test
+        @DisplayName("a rider riding for YouDrop keeps the area and pin they chose, and Order Manager is not asked")
+        void riding_for_youdrop_keeps_the_answers() {
+            Answers ours = new Answers(Kind.RIDER, null, "Sam Salem", null, null, null,
+                    Map.of("preferredArea", "Hamra", "workLatitude", 33.8959,
+                            "workLongitude", 35.4828, "companyRegions", List.of("Made up")),
+                    null);
+
+            service.apply(sam(), ours);
+
+            verify(platform, never()).hiringCompanies();
+            assertThat(recordedDetails())
+                    .containsEntry("preferredArea", "Hamra")
+                    .containsKeys("workLatitude", "workLongitude")
+                    // Only this service writes a company's region; a copy sent with a form is not one.
+                    .doesNotContainKey("companyRegions");
         }
     }
 

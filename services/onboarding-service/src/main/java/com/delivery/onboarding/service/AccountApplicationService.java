@@ -224,12 +224,15 @@ public class AccountApplicationService {
                     "Tell us the name of your shop");
         }
 
-        // The last refusal, and the only one that may wait on another service: an application to
-        // offer services is checked against Product Service, here, with no transaction open — never
-        // inside the intake's, which would hold a pooled connection for as long as Product Service
-        // took (see ApplicationIntake). details is applicant-supplied and holds bank details — into
-        // the record and nowhere else, exactly as on the open path.
-        ServiceProviderAnswers.Checked details = services.checked(kind, answers.details());
+        // The last refusals, and the only ones that may wait on another service: an application to
+        // offer services is checked against Product Service, and a rider naming a delivery company
+        // against Order Manager — the company must be hiring, and its region is what is recorded
+        // (see CompanyRiderAnswers). Both here, with no transaction open — never inside the
+        // intake's, which would hold a pooled connection for as long as either took (see
+        // ApplicationIntake). details is applicant-supplied and holds bank details — into the record
+        // and nowhere else, exactly as on the open path.
+        ServiceProviderAnswers.Checked details =
+                services.checked(kind, answers.details(), answers.targetProviderId());
 
         OnboardingApplication application;
         try {
