@@ -12500,4 +12500,23 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcChatOrderNotFound =>
       'Couldn\'t open this order\'s chat. Reloading the order.';
+
+  @override
+  String get riderRegionLabel => 'Delivery region';
+
+  @override
+  String riderRegionSetBy(String company) {
+    return 'Set by $company. You deliver where the company delivers, so there is no area to choose.';
+  }
+
+  @override
+  String get riderRegionNoneListed => 'No delivery region listed yet';
+
+  @override
+  String get riderRegionCompanyNotHiring =>
+      'That delivery company isn\'t taking riders right now. Choose another company, or ride for YouDrop.';
+
+  @override
+  String get riderRegionCompaniesUnavailable =>
+      'We couldn\'t check that delivery company just now. Try again in a moment.';
 }

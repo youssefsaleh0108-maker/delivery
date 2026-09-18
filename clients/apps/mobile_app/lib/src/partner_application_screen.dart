@@ -574,13 +574,20 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
       put('vehicleYear', _vehicleYear.text);
       put('dateOfBirth', _dateOfBirth.text);
       put('nationalId', _nationalId.text);
-      put('preferredArea', _preferredArea.text);
-      // The pin, when there is one. Sent as numbers rather than a formatted string so a reviewer's
-      // console can put it back on a map; absent entirely when the applicant never placed one,
-      // because "no answer" and "0, 0" are different answers and the second is in the Atlantic.
-      if (_workPin != null) {
-        details['workLatitude'] = _workPin!.latitude;
-        details['workLongitude'] = _workPin!.longitude;
+      // Where they will work is only theirs to say when they ride for YouDrop. A rider joining a
+      // company works where the company works: they were shown its region, read-only, and the server
+      // records that region from its own list — so nothing typed or pinned before they picked the
+      // company travels with the application.
+      if (_company == null) {
+        put('preferredArea', _preferredArea.text);
+        // The pin, when there is one. Sent as numbers rather than a formatted string so a
+        // reviewer's console can put it back on a map; absent entirely when the applicant never
+        // placed one, because "no answer" and "0, 0" are different answers and the second is in the
+        // Atlantic.
+        if (_workPin != null) {
+          details['workLatitude'] = _workPin!.latitude;
+          details['workLongitude'] = _workPin!.longitude;
+        }
       }
       details['ridesFor'] = _company == null ? 'YOUDROP' : _company!.name;
     } else {
@@ -639,6 +646,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
                 );
     } catch (e) {
       if (!mounted) return;
+      if (_companyRefused(e)) return;
       setState(() {
         _busy = false;
         _error = _messageFrom(e);
@@ -670,6 +678,7 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
           .reference;
     } catch (e) {
       if (!mounted) return;
+      if (_companyRefused(e)) return;
       setState(() {
         _busy = false;
         _error = _accountRefusalFrom(e);
@@ -1614,7 +1623,22 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
         ),
       ];
 
-  List<Widget> _riderZone(DeliveryStrings t) => <Widget>[
+  List<Widget> _riderZone(DeliveryStrings t) {
+    final HiringCompany? company = _company;
+    return <Widget>[
+      // Who they ride for comes first, because it decides the rest of the step. It also decides who
+      // reads the application: a rider who names a company is that company's to hire, and one who
+      // does not is ours.
+      AuthFieldLabel(label: t.whoWillYouRideFor, uppercase: true),
+      const SizedBox(height: DeliverySpacing.sm),
+      _companyPicker(t),
+      const SizedBox(height: DeliverySpacing.lg),
+      // A rider joining a company works where the company works (owner, 2026-09), so its region is
+      // shown in place of anything to choose. Riding for YouDrop — or not having said yet — keeps
+      // the pin, the area and the zones card: that rider does say where they will work.
+      if (company != null)
+        ..._companyRegion(t, company)
+      else ...<Widget>[
         _workAreaPicker(t),
         const SizedBox(height: DeliverySpacing.lg),
         AuthField(
@@ -1654,12 +1678,66 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
             padding: const EdgeInsets.symmetric(vertical: DeliverySpacing.sm),
           ),
         ),
-        const SizedBox(height: DeliverySpacing.lg),
-        // Kept from the flow this replaces, because it decides who reads the application: a rider
-        // who names a company is that company's to hire, and one who does not is ours.
-        AuthFieldLabel(label: t.whoWillYouRideFor, uppercase: true),
+      ],
+    ];
+  }
+
+  /// The region of the company a rider chose, read-only (owner, 2026-09: the rider does not select a
+  /// region; the app displays the registered delivery company's).
+  ///
+  /// The names are the company's active coverage zones, from the same public list the company was
+  /// picked from, and the server records that same region on the application. There is nothing here
+  /// for the rider to choose, so nothing here is drawn as a field. A dash when the company has drawn
+  /// no zone yet: the platform has no region to show for it, and saying so beats inventing one.
+  List<Widget> _companyRegion(DeliveryStrings t, HiringCompany company) => <Widget>[
+        AuthFieldLabel(label: t.riderRegionLabel, uppercase: true),
         const SizedBox(height: DeliverySpacing.sm),
-        _companyPicker(t),
+        YdCard.bordered(
+          child: company.regions.isEmpty
+              ? Semantics(
+                  label: t.riderRegionNoneListed,
+                  excludeSemantics: true,
+                  child: const Text(
+                    '—',
+                    style: TextStyle(fontSize: 15, color: DeliveryColors.muted),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    for (int i = 0; i < company.regions.length; i++) ...<Widget>[
+                      if (i > 0) const SizedBox(height: DeliverySpacing.sm),
+                      Row(
+                        children: <Widget>[
+                          const Icon(Icons.place_outlined,
+                              size: 18, color: DeliveryColors.brand),
+                          const SizedBox(width: DeliverySpacing.sm),
+                          Expanded(
+                            child: Text(
+                              company.regions[i],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: DeliveryColors.ink,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: DeliverySpacing.sm),
+        Text(
+          t.riderRegionSetBy(company.name),
+          style: const TextStyle(
+            fontSize: 12,
+            color: DeliveryColors.muted,
+            height: 1.4,
+          ),
+        ),
       ];
 
   /// `map-canvas-container` (Figma 22:624), as a real map with a pin the applicant places.
@@ -1806,6 +1884,37 @@ class _PartnerApplicationScreenState extends State<PartnerApplicationScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _mapTilesFailed = true);
     });
+  }
+
+  /// A refusal about the company a rider named, handled on the open form and the signed-in path
+  /// alike. False for anything else, which the caller reports as it always has.
+  ///
+  /// `company-not-hiring` means the list the rider chose from is out of date: the company stopped
+  /// taking riders, or never was one that hires. The same application can never succeed, so the
+  /// finishing step's "Try again" would be a button that cannot work — the rider is taken back to
+  /// this step instead, with the list read again, nothing chosen, and the reason in their own
+  /// language. `hiring-companies-unavailable` means nothing was judged: "Try again" is exactly right
+  /// for it, and only the sentence needs translating.
+  bool _companyRefused(Object e) {
+    final String? message = riderCompanyRefusal(DeliveryStrings.of(context), e);
+    if (message == null) return false;
+    final bool chooseAgain = isCompanyNotHiring(e);
+    if (chooseAgain) {
+      _emailCode.clear();
+      _phoneCode.clear();
+    }
+    setState(() {
+      _busy = false;
+      _error = message;
+      if (chooseAgain) {
+        _company = null;
+        _ridesForUs = false;
+        _companies = widget.api.hiringCompanies();
+        _phase = _Phase.wizard;
+        _step = totalSteps - 1;
+      }
+    });
+    return true;
   }
 
   Widget _companyPicker(DeliveryStrings t) {

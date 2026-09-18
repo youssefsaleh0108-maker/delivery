@@ -12646,4 +12646,23 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
+
+  @override
+  String get riderRegionLabel => 'منطقة التوصيل';
+
+  @override
+  String riderRegionSetBy(String company) {
+    return 'تحدّدها $company. ستوصّل حيث توصّل الشركة، فلا حاجة لاختيار منطقة.';
+  }
+
+  @override
+  String get riderRegionNoneListed => 'لم تُحدَّد منطقة توصيل بعد';
+
+  @override
+  String get riderRegionCompanyNotHiring =>
+      'شركة التوصيل هذه لا تستقبل سائقين حالياً. اختر شركة أخرى، أو انضم إلى أسطول YouDrop.';
+
+  @override
+  String get riderRegionCompaniesUnavailable =>
+      'تعذّر التحقق من شركة التوصيل الآن. حاول بعد قليل.';
 }

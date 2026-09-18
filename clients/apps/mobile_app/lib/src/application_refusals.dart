@@ -68,6 +68,28 @@ bool isFinalAccountRefusal(Object error) => switch (_codeOf(error)) {
       _ => false,
     };
 
+// ---------------------------------------------------------------- rider company region
+// The refusals about the delivery company a rider names (feat/rider-company-region). A block of
+// their own, so they merge beside any other change to this file without touching it.
+
+/// What to say when the server refused the delivery company a rider named, or could not check it,
+/// in the reader's own language. Null for any other failure.
+///
+/// The partner wizard asks this before [applicationRefusal] or [applicationServerMessage], on the
+/// open form and the signed-in path alike: on the open form these are the only refusals that carry a
+/// code, and without this an Arabic-speaking rider would read the server's English.
+String? riderCompanyRefusal(DeliveryStrings t, Object error) => switch (_codeOf(error)) {
+      'company-not-hiring' => t.riderRegionCompanyNotHiring,
+      'hiring-companies-unavailable' => t.riderRegionCompaniesUnavailable,
+      _ => null,
+    };
+
+/// Whether the server refused the company itself: it is not taking riders, or never was. Sending the
+/// same application again cannot change that; choosing another company, or YouDrop, can.
+bool isCompanyNotHiring(Object error) => _codeOf(error) == 'company-not-hiring';
+
+// ------------------------------------------------------------ end rider company region
+
 String? _codeOf(Object error) {
   if (error is! DioException) return null;
   final Object? body = error.response?.data;

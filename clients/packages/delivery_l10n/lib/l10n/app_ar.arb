@@ -3880,5 +3880,10 @@
   "svcChatClosedOn": "أُغلقت المحادثة بشأن هذا الطلب في {date}",
   "svcChatClosed": "أُغلقت المحادثة بشأن هذا الطلب",
   "svcChatUnavailable": "المحادثة غير متاحة حاليًا.",
-  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله."
+  "svcChatOrderNotFound": "تعذّر فتح محادثة هذا الطلب. نعيد تحميله.",
+  "riderRegionLabel": "منطقة التوصيل",
+  "riderRegionSetBy": "تحدّدها {company}. ستوصّل حيث توصّل الشركة، فلا حاجة لاختيار منطقة.",
+  "riderRegionNoneListed": "لم تُحدَّد منطقة توصيل بعد",
+  "riderRegionCompanyNotHiring": "شركة التوصيل هذه لا تستقبل سائقين حالياً. اختر شركة أخرى، أو انضم إلى أسطول YouDrop.",
+  "riderRegionCompaniesUnavailable": "تعذّر التحقق من شركة التوصيل الآن. حاول بعد قليل."
 }

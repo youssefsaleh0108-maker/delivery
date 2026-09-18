@@ -6090,5 +6090,11 @@
   "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
   "svcChatClosed": "Chat about this order has closed",
   "svcChatUnavailable": "Chat is unavailable right now.",
-  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order.",
+  "riderRegionLabel": "Delivery region",
+  "riderRegionSetBy": "Set by {company}. You deliver where the company delivers, so there is no area to choose.",
+  "@riderRegionSetBy": {"placeholders":{"company":{"type":"String"}}},
+  "riderRegionNoneListed": "No delivery region listed yet",
+  "riderRegionCompanyNotHiring": "That delivery company isn't taking riders right now. Choose another company, or ride for YouDrop.",
+  "riderRegionCompaniesUnavailable": "We couldn't check that delivery company just now. Try again in a moment."
 }

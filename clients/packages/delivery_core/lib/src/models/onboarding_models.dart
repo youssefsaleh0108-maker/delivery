@@ -50,16 +50,40 @@ enum OnboardingStatus {
 
 /// A delivery company somebody could apply to ride for.
 ///
-/// An id and a name, which is all the public list returns. Everything else on the record — payout
-/// state, score, contact details, the fleet — stays behind a token.
+/// An id, a name and where it delivers, which is all the public list returns. Everything else on the
+/// record — payout state, score, contact details, the fleet — stays behind a token.
 class HiringCompany {
-  const HiringCompany({required this.id, required this.name});
+  const HiringCompany({
+    required this.id,
+    required this.name,
+    this.regions = const <String>[],
+  });
 
   final String id;
   final String name;
 
-  factory HiringCompany.fromJson(Map<String, dynamic> json) =>
-      HiringCompany(id: json['id'] as String, name: json['name'] as String? ?? '');
+  /// Where the company delivers: the names of its active coverage zones.
+  ///
+  /// A rider who joins the company works there rather than choosing an area, so the rider wizard
+  /// shows this read-only. Empty when the company has drawn no zone yet — and when the server is
+  /// older than the field, which says nothing either way: there is no region to show, and the
+  /// wizard shows a dash rather than inventing one.
+  final List<String> regions;
+
+  factory HiringCompany.fromJson(Map<String, dynamic> json) => HiringCompany(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? '',
+        regions: _regions(json['regions']),
+      );
+
+  /// Anything but a list reads as no region, and an entry that is not a name is skipped.
+  static List<String> _regions(dynamic value) {
+    if (value is! List) return const <String>[];
+    return List<String>.unmodifiable(<String>[
+      for (final dynamic region in value)
+        if (region is String && region.trim().isNotEmpty) region.trim(),
+    ]);
+  }
 }
 
 class OnboardingApplication {

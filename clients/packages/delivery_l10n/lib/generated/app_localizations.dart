@@ -21206,6 +21206,36 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
+
+  /// No description provided for @riderRegionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery region'**
+  String get riderRegionLabel;
+
+  /// No description provided for @riderRegionSetBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Set by {company}. You deliver where the company delivers, so there is no area to choose.'**
+  String riderRegionSetBy(String company);
+
+  /// No description provided for @riderRegionNoneListed.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivery region listed yet'**
+  String get riderRegionNoneListed;
+
+  /// No description provided for @riderRegionCompanyNotHiring.
+  ///
+  /// In en, this message translates to:
+  /// **'That delivery company isn\'t taking riders right now. Choose another company, or ride for YouDrop.'**
+  String get riderRegionCompanyNotHiring;
+
+  /// No description provided for @riderRegionCompaniesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check that delivery company just now. Try again in a moment.'**
+  String get riderRegionCompaniesUnavailable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {
