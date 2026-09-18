@@ -71,6 +71,21 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * Keycloak's 409, and only its 409: an account already holds the address being signed up.
+     *
+     * <p>Still a {@link ProvisioningException}, so every caller catching that keeps working. Its own
+     * type because the applicant's sign-up answers it differently from every other failure: the
+     * account may be that applicant's own, created by an earlier attempt that failed before the
+     * application recorded it, and taking it up again is then the only way they ever sign in (see
+     * {@code OnboardingService.createApplicantAccount}).
+     */
+    public static class AccountExistsException extends ProvisioningException {
+        public AccountExistsException(String message) {
+            super(message);
+        }
+    }
+
+    /**
      * Creates a partner's account and gives it the role their portal requires.
      *
      * @return the Keycloak {@code sub}, which is the id every service in the platform uses
@@ -160,7 +175,7 @@ public class KeycloakAdminClient {
             userId = idFromLocation(created);
         } catch (HttpClientErrorException.Conflict e) {
             log.warn("An account already exists for applicant {}", email);
-            throw new ProvisioningException("An account already exists for that email address");
+            throw new AccountExistsException("An account already exists for that email address");
         } catch (Exception e) {
             log.error("Could not create an applicant account for {}", email, e);
             throw new ProvisioningException(
@@ -170,8 +185,14 @@ public class KeycloakAdminClient {
         // Both roles. The real one so every screen works and they can explore what they applied
         // for; APPLICANT so the committing acts — publishing goods, claiming a delivery — refuse
         // until somebody approves. Approval removes APPLICANT and changes nothing else.
-        assignRealmRole(bearer, userId, role);
+        //
+        // APPLICANT FIRST, which is what makes an interrupted sign-up safe to finish. Stopped between
+        // the two, the account holds APPLICANT alone and can do nothing, instead of a live role with
+        // nothing holding it back — and "APPLICANT, or no role yet" is exactly what the retry
+        // recognises as this applicant's own account rather than somebody else's (see
+        // OnboardingService.createApplicantAccount). The signed-in path grants in the same order.
         assignRealmRole(bearer, userId, "APPLICANT");
+        assignRealmRole(bearer, userId, role);
         log.info("Applicant {} can sign in as {} while their application is decided", email, role);
         return userId;
     }
@@ -405,11 +426,53 @@ public class KeycloakAdminClient {
     }
 
     /**
+     * The realm roles an account holds directly, by name.
+     *
+     * <p>Asked when an applicant's sign-up meets an account that already has their address, to tell
+     * the one their own earlier attempt left from anybody else's (see
+     * {@code OnboardingService.createApplicantAccount}). Direct mappings only, so Keycloak's default
+     * composite shows up as itself; {@link #isKeycloakOwnRole} names it and its kind.
+     */
+    public List<String> realmRolesOf(String userRef) {
+        String bearer = adminToken();
+        JsonNode roles = keycloak.get()
+                .uri("/admin/realms/{realm}/users/{id}/role-mappings/realm", realm, userRef)
+                .header("Authorization", "Bearer " + bearer)
+                .retrieve()
+                .body(JsonNode.class);
+
+        List<String> names = new java.util.ArrayList<>();
+        if (roles != null && roles.isArray()) {
+            for (JsonNode role : roles) {
+                if (role.hasNonNull("name")) {
+                    names.add(role.path("name").asText());
+                }
+            }
+        }
+        return names;
+    }
+
+    /**
+     * Whether a realm role is one Keycloak gives every account by itself rather than one this
+     * platform grants: the realm's default composite, and the two roles it has always carried.
+     * Holding them says nothing about whose account it is.
+     */
+    public static boolean isKeycloakOwnRole(String role) {
+        return role.startsWith("default-roles-")
+                || role.equals("offline_access")
+                || role.equals("uma_authorization");
+    }
+
+    /**
      * Replaces an account's passcode with one its owner just chose.
      *
-     * <p>The one caller is the password-reset flow, and it calls this only after a one-time code
-     * sent to the account's own address was answered — that proof, not this method, is the
-     * security boundary. {@code temporary} is false for the same reason it is at sign-up: this is
+     * <p>Two callers, and a proof of the inbox stands behind each — that proof, not this method, is
+     * the security boundary. The password-reset flow calls it once a one-time code sent to the
+     * account's own address was answered. An applicant finishing a sign-up that an earlier attempt
+     * left half made calls it for the account that attempt created, and only for an account holding
+     * nothing but what that sign-up grants ({@code OnboardingService.createApplicantAccount}): the
+     * application's address was proved with a code before it could be submitted, and its reference
+     * went to that person alone. {@code temporary} is false for the same reason it is at sign-up: this is
      * the passcode the person chose and expects to use, and a forced-change screen at the next
      * sign-in would demand a second new passcode for no reason.
      *

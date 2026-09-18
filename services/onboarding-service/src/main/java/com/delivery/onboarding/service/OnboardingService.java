@@ -11,12 +11,16 @@ import org.camunda.bpm.engine.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.delivery.onboarding.client.KeycloakAdminClient;
 import com.delivery.onboarding.domain.ContactVerification.Channel;
 import com.delivery.onboarding.domain.OnboardingApplication;
 import com.delivery.onboarding.domain.OnboardingApplicationRepository;
+import com.delivery.onboarding.service.AccountApplicationService.AccountRuleException;
 
 /**
  * Applications to join, and the decisions made on them.
@@ -30,6 +34,9 @@ public class OnboardingService {
 
     private static final String PROCESS_KEY = "partner-onboarding";
 
+    /** What an undecided applicant's account holds beside the role applied for, and loses on approval. */
+    private static final String APPLICANT = "APPLICANT";
+
     private static final Logger log = LoggerFactory.getLogger(OnboardingService.class);
 
     private final OnboardingApplicationRepository applications;
@@ -42,6 +49,12 @@ public class OnboardingService {
     private final ApplicantDocumentService documents;
     private final AutoApprovalPolicy autoApproval;
 
+    /**
+     * Where an automatic approval runs: a transaction of its own, begun after the applicant's sign-in
+     * committed. See {@link #autoApproveIfAutomatic} for why it is a template here.
+     */
+    private final TransactionTemplate approvals;
+
     public OnboardingService(OnboardingApplicationRepository applications,
                              ApplicationIntake intake,
                              VerificationService verifications,
@@ -49,7 +62,8 @@ public class OnboardingService {
                              RuntimeService runtime, TaskService tasks,
                              KeycloakAdminClient keycloak,
                              ApplicantDocumentService documents,
-                             AutoApprovalPolicy autoApproval) {
+                             AutoApprovalPolicy autoApproval,
+                             PlatformTransactionManager transactionManager) {
         this.applications = applications;
         this.intake = intake;
         this.verifications = verifications;
@@ -59,6 +73,8 @@ public class OnboardingService {
         this.keycloak = keycloak;
         this.documents = documents;
         this.autoApproval = autoApproval;
+        this.approvals = new TransactionTemplate(transactionManager);
+        this.approvals.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
         if (!autoApproval.automaticKinds().isEmpty()) {
             // At WARN, on purpose. This is the platform telling its operator that nobody is reading
@@ -104,6 +120,25 @@ public class OnboardingService {
     public static class NoApplicationException extends RuntimeException {
         public NoApplicationException(String message) {
             super(message);
+        }
+    }
+
+    /**
+     * Thrown when an applicant's sign-in could not be made for a reason on the platform's side:
+     * Keycloak unreachable, refusing this service's own token, or failing half way; the record not
+     * saving.
+     *
+     * <p>503 with {@link #CODE}, never the bare 500 it used to be — which the app, having no words for
+     * it, showed as "That did not go through". Nothing the applicant typed is wrong, and the same call
+     * a minute later is the whole remedy, which {@link #createApplicantAccount} makes safe.
+     */
+    public static class SignInUnavailableException extends RuntimeException {
+
+        /** Part of the API: the app matches on this exact string. */
+        public static final String CODE = "sign-in-unavailable";
+
+        public SignInUnavailableException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
@@ -234,21 +269,64 @@ public class OnboardingService {
      * written onto the application beside {@code system:auto-approval}, so the record says plainly
      * that nothing was checked and by what.
      *
-     * <p>A failure here leaves the application SUBMITTED, which is exactly right: it lands in the
-     * reviewer's queue and a human can decide it. The applicant is not lost, and the platform has
-     * not half-approved anybody.
+     * <p><strong>In a transaction of its own, begun after the sign-in committed.</strong> The
+     * approval's steps run inside it — the process's Keycloak role changes and, for a rider,
+     * order-manager attaching them to their company — so when one fails this transaction rolls back
+     * and nothing else does. It is opened with {@link #approvals} (REQUIRES_NEW) because
+     * {@code approve} is on this same class: a call to it from here goes straight past the proxy that
+     * applies its {@code @Transactional}, and would run with no transaction at all, the APPROVED row
+     * committing on its own before a step failed. app-notification's ShopChatService opens its
+     * transaction with a template for the same reason; the signed-in path gets the same effect by
+     * calling {@code approve} on this bean from another one.
+     *
+     * <p>A failure leaves the application SUBMITTED, which is exactly right: it lands in the
+     * reviewer's queue and a human can decide it. The applicant is not lost, their sign-in is made,
+     * and the platform has not half-approved anybody. Nothing reaches the applicant — this never
+     * throws.
+     *
+     * <p>What a rollback cannot undo is Keycloak. The process takes APPLICANT away before it attaches
+     * a rider to their company, so an approval failing at the attach would leave an account able to
+     * act on an application nobody approved. {@link #keepApplicantWhileUndecided} puts it back.
      */
-    private OnboardingApplication autoApprove(OnboardingApplication application) {
+    private void autoApproveIfAutomatic(OnboardingApplication application) {
         try {
-            OnboardingApplication approved = approve(
-                    application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true);
+            if (application.isDecided() || !autoApproval.isAutomatic(application.getKind())) {
+                return;
+            }
+            OnboardingApplication approved = approvals.execute(status -> approve(
+                    application.getId(), AutoApprovalPolicy.AUTOMATIC_REVIEWER, true));
             log.info("Application {} auto-approved once its sign-in existed ({} is automatic)",
                     approved.getReference(), application.getKind());
-            return approved;
         } catch (RuntimeException e) {
             log.error("Auto-approval failed for {}; it stays in the review queue",
                     application.getReference(), e);
-            return application;
+            keepApplicantWhileUndecided(application);
+        }
+    }
+
+    /**
+     * Puts APPLICANT back on an account whose automatic approval failed, while nobody has decided its
+     * application.
+     *
+     * <p>Only while undecided, read again from the database: a reviewer who approved it meanwhile took
+     * APPLICANT away on purpose, and putting it back would stop a partner who has just been let in.
+     * Granting a role the account still holds changes nothing, so this is right whichever step the
+     * approval failed at. Nobody is waiting on an answer from it, so a failure is logged — loudly,
+     * because that account may be able to act before anybody approves it.
+     */
+    private void keepApplicantWhileUndecided(OnboardingApplication application) {
+        String userRef = application.getApplicantUserRef();
+        try {
+            boolean undecided = applications.findById(application.getId())
+                    .map(stored -> !stored.isDecided())
+                    .orElse(false);
+            if (userRef != null && undecided) {
+                keycloak.grantRealmRole(userRef, APPLICANT);
+            }
+        } catch (RuntimeException e) {
+            log.error("Application {} is back in the review queue, but APPLICANT could not be put back "
+                    + "on account {}, which may be able to act before anybody approves it",
+                    application.getReference(), userRef, e);
         }
     }
 
@@ -391,37 +469,40 @@ public class OnboardingService {
      * Gives an applicant a way in while their application is being decided.
      *
      * <p>Creates the Keycloak account, records it against the application, and leaves the decision
-     * untouched — the account holds APPLICANT and nothing else until somebody approves.
+     * untouched — the account holds APPLICANT beside the role applied for until somebody approves.
      *
      * <p>Keyed on the reference rather than on a token, for the same reason the status lookup is:
      * there is no caller identity yet. The reference is 160 bits, was handed to one person, and the
      * address on the application was already proved with a code, so this cannot mint an account on
      * an address the applicant does not control.
+     *
+     * <p><strong>Deliberately NOT transactional</strong>, for the reason {@link #submit} is not. The
+     * sign-in is recorded by {@link ApplicationIntake#attachApplicantAccount}, which commits on its
+     * own, and only then is auto-approval tried, in a transaction of its own. They used to share one:
+     * an approval step that failed marked it rollback-only, the catch logged the failure, and the
+     * commit threw UnexpectedRollbackException — so the applicant was told their sign-in could not be
+     * set up, the record lost the account, and Keycloak kept it, and the next try met a 409 and failed
+     * too. Nor is any transaction open while Keycloak is asked something, so a slow Keycloak holds no
+     * pooled connection.
+     *
+     * <p><strong>Nothing here ends in an unexplained 500.</strong> An address that belongs to another
+     * account is refused with {@code account-exists}. Anything on the platform's side — Keycloak
+     * unreachable or refusing this service's token, the record not saving — is logged here with its
+     * cause and answers {@code sign-in-unavailable}, and trying again is safe: an account a failed
+     * attempt created is taken up by the next one ({@link #resumableAccount}).
      */
-    @Transactional
     public void createApplicantAccount(String reference, String password) {
-        OnboardingApplication application = applications.findByReference(reference)
-                .orElseThrow(() -> new ApplicationRuleException("No application with that reference"));
-
-        if (application.getApplicantUserRef() != null) {
-            throw new ApplicationRuleException("That application already has a sign-in");
+        OnboardingApplication recorded;
+        try {
+            recorded = recordSignIn(reference, password);
+        } catch (ApplicationRuleException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("The sign-in for application {} could not be set up", reference, e);
+            throw new SignInUnavailableException(
+                    "Your sign-in could not be set up just now. Please try again in a minute.", e);
         }
-
-        // The same mapping approval and suspension use — see Kind.liveRole for why it is one
-        // mapping. Granted now so they can explore what they applied for; APPLICANT rides
-        // alongside it until somebody decides.
-        String role = application.getKind().liveRole();
-
-        String userRef = keycloak.createApplicant(
-                application.getContactEmail(),
-                firstNameOf(application.getContactName()),
-                lastNameOf(application.getContactName()),
-                role,
-                password);
-
-        application.applicantAccountCreated(userRef);
-        applications.save(application);
-        log.info("Applicant account created for application {}", application.getReference());
+        log.info("Applicant account created for application {}", recorded.getReference());
 
         // Auto-approval fires HERE, not at submission, and the difference is the whole feature
         // working.
@@ -437,9 +518,96 @@ public class OnboardingService {
         // account they are already holding a passcode for, and APPLICANT is revoked. An application
         // whose applicant never chooses a passcode simply stays in the queue, which is the honest
         // outcome — there is nobody to approve yet.
-        if (autoApproval.isAutomatic(application.getKind()) && !application.isDecided()) {
-            autoApprove(application);
+        autoApproveIfAutomatic(recorded);
+    }
+
+    /**
+     * Makes the applicant's account — or takes up the one an earlier attempt left — and records it
+     * against their application. Returns the application as committed.
+     */
+    private OnboardingApplication recordSignIn(String reference, String password) {
+        OnboardingApplication application = applications.findByReference(reference)
+                .orElseThrow(() -> new ApplicationRuleException("No application with that reference"));
+
+        if (application.getApplicantUserRef() != null) {
+            throw new ApplicationRuleException("That application already has a sign-in");
         }
+
+        String userRef;
+        try {
+            // The same mapping approval and suspension use — see Kind.liveRole for why it is one
+            // mapping. Granted now so they can explore what they applied for; APPLICANT rides
+            // alongside it until somebody decides.
+            userRef = keycloak.createApplicant(
+                    application.getContactEmail(),
+                    firstNameOf(application.getContactName()),
+                    lastNameOf(application.getContactName()),
+                    application.getKind().liveRole(),
+                    password);
+        } catch (KeycloakAdminClient.AccountExistsException e) {
+            userRef = resumableAccount(application).orElseThrow(() -> new AccountRuleException(
+                    AccountRuleException.ACCOUNT_EXISTS,
+                    "An account already uses this email address. Sign in with it, or apply with a "
+                            + "different email."));
+            takeUp(userRef, application, password);
+        }
+
+        return intake.attachApplicantAccount(application.getId(), userRef);
+    }
+
+    /**
+     * The account an earlier, unfinished attempt at this same sign-up left in Keycloak — when that is
+     * what holds this application's address.
+     *
+     * <p>Keycloak's 409 says only that some account has the address. It is this applicant's own
+     * leftover when both of these hold, and nothing weaker will do, because taking an account up sets
+     * its passcode:
+     * <ul>
+     *   <li><strong>No application names it</strong>, as applicant or as provisioned partner. An
+     *       account an application already records belongs to that application.
+     *   <li><strong>It holds nothing this sign-up would not have granted</strong> (Keycloak's own
+     *       default roles aside), and never the live role without APPLICANT. The sign-up grants
+     *       APPLICANT first, so an interrupted one leaves no role, APPLICANT, or both. Anything else
+     *       is an account in use: CUSTOMER is a shopper; a live role without APPLICANT is a working
+     *       partner, whom taking up would fence behind APPLICANT; BACKOFFICE and MERCHANT_STAFF are
+     *       staff.
+     * </ul>
+     *
+     * <p>That this is the applicant, and not somebody who knows their address, rests on what the
+     * password-reset flow rests on: the application could not be submitted without a code sent to
+     * this address, and its reference was handed to that one person.
+     */
+    private Optional<String> resumableAccount(OnboardingApplication application) {
+        Optional<String> found = keycloak.findUserIdByEmail(application.getContactEmail());
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        String userRef = found.get();
+        if (applications.findByApplicantUserRef(userRef).isPresent()
+                || applications.findFirstByProvisionedUserRefOrderByCreatedAtDesc(userRef).isPresent()) {
+            return Optional.empty();
+        }
+
+        String liveRole = application.getKind().liveRole();
+        List<String> held = keycloak.realmRolesOf(userRef).stream()
+                .filter(role -> !KeycloakAdminClient.isKeycloakOwnRole(role))
+                .toList();
+        boolean nothingElse = held.stream().allMatch(role -> role.equals(APPLICANT) || role.equals(liveRole));
+        boolean heldBack = held.contains(APPLICANT) || !held.contains(liveRole);
+        return nothingElse && heldBack ? found : Optional.empty();
+    }
+
+    /**
+     * Finishes what the earlier attempt started on the account {@link #resumableAccount} found: the
+     * two roles, APPLICANT first as at creation, then the passcode the applicant has just chosen — the
+     * one they are about to sign in with, whatever the first attempt was given.
+     */
+    private void takeUp(String userRef, OnboardingApplication application, String password) {
+        keycloak.grantRealmRole(userRef, APPLICANT);
+        keycloak.grantRealmRole(userRef, application.getKind().liveRole());
+        keycloak.resetPassword(userRef, password);
+        log.warn("Application {} took up account {}, which an earlier sign-up attempt created and "
+                + "never recorded", application.getReference(), userRef);
     }
 
     /** What a signed-in applicant is shown about their own application. */

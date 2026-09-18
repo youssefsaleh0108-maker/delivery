@@ -155,6 +155,46 @@ public class ApplicationIntake {
         return application;
     }
 
+    /**
+     * Records the sign-in an applicant just chose against their application, and commits it.
+     *
+     * <p>The open path's counterpart of the attach {@link #recordForAccount} makes in its insert, and
+     * REQUIRES_NEW for the reason this class exists: it commits on its own, before anything is tried
+     * on top of it. What is tried next is auto-approval, and an approval that fails must never take
+     * the sign-in with it. It used to, when both were one transaction: the applicant was told their
+     * sign-in could not be set up while Keycloak kept the account (see
+     * {@link OnboardingService#createApplicantAccount}).
+     *
+     * <p>The same account arriving twice is not a second sign-in — two taps racing both bring the
+     * account the first one made or took up. Any other account on the row is.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public OnboardingApplication attachApplicantAccount(java.util.UUID applicationId, String userRef) {
+        OnboardingApplication application = applications.findById(applicationId)
+                .orElseThrow(() -> new OnboardingService.ApplicationRuleException(
+                        "No application with that reference"));
+        if (userRef.equals(application.getApplicantUserRef())) {
+            return application;
+        }
+        if (application.getApplicantUserRef() != null) {
+            throw new OnboardingService.ApplicationRuleException(
+                    "That application already has a sign-in");
+        }
+        application.applicantAccountCreated(userRef);
+        try {
+            applications.saveAndFlush(application);
+        } catch (DataIntegrityViolationException e) {
+            // One application per account: applicant_user_ref is unique. The caller checked before it
+            // took an existing account up, so this is another application getting there first — and
+            // to the applicant it means what that check means: the address has an account already.
+            throw new AccountApplicationService.AccountRuleException(
+                    AccountApplicationService.AccountRuleException.ACCOUNT_EXISTS,
+                    "An account already uses this email address. Sign in with it, or apply with a "
+                            + "different email.");
+        }
+        return application;
+    }
+
     /** Records the process instance against an application that is already committed. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void attachProcess(java.util.UUID applicationId, String processInstanceId) {

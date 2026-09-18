@@ -400,7 +400,8 @@ class ServiceProviderAnswersTest {
                     mock(KeycloakAdminClient.class), mock(ApplicantDocumentService.class),
                     new AutoApprovalPolicy(false, false, false,
                             mock(AutoApprovalDecisionRepository.class),
-                            mock(AutoApprovalAuditRepository.class)));
+                            mock(AutoApprovalAuditRepository.class)),
+                    mock(org.springframework.transaction.PlatformTransactionManager.class));
         }
 
         /** The open form's services application, with the email proof "email-proof". */

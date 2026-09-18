@@ -137,6 +137,13 @@ public class AccountApplicationService {
         /** The token's address is missing, or its identity provider did not vouch for it. */
         public static final String EMAIL_UNVERIFIED = "email-unverified";
 
+        /**
+         * The open form's last step: the application's address already belongs to another account —
+         * a customer's, a partner's, anybody's but an earlier attempt at this same sign-up — so no
+         * sign-in can be made for it ({@code OnboardingService.createApplicantAccount}).
+         */
+        public static final String ACCOUNT_EXISTS = "account-exists";
+
         public static final String NAME_MISSING = "name-missing";
 
         public static final String SHOP_NAME_MISSING = "shop-name-missing";
