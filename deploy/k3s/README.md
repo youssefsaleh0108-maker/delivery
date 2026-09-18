@@ -97,6 +97,21 @@ invent is the onboarding client secret, which must match what the realm import c
   `platform-secrets`, as onboarding-service gets them; the Vault seed carries them too from the next
   vault pod start. order-manager's image must be built against platform-storage 0.1.3, published to
   GitHub Packages.
+- **Applicant documents reach storage the same way.** `/merchant-kyc` is routed on the API hostname
+  like `/order-attachments` — prefix kept, presigned requests only, MinIO refusing unsigned ones —
+  behind `merchant-kyc-upload-limit`, a 413 over 10 MiB (keep it in step with onboarding-service's
+  `delivery.storage.minio.max-upload-size-bytes`). Until it was, every rider's and merchant's id,
+  licence and registration upload met Traefik's own 404 and never reached MinIO. The bucket has
+  existed since the first bootstrap, so the next sync of each overlay is the whole deployment. To
+  confirm, an unsigned request must now get MinIO's XML `AccessDenied`, not `404 page not found`:
+
+  ```sh
+  curl -s -X PUT https://api-dev.youdrop.shop/merchant-kyc/probe   # and api-qa
+  ```
+
+  The storage routes, then: `product-images` and `apk` (public), `user-avatars`,
+  `order-attachments` and `merchant-kyc` (private, presigned). `delivery-proof` and `receipts` stay
+  unrouted because no service signs a URL into either yet; `scripts/verify.sh` checks both halves.
 - **The demo logins** come from the realm import: customer/rider/merchant/backoffice/carrier.
 - **order-manager's image** is the one Docker Hub pull (its own repo/pipeline); everything else
   pulls public GHCR packages.

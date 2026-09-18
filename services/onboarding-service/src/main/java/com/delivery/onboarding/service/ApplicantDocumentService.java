@@ -42,7 +42,7 @@ import com.delivery.platform.storage.StorageService;
  * row for bytes nobody ever uploaded, and a reviewer would open a broken link and have to guess
  * whether the applicant was at fault.
  *
- * <p><strong>Why the merchant-kyc bucket must stay unrouted, and why every read is a short-lived
+ * <p><strong>Why the merchant-kyc bucket stays private, and why every read is a short-lived
  * presigned URL.</strong> The objects in it are national ids, driving licences and vehicle papers —
  * scans of the exact documents used to open accounts and take out credit in somebody's name. The
  * product-images bucket is publicly readable because a plain CDN URL for a photograph of a burger
@@ -53,9 +53,17 @@ import com.delivery.platform.storage.StorageService;
  * an expiry rather than a permanent address: it is minted per reviewer, per document, per few
  * minutes, after {@code @PreAuthorize} and the ownership checks below have already run, and it is
  * useless to anybody who finds it afterwards. That property depends entirely on the bucket having
- * no anonymous read policy and no Gateway route — if either is ever added, every check in this file
- * becomes decorative. {@link FilePurpose#MERCHANT_KYC} is what binds these objects to that bucket,
- * which is why the purpose is chosen here and never passed in.
+ * no anonymous read policy, and on nothing in front of MinIO signing requests for whoever sends
+ * them — if either is ever added, every check in this file becomes decorative.
+ * {@link FilePurpose#MERCHANT_KYC} is what binds these objects to that bucket, which is why the
+ * purpose is chosen here and never passed in.
+ *
+ * <p><strong>The bucket's path is routed on the API hostname, and has to be.</strong> The URLs are
+ * signed for that host, and it is the applicant's phone and the reviewer's browser that send them.
+ * The route hands each request to MinIO untouched, so MinIO checks the signature itself and a
+ * request without one is refused exactly as before. This comment used to say the bucket must stay
+ * unrouted, which mistook the route for the lock: the signature always was the lock, and all the
+ * missing route did was turn every applicant's upload away at the edge with a 404.
  */
 @Service
 public class ApplicantDocumentService {
