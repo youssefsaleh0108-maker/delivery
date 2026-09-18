@@ -476,6 +476,52 @@ void main() {
     expect(find.text(_en.svcPendingBody('sam@example.test')), findsOneWidget);
     expect(find.text(_en.svcDocsSent), findsOneWidget);
   });
+
+  testWidgets("an address that already has an account is said in the app's words at the passcode",
+      (WidgetTester tester) async {
+    _phone(tester);
+    final _Server server = _Server(_Keycloak())
+      ..accountRefusal = (
+        status: 422,
+        body: <String, Object?>{
+          'code': 'account-exists',
+          'message': 'An account already uses this email address. Sign in with it, or apply with a '
+              'different email.',
+        },
+      );
+    final Dio dio = Dio(BaseOptions(baseUrl: 'https://api.test'))..httpClientAdapter = server;
+
+    await tester.pumpWidget(_app(ServiceProviderSignupScreen(
+      api: OnboardingApi(dio),
+      documentsApi: _Documents(),
+      authService: _PasswordGrant(server.keycloak),
+      pickDocument: _pickScan,
+      onFinished: (AuthSession _) {},
+      onClose: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    await fillPrintShop(tester);
+    await tester.enterText(_field(_en.authOwnerFullName), 'Sam Salem');
+    await tester.enterText(_field(_en.authContactEmail), 'Sam@Example.test');
+    await tester.enterText(_field(_en.password), '246810');
+    await tester.pump();
+    await tapApply(tester);
+    await tester.enterText(
+        find.descendant(of: find.byType(OneTimeCodeField), matching: find.byType(TextField)),
+        '123456');
+    await _pump(tester);
+    if (!server.calls.contains('POST /api/onboarding/verifications/confirm')) {
+      await tester.tap(find.widgetWithText(AuthPrimaryButton, _en.verify));
+      await _pump(tester);
+    }
+
+    expect(server.calls, contains('POST /api/onboarding/applications/ref-open/account'));
+    // Where a bare 500 used to read "That did not go through", the refusal is named — in the app's
+    // own words, not the server's English.
+    expect(find.text('${_en.couldNotCreateSignIn} ${_en.wizAccountExists}'), findsOneWidget);
+    expect(find.textContaining('An account already uses'), findsNothing);
+  });
 }
 
 /// Keycloak as the app sees it: a browser round trip and a refresh, each minting a token from the
@@ -577,6 +623,9 @@ class _Server implements HttpClientAdapter {
   /// Refuses the next signed-in application with this answer, once.
   ({int status, Map<String, Object?> body})? refusal;
 
+  /// Answers the open form's passcode with this instead of making the sign-in.
+  ({int status, Map<String, Object?> body})? accountRefusal;
+
   /// Grants MERCHANT without APPLICANT, as auto-approval does.
   bool automatic = false;
 
@@ -620,6 +669,8 @@ class _Server implements HttpClientAdapter {
       case 'POST /api/onboarding/applications':
         return _json(201, _receipt('SUBMITTED', 'ref-open'));
       case 'POST /api/onboarding/applications/ref-open/account':
+        final ({int status, Map<String, Object?> body})? refusedAccount = accountRefusal;
+        if (refusedAccount != null) return _json(refusedAccount.status, refusedAccount.body);
         return _json(201, <String, Object?>{});
     }
     return _json(404, <String, Object?>{'message': 'not expected in this test: $route'});

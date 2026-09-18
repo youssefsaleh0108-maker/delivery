@@ -21206,6 +21206,18 @@ abstract class DeliveryStrings {
   /// In en, this message translates to:
   /// **'Couldn\'t open this order\'s chat. Reloading the order.'**
   String get svcChatOrderNotFound;
+
+  /// No description provided for @wizAccountExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This email address already has an account. Sign in with that account, or apply with a different email.'**
+  String get wizAccountExists;
+
+  /// No description provided for @wizAccountSignInUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in can\'t be set up right now. Please try again in a minute.'**
+  String get wizAccountSignInUnavailable;
 }
 
 class _DeliveryStringsDelegate extends LocalizationsDelegate<DeliveryStrings> {

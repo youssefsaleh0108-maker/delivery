@@ -10,7 +10,20 @@ import 'package:dio/dio.dart';
 
 /// The server's own words where it has any — they are written to be acted on — and otherwise the
 /// generic "that did not go through", for a failure that never reached a sentence.
+///
+/// Two refusals are said in the reader's language even here, because they come from the step that
+/// shows the server's words — choosing the passcode, where a failure reads "We could not set up your
+/// sign-in" and then this (the partner wizard's `_messageFrom`, and the services signup): an address
+/// that already has an account (`account-exists`), and the platform failing to make one just now
+/// (`sign-in-unavailable`), which a retry in a minute finishes. Until the server named them both were
+/// a bare 500, and a rider read "That did not go through" with nothing to act on.
 String applicationServerMessage(DeliveryStrings t, Object error) {
+  switch (_codeOf(error)) {
+    case 'account-exists':
+      return t.wizAccountExists;
+    case 'sign-in-unavailable':
+      return t.wizAccountSignInUnavailable;
+  }
   if (error is DioException) {
     final Object? body = error.response?.data;
     if (body is Map && body['message'] is String) return body['message'] as String;

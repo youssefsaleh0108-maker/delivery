@@ -12646,4 +12646,12 @@ class DeliveryStringsAr extends DeliveryStrings {
 
   @override
   String get svcChatOrderNotFound => 'تعذّر فتح محادثة هذا الطلب. نعيد تحميله.';
+
+  @override
+  String get wizAccountExists =>
+      'لهذا البريد الإلكتروني حساب بالفعل. سجّل الدخول بذلك الحساب، أو قدّم طلبك ببريد إلكتروني آخر.';
+
+  @override
+  String get wizAccountSignInUnavailable =>
+      'تعذّر إعداد تسجيل الدخول الآن. يُرجى المحاولة مجدداً بعد دقيقة.';
 }

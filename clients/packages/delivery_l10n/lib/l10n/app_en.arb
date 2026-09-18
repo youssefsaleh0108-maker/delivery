@@ -6090,5 +6090,7 @@
   "@svcChatClosedOn": {"placeholders":{"date":{"type":"String"}}},
   "svcChatClosed": "Chat about this order has closed",
   "svcChatUnavailable": "Chat is unavailable right now.",
-  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order."
+  "svcChatOrderNotFound": "Couldn't open this order's chat. Reloading the order.",
+  "wizAccountExists": "This email address already has an account. Sign in with that account, or apply with a different email.",
+  "wizAccountSignInUnavailable": "Sign-in can't be set up right now. Please try again in a minute."
 }

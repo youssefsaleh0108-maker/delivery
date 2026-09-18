@@ -12500,4 +12500,12 @@ class DeliveryStringsEn extends DeliveryStrings {
   @override
   String get svcChatOrderNotFound =>
       'Couldn\'t open this order\'s chat. Reloading the order.';
+
+  @override
+  String get wizAccountExists =>
+      'This email address already has an account. Sign in with that account, or apply with a different email.';
+
+  @override
+  String get wizAccountSignInUnavailable =>
+      'Sign-in can\'t be set up right now. Please try again in a minute.';
 }
