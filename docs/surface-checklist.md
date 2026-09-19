@@ -1653,7 +1653,7 @@ that does not exist, and a screen listed here with no tick is one nobody has dri
 
 - file: `D:/workspace/delivery/clients/apps/mobile_app/lib/src/delivery_area_map_screen.dart` (the rules: shop_delivery_area.dart)
 - reached by: StorePageScreen (either layout) or a service provider's page -> t.dareaButton = "Delivery area".
-- covered by: test/delivery_area_test.dart — the ring to the metre, names only for placed areas, retired areas judged but never shown, the inside / outside / silent lines, the words-only screen, 320dp in English and Arabic.
+- covered by: test/delivery_area_test.dart — the ring to the metre, names only for placed areas, retired areas judged but never shown, the inside / outside / silent lines, the words-only screen, the tiles-unreachable fallback, 320dp in English and Arabic.
 - states: Map over the words · Words only, when nothing can be placed (unplaced areas around a shop with no pin) · Tiles unreachable: t.dareaMapUnavailable where the map was, the words still below · No inside/outside line when the address has neither a pin (for the circle) nor an area (for the areas) — or when the page that opened it had no address book (Reorder, an order's shop card).
 
   - [ ] Back, Semantics t.back = "Back" — maybePop.  `YdScreenHeader (title t.dareaButton, the shop's name under it)`

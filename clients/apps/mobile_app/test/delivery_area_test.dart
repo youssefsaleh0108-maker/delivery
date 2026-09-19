@@ -588,6 +588,44 @@ void main() {
       (const Locale('en'), en),
       (const Locale('ar'), ar),
     ]) {
+      testWidgets(
+          'with the tile server unreachable, says so where the map was, and the words stay '
+          '(${locale.languageCode})', (WidgetTester tester) async {
+        await pumpMap(tester, store(zones: <dynamic>[hamra]),
+            chosen: at(latitude: north(1000), longitude: shopLng),
+            locale: locale,
+            size: const Size(320, 640));
+        expect(find.text(t.dareaMapUnavailable), findsNothing);
+
+        // Tiles failing with none ever loaded, as the tile layer reports them: after four, the
+        // basemap calls the tile server unreachable and stands the screen's fallback in its place.
+        final TileLayer tiles = tester.widget<TileLayer>(find.byType(TileLayer));
+        for (int i = 0; i < 4; i++) {
+          tiles.errorTileCallback!(_FailedTile(), Exception('unreachable'), null);
+        }
+        // The switch waits for the end of a frame, then rebuilds on the next. The tile layer's own
+        // redraw of a failed tile is the frame that ends; here nothing else asks for one.
+        tester.binding.scheduleFrame();
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text(t.dareaMapUnavailable), findsOneWidget);
+        expect(find.byIcon(Icons.map_outlined), findsOneWidget);
+        expect(find.byType(FlutterMap), findsNothing);
+        expect(find.text(OsmBasemap.attribution), findsNothing,
+            reason: 'No tiles are shown, so there is nothing to credit.');
+        // The words under it still say where the shop delivers, and where the address stands.
+        expect(find.text(t.dareaCircleRule('3.0')), findsOneWidget);
+        expect(find.text(t.dareaInside), findsOneWidget);
+        expect(find.text('Hamra'), findsOneWidget, reason: 'In the list; no map to name it on.');
+        expect(tester.takeException(), isNull);
+        if (locale.languageCode == 'ar') {
+          expect(Directionality.of(tester.element(find.text(ar.dareaMapUnavailable))),
+              TextDirection.rtl);
+        }
+        await tester.pumpAndSettle();
+      });
+
       testWidgets('fits a 320dp phone with many areas (${locale.languageCode})',
           (WidgetTester tester) async {
         final List<Map<String, dynamic>> many = <Map<String, dynamic>>[
@@ -676,3 +714,7 @@ void main() {
     expect(find.text(en.dareaButton), findsOneWidget);
   });
 }
+
+/// A tile the tile server did not deliver, as the tile layer hands one to its error callback. The
+/// basemap reads nothing of it but that it failed.
+class _FailedTile extends Fake implements TileImage {}
