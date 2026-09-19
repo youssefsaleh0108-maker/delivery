@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -26,6 +27,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import com.delivery.platform.security.CurrentUser;
 import com.delivery.tracking.service.EtaService;
 import com.delivery.tracking.service.EtaService.EtaResult;
+import com.delivery.tracking.service.Fix;
 import com.delivery.tracking.service.TrackingService;
 import com.delivery.tracking.service.TrackingService.Position;
 import com.delivery.tracking.service.TrackingService.TrackingClosedException;
@@ -52,13 +54,15 @@ public class TrackingController {
      * <p>Called every few seconds per active rider — the highest-frequency write in the platform.
      * Returns 202 rather than a body: the client has nothing to do with the response, and keeping
      * it empty keeps the payload off the mobile data plan.
+     *
+     * <p>Refusals are mapped in {@link PingProblems}: 422 with a {@code reason} for a fix that is
+     * not believable, 401/403 for a caller who is not a signed-in rider.
      */
     @PostMapping("/orders/{orderId}/ping")
     @PreAuthorize("hasRole('DELIVERY')")
     public ResponseEntity<Void> ping(@PathVariable UUID orderId,
                                      @Valid @RequestBody PingRequest request) {
-        Position recorded = tracking.ping(orderId, CurrentUser.requireId(),
-                request.lat(), request.lng(), request.accuracyM());
+        Position recorded = tracking.ping(orderId, PingProblems.rider(), request.fix());
         // The live push. Fire-and-forget by design: the position is already durable, and a
         // subscriber that misses this frame gets it on its next history fetch. Authorisation
         // happened at SUBSCRIBE (WebSocketConfiguration), so everyone on the topic may see it.
@@ -132,10 +136,21 @@ public class TrackingController {
         return TrackingProblems.of(HttpStatus.CONFLICT, "Delivery complete", e.getMessage());
     }
 
+    /**
+     * @param accuracyM  the handset's radius of uncertainty in metres; optional, as it always was,
+     *                   but never negative
+     * @param recordedAt when the phone took the fix, by its own clock (ISO-8601). Optional and
+     *                   additive: app builds that predate it are stamped on arrival, as before
+     */
     public record PingRequest(
             @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
             @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng,
-            Float accuracyM) {
+            @PositiveOrZero Float accuracyM,
+            Instant recordedAt) {
+
+        Fix fix() {
+            return new Fix(lat, lng, accuracyM, recordedAt);
+        }
     }
 
     public record PositionResponse(

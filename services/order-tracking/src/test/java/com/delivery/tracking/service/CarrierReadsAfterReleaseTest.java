@@ -115,7 +115,7 @@ class CarrierReadsAfterReleaseTest {
         presence = new PresenceService(presenceRows, mock(RiderDutyEventRepository.class), sessions,
                 memberships, carrierScope, participants, redis,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
-                WINDOW, Duration.ofSeconds(30), guard);
+                WINDOW, Duration.ofSeconds(30), guard, FixPolicy.defaults());
         dutySessions = new DutySessionService(sessions, presenceRows, carrierScope, presence,
                 "UTC", WINDOW, Duration.ofHours(4), guard);
 

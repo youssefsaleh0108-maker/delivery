@@ -79,6 +79,8 @@ public class PresenceService {
     private final Duration persistInterval;
     /** Confirms with Order Manager that a rider the local linkage nominates is on the fleet NOW. */
     private final FleetMembershipGuard fleetGuard;
+    /** Whether a reported position is believable enough to record — see {@link #recordFix}. */
+    private final FixPolicy fixPolicy;
 
     public PresenceService(RiderPresenceRepository presence,
                            RiderDutyEventRepository dutyEvents,
@@ -90,7 +92,8 @@ public class PresenceService {
                            ObjectMapper objectMapper,
                            @Value("${delivery.tracking.presence.ttl:120s}") Duration presenceWindow,
                            @Value("${delivery.tracking.presence.persist-interval:30s}") Duration persistInterval,
-                           FleetMembershipGuard fleetGuard) {
+                           FleetMembershipGuard fleetGuard,
+                           FixPolicy fixPolicy) {
         this.presence = presence;
         this.dutyEvents = dutyEvents;
         this.dutySessions = dutySessions;
@@ -102,6 +105,7 @@ public class PresenceService {
         this.presenceWindow = presenceWindow;
         this.persistInterval = persistInterval;
         this.fleetGuard = fleetGuard;
+        this.fixPolicy = fixPolicy;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -176,33 +180,87 @@ public class PresenceService {
     /**
      * Records a fix for a rider, whether or not they are carrying anything.
      *
-     * <p>Called from the off-order ping endpoint and from {@link TrackingService#ping} — an order
-     * ping is evidence of life too, and a rider mid-delivery who did not count as present would
-     * drop off the roster the moment they picked something up.
+     * <p>Called from {@link TrackingService#ping} — an order ping is evidence of life too, and a
+     * rider mid-delivery who did not count as present would drop off the roster the moment they
+     * picked something up — and, behind the duty check, from {@link #recordOffOrderFix}. Whoever
+     * calls it has already decided the rider may report at all.
      *
      * <p>Never changes duty state. A location is evidence that a phone is alive, not consent to be
      * given work.
+     *
+     * <p>The fix is judged by {@link FixPolicy} against the last one accepted for this rider before
+     * anything is written, so a refused fix leaves no trace in either store — and in particular
+     * does not become the anchor the next fix is compared with.
+     *
+     * @return the instant the fix is recorded at: the phone's fix time, never later than now
+     * @throws FixPolicy.FixRejectedException when the fix is not believable
      */
     @Transactional
+    public Instant recordFix(String riderId, Fix fix) {
+        return record(riderId, fix, readCache(riderId));
+    }
+
+    /** A fix with no fix time, as reports were before the field existed. */
+    @Transactional
     public void recordFix(String riderId, double lat, double lng, Float accuracyM) {
+        recordFix(riderId, Fix.untimed(lat, lng, accuracyM));
+    }
+
+    /**
+     * The off-order ping: a rider reporting where they are while no order names them.
+     *
+     * <p>Only a rider who is working may do this — declared on duty, or holding a live order. The
+     * rule used to be "anyone with the rider role", which let a rider who had gone home keep
+     * feeding a position into the fleet's roster, and let an app that never checked duty report a
+     * location nobody had asked for. Declared duty rather than effective: a rider who is on duty
+     * and has gone STALE is exactly the one whose next fix must be let in.
+     *
+     * <p>The order-scoped ping does not come through here; it has its own and narrower rule, that
+     * the caller is the rider assigned to that order ({@link TrackingService#ping}).
+     *
+     * @throws OffDutyException when the rider is neither on duty nor carrying anything
+     */
+    @Transactional
+    public Instant recordOffOrderFix(String riderId, Fix fix) {
+        PresenceSnapshot cached = readCache(riderId);
+        boolean onDuty = cached != null
+                ? cached.dutyState() == DutyState.ON_DUTY
+                : presence.findById(riderId)
+                        .map(row -> row.getDutyState() == DutyState.ON_DUTY)
+                        .orElse(false);
+        if (!onDuty && !participants.riderHasLiveOrder(riderId)) {
+            throw new OffDutyException();
+        }
+        return record(riderId, fix, cached);
+    }
+
+    private Instant record(String riderId, Fix fix, PresenceSnapshot cached) {
         Instant now = Instant.now();
 
-        PresenceSnapshot cached = readCache(riderId);
         if (cached == null) {
             // Cold: either this rider is new, or Redis has forgotten them (eviction, restart, or
             // Redis being down entirely). Settle it against the record and write through.
             RiderPresence row = presence.findById(riderId)
                     .orElseGet(() -> RiderPresence.firstSeen(riderId, now));
-            row.sighted(lat, lng, accuracyM, now);
+            Instant at = fixPolicy.admit(fix, FixPolicy.Previous.of(row.getLastLat(),
+                    row.getLastLng(), row.getLastAccuracyM(), row.getLastSeenAt()), now);
+            row.sighted(fix.lat(), fix.lng(), fix.accuracyM(), at);
             presence.save(row);
             cache(PresenceSnapshot.of(row));
-            return;
+            return at;
         }
 
-        // Warm: a cached snapshot exists, so the durable row does too. Move it only if the throttle
-        // is due — see RiderPresenceRepository#touchIfDue for what this trades away and why.
-        presence.touchIfDue(riderId, lat, lng, accuracyM, now, now.minus(persistInterval));
-        cache(cached.withFix(lat, lng, accuracyM, now));
+        // Warm: judged against the cached snapshot, which carries the exact last fix — the durable
+        // row lags it by up to the persist interval, so comparing with the row would measure a
+        // jump from somewhere the rider was half a minute ago.
+        Instant at = fixPolicy.admit(fix, FixPolicy.Previous.of(cached.lat(), cached.lng(),
+                cached.accuracyM(), cached.lastSeenAt()), now);
+        // A cached snapshot exists, so the durable row does too. Move it only if the throttle is
+        // due — see RiderPresenceRepository#touchIfDue for what this trades away and why.
+        presence.touchIfDue(riderId, fix.lat(), fix.lng(), fix.accuracyM(), at,
+                at.minus(persistInterval));
+        cache(cached.withFix(fix.lat(), fix.lng(), fix.accuracyM(), at));
+        return at;
     }
 
     /**
@@ -462,6 +520,19 @@ public class PresenceService {
             // came from the request path must not be reflected back where something might render
             // it. The correlation id is how a support engineer finds the request.
             super("No presence information for that rider");
+        }
+    }
+
+    /**
+     * Thrown when a rider reports a position while neither on duty nor carrying an order.
+     *
+     * <p>A 409 at the edge rather than a 404 or a 403: the rider is who they say they are and may
+     * use the endpoint — just not in their current state, and going on duty changes the answer.
+     */
+    public static class OffDutyException extends RuntimeException {
+        public OffDutyException() {
+            super("You are off duty with no delivery in hand, so your location is not recorded. "
+                    + "Go on duty to share it.");
         }
     }
 

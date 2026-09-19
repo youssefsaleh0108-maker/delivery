@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -23,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -72,6 +72,12 @@ class TrackingServiceTest {
         when(events.save(any(TrackingEvent.class))).thenAnswer(call -> call.getArgument(0));
         when(events.findLatestForOrder(any(UUID.class), any(Pageable.class))).thenReturn(List.of());
         when(events.findByOrderIdOrderByRecordedAtAsc(any(UUID.class))).thenReturn(List.of());
+        // Presence is where a fix is judged and given its time; standing in for it, every fix is
+        // believed and recorded at the phone's time, or on arrival when it carries none.
+        when(presence.recordFix(anyString(), any(Fix.class))).thenAnswer(call -> {
+            Fix fix = call.getArgument(1);
+            return fix.takenAt() != null ? fix.takenAt() : Instant.now();
+        });
         orderAssignedTo(RIDER);
     }
 
@@ -175,7 +181,7 @@ class TrackingServiceTest {
         void also_counts_as_evidence_that_the_rider_is_still_present() {
             tracking.ping(ORDER, RIDER, 33.89, 35.50, 5.0f);
 
-            verify(presence).recordFix(RIDER, 33.89, 35.50, 5.0f);
+            verify(presence).recordFix(RIDER, Fix.untimed(33.89, 35.50, 5.0f));
         }
 
         /**
@@ -247,7 +253,43 @@ class TrackingServiceTest {
             assertThatThrownBy(() -> tracking.ping(ORDER, "other-rider", 33.89, 35.50, null))
                     .isInstanceOf(TrackingService.TrackingNotFoundException.class);
 
-            verify(presence, never()).recordFix(anyString(), anyDouble(), anyDouble(), any());
+            verify(presence, never()).recordFix(anyString(), any(Fix.class));
+        }
+
+        /**
+         * A fix the policy does not believe must reach nothing a customer can see: not the trail a
+         * dispute is settled from, not the hot cache the map reads. Presence judges it first for
+         * exactly this reason, so the refusal lands before either write.
+         */
+        @Test
+        void that_is_not_believable_writes_nothing() {
+            when(presence.recordFix(anyString(), any(Fix.class)))
+                    .thenThrow(new FixPolicy.FixRejectedException(FixPolicy.Reason.IMPLAUSIBLE_JUMP));
+
+            assertThatThrownBy(() -> tracking.ping(ORDER, RIDER,
+                    new Fix(51.5074, -0.1278, 8.0f, Instant.now())))
+                    .isInstanceOf(FixPolicy.FixRejectedException.class);
+
+            verify(events, never()).save(any(TrackingEvent.class));
+            verify(values, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        /**
+         * The trail is about where the rider was when. A fix that sat in a mobile network's queue
+         * for twenty seconds is recorded at the moment the phone took it, not when it landed —
+         * otherwise the ETA would measure from a position it believes is fresher than it is.
+         */
+        @Test
+        void is_recorded_at_the_moment_the_phone_took_it() {
+            Instant takenAt = Instant.now().minusSeconds(20);
+            ArgumentCaptor<TrackingEvent> saved = ArgumentCaptor.forClass(TrackingEvent.class);
+
+            TrackingService.Position position =
+                    tracking.ping(ORDER, RIDER, new Fix(33.89, 35.50, 6.0f, takenAt));
+
+            verify(events).save(saved.capture());
+            assertThat(saved.getValue().getRecordedAt()).isEqualTo(takenAt);
+            assertThat(position.recordedAt()).isEqualTo(takenAt);
         }
     }
 

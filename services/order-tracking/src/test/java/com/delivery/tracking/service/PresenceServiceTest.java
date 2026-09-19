@@ -109,7 +109,7 @@ class PresenceServiceTest {
 
         presence = new PresenceService(presenceRepo, dutyEvents, dutySessions, memberships,
                 carrierScope, participants, redis, new ObjectMapper().registerModule(new JavaTimeModule()),
-                PRESENCE_WINDOW, Duration.ofSeconds(30), fleetGuard);
+                PRESENCE_WINDOW, Duration.ofSeconds(30), fleetGuard, FixPolicy.defaults());
     }
 
     /** A rider row in the given state whose last fix arrived {@code fixAge} ago. */
@@ -374,6 +374,144 @@ class PresenceServiceTest {
             assertThat(presence.ownPresence(RIDER))
                     .hasValueSatisfying(view ->
                             assertThat(view.state()).isEqualTo(PresenceState.STALE));
+        }
+
+        /**
+         * A refused fix must leave no trace: not the durable row, not the cache — and so it cannot
+         * become the anchor the next fix is measured from, which is what lets a run of refusals age
+         * out instead of locking the rider out.
+         */
+        @Test
+        void a_fix_that_is_not_believed_writes_nothing() {
+            rider(DutyState.ON_DUTY, Duration.ofSeconds(10));
+
+            assertThatThrownBy(() -> presence.recordFix(RIDER,
+                    new Fix(51.5074, -0.1278, 8.0f, Instant.now())))
+                    .isInstanceOf(FixPolicy.FixRejectedException.class)
+                    .satisfies(e -> assertThat(((FixPolicy.FixRejectedException) e).reason())
+                            .isEqualTo(FixPolicy.Reason.IMPLAUSIBLE_JUMP));
+
+            verify(presenceRepo, never()).save(any(RiderPresence.class));
+            verify(values, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        @Test
+        void a_fix_too_imprecise_to_place_the_rider_writes_nothing() {
+            assertThatThrownBy(() -> presence.recordFix(RIDER,
+                    new Fix(33.89, 35.50, 2_000f, Instant.now())))
+                    .isInstanceOf(FixPolicy.FixRejectedException.class);
+
+            verify(presenceRepo, never()).save(any(RiderPresence.class));
+        }
+
+        /**
+         * With a warm cache the fix is judged against the cached snapshot, which is exact, and not
+         * against the durable row, which lags it by up to the persist interval. Here the row still
+         * holds a point from far away; judged against it, an honest fix next to the cached one
+         * would be refused as a jump.
+         */
+        @Test
+        void is_judged_against_the_exact_cached_fix_not_the_lagging_row() throws Exception {
+            RiderPresence lagging = RiderPresence.firstSeen(RIDER, Instant.now().minusSeconds(60));
+            lagging.sighted(34.4367, 35.8497, 5.0f, Instant.now().minusSeconds(20));
+            when(presenceRepo.findById(RIDER)).thenReturn(Optional.of(lagging));
+            cache(new PresenceService.PresenceSnapshot(RIDER, CARRIER, DutyState.ON_DUTY,
+                    Instant.now().minus(Duration.ofMinutes(10)), Instant.now().minusSeconds(5),
+                    33.89, 35.50, 5.0f));
+
+            Instant at = presence.recordFix(RIDER, new Fix(33.8905, 35.5003, 6.0f, Instant.now()));
+
+            assertThat(at).isNotNull();
+            verify(presenceRepo).touchIfDue(eq(RIDER), anyDouble(), anyDouble(), anyFloat(),
+                    any(Instant.class), any(Instant.class));
+        }
+
+        /** Last seen is when the phone took the fix — the roster's STALE verdict is about that. */
+        @Test
+        void records_the_phones_fix_time_as_last_seen() {
+            Instant takenAt = Instant.now().minusSeconds(12);
+            ArgumentCaptor<RiderPresence> saved = ArgumentCaptor.forClass(RiderPresence.class);
+
+            Instant at = presence.recordFix(RIDER, new Fix(33.89, 35.50, 5.0f, takenAt));
+
+            verify(presenceRepo).save(saved.capture());
+            assertThat(at).isEqualTo(takenAt);
+            assertThat(saved.getValue().getLastSeenAt()).isEqualTo(takenAt);
+        }
+
+        // ------------------------------------------------------------- off-order reports
+
+        /** The roster's reason for this route: a rider between jobs is who dispatch looks for. */
+        @Test
+        void a_rider_on_duty_may_report_with_no_order() {
+            rider(DutyState.ON_DUTY, null);
+
+            presence.recordOffOrderFix(RIDER, Fix.untimed(33.89, 35.50, 5.0f));
+
+            verify(presenceRepo).save(any(RiderPresence.class));
+        }
+
+        /** Declared duty, not effective: a STALE rider's next fix is the one that must get in. */
+        @Test
+        void a_rider_on_duty_whose_signal_went_stale_may_report() {
+            rider(DutyState.ON_DUTY, Duration.ofMinutes(30));
+
+            presence.recordOffOrderFix(RIDER, Fix.untimed(33.89, 35.50, 5.0f));
+
+            verify(presenceRepo).save(any(RiderPresence.class));
+        }
+
+        @Test
+        void an_off_duty_rider_still_carrying_an_order_may_report() {
+            rider(DutyState.OFF_DUTY, null);
+            when(participants.riderHasLiveOrder(RIDER)).thenReturn(true);
+
+            presence.recordOffOrderFix(RIDER, Fix.untimed(33.89, 35.50, 5.0f));
+
+            verify(presenceRepo).save(any(RiderPresence.class));
+        }
+
+        /**
+         * A rider who went home is not feeding the fleet's roster a position — and the refusal
+         * lands before anything is written, cache included.
+         */
+        @Test
+        void an_off_duty_rider_with_nothing_in_hand_may_not_report() {
+            rider(DutyState.OFF_DUTY, Duration.ofMinutes(1));
+            when(participants.riderHasLiveOrder(RIDER)).thenReturn(false);
+
+            assertThatThrownBy(() -> presence.recordOffOrderFix(RIDER,
+                    Fix.untimed(33.89, 35.50, 5.0f)))
+                    .isInstanceOf(PresenceService.OffDutyException.class);
+
+            verify(presenceRepo, never()).save(any(RiderPresence.class));
+            verify(values, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        /** Somebody we have never heard from has declared nothing, and carries nothing. */
+        @Test
+        void a_rider_never_seen_before_may_not_report() {
+            assertThatThrownBy(() -> presence.recordOffOrderFix(RIDER,
+                    Fix.untimed(33.89, 35.50, 5.0f)))
+                    .isInstanceOf(PresenceService.OffDutyException.class);
+
+            verify(presenceRepo, never()).save(any(RiderPresence.class));
+        }
+
+        /** The cached snapshot answers the duty question when it is there, like every read. */
+        @Test
+        void duty_is_read_from_the_cached_snapshot_when_there_is_one() throws Exception {
+            warmCacheFor(DutyState.OFF_DUTY);
+
+            assertThatThrownBy(() -> presence.recordOffOrderFix(RIDER,
+                    Fix.untimed(33.89, 35.50, 5.0f)))
+                    .isInstanceOf(PresenceService.OffDutyException.class);
+
+            warmCacheFor(DutyState.ON_DUTY);
+            presence.recordOffOrderFix(RIDER, Fix.untimed(33.89, 35.50, 5.0f));
+
+            verify(presenceRepo).touchIfDue(eq(RIDER), anyDouble(), anyDouble(), anyFloat(),
+                    any(Instant.class), any(Instant.class));
         }
 
         private void warmCacheFor(DutyState state) throws Exception {

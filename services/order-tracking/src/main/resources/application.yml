@@ -150,6 +150,26 @@ delivery:
     # single dropped ping does not push every watcher through to Postgres.
     location-cache-ttl: 60s
 
+    ping:
+      # What a rider's reported position must be before it is recorded (FixPolicy). A refused
+      # report answers 422 with a `reason` and leaves no trace in either store.
+      #
+      # Wider than this and the fix cannot place a rider on a street — it is an "approximate
+      # location" permission or a cell tower. The rider app refuses the same fixes before sending.
+      max-accuracy-m: 100
+      # A fix older than this says where the rider was, not where they are. Well past a slow
+      # mobile round trip; well short of the presence window below.
+      max-fix-age: 60s
+      # How far ahead of ours a phone's clock may be before its fixes are refused as future-dated.
+      # Inside it, a fix is recorded as arriving now, so nothing stored is ever in the future.
+      max-clock-skew: 30s
+      # Faster than this between two fixes and the second is a glitch or a spoof. A scooter or a
+      # car on the coast road stays well under it; a multipath jump of kilometres does not.
+      max-speed-kmh: 150
+      # How long the last accepted fix anchors that speed check. Past it, the next fix starts
+      # fresh — so one bad anchor refuses a rider for at most this long.
+      jump-window: 5m
+
     presence:
       # How long after the last fix a rider still counts as present. Past this they read as STALE,
       # not ON_DUTY: a phone that died cannot tell us it died, so silence has to be what changes the

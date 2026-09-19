@@ -66,9 +66,16 @@ public class TrackingService {
      * normal case rather than the rare one - the app is backgrounded, the queued pings drain - and
      * accepting them would follow the rider away from the customer's door on the customer's own
      * map.
+     *
+     * <p>Last, the fix itself must be believable — precise enough, from now, and somewhere the
+     * rider could have got to ({@link FixPolicy}). That is judged after both checks above, so a
+     * refusal's reason is only ever given to the rider already known to be on the order, and before
+     * anything is written, so a refused fix never reaches the trail, the cache or the live topic.
+     *
+     * @throws FixPolicy.FixRejectedException when the fix is not believable
      */
     @Transactional
-    public Position ping(UUID orderId, String riderId, double lat, double lng, Float accuracyM) {
+    public Position ping(UUID orderId, String riderId, Fix fix) {
         OrderParticipants order = participants.findById(orderId)
                 .orElseThrow(() -> new TrackingNotFoundException(orderId));
 
@@ -83,17 +90,26 @@ public class TrackingService {
             throw new TrackingClosedException();
         }
 
-        events.save(new TrackingEvent(orderId, riderId, lat, lng, accuracyM));
-
         // A ping on an order is evidence that this rider's phone is alive, so it counts as presence
         // too. Without this a rider would drop off the on-duty roster the moment they picked
         // something up — the roster would show only the riders with nothing to do, which is exactly
-        // backwards for a dispatcher watching a fleet.
-        presence.recordFix(riderId, lat, lng, accuracyM);
+        // backwards for a dispatcher watching a fleet. It is also where the fix is judged, against
+        // the last one accepted for this rider on any order, so it goes first: a refusal here
+        // throws before the trail below is written.
+        Instant at = presence.recordFix(riderId, fix);
 
-        Position position = new Position(orderId, riderId, lat, lng, accuracyM, Instant.now());
+        events.save(new TrackingEvent(orderId, riderId, fix.lat(), fix.lng(), fix.accuracyM(), at));
+
+        Position position = new Position(orderId, riderId, fix.lat(), fix.lng(), fix.accuracyM(),
+                at);
         cache(position);
         return position;
+    }
+
+    /** A ping with no fix time, as every app build before the field sent one. */
+    @Transactional
+    public Position ping(UUID orderId, String riderId, double lat, double lng, Float accuracyM) {
+        return ping(orderId, riderId, Fix.untimed(lat, lng, accuracyM));
     }
 
     /**
